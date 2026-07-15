@@ -1,0 +1,227 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { Loader2, Send, Sparkles } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { ChatMarkdown } from "@/components/chat/chat-markdown";
+import { DocumentInfoButton } from "@/components/documents/document-link";
+
+type ChatSource = {
+  id: number;
+  title: string | null;
+  category: string | null;
+  shortSummary: string | null;
+};
+
+type Message = {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  sources?: ChatSource[];
+};
+
+const SUGGESTIONS = [
+  "Welche Garantien laufen in den nächsten 6 Monaten ab?",
+  "Welche Versicherungen habe ich und wann sind die Fristen?",
+  "Zeige mir grössere Ausgaben aus diesem Jahr.",
+  "Welche Reiseunterlagen sind gespeichert?",
+];
+
+export function ChatClient() {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, loading]);
+
+  async function send(text: string) {
+    const question = text.trim();
+    if (!question || loading) return;
+
+    setError(null);
+    setInput("");
+    const userMsg: Message = {
+      id: `u-${Date.now()}`,
+      role: "user",
+      content: question,
+    };
+    setMessages((prev) => [...prev, userMsg]);
+    setLoading(true);
+
+    try {
+      const history = [...messages, userMsg].map((m) => ({
+        role: m.role,
+        content: m.content,
+      }));
+
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: question,
+          history: history.slice(0, -1),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || "Chat fehlgeschlagen");
+      }
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `a-${Date.now()}`,
+          role: "assistant",
+          content: data.answer,
+          sources: data.sources,
+        },
+      ]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="flex h-[calc(100vh-8rem)] flex-col gap-4">
+      <div>
+        <h1 className="text-3xl font-semibold tracking-tight">Chat</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Stelle Fragen zu deinen synchronisierten und analysierten Dokumenten
+        </p>
+      </div>
+
+      <Card className="flex min-h-0 flex-1 flex-col border-border/80 shadow-sm">
+        <CardContent className="flex min-h-0 flex-1 flex-col gap-4 p-4">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
+            {messages.length === 0 ? (
+              <div className="flex h-full flex-col items-center justify-center gap-4 py-12 text-center">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 text-blue-600">
+                  <Sparkles className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="font-medium">Frage deine Dokumentenbasis</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Antworten basieren auf lokalen OCR-Texten und AI-Zusammenfassungen.
+                  </p>
+                </div>
+                <div className="flex max-w-2xl flex-wrap justify-center gap-2">
+                  {SUGGESTIONS.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => void send(s)}
+                      className="rounded-full border border-border bg-background px-3 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              messages.map((message) => (
+                <div
+                  key={message.id}
+                  className={
+                    message.role === "user" ? "flex justify-end" : "flex justify-start"
+                  }
+                >
+                  <div
+                    className={
+                      message.role === "user"
+                        ? "max-w-[85%] rounded-2xl bg-primary px-4 py-3 text-sm text-primary-foreground"
+                        : "max-w-[min(100%,42rem)] rounded-2xl border border-border bg-muted/40 px-4 py-3 text-sm"
+                    }
+                  >
+                    {message.role === "assistant" ? (
+                      <ChatMarkdown content={message.content} />
+                    ) : (
+                      <div className="whitespace-pre-wrap">{message.content}</div>
+                    )}
+                    {message.sources && message.sources.length > 0 ? (
+                      <div className="mt-3 space-y-2 border-t border-border/60 pt-3">
+                        <div className="text-xs font-medium text-muted-foreground">
+                          Quellen
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {message.sources.map((source) => (
+                            <div
+                              key={source.id}
+                              className="flex max-w-full items-center gap-1.5"
+                            >
+                              <Link href={`/documents/${source.id}`}>
+                                <Badge
+                                  variant="secondary"
+                                  className="cursor-pointer hover:bg-accent"
+                                >
+                                  {source.title || `Dokument #${source.id}`}
+                                  {source.category
+                                    ? ` · ${source.category}`
+                                    : ""}
+                                </Badge>
+                              </Link>
+                              <DocumentInfoButton
+                                documentId={source.id}
+                                size="icon-sm"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              ))
+            )}
+            {loading ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Suche in Dokumenten und formuliere Antwort…
+              </div>
+            ) : null}
+            <div ref={bottomRef} />
+          </div>
+
+          {error ? (
+            <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+              {error}
+            </div>
+          ) : null}
+
+          <form
+            className="flex items-end gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void send(input);
+            }}
+          >
+            <Textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="z. B. Wann endet die Garantie der Waschmaschine?"
+              className="min-h-[48px] max-h-40 flex-1 resize-none"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  void send(input);
+                }
+              }}
+            />
+            <Button type="submit" disabled={loading || !input.trim()} size="icon">
+              <Send className="h-4 w-4" />
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

@@ -1,0 +1,439 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  DataList,
+  DataListRow,
+  DataListMain,
+  MetaLine,
+} from "@/components/layout/data-list";
+import { useAnalysis } from "@/components/analysis/analysis-provider";
+import { FilterGrid, PageHeader } from "@/components/layout/page-primitives";
+import { toSwissDate } from "@/lib/utils/dates";
+import {
+  DocumentInfoButton,
+  DocumentTitleLink,
+} from "@/components/documents/document-link";
+
+type DocRow = {
+  id: number;
+  title: string | null;
+  created_date: string | null;
+  correspondent_name: string | null;
+  document_type_name: string | null;
+  category?: string | null;
+  analysis_status?: string | null;
+  sync_status: string | null;
+};
+
+type Filters = {
+  correspondents: string[];
+  documentTypes: string[];
+  categories: string[];
+};
+
+function statusBadge(status?: string | null) {
+  const value = status || "pending";
+  const variant =
+    value === "completed"
+      ? "default"
+      : value === "error"
+        ? "destructive"
+        : "secondary";
+  const label =
+    value === "completed"
+      ? "Analysiert"
+      : value === "stale"
+        ? "Veraltet"
+        : value === "error"
+          ? "Fehler"
+          : "Ausstehend";
+  return <Badge variant={variant}>{label}</Badge>;
+}
+
+function toItemsRecord(
+  entries: Array<{ value: string; label: string }>
+): Record<string, string> {
+  return Object.fromEntries(entries.map((e) => [e.value, e.label]));
+}
+
+export function DocumentsClient() {
+  const router = useRouter();
+  const { pendingCount, isRunning, refreshStats } = useAnalysis();
+
+  const [docs, setDocs] = useState<DocRow[]>([]);
+  const [total, setTotal] = useState(0);
+  const [filters, setFilters] = useState<Filters>({
+    correspondents: [],
+    documentTypes: [],
+    categories: [],
+  });
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
+  const [category, setCategory] = useState("all");
+  const [correspondent, setCorrespondent] = useState("all");
+  const [documentType, setDocumentType] = useState("all");
+  const [analysisStatus, setAnalysisStatus] = useState("all");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [analyzingId, setAnalyzingId] = useState<number | null>(null);
+  const requestIdRef = useRef(0);
+
+  const hasActiveFilters =
+    Boolean(search.trim()) ||
+    category !== "all" ||
+    correspondent !== "all" ||
+    documentType !== "all" ||
+    analysisStatus !== "all";
+
+  const load = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
+    setLoading(true);
+    setError(null);
+
+    const params = new URLSearchParams();
+    const q = search.trim();
+    if (q) params.set("search", q);
+    if (category !== "all") params.set("category", category);
+    if (correspondent !== "all") params.set("correspondent", correspondent);
+    if (documentType !== "all") params.set("documentType", documentType);
+    if (analysisStatus !== "all") params.set("analysisStatus", analysisStatus);
+    params.set("limit", "250");
+
+    try {
+      const res = await fetch(`/api/documents?${params.toString()}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Laden fehlgeschlagen");
+      if (requestId !== requestIdRef.current) return;
+      setDocs(data.documents || []);
+      setTotal(Number(data.total) || 0);
+      setFilters({
+        correspondents: data.filters?.correspondents || [],
+        documentTypes: data.filters?.documentTypes || [],
+        categories: data.filters?.categories || [],
+      });
+      await refreshStats();
+    } catch (err) {
+      if (requestId !== requestIdRef.current) return;
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      if (requestId === requestIdRef.current) setLoading(false);
+    }
+  }, [
+    search,
+    category,
+    correspondent,
+    documentType,
+    analysisStatus,
+    refreshStats,
+  ]);
+
+  // Debounce free-text search input → committed search term
+  useEffect(() => {
+    const handle = window.setTimeout(() => {
+      setSearch(searchInput.trim());
+    }, 350);
+    return () => window.clearTimeout(handle);
+  }, [searchInput]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  useEffect(() => {
+    if (!isRunning) return;
+    const id = window.setInterval(() => {
+      void load();
+    }, 8000);
+    return () => window.clearInterval(id);
+  }, [isRunning, load]);
+
+  async function analyzeOne(id: number) {
+    setAnalyzingId(id);
+    setError(null);
+    try {
+      const res = await fetch("/api/analyze/document", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ documentId: id }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || "Analyse fehlgeschlagen");
+      }
+      await load();
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setAnalyzingId(null);
+    }
+  }
+
+  function resetFilters() {
+    setSearchInput("");
+    setSearch("");
+    setCategory("all");
+    setCorrespondent("all");
+    setDocumentType("all");
+    setAnalysisStatus("all");
+  }
+
+  const categoryItems = useMemo(
+    () =>
+      toItemsRecord([
+        { value: "all", label: "Alle Kategorien" },
+        ...filters.categories.map((c) => ({ value: c, label: c })),
+      ]),
+    [filters.categories]
+  );
+
+  const correspondentItems = useMemo(
+    () =>
+      toItemsRecord([
+        { value: "all", label: "Alle Korrespondenten" },
+        ...filters.correspondents.map((c) => ({ value: c, label: c })),
+      ]),
+    [filters.correspondents]
+  );
+
+  const documentTypeItems = useMemo(
+    () =>
+      toItemsRecord([
+        { value: "all", label: "Alle Typen" },
+        ...filters.documentTypes.map((t) => ({ value: t, label: t })),
+      ]),
+    [filters.documentTypes]
+  );
+
+  const statusItems = useMemo(
+    () =>
+      toItemsRecord([
+        { value: "all", label: "Alle Status" },
+        { value: "pending", label: "Ausstehend" },
+        { value: "completed", label: "Analysiert" },
+        { value: "stale", label: "Veraltet" },
+        { value: "error", label: "Fehler" },
+      ]),
+    []
+  );
+
+  return (
+    <div className="min-w-0 space-y-6">
+      <PageHeader
+        title="Dokumente"
+        description={
+          hasActiveFilters
+            ? `${total} Treffer · ${pendingCount} Analysen ausstehend`
+            : `${total} Dokumente im lokalen Cache · ${pendingCount} ausstehend`
+        }
+      />
+
+      <Card className="min-w-0 overflow-hidden border-border/80 shadow-sm">
+        <CardContent className="space-y-3 py-4">
+          <FilterGrid>
+            <div className="min-w-0 xl:col-span-2">
+              <Input
+                className="w-full"
+                placeholder="Suche Titel / Inhalt / Korrespondent…"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    setSearch(searchInput.trim());
+                  }
+                }}
+              />
+            </div>
+
+            <Select
+              value={category}
+              onValueChange={(value) => {
+                if (value != null) setCategory(value);
+              }}
+              items={categoryItems}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(categoryItems).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={correspondent}
+              onValueChange={(value) => {
+                if (value != null) setCorrespondent(value);
+              }}
+              items={correspondentItems}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(correspondentItems).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={documentType}
+              onValueChange={(value) => {
+                if (value != null) setDocumentType(value);
+              }}
+              items={documentTypeItems}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(documentTypeItems).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <div className="grid min-w-0 grid-cols-[1fr_auto_auto] gap-2">
+              <Select
+                value={analysisStatus}
+                onValueChange={(value) => {
+                  if (value != null) setAnalysisStatus(value);
+                }}
+                items={statusItems}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(statusItems).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setSearch(searchInput.trim())}
+              >
+                Suchen
+              </Button>
+              {hasActiveFilters ? (
+                <Button type="button" variant="outline" onClick={resetFilters}>
+                  Reset
+                </Button>
+              ) : null}
+            </div>
+          </FilterGrid>
+
+          {hasActiveFilters ? (
+            <p className="text-xs text-muted-foreground">
+              Filter aktiv
+              {search ? ` · Suche: „${search}“` : ""}
+              {category !== "all" ? ` · Kategorie: ${category}` : ""}
+              {correspondent !== "all"
+                ? ` · Korrespondent: ${correspondent}`
+                : ""}
+              {documentType !== "all" ? ` · Typ: ${documentType}` : ""}
+              {analysisStatus !== "all" ? ` · Status: ${analysisStatus}` : ""}
+              {total > docs.length
+                ? ` · Anzeige der ersten ${docs.length} von ${total}`
+                : ""}
+            </p>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      {error ? (
+        <Card className="border-destructive/30">
+          <CardContent className="py-4 text-sm text-destructive">
+            {error}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      <Card className="min-w-0 overflow-hidden border-border/80 shadow-sm">
+        <CardContent className="p-0">
+          {loading ? (
+            <div className="p-8 text-sm text-muted-foreground">
+              Lade Dokumente…
+            </div>
+          ) : docs.length === 0 ? (
+            <div className="p-8 text-sm text-muted-foreground">
+              {hasActiveFilters
+                ? "Keine Treffer für diese Suche/Filter. Filter zurücksetzen oder anderen Begriff versuchen."
+                : "Keine Dokumente gefunden. Starte zuerst den Paperless-Sync."}
+            </div>
+          ) : (
+            <DataList>
+              {docs.map((doc) => (
+                <DataListRow key={doc.id}>
+                  <DataListMain
+                    title={
+                      <DocumentTitleLink
+                        documentId={doc.id}
+                        title={doc.title}
+                      />
+                    }
+                    meta={
+                      <MetaLine>
+                        <span className="tabular-nums">
+                          {toSwissDate(doc.created_date)}
+                        </span>
+                        {doc.correspondent_name ? (
+                          <span>{doc.correspondent_name}</span>
+                        ) : null}
+                        {doc.document_type_name ? (
+                          <span>{doc.document_type_name}</span>
+                        ) : null}
+                        {doc.category ? <span>{doc.category}</span> : null}
+                        {statusBadge(doc.analysis_status)}
+                      </MetaLine>
+                    }
+                    actions={
+                      <>
+                        <DocumentInfoButton documentId={doc.id} />
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={analyzingId === doc.id || isRunning}
+                          onClick={() => void analyzeOne(doc.id)}
+                        >
+                          {analyzingId === doc.id ? "…" : "Analysieren"}
+                        </Button>
+                      </>
+                    }
+                  />
+                </DataListRow>
+              ))}
+            </DataList>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
