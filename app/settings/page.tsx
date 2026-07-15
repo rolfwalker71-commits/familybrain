@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { KeyRound, Server } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,6 +15,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { PageHeader } from "@/components/layout/page-primitives";
+import { IconCircle, pageVisuals } from "@/components/layout/icon-circle";
 
 const OPENAI_MODELS = [
   "gpt-4o-mini",
@@ -118,16 +121,19 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-semibold tracking-tight">Einstellungen</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Paperless-Verbindung und OpenAI-Konfiguration
-        </p>
-      </div>
+      <PageHeader
+        title="Einstellungen"
+        description="Paperless-Verbindung und OpenAI-Konfiguration"
+        icon={pageVisuals.settings.icon}
+        tone={pageVisuals.settings.tone}
+      />
 
       <Card className="border-border/80 shadow-sm">
         <CardHeader>
-          <CardTitle className="text-base">Paperless-ngx</CardTitle>
+          <CardTitle className="flex items-center gap-3 text-base">
+            <IconCircle icon={Server} tone="blue" size="sm" />
+            Paperless-ngx
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
@@ -164,7 +170,10 @@ export default function SettingsPage() {
 
       <Card className="border-border/80 shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-base">OpenAI</CardTitle>
+          <CardTitle className="flex items-center gap-3 text-base">
+            <IconCircle icon={KeyRound} tone="violet" size="sm" />
+            OpenAI
+          </CardTitle>
           {hasOpenAIKey ? (
             <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">
               Konfiguriert

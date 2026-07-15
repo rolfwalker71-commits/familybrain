@@ -9,6 +9,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { ChatMarkdown } from "@/components/chat/chat-markdown";
 import { DocumentInfoButton } from "@/components/documents/document-link";
+import { PageHeader } from "@/components/layout/page-primitives";
+import { IconCircle, pageVisuals } from "@/components/layout/icon-circle";
 
 type ChatSource = {
   id: number;
@@ -93,21 +95,19 @@ export function ChatClient() {
 
   return (
     <div className="flex h-[calc(100vh-8rem)] flex-col gap-4">
-      <div>
-        <h1 className="text-3xl font-semibold tracking-tight">Chat</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Stelle Fragen zu deinen synchronisierten und analysierten Dokumenten
-        </p>
-      </div>
+      <PageHeader
+        title="Chat"
+        description="Stelle Fragen zu deinen synchronisierten und analysierten Dokumenten"
+        icon={pageVisuals.chat.icon}
+        tone={pageVisuals.chat.tone}
+      />
 
       <Card className="flex min-h-0 flex-1 flex-col border-border/80 shadow-sm">
         <CardContent className="flex min-h-0 flex-1 flex-col gap-4 p-4">
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
             {messages.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-center gap-4 py-12 text-center">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 text-blue-600">
-                  <Sparkles className="h-5 w-5" />
-                </div>
+                <IconCircle icon={Sparkles} tone="indigo" size="lg" />
                 <div>
                   <p className="font-medium">Frage deine Dokumentenbasis</p>
                   <p className="mt-1 text-sm text-muted-foreground">

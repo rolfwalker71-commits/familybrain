@@ -33,6 +33,7 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 !.env.local.example
+!.env.example
 
 # vercel
 .vercel
@@ -44,4 +45,6 @@ next-env.d.ts
 # local sqlite database
 /data/*.sqlite
 /data/*.sqlite-*
+/familybrain.sqlite
+/familybrain.sqlite-*
 !.gitkeep

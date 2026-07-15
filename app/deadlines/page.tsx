@@ -20,6 +20,7 @@ import {
 } from "@/components/layout/data-list";
 import { toSwissDate } from "@/lib/utils/dates";
 import { PageHeader } from "@/components/layout/page-primitives";
+import { pageVisuals } from "@/components/layout/icon-circle";
 import { AddToCalendarButton } from "@/components/calendar/add-to-calendar-button";
 import {
   DocumentInfoButton,
@@ -97,6 +98,8 @@ export default function DeadlinesPage() {
       <PageHeader
         title="Fristenradar"
         description="Kündigungen, Garantieenden und Zahlungstermine"
+        icon={pageVisuals.deadlines.icon}
+        tone={pageVisuals.deadlines.tone}
         actions={
           <div className="flex flex-wrap items-center gap-2">
             {calendarEvents.length > 0 ? (

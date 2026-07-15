@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { Link2, RefreshCw, BrainCircuit } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +11,8 @@ import { Label } from "@/components/ui/label";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { useAnalysis } from "@/components/analysis/analysis-provider";
 import { readNdjsonStream } from "@/lib/utils/stream";
+import { PageHeader } from "@/components/layout/page-primitives";
+import { IconCircle, pageVisuals } from "@/components/layout/icon-circle";
 
 type SyncResult = {
   totalRemote: number;
@@ -221,16 +224,19 @@ export function SyncClient() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-semibold tracking-tight">Sync</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Paperless verbinden, Dokumente synchronisieren und AI-Analyse starten
-        </p>
-      </div>
+      <PageHeader
+        title="Sync"
+        description="Paperless verbinden, Dokumente synchronisieren und AI-Analyse starten"
+        icon={pageVisuals.sync.icon}
+        tone={pageVisuals.sync.tone}
+      />
 
       <Card className="border-border/80 shadow-sm">
         <CardHeader>
-          <CardTitle className="text-base">1. Paperless-Verbindung</CardTitle>
+          <CardTitle className="flex items-center gap-3 text-base">
+            <IconCircle icon={Link2} tone="blue" size="sm" />
+            1. Paperless-Verbindung
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
@@ -273,7 +279,10 @@ export function SyncClient() {
 
       <Card className="border-border/80 shadow-sm">
         <CardHeader>
-          <CardTitle className="text-base">2. Dokumente synchronisieren</CardTitle>
+          <CardTitle className="flex items-center gap-3 text-base">
+            <IconCircle icon={RefreshCw} tone="amber" size="sm" />
+            2. Dokumente synchronisieren
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
@@ -328,7 +337,10 @@ export function SyncClient() {
 
       <Card className="border-border/80 shadow-sm">
         <CardHeader>
-          <CardTitle className="text-base">3. AI-Analyse</CardTitle>
+          <CardTitle className="flex items-center gap-3 text-base">
+            <IconCircle icon={BrainCircuit} tone="violet" size="sm" />
+            3. AI-Analyse
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">

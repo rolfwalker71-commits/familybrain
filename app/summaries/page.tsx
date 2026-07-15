@@ -1,6 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { listSummaries } from "@/lib/db/queries";
 import { PageHeader } from "@/components/layout/page-primitives";
+import { pageVisuals } from "@/components/layout/icon-circle";
 import {
   SummariesGrid,
   type SummaryCardRow,
@@ -16,6 +17,8 @@ export default function SummariesPage() {
       <PageHeader
         title="Zusammenfassungen"
         description="Alle analysierten Dokumente im Überblick"
+        icon={pageVisuals.summaries.icon}
+        tone={pageVisuals.summaries.tone}
       />
 
       {rows.length === 0 ? (

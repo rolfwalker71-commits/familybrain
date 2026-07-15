@@ -45,9 +45,33 @@ npm run analyze:pending
 npm run analyze:pending -- 25
 ```
 
+## Docker (same machine as Paperless)
+
+Single-instance deploy with persistent SQLite:
+
+```bash
+cp .env.example .env
+# Optional: set OPENAI_API_KEY in .env (or later in UI)
+docker compose up -d --build
+```
+
+Open [http://localhost:3000](http://localhost:3000) (or `FAMILYBRAIN_PORT`).
+
+1. **Einstellungen**: Paperless base URL (your usual external URL is fine) + API token  
+2. Test connection → Sync  
+3. Start analysis  
+
+Data lives in `./data` on the host (`DATABASE_PATH=/app/data/familybrain.sqlite` in the container).
+
+```bash
+docker compose logs -f familybrain
+docker compose down
+```
+
 ## Notes
 
 - Paperless remains source of truth
 - No write-back to Paperless in this MVP
 - PDFs are not downloaded; OCR `content` from the API is used
 - SQLite file: `data/familybrain.sqlite` (gitignored)
+- One FamilyBrain instance is enough for a home Paperless host

@@ -1,6 +1,10 @@
 import { getDb } from "@/lib/db/client";
 import type { DocumentAnalysis } from "@/lib/ai/schemas";
 import { nowIso } from "@/lib/utils/dates";
+import {
+  parseItineraryFromOcr,
+  type ItineraryStop,
+} from "@/lib/extraction/itinerary";
 
 function warrantyStatus(warrantyUntil: string | null): string {
   if (!warrantyUntil) return "unknown";
@@ -12,6 +16,90 @@ function warrantyStatus(warrantyUntil: string | null): string {
   return "active";
 }
 
+function enrichTravelWithItinerary(
+  analysis: DocumentAnalysis,
+  ocrContent: string | null
+): DocumentAnalysis {
+  const ocrStops = parseItineraryFromOcr(ocrContent);
+  const travelItems = [...(analysis.travel_items || [])];
+
+  if (travelItems.length === 0 && ocrStops.length > 0) {
+    travelItems.push({
+      travel_type: "Kreuzfahrt",
+      provider: null,
+      title: null,
+      start_date: ocrStops[0]?.date ?? null,
+      end_date: ocrStops[ocrStops.length - 1]?.date ?? null,
+      origin: ocrStops[0]?.location ?? null,
+      destination: ocrStops[ocrStops.length - 1]?.location ?? null,
+      booking_reference: null,
+      price: null,
+      currency: null,
+      itinerary: ocrStops,
+    });
+  } else {
+    for (let i = 0; i < travelItems.length; i++) {
+      const existing = (travelItems[i].itinerary || []).map((s) => ({
+        date: s.date ?? null,
+        day_label: s.day_label ?? null,
+        location: s.location,
+        arrive: s.arrive ?? null,
+        depart: s.depart ?? null,
+        note: s.note ?? null,
+      }));
+      if (existing.length === 0 && ocrStops.length > 0) {
+        travelItems[i] = { ...travelItems[i], itinerary: ocrStops };
+      } else if (existing.length > 0) {
+        travelItems[i] = { ...travelItems[i], itinerary: existing };
+      }
+    }
+  }
+
+  const importantDates = [...(analysis.important_dates || [])];
+  const existingKeys = new Set(
+    importantDates.map(
+      (d) => `${d.date || ""}|${(d.label || "").toLowerCase()}`
+    )
+  );
+
+  const stopsForDates: ItineraryStop[] = [];
+  for (const t of travelItems) {
+    for (const s of t.itinerary || []) {
+      stopsForDates.push({
+        date: s.date ?? null,
+        day_label: s.day_label ?? null,
+        location: s.location,
+        arrive: s.arrive ?? null,
+        depart: s.depart ?? null,
+        note: s.note ?? null,
+      });
+    }
+  }
+  if (stopsForDates.length === 0) stopsForDates.push(...ocrStops);
+
+  for (const stop of stopsForDates) {
+    if (!stop.date) continue;
+    const label = `Anlaufhafen: ${stop.location}`;
+    const key = `${stop.date}|${label.toLowerCase()}`;
+    if (existingKeys.has(key)) continue;
+    existingKeys.add(key);
+    const times = [stop.arrive && `Ankunft ${stop.arrive}`, stop.depart && `Abfahrt ${stop.depart}`]
+      .filter(Boolean)
+      .join(" · ");
+    importantDates.push({
+      date: stop.date,
+      label,
+      description: times || stop.note || stop.day_label || null,
+    });
+  }
+
+  return {
+    ...analysis,
+    travel_items: travelItems,
+    important_dates: importantDates,
+  };
+}
+
 export function saveAnalysis(
   documentId: number,
   analysis: DocumentAnalysis,
@@ -19,6 +107,10 @@ export function saveAnalysis(
 ): void {
   const db = getDb();
   const ts = nowIso();
+  const doc = db
+    .prepare(`SELECT content FROM paperless_documents WHERE id = ?`)
+    .get(documentId) as { content: string | null } | undefined;
+  const enriched = enrichTravelWithItinerary(analysis, doc?.content ?? null);
 
   const tx = db.transaction(() => {
     db.prepare(
@@ -47,18 +139,18 @@ export function saveAnalysis(
         updated_at = excluded.updated_at`
     ).run(
       documentId,
-      analysis.short_summary,
-      analysis.detailed_summary,
-      JSON.stringify(analysis.important_points),
-      JSON.stringify(analysis.important_dates),
-      JSON.stringify(analysis.amounts),
-      JSON.stringify(analysis.deadlines),
-      JSON.stringify(analysis.contract_parties),
-      JSON.stringify(analysis.warranty_info),
-      JSON.stringify(analysis.cancellation_terms),
-      analysis.category,
-      JSON.stringify(analysis.possible_todos),
-      analysis.confidence,
+      enriched.short_summary,
+      enriched.detailed_summary,
+      JSON.stringify(enriched.important_points),
+      JSON.stringify(enriched.important_dates),
+      JSON.stringify(enriched.amounts),
+      JSON.stringify(enriched.deadlines),
+      JSON.stringify(enriched.contract_parties),
+      JSON.stringify(enriched.warranty_info),
+      JSON.stringify(enriched.cancellation_terms),
+      enriched.category,
+      JSON.stringify(enriched.possible_todos),
+      enriched.confidence,
       modelName,
       ts,
       ts,
@@ -115,7 +207,7 @@ export function saveAnalysis(
       return 1;
     }
 
-    const wi = analysis.warranty_info;
+    const wi = enriched.warranty_info;
     if (wi?.has_warranty && (wi.product_name || wi.vendor || wi.warranty_until)) {
       db.prepare(
         `INSERT INTO devices_and_warranties (
@@ -134,7 +226,7 @@ export function saveAnalysis(
         wi.warranty_months ?? null,
         wi.warranty_until,
         warrantyStatus(wi.warranty_until),
-        analysis.confidence,
+        enriched.confidence,
         ts,
         ts
       );
@@ -146,7 +238,7 @@ export function saveAnalysis(
         status, confidence, created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, 'open', ?, ?, ?)`
     );
-    for (const d of analysis.deadlines) {
+    for (const d of enriched.deadlines) {
       insertDeadline.run(
         documentId,
         d.title,
@@ -154,26 +246,26 @@ export function saveAnalysis(
         d.date,
         d.type,
         d.description,
-        analysis.confidence,
+        enriched.confidence,
         ts,
         ts
       );
     }
 
     if (
-      analysis.cancellation_terms?.has_cancellation_terms &&
-      analysis.cancellation_terms.latest_cancellation_date
+      enriched.cancellation_terms?.has_cancellation_terms &&
+      enriched.cancellation_terms.latest_cancellation_date
     ) {
       insertDeadline.run(
         documentId,
         "Kündigungsfrist",
-        analysis.cancellation_terms.notice_period
-          ? `Kündigungsfrist: ${analysis.cancellation_terms.notice_period}`
+        enriched.cancellation_terms.notice_period
+          ? `Kündigungsfrist: ${enriched.cancellation_terms.notice_period}`
           : "Kündigung prüfen",
-        analysis.cancellation_terms.latest_cancellation_date,
+        enriched.cancellation_terms.latest_cancellation_date,
         "cancellation",
-        analysis.cancellation_terms.notice_period,
-        analysis.confidence,
+        enriched.cancellation_terms.notice_period,
+        enriched.confidence,
         ts,
         ts
       );
@@ -185,7 +277,7 @@ export function saveAnalysis(
         description, is_recurring, counts_in_stats, confidence, created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     );
-    for (const f of analysis.financial_items) {
+    for (const f of enriched.financial_items) {
       insertFinance.run(
         documentId,
         f.vendor,
@@ -204,15 +296,15 @@ export function saveAnalysis(
           category: f.category,
           description: f.description,
         }),
-        analysis.confidence,
+        enriched.confidence,
         ts,
         ts
       );
     }
 
     // Also promote amounts into financial_items when no structured items returned
-    if (analysis.financial_items.length === 0) {
-      for (const a of analysis.amounts) {
+    if (enriched.financial_items.length === 0) {
+      for (const a of enriched.amounts) {
         if (a.amount == null) continue;
         insertFinance.run(
           documentId,
@@ -229,7 +321,7 @@ export function saveAnalysis(
             category: a.label,
             description: a.label,
           }),
-          analysis.confidence,
+          enriched.confidence,
           ts,
           ts
         );
@@ -242,7 +334,7 @@ export function saveAnalysis(
         booking_reference, price, currency, extracted_data, confidence, created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     );
-    for (const t of analysis.travel_items) {
+    for (const t of enriched.travel_items) {
       insertTravel.run(
         documentId,
         t.travel_type,
@@ -256,7 +348,7 @@ export function saveAnalysis(
         t.price,
         t.currency,
         JSON.stringify(t),
-        analysis.confidence,
+        enriched.confidence,
         ts,
         ts
       );

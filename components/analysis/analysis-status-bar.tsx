@@ -5,6 +5,7 @@ import { BrainCircuit, Loader2 } from "lucide-react";
 import { useAnalysis } from "@/components/analysis/analysis-provider";
 import { Button } from "@/components/ui/button";
 import { ProgressBar } from "@/components/ui/progress-bar";
+import { IconCircle } from "@/components/layout/icon-circle";
 
 export function AnalysisStatusBar() {
   const {
@@ -43,13 +44,11 @@ export function AnalysisStatusBar() {
       <div className="mx-auto flex max-w-7xl flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 items-start gap-3">
-            <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600">
-              {isRunning ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <BrainCircuit className="h-4 w-4" />
-              )}
-            </div>
+            {isRunning ? (
+              <IconCircle icon={Loader2} tone="blue" size="sm" className="mt-0.5 [&_svg]:animate-spin" />
+            ) : (
+              <IconCircle icon={BrainCircuit} tone="violet" size="sm" className="mt-0.5" />
+            )}
             <div className="min-w-0">
               <div className="text-sm font-medium text-foreground">
                 {isRunning

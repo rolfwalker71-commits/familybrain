@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { IconCircle } from "@/components/layout/icon-circle";
 
 export function DocumentPdfPreview({
   paperlessId,
@@ -28,7 +29,10 @@ export function DocumentPdfPreview({
     <>
       <Card className="border-border/80 shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-base">PDF-Vorschau</CardTitle>
+          <CardTitle className="flex items-center gap-3 text-base">
+            <IconCircle icon={FileText} tone="blue" size="sm" />
+            PDF-Vorschau
+          </CardTitle>
           <Button
             size="sm"
             variant="outline"

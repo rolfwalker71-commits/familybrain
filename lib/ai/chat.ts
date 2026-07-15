@@ -19,6 +19,9 @@ Die Wissensbasis umfasst ALLE synchronisierten Dokumente und Extrakte – über 
 Regeln:
 - Antworte auf Deutsch, klar und konkret.
 - Nutze die gesamte bereitgestellte Basis (Korpus-Statistik, strukturierte Fakten UND Dokumentkontexte).
+- OCR-Auszüge und Abschnitte «Reiseverlauf / Ports of Call» können Tabellen und Tageshäfen enthalten – lies diese sorgfältig aus und zitiere sie.
+- Wenn die Frage ein konkretes Schiff, Produkt oder eine Buchungsnummer nennt, beantworte NUR mit Daten zu genau diesem Objekt. Erwähne andere Reisen/Schiffe nur, wenn sie explizit gemeint sind – nicht als Ersatzantwort.
+- Strukturelle Fakten können unvollständig oder zu einem anderen Objekt gehören. Bei Widerspruch haben die Dokumentkontexte (OCR / Reiseverlauf) Vorrang.
 - Beschränke dich NICHT künstlich auf eine Kategorie, wenn die Daten aus mehreren Bereichen relevant sind.
 - Beträge, Daten, Produktnamen und Fristen nur nennen, wenn sie in den Daten stehen.
 - Wenn etwas fehlt, sage ehrlich, dass es in der aktuellen Basis nicht gefunden wurde.
@@ -93,7 +96,8 @@ ${factBlocks}
 RELEVANTE DOKUMENTE AUS DER GESAMTEN BASIS:
 ${contextBlocks}
 
-Beantworte die Frage jetzt anhand der gesamten lokalen Wissensbasis.`,
+Beantworte die Frage jetzt anhand der gesamten lokalen Wissensbasis.
+Wenn die Frage ein bestimmtes Schiff/Produkt nennt: nimm die dazu passenden Dokumente und den Reiseverlauf dort – ignoriere andere Kreuzfahrten als Antwort.`,
       },
     ],
   });

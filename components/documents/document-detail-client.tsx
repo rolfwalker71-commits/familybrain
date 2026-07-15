@@ -7,8 +7,26 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toSwissDate } from "@/lib/utils/dates";
 import { formatCHF } from "@/lib/utils/format";
-import { ExternalLink } from "lucide-react";
+import {
+  ExternalLink,
+  FileText,
+  Info,
+  ListChecks,
+  CalendarDays,
+  Users,
+  Shield,
+  Banknote,
+  ScrollText,
+  FileSearch,
+  Plane,
+} from "lucide-react";
 import { DocumentPdfPreview } from "@/components/documents/document-pdf-preview";
+import {
+  IconCircle,
+  knowledgeVisual,
+} from "@/components/layout/icon-circle";
+import { ItineraryCard } from "@/components/travel/itinerary-list";
+import { resolveItinerary } from "@/lib/extraction/itinerary";
 
 type DetailProps = {
   detail: {
@@ -92,6 +110,55 @@ export function DocumentDetailClient({ detail }: DetailProps) {
   const warrantyInfo = parseJsonObject(summary?.warranty_info);
   const cancellation = parseJsonObject(summary?.cancellation_terms);
 
+  const itinerary = resolveItinerary({
+    travelItems: detail.travelItems,
+    ocrContent: document.content,
+  });
+
+  const travelRows = detail.travelItems as Array<{
+    travel_type?: string | null;
+    provider?: string | null;
+    title?: string | null;
+    start_date?: string | null;
+    end_date?: string | null;
+    origin?: string | null;
+    destination?: string | null;
+    booking_reference?: string | null;
+    price?: number | null;
+    currency?: string | null;
+  }>;
+
+  const dateKeys = new Set(
+    importantDates.map(
+      (d) => `${d.date || ""}|${(d.label || "").toLowerCase()}`
+    )
+  );
+  const mergedDates = [...importantDates];
+  for (const stop of itinerary) {
+    if (!stop.date) continue;
+    const label = `Anlaufhafen: ${stop.location}`;
+    const key = `${stop.date}|${label.toLowerCase()}`;
+    if (dateKeys.has(key)) continue;
+    dateKeys.add(key);
+    mergedDates.push({
+      date: stop.date,
+      label,
+      description:
+        [stop.arrive && `Ankunft ${stop.arrive}`, stop.depart && `Abfahrt ${stop.depart}`]
+          .filter(Boolean)
+          .join(" · ") ||
+        stop.note ||
+        undefined,
+    });
+  }
+  mergedDates.sort((a, b) =>
+    String(a.date || "").localeCompare(String(b.date || ""))
+  );
+
+  const categoryName =
+    typeof summary?.category === "string" ? summary.category : null;
+  const categoryVisual = knowledgeVisual(categoryName || "Sonstiges");
+
   async function analyze() {
     setAnalyzing(true);
     setError(null);
@@ -114,7 +181,7 @@ export function DocumentDetailClient({ detail }: DetailProps) {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
+        <div className="min-w-0">
           <button
             type="button"
             onClick={() => router.back()}
@@ -122,13 +189,23 @@ export function DocumentDetailClient({ detail }: DetailProps) {
           >
             ← Zurück
           </button>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {document.title || `Dokument #${document.id}`}
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Paperless-ID {document.paperless_id} · {document.correspondent_name || "–"} ·{" "}
-            {toSwissDate(document.created_date)}
-          </p>
+          <div className="flex items-start gap-3">
+            <IconCircle
+              icon={categoryVisual.icon}
+              tone={categoryVisual.tone}
+              size="lg"
+            />
+            <div className="min-w-0">
+              <h1 className="break-words text-2xl font-semibold tracking-tight">
+                {document.title || `Dokument #${document.id}`}
+              </h1>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Paperless-ID {document.paperless_id} ·{" "}
+                {document.correspondent_name || "–"} ·{" "}
+                {toSwissDate(document.created_date)}
+              </p>
+            </div>
+          </div>
         </div>
         <div className="flex gap-2">
           {document.paperless_url ? (
@@ -173,7 +250,10 @@ export function DocumentDetailClient({ detail }: DetailProps) {
           <div className="grid gap-4 sm:grid-cols-2">
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Metadaten</CardTitle>
+                <CardTitle className="flex items-center gap-3 text-base">
+                  <IconCircle icon={Info} tone="slate" size="sm" />
+                  Metadaten
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
                 <div>Typ: {document.document_type_name || "–"}</div>
@@ -184,7 +264,10 @@ export function DocumentDetailClient({ detail }: DetailProps) {
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Kurzfassung</CardTitle>
+                <CardTitle className="flex items-center gap-3 text-base">
+                  <IconCircle icon={FileSearch} tone="indigo" size="sm" />
+                  Kurzfassung
+                </CardTitle>
               </CardHeader>
               <CardContent className="text-sm text-muted-foreground">
                 {String(summary?.short_summary || "Noch nicht analysiert.")}
@@ -202,7 +285,10 @@ export function DocumentDetailClient({ detail }: DetailProps) {
       {summary?.detailed_summary ? (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Detaillierte Zusammenfassung</CardTitle>
+            <CardTitle className="flex items-center gap-3 text-base">
+              <IconCircle icon={ScrollText} tone="blue" size="sm" />
+              Detaillierte Zusammenfassung
+            </CardTitle>
           </CardHeader>
           <CardContent className="whitespace-pre-wrap text-sm text-muted-foreground">
             {String(summary.detailed_summary)}
@@ -213,7 +299,10 @@ export function DocumentDetailClient({ detail }: DetailProps) {
       {importantPoints.length > 0 ? (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Wichtige Punkte</CardTitle>
+            <CardTitle className="flex items-center gap-3 text-base">
+              <IconCircle icon={ListChecks} tone="green" size="sm" />
+              Wichtige Punkte
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <ul className="list-disc space-y-1 pl-5 text-sm">
@@ -225,10 +314,55 @@ export function DocumentDetailClient({ detail }: DetailProps) {
         </Card>
       ) : null}
 
+      {travelRows.length > 0 || itinerary.length > 0 ? (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {travelRows.length > 0 ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-3 text-base">
+                  <IconCircle icon={Plane} tone="teal" size="sm" />
+                  Reise
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                {travelRows.map((t, i) => (
+                  <div key={i} className="space-y-1">
+                    <div className="font-medium">
+                      {t.title || t.travel_type || "Reise"}
+                    </div>
+                    <div className="text-muted-foreground">
+                      {[t.provider, t.booking_reference && `Ref. ${t.booking_reference}`]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </div>
+                    <div>
+                      {toSwissDate(t.start_date)} – {toSwissDate(t.end_date)}
+                    </div>
+                    <div>
+                      {(t.origin || "–")} → {(t.destination || "–")}
+                    </div>
+                    {t.price != null ? (
+                      <div>{formatCHF(t.price, t.currency || "CHF")}</div>
+                    ) : null}
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          ) : null}
+          <ItineraryCard
+            stops={itinerary}
+            calendarFilename={`familybrain-reiseverlauf-${document.id}`}
+          />
+        </div>
+      ) : null}
+
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Beträge</CardTitle>
+            <CardTitle className="flex items-center gap-3 text-base">
+              <IconCircle icon={Banknote} tone="green" size="sm" />
+              Beträge
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
             {amounts.length === 0
@@ -244,12 +378,15 @@ export function DocumentDetailClient({ detail }: DetailProps) {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Wichtige Daten</CardTitle>
+            <CardTitle className="flex items-center gap-3 text-base">
+              <IconCircle icon={CalendarDays} tone="amber" size="sm" />
+              Wichtige Daten
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
-            {importantDates.length === 0
+            {mergedDates.length === 0
               ? "Keine Daten erkannt."
-              : importantDates.map((d, i) => (
+              : mergedDates.map((d, i) => (
                   <div key={i}>
                     {toSwissDate(d.date)} – {d.label || "Datum"}
                     {d.description ? `: ${d.description}` : ""}
@@ -262,7 +399,10 @@ export function DocumentDetailClient({ detail }: DetailProps) {
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Fristen</CardTitle>
+            <CardTitle className="flex items-center gap-3 text-base">
+              <IconCircle icon={CalendarDays} tone="rose" size="sm" />
+              Fristen
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
             {detail.deadlines.length === 0
@@ -285,7 +425,10 @@ export function DocumentDetailClient({ detail }: DetailProps) {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Vertragsparteien</CardTitle>
+            <CardTitle className="flex items-center gap-3 text-base">
+              <IconCircle icon={Users} tone="slate" size="sm" />
+              Vertragsparteien
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
             {parties.length === 0
@@ -303,7 +446,10 @@ export function DocumentDetailClient({ detail }: DetailProps) {
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Garantieinfos</CardTitle>
+            <CardTitle className="flex items-center gap-3 text-base">
+              <IconCircle icon={Shield} tone="orange" size="sm" />
+              Garantieinfos
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-1 text-sm">
             {warrantyInfo?.has_warranty ? (
@@ -324,7 +470,10 @@ export function DocumentDetailClient({ detail }: DetailProps) {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Kündigung / To-dos</CardTitle>
+            <CardTitle className="flex items-center gap-3 text-base">
+              <IconCircle icon={ListChecks} tone="violet" size="sm" />
+              Kündigung / To-dos
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
             {cancellation?.has_cancellation_terms ? (
@@ -351,7 +500,10 @@ export function DocumentDetailClient({ detail }: DetailProps) {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-base">OCR-Text</CardTitle>
+          <CardTitle className="flex items-center gap-3 text-base">
+            <IconCircle icon={FileText} tone="slate" size="sm" />
+            OCR-Text
+          </CardTitle>
           <Button variant="ghost" size="sm" onClick={() => setShowOcr((v) => !v)}>
             {showOcr ? "Einklappen" : "Ausklappen"}
           </Button>

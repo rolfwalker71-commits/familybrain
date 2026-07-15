@@ -1,5 +1,6 @@
 import { getDb } from "@/lib/db/client";
 import { toSwissDate } from "@/lib/utils/dates";
+import { resolveItinerary } from "@/lib/extraction/itinerary";
 
 export type ChatSource = {
   id: number;
@@ -159,18 +160,255 @@ function tokenize(query: string): string[] {
     .slice(0, 12);
 }
 
+/** Multi-word phrases from the question (e.g. "legend of the seas"). */
+function extractPhrases(query: string): string[] {
+  const lower = query.toLowerCase().normalize("NFC");
+  const phrases: string[] = [];
+
+  // Royal Caribbean-style: "<Name> of the Seas"
+  for (const m of lower.matchAll(/\b([a-zäöü]+\s+of\s+the\s+seas)\b/gi)) {
+    phrases.push(m[1].replace(/\s+/g, " ").trim());
+  }
+
+  const tokens = tokenize(query);
+  for (let n = Math.min(4, tokens.length); n >= 2; n--) {
+    for (let i = 0; i <= tokens.length - n; i++) {
+      phrases.push(tokens.slice(i, i + n).join(" "));
+    }
+  }
+
+  return [...new Set(phrases)].slice(0, 10);
+}
+
+function phraseHits(haystackLower: string, phrases: string[]): number {
+  let hits = 0;
+  for (const p of phrases) {
+    if (p.length >= 8 && haystackLower.includes(p)) hits += 1;
+  }
+  return hits;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Match tokens as whole words/hyphen segments – avoids "port" hitting "important". */
+function countTokenMatches(haystackLower: string, token: string): number {
+  if (!token) return 0;
+  if (token.includes("-")) {
+    let from = 0;
+    let count = 0;
+    while (true) {
+      const idx = haystackLower.indexOf(token, from);
+      if (idx < 0) break;
+      count += 1;
+      from = idx + token.length;
+    }
+    return count;
+  }
+  const re = new RegExp(`(?:^|[^a-z0-9äöüàéèêâôûïß])${escapeRegExp(token)}(?=[^a-z0-9äöüàéèêâôûïß]|$)`, "gi");
+  const matches = haystackLower.match(re);
+  return matches?.length || 0;
+}
+
+function findTokenPositions(
+  haystackLower: string,
+  token: string,
+  maxHits: number
+): number[] {
+  const positions: number[] = [];
+  if (!token) return positions;
+
+  if (token.includes("-")) {
+    let from = 0;
+    while (positions.length < maxHits) {
+      const idx = haystackLower.indexOf(token, from);
+      if (idx < 0) break;
+      positions.push(idx);
+      from = idx + token.length;
+    }
+    return positions;
+  }
+
+  const re = new RegExp(
+    `(?:^|[^a-z0-9äöüàéèêâôûïß])(${escapeRegExp(token)})(?=[^a-z0-9äöüàéèêâôûïß]|$)`,
+    "gi"
+  );
+  let match: RegExpExecArray | null;
+  while (positions.length < maxHits && (match = re.exec(haystackLower))) {
+    const full = match[0];
+    const matched = match[1] || token;
+    const offset = full.length - matched.length;
+    positions.push(match.index + offset);
+  }
+  return positions;
+}
+
 function scoreText(haystack: string, tokens: string[]): { score: number; hits: number } {
   const text = haystack.toLowerCase();
   let score = 0;
   let hits = 0;
   for (const token of tokens) {
-    if (!text.includes(token)) continue;
+    const occurrences = countTokenMatches(text, token);
+    if (occurrences <= 0) continue;
     hits += 1;
-    // denser matches score higher
-    const occurrences = text.split(token).length - 1;
     score += 2 + Math.min(3, occurrences);
   }
   return { score, hits };
+}
+
+/** Expand query terms with close domain synonyms so EN/DE variants match. */
+function expandTokens(tokens: string[]): string[] {
+  const set = new Set(tokens);
+  const add = (...words: string[]) => {
+    for (const w of words) {
+      if (w.length >= 3) set.add(w);
+    }
+  };
+
+  for (const t of tokens) {
+    if (t.includes("kreuzfahrt") || t === "cruise") {
+      add(
+        "kreuzfahrt",
+        "cruise",
+        "kreuzfahrtverlauf",
+        "reiseverlauf",
+        "itinerary"
+      );
+    }
+    if (t === "ports" || t === "call" || t === "hafen" || t === "häfen" || t === "anlauf") {
+      add(
+        "ports",
+        "ports-of-call",
+        "hafen",
+        "häfen",
+        "anlaufhafen",
+        "anlaufhäfen",
+        "kreuzfahrtverlauf",
+        "reiseverlauf",
+        "itinerary"
+      );
+    }
+    if (t === "häfen" || t === "hafen" || t.startsWith("anlauf")) {
+      add("häfen", "hafen", "ports", "ports-of-call", "kreuzfahrtverlauf");
+    }
+    if (t === "verlauf" || t === "itinerary" || t.includes("reiseverlauf")) {
+      add(
+        "itinerary",
+        "verlauf",
+        "kreuzfahrtverlauf",
+        "reiseverlauf",
+        "ports-of-call"
+      );
+    }
+  }
+
+  return [...set].slice(0, 24);
+}
+
+/**
+ * Pull windows of OCR text around query matches so the model sees the relevant
+ * passage (e.g. Kreuzfahrtverlauf / PORTS-OF-CALL), not just the document head.
+ */
+function extractRelevantSnippets(
+  content: string | null | undefined,
+  tokens: string[],
+  maxChars = 3500
+): string {
+  if (!content?.trim()) return "";
+  const text = content;
+  const lower = text.toLowerCase();
+
+  if (tokens.length === 0) {
+    return text.slice(0, Math.min(2000, maxChars));
+  }
+
+  // Longer / rarer tokens are more discriminative than generic ones like "cruise"
+  const tokenWeight = (t: string) => Math.min(8, t.length);
+
+  type Hit = { pos: number; token: string; weight: number };
+  const hits: Hit[] = [];
+  for (const token of tokens) {
+    const maxPerToken = token.length >= 8 ? 6 : 4;
+    for (const idx of findTokenPositions(lower, token, maxPerToken)) {
+      hits.push({ pos: idx, token, weight: tokenWeight(token) });
+    }
+  }
+
+  // Prefer itinerary tables when the question is about ports/stops
+  const itineraryMarkers = [
+    "kreuzfahrtverlauf",
+    "ports-of-call",
+    "cruise itinerary",
+    "reiseverlauf",
+  ];
+  for (const marker of itineraryMarkers) {
+    let from = 0;
+    let found = 0;
+    while (found < 2) {
+      const idx = lower.indexOf(marker, from);
+      if (idx < 0) break;
+      hits.push({ pos: idx, token: marker, weight: 24 });
+      from = idx + marker.length;
+      found += 1;
+    }
+  }
+
+  if (hits.length === 0) {
+    const mid = Math.max(0, Math.floor(text.length / 4));
+    return text.slice(mid, mid + Math.min(2000, maxChars));
+  }
+
+  hits.sort((a, b) => a.pos - b.pos);
+  const windowRadius = 750;
+  type Range = {
+    start: number;
+    end: number;
+    weight: number;
+    tokens: Set<string>;
+  };
+  const ranges: Range[] = [];
+
+  for (const hit of hits) {
+    const start = Math.max(0, hit.pos - windowRadius);
+    const end = Math.min(text.length, hit.pos + windowRadius);
+    const last = ranges[ranges.length - 1];
+    if (last && start <= last.end + 120) {
+      last.end = Math.max(last.end, end);
+      last.weight += hit.weight;
+      last.tokens.add(hit.token);
+    } else {
+      ranges.push({
+        start,
+        end,
+        weight: hit.weight,
+        tokens: new Set([hit.token]),
+      });
+    }
+  }
+
+  // Prefer dense, multi-token windows (itinerary tables) over letterhead noise
+  ranges.sort((a, b) => {
+    const uniq = b.tokens.size - a.tokens.size;
+    if (uniq !== 0) return uniq;
+    return b.weight - a.weight;
+  });
+
+  const chunks: string[] = [];
+  let used = 0;
+  for (const range of ranges) {
+    if (used >= maxChars) break;
+    const slice = text.slice(range.start, range.end).trim();
+    if (!slice) continue;
+    const remaining = maxChars - used;
+    const piece =
+      slice.length > remaining ? `${slice.slice(0, remaining)}…` : slice;
+    const prefix = range.start > 0 ? "…" : "";
+    chunks.push(`${prefix}${piece}`);
+    used += piece.length;
+  }
+
+  return chunks.join("\n\n---\n\n");
 }
 
 type DocRow = {
@@ -201,29 +439,65 @@ function buildSearchBlob(row: DocRow): string {
     row.amounts,
     row.deadlines,
     row.warranty_info,
-    (row.content || "").slice(0, 8000),
+    row.content || "",
   ]
     .filter(Boolean)
     .join("\n")
     .toLowerCase();
 }
 
-function enrichExcerpt(row: DocRow): string {
+function enrichExcerpt(row: DocRow, tokens: string[] = []): string {
   const db = getDb();
   const parts: string[] = [];
+  const OCR_BUDGET = 3500;
+  const META_BUDGET = 3200;
 
   if (row.short_summary) parts.push(`Kurzfassung: ${row.short_summary}`);
   if (row.detailed_summary) {
-    parts.push(`Details: ${row.detailed_summary.slice(0, 1000)}`);
+    parts.push(`Details: ${row.detailed_summary.slice(0, 800)}`);
   }
   if (row.category) parts.push(`Kategorie: ${row.category}`);
-  if (row.important_points) {
-    parts.push(`Wichtige Punkte: ${row.important_points.slice(0, 600)}`);
+
+  const travel = db
+    .prepare(
+      `SELECT travel_type, title, provider, start_date, end_date, origin, destination, extracted_data
+       FROM travel_items WHERE document_id = ?`
+    )
+    .all(row.id) as Array<Record<string, unknown>>;
+  for (const t of travel) {
+    parts.push(
+      `Reise: ${t.travel_type || "?"} · ${t.title || "?"} · ${t.provider || "?"} · ${toSwissDate(String(t.start_date || ""))}–${toSwissDate(String(t.end_date || ""))} · ${t.origin || ""}→${t.destination || ""}`
+    );
   }
-  if (row.amounts) parts.push(`Beträge JSON: ${row.amounts.slice(0, 500)}`);
-  if (row.deadlines) parts.push(`Fristen JSON: ${row.deadlines.slice(0, 500)}`);
+
+  // Put ports early so they are not truncated by META_BUDGET
+  const itinerary = resolveItinerary({
+    travelItems: travel,
+    ocrContent: row.content,
+  });
+  if (itinerary.length > 0) {
+    parts.push(
+      "Reiseverlauf / Ports of Call:",
+      ...itinerary.map((s) => {
+        const when = s.date ? toSwissDate(s.date) : s.day_label || "?";
+        const times = [
+          s.arrive ? `Ankunft ${s.arrive}` : null,
+          s.depart ? `Abfahrt ${s.depart}` : null,
+        ]
+          .filter(Boolean)
+          .join(", ");
+        return `- ${when}: ${s.location}${times ? ` (${times})` : ""}${s.note ? ` · ${s.note}` : ""}`;
+      })
+    );
+  }
+
+  if (row.important_points) {
+    parts.push(`Wichtige Punkte: ${row.important_points.slice(0, 500)}`);
+  }
+  if (row.amounts) parts.push(`Beträge JSON: ${row.amounts.slice(0, 400)}`);
+  if (row.deadlines) parts.push(`Fristen JSON: ${row.deadlines.slice(0, 400)}`);
   if (row.warranty_info) {
-    parts.push(`Garantie JSON: ${row.warranty_info.slice(0, 500)}`);
+    parts.push(`Garantie JSON: ${row.warranty_info.slice(0, 400)}`);
   }
 
   const warranties = db
@@ -232,7 +506,7 @@ function enrichExcerpt(row: DocRow): string {
        FROM devices_and_warranties WHERE document_id = ?`
     )
     .all(row.id) as Array<Record<string, unknown>>;
-  for (const w of warranties) {
+  for (const w of warranties.slice(0, 5)) {
     parts.push(
       `Gerät/Garantie: ${w.product_name || "?"} · ${w.vendor || "?"} · bis ${toSwissDate(String(w.warranty_until || ""))} · ${w.price ?? "?"} ${w.currency || ""}`
     );
@@ -244,7 +518,7 @@ function enrichExcerpt(row: DocRow): string {
        FROM deadlines WHERE document_id = ?`
     )
     .all(row.id) as Array<Record<string, unknown>>;
-  for (const d of deadlines) {
+  for (const d of deadlines.slice(0, 5)) {
     parts.push(
       `Frist: ${d.title} · ${toSwissDate(String(d.deadline_date || ""))} · Typ ${d.deadline_type || "?"} · ${d.description || ""}`
     );
@@ -253,7 +527,7 @@ function enrichExcerpt(row: DocRow): string {
   const finances = db
     .prepare(
       `SELECT vendor, amount, currency, invoice_date, category, description
-       FROM financial_items WHERE document_id = ? LIMIT 10`
+       FROM financial_items WHERE document_id = ? LIMIT 6`
     )
     .all(row.id) as Array<Record<string, unknown>>;
   for (const f of finances) {
@@ -262,23 +536,15 @@ function enrichExcerpt(row: DocRow): string {
     );
   }
 
-  const travel = db
-    .prepare(
-      `SELECT travel_type, title, provider, start_date, end_date, origin, destination
-       FROM travel_items WHERE document_id = ?`
-    )
-    .all(row.id) as Array<Record<string, unknown>>;
-  for (const t of travel) {
-    parts.push(
-      `Reise: ${t.travel_type || "?"} · ${t.title || "?"} · ${t.provider || "?"} · ${toSwissDate(String(t.start_date || ""))}–${toSwissDate(String(t.end_date || ""))} · ${t.origin || ""}→${t.destination || ""}`
-    );
-  }
+  const meta = parts.join("\n").slice(0, META_BUDGET);
 
-  if (parts.length === 0 && row.content) {
-    parts.push(row.content.slice(0, 1500));
-  }
+  // Always reserve room for OCR passages – summaries often omit tables/itineraries.
+  const ocrSnippets = extractRelevantSnippets(row.content, tokens, OCR_BUDGET);
+  const ocrBlock = ocrSnippets
+    ? `OCR-Auszug (passend zur Frage):\n${ocrSnippets}`
+    : "";
 
-  return parts.join("\n").slice(0, 4000);
+  return [meta, ocrBlock].filter(Boolean).join("\n\n").slice(0, META_BUDGET + OCR_BUDGET + 80);
 }
 
 function getCorpusStats(): CorpusStats {
@@ -342,8 +608,6 @@ function collectFactsAcrossCorpus(tokens: string[]): StructuredFact[] {
       w.vendor,
       w.serial_number,
       w.document_title,
-      "garantie",
-      "gerät",
     ]
       .filter(Boolean)
       .join(" ")
@@ -375,8 +639,6 @@ function collectFactsAcrossCorpus(tokens: string[]): StructuredFact[] {
       d.deadline_type,
       d.description,
       d.document_title,
-      "frist",
-      "kündigung",
     ]
       .filter(Boolean)
       .join(" ")
@@ -408,9 +670,6 @@ function collectFactsAcrossCorpus(tokens: string[]): StructuredFact[] {
       f.category,
       f.description,
       f.document_title,
-      "rechnung",
-      "ausgabe",
-      "betrag",
     ]
       .filter(Boolean)
       .join(" ")
@@ -429,10 +688,12 @@ function collectFactsAcrossCorpus(tokens: string[]): StructuredFact[] {
 
   const travel = db
     .prepare(
-      `SELECT t.travel_type, t.title, t.provider, t.start_date, t.end_date, t.origin, t.destination, t.booking_reference,
-              d.id as document_id, d.title as document_title
+      `SELECT t.travel_type, t.title, t.provider, t.start_date, t.end_date, t.origin, t.destination, t.booking_reference, t.extracted_data,
+              d.id as document_id, d.title as document_title, d.content as document_content,
+              s.short_summary, s.detailed_summary
        FROM travel_items t
-       JOIN paperless_documents d ON d.id = t.document_id`
+       JOIN paperless_documents d ON d.id = t.document_id
+       LEFT JOIN document_summaries s ON s.document_id = d.id`
     )
     .all() as Array<Record<string, unknown>>;
 
@@ -445,19 +706,35 @@ function collectFactsAcrossCorpus(tokens: string[]): StructuredFact[] {
       t.destination,
       t.booking_reference,
       t.document_title,
-      "reise",
-      "flug",
-      "hotel",
+      t.short_summary,
+      t.detailed_summary,
+      t.extracted_data,
+      // Ship names often appear only in OCR (e.g. LEGEND OF THE SEAS)
+      String(t.document_content || "").slice(0, 12000),
     ]
       .filter(Boolean)
       .join(" ")
       .toLowerCase();
     const score = tokens.length === 0 ? 1 : scoreFactBlob(blob, tokens);
     if (tokens.length > 0 && score <= 0) continue;
+
+    const itinerary = resolveItinerary({
+      travelItems: [{ extracted_data: t.extracted_data }],
+      ocrContent: String(t.document_content || ""),
+    });
+    const itineraryLine =
+      itinerary.length > 0
+        ? ` · Häfen: ${itinerary
+            .filter((s) => !/cruising/i.test(s.location))
+            .map((s) => s.location)
+            .slice(0, 12)
+            .join(" → ")}`
+        : "";
+
     facts.push({
       kind: "travel",
       label: String(t.title || t.travel_type || "Reise"),
-      details: `${t.provider || "–"} · ${toSwissDate(String(t.start_date || ""))}–${toSwissDate(String(t.end_date || ""))} · ${t.origin || ""}→${t.destination || ""} · Ref ${t.booking_reference || "–"}`,
+      details: `${t.provider || "–"} · ${toSwissDate(String(t.start_date || ""))}–${toSwissDate(String(t.end_date || ""))} · ${t.origin || ""}→${t.destination || ""} · Ref ${t.booking_reference || "–"}${itineraryLine}`,
       documentId: Number(t.document_id),
       documentTitle: (t.document_title as string) || null,
       score: score || 1,
@@ -474,7 +751,8 @@ function collectFactsAcrossCorpus(tokens: string[]): StructuredFact[] {
  */
 export function retrieveForChat(query: string, limit = 12): ChatRetrieval {
   const db = getDb();
-  const tokens = tokenize(query);
+  const tokens = expandTokens(tokenize(query));
+  const phrases = extractPhrases(query);
   const corpus = getCorpusStats();
 
   // Full corpus of documents with optional analysis – not limited by category.
@@ -508,27 +786,29 @@ export function retrieveForChat(query: string, limit = 12): ChatRetrieval {
           `${row.correspondent_name || ""} ${row.category || ""}`.toLowerCase(),
           tokens
         );
-        const contentScore = scoreText(
-          (row.content || "").slice(0, 8000).toLowerCase(),
-          tokens
-        );
+        // Full OCR – itineraries/tables often sit past letterheads (8k+)
+        const contentLower = (row.content || "").toLowerCase();
+        const contentScore = scoreText(contentLower, tokens);
         const analysisScore = scoreText(
           `${row.important_points || ""} ${row.amounts || ""} ${row.deadlines || ""} ${row.warranty_info || ""}`.toLowerCase(),
           tokens
         );
+        const phrasesMatched = phraseHits(blob, phrases);
 
         score =
           titleScore.score * 4 +
           summaryScore.score * 3 +
           metaScore.score * 3 +
           analysisScore.score * 3 +
-          contentScore.score * 1;
+          contentScore.score * 2 +
+          phrasesMatched * 40;
         hits =
           titleScore.hits +
           summaryScore.hits +
           metaScore.hits +
           analysisScore.hits +
-          contentScore.hits;
+          contentScore.hits +
+          phrasesMatched;
 
         if (row.analysis_status === "completed") score += 1;
         // Require at least one real token hit somewhere in the full base
@@ -539,9 +819,28 @@ export function retrieveForChat(query: string, limit = 12): ChatRetrieval {
     })
     .filter((x) => x.score > 0)
     .sort((a, b) => b.score - a.score)
-    .slice(0, limit);
+    .slice(0, Math.max(limit, 8));
 
-  const facts = collectFactsAcrossCorpus(tokens);
+  let facts = collectFactsAcrossCorpus(tokens);
+
+  // If the question names a specific multi-word entity, keep facts from those docs first
+  if (phrases.length > 0) {
+    const phraseDocIds = new Set(
+      scoredDocs
+        .filter((d) => phraseHits(d.blob, phrases) > 0)
+        .map((d) => d.row.id)
+    );
+    if (phraseDocIds.size > 0) {
+      const preferred = facts.filter(
+        (f) => f.documentId && phraseDocIds.has(f.documentId)
+      );
+      const rest = facts.filter(
+        (f) => !f.documentId || !phraseDocIds.has(f.documentId)
+      );
+      facts = [...preferred, ...rest];
+    }
+  }
+  facts = facts.slice(0, 40);
 
   // Ensure documents linked from top facts are present in sources
   const sourceIds = new Set(scoredDocs.map((d) => d.row.id));
@@ -563,7 +862,7 @@ export function retrieveForChat(query: string, limit = 12): ChatRetrieval {
     shortSummary: row.short_summary,
     correspondent: row.correspondent_name,
     createdDate: row.created_date,
-    excerpt: enrichExcerpt(row),
+    excerpt: enrichExcerpt(row, tokens),
     score,
   }));
 

@@ -60,6 +60,15 @@ export const FinancialItemSchema = z.object({
   description: z.string().nullable().optional(),
 });
 
+export const TravelItineraryStopSchema = z.object({
+  date: z.string().nullable(),
+  day_label: z.string().nullable().optional(),
+  location: z.string(),
+  arrive: z.string().nullable().optional(),
+  depart: z.string().nullable().optional(),
+  note: z.string().nullable().optional(),
+});
+
 export const TravelItemSchema = z.object({
   travel_type: z.string().nullable(),
   provider: z.string().nullable(),
@@ -71,6 +80,8 @@ export const TravelItemSchema = z.object({
   booking_reference: z.string().nullable(),
   price: z.number().nullable(),
   currency: z.string().nullable(),
+  /** Ports of call / daily stops (cruise, multi-city trips, etc.) */
+  itinerary: z.array(TravelItineraryStopSchema).optional().default([]),
 });
 
 export const DocumentAnalysisSchema = z.object({

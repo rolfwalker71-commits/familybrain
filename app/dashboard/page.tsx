@@ -9,39 +9,35 @@ import {
   Plane,
   AlertCircle,
   Calendar,
+  Sparkles,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { getDashboardStats, listDeadlines } from "@/lib/db/queries";
 import { formatCHF } from "@/lib/utils/format";
 import { toSwissDate } from "@/lib/utils/dates";
-import { cn } from "@/lib/utils";
-import { MetricGrid } from "@/components/layout/page-primitives";
+import { MetricGrid, PageHeader } from "@/components/layout/page-primitives";
+import {
+  IconCircle,
+  pageVisuals,
+  type IconTone,
+} from "@/components/layout/icon-circle";
 import { DocumentInfoButton } from "@/components/documents/document-link";
+import type { LucideIcon } from "lucide-react";
 
 export const dynamic = "force-dynamic";
-
-const iconTone = {
-  blue: "bg-blue-50 text-blue-600",
-  amber: "bg-amber-50 text-amber-600",
-  rose: "bg-rose-50 text-rose-500",
-  orange: "bg-orange-50 text-orange-500",
-  green: "bg-emerald-50 text-emerald-600",
-  purple: "bg-blue-50 text-blue-600",
-  teal: "bg-teal-50 text-teal-600",
-} as const;
 
 function StatCard({
   title,
   value,
-  icon: Icon,
+  icon,
   tone,
   href,
 }: {
   title: string;
   value: string | number;
-  icon: React.ComponentType<{ className?: string }>;
-  tone: keyof typeof iconTone;
+  icon: LucideIcon;
+  tone: IconTone;
   href?: string;
 }) {
   const content = (
@@ -55,14 +51,7 @@ function StatCard({
             {value}
           </p>
         </div>
-        <div
-          className={cn(
-            "flex h-10 w-10 shrink-0 items-center justify-center rounded-full",
-            iconTone[tone]
-          )}
-        >
-          <Icon className="h-5 w-5" />
-        </div>
+        <IconCircle icon={icon} tone={tone} />
       </CardContent>
     </Card>
   );
@@ -92,14 +81,12 @@ export default function DashboardPage() {
 
   return (
     <div className="min-w-0 space-y-8">
-      <div>
-        <h1 className="text-3xl font-semibold tracking-tight text-foreground">
-          Dashboard
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Überblick über deine Dokumente und Analysen
-        </p>
-      </div>
+      <PageHeader
+        title="Dashboard"
+        description="Überblick über deine Dokumente und Analysen"
+        icon={pageVisuals.dashboard.icon}
+        tone={pageVisuals.dashboard.tone}
+      />
 
       <MetricGrid>
         <StatCard
@@ -141,7 +128,7 @@ export default function DashboardPage() {
           title="Ausgaben dieses Jahr (ohne Unbekannt)"
           value={formatCHF(stats.financialTotalThisYear)}
           icon={Wallet}
-          tone="purple"
+          tone="blue"
           href="/finance"
         />
         <StatCard
@@ -155,10 +142,11 @@ export default function DashboardPage() {
 
       <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
         <Card className="min-w-0 overflow-hidden border-border/80 shadow-sm">
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between gap-3">
             <CardTitle className="text-base font-semibold">
               Zuletzt analysiert
             </CardTitle>
+            <IconCircle icon={Sparkles} tone="indigo" size="sm" />
           </CardHeader>
           <CardContent className="min-w-0">
             {stats.recentAnalyses.length === 0 ? (
@@ -222,10 +210,11 @@ export default function DashboardPage() {
         </Card>
 
         <Card className="min-w-0 overflow-hidden border-border/80 shadow-sm">
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between gap-3">
             <CardTitle className="text-base font-semibold">
               Nächste Fristen
             </CardTitle>
+            <IconCircle icon={Calendar} tone="rose" size="sm" />
           </CardHeader>
           <CardContent className="min-w-0">
             {upcoming.length === 0 ? (

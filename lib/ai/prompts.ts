@@ -1,4 +1,5 @@
 import { KNOWLEDGE_AREAS } from "@/lib/extraction/categories";
+import { selectAnalysisOcrWindow } from "@/lib/extraction/itinerary";
 
 const categoriesList = KNOWLEDGE_AREAS.map((a) => a.name).join(", ");
 
@@ -10,6 +11,8 @@ Rules:
 - Prefer ISO dates yyyy-mm-dd for all date fields.
 - Extract CHF amounts carefully.
 - Identify whether the document is Rechnung, Vertrag, Versicherung, Garantie, Reiseunterlage, Arztbericht, Steuerdokument or Sonstiges.
+- For travel/cruise documents, extract the full itinerary (ports of call / Kreuzfahrtverlauf / daily stops) into travel_items[].itinerary AND also list each stop date in important_dates.
+- Also capture other date-relevant fields in important_dates: payment due, cancellation deadline, boarding, check-in, flight departure/arrival, hotel check-in/out, appointment dates, warranty end, contract start/end.
 - Return VALID JSON only. No markdown. No commentary.
 - Category must be one of: ${categoriesList}`;
 
@@ -21,7 +24,7 @@ export function buildAnalysisUserPrompt(input: {
   tags: string[];
   content: string | null;
 }): string {
-  const content = (input.content ?? "").slice(0, 24000);
+  const content = selectAnalysisOcrWindow(input.content, 28000);
   return `Analyze this Paperless document and return JSON matching the required schema.
 
 Metadata:
@@ -84,10 +87,24 @@ Required JSON shape:
     "destination": null,
     "booking_reference": null,
     "price": null,
-    "currency": null
+    "currency": null,
+    "itinerary": [{
+      "date": "2026-10-25",
+      "day_label": "25 OCT",
+      "location": "Barcelona, Spain",
+      "arrive": null,
+      "depart": "17:00",
+      "note": null
+    }]
   }],
   "confidence": 0.8
-}`;
+}
+
+Travel/cruise specifics:
+- If OCR contains "Kreuzfahrtverlauf", "PORTS-OF-CALL", "Cruise Itinerary" or similar day-by-day stops, fill travel_items[0].itinerary completely (one object per day/port).
+- Put cruising/sea days as location "Cruising" with note "Seetag".
+- Mirror each itinerary stop with a date into important_dates (label like "Anlaufhafen: Barcelona").
+- Also put payment due dates, cancellation deadlines, boarding/sailing times into important_dates.`;
 }
 
 export function buildRepairPrompt(invalidJson: string, validationError: string): string {

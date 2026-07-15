@@ -20,11 +20,14 @@ import {
   SoftText,
 } from "@/components/layout/data-list";
 import { PageHeader } from "@/components/layout/page-primitives";
+import { IconCircle, pageVisuals } from "@/components/layout/icon-circle";
 import { AddToCalendarButton } from "@/components/calendar/add-to-calendar-button";
 import {
   DocumentInfoButton,
   DocumentTitleLink,
 } from "@/components/documents/document-link";
+import { ItineraryList } from "@/components/travel/itinerary-list";
+import { resolveItinerary } from "@/lib/extraction/itinerary";
 import { formatCHF } from "@/lib/utils/format";
 import { toSwissDate } from "@/lib/utils/dates";
 import { cn } from "@/lib/utils";
@@ -42,6 +45,8 @@ export type TravelRow = {
   booking_reference: string | null;
   price: number | null;
   currency: string | null;
+  extracted_data?: string | null;
+  document_content?: string | null;
   document_title: string | null;
   document_local_id: number;
 };
@@ -312,6 +317,8 @@ export function TravelOverviewClient({ items }: Props) {
       <PageHeader
         title="Reise-Gedächtnis"
         description="KPIs zuerst – Details per Drilldown, Termine in den Kalender"
+        icon={pageVisuals.travel.icon}
+        tone={pageVisuals.travel.tone}
         actions={
           upcomingEvents.length > 0 ? (
             <AddToCalendarButton
@@ -332,9 +339,7 @@ export function TravelOverviewClient({ items }: Props) {
                 {totals.count}
               </p>
             </div>
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-sky-50 text-sky-600">
-              <Ticket className="h-5 w-5" />
-            </div>
+            <IconCircle icon={Ticket} tone="sky" />
           </CardContent>
         </Card>
         <Card className="min-w-0 overflow-hidden border-border/80 shadow-sm">
@@ -345,9 +350,7 @@ export function TravelOverviewClient({ items }: Props) {
                 {totals.withDates}
               </p>
             </div>
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-50 text-blue-600">
-              <CalendarDays className="h-5 w-5" />
-            </div>
+            <IconCircle icon={CalendarDays} tone="blue" />
           </CardContent>
         </Card>
         <Card className="min-w-0 overflow-hidden border-border/80 shadow-sm">
@@ -358,9 +361,7 @@ export function TravelOverviewClient({ items }: Props) {
                 {upcoming.length}
               </p>
             </div>
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
-              <Plane className="h-5 w-5" />
-            </div>
+            <IconCircle icon={Plane} tone="green" />
           </CardContent>
         </Card>
         <Card className="min-w-0 overflow-hidden border-border/80 shadow-sm">
@@ -371,9 +372,7 @@ export function TravelOverviewClient({ items }: Props) {
                 {formatCHF(totals.total)}
               </p>
             </div>
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-50 text-amber-600">
-              <MapPin className="h-5 w-5" />
-            </div>
+            <IconCircle icon={MapPin} tone="amber" />
           </CardContent>
         </Card>
       </div>
@@ -399,10 +398,7 @@ export function TravelOverviewClient({ items }: Props) {
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2 text-sm font-medium">
-                    <Icon className="h-4 w-4 text-muted-foreground" />
-                    {meta.title}
-                  </div>
+                  <div className="text-sm font-medium">{meta.title}</div>
                   <p className="mt-3 text-2xl font-semibold tabular-nums">
                     {meta.items.length}
                   </p>
@@ -410,12 +406,25 @@ export function TravelOverviewClient({ items }: Props) {
                     {meta.hint}
                   </p>
                 </div>
-                <ChevronRight
-                  className={cn(
-                    "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
-                    active && "rotate-90 text-primary"
-                  )}
-                />
+                <div className="flex items-center gap-2">
+                  <IconCircle
+                    icon={Icon}
+                    tone={
+                      key === "year"
+                        ? "blue"
+                        : key === "type"
+                          ? "teal"
+                          : "amber"
+                    }
+                    size="sm"
+                  />
+                  <ChevronRight
+                    className={cn(
+                      "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
+                      active && "rotate-90 text-primary"
+                    )}
+                  />
+                </div>
               </div>
               {top ? (
                 <div className="mt-4 rounded-lg bg-muted/50 px-3 py-2">
@@ -585,6 +594,26 @@ export function TravelOverviewClient({ items }: Props) {
                         </div>
                       }
                     />
+                    {(() => {
+                      const stops = resolveItinerary({
+                        travelItems: [openDetail],
+                        ocrContent: openDetail.document_content,
+                      });
+                      if (stops.length === 0) return null;
+                      return (
+                        <div className="sm:col-span-2 space-y-2">
+                          <div className="text-xs font-medium text-muted-foreground">
+                            Reiseverlauf / Ports of Call
+                          </div>
+                          <ItineraryList
+                            stops={stops}
+                            compact
+                            showAllExport
+                            calendarFilename={`familybrain-reiseverlauf-${openDetail.id}`}
+                          />
+                        </div>
+                      );
+                    })()}
                     <div className="sm:col-span-2">
                       {travelToCalendarEvent(openDetail) ? (
                         <AddToCalendarButton
@@ -604,11 +633,14 @@ export function TravelOverviewClient({ items }: Props) {
 
       <Card className="min-w-0 overflow-hidden border-border/80 shadow-sm">
         <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3">
-          <div>
-            <CardTitle className="text-base">Kommende Reisen</CardTitle>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Klick auf eine Zeile für Details · Kalender-Export pro Eintrag
-            </p>
+          <div className="flex min-w-0 items-start gap-3">
+            <IconCircle icon={Plane} tone="teal" size="sm" />
+            <div>
+              <CardTitle className="text-base">Kommende Reisen</CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Klick auf eine Zeile für Details · Kalender-Export pro Eintrag
+              </p>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -680,6 +712,26 @@ export function TravelOverviewClient({ items }: Props) {
                     </div>
                   }
                 />
+                {(() => {
+                  const stops = resolveItinerary({
+                    travelItems: [openDetail],
+                    ocrContent: openDetail.document_content,
+                  });
+                  if (stops.length === 0) return null;
+                  return (
+                    <div className="sm:col-span-2 space-y-2">
+                      <div className="text-xs font-medium text-muted-foreground">
+                        Reiseverlauf / Ports of Call
+                      </div>
+                      <ItineraryList
+                        stops={stops}
+                        compact
+                        showAllExport
+                        calendarFilename={`familybrain-reiseverlauf-${openDetail.id}`}
+                      />
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           ) : null}

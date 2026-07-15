@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -21,6 +21,7 @@ import {
 } from "@/components/layout/data-list";
 import { useAnalysis } from "@/components/analysis/analysis-provider";
 import { FilterGrid, PageHeader } from "@/components/layout/page-primitives";
+import { pageVisuals } from "@/components/layout/icon-circle";
 import { toSwissDate } from "@/lib/utils/dates";
 import {
   DocumentInfoButton,
@@ -71,6 +72,7 @@ function toItemsRecord(
 
 export function DocumentsClient() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { pendingCount, isRunning, refreshStats } = useAnalysis();
 
   const [docs, setDocs] = useState<DocRow[]>([]);
@@ -80,16 +82,59 @@ export function DocumentsClient() {
     documentTypes: [],
     categories: [],
   });
-  const [searchInput, setSearchInput] = useState("");
-  const [search, setSearch] = useState("");
-  const [category, setCategory] = useState("all");
-  const [correspondent, setCorrespondent] = useState("all");
-  const [documentType, setDocumentType] = useState("all");
-  const [analysisStatus, setAnalysisStatus] = useState("all");
+  const [searchInput, setSearchInput] = useState(
+    searchParams.get("search") || ""
+  );
+  const [search, setSearch] = useState(searchParams.get("search") || "");
+  const [category, setCategory] = useState(
+    searchParams.get("category") || "all"
+  );
+  const [correspondent, setCorrespondent] = useState(
+    searchParams.get("correspondent") || "all"
+  );
+  const [documentType, setDocumentType] = useState(
+    searchParams.get("documentType") || "all"
+  );
+  const [analysisStatus, setAnalysisStatus] = useState(
+    searchParams.get("analysisStatus") || "all"
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [analyzingId, setAnalyzingId] = useState<number | null>(null);
   const requestIdRef = useRef(0);
+
+  // Keep filters in sync when navigating from Wissensbereiche (/documents?category=…)
+  useEffect(() => {
+    setCategory(searchParams.get("category") || "all");
+    setCorrespondent(searchParams.get("correspondent") || "all");
+    setDocumentType(searchParams.get("documentType") || "all");
+    setAnalysisStatus(searchParams.get("analysisStatus") || "all");
+    const q = searchParams.get("search") || "";
+    setSearchInput(q);
+    setSearch(q);
+  }, [searchParams]);
+
+  function updateUrl(next: {
+    search?: string;
+    category?: string;
+    correspondent?: string;
+    documentType?: string;
+    analysisStatus?: string;
+  }) {
+    const params = new URLSearchParams();
+    const s = next.search ?? search;
+    const c = next.category ?? category;
+    const corr = next.correspondent ?? correspondent;
+    const dt = next.documentType ?? documentType;
+    const st = next.analysisStatus ?? analysisStatus;
+    if (s.trim()) params.set("search", s.trim());
+    if (c !== "all") params.set("category", c);
+    if (corr !== "all") params.set("correspondent", corr);
+    if (dt !== "all") params.set("documentType", dt);
+    if (st !== "all") params.set("analysisStatus", st);
+    const qs = params.toString();
+    router.replace(qs ? `/documents?${qs}` : "/documents", { scroll: false });
+  }
 
   const hasActiveFilters =
     Boolean(search.trim()) ||
@@ -140,12 +185,18 @@ export function DocumentsClient() {
     refreshStats,
   ]);
 
-  // Debounce free-text search input → committed search term
+  // Debounce free-text search input → committed search term + URL
   useEffect(() => {
     const handle = window.setTimeout(() => {
-      setSearch(searchInput.trim());
+      const next = searchInput.trim();
+      setSearch(next);
+      const current = searchParams.get("search") || "";
+      if (next !== current) {
+        updateUrl({ search: next });
+      }
     }, 350);
     return () => window.clearTimeout(handle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchInput]);
 
   useEffect(() => {
@@ -189,6 +240,7 @@ export function DocumentsClient() {
     setCorrespondent("all");
     setDocumentType("all");
     setAnalysisStatus("all");
+    router.replace("/documents", { scroll: false });
   }
 
   const categoryItems = useMemo(
@@ -196,8 +248,11 @@ export function DocumentsClient() {
       toItemsRecord([
         { value: "all", label: "Alle Kategorien" },
         ...filters.categories.map((c) => ({ value: c, label: c })),
+        ...(category !== "all" && !filters.categories.includes(category)
+          ? [{ value: category, label: category }]
+          : []),
       ]),
-    [filters.categories]
+    [filters.categories, category]
   );
 
   const correspondentItems = useMemo(
@@ -236,9 +291,11 @@ export function DocumentsClient() {
         title="Dokumente"
         description={
           hasActiveFilters
-            ? `${total} Treffer · ${pendingCount} Analysen ausstehend`
+            ? `${total} Treffer${category !== "all" ? ` · ${category}` : ""} · ${pendingCount} Analysen ausstehend`
             : `${total} Dokumente im lokalen Cache · ${pendingCount} ausstehend`
         }
+        icon={pageVisuals.documents.icon}
+        tone={pageVisuals.documents.tone}
       />
 
       <Card className="min-w-0 overflow-hidden border-border/80 shadow-sm">
@@ -253,7 +310,9 @@ export function DocumentsClient() {
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     e.preventDefault();
-                    setSearch(searchInput.trim());
+                    const next = searchInput.trim();
+                    setSearch(next);
+                    updateUrl({ search: next });
                   }
                 }}
               />
@@ -262,7 +321,9 @@ export function DocumentsClient() {
             <Select
               value={category}
               onValueChange={(value) => {
-                if (value != null) setCategory(value);
+                if (value == null) return;
+                setCategory(value);
+                updateUrl({ category: value });
               }}
               items={categoryItems}
             >
@@ -281,7 +342,9 @@ export function DocumentsClient() {
             <Select
               value={correspondent}
               onValueChange={(value) => {
-                if (value != null) setCorrespondent(value);
+                if (value == null) return;
+                setCorrespondent(value);
+                updateUrl({ correspondent: value });
               }}
               items={correspondentItems}
             >
@@ -300,7 +363,9 @@ export function DocumentsClient() {
             <Select
               value={documentType}
               onValueChange={(value) => {
-                if (value != null) setDocumentType(value);
+                if (value == null) return;
+                setDocumentType(value);
+                updateUrl({ documentType: value });
               }}
               items={documentTypeItems}
             >
@@ -320,7 +385,9 @@ export function DocumentsClient() {
               <Select
                 value={analysisStatus}
                 onValueChange={(value) => {
-                  if (value != null) setAnalysisStatus(value);
+                  if (value == null) return;
+                  setAnalysisStatus(value);
+                  updateUrl({ analysisStatus: value });
                 }}
                 items={statusItems}
               >

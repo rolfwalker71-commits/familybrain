@@ -1,4 +1,7 @@
+import type { ReactNode } from "react";
+import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { IconCircle, type IconTone } from "@/components/layout/icon-circle";
 
 /** Prefer wrapping over clipping. Title remains for hover context. */
 export function TruncateText({
@@ -26,18 +29,27 @@ export function PageHeader({
   title,
   description,
   actions,
+  icon,
+  tone = "blue",
 }: {
   title: string;
   description?: string;
-  actions?: React.ReactNode;
+  actions?: ReactNode;
+  icon?: LucideIcon;
+  tone?: IconTone;
 }) {
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-      <div className="min-w-0">
-        <h1 className="truncate text-3xl font-semibold tracking-tight">{title}</h1>
-        {description ? (
-          <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-        ) : null}
+      <div className="flex min-w-0 items-start gap-3">
+        {icon ? <IconCircle icon={icon} tone={tone} size="lg" /> : null}
+        <div className="min-w-0">
+          <h1 className="break-words text-3xl font-semibold tracking-tight">
+            {title}
+          </h1>
+          {description ? (
+            <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+          ) : null}
+        </div>
       </div>
       {actions ? (
         <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>

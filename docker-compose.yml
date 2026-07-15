@@ -1,0 +1,16 @@
+services:
+  familybrain:
+    build: .
+    container_name: familybrain
+    ports:
+      - "${FAMILYBRAIN_PORT:-3000}:3000"
+    environment:
+      HOSTNAME: "0.0.0.0"
+      PORT: "3000"
+      DATABASE_PATH: /app/data/familybrain.sqlite
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+    volumes:
+      # Persist SQLite (+ WAL) across restarts / redeploys
+      - ./data:/app/data
+    restart: unless-stopped

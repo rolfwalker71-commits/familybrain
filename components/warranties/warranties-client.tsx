@@ -11,6 +11,7 @@ import {
   VendorText,
 } from "@/components/layout/data-list";
 import { PageHeader } from "@/components/layout/page-primitives";
+import { pageVisuals } from "@/components/layout/icon-circle";
 import { AddToCalendarButton } from "@/components/calendar/add-to-calendar-button";
 import {
   DocumentInfoButton,
@@ -73,6 +74,8 @@ export function WarrantiesClient({ rows }: { rows: WarrantyRow[] }) {
       <PageHeader
         title="Geräte & Garantien"
         description="Extrahierte Geräte und Garantielaufzeiten"
+        icon={pageVisuals.warranties.icon}
+        tone={pageVisuals.warranties.tone}
         actions={
           exportable.length > 0 ? (
             <AddToCalendarButton

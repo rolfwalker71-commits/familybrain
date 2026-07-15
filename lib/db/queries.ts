@@ -725,7 +725,8 @@ export function listTravelItems() {
   const db = getDb();
   return db
     .prepare(
-      `SELECT t.*, d.title as document_title, d.id as document_local_id
+      `SELECT t.*, d.title as document_title, d.id as document_local_id,
+              d.content as document_content
        FROM travel_items t
        JOIN paperless_documents d ON d.id = t.document_id
        ORDER BY COALESCE(t.start_date, '9999-12-31') ASC`

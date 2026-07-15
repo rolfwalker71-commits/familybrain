@@ -23,6 +23,7 @@ import {
   VendorText,
 } from "@/components/layout/data-list";
 import { PageHeader } from "@/components/layout/page-primitives";
+import { IconCircle, pageVisuals } from "@/components/layout/icon-circle";
 import { AddToCalendarButton } from "@/components/calendar/add-to-calendar-button";
 import {
   DocumentInfoButton,
@@ -338,6 +339,8 @@ export function FinanceOverviewClient({
             .filter(Boolean)
             .join(" · ")
         }
+        icon={pageVisuals.finance.icon}
+        tone={pageVisuals.finance.tone}
         actions={
           dueEvents.length > 0 ? (
             <AddToCalendarButton
@@ -366,7 +369,7 @@ export function FinanceOverviewClient({
               />
               <div className="min-w-0">
                 <CardTitle className="flex items-center gap-2 text-base">
-                  <CircleAlert className="h-4 w-4 text-amber-600" />
+                  <IconCircle icon={CircleAlert} tone="amber" size="sm" />
                   Rechnungen mit Zahlungsfrist
                 </CardTitle>
                 <p className="mt-1 text-sm text-muted-foreground">
@@ -450,9 +453,7 @@ export function FinanceOverviewClient({
                 {formatCHF(totals.total)}
               </p>
             </div>
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-50 text-blue-600">
-              <Wallet className="h-5 w-5" />
-            </div>
+            <IconCircle icon={Wallet} tone="blue" />
           </CardContent>
         </Card>
         <Card className="min-w-0 overflow-hidden border-border/80 shadow-sm">
@@ -466,9 +467,7 @@ export function FinanceOverviewClient({
                 {totals.count}
               </p>
             </div>
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-50 text-blue-600">
-              <FileText className="h-5 w-5" />
-            </div>
+            <IconCircle icon={FileText} tone="sky" />
           </CardContent>
         </Card>
         <Card className="min-w-0 overflow-hidden border-border/80 shadow-sm">
@@ -482,9 +481,7 @@ export function FinanceOverviewClient({
                 {topVendor ? formatCHF(topVendor.total) : "–"}
               </p>
             </div>
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-50 text-amber-600">
-              <Building2 className="h-5 w-5" />
-            </div>
+            <IconCircle icon={Building2} tone="amber" />
           </CardContent>
         </Card>
         <Card className="min-w-0 overflow-hidden border-border/80 shadow-sm">
@@ -495,9 +492,7 @@ export function FinanceOverviewClient({
                 {recurring.length}
               </p>
             </div>
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
-              <Repeat className="h-5 w-5" />
-            </div>
+            <IconCircle icon={Repeat} tone="green" />
           </CardContent>
         </Card>
       </div>
@@ -525,10 +520,7 @@ export function FinanceOverviewClient({
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2 text-sm font-medium">
-                    <Icon className="h-4 w-4 text-muted-foreground" />
-                    {meta.title}
-                  </div>
+                  <div className="text-sm font-medium">{meta.title}</div>
                   <p className="mt-3 text-2xl font-semibold tabular-nums">
                     {formatCHF(dimTotal)}
                   </p>
@@ -536,12 +528,25 @@ export function FinanceOverviewClient({
                     {items.length} Einträge · ohne Unbekannt · {meta.hint}
                   </p>
                 </div>
-                <ChevronRight
-                  className={cn(
-                    "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
-                    active && "rotate-90 text-primary"
-                  )}
-                />
+                <div className="flex items-center gap-2">
+                  <IconCircle
+                    icon={Icon}
+                    tone={
+                      key === "year"
+                        ? "blue"
+                        : key === "vendor"
+                          ? "amber"
+                          : "violet"
+                    }
+                    size="sm"
+                  />
+                  <ChevronRight
+                    className={cn(
+                      "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
+                      active && "rotate-90 text-primary"
+                    )}
+                  />
+                </div>
               </div>
               {top ? (
                 <div className="mt-4 rounded-lg bg-muted/50 px-3 py-2">
@@ -672,7 +677,10 @@ export function FinanceOverviewClient({
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <Card className="min-w-0 overflow-hidden border-border/80 shadow-sm">
           <CardHeader>
-            <CardTitle className="text-base">Wiederkehrende Zahlungen</CardTitle>
+            <CardTitle className="flex items-center gap-3 text-base">
+              <IconCircle icon={Repeat} tone="green" size="sm" />
+              Wiederkehrende Zahlungen
+            </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             {recurring.length === 0 ? (
@@ -691,7 +699,10 @@ export function FinanceOverviewClient({
 
         <Card className="min-w-0 overflow-hidden border-border/80 shadow-sm">
           <CardHeader>
-            <CardTitle className="text-base">Grösste Einzelbeträge</CardTitle>
+            <CardTitle className="flex items-center gap-3 text-base">
+              <IconCircle icon={Wallet} tone="blue" size="sm" />
+              Grösste Einzelbeträge
+            </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             {topInvoices.length === 0 ? (
