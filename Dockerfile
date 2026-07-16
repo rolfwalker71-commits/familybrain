@@ -42,8 +42,12 @@ COPY --from=builder --chown=node:node /app/public ./public
 COPY --from=builder --chown=node:node /app/lib ./lib
 COPY --from=builder --chown=node:node /app/next.config.ts ./
 COPY --from=builder --chown=node:node /app/scripts ./scripts
+COPY --chown=node:node docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh
 
-USER node
+# Start as root so the entrypoint can chown the mounted ./data volume,
+# then drop privileges to `node` before starting Next.js.
+USER root
 EXPOSE 3000
 
-CMD ["npm", "run", "start"]
+ENTRYPOINT ["/app/docker-entrypoint.sh"]

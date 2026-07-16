@@ -102,6 +102,16 @@ docker compose up -d --build
 
 SQLite in `./data` is kept via the volume mount.
 
+**Troubleshooting**
+
+```bash
+docker compose logs -f familybrain
+```
+
+- Browser shows „This page couldn't load“ / server error: usually the app can't write `./data` (permissions) or the DB init failed. After pulling the latest image (entrypoint fixes ownership), rebuild and restart.
+- Still stuck: `sudo chown -R 1000:1000 data` then `docker compose restart`.
+- Confirm the container is healthy: `curl -sI http://127.0.0.1:3100/dashboard`
+
 ## Notes
 
 - Paperless remains source of truth

@@ -1,7 +1,6 @@
 import Database from "better-sqlite3";
 import fs from "fs";
 import path from "path";
-import { ensureInitialized } from "./migrations";
 
 const globalForDb = globalThis as unknown as {
   familybrainDb?: Database.Database;
@@ -43,6 +42,12 @@ export function getDb(): Database.Database {
 
   if (!globalForDb.familybrainInitialized) {
     globalForDb.familybrainInitialized = true;
+    // Lazy require avoids a circular import (client ↔ migrations) that can
+    // leave ensureInitialized undefined at module evaluation time.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { ensureInitialized } = require("./migrations") as {
+      ensureInitialized: () => void;
+    };
     ensureInitialized();
   }
 
