@@ -28,7 +28,8 @@ import {
 } from "@/components/documents/document-link";
 import { ItineraryList } from "@/components/travel/itinerary-list";
 import { resolveItinerary } from "@/lib/extraction/itinerary";
-import { normalizeTravelType } from "@/lib/extraction/normalize-categories";
+import { normalizeTravelType, TRAVEL_TYPES } from "@/lib/extraction/normalize-categories";
+import { TravelTypeReclassify } from "@/components/travel/travel-type-reclassify";
 import { formatCHF } from "@/lib/utils/format";
 import { toSwissDate } from "@/lib/utils/dates";
 import { cn } from "@/lib/utils";
@@ -37,6 +38,7 @@ import type { CalendarEvent } from "@/lib/utils/ics";
 export type TravelRow = {
   id: number;
   travel_type: string | null;
+  travel_type_override?: string | null;
   provider: string | null;
   title: string | null;
   start_date: string | null;
@@ -58,17 +60,39 @@ type Dimension = "year" | "type" | "provider";
 
 function typeLabel(row: {
   travel_type?: string | null;
+  travel_type_override?: string | null;
   title?: string | null;
   provider?: string | null;
   origin?: string | null;
   destination?: string | null;
 }) {
+  const override = row.travel_type_override?.trim();
+  if (override && (TRAVEL_TYPES as readonly string[]).includes(override)) {
+    return override;
+  }
   return normalizeTravelType(row.travel_type, {
     title: row.title,
     provider: row.provider,
     origin: row.origin,
     destination: row.destination,
   });
+}
+
+function learnHintFor(row: {
+  provider?: string | null;
+  title?: string | null;
+}): string | null {
+  const provider = row.provider?.trim();
+  if (provider && provider.length >= 2 && !/^unbekannt$/i.test(provider)) {
+    return `Künftig: Anbieter enthält «${provider}»`;
+  }
+  const title = row.title?.trim();
+  if (title && title.length >= 4) {
+    const words = title.split(/\s+/).filter((w) => w.length > 2).slice(0, 3);
+    const phrase = words.join(" ") || title.slice(0, 40);
+    return `Künftig: Titel enthält «${phrase}»`;
+  }
+  return null;
 }
 
 function percent(part: number, whole: number) {
@@ -542,7 +566,13 @@ export function TravelOverviewClient({ items }: Props) {
                     <DetailField label="Titel" value={openDetail.title} />
                     <DetailField
                       label="Typ"
-                      value={typeLabel(openDetail)}
+                      value={
+                        <TravelTypeReclassify
+                          itemId={openDetail.id}
+                          currentType={typeLabel(openDetail)}
+                          learnHint={learnHintFor(openDetail)}
+                        />
+                      }
                     />
                     <DetailField label="Anbieter" value={openDetail.provider} />
                     <DetailField
@@ -660,7 +690,13 @@ export function TravelOverviewClient({ items }: Props) {
                 <DetailField label="Titel" value={openDetail.title} />
                 <DetailField
                   label="Typ"
-                  value={typeLabel(openDetail)}
+                  value={
+                    <TravelTypeReclassify
+                      itemId={openDetail.id}
+                      currentType={typeLabel(openDetail)}
+                      learnHint={learnHintFor(openDetail)}
+                    />
+                  }
                 />
                 <DetailField label="Anbieter" value={openDetail.provider} />
                 <DetailField

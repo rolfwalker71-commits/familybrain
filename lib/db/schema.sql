@@ -123,6 +123,7 @@ CREATE TABLE IF NOT EXISTS travel_items (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   document_id INTEGER NOT NULL,
   travel_type TEXT,
+  travel_type_override TEXT,
   provider TEXT,
   title TEXT,
   start_date TEXT,
@@ -139,6 +140,21 @@ CREATE TABLE IF NOT EXISTS travel_items (
   FOREIGN KEY(document_id) REFERENCES paperless_documents(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS classification_rules (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  domain TEXT NOT NULL,
+  match_field TEXT NOT NULL,
+  match_mode TEXT NOT NULL DEFAULT 'contains',
+  match_value TEXT NOT NULL,
+  target_value TEXT NOT NULL,
+  priority INTEGER NOT NULL DEFAULT 100,
+  enabled INTEGER NOT NULL DEFAULT 1,
+  hit_count INTEGER NOT NULL DEFAULT 0,
+  last_hit_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_docs_paperless_id ON paperless_documents(paperless_id);
 CREATE INDEX IF NOT EXISTS idx_docs_created_date ON paperless_documents(created_date);
 CREATE INDEX IF NOT EXISTS idx_docs_modified_at ON paperless_documents(modified_at);
@@ -150,3 +166,5 @@ CREATE INDEX IF NOT EXISTS idx_warranties_until ON devices_and_warranties(warran
 CREATE INDEX IF NOT EXISTS idx_tags_document_id ON document_tags(document_id);
 CREATE INDEX IF NOT EXISTS idx_finance_invoice_date ON financial_items(invoice_date);
 CREATE INDEX IF NOT EXISTS idx_travel_start_date ON travel_items(start_date);
+CREATE INDEX IF NOT EXISTS idx_classification_rules_domain
+  ON classification_rules(domain, enabled, priority);

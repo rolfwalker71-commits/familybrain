@@ -17,13 +17,20 @@ export function bootstrapDatabase(db: Database.Database): void {
   const schema = fs.readFileSync(schemaPath, "utf8");
   db.exec(schema);
 
-  const cols = db.prepare(`PRAGMA table_info(financial_items)`).all() as Array<{
-    name: string;
-  }>;
-  if (!cols.some((c) => c.name === "counts_in_stats")) {
+  const financeCols = db
+    .prepare(`PRAGMA table_info(financial_items)`)
+    .all() as Array<{ name: string }>;
+  if (!financeCols.some((c) => c.name === "counts_in_stats")) {
     db.exec(
       `ALTER TABLE financial_items ADD COLUMN counts_in_stats INTEGER NOT NULL DEFAULT 1`
     );
+  }
+
+  const travelCols = db
+    .prepare(`PRAGMA table_info(travel_items)`)
+    .all() as Array<{ name: string }>;
+  if (!travelCols.some((c) => c.name === "travel_type_override")) {
+    db.exec(`ALTER TABLE travel_items ADD COLUMN travel_type_override TEXT`);
   }
 
   const insertArea = db.prepare(

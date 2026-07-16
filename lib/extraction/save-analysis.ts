@@ -9,8 +9,8 @@ import {
   normalizeDeadlineType,
   normalizeFinanceCategory,
   normalizeKnowledgeCategory,
-  normalizeTravelType,
 } from "@/lib/extraction/normalize-categories";
+import { resolveTravelType, findTravelTypeRule } from "@/lib/extraction/classification-rules";
 
 function warrantyStatus(warrantyUntil: string | null): string {
   if (!warrantyUntil) return "unknown";
@@ -185,7 +185,52 @@ export function saveAnalysis(
     }>;
 
     db.prepare(`DELETE FROM financial_items WHERE document_id = ?`).run(documentId);
+
+    const previousTravel = db
+      .prepare(
+        `SELECT travel_type, travel_type_override, provider, title, start_date, end_date,
+                origin, destination, booking_reference
+         FROM travel_items WHERE document_id = ?`
+      )
+      .all(documentId) as Array<{
+      travel_type: string | null;
+      travel_type_override: string | null;
+      provider: string | null;
+      title: string | null;
+      start_date: string | null;
+      end_date: string | null;
+      origin: string | null;
+      destination: string | null;
+      booking_reference: string | null;
+    }>;
+
     db.prepare(`DELETE FROM travel_items WHERE document_id = ?`).run(documentId);
+
+    function resolveTravelOverride(input: {
+      provider?: string | null;
+      title?: string | null;
+      start_date?: string | null;
+      booking_reference?: string | null;
+      origin?: string | null;
+      destination?: string | null;
+    }): string | null {
+      const match = previousTravel.find(
+        (p) =>
+          (p.booking_reference || null) === (input.booking_reference || null) &&
+          (p.provider || null) === (input.provider || null) &&
+          (p.title || null) === (input.title || null) &&
+          (p.start_date || null) === (input.start_date || null)
+      );
+      if (match?.travel_type_override) return match.travel_type_override;
+      // Weaker rematch without booking ref
+      const soft = previousTravel.find(
+        (p) =>
+          p.travel_type_override &&
+          (p.provider || null) === (input.provider || null) &&
+          (p.title || null) === (input.title || null)
+      );
+      return soft?.travel_type_override ?? null;
+    }
 
     function resolveCountsInStats(input: {
       vendor?: string | null;
@@ -339,19 +384,39 @@ export function saveAnalysis(
 
     const insertTravel = db.prepare(
       `INSERT INTO travel_items (
-        document_id, travel_type, provider, title, start_date, end_date, origin, destination,
-        booking_reference, price, currency, extracted_data, confidence, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        document_id, travel_type, travel_type_override, provider, title, start_date, end_date,
+        origin, destination, booking_reference, price, currency, extracted_data, confidence,
+        created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     );
     for (const t of enriched.travel_items) {
+      const ctx = {
+        title: t.title,
+        provider: t.provider,
+        origin: t.origin,
+        destination: t.destination,
+      };
+      const previousOverride = resolveTravelOverride({
+        provider: t.provider,
+        title: t.title,
+        start_date: t.start_date,
+        booking_reference: t.booking_reference,
+        origin: t.origin,
+        destination: t.destination,
+      });
+      const travelType = resolveTravelType(t.travel_type, {
+        ...ctx,
+        travel_type_override: previousOverride,
+      });
+      // Persist rule hits as override so read-time heuristics cannot undo them.
+      const matched = previousOverride ? null : findTravelTypeRule(ctx);
+      const storedOverride =
+        previousOverride || (matched ? matched.target_value : null);
+
       insertTravel.run(
         documentId,
-        normalizeTravelType(t.travel_type, {
-          title: t.title,
-          provider: t.provider,
-          origin: t.origin,
-          destination: t.destination,
-        }),
+        travelType,
+        storedOverride,
         t.provider,
         t.title,
         t.start_date,

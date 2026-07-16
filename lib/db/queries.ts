@@ -4,7 +4,14 @@ import { daysFromNow, currentYear, nowIso } from "@/lib/utils/dates";
 import {
   aggregateByMappedLabel,
   financeBucket,
+  TRAVEL_TYPES,
+  type TravelTypeCanonical,
 } from "@/lib/extraction/normalize-categories";
+import {
+  applyTravelTypeRuleToMatchingItems,
+  suggestTravelLearnMatch,
+  upsertTravelTypeRule,
+} from "@/lib/extraction/classification-rules";
 
 export type PaperlessDocumentRow = {
   id: number;
@@ -554,6 +561,90 @@ export function updateFinancialItemCountsInStats(
   db.prepare(
     `UPDATE financial_items SET counts_in_stats = ?, updated_at = ? WHERE id = ?`
   ).run(countsInStats ? 1 : 0, nowIso(), id);
+}
+
+export function getTravelItemById(id: number) {
+  const db = getDb();
+  return (
+    (db
+      .prepare(
+        `SELECT t.*, d.title as document_title, d.id as document_local_id
+         FROM travel_items t
+         JOIN paperless_documents d ON d.id = t.document_id
+         WHERE t.id = ?`
+      )
+      .get(id) as
+      | ({
+          id: number;
+          travel_type: string | null;
+          travel_type_override: string | null;
+          provider: string | null;
+          title: string | null;
+          origin: string | null;
+          destination: string | null;
+          document_title: string | null;
+          document_local_id: number;
+        } & Record<string, unknown>)
+      | undefined) || null
+  );
+}
+
+export function reclassifyTravelItem(input: {
+  id: number;
+  travelType: string;
+  learn?: boolean;
+}): {
+  ok: true;
+  travel_type: string;
+  learned: boolean;
+  rule_id: number | null;
+  applied_to: number;
+  learn_label: string | null;
+} {
+  if (!(TRAVEL_TYPES as readonly string[]).includes(input.travelType)) {
+    throw new Error("Ungültiger Reisetyp");
+  }
+
+  const row = getTravelItemById(input.id);
+  if (!row) throw new Error("Reiseeintrag nicht gefunden");
+
+  const db = getDb();
+  const ts = nowIso();
+  db.prepare(
+    `UPDATE travel_items
+     SET travel_type = ?, travel_type_override = ?, updated_at = ?
+     WHERE id = ?`
+  ).run(input.travelType, input.travelType, ts, input.id);
+
+  let learned = false;
+  let ruleId: number | null = null;
+  let appliedTo = 1;
+  let learnLabel: string | null = null;
+
+  if (input.learn) {
+    const suggestion = suggestTravelLearnMatch(row);
+    if (suggestion) {
+      const rule = upsertTravelTypeRule({
+        matchField: suggestion.matchField,
+        matchMode: suggestion.matchMode,
+        matchValue: suggestion.matchValue,
+        targetValue: input.travelType as TravelTypeCanonical,
+      });
+      ruleId = rule.id;
+      learned = true;
+      learnLabel = suggestion.label;
+      appliedTo = applyTravelTypeRuleToMatchingItems(rule);
+    }
+  }
+
+  return {
+    ok: true,
+    travel_type: input.travelType,
+    learned,
+    rule_id: ruleId,
+    applied_to: appliedTo,
+    learn_label: learnLabel,
+  };
 }
 
 /** Included in KPIs: opted into stats AND known vendor (not empty/"Unbekannt"). */
