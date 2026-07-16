@@ -1,8 +1,6 @@
 import { getDb } from "./client";
-import { ensureInitialized, getSetting, setSetting } from "./migrations";
+import { getSetting, setSetting } from "./migrations";
 import { daysFromNow, currentYear, nowIso } from "@/lib/utils/dates";
-
-ensureInitialized();
 
 export type PaperlessDocumentRow = {
   id: number;

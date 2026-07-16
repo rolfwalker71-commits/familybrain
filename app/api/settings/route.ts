@@ -10,6 +10,7 @@ import { maskToken } from "@/lib/utils/format";
 import { hasOpenAIKey } from "@/lib/ai/client";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   const paperless = getPaperlessSettings();

@@ -1,9 +1,11 @@
 import Database from "better-sqlite3";
 import fs from "fs";
 import path from "path";
+import { ensureInitialized } from "./migrations";
 
 const globalForDb = globalThis as unknown as {
   familybrainDb?: Database.Database;
+  familybrainInitialized?: boolean;
 };
 
 function resolveDbPath(): string {
@@ -31,8 +33,19 @@ export function getDb(): Database.Database {
   const db = new Database(dbPath);
   db.pragma("journal_mode = WAL");
   db.pragma("foreign_keys = ON");
+  // Wait instead of throwing SQLITE_BUSY when another process/worker
+  // (e.g. parallel Next build workers) holds a short-lived write lock.
+  db.pragma("busy_timeout = 5000");
 
+  // Assign before running migrations so the re-entrant getDb() calls inside
+  // ensureInitialized() reuse this instance instead of recursing.
   globalForDb.familybrainDb = db;
+
+  if (!globalForDb.familybrainInitialized) {
+    globalForDb.familybrainInitialized = true;
+    ensureInitialized();
+  }
+
   return db;
 }
 
