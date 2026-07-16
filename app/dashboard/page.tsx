@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { getDashboardStats, listDeadlines } from "@/lib/db/queries";
 import { formatCHF } from "@/lib/utils/format";
 import { toSwissDate } from "@/lib/utils/dates";
-import { MetricGrid, PageHeader } from "@/components/layout/page-primitives";
+import { MetricGrid, PageHeader, MetricTile } from "@/components/layout/page-primitives";
 import {
   IconCircle,
   pageVisuals,
@@ -41,19 +41,7 @@ function StatCard({
   href?: string;
 }) {
   const content = (
-    <Card className="h-full min-w-0 overflow-hidden border-border/80 shadow-sm transition-shadow hover:shadow-md">
-      <CardContent className="flex items-start justify-between gap-3 p-5">
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm text-muted-foreground" title={title}>
-            {title}
-          </p>
-          <p className="mt-2 truncate text-2xl font-semibold tracking-tight text-foreground tabular-nums">
-            {value}
-          </p>
-        </div>
-        <IconCircle icon={icon} tone={tone} />
-      </CardContent>
-    </Card>
+    <MetricTile title={title} value={value} icon={icon} tone={tone} className="h-full" />
   );
 
   return href ? (

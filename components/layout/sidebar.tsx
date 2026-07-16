@@ -42,14 +42,6 @@ const navItems: NavItem[] = [
     icon: Files,
     countKey: "totalDocuments",
   },
-  { href: "/chat", label: "Chat", icon: MessageSquare },
-  {
-    href: "/sync",
-    label: "Sync",
-    icon: RefreshCw,
-    countKey: "pendingCount",
-    pendingStyle: true,
-  },
   {
     href: "/knowledge",
     label: "Wissensbereiche",
@@ -81,6 +73,14 @@ const navItems: NavItem[] = [
     countKey: "travelDocuments",
   },
   { href: "/settings", label: "Einstellungen", icon: Settings },
+  { href: "/chat", label: "Chat", icon: MessageSquare },
+  {
+    href: "/sync",
+    label: "Sync",
+    icon: RefreshCw,
+    countKey: "pendingCount",
+    pendingStyle: true,
+  },
 ];
 
 function formatCount(n: number) {
@@ -153,7 +153,7 @@ export function Sidebar() {
         })}
       </nav>
 
-      <div className="mt-auto border-t border-sidebar-border/60 px-5 pb-24 pt-4">
+      <div className="mt-auto border-t border-sidebar-border/60 px-5 pb-36 pt-4">
         <p
           className="font-mono text-[10px] tabular-nums tracking-wide text-sidebar-foreground/50"
           title="App-Version (Datum-Uhrzeit des letzten Commits)"

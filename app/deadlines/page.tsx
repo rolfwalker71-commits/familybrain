@@ -71,14 +71,31 @@ export default function DeadlinesPage() {
   const [status, setStatus] = useState("open");
   const [rows, setRows] = useState<DeadlineRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const statusItems = {
+    open: "Offen",
+    completed: "Erledigt",
+    all: "Alle",
+  };
 
   async function load(selected = status) {
     setLoading(true);
-    const params = selected === "all" ? "" : `?status=${selected}`;
-    const res = await fetch(`/api/deadlines${params}`);
-    const data = await res.json();
-    setRows(data.deadlines || []);
-    setLoading(false);
+    setError(null);
+    try {
+      const params = selected === "all" ? "" : `?status=${selected}`;
+      const res = await fetch(`/api/deadlines${params}`);
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Fristen konnten nicht geladen werden");
+      }
+      setRows(data.deadlines || []);
+    } catch (err) {
+      setRows([]);
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -120,24 +137,34 @@ export default function DeadlinesPage() {
               onValueChange={(value) => {
                 if (value != null) setStatus(value);
               }}
+              items={statusItems}
             >
               <SelectTrigger className="w-40">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="open">Offen</SelectItem>
-                <SelectItem value="completed">Erledigt</SelectItem>
-                <SelectItem value="all">Alle</SelectItem>
+                {Object.entries(statusItems).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
         }
       />
 
-      <Card className="min-w-0 overflow-hidden border-border/80 shadow-sm">
+      <Card className="min-w-0 overflow-hidden border-border shadow-[0_1px_2px_rgba(15,23,42,0.06),0_4px_14px_rgba(15,23,42,0.08)]">
         <CardContent className="p-0">
           {loading ? (
             <div className="p-8 text-sm text-muted-foreground">Lade Fristen…</div>
+          ) : error ? (
+            <div className="space-y-3 p-8 text-sm">
+              <p className="text-destructive">{error}</p>
+              <Button type="button" variant="outline" size="sm" onClick={() => void load()}>
+                Erneut laden
+              </Button>
+            </div>
           ) : rows.length === 0 ? (
             <div className="p-8 text-sm text-muted-foreground">
               Keine Fristen gefunden.

@@ -22,7 +22,7 @@ import {
   MetaLine,
   VendorText,
 } from "@/components/layout/data-list";
-import { PageHeader } from "@/components/layout/page-primitives";
+import { PageHeader, TileTitleBar, MetricTile } from "@/components/layout/page-primitives";
 import { IconCircle, pageVisuals } from "@/components/layout/icon-circle";
 import { AddToCalendarButton } from "@/components/calendar/add-to-calendar-button";
 import {
@@ -371,7 +371,7 @@ export function FinanceOverviewClient({
   }, [selectedInvoices, detailGroupBy]);
 
   function openDimension(next: Dimension) {
-    setDimension(next);
+    setDimension((prev) => (prev === next ? null : next));
     setSelected(null);
   }
 
@@ -406,8 +406,8 @@ export function FinanceOverviewClient({
       />
 
       {recentDueInvoices.length > 0 || olderDueInvoices.length > 0 ? (
-        <Card className="min-w-0 overflow-hidden border-amber-200/80 bg-amber-50/40 shadow-sm">
-          <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 py-4">
+        <Card className="min-w-0 overflow-hidden border-amber-300 bg-card p-0 shadow-[0_1px_2px_rgba(15,23,42,0.06),0_4px_14px_rgba(15,23,42,0.08)] [--card-spacing:0px]">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-muted px-4 py-3">
             <button
               type="button"
               onClick={() => setDueOpen((v) => !v)}
@@ -416,15 +416,15 @@ export function FinanceOverviewClient({
             >
               <ChevronDown
                 className={cn(
-                  "mt-1 h-4 w-4 shrink-0 text-amber-700 transition-transform",
+                  "mt-1.5 h-4 w-4 shrink-0 text-amber-700 transition-transform",
                   !dueOpen && "-rotate-90"
                 )}
               />
               <div className="min-w-0">
-                <CardTitle className="flex items-center gap-2 text-base">
+                <div className="flex items-center gap-2 text-[19px] font-bold text-foreground">
                   <IconCircle icon={CircleAlert} tone="amber" size="sm" />
                   Rechnungen mit Zahlungsfrist
-                </CardTitle>
+                </div>
                 <p className="mt-1 text-sm text-muted-foreground">
                   {recentDueInvoices.length} aktuell (≤ {DUE_VISIBILITY_DAYS}{" "}
                   Tage) · {formatCHF(recentDueTotal)}
@@ -441,7 +441,7 @@ export function FinanceOverviewClient({
                 label="Alle in Kalender"
               />
             ) : null}
-          </CardHeader>
+          </div>
           {dueOpen ? (
             <CardContent className="space-y-0 p-0">
               {recentDueInvoices.length === 0 ? (
@@ -454,8 +454,8 @@ export function FinanceOverviewClient({
               )}
 
               {olderDueInvoices.length > 0 ? (
-                <div className="border-t border-amber-200/70">
-                  <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+                <div className="border-t border-border">
+                  <div className="flex flex-wrap items-center justify-between gap-2 bg-muted/70 px-4 py-3">
                     <button
                       type="button"
                       onClick={() => setOlderDueOpen((v) => !v)}
@@ -468,7 +468,7 @@ export function FinanceOverviewClient({
                           !olderDueOpen && "-rotate-90"
                         )}
                       />
-                      <span className="font-medium">
+                      <span className="font-bold">
                         Älter als {DUE_VISIBILITY_DAYS} Tage
                       </span>
                       <span className="text-muted-foreground">
@@ -495,59 +495,45 @@ export function FinanceOverviewClient({
       ) : null}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Card className="min-w-0 overflow-hidden border-border/80 shadow-sm">
-          <CardContent className="flex items-start justify-between gap-3 p-5">
-            <div className="min-w-0">
-              <p className="text-sm text-muted-foreground">
-                Gesamtausgaben{" "}
-                <span className="text-xs">(ohne Unbekannt)</span>
-              </p>
-              <p className="mt-2 break-words text-2xl font-semibold tabular-nums">
-                {formatCHF(totals.total)}
-              </p>
-            </div>
-            <IconCircle icon={Wallet} tone="blue" />
-          </CardContent>
-        </Card>
-        <Card className="min-w-0 overflow-hidden border-border/80 shadow-sm">
-          <CardContent className="flex items-start justify-between gap-3 p-5">
-            <div className="min-w-0">
-              <p className="text-sm text-muted-foreground">
-                Positionen{" "}
-                <span className="text-xs">(ohne Unbekannt)</span>
-              </p>
-              <p className="mt-2 text-2xl font-semibold tabular-nums">
-                {totals.count}
-              </p>
-            </div>
-            <IconCircle icon={FileText} tone="sky" />
-          </CardContent>
-        </Card>
-        <Card className="min-w-0 overflow-hidden border-border/80 shadow-sm">
-          <CardContent className="flex items-start justify-between gap-3 p-5">
-            <div className="min-w-0">
-              <p className="text-sm text-muted-foreground">Top-Lieferant</p>
-              <p className="mt-2 break-words text-lg font-semibold">
-                {topVendor?.label || "–"}
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground tabular-nums">
-                {topVendor ? formatCHF(topVendor.total) : "–"}
-              </p>
-            </div>
-            <IconCircle icon={Building2} tone="amber" />
-          </CardContent>
-        </Card>
-        <Card className="min-w-0 overflow-hidden border-border/80 shadow-sm">
-          <CardContent className="flex items-start justify-between gap-3 p-5">
-            <div className="min-w-0">
-              <p className="text-sm text-muted-foreground">Wiederkehrend</p>
-              <p className="mt-2 text-2xl font-semibold tabular-nums">
-                {recurring.length}
-              </p>
-            </div>
-            <IconCircle icon={Repeat} tone="green" />
-          </CardContent>
-        </Card>
+        <MetricTile
+          title={
+            <>
+              Gesamtausgaben{" "}
+              <span className="text-sm font-normal text-muted-foreground">
+                (ohne Unbekannt)
+              </span>
+            </>
+          }
+          value={formatCHF(totals.total)}
+          icon={Wallet}
+          tone="blue"
+        />
+        <MetricTile
+          title={
+            <>
+              Positionen{" "}
+              <span className="text-sm font-normal text-muted-foreground">
+                (ohne Unbekannt)
+              </span>
+            </>
+          }
+          value={totals.count}
+          icon={FileText}
+          tone="sky"
+        />
+        <MetricTile
+          title="Top-Lieferant"
+          value={topVendor?.label || "–"}
+          subtitle={topVendor ? formatCHF(topVendor.total) : undefined}
+          icon={Building2}
+          tone="amber"
+        />
+        <MetricTile
+          title="Wiederkehrend"
+          value={recurring.length}
+          icon={Repeat}
+          tone="green"
+        />
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -565,57 +551,60 @@ export function FinanceOverviewClient({
               type="button"
               onClick={() => openDimension(key)}
               className={cn(
-                "min-w-0 rounded-xl border bg-card p-5 text-left shadow-sm transition-all",
+                "min-w-0 overflow-hidden rounded-xl border-2 border-border bg-card text-left shadow-[0_1px_2px_rgba(15,23,42,0.06),0_4px_14px_rgba(15,23,42,0.08)] transition-all",
                 active
                   ? "border-primary ring-2 ring-primary/20"
-                  : "border-border/80 hover:border-primary/40 hover:shadow-md"
+                  : "hover:border-primary/40"
               )}
             >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="text-sm font-medium">{meta.title}</div>
-                  <p className="mt-3 text-2xl font-semibold tabular-nums">
-                    {formatCHF(dimTotal)}
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {items.length} Einträge · ohne Unbekannt · {meta.hint}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <IconCircle
-                    icon={Icon}
-                    tone={
-                      key === "year"
-                        ? "blue"
-                        : key === "vendor"
-                          ? "amber"
-                          : "violet"
-                    }
-                    size="sm"
-                  />
-                  <ChevronRight
-                    className={cn(
-                      "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
-                      active && "rotate-90 text-primary"
-                    )}
-                  />
-                </div>
-              </div>
-              {top ? (
-                <div className="mt-4 rounded-lg bg-muted/50 px-3 py-2">
-                  <p className="text-xs text-muted-foreground">Top</p>
-                  <div className="mt-0.5 flex min-w-0 items-center justify-between gap-2">
-                    <span className="break-words text-sm font-medium">
-                      {top.label}
-                    </span>
-                    <span className="shrink-0 text-sm tabular-nums">
-                      {formatCHF(top.total)}
-                    </span>
+              <TileTitleBar
+                trailing={
+                  <div className="flex items-center gap-2">
+                    <IconCircle
+                      icon={Icon}
+                      tone={
+                        key === "year"
+                          ? "blue"
+                          : key === "vendor"
+                            ? "amber"
+                            : "violet"
+                      }
+                      size="sm"
+                    />
+                    <ChevronRight
+                      className={cn(
+                        "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
+                        active && "rotate-90 text-primary"
+                      )}
+                    />
                   </div>
-                </div>
-              ) : (
-                <p className="mt-4 text-sm text-muted-foreground">{meta.empty}</p>
-              )}
+                }
+              >
+                {meta.title}
+              </TileTitleBar>
+              <div className="p-5">
+                <p className="text-2xl font-semibold tabular-nums">
+                  {formatCHF(dimTotal)}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {items.length} Einträge · ohne Unbekannt · {meta.hint}
+                </p>
+                {top ? (
+                  <div className="mt-4 rounded-lg bg-muted px-3 py-2">
+                    <p className="text-xs text-muted-foreground">Top</p>
+                    <div className="mt-0.5 flex min-w-0 items-center justify-between gap-2">
+                      <span className="break-words text-sm font-medium">
+                        {top.label}
+                      </span>
+                      <span className="shrink-0 text-sm tabular-nums">
+                        {formatCHF(top.total)}
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="mt-4 text-sm text-muted-foreground">{meta.empty}</p>
+                )}
+              </div>
             </button>
           );
         })}
@@ -661,27 +650,30 @@ export function FinanceOverviewClient({
                         setSelected(isSelected ? null : item.label)
                       }
                       className={cn(
-                        "min-w-0 rounded-xl border p-4 text-left transition-colors",
+                        "min-w-0 overflow-hidden rounded-xl border-2 border-border bg-card text-left shadow-[0_1px_2px_rgba(15,23,42,0.06),0_4px_14px_rgba(15,23,42,0.08)] transition-colors",
                         isSelected
-                          ? "border-primary bg-accent/40"
-                          : "border-border/70 hover:bg-muted/40"
+                          ? "border-primary ring-2 ring-primary/20"
+                          : "hover:border-primary/40"
                       )}
                     >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0 break-words font-medium">
-                          {item.label}
+                      <TileTitleBar
+                        trailing={
+                          <Badge variant="secondary" className="shrink-0">
+                            {item.count}
+                          </Badge>
+                        }
+                      >
+                        <span className="break-words">{item.label}</span>
+                      </TileTitleBar>
+                      <div className="p-4">
+                        <div className="text-xl font-semibold tabular-nums">
+                          {formatCHF(item.total)}
                         </div>
-                        <Badge variant="secondary" className="shrink-0">
-                          {item.count}
-                        </Badge>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          {share}% der Gesamtausgaben (ohne Unbekannt)
+                        </div>
+                        <ShareBar value={share} />
                       </div>
-                      <div className="mt-2 text-xl font-semibold tabular-nums">
-                        {formatCHF(item.total)}
-                      </div>
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        {share}% der Gesamtausgaben (ohne Unbekannt)
-                      </div>
-                      <ShareBar value={share} />
                     </button>
                   );
                 })}
@@ -689,13 +681,11 @@ export function FinanceOverviewClient({
             )}
 
             {selectedRow ? (
-              <div className="rounded-xl border border-border bg-muted/20 p-4">
-                <div className="flex flex-wrap items-end justify-between gap-3">
+              <div className="overflow-hidden rounded-xl border border-border bg-card">
+                <TileTitleBar>
                   <div className="min-w-0">
-                    <h3 className="break-words text-base font-semibold">
-                      {selectedRow.label}
-                    </h3>
-                    <p className="mt-1 text-sm text-muted-foreground">
+                    <div className="break-words">{selectedRow.label}</div>
+                    <p className="mt-0.5 text-xs font-normal text-muted-foreground">
                       {selectedRow.count} Positionen ·{" "}
                       {formatCHF(selectedRow.total)} ·{" "}
                       {detailGroupBy === "year"
@@ -703,32 +693,33 @@ export function FinanceOverviewClient({
                         : "nach Lieferant"}
                     </p>
                   </div>
-                </div>
+                </TileTitleBar>
 
                 {detailGroups.length === 0 ? (
-                  <p className="mt-4 text-sm text-muted-foreground">
+                  <p className="p-4 text-sm text-muted-foreground">
                     Keine Positionen für diese Auswahl.
                   </p>
                 ) : (
-                  <div className="mt-4 space-y-3">
+                  <div className="space-y-3 p-4">
                     {detailGroups.map((group) => (
                       <div
                         key={group.key}
                         className="overflow-hidden rounded-lg border border-border bg-card"
                       >
-                        <div className="flex items-center justify-between gap-3 bg-muted/40 px-4 py-2">
-                          <div className="flex min-w-0 items-center gap-2">
-                            <span className="break-words text-sm font-semibold">
-                              {group.label}
-                            </span>
-                            <Badge variant="secondary" className="shrink-0">
-                              {group.rows.length}
-                            </Badge>
-                          </div>
-                          <span className="shrink-0 text-sm font-semibold tabular-nums">
-                            {formatCHF(group.total)}
-                          </span>
-                        </div>
+                        <TileTitleBar
+                          trailing={
+                            <>
+                              <Badge variant="secondary" className="shrink-0">
+                                {group.rows.length}
+                              </Badge>
+                              <span className="text-sm font-semibold tabular-nums">
+                                {formatCHF(group.total)}
+                              </span>
+                            </>
+                          }
+                        >
+                          <span className="break-words">{group.label}</span>
+                        </TileTitleBar>
                         <DataList>
                           {group.rows.map((row) => (
                             <InvoiceListRow

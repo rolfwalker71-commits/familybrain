@@ -19,7 +19,7 @@ import {
   MetaLine,
   SoftText,
 } from "@/components/layout/data-list";
-import { PageHeader } from "@/components/layout/page-primitives";
+import { PageHeader, TileTitleBar, MetricTile } from "@/components/layout/page-primitives";
 import { IconCircle, pageVisuals } from "@/components/layout/icon-circle";
 import { AddToCalendarButton } from "@/components/calendar/add-to-calendar-button";
 import {
@@ -292,7 +292,7 @@ export function TravelOverviewClient({ items }: Props) {
   );
 
   function openDimension(next: Dimension) {
-    setDimension(next);
+    setDimension((prev) => (prev === next ? null : next));
     setSelected(null);
     setDetailId(null);
   }
@@ -320,50 +320,30 @@ export function TravelOverviewClient({ items }: Props) {
       />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Card className="min-w-0 overflow-hidden border-border/80 shadow-sm">
-          <CardContent className="flex items-start justify-between gap-3 p-5">
-            <div className="min-w-0">
-              <p className="text-sm text-muted-foreground">Reiseeinträge</p>
-              <p className="mt-2 text-2xl font-semibold tabular-nums">
-                {totals.count}
-              </p>
-            </div>
-            <IconCircle icon={Ticket} tone="sky" />
-          </CardContent>
-        </Card>
-        <Card className="min-w-0 overflow-hidden border-border/80 shadow-sm">
-          <CardContent className="flex items-start justify-between gap-3 p-5">
-            <div className="min-w-0">
-              <p className="text-sm text-muted-foreground">Mit Termin</p>
-              <p className="mt-2 text-2xl font-semibold tabular-nums">
-                {totals.withDates}
-              </p>
-            </div>
-            <IconCircle icon={CalendarDays} tone="blue" />
-          </CardContent>
-        </Card>
-        <Card className="min-w-0 overflow-hidden border-border/80 shadow-sm">
-          <CardContent className="flex items-start justify-between gap-3 p-5">
-            <div className="min-w-0">
-              <p className="text-sm text-muted-foreground">Kommend</p>
-              <p className="mt-2 text-2xl font-semibold tabular-nums">
-                {upcoming.length}
-              </p>
-            </div>
-            <IconCircle icon={Plane} tone="green" />
-          </CardContent>
-        </Card>
-        <Card className="min-w-0 overflow-hidden border-border/80 shadow-sm">
-          <CardContent className="flex items-start justify-between gap-3 p-5">
-            <div className="min-w-0">
-              <p className="text-sm text-muted-foreground">Erkannte Kosten</p>
-              <p className="mt-2 break-words text-2xl font-semibold tabular-nums">
-                {formatCHF(totals.total)}
-              </p>
-            </div>
-            <IconCircle icon={MapPin} tone="amber" />
-          </CardContent>
-        </Card>
+        <MetricTile
+          title="Reiseeinträge"
+          value={totals.count}
+          icon={Ticket}
+          tone="sky"
+        />
+        <MetricTile
+          title="Mit Termin"
+          value={totals.withDates}
+          icon={CalendarDays}
+          tone="blue"
+        />
+        <MetricTile
+          title="Kommend"
+          value={upcoming.length}
+          icon={Plane}
+          tone="green"
+        />
+        <MetricTile
+          title="Erkannte Kosten"
+          value={formatCHF(totals.total)}
+          icon={MapPin}
+          tone="amber"
+        />
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -379,57 +359,58 @@ export function TravelOverviewClient({ items }: Props) {
               type="button"
               onClick={() => openDimension(key)}
               className={cn(
-                "min-w-0 rounded-xl border bg-card p-5 text-left shadow-sm transition-all",
+                "min-w-0 overflow-hidden rounded-xl border-2 border-border bg-card text-left shadow-[0_1px_2px_rgba(15,23,42,0.06),0_4px_14px_rgba(15,23,42,0.08)] transition-all",
                 active
                   ? "border-primary ring-2 ring-primary/20"
-                  : "border-border/80 hover:border-primary/40 hover:shadow-md"
+                  : "hover:border-primary/40"
               )}
             >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="text-sm font-medium">{meta.title}</div>
-                  <p className="mt-3 text-2xl font-semibold tabular-nums">
-                    {meta.items.length}
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {meta.hint}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <IconCircle
-                    icon={Icon}
-                    tone={
-                      key === "year"
-                        ? "blue"
-                        : key === "type"
-                          ? "teal"
-                          : "amber"
-                    }
-                    size="sm"
-                  />
-                  <ChevronRight
-                    className={cn(
-                      "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
-                      active && "rotate-90 text-primary"
-                    )}
-                  />
-                </div>
-              </div>
-              {top ? (
-                <div className="mt-4 rounded-lg bg-muted/50 px-3 py-2">
-                  <p className="text-xs text-muted-foreground">Top</p>
-                  <div className="mt-0.5 flex min-w-0 items-center justify-between gap-2">
-                    <span className="break-words text-sm font-medium">
-                      {top.label}
-                    </span>
-                    <span className="shrink-0 text-sm tabular-nums">
-                      {top.count}×
-                    </span>
+              <TileTitleBar
+                trailing={
+                  <div className="flex items-center gap-2">
+                    <IconCircle
+                      icon={Icon}
+                      tone={
+                        key === "year"
+                          ? "blue"
+                          : key === "type"
+                            ? "teal"
+                            : "amber"
+                      }
+                      size="sm"
+                    />
+                    <ChevronRight
+                      className={cn(
+                        "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
+                        active && "rotate-90 text-primary"
+                      )}
+                    />
                   </div>
-                </div>
-              ) : (
-                <p className="mt-4 text-sm text-muted-foreground">{meta.empty}</p>
-              )}
+                }
+              >
+                {meta.title}
+              </TileTitleBar>
+              <div className="p-5">
+                <p className="text-2xl font-semibold tabular-nums">
+                  {meta.items.length}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">{meta.hint}</p>
+                {top ? (
+                  <div className="mt-4 rounded-lg bg-muted px-3 py-2">
+                    <p className="text-xs text-muted-foreground">Top</p>
+                    <div className="mt-0.5 flex min-w-0 items-center justify-between gap-2">
+                      <span className="break-words text-sm font-medium">
+                        {top.label}
+                      </span>
+                      <span className="shrink-0 text-sm tabular-nums">
+                        {top.count}×
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="mt-4 text-sm text-muted-foreground">{meta.empty}</p>
+                )}
+              </div>
             </button>
           );
         })}
@@ -477,27 +458,30 @@ export function TravelOverviewClient({ items }: Props) {
                         setDetailId(null);
                       }}
                       className={cn(
-                        "min-w-0 rounded-xl border p-4 text-left transition-colors",
+                        "min-w-0 overflow-hidden rounded-xl border-2 border-border bg-card text-left shadow-[0_1px_2px_rgba(15,23,42,0.06),0_4px_14px_rgba(15,23,42,0.08)] transition-colors",
                         isSelected
-                          ? "border-primary bg-accent/40"
-                          : "border-border/70 hover:bg-muted/40"
+                          ? "border-primary ring-2 ring-primary/20"
+                          : "hover:border-primary/40"
                       )}
                     >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0 break-words font-medium">
-                          {item.label}
+                      <TileTitleBar
+                        trailing={
+                          <Badge variant="secondary" className="shrink-0">
+                            {item.count}
+                          </Badge>
+                        }
+                      >
+                        <span className="break-words">{item.label}</span>
+                      </TileTitleBar>
+                      <div className="p-4">
+                        <div className="text-xl font-semibold tabular-nums">
+                          {formatCHF(item.total)}
                         </div>
-                        <Badge variant="secondary" className="shrink-0">
-                          {item.count}
-                        </Badge>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          {share}% der Einträge
+                        </div>
+                        <ShareBar value={share} />
                       </div>
-                      <div className="mt-2 text-xl font-semibold tabular-nums">
-                        {formatCHF(item.total)}
-                      </div>
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        {share}% der Einträge
-                      </div>
-                      <ShareBar value={share} />
                     </button>
                   );
                 })}
@@ -505,27 +489,29 @@ export function TravelOverviewClient({ items }: Props) {
             )}
 
             {selectedRow ? (
-              <div className="rounded-xl border border-border bg-muted/20 p-4">
-                <div className="flex flex-wrap items-end justify-between gap-3">
+              <div className="overflow-hidden rounded-xl border border-border bg-card">
+                <TileTitleBar
+                  interactiveTrailing
+                  trailing={
+                    <AddToCalendarButton
+                      events={detailRows
+                        .map(travelToCalendarEvent)
+                        .filter((e): e is CalendarEvent => Boolean(e))}
+                      filename={`familybrain-reise-${selectedRow.label}`}
+                      label="Auswahl in Kalender"
+                    />
+                  }
+                >
                   <div className="min-w-0">
-                    <h3 className="break-words text-base font-semibold">
-                      {selectedRow.label}
-                    </h3>
-                    <p className="mt-1 text-sm text-muted-foreground">
+                    <div className="break-words">{selectedRow.label}</div>
+                    <p className="mt-0.5 text-xs font-normal text-muted-foreground">
                       {selectedRow.count} Einträge ·{" "}
                       {formatCHF(selectedRow.total)}
                     </p>
                   </div>
-                  <AddToCalendarButton
-                    events={detailRows
-                      .map(travelToCalendarEvent)
-                      .filter((e): e is CalendarEvent => Boolean(e))}
-                    filename={`familybrain-reise-${selectedRow.label}`}
-                    label="Auswahl in Kalender"
-                  />
-                </div>
+                </TileTitleBar>
 
-                <div className="mt-4 overflow-hidden rounded-lg border border-border bg-card">
+                <div className="border-t-0">
                   <DataList>
                     {detailRows.map((row) => (
                       <TravelListRow
@@ -541,7 +527,7 @@ export function TravelOverviewClient({ items }: Props) {
                 </div>
 
                 {openDetail && detailRows.some((r) => r.id === openDetail.id) ? (
-                  <div className="mt-4 grid gap-3 rounded-lg border border-border bg-card p-4 sm:grid-cols-2">
+                  <div className="grid gap-3 border-t border-border p-4 sm:grid-cols-2">
                     <DetailField label="Titel" value={openDetail.title} />
                     <DetailField
                       label="Typ"

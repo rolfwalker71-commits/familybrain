@@ -157,11 +157,11 @@ export function DataListHeader({
   actions?: ReactNode;
 }) {
   return (
-    <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border/70 px-4 py-3">
+    <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border bg-muted px-4 py-2.5">
       <div className="min-w-0">
-        <h3 className="text-base font-semibold">{title}</h3>
+        <h3 className="text-[19px] font-bold text-foreground">{title}</h3>
         {description ? (
-          <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
         ) : null}
       </div>
       {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}

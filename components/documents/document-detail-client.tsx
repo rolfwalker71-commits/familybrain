@@ -499,11 +499,18 @@ export function DocumentDetailClient({ detail }: DetailProps) {
       </div>
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="flex items-center gap-3 text-base">
-            <IconCircle icon={FileText} tone="slate" size="sm" />
-            OCR-Text
-          </CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={() => setShowOcr((v) => !v)}
+            className="flex min-w-0 flex-1 items-center gap-3 text-left"
+            aria-expanded={showOcr}
+          >
+            <CardTitle className="flex items-center gap-3 text-base">
+              <IconCircle icon={FileText} tone="slate" size="sm" />
+              OCR-Text
+            </CardTitle>
+          </button>
           <Button variant="ghost" size="sm" onClick={() => setShowOcr((v) => !v)}>
             {showOcr ? "Einklappen" : "Ausklappen"}
           </Button>

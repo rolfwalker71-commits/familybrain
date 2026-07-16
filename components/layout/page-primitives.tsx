@@ -95,9 +95,93 @@ export function CardGrid({
   );
 }
 
+/**
+ * Full-bleed title bar for tiles / group headers.
+ * Uses muted gray (darker than page background) so headings stand out.
+ *
+ * The bar itself is pointer-events-none so parent `<button>` / Link clicks work.
+ * Set `interactiveTrailing` when trailing contains real controls (e.g. calendar).
+ */
+export function TileTitleBar({
+  children,
+  trailing,
+  className,
+  interactiveTrailing = false,
+}: {
+  children: ReactNode;
+  trailing?: ReactNode;
+  className?: string;
+  interactiveTrailing?: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        // Always pass clicks through to a parent <button>/Link; only
+        // interactive trailing controls re-enable pointer events.
+        "pointer-events-none flex w-full items-center justify-between gap-3 border-b border-border bg-muted px-4 py-2.5",
+        className
+      )}
+    >
+      <div className="min-w-0 flex-1 text-[19px] font-bold text-foreground">
+        {children}
+      </div>
+      {trailing ? (
+        <div
+          className={cn(
+            "flex shrink-0 items-center gap-2",
+            interactiveTrailing && "pointer-events-auto"
+          )}
+        >
+          {trailing}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** Small KPI / metric tile used on dashboard, finance, travel, etc. */
+export function MetricTile({
+  title,
+  value,
+  subtitle,
+  icon,
+  tone = "blue",
+  className,
+}: {
+  title: ReactNode;
+  value: ReactNode;
+  subtitle?: ReactNode;
+  icon?: LucideIcon;
+  tone?: IconTone;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "min-w-0 overflow-hidden rounded-xl border-2 border-border bg-card shadow-[0_1px_2px_rgba(15,23,42,0.06),0_4px_14px_rgba(15,23,42,0.08)]",
+        className
+      )}
+    >
+      <TileTitleBar
+        trailing={icon ? <IconCircle icon={icon} tone={tone} size="sm" /> : undefined}
+      >
+        {title}
+      </TileTitleBar>
+      <div className="p-4">
+        <div className="break-words text-2xl font-semibold tabular-nums text-foreground">
+          {value}
+        </div>
+        {subtitle ? (
+          <div className="mt-1 text-xs text-muted-foreground">{subtitle}</div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 export function TableShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="w-full min-w-0 overflow-hidden rounded-xl border border-border/80 bg-card shadow-sm">
+    <div className="w-full min-w-0 overflow-hidden rounded-xl border-2 border-border bg-card shadow-[0_1px_2px_rgba(15,23,42,0.06),0_4px_14px_rgba(15,23,42,0.08)]">
       <div className="w-full overflow-x-auto">{children}</div>
     </div>
   );
