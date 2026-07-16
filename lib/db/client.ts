@@ -1,6 +1,7 @@
 import Database from "better-sqlite3";
 import fs from "fs";
 import path from "path";
+import { bootstrapDatabase } from "./bootstrap";
 
 const globalForDb = globalThis as unknown as {
   familybrainDb?: Database.Database;
@@ -22,8 +23,18 @@ function resolveDbPath(): string {
 }
 
 export function getDb(): Database.Database {
-  if (globalForDb.familybrainDb) {
+  if (globalForDb.familybrainDb && globalForDb.familybrainInitialized) {
     return globalForDb.familybrainDb;
+  }
+
+  if (globalForDb.familybrainDb && !globalForDb.familybrainInitialized) {
+    // Previous open without successful bootstrap – close and retry.
+    try {
+      globalForDb.familybrainDb.close();
+    } catch {
+      /* ignore */
+    }
+    globalForDb.familybrainDb = undefined;
   }
 
   const dbPath = resolveDbPath();
@@ -32,23 +43,22 @@ export function getDb(): Database.Database {
   const db = new Database(dbPath);
   db.pragma("journal_mode = WAL");
   db.pragma("foreign_keys = ON");
-  // Wait instead of throwing SQLITE_BUSY when another process/worker
-  // (e.g. parallel Next build workers) holds a short-lived write lock.
   db.pragma("busy_timeout = 5000");
 
-  // Assign before running migrations so the re-entrant getDb() calls inside
-  // ensureInitialized() reuse this instance instead of recursing.
   globalForDb.familybrainDb = db;
 
-  if (!globalForDb.familybrainInitialized) {
+  try {
+    bootstrapDatabase(db);
     globalForDb.familybrainInitialized = true;
-    // Lazy require avoids a circular import (client ↔ migrations) that can
-    // leave ensureInitialized undefined at module evaluation time.
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { ensureInitialized } = require("./migrations") as {
-      ensureInitialized: () => void;
-    };
-    ensureInitialized();
+  } catch (error) {
+    globalForDb.familybrainInitialized = false;
+    try {
+      db.close();
+    } catch {
+      /* ignore */
+    }
+    globalForDb.familybrainDb = undefined;
+    throw error;
   }
 
   return db;
