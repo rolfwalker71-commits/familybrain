@@ -1,6 +1,10 @@
 import { getDb } from "./client";
 import { getSetting, setSetting } from "./migrations";
 import { daysFromNow, currentYear, nowIso } from "@/lib/utils/dates";
+import {
+  aggregateByMappedLabel,
+  financeBucket,
+} from "@/lib/extraction/normalize-categories";
 
 export type PaperlessDocumentRow = {
   id: number;
@@ -92,6 +96,8 @@ export function listDocuments(filters: DocumentFilters = {}) {
     params.push(q, q, q, q, q, q, q);
   }
   if (filters.category) {
+    // Exact match on stored category; also accept common aliases via normalized compare in JS fallback not needed —
+    // knowledge area links and AI saves use canonical German names.
     where.push(`s.category = ?`);
     params.push(filters.category);
   }
@@ -584,7 +590,7 @@ export function getFinanceOverview() {
     )
     .all();
 
-  const byCategory = db
+  const byCategoryRaw = db
     .prepare(
       `SELECT COALESCE(NULLIF(TRIM(category), ''), 'Sonstiges') as category,
               COUNT(*) as count,
@@ -594,7 +600,15 @@ export function getFinanceOverview() {
        GROUP BY COALESCE(NULLIF(TRIM(category), ''), 'Sonstiges')
        ORDER BY total DESC`
     )
-    .all();
+    .all() as { category: string; count: number; total: number }[];
+
+  const byCategory = aggregateByMappedLabel(byCategoryRaw, (r) =>
+    financeBucket(r.category)
+  ).map((r) => ({
+    category: r.label,
+    count: r.count,
+    total: r.total,
+  }));
 
   const totals = db
     .prepare(
@@ -705,18 +719,21 @@ export function listFinancialItemsByDimension(input: {
       .all(vendor === null ? "Unbekannt" : input.value, limit);
   }
 
-  return db
+  const rows = db
     .prepare(
       `SELECT f.*, d.title as document_title, d.id as document_local_id
        FROM financial_items f
        JOIN paperless_documents d ON d.id = f.document_id
        WHERE COALESCE(f.counts_in_stats, 1) = 1
          AND NULLIF(TRIM(f.vendor), '') IS NOT NULL
-         AND COALESCE(NULLIF(TRIM(f.category), ''), 'Sonstiges') = ?
        ORDER BY COALESCE(f.amount, 0) DESC
-       LIMIT ?`
+       LIMIT 500`
     )
-    .all(input.value, limit);
+    .all() as Array<{ category: string | null; [key: string]: unknown }>;
+
+  return rows
+    .filter((r) => financeBucket(r.category) === input.value)
+    .slice(0, limit);
 }
 
 export function listTravelItems() {

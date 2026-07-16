@@ -1,7 +1,15 @@
 import { KNOWLEDGE_AREAS } from "@/lib/extraction/categories";
 import { selectAnalysisOcrWindow } from "@/lib/extraction/itinerary";
+import {
+  DEADLINE_TYPES,
+  FINANCE_BUCKETS,
+  TRAVEL_TYPES,
+} from "@/lib/extraction/normalize-categories";
 
 const categoriesList = KNOWLEDGE_AREAS.map((a) => a.name).join(", ");
+const travelTypesList = TRAVEL_TYPES.join(", ");
+const deadlineTypesList = DEADLINE_TYPES.join(", ");
+const financeBucketsList = FINANCE_BUCKETS.join(", ");
 
 export const ANALYSIS_SYSTEM_PROMPT = `You are an assistant that extracts structured household knowledge from OCR text of personal documents (Swiss family context).
 
@@ -13,6 +21,10 @@ Rules:
 - Identify whether the document is Rechnung, Vertrag, Versicherung, Garantie, Reiseunterlage, Arztbericht, Steuerdokument or Sonstiges.
 - For travel/cruise documents, extract the full itinerary (ports of call / Kreuzfahrtverlauf / daily stops) into travel_items[].itinerary AND also list each stop date in important_dates.
 - Also capture other date-relevant fields in important_dates: payment due, cancellation deadline, boarding, check-in, flight departure/arrival, hotel check-in/out, appointment dates, warranty end, contract start/end.
+- category MUST be one of: ${categoriesList}
+- travel_items[].travel_type SHOULD be one of: ${travelTypesList} (use German labels; map Cruise→Kreuzfahrt, Hotelaufenthalt→Hotel, Visa Waiver→Visa / Einreise)
+- deadlines[].type SHOULD be one of: ${deadlineTypesList} (map cancellation→Kündigung, payment→Zahlung, appeal/einspruch→Einsprache)
+- financial_items[].category SHOULD map into these buckets when possible: ${financeBucketsList} (use short German labels; salary/balance lines → Saldo / Konto or Lohn; never invent English duplicates)
 - Return VALID JSON only. No markdown. No commentary.
 - Category must be one of: ${categoriesList}`;
 

@@ -120,3 +120,4 @@ docker compose logs -f familybrain
 - SQLite file: `data/familybrain.sqlite` (gitignored)
 - One FamilyBrain instance is enough for a home Paperless host
 - Default Docker host port: **3100** (avoids conflicts with other apps on 3000)
+- Travel/finance/deadline labels are normalized semantically on read and on new analyses (e.g. Cruise→Kreuzfahrt); finance overview uses display buckets

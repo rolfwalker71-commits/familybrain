@@ -34,6 +34,7 @@ import { formatCHF } from "@/lib/utils/format";
 import { daysAgo, toSwissDate } from "@/lib/utils/dates";
 import { cn } from "@/lib/utils";
 import type { CalendarEvent } from "@/lib/utils/ics";
+import { financeBucket } from "@/lib/extraction/normalize-categories";
 
 const DUE_VISIBILITY_DAYS = 180;
 
@@ -282,7 +283,7 @@ export function FinanceOverviewClient({
       icon: Tags,
       items: byCategory,
       empty: "Keine Kategorien",
-      hint: "AI-Kategorien aus Analysen",
+                  hint: "Semantisch gruppiert",
     },
   } as const;
 
@@ -311,7 +312,7 @@ export function FinanceOverviewClient({
           const v = row.vendor?.trim() || "Unbekannt";
           return v === selected;
         }
-        const c = row.category?.trim() || "Sonstiges";
+        const c = financeBucket(row.category);
         return c === selected;
       })
       .slice(0, 12);

@@ -5,6 +5,12 @@ import {
   parseItineraryFromOcr,
   type ItineraryStop,
 } from "@/lib/extraction/itinerary";
+import {
+  normalizeDeadlineType,
+  normalizeFinanceCategory,
+  normalizeKnowledgeCategory,
+  normalizeTravelType,
+} from "@/lib/extraction/normalize-categories";
 
 function warrantyStatus(warrantyUntil: string | null): string {
   if (!warrantyUntil) return "unknown";
@@ -148,7 +154,7 @@ export function saveAnalysis(
       JSON.stringify(enriched.contract_parties),
       JSON.stringify(enriched.warranty_info),
       JSON.stringify(enriched.cancellation_terms),
-      enriched.category,
+      normalizeKnowledgeCategory(enriched.category),
       JSON.stringify(enriched.possible_todos),
       enriched.confidence,
       modelName,
@@ -244,7 +250,7 @@ export function saveAnalysis(
         d.title,
         d.description,
         d.date,
-        d.type,
+        normalizeDeadlineType(d.type),
         d.description,
         enriched.confidence,
         ts,
@@ -258,12 +264,12 @@ export function saveAnalysis(
     ) {
       insertDeadline.run(
         documentId,
-        "Kündigungsfrist",
+        "Kündigung",
         enriched.cancellation_terms.notice_period
           ? `Kündigungsfrist: ${enriched.cancellation_terms.notice_period}`
           : "Kündigung prüfen",
         enriched.cancellation_terms.latest_cancellation_date,
-        "cancellation",
+        "Kündigung",
         enriched.cancellation_terms.notice_period,
         enriched.confidence,
         ts,
@@ -285,7 +291,7 @@ export function saveAnalysis(
         f.currency ?? "CHF",
         f.invoice_date,
         f.due_date,
-        f.category,
+        normalizeFinanceCategory(f.category),
         f.description ?? null,
         f.is_recurring ? 1 : 0,
         resolveCountsInStats({
@@ -313,7 +319,7 @@ export function saveAnalysis(
           a.currency ?? "CHF",
           null,
           null,
-          a.label,
+          normalizeFinanceCategory(a.label),
           a.label,
           0,
           resolveCountsInStats({
@@ -337,7 +343,7 @@ export function saveAnalysis(
     for (const t of enriched.travel_items) {
       insertTravel.run(
         documentId,
-        t.travel_type,
+        normalizeTravelType(t.travel_type),
         t.provider,
         t.title,
         t.start_date,

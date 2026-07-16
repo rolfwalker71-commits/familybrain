@@ -28,6 +28,7 @@ import {
 } from "@/components/documents/document-link";
 import { ItineraryList } from "@/components/travel/itinerary-list";
 import { resolveItinerary } from "@/lib/extraction/itinerary";
+import { normalizeTravelType } from "@/lib/extraction/normalize-categories";
 import { formatCHF } from "@/lib/utils/format";
 import { toSwissDate } from "@/lib/utils/dates";
 import { cn } from "@/lib/utils";
@@ -55,20 +56,8 @@ type AggRow = { label: string; count: number; total: number };
 
 type Dimension = "year" | "type" | "provider";
 
-const typeLabels: Record<string, string> = {
-  flight: "Flug",
-  hotel: "Hotel",
-  train: "Bahn",
-  cruise: "Kreuzfahrt",
-  rental_car: "Mietwagen",
-  insurance: "Reiseversicherung",
-  package: "Paket",
-  other: "Sonstiges",
-};
-
 function typeLabel(type: string | null | undefined) {
-  if (!type) return "Sonstiges";
-  return typeLabels[type] || type;
+  return normalizeTravelType(type);
 }
 
 function percent(part: number, whole: number) {
@@ -266,7 +255,7 @@ export function TravelOverviewClient({ items }: Props) {
       icon: Plane,
       items: byType,
       empty: "Keine Typen",
-      hint: "Flug, Hotel, Bahn …",
+      hint: "Flug, Hotel, Kreuzfahrt …",
     },
     provider: {
       title: "Nach Anbieter",

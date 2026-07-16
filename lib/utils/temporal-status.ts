@@ -1,3 +1,8 @@
+import {
+  normalizeDeadlineType,
+  type DeadlineTypeCanonical,
+} from "@/lib/extraction/normalize-categories";
+
 export type TemporalStatus = "active" | "expiring_soon" | "expired" | "unknown";
 
 export function resolveTemporalStatus(
@@ -43,17 +48,8 @@ export function temporalStatusLabel(status: string | null | undefined): string {
 /** Alias for warranty list – same labels */
 export const warrantyStatusLabel = temporalStatusLabel;
 
-export function deadlineTypeLabel(type: string | null | undefined): string {
-  switch (type) {
-    case "cancellation":
-      return "Kündigung";
-    case "payment":
-      return "Zahlung";
-    case "warranty":
-      return "Garantie";
-    case "notice":
-      return "Frist";
-    default:
-      return type || "Sonstiges";
-  }
+export function deadlineTypeLabel(
+  type: string | null | undefined
+): DeadlineTypeCanonical {
+  return normalizeDeadlineType(type);
 }
