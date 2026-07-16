@@ -9,7 +9,9 @@
     "lint": "eslint",
     "db:init": "tsx scripts/init-db.ts",
     "sync:paperless": "tsx scripts/sync-paperless.ts",
-    "analyze:pending": "tsx scripts/analyze-pending.ts"
+    "analyze:pending": "tsx scripts/analyze-pending.ts",
+    "version:bump": "node scripts/bump-version.js",
+    "hooks:install": "git config core.hooksPath scripts/git-hooks && chmod +x scripts/git-hooks/pre-commit"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",

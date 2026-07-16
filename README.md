@@ -121,3 +121,4 @@ docker compose logs -f familybrain
 - One FamilyBrain instance is enough for a home Paperless host
 - Default Docker host port: **3100** (avoids conflicts with other apps on 3000)
 - Travel/finance/deadline labels are normalized semantically on read and on new analyses (e.g. Cruise→Kreuzfahrt); finance overview uses display buckets
+- App version (`YYYYMMDD-HHMM`) is shown at the bottom of the sidebar; enable auto-bump on commit once with `npm run hooks:install`

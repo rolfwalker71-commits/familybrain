@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAnalysis } from "@/components/analysis/analysis-provider";
+import { APP_VERSION } from "@/lib/app-version";
 
 type NavItem = {
   href: string;
@@ -104,7 +105,7 @@ export function Sidebar() {
         </Link>
       </div>
 
-      <nav className="flex-1 space-y-1 px-3 pb-6">
+      <nav className="flex-1 space-y-1 px-3 pb-4">
         {navItems.map((item) => {
           const active =
             pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -151,6 +152,15 @@ export function Sidebar() {
           );
         })}
       </nav>
+
+      <div className="mt-auto border-t border-sidebar-border/60 px-5 py-4">
+        <p
+          className="font-mono text-[10px] tabular-nums tracking-wide text-sidebar-foreground/50"
+          title="App-Version (Datum-Uhrzeit des letzten Commits)"
+        >
+          {APP_VERSION}
+        </p>
+      </div>
     </aside>
   );
 }

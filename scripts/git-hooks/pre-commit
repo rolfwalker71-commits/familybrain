@@ -1,0 +1,7 @@
+#!/bin/sh
+# Bump APP_VERSION (YYYYMMDD-HHMM) and stage it for this commit.
+set -e
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+node scripts/bump-version.js >/dev/null
+git add lib/app-version.ts
