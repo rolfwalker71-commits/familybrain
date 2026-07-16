@@ -19,6 +19,12 @@ import {
   SoftText,
 } from "@/components/layout/data-list";
 import { toSwissDate } from "@/lib/utils/dates";
+import {
+  deadlineTypeLabel,
+  resolveTemporalStatus,
+  temporalStatusBadgeClass,
+  temporalStatusLabel,
+} from "@/lib/utils/temporal-status";
 import { PageHeader } from "@/components/layout/page-primitives";
 import { pageVisuals } from "@/components/layout/icon-circle";
 import { AddToCalendarButton } from "@/components/calendar/add-to-calendar-button";
@@ -140,6 +146,11 @@ export default function DeadlinesPage() {
             <DataList>
               {rows.map((row) => {
                 const event = deadlineToEvent(row);
+                const temporalStatus =
+                  row.status === "completed"
+                    ? "unknown"
+                    : resolveTemporalStatus(row.deadline_date);
+
                 return (
                   <DataListRow key={row.id}>
                     <DataListMain
@@ -153,11 +164,23 @@ export default function DeadlinesPage() {
                       }
                       meta={
                         <MetaLine>
-                          <span className="tabular-nums">
+                          <span className="font-semibold tabular-nums">
                             {toSwissDate(row.deadline_date)}
                           </span>
                           <Badge variant="secondary">
-                            {row.deadline_type || "other"}
+                            {deadlineTypeLabel(row.deadline_type)}
+                          </Badge>
+                          <Badge
+                            variant="secondary"
+                            className={
+                              row.status === "completed"
+                                ? "border-transparent bg-muted text-muted-foreground hover:bg-muted"
+                                : temporalStatusBadgeClass(temporalStatus)
+                            }
+                          >
+                            {row.status === "completed"
+                              ? "Erledigt"
+                              : temporalStatusLabel(temporalStatus)}
                           </Badge>
                           <span className="tabular-nums">
                             {row.confidence != null

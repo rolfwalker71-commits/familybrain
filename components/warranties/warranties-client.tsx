@@ -19,6 +19,12 @@ import {
 } from "@/components/documents/document-link";
 import { toSwissDate } from "@/lib/utils/dates";
 import { formatCHF } from "@/lib/utils/format";
+import {
+  resolveTemporalStatus,
+  temporalStatusBadgeClass,
+  type TemporalStatus,
+  warrantyStatusLabel,
+} from "@/lib/utils/temporal-status";
 import type { CalendarEvent } from "@/lib/utils/ics";
 
 export type WarrantyRow = {
@@ -64,6 +70,17 @@ function warrantyToEvent(row: WarrantyRow): CalendarEvent | null {
   };
 }
 
+function asTemporalStatus(status: string | null | undefined): TemporalStatus {
+  if (
+    status === "active" ||
+    status === "expiring_soon" ||
+    status === "expired"
+  ) {
+    return status;
+  }
+  return "unknown";
+}
+
 export function WarrantiesClient({ rows }: { rows: WarrantyRow[] }) {
   const exportable = rows
     .map(warrantyToEvent)
@@ -98,6 +115,10 @@ export function WarrantiesClient({ rows }: { rows: WarrantyRow[] }) {
             <DataList>
               {rows.map((row) => {
                 const event = warrantyToEvent(row);
+                const status: TemporalStatus =
+                  row.status && row.status !== "unknown"
+                    ? asTemporalStatus(row.status)
+                    : resolveTemporalStatus(row.warranty_until);
                 const manufacturerLine = [
                   row.manufacturer || null,
                   row.serial_number ? `SN ${row.serial_number}` : null,
@@ -124,14 +145,17 @@ export function WarrantiesClient({ rows }: { rows: WarrantyRow[] }) {
                           <span>
                             Kauf {toSwissDate(row.purchase_date)}
                           </span>
-                          <span>
+                          <span className="font-semibold">
                             Garantie bis {toSwissDate(row.warranty_until)}
                           </span>
                           <span className="tabular-nums">
                             {formatCHF(row.price, row.currency || "CHF")}
                           </span>
-                          <Badge variant="secondary">
-                            {row.status || "unknown"}
+                          <Badge
+                            variant="secondary"
+                            className={temporalStatusBadgeClass(status)}
+                          >
+                            {warrantyStatusLabel(status)}
                           </Badge>
                           <DocumentTitleLink
                             documentId={row.document_local_id}

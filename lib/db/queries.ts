@@ -505,7 +505,7 @@ export function listWarranties() {
       `SELECT w.*, d.title as document_title, d.id as document_local_id
        FROM devices_and_warranties w
        JOIN paperless_documents d ON d.id = w.document_id
-       ORDER BY COALESCE(w.warranty_until, '9999-12-31') ASC`
+       ORDER BY COALESCE(w.warranty_until, '0000-01-01') DESC`
     )
     .all();
 }
@@ -519,7 +519,7 @@ export function listDeadlines(status?: string) {
          FROM deadlines dl
          JOIN paperless_documents d ON d.id = dl.document_id
          WHERE dl.status = ?
-         ORDER BY COALESCE(dl.deadline_date, '9999-12-31') ASC`
+         ORDER BY COALESCE(dl.deadline_date, '0000-01-01') DESC`
       )
       .all(status);
   }
@@ -528,7 +528,7 @@ export function listDeadlines(status?: string) {
       `SELECT dl.*, d.title as document_title, d.id as document_local_id
        FROM deadlines dl
        JOIN paperless_documents d ON d.id = dl.document_id
-       ORDER BY COALESCE(dl.deadline_date, '9999-12-31') ASC`
+       ORDER BY COALESCE(dl.deadline_date, '0000-01-01') DESC`
     )
     .all();
 }

@@ -47,7 +47,7 @@ npm run analyze:pending -- 25
 
 ## Docker (same machine as Paperless)
 
-Single-instance deploy with persistent SQLite:
+Single-instance deploy with persistent SQLite. Default host port is **3100** (container still listens on 3000 internally), so it does not clash with apps already on 3000.
 
 ```bash
 cp .env.example .env
@@ -55,9 +55,9 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
-Open [http://localhost:3000](http://localhost:3000) (or `FAMILYBRAIN_PORT`).
+Open [http://localhost:3100](http://localhost:3100) (override with `FAMILYBRAIN_PORT` in `.env`).
 
-1. **Einstellungen**: Paperless base URL (your usual external URL is fine) + API token  
+1. **Einstellungen**: Paperless base URL + API token  
 2. Test connection → Sync  
 3. Start analysis  
 
@@ -68,6 +68,40 @@ docker compose logs -f familybrain
 docker compose down
 ```
 
+### Deploy on a Linux host next to Paperless-ngx
+
+FamilyBrain is a **separate** Compose stack. It does not join the Paperless network; it talks to Paperless over HTTP like a browser.
+
+1. On the host, clone/copy the repo (or only `Dockerfile`, `docker-compose.yml`, `.env.example`):
+   ```bash
+   git clone <your-repo-url> familybrain
+   cd familybrain
+   cp .env.example .env
+   ```
+2. Optionally put `OPENAI_API_KEY` in `.env` (or set it later in the UI).
+3. Start:
+   ```bash
+   docker compose up -d --build
+   ```
+4. Open `http://<host-ip>:3100` (firewall: allow TCP 3100 if you access from other devices).
+5. In **Einstellungen**:
+   - **Paperless base URL**: the URL you already use in the browser  
+     (e.g. `https://paperless.example.com` or `http://host-ip:8000`).  
+     Prefer the same URL that works from your LAN; Docker-internal names like `http://webserver:8000` only work if both stacks share a network (not required for this MVP).
+   - Paste a Paperless **API token** (Paperless → Settings → API Tokens).
+6. Test connection → Sync → analyze.
+
+**Existing data:** copy `data/familybrain.sqlite` (and stop the app first if WAL files exist) into `./data/` on the host before `up`, or start empty and re-sync from Paperless.
+
+**Updates:**
+```bash
+cd familybrain
+git pull
+docker compose up -d --build
+```
+
+SQLite in `./data` is kept via the volume mount.
+
 ## Notes
 
 - Paperless remains source of truth
@@ -75,3 +109,4 @@ docker compose down
 - PDFs are not downloaded; OCR `content` from the API is used
 - SQLite file: `data/familybrain.sqlite` (gitignored)
 - One FamilyBrain instance is enough for a home Paperless host
+- Default Docker host port: **3100** (avoids conflicts with other apps on 3000)
