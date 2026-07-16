@@ -153,7 +153,7 @@ export function Sidebar() {
         })}
       </nav>
 
-      <div className="mt-auto border-t border-sidebar-border/60 px-5 py-4">
+      <div className="mt-auto border-t border-sidebar-border/60 px-5 pb-12 pt-4">
         <p
           className="font-mono text-[10px] tabular-nums tracking-wide text-sidebar-foreground/50"
           title="App-Version (Datum-Uhrzeit des letzten Commits)"
