@@ -667,6 +667,18 @@ export function getFinanceOverview() {
     )
     .all();
 
+  // Full set of counted positions with a known vendor, for grouped drilldowns
+  // (vendor → by year, year → by vendor). Kept client-side; ~hundreds of rows.
+  const detailInvoices = db
+    .prepare(
+      `SELECT f.*, d.title as document_title, d.id as document_local_id
+       FROM financial_items f
+       JOIN paperless_documents d ON d.id = f.document_id
+       WHERE ${FINANCE_STATS_FILTER}
+       ORDER BY COALESCE(f.amount, 0) DESC`
+    )
+    .all();
+
   return {
     byYear,
     byVendor,
@@ -674,6 +686,7 @@ export function getFinanceOverview() {
     recurring,
     topInvoices,
     dueInvoices,
+    detailInvoices,
     totals,
     excludedCount,
     unknownVendor,

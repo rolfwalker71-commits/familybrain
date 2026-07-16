@@ -64,8 +64,16 @@ type Props = {
   recurring: InvoiceRow[];
   topInvoices: InvoiceRow[];
   dueInvoices: InvoiceRow[];
+  detailInvoices: InvoiceRow[];
   excludedCount: number;
   unknownVendor: { count: number; total: number };
+};
+
+type DetailGroup = {
+  key: string;
+  label: string;
+  total: number;
+  rows: InvoiceRow[];
 };
 
 function isCountedInStats(row: InvoiceRow) {
@@ -122,23 +130,30 @@ function InvoiceListRow({
   today,
   showDueDate = false,
   showCalendar = false,
+  titleField = "vendor",
 }: {
   row: InvoiceRow;
   today?: string;
   showDueDate?: boolean;
   showCalendar?: boolean;
+  /** Which value to show as the primary row title. */
+  titleField?: "vendor" | "document";
 }) {
   const event = showCalendar ? invoiceDueEvent(row) : null;
   const counted = isCountedInStats(row);
   const overdue =
     showDueDate && Boolean(today && row.due_date && row.due_date < today);
+  const primaryTitle =
+    titleField === "document"
+      ? row.document_title || row.description || row.vendor || "–"
+      : row.vendor || "–";
 
   return (
     <DataListRow
       className={cn(!counted && "bg-muted/30 text-muted-foreground")}
     >
       <DataListMain
-        title={<VendorText>{row.vendor || "–"}</VendorText>}
+        title={<VendorText>{primaryTitle}</VendorText>}
         subtitle={
           <span className="tabular-nums font-medium">
             {formatCHF(row.amount, row.currency || "CHF")}
@@ -204,6 +219,7 @@ export function FinanceOverviewClient({
   recurring,
   topInvoices,
   dueInvoices,
+  detailInvoices: allInvoices,
   excludedCount,
   unknownVendor,
 }: Props) {
@@ -300,23 +316,59 @@ export function FinanceOverviewClient({
     return activeItems.find((i) => i.label === selected) || null;
   }, [activeItems, dimension, selected]);
 
-  const detailInvoices = useMemo(() => {
+  // Rows belonging to the current selection (full set, not just top 80).
+  const selectedInvoices = useMemo(() => {
     if (!dimension || !selected) return [];
-    return topInvoices
-      .filter((row) => {
-        if (dimension === "year") {
-          const y = (row.invoice_date || "").slice(0, 4);
-          return y === selected;
-        }
-        if (dimension === "vendor") {
-          const v = row.vendor?.trim() || "Unbekannt";
-          return v === selected;
-        }
-        const c = financeBucket(row.category);
-        return c === selected;
-      })
-      .slice(0, 12);
-  }, [dimension, selected, topInvoices]);
+    return allInvoices.filter((row) => {
+      if (dimension === "year") {
+        const y = (row.invoice_date || row.due_date || "").slice(0, 4);
+        return y === selected;
+      }
+      if (dimension === "vendor") {
+        const v = row.vendor?.trim() || "Unbekannt";
+        return v === selected;
+      }
+      return financeBucket(row.category) === selected;
+    });
+  }, [dimension, selected, allInvoices]);
+
+  // How the receipts are grouped inside the detail panel:
+  //  - vendor  → grouped by year (newest first)
+  //  - year    → grouped by vendor (highest total first)
+  //  - category→ grouped by vendor (highest total first)
+  const detailGroupBy: "year" | "vendor" =
+    dimension === "vendor" ? "year" : "vendor";
+
+  const detailGroups = useMemo<DetailGroup[]>(() => {
+    if (selectedInvoices.length === 0) return [];
+    const map = new Map<string, DetailGroup>();
+    for (const row of selectedInvoices) {
+      let key: string;
+      let label: string;
+      if (detailGroupBy === "year") {
+        key = (row.invoice_date || row.due_date || "").slice(0, 4) || "0000";
+        label = key === "0000" ? "Ohne Datum" : key;
+      } else {
+        label = row.vendor?.trim() || "Unbekannt";
+        key = label;
+      }
+      const prev =
+        map.get(key) || ({ key, label, total: 0, rows: [] } as DetailGroup);
+      prev.total += row.amount || 0;
+      prev.rows.push(row);
+      map.set(key, prev);
+    }
+    const groups = [...map.values()];
+    for (const g of groups) {
+      g.rows.sort((a, b) => (b.amount || 0) - (a.amount || 0));
+    }
+    if (detailGroupBy === "year") {
+      groups.sort((a, b) => b.key.localeCompare(a.key));
+    } else {
+      groups.sort((a, b) => b.total - a.total);
+    }
+    return groups;
+  }, [selectedInvoices, detailGroupBy]);
 
   function openDimension(next: Dimension) {
     setDimension(next);
@@ -644,29 +696,57 @@ export function FinanceOverviewClient({
                       {selectedRow.label}
                     </h3>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      {selectedRow.count} Positionen · {formatCHF(selectedRow.total)}
+                      {selectedRow.count} Positionen ·{" "}
+                      {formatCHF(selectedRow.total)} ·{" "}
+                      {detailGroupBy === "year"
+                        ? "nach Jahr"
+                        : "nach Lieferant"}
                     </p>
                   </div>
                 </div>
 
-                {detailInvoices.length === 0 ? (
+                {detailGroups.length === 0 ? (
                   <p className="mt-4 text-sm text-muted-foreground">
-                    Keine Beispieldokumente in den Top-Rechnungen für diese Auswahl.
-                    Öffne die Dokumente über die Suche.
+                    Keine Positionen für diese Auswahl.
                   </p>
                 ) : (
-                  <div className="mt-4 overflow-hidden rounded-lg border border-border bg-card">
-                    <DataList>
-                      {detailInvoices.map((row) => (
-                        <InvoiceListRow
-                          key={row.id}
-                          row={row}
-                          showDueDate
-                          showCalendar
-                          today={today}
-                        />
-                      ))}
-                    </DataList>
+                  <div className="mt-4 space-y-3">
+                    {detailGroups.map((group) => (
+                      <div
+                        key={group.key}
+                        className="overflow-hidden rounded-lg border border-border bg-card"
+                      >
+                        <div className="flex items-center justify-between gap-3 bg-muted/40 px-4 py-2">
+                          <div className="flex min-w-0 items-center gap-2">
+                            <span className="break-words text-sm font-semibold">
+                              {group.label}
+                            </span>
+                            <Badge variant="secondary" className="shrink-0">
+                              {group.rows.length}
+                            </Badge>
+                          </div>
+                          <span className="shrink-0 text-sm font-semibold tabular-nums">
+                            {formatCHF(group.total)}
+                          </span>
+                        </div>
+                        <DataList>
+                          {group.rows.map((row) => (
+                            <InvoiceListRow
+                              key={row.id}
+                              row={row}
+                              showDueDate
+                              showCalendar
+                              today={today}
+                              titleField={
+                                detailGroupBy === "vendor"
+                                  ? "document"
+                                  : "vendor"
+                              }
+                            />
+                          ))}
+                        </DataList>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>

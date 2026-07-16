@@ -41,6 +41,7 @@ export default function FinancePage() {
       recurring={data.recurring as never[]}
       topInvoices={data.topInvoices as never[]}
       dueInvoices={data.dueInvoices as never[]}
+      detailInvoices={data.detailInvoices as never[]}
       excludedCount={data.excludedCount}
       unknownVendor={
         data.unknownVendor as { count: number; total: number }
