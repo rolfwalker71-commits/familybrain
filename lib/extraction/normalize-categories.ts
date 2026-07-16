@@ -78,15 +78,115 @@ const TRAVEL_EXACT: Record<string, TravelTypeCanonical> = {
   sonstiges: "Sonstiges",
 };
 
+export type TravelTypeContext = {
+  title?: string | null;
+  provider?: string | null;
+  origin?: string | null;
+  destination?: string | null;
+};
+
+const FLIGHT_HINTS = [
+  "flight",
+  "hinflug",
+  "ruckflug",
+  "airline",
+  "airlines",
+  "e-ticket",
+  "eticket",
+  "boarding",
+  "airways",
+  "lufthansa",
+  "edelweiss",
+  "condor",
+  "easyjet",
+  "ryanair",
+  "gotogate",
+  "chair airlines",
+  "tap portugal",
+  "british airways",
+  "air france",
+  "qatar airways",
+  "emirates",
+];
+
+/** Short tokens matched as whole words only (avoid "swiss" in "switzerland", "flug" in "zugfahrt"). */
+const FLIGHT_WORD_HINTS = ["swiss", "klm", "flug", "fluge", "flights"];
+
+function hasWord(hay: string, word: string): boolean {
+  return new RegExp(`(?:^|[^a-z0-9])${word}(?:[^a-z0-9]|$)`, "i").test(hay);
+}
+
+function looksLikeFlight(blob: string): boolean {
+  if (/zugfahrt/.test(blob)) {
+    // Train journeys contain the substring "flug" — ignore that false positive.
+    const withoutTrain = blob.replace(/zugfahrt/g, " ");
+    if (includesAny(withoutTrain, FLIGHT_HINTS)) return true;
+    return FLIGHT_WORD_HINTS.some((w) => hasWord(withoutTrain, w));
+  }
+  if (includesAny(blob, FLIGHT_HINTS)) return true;
+  return FLIGHT_WORD_HINTS.some((w) => hasWord(blob, w));
+}
+
+const CRUISE_HINTS = [
+  "cruise",
+  "cruises",
+  "kreuzfahrt",
+  "kreuzfahrten",
+  "kreuzfahrtschiff",
+  "ports of call",
+  "kreuzfahrtverlauf",
+  "of the seas",
+  "royal caribbean",
+  "rccl",
+  "msc cruises",
+  "norwegian cruise",
+];
+
+function looksLikeCruise(blob: string): boolean {
+  if (includesAny(blob, CRUISE_HINTS)) return true;
+  // Require ship-related compounds; bare "schiff" alone is too noisy.
+  return includesAny(blob, ["kreuzfahrtschiff", "kreuzfahrt schiff", "schiffahrt"]);
+}
+
+/**
+ * Canonical travel type. Optional title/provider/route context wins when the
+ * raw type is wrong (e.g. AI labels a flight ticket as Kreuzfahrt).
+ */
 export function normalizeTravelType(
-  raw: string | null | undefined
+  raw: string | null | undefined,
+  ctx?: TravelTypeContext
 ): TravelTypeCanonical {
   const key = fold(raw);
-  if (!key) return "Sonstiges";
-  if (TRAVEL_EXACT[key]) return TRAVEL_EXACT[key];
+  // Prefer title + provider only — origin/destination often contain "Airport"
+  // on transfers and must not force Flug.
+  const evidence = fold([ctx?.title, ctx?.provider].filter(Boolean).join(" "));
 
-  if (includesAny(key, ["cruise", "kreuzfahrt", "schiff"])) return "Kreuzfahrt";
-  if (includesAny(key, ["flight", "flug", "airline", "airport"])) return "Flug";
+  if (includesAny(evidence, ["transfer", "shuttle", "taxi"])) return "Transfer";
+  if (includesAny(evidence, ["parking", "parkplatz", "parkhaus"])) return "Parking";
+  if (
+    includesAny(evidence, ["hotel", "unterkunft", "accommodation", "resort"]) &&
+    !looksLikeFlight(evidence)
+  ) {
+    return "Hotel";
+  }
+
+  const evidenceFlight = looksLikeFlight(evidence);
+  const evidenceCruise = looksLikeCruise(evidence);
+
+  // Title/provider beats a wrong raw label (common on package PDFs).
+  if (evidenceFlight && !evidenceCruise) return "Flug";
+  if (evidenceCruise && !evidenceFlight) return "Kreuzfahrt";
+
+  if (key && TRAVEL_EXACT[key]) return TRAVEL_EXACT[key];
+
+  // Prefer Flug before Kreuzfahrt on ambiguous raw strings.
+  if (
+    includesAny(key, ["flight", "flug", "airline", "airport", "flughafen"]) &&
+    !/zugfahrt/.test(key)
+  )
+    return "Flug";
+  if (looksLikeCruise(key) || includesAny(key, ["cruise", "kreuzfahrt"]))
+    return "Kreuzfahrt";
   if (includesAny(key, ["hotel", "unterkunft", "accommodation", "resort"]))
     return "Hotel";
   if (includesAny(key, ["train", "bahn", "zug", "rail", "sbb"])) return "Bahn";
@@ -101,6 +201,7 @@ export function normalizeTravelType(
   if (includesAny(key, ["versicherung", "insurance"]))
     return "Reiseversicherung";
 
+  if (!key) return "Sonstiges";
   return "Sonstiges";
 }
 

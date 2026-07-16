@@ -30,8 +30,11 @@ function enrichTravelWithItinerary(
   const travelItems = [...(analysis.travel_items || [])];
 
   if (travelItems.length === 0 && ocrStops.length > 0) {
+    const cruiseOcr = /kreuzfahrtverlauf|ports-of-call|cruise itinerary|of the seas/i.test(
+      ocrContent || ""
+    );
     travelItems.push({
-      travel_type: "Kreuzfahrt",
+      travel_type: cruiseOcr ? "Kreuzfahrt" : "Sonstiges",
       provider: null,
       title: null,
       start_date: ocrStops[0]?.date ?? null,
@@ -343,7 +346,12 @@ export function saveAnalysis(
     for (const t of enriched.travel_items) {
       insertTravel.run(
         documentId,
-        normalizeTravelType(t.travel_type),
+        normalizeTravelType(t.travel_type, {
+          title: t.title,
+          provider: t.provider,
+          origin: t.origin,
+          destination: t.destination,
+        }),
         t.provider,
         t.title,
         t.start_date,

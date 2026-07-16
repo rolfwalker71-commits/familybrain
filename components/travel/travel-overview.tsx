@@ -56,8 +56,19 @@ type AggRow = { label: string; count: number; total: number };
 
 type Dimension = "year" | "type" | "provider";
 
-function typeLabel(type: string | null | undefined) {
-  return normalizeTravelType(type);
+function typeLabel(row: {
+  travel_type?: string | null;
+  title?: string | null;
+  provider?: string | null;
+  origin?: string | null;
+  destination?: string | null;
+}) {
+  return normalizeTravelType(row.travel_type, {
+    title: row.title,
+    provider: row.provider,
+    origin: row.origin,
+    destination: row.destination,
+  });
 }
 
 function percent(part: number, whole: number) {
@@ -91,7 +102,7 @@ function travelToCalendarEvent(row: TravelRow): CalendarEvent | null {
 
   return {
     uid: `travel-${row.id}@familybrain.local`,
-    title: row.title || typeLabel(row.travel_type),
+    title: row.title || typeLabel(row),
     description: parts.join("\n"),
     location: route || row.destination || row.origin || undefined,
     startDate: row.start_date,
@@ -142,7 +153,7 @@ function TravelListRow({
       onClick={onSelect}
     >
       <DataListMain
-        title={row.title || typeLabel(row.travel_type)}
+        title={row.title || typeLabel(row)}
         subtitle={
           softParts ? (
             <SoftText className="mt-0 text-sm">{softParts}</SoftText>
@@ -150,7 +161,7 @@ function TravelListRow({
         }
         meta={
           <MetaLine>
-            <Badge variant="secondary">{typeLabel(row.travel_type)}</Badge>
+            <Badge variant="secondary">{typeLabel(row)}</Badge>
             <span className="tabular-nums">
               {toSwissDate(row.start_date)}
               {row.end_date ? ` – ${toSwissDate(row.end_date)}` : ""}
@@ -212,7 +223,7 @@ export function TravelOverviewClient({ items }: Props) {
     () =>
       aggregate(
         items,
-        (r) => typeLabel(r.travel_type),
+        (r) => typeLabel(r),
         (r) => r.price || 0
       ),
     [items]
@@ -280,7 +291,7 @@ export function TravelOverviewClient({ items }: Props) {
         return ((row.start_date || "").slice(0, 4) || "Ohne Datum") === selected;
       }
       if (dimension === "type") {
-        return typeLabel(row.travel_type) === selected;
+        return typeLabel(row) === selected;
       }
       return (row.provider?.trim() || "Unbekannt") === selected;
     });
@@ -531,7 +542,7 @@ export function TravelOverviewClient({ items }: Props) {
                     <DetailField label="Titel" value={openDetail.title} />
                     <DetailField
                       label="Typ"
-                      value={typeLabel(openDetail.travel_type)}
+                      value={typeLabel(openDetail)}
                     />
                     <DetailField label="Anbieter" value={openDetail.provider} />
                     <DetailField
@@ -649,7 +660,7 @@ export function TravelOverviewClient({ items }: Props) {
                 <DetailField label="Titel" value={openDetail.title} />
                 <DetailField
                   label="Typ"
-                  value={typeLabel(openDetail.travel_type)}
+                  value={typeLabel(openDetail)}
                 />
                 <DetailField label="Anbieter" value={openDetail.provider} />
                 <DetailField
