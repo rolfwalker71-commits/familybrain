@@ -20,7 +20,7 @@ import {
   SoftText,
 } from "@/components/layout/data-list";
 import { PageHeader, TileTitleBar, MetricTile } from "@/components/layout/page-primitives";
-import { IconCircle, pageVisuals } from "@/components/layout/icon-circle";
+import { IconCircle, pageVisuals, toneSurface, type IconTone } from "@/components/layout/icon-circle";
 import { AddToCalendarButton } from "@/components/calendar/add-to-calendar-button";
 import {
   DocumentInfoButton,
@@ -281,6 +281,7 @@ export function TravelOverviewClient({ items }: Props) {
     year: {
       title: "Nach Jahr",
       icon: CalendarDays,
+      tone: "blue" as IconTone,
       items: byYear,
       empty: "Keine Jahresdaten",
       hint: "Reisen mit Startdatum",
@@ -288,6 +289,7 @@ export function TravelOverviewClient({ items }: Props) {
     type: {
       title: "Nach Typ",
       icon: Plane,
+      tone: "teal" as IconTone,
       items: byType,
       empty: "Keine Typen",
       hint: "Flug, Hotel, Kreuzfahrt …",
@@ -295,6 +297,7 @@ export function TravelOverviewClient({ items }: Props) {
     provider: {
       title: "Nach Anbieter",
       icon: Building2,
+      tone: "amber" as IconTone,
       items: byProvider,
       empty: "Keine Anbieter",
       hint: "Airlines, Hotels, Buchungsportale",
@@ -359,19 +362,19 @@ export function TravelOverviewClient({ items }: Props) {
           title="Reiseeinträge"
           value={totals.count}
           icon={Ticket}
-          tone="sky"
+          tone="teal"
         />
         <MetricTile
           title="Mit Termin"
           value={totals.withDates}
           icon={CalendarDays}
-          tone="blue"
+          tone="sky"
         />
         <MetricTile
           title="Kommend"
           value={upcoming.length}
           icon={Plane}
-          tone="green"
+          tone="blue"
         />
         <MetricTile
           title="Erkannte Kosten"
@@ -387,6 +390,7 @@ export function TravelOverviewClient({ items }: Props) {
           const Icon = meta.icon;
           const active = dimension === key;
           const top = meta.items[0];
+          const surface = toneSurface(meta.tone);
 
           return (
             <button
@@ -394,26 +398,18 @@ export function TravelOverviewClient({ items }: Props) {
               type="button"
               onClick={() => openDimension(key)}
               className={cn(
-                "min-w-0 overflow-hidden rounded-xl border-2 border-border bg-card text-left shadow-[0_1px_2px_rgba(15,23,42,0.06),0_4px_14px_rgba(15,23,42,0.08)] transition-all",
+                "min-w-0 overflow-hidden rounded-xl border-2 text-left shadow-[0_1px_2px_rgba(15,23,42,0.06),0_4px_14px_rgba(15,23,42,0.08)] transition-all",
+                surface.body,
                 active
                   ? "border-primary ring-2 ring-primary/20"
                   : "hover:border-primary/40"
               )}
             >
               <TileTitleBar
+                tone={meta.tone}
                 trailing={
                   <div className="flex items-center gap-2">
-                    <IconCircle
-                      icon={Icon}
-                      tone={
-                        key === "year"
-                          ? "blue"
-                          : key === "type"
-                            ? "teal"
-                            : "amber"
-                      }
-                      size="sm"
-                    />
+                    <IconCircle icon={Icon} tone={meta.tone} size="sm" />
                     <ChevronRight
                       className={cn(
                         "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
@@ -452,8 +448,14 @@ export function TravelOverviewClient({ items }: Props) {
       </div>
 
       {dimension ? (
-        <Card className="min-w-0 overflow-hidden border-border/80 shadow-sm">
-          <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3">
+        <Card
+          tone={dimensionMeta[dimension].tone}
+          className="min-w-0 overflow-hidden shadow-sm"
+        >
+          <CardHeader
+            tone={dimensionMeta[dimension].tone}
+            className="flex flex-row flex-wrap items-center justify-between gap-3"
+          >
             <div className="min-w-0">
               <CardTitle className="text-base">
                 {dimensionMeta[dimension].title}
@@ -484,6 +486,8 @@ export function TravelOverviewClient({ items }: Props) {
                 {activeItems.map((item) => {
                   const share = percent(item.count, totals.count || 1);
                   const isSelected = selected === item.label;
+                  const dimTone = dimensionMeta[dimension].tone;
+                  const itemSurface = toneSurface(dimTone);
                   return (
                     <button
                       key={item.label}
@@ -493,13 +497,15 @@ export function TravelOverviewClient({ items }: Props) {
                         setDetailId(null);
                       }}
                       className={cn(
-                        "min-w-0 overflow-hidden rounded-xl border-2 border-border bg-card text-left shadow-[0_1px_2px_rgba(15,23,42,0.06),0_4px_14px_rgba(15,23,42,0.08)] transition-colors",
+                        "min-w-0 overflow-hidden rounded-xl border-2 text-left shadow-[0_1px_2px_rgba(15,23,42,0.06),0_4px_14px_rgba(15,23,42,0.08)] transition-colors",
+                        itemSurface.body,
                         isSelected
                           ? "border-primary ring-2 ring-primary/20"
                           : "hover:border-primary/40"
                       )}
                     >
                       <TileTitleBar
+                        tone={dimTone}
                         trailing={
                           <Badge variant="secondary" className="shrink-0">
                             {item.count}
@@ -524,8 +530,14 @@ export function TravelOverviewClient({ items }: Props) {
             )}
 
             {selectedRow ? (
-              <div className="overflow-hidden rounded-xl border border-border bg-card">
+              <div
+                className={cn(
+                  "overflow-hidden rounded-xl border-2",
+                  toneSurface(dimensionMeta[dimension].tone).body
+                )}
+              >
                 <TileTitleBar
+                  tone={dimensionMeta[dimension].tone}
                   interactiveTrailing
                   trailing={
                     <AddToCalendarButton
@@ -539,7 +551,7 @@ export function TravelOverviewClient({ items }: Props) {
                 >
                   <div className="min-w-0">
                     <div className="break-words">{selectedRow.label}</div>
-                    <p className="mt-0.5 text-xs font-normal text-muted-foreground">
+                    <p className="mt-0.5 text-xs font-normal opacity-80">
                       {selectedRow.count} Einträge ·{" "}
                       {formatCHF(selectedRow.total)}
                     </p>
@@ -647,8 +659,11 @@ export function TravelOverviewClient({ items }: Props) {
         </Card>
       ) : null}
 
-      <Card className="min-w-0 overflow-hidden border-border/80 shadow-sm">
-        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3">
+      <Card tone="teal" className="min-w-0 overflow-hidden shadow-sm">
+        <CardHeader
+          tone="teal"
+          className="flex flex-row flex-wrap items-center justify-between gap-3"
+        >
           <div className="flex min-w-0 items-start gap-3">
             <IconCircle icon={Plane} tone="teal" size="sm" />
             <div>

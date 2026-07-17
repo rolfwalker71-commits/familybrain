@@ -31,8 +31,11 @@ export default function KnowledgePage() {
               href={`/documents?category=${encodeURIComponent(area.name)}`}
               className="min-w-0"
             >
-              <Card className="flex h-full min-w-0 flex-col overflow-hidden transition-colors hover:border-primary/40">
-                <CardHeader className="min-w-0 pb-2">
+              <Card
+                tone={visual.tone}
+                className="flex h-full min-w-0 flex-col overflow-hidden transition-colors hover:border-primary/40"
+              >
+                <CardHeader tone={visual.tone} className="min-w-0 pb-2">
                   <div className="flex items-start justify-between gap-3">
                     <CardTitle
                       className="min-w-0 break-words text-base"

@@ -23,7 +23,7 @@ import {
   VendorText,
 } from "@/components/layout/data-list";
 import { PageHeader, TileTitleBar, MetricTile } from "@/components/layout/page-primitives";
-import { IconCircle, pageVisuals } from "@/components/layout/icon-circle";
+import { IconCircle, pageVisuals, toneSurface, type IconTone } from "@/components/layout/icon-circle";
 import { AddToCalendarButton } from "@/components/calendar/add-to-calendar-button";
 import {
   DocumentInfoButton,
@@ -283,6 +283,7 @@ export function FinanceOverviewClient({
     year: {
       title: "Nach Jahr",
       icon: CalendarDays,
+      tone: "blue" as IconTone,
       items: byYear,
       empty: "Keine Jahresdaten",
       hint: "Jahre mit erkannten Beträgen",
@@ -290,6 +291,7 @@ export function FinanceOverviewClient({
     vendor: {
       title: "Nach Lieferant",
       icon: Building2,
+      tone: "amber" as IconTone,
       items: byVendor,
       empty: "Keine Lieferanten",
       hint: "Höchste Ausgaben zuerst",
@@ -297,9 +299,10 @@ export function FinanceOverviewClient({
     category: {
       title: "Nach Kategorie",
       icon: Tags,
+      tone: "violet" as IconTone,
       items: byCategory,
       empty: "Keine Kategorien",
-                  hint: "Semantisch gruppiert",
+      hint: "Semantisch gruppiert",
     },
   } as const;
 
@@ -406,8 +409,16 @@ export function FinanceOverviewClient({
       />
 
       {recentDueInvoices.length > 0 || olderDueInvoices.length > 0 ? (
-        <Card className="min-w-0 overflow-hidden border-amber-300 bg-card p-0 shadow-[0_1px_2px_rgba(15,23,42,0.06),0_4px_14px_rgba(15,23,42,0.08)] [--card-spacing:0px]">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-muted px-4 py-3">
+        <Card
+          tone="amber"
+          className="min-w-0 overflow-hidden border-amber-300 p-0 shadow-[0_1px_2px_rgba(15,23,42,0.06),0_4px_14px_rgba(15,23,42,0.08)] [--card-spacing:0px]"
+        >
+          <div
+            className={cn(
+              "flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3",
+              toneSurface("amber").title
+            )}
+          >
             <button
               type="button"
               onClick={() => setDueOpen((v) => !v)}
@@ -421,11 +432,11 @@ export function FinanceOverviewClient({
                 )}
               />
               <div className="min-w-0">
-                <div className="flex items-center gap-2 text-[19px] font-bold text-foreground">
+                <div className="flex items-center gap-2 text-[16px] font-bold">
                   <IconCircle icon={CircleAlert} tone="amber" size="sm" />
                   Rechnungen mit Zahlungsfrist
                 </div>
-                <p className="mt-1 text-sm text-muted-foreground">
+                <p className="mt-1 text-sm opacity-80">
                   {recentDueInvoices.length} aktuell (≤ {DUE_VISIBILITY_DAYS}{" "}
                   Tage) · {formatCHF(recentDueTotal)}
                   {olderDueInvoices.length > 0
@@ -499,20 +510,20 @@ export function FinanceOverviewClient({
           title={
             <>
               Gesamtausgaben{" "}
-              <span className="text-sm font-normal text-muted-foreground">
+              <span className="text-sm font-normal opacity-70">
                 (ohne Unbekannt)
               </span>
             </>
           }
           value={formatCHF(totals.total)}
           icon={Wallet}
-          tone="blue"
+          tone="green"
         />
         <MetricTile
           title={
             <>
               Positionen{" "}
-              <span className="text-sm font-normal text-muted-foreground">
+              <span className="text-sm font-normal opacity-70">
                 (ohne Unbekannt)
               </span>
             </>
@@ -532,7 +543,7 @@ export function FinanceOverviewClient({
           title="Wiederkehrend"
           value={recurring.length}
           icon={Repeat}
-          tone="green"
+          tone="teal"
         />
       </div>
 
@@ -544,6 +555,7 @@ export function FinanceOverviewClient({
           const active = dimension === key;
           const top = items[0];
           const dimTotal = items.reduce((sum, i) => sum + (i.total || 0), 0);
+          const surface = toneSurface(meta.tone);
 
           return (
             <button
@@ -551,26 +563,18 @@ export function FinanceOverviewClient({
               type="button"
               onClick={() => openDimension(key)}
               className={cn(
-                "min-w-0 overflow-hidden rounded-xl border-2 border-border bg-card text-left shadow-[0_1px_2px_rgba(15,23,42,0.06),0_4px_14px_rgba(15,23,42,0.08)] transition-all",
+                "min-w-0 overflow-hidden rounded-xl border-2 text-left shadow-[0_1px_2px_rgba(15,23,42,0.06),0_4px_14px_rgba(15,23,42,0.08)] transition-all",
+                surface.body,
                 active
                   ? "border-primary ring-2 ring-primary/20"
                   : "hover:border-primary/40"
               )}
             >
               <TileTitleBar
+                tone={meta.tone}
                 trailing={
                   <div className="flex items-center gap-2">
-                    <IconCircle
-                      icon={Icon}
-                      tone={
-                        key === "year"
-                          ? "blue"
-                          : key === "vendor"
-                            ? "amber"
-                            : "violet"
-                      }
-                      size="sm"
-                    />
+                    <IconCircle icon={Icon} tone={meta.tone} size="sm" />
                     <ChevronRight
                       className={cn(
                         "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
@@ -611,8 +615,14 @@ export function FinanceOverviewClient({
       </div>
 
       {dimension ? (
-        <Card className="min-w-0 overflow-hidden border-border/80 shadow-sm">
-          <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3">
+        <Card
+          tone={dimensionMeta[dimension].tone}
+          className="min-w-0 overflow-hidden shadow-sm"
+        >
+          <CardHeader
+            tone={dimensionMeta[dimension].tone}
+            className="flex flex-row flex-wrap items-center justify-between gap-3"
+          >
             <div className="min-w-0">
               <CardTitle className="text-base">
                 {dimensionMeta[dimension].title}
@@ -642,6 +652,8 @@ export function FinanceOverviewClient({
                 {activeItems.map((item) => {
                   const share = percent(item.total, activeTotal);
                   const isSelected = selected === item.label;
+                  const dimTone = dimensionMeta[dimension].tone;
+                  const itemSurface = toneSurface(dimTone);
                   return (
                     <button
                       key={item.label}
@@ -650,13 +662,15 @@ export function FinanceOverviewClient({
                         setSelected(isSelected ? null : item.label)
                       }
                       className={cn(
-                        "min-w-0 overflow-hidden rounded-xl border-2 border-border bg-card text-left shadow-[0_1px_2px_rgba(15,23,42,0.06),0_4px_14px_rgba(15,23,42,0.08)] transition-colors",
+                        "min-w-0 overflow-hidden rounded-xl border-2 text-left shadow-[0_1px_2px_rgba(15,23,42,0.06),0_4px_14px_rgba(15,23,42,0.08)] transition-colors",
+                        itemSurface.body,
                         isSelected
                           ? "border-primary ring-2 ring-primary/20"
                           : "hover:border-primary/40"
                       )}
                     >
                       <TileTitleBar
+                        tone={dimTone}
                         trailing={
                           <Badge variant="secondary" className="shrink-0">
                             {item.count}
@@ -681,11 +695,16 @@ export function FinanceOverviewClient({
             )}
 
             {selectedRow ? (
-              <div className="overflow-hidden rounded-xl border border-border bg-card">
-                <TileTitleBar>
+              <div
+                className={cn(
+                  "overflow-hidden rounded-xl border-2",
+                  toneSurface(dimensionMeta[dimension].tone).body
+                )}
+              >
+                <TileTitleBar tone={dimensionMeta[dimension].tone}>
                   <div className="min-w-0">
                     <div className="break-words">{selectedRow.label}</div>
-                    <p className="mt-0.5 text-xs font-normal text-muted-foreground">
+                    <p className="mt-0.5 text-xs font-normal opacity-80">
                       {selectedRow.count} Positionen ·{" "}
                       {formatCHF(selectedRow.total)} ·{" "}
                       {detailGroupBy === "year"
@@ -704,9 +723,13 @@ export function FinanceOverviewClient({
                     {detailGroups.map((group) => (
                       <div
                         key={group.key}
-                        className="overflow-hidden rounded-lg border border-border bg-card"
+                        className={cn(
+                          "overflow-hidden rounded-lg border-2",
+                          toneSurface(dimensionMeta[dimension].tone).body
+                        )}
                       >
                         <TileTitleBar
+                          tone={dimensionMeta[dimension].tone}
                           trailing={
                             <>
                               <Badge variant="secondary" className="shrink-0">
@@ -747,8 +770,8 @@ export function FinanceOverviewClient({
       ) : null}
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-        <Card className="min-w-0 overflow-hidden border-border/80 shadow-sm">
-          <CardHeader>
+        <Card tone="green" className="min-w-0 overflow-hidden shadow-sm">
+          <CardHeader tone="green">
             <CardTitle className="flex items-center gap-3 text-base">
               <IconCircle icon={Repeat} tone="green" size="sm" />
               Wiederkehrende Zahlungen
@@ -769,10 +792,10 @@ export function FinanceOverviewClient({
           </CardContent>
         </Card>
 
-        <Card className="min-w-0 overflow-hidden border-border/80 shadow-sm">
-          <CardHeader>
+        <Card tone="green" className="min-w-0 overflow-hidden shadow-sm">
+          <CardHeader tone="green">
             <CardTitle className="flex items-center gap-3 text-base">
-              <IconCircle icon={Wallet} tone="blue" size="sm" />
+              <IconCircle icon={Wallet} tone="green" size="sm" />
               Grösste Einzelbeträge
             </CardTitle>
           </CardHeader>

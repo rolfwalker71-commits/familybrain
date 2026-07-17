@@ -1,18 +1,26 @@
 import * as React from "react"
 
 import { cn } from "@/lib/utils"
+import { toneSurface, type IconTone } from "@/components/layout/icon-circle"
 
 function Card({
   className,
   size = "default",
+  tone,
   ...props
-}: React.ComponentProps<"div"> & { size?: "default" | "sm" }) {
+}: React.ComponentProps<"div"> & {
+  size?: "default" | "sm"
+  tone?: IconTone
+}) {
+  const surface = tone ? toneSurface(tone) : null
   return (
     <div
       data-slot="card"
       data-size={size}
+      data-tone={tone}
       className={cn(
-        "group/card flex flex-col gap-(--card-spacing) overflow-hidden rounded-xl border-2 border-border bg-card py-(--card-spacing) text-sm text-card-foreground shadow-[0_1px_2px_rgba(15,23,42,0.06),0_4px_14px_rgba(15,23,42,0.08)] [--card-spacing:--spacing(4)] has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:--spacing(3)] data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl",
+        "group/card flex flex-col gap-(--card-spacing) overflow-hidden rounded-xl border-2 py-(--card-spacing) text-sm text-card-foreground shadow-[0_1px_2px_rgba(15,23,42,0.06),0_4px_14px_rgba(15,23,42,0.08)] [--card-spacing:--spacing(4)] has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:--spacing(3)] data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl",
+        surface ? surface.body : "border-border bg-card",
         className
       )}
       {...props}
@@ -20,12 +28,18 @@ function Card({
   )
 }
 
-function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
+function CardHeader({
+  className,
+  tone,
+  ...props
+}: React.ComponentProps<"div"> & { tone?: IconTone }) {
+  const surface = tone ? toneSurface(tone) : null
   return (
     <div
       data-slot="card-header"
       className={cn(
-        "group/card-header @container/card-header grid auto-rows-min items-start gap-1 -mt-(--card-spacing) border-b border-border bg-muted px-(--card-spacing) py-3 has-data-[slot=card-action]:grid-cols-[1fr_auto] has-data-[slot=card-description]:grid-rows-[auto_auto]",
+        "group/card-header @container/card-header grid auto-rows-min items-start gap-1 -mt-(--card-spacing) border-b px-(--card-spacing) py-3 has-data-[slot=card-action]:grid-cols-[1fr_auto] has-data-[slot=card-description]:grid-rows-[auto_auto]",
+        surface ? surface.title : "border-border bg-muted",
         className
       )}
       {...props}
@@ -38,7 +52,7 @@ function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="card-title"
       className={cn(
-        "font-heading text-[21px]! leading-snug font-bold group-data-[size=sm]/card:text-[19px]!",
+        "font-heading text-[18px]! leading-snug font-bold group-data-[size=sm]/card:text-[16px]!",
         className
       )}
       {...props}
@@ -79,12 +93,18 @@ function CardContent({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
-function CardFooter({ className, ...props }: React.ComponentProps<"div">) {
+function CardFooter({
+  className,
+  tone,
+  ...props
+}: React.ComponentProps<"div"> & { tone?: IconTone }) {
+  const soft = tone ? toneSurface(tone).soft : "bg-muted/50"
   return (
     <div
       data-slot="card-footer"
       className={cn(
-        "flex items-center rounded-b-xl border-t bg-muted/50 p-(--card-spacing)",
+        "flex items-center rounded-b-xl border-t p-(--card-spacing)",
+        soft,
         className
       )}
       {...props}

@@ -1,7 +1,11 @@
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { IconCircle, type IconTone } from "@/components/layout/icon-circle";
+import {
+  IconCircle,
+  toneSurface,
+  type IconTone,
+} from "@/components/layout/icon-circle";
 
 /** Prefer wrapping over clipping. Title remains for hover context. */
 export function TruncateText({
@@ -97,7 +101,6 @@ export function CardGrid({
 
 /**
  * Full-bleed title bar for tiles / group headers.
- * Uses muted gray (darker than page background) so headings stand out.
  *
  * The bar itself is pointer-events-none so parent `<button>` / Link clicks work.
  * Set `interactiveTrailing` when trailing contains real controls (e.g. calendar).
@@ -106,25 +109,27 @@ export function TileTitleBar({
   children,
   trailing,
   className,
+  tone = "slate",
   interactiveTrailing = false,
 }: {
   children: ReactNode;
   trailing?: ReactNode;
   className?: string;
+  tone?: IconTone;
   interactiveTrailing?: boolean;
 }) {
+  const surface = toneSurface(tone);
   return (
     <div
       className={cn(
         // Always pass clicks through to a parent <button>/Link; only
         // interactive trailing controls re-enable pointer events.
-        "pointer-events-none flex w-full items-center justify-between gap-3 border-b border-border bg-muted px-4 py-2.5",
+        "pointer-events-none flex w-full items-center justify-between gap-3 border-b px-4 py-2.5",
+        surface.title,
         className
       )}
     >
-      <div className="min-w-0 flex-1 text-[19px] font-bold text-foreground">
-        {children}
-      </div>
+      <div className="min-w-0 flex-1 text-[16px] font-bold">{children}</div>
       {trailing ? (
         <div
           className={cn(
@@ -155,15 +160,20 @@ export function MetricTile({
   tone?: IconTone;
   className?: string;
 }) {
+  const surface = toneSurface(tone);
   return (
     <div
       className={cn(
-        "min-w-0 overflow-hidden rounded-xl border-2 border-border bg-card shadow-[0_1px_2px_rgba(15,23,42,0.06),0_4px_14px_rgba(15,23,42,0.08)]",
+        "min-w-0 overflow-hidden rounded-xl border-2 shadow-[0_1px_2px_rgba(15,23,42,0.06),0_4px_14px_rgba(15,23,42,0.08)]",
+        surface.body,
         className
       )}
     >
       <TileTitleBar
-        trailing={icon ? <IconCircle icon={icon} tone={tone} size="sm" /> : undefined}
+        tone={tone}
+        trailing={
+          icon ? <IconCircle icon={icon} tone={tone} size="sm" /> : undefined
+        }
       >
         {title}
       </TileTitleBar>
@@ -179,9 +189,21 @@ export function MetricTile({
   );
 }
 
-export function TableShell({ children }: { children: React.ReactNode }) {
+export function TableShell({
+  children,
+  tone = "slate",
+}: {
+  children: React.ReactNode;
+  tone?: IconTone;
+}) {
+  const surface = toneSurface(tone);
   return (
-    <div className="w-full min-w-0 overflow-hidden rounded-xl border-2 border-border bg-card shadow-[0_1px_2px_rgba(15,23,42,0.06),0_4px_14px_rgba(15,23,42,0.08)]">
+    <div
+      className={cn(
+        "w-full min-w-0 overflow-hidden rounded-xl border-2 shadow-[0_1px_2px_rgba(15,23,42,0.06),0_4px_14px_rgba(15,23,42,0.08)]",
+        surface.body
+      )}
+    >
       <div className="w-full overflow-x-auto">{children}</div>
     </div>
   );

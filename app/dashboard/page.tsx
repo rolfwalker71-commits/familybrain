@@ -116,7 +116,7 @@ export default function DashboardPage() {
           title="Ausgaben dieses Jahr (ohne Unbekannt)"
           value={formatCHF(stats.financialTotalThisYear)}
           icon={Wallet}
-          tone="blue"
+          tone="green"
           href="/finance"
         />
         <StatCard
@@ -129,8 +129,11 @@ export default function DashboardPage() {
       </MetricGrid>
 
       <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card className="min-w-0 overflow-hidden border-border/80 shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between gap-3">
+        <Card tone="indigo" className="min-w-0 overflow-hidden shadow-sm">
+          <CardHeader
+            tone="indigo"
+            className="flex flex-row items-center justify-between gap-3"
+          >
             <CardTitle className="text-base font-semibold">
               Zuletzt analysiert
             </CardTitle>
@@ -197,8 +200,11 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="min-w-0 overflow-hidden border-border/80 shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between gap-3">
+        <Card tone="rose" className="min-w-0 overflow-hidden shadow-sm">
+          <CardHeader
+            tone="rose"
+            className="flex flex-row items-center justify-between gap-3"
+          >
             <CardTitle className="text-base font-semibold">
               Nächste Fristen
             </CardTitle>
