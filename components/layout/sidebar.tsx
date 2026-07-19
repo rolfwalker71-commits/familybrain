@@ -43,14 +43,6 @@ const navItems: NavItem[] = [
     icon: Files,
     countKey: "totalDocuments",
   },
-  { href: "/chat", label: "Chat", icon: MessageSquare },
-  {
-    href: "/sync",
-    label: "Sync",
-    icon: RefreshCw,
-    countKey: "pendingCount",
-    pendingStyle: true,
-  },
   {
     href: "/knowledge",
     label: "Wissensbereiche",
@@ -82,6 +74,14 @@ const navItems: NavItem[] = [
     countKey: "travelDocuments",
   },
   { href: "/settings", label: "Einstellungen", icon: Settings },
+  { href: "/chat", label: "Chat", icon: MessageSquare },
+  {
+    href: "/sync",
+    label: "Sync",
+    icon: RefreshCw,
+    countKey: "pendingCount",
+    pendingStyle: true,
+  },
 ];
 
 function formatCount(n: number) {
