@@ -1,4 +1,4 @@
-import { toSwissDate } from "@/lib/utils/dates";
+import { currentYear, toSwissDate } from "@/lib/utils/dates";
 import { getOpenAIClient, getOpenAIModel } from "./client";
 import { retrieveForChat, type ChatSource } from "./chat-retrieve";
 
@@ -12,9 +12,18 @@ export type ChatAnswer = {
   sources: ChatSource[];
 };
 
-const SYSTEM_PROMPT = `Du bist FamilyBrain, ein Assistent für die gesamte lokale Dokumentenbasis einer Familie (Paperless-Sync + AI-Analysen).
+function buildSystemPrompt(todayIso: string, year: number): string {
+  const todaySwiss = toSwissDate(todayIso);
+  return `Du bist FamilyBrain, ein Assistent für die gesamte lokale Dokumentenbasis einer Familie (Paperless-Sync + AI-Analysen).
 
 Die Wissensbasis umfasst ALLE synchronisierten Dokumente und Extrakte – über alle Kategorien hinweg (Gesundheit, Versicherungen, Wohnen, Steuern, Finanzen, Reisen, Geräte & Garantien, Verträge usw.).
+
+Kalenderkontext (verbindlich):
+- Heute ist ${todaySwiss} (ISO ${todayIso}).
+- Das aktuelle Kalenderjahr ist ${year}.
+- «dieses Jahr», «aktuelles Jahr», «heuer» meinen immer ${year} – niemals ein anderes Jahr.
+- «nächstes Jahr» meint ${year + 1}; «letztes Jahr» meint ${year - 1}.
+- «heute», «demnächst», «kommend», «geplant» beziehen sich auf Daten ab ${todaySwiss}. Vergangene Reisen/Fristen nur nennen, wenn die Frage ausdrücklich danach fragt oder nichts Aktuelles vorhanden ist.
 
 Regeln:
 - Antworte auf Deutsch, klar und konkret.
@@ -33,6 +42,7 @@ Regeln:
   [[SOURCE_IDS:1354,42]]
 - In diesen Marker gehören höchstens 4 Dokument-IDs und NUR Dokumente, deren Inhalt die konkrete Antwort direkt belegt. Ähnliche Treffer, allgemeiner Kontext oder Dokumente, die nicht in der Antwort verwendet wurden, gehören nicht hinein.
 - Wenn kein Dokument die Antwort direkt belegt, verwende [[SOURCE_IDS:]].`;
+}
 
 const SOURCE_IDS_MARKER = /\[\[SOURCE_IDS:\s*([0-9,\s]*)\]\]\s*$/i;
 const TRAILING_SOURCE_SECTION =
@@ -72,9 +82,12 @@ export async function answerDocumentChat(
   question: string,
   history: ChatMessage[] = []
 ): Promise<ChatAnswer> {
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const year = currentYear();
   const retrieval = retrieveForChat(question, 12);
 
   const corpusBlock = `Gesamte lokale Basis:
+- Heute: ${toSwissDate(todayIso)} · aktuelles Jahr: ${year}
 - Dokumente synchronisiert: ${retrieval.corpus.totalDocuments}
 - Davon analysiert: ${retrieval.corpus.analyzedDocuments}
 - Garantien/Geräte: ${retrieval.corpus.warranties}
@@ -117,7 +130,7 @@ ${s.excerpt}`
     model,
     temperature: 0.1,
     messages: [
-      { role: "system", content: SYSTEM_PROMPT },
+      { role: "system", content: buildSystemPrompt(todayIso, year) },
       ...history.slice(-6).map((m) => ({
         role: m.role as "user" | "assistant",
         content: m.content,
@@ -135,6 +148,7 @@ RELEVANTE DOKUMENTE AUS DER GESAMTEN BASIS:
 ${contextBlocks}
 
 Beantworte die Frage jetzt anhand der gesamten lokalen Wissensbasis.
+Beachte den Kalenderkontext: «dieses Jahr» = ${year}, «kommend/geplant» ab ${toSwissDate(todayIso)}. Vergangene Jahre nur, wenn die Frage danach fragt oder nichts Aktuelles vorhanden ist.
 Wenn die Frage ein bestimmtes Schiff/Produkt nennt: nimm die dazu passenden Dokumente und den Reiseverlauf dort – ignoriere andere Kreuzfahrten als Antwort.
 
 Wichtig für Quellen:

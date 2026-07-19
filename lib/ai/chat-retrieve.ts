@@ -1,5 +1,5 @@
 import { getDb } from "@/lib/db/client";
-import { toSwissDate } from "@/lib/utils/dates";
+import { currentYear, toSwissDate } from "@/lib/utils/dates";
 import { resolveItinerary } from "@/lib/extraction/itinerary";
 
 export type ChatSource = {
@@ -158,6 +158,39 @@ function tokenize(query: string): string[] {
     .map((t) => t.trim())
     .filter((t) => t.length >= 3 && !STOPWORDS.has(t))
     .slice(0, 12);
+}
+
+/** Resolve relative year phrases so retrieval prefers the calendar year users mean. */
+function relativeYearHints(query: string): { years: string[]; preferUpcoming: boolean } {
+  const lower = query.toLowerCase().normalize("NFC");
+  const year = currentYear();
+  const years: string[] = [];
+  let preferUpcoming = false;
+
+  if (
+    /\bdieses\s+jahr\b/.test(lower) ||
+    /\baktuelles?\s+jahr\b/.test(lower) ||
+    /\bheuer\b/.test(lower) ||
+    /\bin\s+diesem\s+jahr\b/.test(lower)
+  ) {
+    years.push(String(year));
+  }
+  if (/\bnächstes\s+jahr\b/.test(lower) || /\bnæchstes\s+jahr\b/.test(lower)) {
+    years.push(String(year + 1));
+  }
+  if (/\bletztes\s+jahr\b/.test(lower) || /\bvorjahr\b/.test(lower)) {
+    years.push(String(year - 1));
+  }
+  if (
+    /\bkommend|\bgeplant|\banstehend|\bdemnächst|\bbald\b|\bnoch\s+geplant/.test(
+      lower
+    )
+  ) {
+    preferUpcoming = true;
+    if (!years.includes(String(year))) years.push(String(year));
+  }
+
+  return { years: [...new Set(years)], preferUpcoming };
 }
 
 /** Multi-word phrases from the question (e.g. "legend of the seas"). */
@@ -587,7 +620,11 @@ function scoreFactBlob(blob: string, tokens: string[]): number {
   return hits > 0 ? score : 0;
 }
 
-function collectFactsAcrossCorpus(tokens: string[]): StructuredFact[] {
+function collectFactsAcrossCorpus(
+  tokens: string[],
+  yearHints: string[] = [],
+  preferUpcoming = false
+): StructuredFact[] {
   const db = getDb();
   const facts: StructuredFact[] = [];
 
@@ -718,6 +755,19 @@ function collectFactsAcrossCorpus(tokens: string[]): StructuredFact[] {
     const score = tokens.length === 0 ? 1 : scoreFactBlob(blob, tokens);
     if (tokens.length > 0 && score <= 0) continue;
 
+    let boosted = score || 1;
+    const startYear = String(t.start_date || "").slice(0, 4);
+    if (yearHints.length > 0) {
+      if (yearHints.includes(startYear)) boosted += 25;
+      else if (startYear) boosted -= 8;
+    }
+    if (preferUpcoming) {
+      const today = new Date().toISOString().slice(0, 10);
+      const start = String(t.start_date || "").slice(0, 10);
+      if (start && start >= today) boosted += 20;
+      else if (start && start < today) boosted -= 12;
+    }
+
     const itinerary = resolveItinerary({
       travelItems: [{ extracted_data: t.extracted_data }],
       ocrContent: String(t.document_content || ""),
@@ -737,7 +787,7 @@ function collectFactsAcrossCorpus(tokens: string[]): StructuredFact[] {
       details: `${t.provider || "–"} · ${toSwissDate(String(t.start_date || ""))}–${toSwissDate(String(t.end_date || ""))} · ${t.origin || ""}→${t.destination || ""} · Ref ${t.booking_reference || "–"}${itineraryLine}`,
       documentId: Number(t.document_id),
       documentTitle: (t.document_title as string) || null,
-      score: score || 1,
+      score: boosted,
     });
   }
 
@@ -751,7 +801,11 @@ function collectFactsAcrossCorpus(tokens: string[]): StructuredFact[] {
  */
 export function retrieveForChat(query: string, limit = 12): ChatRetrieval {
   const db = getDb();
-  const tokens = expandTokens(tokenize(query));
+  const yearHints = relativeYearHints(query);
+  const tokens = expandTokens([
+    ...tokenize(query),
+    ...yearHints.years,
+  ]);
   const phrases = extractPhrases(query);
   const corpus = getCorpusStats();
 
@@ -821,7 +875,11 @@ export function retrieveForChat(query: string, limit = 12): ChatRetrieval {
     .sort((a, b) => b.score - a.score)
     .slice(0, Math.max(limit, 8));
 
-  let facts = collectFactsAcrossCorpus(tokens);
+  let facts = collectFactsAcrossCorpus(
+    tokens,
+    yearHints.years,
+    yearHints.preferUpcoming
+  );
 
   // If the question names a specific multi-word entity, keep facts from those docs first
   if (phrases.length > 0) {
