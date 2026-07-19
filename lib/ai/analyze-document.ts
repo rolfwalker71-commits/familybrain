@@ -15,7 +15,13 @@ export type AnalyzeResult = {
   model: string;
 };
 
-export async function analyzeDocument(documentId: number): Promise<AnalyzeResult> {
+export async function analyzeDocument(
+  documentId: number,
+  options?: {
+    expectedContentHash?: string | null;
+    manageErrorStatus?: boolean;
+  }
+): Promise<AnalyzeResult> {
   const detail = getDocumentById(documentId);
   if (!detail) {
     throw new Error(`Dokument ${documentId} nicht gefunden.`);
@@ -70,11 +76,18 @@ export async function analyzeDocument(documentId: number): Promise<AnalyzeResult
       }
     }
 
-    saveAnalysis(documentId, parsed.data, model);
+    saveAnalysis(
+      documentId,
+      parsed.data,
+      model,
+      options?.expectedContentHash
+    );
     return { documentId, analysis: parsed.data, model };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    markAnalysisError(documentId, message);
+    if (options?.manageErrorStatus !== false) {
+      markAnalysisError(documentId, message);
+    }
     throw error;
   }
 }

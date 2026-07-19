@@ -1,15 +1,17 @@
 import { ensureInitialized } from "../lib/db/migrations";
-import { analyzePendingBatch } from "../lib/ai/analyze-document";
 import { isJobRunning } from "../lib/jobs/queries";
+import { runSyncAnalyzeJob } from "../lib/jobs/runner";
 
 async function main() {
   ensureInitialized();
   if (isJobRunning()) {
-    throw new Error("Ein automatischer Sync-/Analyse-Lauf ist bereits aktiv.");
+    throw new Error("Ein Sync-/Analyse-Lauf ist bereits aktiv.");
   }
-  const limit = Number(process.argv[2] || 10);
-  const result = await analyzePendingBatch(limit);
+  const result = await runSyncAnalyzeJob("manual");
   console.log(JSON.stringify(result, null, 2));
+  if (!result.ok || result.status === "error") {
+    process.exit(1);
+  }
 }
 
 main().catch((error) => {

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { analyzeDocument } from "@/lib/ai/analyze-document";
+import { getActiveJobRun } from "@/lib/jobs/queries";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -11,6 +12,13 @@ const BodySchema = z.object({
 
 export async function POST(request: Request) {
   try {
+    if (getActiveJobRun()) {
+      return NextResponse.json(
+        { error: "Ein automatischer Sync-/Analyse-Lauf ist bereits aktiv." },
+        { status: 409 }
+      );
+    }
+
     const body = await request.json();
     const parsed = BodySchema.safeParse(body);
     if (!parsed.success) {

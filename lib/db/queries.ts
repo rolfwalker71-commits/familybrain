@@ -86,7 +86,9 @@ export function saveOpenAISettings(apiKey: string | null, model: string | null) 
 
 export function listDocuments(filters: DocumentFilters = {}) {
   const db = getDb();
-  const where: string[] = [];
+  const where: string[] = [
+    `COALESCE(d.sync_status, 'synced') != 'missing'`,
+  ];
   const params: unknown[] = [];
 
   if (filters.search) {
@@ -212,18 +214,60 @@ export function upsertDocument(input: {
   const existing = getDocumentByPaperlessId(input.paperless_id);
   const ts = nowIso();
 
-  if (!existing) {
-    const result = db
-      .prepare(
-        `INSERT INTO paperless_documents (
-          paperless_id, title, content, content_hash, created_date, modified_at, added_at,
-          document_type_id, document_type_name, correspondent_id, correspondent_name,
-          original_file_name, archived_file_name, paperless_url, raw_metadata,
-          sync_status, last_synced_at, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced', ?, ?, ?)`
-      )
-      .run(
-        input.paperless_id,
+  return db.transaction(() => {
+    if (!existing) {
+      const result = db
+        .prepare(
+          `INSERT INTO paperless_documents (
+            paperless_id, title, content, content_hash, created_date, modified_at, added_at,
+            document_type_id, document_type_name, correspondent_id, correspondent_name,
+            original_file_name, archived_file_name, paperless_url, raw_metadata,
+            sync_status, last_synced_at, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced', ?, ?, ?)`
+        )
+        .run(
+          input.paperless_id,
+          input.title,
+          input.content,
+          input.content_hash,
+          input.created_date,
+          input.modified_at,
+          input.added_at,
+          input.document_type_id,
+          input.document_type_name,
+          input.correspondent_id,
+          input.correspondent_name,
+          input.original_file_name,
+          input.archived_file_name,
+          input.paperless_url,
+          input.raw_metadata,
+          ts,
+          ts,
+          ts
+        );
+      const id = Number(result.lastInsertRowid);
+      replaceTags(id, input.tags);
+      ensurePendingSummary(id);
+      return { id, changed: true, isNew: true };
+    }
+
+    const contentChanged = existing.content_hash !== input.content_hash;
+    const metadataChanged =
+      existing.modified_at !== input.modified_at ||
+      existing.title !== input.title ||
+      existing.document_type_name !== input.document_type_name ||
+      existing.correspondent_name !== input.correspondent_name ||
+      existing.sync_status === "missing";
+
+    if (contentChanged || metadataChanged) {
+      db.prepare(
+        `UPDATE paperless_documents SET
+          title = ?, content = ?, content_hash = ?, created_date = ?, modified_at = ?, added_at = ?,
+          document_type_id = ?, document_type_name = ?, correspondent_id = ?, correspondent_name = ?,
+          original_file_name = ?, archived_file_name = ?, paperless_url = ?, raw_metadata = ?,
+          sync_status = 'synced', last_synced_at = ?, updated_at = ?
+         WHERE id = ?`
+      ).run(
         input.title,
         input.content,
         input.content_hash,
@@ -240,60 +284,21 @@ export function upsertDocument(input: {
         input.raw_metadata,
         ts,
         ts,
-        ts
+        existing.id
       );
-    const id = Number(result.lastInsertRowid);
-    replaceTags(id, input.tags);
-    ensurePendingSummary(id);
-    return { id, changed: true, isNew: true };
-  }
-
-  const contentChanged = existing.content_hash !== input.content_hash;
-  const metadataChanged =
-    existing.modified_at !== input.modified_at ||
-    existing.title !== input.title ||
-    existing.document_type_name !== input.document_type_name ||
-    existing.correspondent_name !== input.correspondent_name;
-
-  if (contentChanged || metadataChanged) {
-    db.prepare(
-      `UPDATE paperless_documents SET
-        title = ?, content = ?, content_hash = ?, created_date = ?, modified_at = ?, added_at = ?,
-        document_type_id = ?, document_type_name = ?, correspondent_id = ?, correspondent_name = ?,
-        original_file_name = ?, archived_file_name = ?, paperless_url = ?, raw_metadata = ?,
-        sync_status = 'synced', last_synced_at = ?, updated_at = ?
-       WHERE id = ?`
-    ).run(
-      input.title,
-      input.content,
-      input.content_hash,
-      input.created_date,
-      input.modified_at,
-      input.added_at,
-      input.document_type_id,
-      input.document_type_name,
-      input.correspondent_id,
-      input.correspondent_name,
-      input.original_file_name,
-      input.archived_file_name,
-      input.paperless_url,
-      input.raw_metadata,
-      ts,
-      ts,
-      existing.id
-    );
-    replaceTags(existing.id, input.tags);
-    if (contentChanged) {
-      markSummaryStale(existing.id);
+      replaceTags(existing.id, input.tags);
+      if (contentChanged || metadataChanged) {
+        markSummaryStale(existing.id);
+      }
+      return { id: existing.id, changed: true, isNew: false };
     }
-    return { id: existing.id, changed: true, isNew: false };
-  }
 
-  db.prepare(
-    `UPDATE paperless_documents SET last_synced_at = ?, sync_status = 'synced', updated_at = ? WHERE id = ?`
-  ).run(ts, ts, existing.id);
-  replaceTags(existing.id, input.tags);
-  return { id: existing.id, changed: false, isNew: false };
+    db.prepare(
+      `UPDATE paperless_documents SET last_synced_at = ?, sync_status = 'synced', updated_at = ? WHERE id = ?`
+    ).run(ts, ts, existing.id);
+    replaceTags(existing.id, input.tags);
+    return { id: existing.id, changed: false, isNew: false };
+  })();
 }
 
 function replaceTags(
@@ -334,7 +339,15 @@ function markSummaryStale(documentId: number) {
     return;
   }
   db.prepare(
-    `UPDATE document_summaries SET analysis_status = 'stale', updated_at = ? WHERE document_id = ?`
+    `UPDATE document_summaries
+     SET analysis_status = 'stale',
+         analysis_attempts = 0,
+         analysis_claimed_at = NULL,
+         analysis_claim_hash = NULL,
+         analysis_next_retry_at = NULL,
+         analysis_last_error = NULL,
+         updated_at = ?
+     WHERE document_id = ?`
   ).run(ts, documentId);
 }
 
@@ -345,12 +358,19 @@ export function listPendingDocumentIds(limit = 10): number[] {
       `SELECT d.id
        FROM paperless_documents d
        LEFT JOIN document_summaries s ON s.document_id = d.id
-       WHERE s.analysis_status IS NULL
-          OR s.analysis_status IN ('pending', 'stale', 'error')
+       WHERE COALESCE(d.sync_status, 'synced') != 'missing'
+         AND (
+           s.analysis_status IS NULL
+           OR (
+             s.analysis_status IN ('pending', 'stale', 'error')
+             AND COALESCE(s.analysis_attempts, 0) < 3
+             AND (s.analysis_next_retry_at IS NULL OR s.analysis_next_retry_at <= ?)
+           )
+         )
        ORDER BY d.id
        LIMIT ?`
     )
-    .all(limit) as { id: number }[];
+    .all(nowIso(), limit) as { id: number }[];
   return rows.map((r) => r.id);
 }
 
@@ -387,7 +407,12 @@ export function getFilterOptions() {
 export function getDashboardStats() {
   const db = getDb();
   const totalDocuments = (
-    db.prepare(`SELECT COUNT(*) as c FROM paperless_documents`).get() as { c: number }
+    db
+      .prepare(
+        `SELECT COUNT(*) as c FROM paperless_documents
+         WHERE COALESCE(sync_status, 'synced') != 'missing'`
+      )
+      .get() as { c: number }
   ).c;
 
   const pendingAnalysis = (
@@ -396,7 +421,15 @@ export function getDashboardStats() {
         `SELECT COUNT(*) as c
          FROM paperless_documents d
          LEFT JOIN document_summaries s ON s.document_id = d.id
-         WHERE s.analysis_status IS NULL OR s.analysis_status IN ('pending', 'stale', 'error')`
+         WHERE COALESCE(d.sync_status, 'synced') != 'missing'
+           AND (
+             s.analysis_status IS NULL
+             OR (
+               s.analysis_status IN ('pending', 'stale', 'error')
+               AND COALESCE(s.analysis_attempts, 0) < 3
+               AND (s.analysis_next_retry_at IS NULL OR s.analysis_next_retry_at <= datetime('now'))
+             )
+           )`
       )
       .get() as { c: number }
   ).c;

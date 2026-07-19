@@ -67,6 +67,7 @@ export class PaperlessClient {
         headers: this.headers(accept),
         cache: "no-store",
         redirect: "manual",
+        signal: AbortSignal.timeout(60_000),
       });
 
       if (response.status >= 300 && response.status < 400) {
@@ -104,11 +105,46 @@ export class PaperlessClient {
   }
 
   async listDocumentsPage(
-    pageUrl?: string
+    pageUrl?: string,
+    options?: {
+      pageSize?: number;
+      ordering?: string;
+      modifiedGte?: string;
+      fields?: string;
+    }
   ): Promise<PaperlessPaginatedResponse<PaperlessDocument>> {
-    const path =
-      pageUrl ?? "/api/documents/?page_size=50&ordering=-modified";
-    return this.request(path);
+    if (pageUrl) {
+      return this.request(pageUrl);
+    }
+    const params = new URLSearchParams();
+    params.set("page_size", String(options?.pageSize ?? 50));
+    params.set("ordering", options?.ordering ?? "-modified");
+    if (options?.modifiedGte) {
+      params.set("modified__gte", options.modifiedGte);
+    }
+    if (options?.fields) {
+      params.set("fields", options.fields);
+    }
+    return this.request(`/api/documents/?${params.toString()}`);
+  }
+
+  async listAllDocumentIds(): Promise<number[]> {
+    const ids: number[] = [];
+    let nextUrl: string | undefined;
+    let first = true;
+    while (first || nextUrl) {
+      first = false;
+      const page = await this.listDocumentsPage(nextUrl, {
+        pageSize: 100,
+        ordering: "id",
+        fields: "id",
+      });
+      for (const doc of page.results) {
+        ids.push(doc.id);
+      }
+      nextUrl = page.next ?? undefined;
+    }
+    return ids;
   }
 
   async getTag(id: number): Promise<PaperlessTag | null> {

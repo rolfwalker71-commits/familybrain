@@ -1,9 +1,17 @@
 import { syncPaperlessDocuments } from "@/lib/paperless/sync";
+import { getActiveJobRun } from "@/lib/jobs/queries";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
 export async function POST() {
+  if (getActiveJobRun()) {
+    return Response.json(
+      { error: "Ein automatischer Sync-/Analyse-Lauf ist bereits aktiv." },
+      { status: 409 }
+    );
+  }
+
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream({

@@ -1,10 +1,18 @@
 import { analyzeDocument } from "@/lib/ai/analyze-document";
 import { listPendingDocumentIds } from "@/lib/db/queries";
+import { getActiveJobRun } from "@/lib/jobs/queries";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
 export async function POST(request: Request) {
+  if (getActiveJobRun()) {
+    return Response.json(
+      { error: "Ein automatischer Sync-/Analyse-Lauf ist bereits aktiv." },
+      { status: 409 }
+    );
+  }
+
   const body = await request.json().catch(() => ({}));
   const limit = Math.min(Math.max(Number(body.limit) || 10, 1), 50);
 

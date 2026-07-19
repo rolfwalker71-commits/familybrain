@@ -33,6 +33,34 @@ export function bootstrapDatabase(db: Database.Database): void {
     db.exec(`ALTER TABLE travel_items ADD COLUMN travel_type_override TEXT`);
   }
 
+  const summaryCols = db
+    .prepare(`PRAGMA table_info(document_summaries)`)
+    .all() as Array<{ name: string }>;
+  const summaryColNames = new Set(summaryCols.map((c) => c.name));
+  if (!summaryColNames.has("analysis_attempts")) {
+    db.exec(
+      `ALTER TABLE document_summaries ADD COLUMN analysis_attempts INTEGER NOT NULL DEFAULT 0`
+    );
+  }
+  if (!summaryColNames.has("analysis_claimed_at")) {
+    db.exec(`ALTER TABLE document_summaries ADD COLUMN analysis_claimed_at TEXT`);
+  }
+  if (!summaryColNames.has("analysis_claim_hash")) {
+    db.exec(`ALTER TABLE document_summaries ADD COLUMN analysis_claim_hash TEXT`);
+  }
+  if (!summaryColNames.has("analysis_next_retry_at")) {
+    db.exec(
+      `ALTER TABLE document_summaries ADD COLUMN analysis_next_retry_at TEXT`
+    );
+  }
+  if (!summaryColNames.has("analysis_last_error")) {
+    db.exec(`ALTER TABLE document_summaries ADD COLUMN analysis_last_error TEXT`);
+  }
+  db.exec(
+    `CREATE INDEX IF NOT EXISTS idx_summaries_retry
+     ON document_summaries(analysis_status, analysis_next_retry_at)`
+  );
+
   const insertArea = db.prepare(
     `INSERT OR IGNORE INTO knowledge_areas (name, description) VALUES (?, ?)`
   );

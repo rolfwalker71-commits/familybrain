@@ -13,6 +13,7 @@ import { useAnalysis } from "@/components/analysis/analysis-provider";
 import { readNdjsonStream } from "@/lib/utils/stream";
 import { PageHeader } from "@/components/layout/page-primitives";
 import { IconCircle, pageVisuals } from "@/components/layout/icon-circle";
+import { AutomationPanel } from "@/components/sync/automation-panel";
 
 type SyncResult = {
   totalRemote: number;
@@ -276,6 +277,8 @@ export function SyncClient() {
           </div>
         </CardContent>
       </Card>
+
+      <AutomationPanel />
 
       <Card className="border-border/80 shadow-sm">
         <CardHeader>

@@ -55,10 +55,41 @@ CREATE TABLE IF NOT EXISTS document_summaries (
   confidence REAL,
   model_name TEXT,
   analysis_status TEXT DEFAULT 'pending',
+  analysis_attempts INTEGER NOT NULL DEFAULT 0,
+  analysis_claimed_at TEXT,
+  analysis_claim_hash TEXT,
+  analysis_next_retry_at TEXT,
+  analysis_last_error TEXT,
   analyzed_at TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   FOREIGN KEY(document_id) REFERENCES paperless_documents(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS job_runs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  job_type TEXT NOT NULL DEFAULT 'sync_analyze',
+  trigger TEXT NOT NULL,
+  status TEXT NOT NULL,
+  started_at TEXT NOT NULL,
+  finished_at TEXT,
+  summary_json TEXT,
+  error_message TEXT,
+  lease_owner TEXT,
+  lease_expires_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS job_run_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  run_id INTEGER NOT NULL,
+  item_kind TEXT NOT NULL,
+  external_ref TEXT,
+  title TEXT,
+  status TEXT NOT NULL,
+  message TEXT,
+  payload_json TEXT,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY(run_id) REFERENCES job_runs(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS knowledge_areas (
@@ -168,3 +199,7 @@ CREATE INDEX IF NOT EXISTS idx_finance_invoice_date ON financial_items(invoice_d
 CREATE INDEX IF NOT EXISTS idx_travel_start_date ON travel_items(start_date);
 CREATE INDEX IF NOT EXISTS idx_classification_rules_domain
   ON classification_rules(domain, enabled, priority);
+CREATE INDEX IF NOT EXISTS idx_docs_sync_status ON paperless_documents(sync_status);
+CREATE INDEX IF NOT EXISTS idx_job_runs_started ON job_runs(started_at DESC);
+CREATE INDEX IF NOT EXISTS idx_job_runs_status ON job_runs(status);
+CREATE INDEX IF NOT EXISTS idx_job_run_items_run ON job_run_items(run_id, id);

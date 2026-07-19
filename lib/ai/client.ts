@@ -12,7 +12,11 @@ export function getOpenAIClient(): OpenAI {
       "OpenAI API-Key fehlt. Bitte unter Einstellungen hinterlegen."
     );
   }
-  return new OpenAI({ apiKey });
+  return new OpenAI({
+    apiKey,
+    timeout: 120_000,
+    maxRetries: 2,
+  });
 }
 
 export function getOpenAIModel(): string {

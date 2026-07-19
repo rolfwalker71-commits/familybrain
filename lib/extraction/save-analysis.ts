@@ -112,7 +112,8 @@ function enrichTravelWithItinerary(
 export function saveAnalysis(
   documentId: number,
   analysis: DocumentAnalysis,
-  modelName: string
+  modelName: string,
+  expectedContentHash?: string | null
 ): void {
   const db = getDb();
   const ts = nowIso();
@@ -122,6 +123,15 @@ export function saveAnalysis(
   const enriched = enrichTravelWithItinerary(analysis, doc?.content ?? null);
 
   const tx = db.transaction(() => {
+    if (expectedContentHash !== undefined) {
+      const current = db
+        .prepare(`SELECT content_hash FROM paperless_documents WHERE id = ?`)
+        .get(documentId) as { content_hash: string | null } | undefined;
+      if (!current || current.content_hash !== expectedContentHash) {
+        throw new Error("CONTENT_HASH_MISMATCH");
+      }
+    }
+
     db.prepare(
       `INSERT INTO document_summaries (
         document_id, short_summary, detailed_summary, important_points, important_dates,
@@ -144,6 +154,11 @@ export function saveAnalysis(
         confidence = excluded.confidence,
         model_name = excluded.model_name,
         analysis_status = 'completed',
+        analysis_attempts = 0,
+        analysis_claimed_at = NULL,
+        analysis_claim_hash = NULL,
+        analysis_next_retry_at = NULL,
+        analysis_last_error = NULL,
         analyzed_at = excluded.analyzed_at,
         updated_at = excluded.updated_at`
     ).run(
