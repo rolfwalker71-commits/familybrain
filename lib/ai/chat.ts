@@ -28,7 +28,45 @@ Regeln:
 - Erfinde nichts.
 - Formatiere Antworten als Markdown: **fett** für Totale/Kernaussagen, *kursiv* sparsam für Hinweise, Aufzählungen mit -, Tabellen mit | wenn mehrere Beträge/Daten/Positionen sinnvoll sind.
 - Schreibe alle Datumsangaben im Schweizer Format **dd.mm.yyyy** (z. B. 06.06.2026). Nie yyyy-mm-dd oder amerikanisch.
-- Nenne am Ende kurz die wichtigsten Quelldokumente (Markdown-Liste).`;
+- Schreibe KEINEN sichtbaren Abschnitt «Quellen» in die Antwort.
+- Hänge als allerletzte Zeile exakt einen maschinenlesbaren Marker an:
+  [[SOURCE_IDS:1354,42]]
+- In diesen Marker gehören höchstens 4 Dokument-IDs und NUR Dokumente, deren Inhalt die konkrete Antwort direkt belegt. Ähnliche Treffer, allgemeiner Kontext oder Dokumente, die nicht in der Antwort verwendet wurden, gehören nicht hinein.
+- Wenn kein Dokument die Antwort direkt belegt, verwende [[SOURCE_IDS:]].`;
+
+const SOURCE_IDS_MARKER = /\[\[SOURCE_IDS:\s*([0-9,\s]*)\]\]\s*$/i;
+const TRAILING_SOURCE_SECTION =
+  /\n+(?:#{1,6}\s*)?(?:\*\*)?Quellen(?:\*\*)?:?\s*\n[\s\S]*$/i;
+
+/**
+ * The model marks only documents it actually used. Keep this metadata out of
+ * the visible answer and discard broad retrieval candidates.
+ */
+export function parseChatAnswerSources(rawAnswer: string): {
+  answer: string;
+  sourceIds: number[];
+} {
+  const trimmed = rawAnswer.trim();
+  const marker = trimmed.match(SOURCE_IDS_MARKER);
+  const sourceIds = marker
+    ? [
+        ...new Set(
+          marker[1]
+            .split(",")
+            .map((value) => Number(value.trim()))
+            .filter((value) => Number.isInteger(value) && value > 0)
+        ),
+      ].slice(0, 4)
+    : [];
+
+  let answer = marker
+    ? trimmed.slice(0, marker.index).trim()
+    : trimmed;
+  // Defensive cleanup for models that still add the old visible source list.
+  answer = answer.replace(TRAILING_SOURCE_SECTION, "").trim();
+
+  return { answer, sourceIds };
+}
 
 export async function answerDocumentChat(
   question: string,
@@ -97,36 +135,42 @@ RELEVANTE DOKUMENTE AUS DER GESAMTEN BASIS:
 ${contextBlocks}
 
 Beantworte die Frage jetzt anhand der gesamten lokalen Wissensbasis.
-Wenn die Frage ein bestimmtes Schiff/Produkt nennt: nimm die dazu passenden Dokumente und den Reiseverlauf dort – ignoriere andere Kreuzfahrten als Antwort.`,
+Wenn die Frage ein bestimmtes Schiff/Produkt nennt: nimm die dazu passenden Dokumente und den Reiseverlauf dort – ignoriere andere Kreuzfahrten als Antwort.
+
+Wichtig für Quellen:
+- Gib keinen sichtbaren Quellenabschnitt aus.
+- Markiere am Ende nur die Dokument-IDs, die deine Antwort unmittelbar belegen.
+- Gib niemals alle Retrieval-Treffer als Quellen an.`,
       },
     ],
   });
 
-  const answer =
+  const rawAnswer =
     completion.choices[0]?.message?.content?.trim() ||
     "Ich konnte keine Antwort erzeugen.";
+  const parsed = parseChatAnswerSources(rawAnswer);
 
-  let sources = retrieval.sources;
-  if (sources.length === 0 && retrieval.facts.length > 0) {
-    const seen = new Set<number>();
-    sources = [];
-    for (const f of retrieval.facts) {
-      if (!f.documentId || seen.has(f.documentId)) continue;
-      seen.add(f.documentId);
-      sources.push({
-        id: f.documentId,
-        paperlessId: 0,
-        title: f.documentTitle,
-        category: null,
-        shortSummary: f.details,
-        correspondent: null,
-        createdDate: null,
-        excerpt: f.details,
-        score: f.score,
-      });
-      if (sources.length >= 8) break;
-    }
+  const sourceCandidates = new Map<number, ChatSource>(
+    retrieval.sources.map((source) => [source.id, source])
+  );
+  for (const fact of retrieval.facts) {
+    if (!fact.documentId || sourceCandidates.has(fact.documentId)) continue;
+    sourceCandidates.set(fact.documentId, {
+      id: fact.documentId,
+      paperlessId: 0,
+      title: fact.documentTitle,
+      category: null,
+      shortSummary: fact.details,
+      correspondent: null,
+      createdDate: null,
+      excerpt: fact.details,
+      score: fact.score,
+    });
   }
 
-  return { answer, sources };
+  const sources = parsed.sourceIds
+    .map((id) => sourceCandidates.get(id))
+    .filter((source): source is ChatSource => Boolean(source));
+
+  return { answer: parsed.answer, sources };
 }

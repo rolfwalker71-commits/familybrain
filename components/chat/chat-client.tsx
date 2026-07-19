@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Loader2, Send, Sparkles } from "lucide-react";
+import { ExternalLink, Loader2, Send, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -150,7 +150,7 @@ export function ChatClient() {
                     {message.sources && message.sources.length > 0 ? (
                       <div className="mt-3 space-y-2 border-t border-border/60 pt-3">
                         <div className="text-xs font-medium text-muted-foreground">
-                          Quellen
+                          Verwendete Dokumente
                         </div>
                         <div className="flex flex-wrap gap-2">
                           {message.sources.map((source) => (
@@ -158,15 +158,22 @@ export function ChatClient() {
                               key={source.id}
                               className="flex max-w-full items-center gap-1.5"
                             >
-                              <Link href={`/documents/${source.id}`}>
+                              <Link
+                                href={`/documents/${source.id}`}
+                                title="Quelldokument öffnen"
+                                className="max-w-full"
+                              >
                                 <Badge
                                   variant="secondary"
-                                  className="cursor-pointer hover:bg-accent"
+                                  className="max-w-full cursor-pointer gap-1.5 hover:bg-accent"
                                 >
-                                  {source.title || `Dokument #${source.id}`}
-                                  {source.category
-                                    ? ` · ${source.category}`
-                                    : ""}
+                                  <span className="truncate">
+                                    {source.title || `Dokument #${source.id}`}
+                                    {source.category
+                                      ? ` · ${source.category}`
+                                      : ""}
+                                  </span>
+                                  <ExternalLink className="size-3 shrink-0" />
                                 </Badge>
                               </Link>
                               <DocumentInfoButton
