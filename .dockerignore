@@ -28,6 +28,10 @@ data/*.sqlite-*
 data/*
 !data/.gitkeep
 
+# Accidental nested clones / copies inside the build context
+familybrain
+Familiybrain
+
 # misc
 .DS_Store
 *.pem
