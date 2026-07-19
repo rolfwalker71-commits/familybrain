@@ -263,7 +263,7 @@ export function SyncClient() {
               onChange={(e) => setApiToken(e.target.value)}
             />
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
             <Button onClick={() => void saveSettings()} disabled={busy !== null}>
               {busy === "save" ? "Speichert…" : "Speichern"}
             </Button>
@@ -364,7 +364,7 @@ export function SyncClient() {
               </span>
             ) : null}
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
             {analysisRunning ? (
               <Button variant="outline" onClick={stopAnalysis}>
                 Analyse stoppen

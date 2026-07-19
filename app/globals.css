@@ -88,8 +88,23 @@
   }
   body {
     @apply bg-background text-foreground;
+    min-height: 100dvh;
+    -webkit-tap-highlight-color: transparent;
   }
   html {
     @apply font-sans;
+    min-height: 100%;
+    overscroll-behavior-y: none;
+  }
+}
+
+@media (pointer: coarse) {
+  [data-slot="button"] {
+    min-height: 2.75rem;
+    min-width: 2.75rem;
+  }
+  [data-slot="select-trigger"],
+  [data-slot="input"] {
+    min-height: 2.75rem;
   }
 }

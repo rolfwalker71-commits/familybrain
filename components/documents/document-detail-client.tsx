@@ -207,13 +207,13 @@ export function DocumentDetailClient({ detail }: DetailProps) {
             </div>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto">
           {document.paperless_url ? (
             <a
               href={document.paperless_url}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex h-8 items-center justify-center gap-2 rounded-lg border border-border bg-background px-2.5 text-sm font-medium hover:bg-muted"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border bg-background px-3 text-sm font-medium hover:bg-muted"
             >
               <ExternalLink className="h-4 w-4" />
               In Paperless öffnen

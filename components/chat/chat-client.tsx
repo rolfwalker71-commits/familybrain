@@ -39,6 +39,7 @@ export function ChatClient() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const messageSequence = useRef(0);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -50,8 +51,9 @@ export function ChatClient() {
 
     setError(null);
     setInput("");
+    messageSequence.current += 1;
     const userMsg: Message = {
-      id: `u-${Date.now()}`,
+      id: `u-${messageSequence.current}`,
       role: "user",
       content: question,
     };
@@ -80,7 +82,7 @@ export function ChatClient() {
       setMessages((prev) => [
         ...prev,
         {
-          id: `a-${Date.now()}`,
+          id: `a-${messageSequence.current}`,
           role: "assistant",
           content: data.answer,
           sources: data.sources,
@@ -94,7 +96,7 @@ export function ChatClient() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-8rem)] flex-col gap-4">
+    <div className="flex h-[calc(100dvh-8rem)] min-h-[32rem] flex-col gap-3 sm:gap-4 lg:h-[calc(100dvh-4rem)]">
       <PageHeader
         title="Chat"
         description="Stelle Fragen zu deinen synchronisierten und analysierten Dokumenten"
@@ -103,7 +105,7 @@ export function ChatClient() {
       />
 
       <Card className="flex min-h-0 flex-1 flex-col border-border/80 shadow-sm">
-        <CardContent className="flex min-h-0 flex-1 flex-col gap-4 p-4">
+        <CardContent className="flex min-h-0 flex-1 flex-col gap-3 p-3 sm:gap-4 sm:p-4">
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
             {messages.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-center gap-4 py-12 text-center">
@@ -120,7 +122,7 @@ export function ChatClient() {
                       key={s}
                       type="button"
                       onClick={() => void send(s)}
-                      className="rounded-full border border-border bg-background px-3 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                      className="min-h-11 rounded-full border border-border bg-background px-3 py-2 text-left text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                     >
                       {s}
                     </button>
@@ -138,7 +140,7 @@ export function ChatClient() {
                   <div
                     className={
                       message.role === "user"
-                        ? "max-w-[85%] rounded-2xl bg-primary px-4 py-3 text-sm text-primary-foreground"
+                        ? "max-w-[92%] rounded-2xl bg-primary px-4 py-3 text-sm text-primary-foreground sm:max-w-[85%]"
                         : "max-w-[min(100%,42rem)] rounded-2xl border border-border bg-muted/40 px-4 py-3 text-sm"
                     }
                   >
@@ -205,7 +207,7 @@ export function ChatClient() {
           ) : null}
 
           <form
-            className="flex items-end gap-2"
+            className="flex items-end gap-2 pb-[env(safe-area-inset-bottom)]"
             onSubmit={(e) => {
               e.preventDefault();
               void send(input);
@@ -217,13 +219,23 @@ export function ChatClient() {
               placeholder="z. B. Wann endet die Garantie der Waschmaschine?"
               className="min-h-[48px] max-h-40 flex-1 resize-none"
               onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
+                if (
+                  e.key === "Enter" &&
+                  !e.shiftKey &&
+                  window.matchMedia("(pointer: fine)").matches
+                ) {
                   e.preventDefault();
                   void send(input);
                 }
               }}
             />
-            <Button type="submit" disabled={loading || !input.trim()} size="icon">
+            <Button
+              type="submit"
+              disabled={loading || !input.trim()}
+              size="icon"
+              className="size-11"
+              aria-label="Nachricht senden"
+            >
               <Send className="h-4 w-4" />
             </Button>
           </form>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { FileText, Maximize2 } from "lucide-react";
+import { ExternalLink, FileText, Maximize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -33,14 +33,26 @@ export function DocumentPdfPreview({
             <IconCircle icon={FileText} tone="blue" size="sm" />
             PDF-Vorschau
           </CardTitle>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setOpen(true)}
-          >
-            <Maximize2 className="mr-1.5 h-3.5 w-3.5" />
-            Öffnen
-          </Button>
+          <div className="flex items-center gap-2">
+            <a
+              href={pdfUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/90 md:hidden"
+            >
+              <ExternalLink className="size-4" />
+              PDF
+            </a>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setOpen(true)}
+              className="hidden md:inline-flex"
+            >
+              <Maximize2 className="mr-1.5 h-3.5 w-3.5" />
+              Vorschau
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <button
@@ -62,7 +74,7 @@ export function DocumentPdfPreview({
                 <span className="text-sm">Vorschau klicken · PDF öffnen</span>
               </div>
             )}
-            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/50 to-transparent px-3 py-2 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">
+            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/50 to-transparent px-3 py-2 text-xs text-white opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
               Klicken für Vollansicht
             </div>
           </button>
@@ -71,7 +83,7 @@ export function DocumentPdfPreview({
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent
-          className="flex h-[90vh] w-[min(1100px,95vw)] max-w-none flex-col gap-3 p-4 sm:max-w-none"
+          className="flex h-dvh w-screen max-w-none flex-col gap-3 rounded-none p-3 sm:h-[90dvh] sm:w-[min(1100px,95vw)] sm:max-w-none sm:rounded-xl sm:p-4"
           showCloseButton
         >
           <DialogHeader>
@@ -94,7 +106,7 @@ export function DocumentPdfPreview({
               href={pdfUrl}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex h-8 items-center rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+              className="inline-flex min-h-11 items-center rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/90"
             >
               In neuem Tab öffnen
             </a>

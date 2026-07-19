@@ -10,6 +10,10 @@ services:
       DATABASE_PATH: /app/data/familybrain.sqlite
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      FAMILYBRAIN_USERNAME: ${FAMILYBRAIN_USERNAME:-admin}
+      FAMILYBRAIN_PASSWORD: ${FAMILYBRAIN_PASSWORD:-}
+      FAMILYBRAIN_PASSWORD_HASH: ${FAMILYBRAIN_PASSWORD_HASH:-}
+      FAMILYBRAIN_SESSION_SECRET: ${FAMILYBRAIN_SESSION_SECRET:-}
     volumes:
       # Persist SQLite (+ WAL) across restarts / redeploys
       - ./data:/app/data

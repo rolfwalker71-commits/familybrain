@@ -162,6 +162,7 @@ export default function SettingsPage() {
           <Button
             onClick={() => void savePaperless()}
             disabled={saving !== null}
+            className="w-full sm:w-auto"
           >
             {saving === "paperless" ? "Speichert…" : "Paperless speichern"}
           </Button>
@@ -233,7 +234,11 @@ export default function SettingsPage() {
               />
             </div>
           ) : null}
-          <Button onClick={() => void saveOpenAI()} disabled={saving !== null}>
+          <Button
+            onClick={() => void saveOpenAI()}
+            disabled={saving !== null}
+            className="w-full sm:w-auto"
+          >
             {saving === "openai" ? "Speichert…" : "OpenAI speichern"}
           </Button>
         </CardContent>

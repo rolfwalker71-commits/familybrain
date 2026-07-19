@@ -194,7 +194,7 @@ export function AutomationPanel() {
           ) : null}
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-[auto_180px_auto] sm:items-end">
+        <div className="grid gap-4 md:grid-cols-[auto_180px_auto] md:items-end">
           <label className="flex items-center gap-2 pb-2 text-sm">
             <input
               type="checkbox"
@@ -219,6 +219,7 @@ export function AutomationPanel() {
           </div>
           <Button
             variant="secondary"
+            className="w-full md:w-auto"
             disabled={
               busy !== null ||
               intervalMinutes < 5 ||
@@ -232,6 +233,7 @@ export function AutomationPanel() {
 
         <Button
           onClick={() => void runNow()}
+          className="w-full sm:w-auto"
           disabled={busy !== null || Boolean(active)}
         >
           {active ? (

@@ -40,7 +40,7 @@ export function AnalysisStatusBar() {
   }
 
   return (
-    <div className="sticky top-0 z-20 border-b border-border bg-card/95 px-6 py-3 backdrop-blur supports-[backdrop-filter]:bg-card/80 lg:px-8">
+    <div className="z-20 border-b border-border bg-card/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-card/80 sm:px-6 lg:sticky lg:top-0 lg:px-8">
       <div className="mx-auto flex max-w-7xl flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 items-start gap-3">
@@ -83,7 +83,7 @@ export function AnalysisStatusBar() {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
             {isRunning ? (
               <Button size="sm" variant="outline" onClick={stopAnalysis}>
                 Stoppen

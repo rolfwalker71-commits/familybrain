@@ -381,7 +381,7 @@ export function DocumentsClient() {
               </SelectContent>
             </Select>
 
-            <div className="grid min-w-0 grid-cols-[1fr_auto_auto] gap-2">
+            <div className="grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-[1fr_auto_auto]">
               <Select
                 value={analysisStatus}
                 onValueChange={(value) => {
@@ -391,7 +391,7 @@ export function DocumentsClient() {
                 }}
                 items={statusItems}
               >
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="col-span-2 w-full sm:col-span-1">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

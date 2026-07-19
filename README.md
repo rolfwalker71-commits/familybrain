@@ -9,6 +9,8 @@ Local-first MVP: connect Paperless-ngx, sync documents into SQLite, and extract 
 - Document list + detail views
 - AI summaries (category, dates, amounts, deadlines, warranties, finance, travel)
 - Dashboards for warranties, deadlines, finance and travel
+- Single-user login for every page and API route
+- Installable online PWA for iOS, iPadOS and Android
 
 ## Stack
 
@@ -24,7 +26,9 @@ Local-first MVP: connect Paperless-ngx, sync documents into SQLite, and extract 
 ```bash
 npm install
 cp .env.local.example .env.local
-# Add OPENAI_API_KEY to .env.local
+# Add FAMILYBRAIN_USERNAME, FAMILYBRAIN_PASSWORD and a 32+ character
+# FAMILYBRAIN_SESSION_SECRET to .env.local
+# Add OPENAI_API_KEY to .env.local (optional; can be set in the UI)
 npm run db:init
 npm run dev
 ```
@@ -43,6 +47,7 @@ npm run db:init
 npm run sync:paperless
 npm run analyze:pending
 npm run analyze:pending -- 25
+npm run auth:secrets -- 'a secure password with 12+ characters'
 ```
 
 ## Docker (same machine as Paperless)
@@ -51,6 +56,9 @@ Single-instance deploy with persistent SQLite. Default host port is **3100** (co
 
 ```bash
 cp .env.example .env
+# Generate a password hash and session secret, then copy both lines into .env:
+npm run auth:secrets -- 'a secure password with 12+ characters'
+# Set FAMILYBRAIN_USERNAME in .env (default: admin)
 # Optional: set OPENAI_API_KEY in .env (or later in UI)
 docker compose up -d --build
 ```
@@ -78,7 +86,12 @@ FamilyBrain is a **separate** Compose stack. It does not join the Paperless netw
    cd familybrain
    cp .env.example .env
    ```
-2. Optionally put `OPENAI_API_KEY` in `.env` (or set it later in the UI).
+2. Generate the required login secrets and copy the output into `.env`:
+   ```bash
+   npm run auth:secrets -- 'a secure password with 12+ characters'
+   ```
+   Set `FAMILYBRAIN_USERNAME` as desired. Optionally put `OPENAI_API_KEY` in
+   `.env` (or set it later in the UI).
 3. Start:
    ```bash
    docker compose up -d --build
@@ -90,6 +103,23 @@ FamilyBrain is a **separate** Compose stack. It does not join the Paperless netw
      Prefer the same URL that works from your LAN; Docker-internal names like `http://webserver:8000` only work if both stacks share a network (not required for this MVP).
    - Paste a Paperless **API token** (Paperless → Settings → API Tokens).
 6. Test connection → Sync → analyze.
+
+### PWA installation
+
+FamilyBrain is an online PWA and always needs a connection to the FamilyBrain
+server. No document or API data is cached for offline use.
+
+- **iPhone/iPad:** open the HTTPS URL in Safari → Share → **Add to Home Screen**
+- **Android:** open the HTTPS URL in Chrome → menu → **Install app**
+
+Use HTTPS on the reverse proxy. Login sessions are stored in a secure,
+HTTP-only cookie and work in both the desktop browser and the installed PWA.
+On some iOS versions the installed PWA asks for one additional login.
+
+The reverse proxy should preserve `Host` and send `X-Forwarded-Host`,
+`X-Forwarded-Proto` and `X-Forwarded-For`. FamilyBrain uses these headers for
+same-origin protection and login throttling. Rotating
+`FAMILYBRAIN_SESSION_SECRET` invalidates all existing sessions.
 
 **Existing data:** copy `data/familybrain.sqlite` (and stop the app first if WAL files exist) into `./data/` on the host before `up`, or start empty and re-sync from Paperless.
 

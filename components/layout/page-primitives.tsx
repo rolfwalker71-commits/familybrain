@@ -47,7 +47,7 @@ export function PageHeader({
       <div className="flex min-w-0 items-start gap-3">
         {icon ? <IconCircle icon={icon} tone={tone} size="lg" /> : null}
         <div className="min-w-0">
-          <h1 className="break-words text-3xl font-semibold tracking-tight">
+          <h1 className="break-words text-2xl font-semibold tracking-tight sm:text-3xl">
             {title}
           </h1>
           {description ? (
@@ -56,7 +56,9 @@ export function PageHeader({
         </div>
       </div>
       {actions ? (
-        <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:shrink-0">
+          {actions}
+        </div>
       ) : null}
     </div>
   );

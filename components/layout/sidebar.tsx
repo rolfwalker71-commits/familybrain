@@ -13,6 +13,7 @@ import {
   Plane,
   Settings,
   MessageSquare,
+  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAnalysis } from "@/components/analysis/analysis-provider";
@@ -87,13 +88,24 @@ function formatCount(n: number) {
   return new Intl.NumberFormat("de-CH").format(n);
 }
 
-export function Sidebar() {
+export function Sidebar({
+  className,
+  onNavigate,
+}: {
+  className?: string;
+  onNavigate?: () => void;
+}) {
   const pathname = usePathname();
   const analysis = useAnalysis();
   const { isRunning } = analysis;
 
   return (
-    <aside className="flex h-full w-60 shrink-0 flex-col bg-sidebar text-sidebar-foreground">
+    <aside
+      className={cn(
+        "flex h-full w-60 shrink-0 flex-col bg-sidebar text-sidebar-foreground",
+        className
+      )}
+    >
       <div className="px-5 py-6">
         <Link href="/dashboard" className="flex items-center gap-3">
           <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground">
@@ -118,6 +130,7 @@ export function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
+              onClick={onNavigate}
               className={cn(
                 "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                 active
@@ -153,7 +166,20 @@ export function Sidebar() {
         })}
       </nav>
 
-      <div className="mt-auto border-t border-sidebar-border/60 px-5 pb-36 pt-4">
+      <div className="mt-auto space-y-3 border-t border-sidebar-border/60 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4">
+        <button
+          type="button"
+          className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          onClick={async () => {
+            await fetch("/api/auth/logout", { method: "POST" }).catch(
+              () => undefined
+            );
+            window.location.assign("/login");
+          }}
+        >
+          <LogOut className="size-4" />
+          Abmelden
+        </button>
         <p
           className="font-mono text-[10px] tabular-nums tracking-wide text-sidebar-foreground/50"
           title="App-Version (Datum-Uhrzeit des letzten Commits)"
