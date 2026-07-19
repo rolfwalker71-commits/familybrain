@@ -99,43 +99,51 @@ export function startScheduler(): void {
   if (state.started) return;
   state.started = true;
 
-  // In this deployment there is exactly one Node process. Any persisted
-  // running lease at process startup belongs to an interrupted predecessor.
-  recoverExpiredJobLeases(new Date(Date.now() + JOB_LEASE_MS + 1));
-  recoverExpiredAnalysisClaims(
-    new Date(Date.now() + ANALYSIS_CLAIM_LEASE_MS + 1)
-  );
+  try {
+    // In this deployment there is exactly one Node process. Any persisted
+    // running lease at process startup belongs to an interrupted predecessor.
+    recoverExpiredJobLeases(new Date(Date.now() + JOB_LEASE_MS + 1));
+    recoverExpiredAnalysisClaims(
+      new Date(Date.now() + ANALYSIS_CLAIM_LEASE_MS + 1)
+    );
+  } catch (error) {
+    console.error("[familybrain] Failed to recover job leases:", error);
+  }
 
   // Poll settings frequently; actual job runs only when due.
   const pollMs = 15_000;
   let lastDueCheck = 0;
 
   const check = () => {
-    const settings = getSchedulerSettings();
-    if (!settings.enabled) {
-      state.nextTickAt = null;
-      return;
-    }
-
-    const now = Date.now();
-
-    if (!state.lastTickAt) {
-      // Initial ingestion starts shortly after startup and runs independently
-      // until every document is synchronized and analyzed.
-      if (!state.nextTickAt) {
-        state.nextTickAt = new Date(now + 20_000).toISOString();
+    try {
+      const settings = getSchedulerSettings();
+      if (!settings.enabled) {
+        state.nextTickAt = null;
+        return;
       }
-    } else if (!state.nextTickAt) {
-      scheduleNext(settings.intervalMinutes);
-    }
 
-    const dueAt = state.nextTickAt
-      ? new Date(state.nextTickAt).getTime()
-      : Number.POSITIVE_INFINITY;
+      const now = Date.now();
 
-    if (now >= dueAt && now - lastDueCheck > 1000) {
-      lastDueCheck = now;
-      void tick();
+      if (!state.lastTickAt) {
+        // Initial ingestion starts shortly after startup and runs independently
+        // until every document is synchronized and analyzed.
+        if (!state.nextTickAt) {
+          state.nextTickAt = new Date(now + 20_000).toISOString();
+        }
+      } else if (!state.nextTickAt) {
+        scheduleNext(settings.intervalMinutes);
+      }
+
+      const dueAt = state.nextTickAt
+        ? new Date(state.nextTickAt).getTime()
+        : Number.POSITIVE_INFINITY;
+
+      if (now >= dueAt && now - lastDueCheck > 1000) {
+        lastDueCheck = now;
+        void tick();
+      }
+    } catch (error) {
+      console.error("[familybrain] Scheduler tick check failed:", error);
     }
   };
 

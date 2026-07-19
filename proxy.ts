@@ -41,8 +41,25 @@ function hasValidOrigin(request: NextRequest): boolean {
   }
 }
 
+function requestOrigin(request: NextRequest): string {
+  const forwardedHost = request.headers.get("x-forwarded-host");
+  const host =
+    forwardedHost?.split(",")[0]?.trim() ||
+    request.headers.get("host") ||
+    request.nextUrl.host;
+  const forwardedProto = request.headers
+    .get("x-forwarded-proto")
+    ?.split(",")[0]
+    ?.trim();
+  const proto =
+    forwardedProto ||
+    (request.nextUrl.protocol === "https:" ? "https" : "http");
+  return `${proto}://${host}`;
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
+  const origin = requestOrigin(request);
 
   if (pathname.startsWith("/api/") && !hasValidOrigin(request)) {
     return NextResponse.json(
@@ -56,17 +73,22 @@ export async function proxy(request: NextRequest) {
   }
 
   const auth = getAuthConfiguration();
-  const session = auth.configured
-    ? await verifySessionToken(
-        request.cookies.get(SESSION_COOKIE_NAME)?.value,
-        auth.sessionSecret,
-        auth.username
-      )
-    : null;
+  let session = null;
+  try {
+    session = auth.configured
+      ? await verifySessionToken(
+          request.cookies.get(SESSION_COOKIE_NAME)?.value,
+          auth.sessionSecret,
+          auth.username
+        )
+      : null;
+  } catch (error) {
+    console.error("[familybrain] Session verification failed:", error);
+  }
 
   if (session) {
     if (pathname === "/login") {
-      return NextResponse.redirect(new URL("/dashboard", request.url));
+      return NextResponse.redirect(new URL("/dashboard", origin));
     }
     return NextResponse.next();
   }
@@ -86,7 +108,7 @@ export async function proxy(request: NextRequest) {
     );
   }
 
-  const loginUrl = new URL("/login", request.url);
+  const loginUrl = new URL("/login", origin);
   const next = `${pathname}${search}`;
   if (next !== "/") loginUrl.searchParams.set("next", next);
   return NextResponse.redirect(loginUrl);

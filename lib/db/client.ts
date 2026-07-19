@@ -38,9 +38,30 @@ export function getDb(): Database.Database {
   }
 
   const dbPath = resolveDbPath();
-  fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+  const dbDir = path.dirname(dbPath);
+  try {
+    fs.mkdirSync(dbDir, { recursive: true });
+  } catch (error) {
+    throw new Error(
+      `Cannot create database directory '${dbDir}': ${
+        error instanceof Error ? error.message : String(error)
+      }. Fix host volume permissions (e.g. chown -R 1000:1000 ./data).`,
+      { cause: error }
+    );
+  }
 
-  const db = new Database(dbPath);
+  let db: Database.Database;
+  try {
+    db = new Database(dbPath);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `Cannot open SQLite database '${dbPath}': ${detail}. ` +
+        `The directory must be writable by the app user (Docker: uid 1000). ` +
+        `On the host: sudo chown -R 1000:1000 ./data && docker compose restart`,
+      { cause: error }
+    );
+  }
   db.pragma("journal_mode = WAL");
   db.pragma("foreign_keys = ON");
   db.pragma("busy_timeout = 5000");
