@@ -415,7 +415,7 @@ export function FinanceOverviewClient({
         >
           <div
             className={cn(
-              "flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3",
+              "flex flex-wrap items-center justify-between gap-3 border-b px-4 py-1.5",
               toneSurface("amber").title
             )}
           >

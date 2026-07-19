@@ -35,8 +35,8 @@ export default function KnowledgePage() {
                 tone={visual.tone}
                 className="flex h-full min-w-0 flex-col overflow-hidden transition-colors hover:border-primary/40"
               >
-                <CardHeader tone={visual.tone} className="min-w-0 pb-2">
-                  <div className="flex items-start justify-between gap-3">
+                <CardHeader tone={visual.tone} className="min-w-0">
+                  <div className="flex items-center justify-between gap-3">
                     <CardTitle
                       className="min-w-0 break-words text-base"
                       title={area.name}

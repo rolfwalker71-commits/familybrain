@@ -124,12 +124,14 @@ export function TileTitleBar({
       className={cn(
         // Always pass clicks through to a parent <button>/Link; only
         // interactive trailing controls re-enable pointer events.
-        "pointer-events-none flex w-full items-center justify-between gap-3 border-b px-4 py-2.5",
+        "pointer-events-none flex w-full items-center justify-between gap-3 border-b px-4 py-1.5",
         surface.title,
         className
       )}
     >
-      <div className="min-w-0 flex-1 text-[16px] font-bold">{children}</div>
+      <div className="flex min-h-8 min-w-0 flex-1 items-center text-[16px] font-bold leading-none">
+        {children}
+      </div>
       {trailing ? (
         <div
           className={cn(

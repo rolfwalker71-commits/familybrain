@@ -38,7 +38,7 @@ function CardHeader({
     <div
       data-slot="card-header"
       className={cn(
-        "group/card-header @container/card-header grid auto-rows-min items-start gap-1 -mt-(--card-spacing) border-b px-(--card-spacing) py-3 has-data-[slot=card-action]:grid-cols-[1fr_auto] has-data-[slot=card-description]:grid-rows-[auto_auto]",
+        "group/card-header @container/card-header grid auto-rows-min items-center gap-1 -mt-(--card-spacing) border-b px-(--card-spacing) py-1.5 has-data-[slot=card-action]:grid-cols-[1fr_auto] has-data-[slot=card-description]:grid-rows-[auto_auto]",
         surface ? surface.title : "border-border bg-muted",
         className
       )}
@@ -52,7 +52,7 @@ function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="card-title"
       className={cn(
-        "font-heading text-[18px]! leading-snug font-bold group-data-[size=sm]/card:text-[16px]!",
+        "font-heading flex items-center text-[18px]! leading-none font-bold group-data-[size=sm]/card:text-[16px]!",
         className
       )}
       {...props}
