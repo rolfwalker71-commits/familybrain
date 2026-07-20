@@ -171,10 +171,11 @@ export function parseChatAnswerSources(rawAnswer: string): {
   answer = answer.replace(TRAILING_SOURCE_SECTION, "").trim();
   // Models often emit "[[SOURCE_IDS:]], [[NOTE_IDS:]], [[GUIDE_IDS:]]" —
   // stripping markers leaves orphan commas like ", ,".
+  // Only match spaces/tabs between commas — never newlines — so
+  // "text,\n,more" is not collapsed into "text more".
   answer = answer
-    .replace(/(?:^|\n)\s*,(?:\s*,)*\s*(?=\n|$)/g, "\n")
-    .replace(/[ \t]*,(?:\s*,)+[ \t]*/g, " ")
-    .replace(/[ \t]+,[ \t]*$/gm, "")
+    .replace(/^[ \t]*,(?:[ \t]*,)*[ \t]*$/gm, "")
+    .replace(/[ \t]*,(?:[ \t]*,)+[ \t]*/g, " ")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 
