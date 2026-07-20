@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
+    "@qdrant/js-client-rest": "^1.18.0",
     "better-sqlite3": "^12.11.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -25,6 +26,7 @@
     "lucide-react": "^1.24.0",
     "next": "16.2.10",
     "openai": "^6.47.0",
+    "pdf-parse": "^2.4.5",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-markdown": "^10.1.0",
@@ -38,6 +40,7 @@
     "@tailwindcss/postcss": "^4",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^20",
+    "@types/pdf-parse": "^1.1.5",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
