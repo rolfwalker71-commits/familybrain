@@ -87,7 +87,7 @@ export function ChatClient() {
   const [editingFromMessageId, setEditingFromMessageId] = useState<string | null>(
     null
   );
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const messagesScrollRef = useRef<HTMLDivElement>(null);
   const messageSequence = useRef(0);
   const copiedResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -105,8 +105,14 @@ export function ChatClient() {
     void loadCorrections();
   }, []);
 
+  // Scroll only inside the messages pane — never scrollIntoView (that can yank the whole page).
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const pane = messagesScrollRef.current;
+    if (!pane) return;
+    const id = requestAnimationFrame(() => {
+      pane.scrollTop = pane.scrollHeight;
+    });
+    return () => cancelAnimationFrame(id);
   }, [messages, loading]);
 
   useEffect(() => {
@@ -248,7 +254,7 @@ export function ChatClient() {
           tone={pageVisuals.chat.tone}
         />
       </div>
-      <Card className="flex min-h-0 flex-1 flex-col overflow-hidden border-border/80 shadow-sm">
+      <Card className="flex min-h-0 flex-1 flex-col gap-0 overflow-hidden border-border/80 py-0 shadow-sm">
         <CardContent className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-3 sm:gap-4 sm:p-4">
           <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
             <p className="text-xs text-muted-foreground">
@@ -345,7 +351,10 @@ export function ChatClient() {
             </div>
           ) : null}
 
-          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
+          <div
+            ref={messagesScrollRef}
+            className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain pr-1"
+          >
             {messages.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-center gap-4 py-12 text-center">
                 <IconCircle icon={Sparkles} tone="indigo" size="lg" />
@@ -524,7 +533,6 @@ export function ChatClient() {
                 Suche in Dokumenten, Notizen, Guides und Korrekturen…
               </div>
             ) : null}
-            <div ref={bottomRef} />
           </div>
 
           {status ? (
