@@ -50,17 +50,45 @@ npm run analyze:pending -- 25
 npm run auth:secrets -- 'a secure password with 12+ characters'
 ```
 
-## Docker (same machine as Paperless)
+## Docker (recommended: pre-built image)
 
-Single-instance deploy with persistent SQLite. Default host port is **3100** (container still listens on 3000 internally), so it does not clash with apps already on 3000.
+FamilyBrain publishes a ready-to-run image to GitHub Container Registry (GHCR).
+You do **not** need Node.js or a local build on the server — only Docker Compose.
+
+Default host port is **3100** (container listens on 3000 internally).
+
+### First install
 
 ```bash
+mkdir familybrain && cd familybrain
+curl -fsSLO https://raw.githubusercontent.com/rolfwalker71-commits/familybrain/main/docker-compose.yml
+curl -fsSLO https://raw.githubusercontent.com/rolfwalker71-commits/familybrain/main/.env.example
 cp .env.example .env
-# Generate a password hash and session secret, then copy both lines into .env:
-npm run auth:secrets -- 'a secure password with 12+ characters'
-# Set FAMILYBRAIN_USERNAME in .env (default: admin)
-# Optional: set OPENAI_API_KEY in .env (or later in UI)
-docker compose up -d --build
+mkdir -p data
+```
+
+Generate login secrets (Docker one-liner, no local npm required):
+
+```bash
+docker run --rm node:22-bookworm-slim node -e "
+const { randomBytes, scryptSync } = require('crypto');
+const pw = process.argv[1];
+const salt = randomBytes(24).toString('base64url');
+const hash = scryptSync(pw, salt, 64).toString('base64url');
+console.log('FAMILYBRAIN_PASSWORD_HASH=scrypt:' + salt + ':' + hash);
+console.log('FAMILYBRAIN_SESSION_SECRET=' + randomBytes(48).toString('base64url'));
+" 'your-secure-password-here'
+```
+
+Copy the two output lines into `.env`. Set `FAMILYBRAIN_USERNAME` if needed.
+Optionally add `OPENAI_API_KEY` to `.env` (or configure later in the UI).
+
+Start:
+
+```bash
+sudo chown -R 1000:1000 ./data
+docker compose pull
+docker compose up -d
 ```
 
 Open [http://localhost:3100](http://localhost:3100) (override with `FAMILYBRAIN_PORT` in `.env`).
@@ -76,25 +104,44 @@ docker compose logs -f familybrain
 docker compose down
 ```
 
+### Updates (all hosts)
+
+```bash
+cd familybrain
+docker compose pull
+docker compose up -d
+```
+
+SQLite in `./data` is kept via the volume mount. No `git pull` or `--build` required
+on production servers.
+
+Pin a specific release instead of `latest`:
+
+```bash
+# in .env
+FAMILYBRAIN_IMAGE_TAG=v0.2.0
+docker compose pull && docker compose up -d
+```
+
+### Local build (developers only)
+
+If you clone the repo and change code:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+```
+
 ### Deploy on a Linux host next to Paperless-ngx
 
 FamilyBrain is a **separate** Compose stack. It does not join the Paperless network; it talks to Paperless over HTTP like a browser.
 
-1. On the host, clone/copy the repo (or only `Dockerfile`, `docker-compose.yml`, `.env.example`):
-   ```bash
-   git clone <your-repo-url> familybrain
-   cd familybrain
-   cp .env.example .env
-   ```
-2. Generate the required login secrets and copy the output into `.env`:
-   ```bash
-   npm run auth:secrets -- 'a secure password with 12+ characters'
-   ```
-   Set `FAMILYBRAIN_USERNAME` as desired. Optionally put `OPENAI_API_KEY` in
-   `.env` (or set it later in the UI).
+1. On the host, create a directory with `docker-compose.yml`, `.env`, and `./data/` (see **First install** above). You only need those files — not the full git repo.
+2. Generate auth secrets and fill `.env` (see above).
 3. Start:
    ```bash
-   docker compose up -d --build
+   sudo chown -R 1000:1000 ./data
+   docker compose pull
+   docker compose up -d
    ```
 4. Open `http://<host-ip>:3100` (firewall: allow TCP 3100 if you access from other devices).
 5. In **Einstellungen**:
@@ -103,6 +150,9 @@ FamilyBrain is a **separate** Compose stack. It does not join the Paperless netw
      Prefer the same URL that works from your LAN; Docker-internal names like `http://webserver:8000` only work if both stacks share a network (not required for this MVP).
    - Paste a Paperless **API token** (Paperless → Settings → API Tokens).
 6. Test connection → Sync → analyze.
+
+**Multiple locations:** repeat the same setup on each host. Each instance keeps its own `./data/` volume; only `.env` and compose files are shared.
+
 
 ### PWA installation
 
@@ -123,24 +173,33 @@ same-origin protection and login throttling. Rotating
 
 **Existing data:** copy `data/familybrain.sqlite` (and stop the app first if WAL files exist) into `./data/` on the host before `up`, or start empty and re-sync from Paperless.
 
-**Updates:**
-```bash
-cd familybrain
-git pull
-docker compose up -d --build
-```
-
-SQLite in `./data` is kept via the volume mount.
-
 **Troubleshooting**
 
 ```bash
 docker compose logs -f familybrain
 ```
 
-- Browser shows „This page couldn't load“ / server error: usually the app can't write `./data` (permissions) or the DB init failed. After pulling the latest image (entrypoint fixes ownership), rebuild and restart.
-- Still stuck: `sudo chown -R 1000:1000 data` then `docker compose restart`.
-- Confirm the container is healthy: `curl -sI http://127.0.0.1:3100/dashboard`
+- Browser shows „This page couldn't load“ / server error: usually the app can't write `./data` (permissions) or the DB init failed. Fix ownership, then restart:
+  `sudo chown -R 1000:1000 data && docker compose restart`
+- Confirm the container is healthy: `curl -sI http://127.0.0.1:3100/login`
+- Image pull fails on a private fork: run `docker login ghcr.io` with a GitHub PAT that has `read:packages`.
+
+## Publishing (maintainers)
+
+Images are built automatically by GitHub Actions on every push to `main` and on version tags `v*`.
+
+- Image: `ghcr.io/rolfwalker71-commits/familybrain:latest`
+- Tagged releases: `ghcr.io/rolfwalker71-commits/familybrain:v1.2.3`
+
+After the first successful workflow run, open the package on GitHub → **Package settings** → set visibility to **Public** so others can pull without login.
+
+Release a version:
+
+```bash
+git tag v0.2.0
+git push origin v0.2.0
+```
+
 
 ## Notes
 

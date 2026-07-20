@@ -1,0 +1,7 @@
+# Optional override for local development or when GHCR is unavailable.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+
+services:
+  familybrain:
+    build: .
+    image: familybrain-local:dev

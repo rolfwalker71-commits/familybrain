@@ -1,6 +1,6 @@
 services:
   familybrain:
-    build: .
+    image: ghcr.io/rolfwalker71-commits/familybrain:${FAMILYBRAIN_IMAGE_TAG:-latest}
     container_name: familybrain
     ports:
       - "${FAMILYBRAIN_PORT:-3100}:3000"
