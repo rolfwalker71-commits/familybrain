@@ -45,7 +45,23 @@ export async function POST(request: Request) {
       );
     }
 
-    const form = await request.formData();
+    let form: FormData;
+    try {
+      form = await request.formData();
+    } catch (error) {
+      const cause =
+        error instanceof Error && "cause" in error
+          ? String((error as Error & { cause?: unknown }).cause ?? "")
+          : "";
+      console.error("[guides] FormData parse failed:", error, cause);
+      return NextResponse.json(
+        {
+          error:
+            "Upload konnte nicht gelesen werden (FormData). Oft ist der Request hinter nginx abgeschnitten — bitte `client_max_body_size 50m;` setzen und nginx neu laden. Max. PDF-Größe: 50 MB.",
+        },
+        { status: 413 }
+      );
+    }
     const file = form.get("file");
     const titleInput = String(form.get("title") || "").trim();
     const replaceExisting = form.get("replaceExisting") !== "false";

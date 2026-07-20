@@ -81,6 +81,14 @@ export function GuidesClient() {
       return;
     }
 
+    const maxUploadBytes = 50 * 1024 * 1024;
+    if (file.size > maxUploadBytes) {
+      setError(
+        `PDF ist zu gross (${(file.size / (1024 * 1024)).toFixed(1)} MB, max. 50 MB).`
+      );
+      return;
+    }
+
     setBusy("upload");
     setError(null);
     setMessage(null);
@@ -92,7 +100,16 @@ export function GuidesClient() {
       form.append("replaceExisting", replaceExisting ? "true" : "false");
 
       const res = await fetch("/api/guides", { method: "POST", body: form });
-      const data = await res.json();
+      let data: { error?: string; chunkCount?: number; pageCount?: number; replacedGuideId?: number | null };
+      try {
+        data = await res.json();
+      } catch {
+        throw new Error(
+          res.status === 413
+            ? "Upload vom Reverse Proxy abgelehnt (zu gross). In nginx `client_max_body_size 50m;` setzen."
+            : "Upload fehlgeschlagen (ungültige Serverantwort)."
+        );
+      }
       if (!res.ok) throw new Error(data.error || "Upload fehlgeschlagen");
 
       const replaced =

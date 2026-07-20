@@ -171,6 +171,14 @@ The reverse proxy should preserve `Host` and send `X-Forwarded-Host`,
 same-origin protection and login throttling. Rotating
 `FAMILYBRAIN_SESSION_SECRET` invalidates all existing sessions.
 
+For PDF guide uploads (up to 50 MB), raise the proxy body limit. With nginx:
+
+```nginx
+client_max_body_size 50m;
+```
+
+Without that, larger PDFs often fail with a cryptic `Failed to parse body as FormData` error while smaller ones still work.
+
 **Existing data:** copy `data/familybrain.sqlite` (and stop the app first if WAL files exist) into `./data/` on the host before `up`, or start empty and re-sync from Paperless.
 
 **Troubleshooting**
