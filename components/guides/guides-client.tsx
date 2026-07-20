@@ -387,6 +387,10 @@ export function GuidesClient() {
                     {guide.embedding_error ? (
                       <div className="mt-2 text-xs text-destructive">
                         {guide.embedding_error}
+                        <div className="mt-1 text-muted-foreground">
+                          Mit dem Refresh-Button erneut indexieren (erneuter Upload
+                          nicht nötig).
+                        </div>
                       </div>
                     ) : null}
                   </div>

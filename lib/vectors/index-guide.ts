@@ -32,16 +32,38 @@ export async function indexKnowledgeGuide(guideId: number): Promise<{
   });
 
   try {
-    const chunks = splitTextIntoChunks(guide.extracted_text);
+    const rawChunks = splitTextIntoChunks(guide.extracted_text);
+    const chunks = rawChunks
+      .map((chunk) => ({
+        ...chunk,
+        text: chunk.text
+          .replace(/\u0000/g, "")
+          .replace(/[\uD800-\uDFFF]/g, "")
+          .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, " ")
+          .trim(),
+      }))
+      .filter((chunk) => chunk.text.length > 0)
+      .map((chunk, index) => ({ ...chunk, index }));
+
     if (chunks.length === 0) {
       throw new Error("Aus dem PDF konnte kein indexierbarer Text erzeugt werden.");
     }
+
+    console.info(
+      `[guides] indexing guide=${guideId} chunks=${chunks.length} chars=${guide.extracted_text.length}`
+    );
 
     const contentHash = hashChunks(chunks);
     await deleteVectorPointsBySource("guide", String(guideId));
     deleteGuideChunks(guideId);
 
     const vectors = await embedTexts(chunks.map((chunk) => chunk.text));
+    if (vectors.length !== chunks.length) {
+      throw new Error(
+        `Embedding-Anzahl stimmt nicht (${vectors.length} Vektoren für ${chunks.length} Chunks).`
+      );
+    }
+
     const embeddedAt = nowIso();
     const sourceId = String(guideId);
 
@@ -92,6 +114,7 @@ export async function indexKnowledgeGuide(guideId: number): Promise<{
     return { chunkCount: chunks.length };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    console.error(`[guides] indexing failed guide=${guideId}:`, message);
     updateKnowledgeGuideIndexing(guideId, {
       embeddingStatus: "error",
       embeddingError: message,

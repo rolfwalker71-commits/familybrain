@@ -62,14 +62,46 @@ export async function upsertVectorPoints(
   await ensureVectorCollection();
 
   const qdrant = getQdrantClient();
-  await qdrant.upsert(getQdrantCollection(), {
-    wait: true,
-    points: points.map((point) => ({
-      id: buildVectorPointId(point.sourceType, point.sourceId, point.chunkIndex),
-      vector: point.vector,
-      payload: point.payload,
-    })),
-  });
+  const collection = getQdrantCollection();
+  const UPSERT_BATCH = 64;
+
+  for (let offset = 0; offset < points.length; offset += UPSERT_BATCH) {
+    const batch = points.slice(offset, offset + UPSERT_BATCH);
+    try {
+      await qdrant.upsert(collection, {
+        wait: true,
+        points: batch.map((point) => ({
+          id: buildVectorPointId(point.sourceType, point.sourceId, point.chunkIndex),
+          vector: point.vector,
+          payload: {
+            ...point.payload,
+            // Keep payload UTF-8 safe for Qdrant.
+            text: point.payload.text
+              .replace(/\u0000/g, "")
+              .replace(/[\uD800-\uDFFF]/g, ""),
+            title: point.payload.title
+              .replace(/\u0000/g, "")
+              .replace(/[\uD800-\uDFFF]/g, ""),
+          },
+        })),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const detail =
+        error && typeof error === "object" && "data" in error
+          ? JSON.stringify((error as { data?: unknown }).data)
+          : null;
+      throw new Error(
+        [
+          `Qdrant Upsert fehlgeschlagen (Batch ab Punkt ${offset}/${points.length})`,
+          message,
+          detail,
+        ]
+          .filter(Boolean)
+          .join(" — ")
+      );
+    }
+  }
 }
 
 export async function deleteVectorPointsBySource(
