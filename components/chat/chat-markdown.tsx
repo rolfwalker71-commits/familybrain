@@ -70,9 +70,13 @@ export function ChatMarkdown({ content, className }: ChatMarkdownProps) {
             );
           },
           pre: ({ children }) => (
-            <pre className="mb-2 overflow-x-auto rounded-lg bg-background/80 p-3 text-xs last:mb-0">
-              {children}
-            </pre>
+            <div className="mb-4 last:mb-0">
+              <div className="overflow-x-auto rounded-lg bg-background/80 [scrollbar-width:thin]">
+                <pre className="m-0 min-w-0 whitespace-pre p-3 font-mono text-xs leading-relaxed">
+                  {children}
+                </pre>
+              </div>
+            </div>
           ),
           table: ({ children }) => (
             <div className="mb-3 overflow-x-auto last:mb-0">
