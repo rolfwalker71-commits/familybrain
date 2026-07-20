@@ -70,13 +70,12 @@ export function ChatMarkdown({ content, className }: ChatMarkdownProps) {
             );
           },
           pre: ({ children }) => (
-            <div className="mb-4 last:mb-0">
-              <div className="overflow-x-auto rounded-lg bg-background/80 [scrollbar-width:thin]">
-                <pre className="m-0 min-w-0 whitespace-pre p-3 font-mono text-xs leading-relaxed">
-                  {children}
-                </pre>
-              </div>
-            </div>
+            // Always keep bottom margin (no last:mb-0) — otherwise list items
+            // leave zero gap and overlay scrollbars cover the next heading/text.
+            // Soft-wrap long lines so chat bubbles rarely need horizontal scroll.
+            <pre className="mb-3 overflow-x-auto rounded-lg bg-background/80 p-3 font-mono text-xs leading-relaxed whitespace-pre-wrap break-all [overflow-wrap:anywhere]">
+              {children}
+            </pre>
           ),
           table: ({ children }) => (
             <div className="mb-3 overflow-x-auto last:mb-0">
