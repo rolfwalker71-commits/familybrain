@@ -26,6 +26,66 @@ function sanitizeFilename(name: string): string {
   return path.basename(name).replace(/[^a-zA-Z0-9._-]+/g, "_");
 }
 
+type UploadPayload = {
+  buffer: Buffer;
+  filename: string;
+  titleInput: string;
+  replaceExisting: boolean;
+};
+
+async function readUploadPayload(request: Request): Promise<UploadPayload> {
+  const contentType = (request.headers.get("content-type") || "").toLowerCase();
+
+  // Prefer raw PDF body — more reliable behind reverse proxies than multipart FormData.
+  if (
+    contentType.includes("application/pdf") ||
+    contentType.includes("application/octet-stream")
+  ) {
+    const buffer = Buffer.from(await request.arrayBuffer());
+    const filenameHeader = request.headers.get("x-guide-filename") || "guide.pdf";
+    return {
+      buffer,
+      filename: sanitizeFilename(filenameHeader),
+      titleInput: String(request.headers.get("x-guide-title") || "").trim(),
+      replaceExisting: request.headers.get("x-guide-replace") !== "false",
+    };
+  }
+
+  let form: FormData;
+  try {
+    form = await request.formData();
+  } catch (error) {
+    const cause =
+      error instanceof Error && "cause" in error
+        ? String((error as Error & { cause?: unknown }).cause ?? "")
+        : "";
+    console.error("[guides] FormData parse failed:", error, cause);
+    throw Object.assign(
+      new Error(
+        "Upload konnte nicht gelesen werden. Bitte Seite neu laden und erneut versuchen (raw PDF Upload)."
+      ),
+      { status: 413 }
+    );
+  }
+
+  const file = form.get("file");
+  if (!(file instanceof File)) {
+    throw Object.assign(new Error("PDF-Datei fehlt."), { status: 400 });
+  }
+  if (file.type && file.type !== "application/pdf") {
+    throw Object.assign(new Error("Nur PDF-Dateien werden unterstützt."), {
+      status: 400,
+    });
+  }
+
+  return {
+    buffer: Buffer.from(await file.arrayBuffer()),
+    filename: sanitizeFilename(file.name || "guide.pdf"),
+    titleInput: String(form.get("title") || "").trim(),
+    replaceExisting: form.get("replaceExisting") !== "false",
+  };
+}
+
 export async function GET() {
   const qdrant = await checkQdrantConnection();
   return NextResponse.json({
@@ -45,46 +105,47 @@ export async function POST(request: Request) {
       );
     }
 
-    let form: FormData;
-    try {
-      form = await request.formData();
-    } catch (error) {
-      const cause =
-        error instanceof Error && "cause" in error
-          ? String((error as Error & { cause?: unknown }).cause ?? "")
-          : "";
-      console.error("[guides] FormData parse failed:", error, cause);
-      return NextResponse.json(
-        {
-          error:
-            "Upload konnte nicht gelesen werden (FormData). Oft ist der Request hinter nginx abgeschnitten — bitte `client_max_body_size 50m;` setzen und nginx neu laden. Max. PDF-Größe: 50 MB.",
-        },
-        { status: 413 }
-      );
-    }
-    const file = form.get("file");
-    const titleInput = String(form.get("title") || "").trim();
-    const replaceExisting = form.get("replaceExisting") !== "false";
-
-    if (!(file instanceof File)) {
-      return NextResponse.json({ error: "PDF-Datei fehlt." }, { status: 400 });
-    }
-
-    if (file.type && file.type !== "application/pdf") {
-      return NextResponse.json(
-        { error: "Nur PDF-Dateien werden unterstützt." },
-        { status: 400 }
-      );
-    }
-
-    if (file.size > MAX_UPLOAD_BYTES) {
+    const contentLength = Number(request.headers.get("content-length") || 0);
+    if (contentLength > MAX_UPLOAD_BYTES) {
       return NextResponse.json(
         { error: "PDF ist zu gross (max. 50 MB)." },
         { status: 400 }
       );
     }
 
-    const filename = sanitizeFilename(file.name || "guide.pdf");
+    let payload: UploadPayload;
+    try {
+      payload = await readUploadPayload(request);
+    } catch (error) {
+      const status =
+        error instanceof Error && "status" in error
+          ? Number((error as Error & { status?: number }).status) || 500
+          : 500;
+      const message = error instanceof Error ? error.message : String(error);
+      return NextResponse.json({ error: message }, { status });
+    }
+
+    const { buffer, filename, titleInput, replaceExisting } = payload;
+
+    if (buffer.length === 0) {
+      return NextResponse.json({ error: "PDF-Datei fehlt." }, { status: 400 });
+    }
+
+    if (buffer.length > MAX_UPLOAD_BYTES) {
+      return NextResponse.json(
+        { error: "PDF ist zu gross (max. 50 MB)." },
+        { status: 400 }
+      );
+    }
+
+    // Basic PDF magic-byte check
+    if (buffer.subarray(0, 4).toString("utf8") !== "%PDF") {
+      return NextResponse.json(
+        { error: "Datei sieht nicht wie ein PDF aus." },
+        { status: 400 }
+      );
+    }
+
     const title =
       titleInput ||
       filename.replace(/\.pdf$/i, "").replace(/[_-]+/g, " ").trim() ||
@@ -101,7 +162,6 @@ export async function POST(request: Request) {
       }
     }
 
-    const buffer = Buffer.from(await file.arrayBuffer());
     const fileHash = createHash("sha256").update(buffer).digest("hex");
 
     ensureGuidesDirectory();

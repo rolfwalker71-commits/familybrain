@@ -94,19 +94,30 @@ export function GuidesClient() {
     setMessage(null);
 
     try {
-      const form = new FormData();
-      form.append("file", file);
-      if (title.trim()) form.append("title", title.trim());
-      form.append("replaceExisting", replaceExisting ? "true" : "false");
+      const headers: Record<string, string> = {
+        "Content-Type": "application/pdf",
+        "X-Guide-Filename": file.name || "guide.pdf",
+        "X-Guide-Replace": replaceExisting ? "true" : "false",
+      };
+      if (title.trim()) headers["X-Guide-Title"] = title.trim();
 
-      const res = await fetch("/api/guides", { method: "POST", body: form });
-      let data: { error?: string; chunkCount?: number; pageCount?: number; replacedGuideId?: number | null };
+      const res = await fetch("/api/guides", {
+        method: "POST",
+        headers,
+        body: file,
+      });
+      let data: {
+        error?: string;
+        chunkCount?: number;
+        pageCount?: number;
+        replacedGuideId?: number | null;
+      };
       try {
         data = await res.json();
       } catch {
         throw new Error(
           res.status === 413
-            ? "Upload vom Reverse Proxy abgelehnt (zu gross). In nginx `client_max_body_size 50m;` setzen."
+            ? "Upload vom Reverse Proxy abgelehnt (zu gross)."
             : "Upload fehlgeschlagen (ungültige Serverantwort)."
         );
       }
