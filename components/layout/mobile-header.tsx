@@ -22,13 +22,13 @@ export function MobileHeader() {
       <Link
         href="/dashboard"
         className="flex min-h-11 items-center gap-3 rounded-lg"
-        aria-label="FamilyBrain Dashboard"
+        aria-label="MyBrain Dashboard"
       >
         <span className="flex size-10 items-center justify-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground">
           <Brain className="size-5" />
         </span>
-        <span className="text-base font-semibold tracking-tight">
-          FamilyBrain
+        <span className="text-2xl font-extrabold tracking-tight">
+          MyBrain
         </span>
       </Link>
 
@@ -51,7 +51,7 @@ export function MobileHeader() {
         >
           <SheetHeader className="sr-only">
             <SheetTitle>Navigation</SheetTitle>
-            <SheetDescription>FamilyBrain Hauptnavigation</SheetDescription>
+            <SheetDescription>MyBrain Hauptnavigation</SheetDescription>
           </SheetHeader>
           <Sidebar className="w-full" onNavigate={() => setOpen(false)} />
         </SheetContent>

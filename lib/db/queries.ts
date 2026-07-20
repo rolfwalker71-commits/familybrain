@@ -1340,3 +1340,82 @@ export function replaceGuideChunks(
   });
   tx(chunks);
 }
+
+export type ChatCorrectionRow = {
+  id: number;
+  topic: string | null;
+  content: string;
+  active: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export function listChatCorrections(activeOnly = false): ChatCorrectionRow[] {
+  const db = getDb();
+  if (activeOnly) {
+    return db
+      .prepare(
+        `SELECT * FROM chat_corrections WHERE active = 1 ORDER BY updated_at DESC`
+      )
+      .all() as ChatCorrectionRow[];
+  }
+  return db
+    .prepare(`SELECT * FROM chat_corrections ORDER BY updated_at DESC`)
+    .all() as ChatCorrectionRow[];
+}
+
+export function getChatCorrectionById(id: number): ChatCorrectionRow | null {
+  const db = getDb();
+  const row = db
+    .prepare(`SELECT * FROM chat_corrections WHERE id = ?`)
+    .get(id) as ChatCorrectionRow | undefined;
+  return row ?? null;
+}
+
+export function createChatCorrection(input: {
+  topic?: string | null;
+  content: string;
+}): number {
+  const db = getDb();
+  const ts = nowIso();
+  const result = db
+    .prepare(
+      `INSERT INTO chat_corrections (topic, content, active, created_at, updated_at)
+       VALUES (?, ?, 1, ?, ?)`
+    )
+    .run(input.topic?.trim() || null, input.content.trim(), ts, ts);
+  return Number(result.lastInsertRowid);
+}
+
+export function updateChatCorrection(
+  id: number,
+  input: { topic?: string | null; content?: string; active?: boolean }
+): ChatCorrectionRow | null {
+  const existing = getChatCorrectionById(id);
+  if (!existing) return null;
+
+  const db = getDb();
+  const topic =
+    input.topic !== undefined
+      ? input.topic?.trim() || null
+      : existing.topic;
+  const content =
+    input.content !== undefined ? input.content.trim() : existing.content;
+  const active =
+    input.active !== undefined ? (input.active ? 1 : 0) : existing.active;
+
+  db.prepare(
+    `UPDATE chat_corrections
+     SET topic = ?, content = ?, active = ?, updated_at = ?
+     WHERE id = ?`
+  ).run(topic, content, active, nowIso(), id);
+
+  return getChatCorrectionById(id);
+}
+
+export function deleteChatCorrection(id: number): boolean {
+  const db = getDb();
+  const result = db.prepare(`DELETE FROM chat_corrections WHERE id = ?`).run(id);
+  return result.changes > 0;
+}
+

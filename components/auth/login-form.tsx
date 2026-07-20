@@ -46,7 +46,7 @@ export function LoginForm({ nextPath }: { nextPath: string }) {
             <Brain className="size-7" />
           </span>
           <div>
-            <p className="text-sm font-medium text-primary">FamilyBrain</p>
+            <p className="text-sm font-medium text-primary">MyBrain</p>
             <CardTitle className="text-2xl">Willkommen zurück</CardTitle>
           </div>
         </div>

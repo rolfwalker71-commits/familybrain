@@ -72,6 +72,21 @@ export function bootstrapDatabase(db: Database.Database): void {
   seed();
   ensureTriliumNotesTable(db);
   ensureKnowledgeGuidesTables(db);
+  ensureChatCorrectionsTable(db);
+}
+
+function ensureChatCorrectionsTable(db: Database.Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS chat_corrections (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      topic TEXT,
+      content TEXT NOT NULL,
+      active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_chat_corrections_active ON chat_corrections(active);
+  `);
 }
 
 function ensureKnowledgeGuidesTables(db: Database.Database): void {

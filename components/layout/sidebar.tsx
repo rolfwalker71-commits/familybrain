@@ -15,15 +15,18 @@ import {
   MessageSquare,
   LogOut,
   BookOpen,
+  type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAnalysis } from "@/components/analysis/analysis-provider";
 import { APP_VERSION } from "@/lib/app-version";
+import { IconCircle, type IconTone } from "@/components/layout/icon-circle";
 
 type NavItem = {
   href: string;
   label: string;
-  icon: typeof LayoutDashboard;
+  icon: LucideIcon;
+  tone: IconTone;
   countKey?:
     | "totalDocuments"
     | "pendingCount"
@@ -37,50 +40,57 @@ type NavItem = {
 };
 
 const navItems: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, tone: "blue" },
   {
     href: "/documents",
     label: "Dokumente",
     icon: Files,
+    tone: "blue",
     countKey: "totalDocuments",
   },
   {
     href: "/knowledge",
     label: "Wissensbereiche",
     icon: Brain,
+    tone: "violet",
     countKey: "knowledgeDocuments",
   },
   {
     href: "/warranties",
     label: "Garantien",
     icon: Shield,
+    tone: "orange",
     countKey: "warrantiesTotal",
   },
   {
     href: "/deadlines",
     label: "Fristen",
     icon: CalendarClock,
+    tone: "rose",
     countKey: "deadlinesOpen",
   },
   {
     href: "/finance",
     label: "Finanzen",
     icon: Wallet,
+    tone: "green",
     countKey: "financialItemsTotal",
   },
   {
     href: "/travel",
     label: "Reisen",
     icon: Plane,
+    tone: "teal",
     countKey: "travelDocuments",
   },
-  { href: "/settings", label: "Einstellungen", icon: Settings },
-  { href: "/guides", label: "Guides", icon: BookOpen },
-  { href: "/chat", label: "Chat", icon: MessageSquare },
+  { href: "/guides", label: "Guides", icon: BookOpen, tone: "teal" },
+  { href: "/chat", label: "Chat", icon: MessageSquare, tone: "indigo" },
+  { href: "/settings", label: "Einstellungen", icon: Settings, tone: "slate" },
   {
     href: "/sync",
     label: "Sync",
     icon: RefreshCw,
+    tone: "amber",
     countKey: "pendingCount",
     pendingStyle: true,
   },
@@ -113,8 +123,8 @@ export function Sidebar({
           <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground">
             <Brain className="h-6 w-6" />
           </span>
-          <span className="text-lg font-semibold tracking-tight text-white">
-            FamilyBrain
+          <span className="text-3xl font-extrabold leading-none tracking-tight text-white">
+            MyBrain
           </span>
         </Link>
       </div>
@@ -123,7 +133,6 @@ export function Sidebar({
         {navItems.map((item) => {
           const active =
             pathname === item.href || pathname.startsWith(`${item.href}/`);
-          const Icon = item.icon;
           const count =
             item.countKey != null ? Number(analysis[item.countKey] || 0) : null;
           const showCount = count != null && count > 0;
@@ -140,7 +149,12 @@ export function Sidebar({
                   : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
               )}
             >
-              <Icon className="h-4 w-4 shrink-0 opacity-90" />
+              <IconCircle
+                icon={item.icon}
+                tone={item.tone}
+                size="sm"
+                className="shadow-sm"
+              />
               <span className="flex-1">{item.label}</span>
               {showCount ? (
                 <span

@@ -7,6 +7,10 @@ import {
 } from "@/lib/db/queries";
 import { retrieveGuidesForChat } from "@/lib/vectors/retrieve";
 import type { GuideSource } from "@/lib/vectors/types";
+import {
+  formatCorrectionsForPrompt,
+  retrieveCorrectionsForChat,
+} from "@/lib/chat/corrections";
 import { getOpenAIClient, getOpenAIModel } from "./client";
 import { retrieveForChat, type ChatSource } from "./chat-retrieve";
 
@@ -40,12 +44,14 @@ Kalenderkontext (verbindlich):
 
 Regeln:
 - Antworte auf Deutsch, klar und konkret.
-- Nutze die gesamte bereitgestellte Basis (Korpus-Statistik, strukturierte Fakten, Dokumentkontexte, Trilium-Notizen UND Guide-Auszüge).
+- Nutze die gesamte bereitgestellte Basis (Korpus-Statistik, strukturierte Fakten, Dokumentkontexte, Trilium-Notizen, Guide-Auszüge UND gespeicherte Nutzer-Korrekturen).
+- GESPEICHERTE NUTZER-KORREKTUREN haben bei Widerspruch IMMER Vorrang vor Dokumenten, OCR, Fakten, Notizen und Guides.
+- Wenn eine Korrektur einen Termin, ein Schiff, eine Buchung oder ein Datum korrigiert, verwende die Korrektur – nicht die ältere Dokumentangabe.
 - Unterscheide klar zwischen Belegen (Dokumente), manuellen Notizen (Trilium) und importierten Guides (PDF-Handbücher).
 - OCR-Auszüge und Abschnitte «Reiseverlauf / Ports of Call» können Tabellen und Tageshäfen enthalten – lies diese sorgfältig aus und zitiere sie.
 - Wenn die Frage ein konkretes Schiff, Produkt oder eine Buchungsnummer nennt, beantworte NUR mit Daten zu genau diesem Objekt.
-- Strukturelle Fakten können unvollständig sein. Bei Widerspruch haben die Dokumentkontexte (OCR / Reiseverlauf) Vorrang vor Kurzfassungen.
-- Beträge, Daten, Produktnamen und Fristen nur nennen, wenn sie in den Daten stehen.
+- Strukturelle Fakten können unvollständig sein. Bei Widerspruch: zuerst Korrekturen, danach Dokumentkontexte (OCR / Reiseverlauf) vor Kurzfassungen.
+- Beträge, Daten, Produktnamen und Fristen nur nennen, wenn sie in den Daten oder Korrekturen stehen.
 - Wenn etwas fehlt, sage ehrlich, dass es in der aktuellen Basis nicht gefunden wurde.
 - Erfinde nichts.
 - Formatiere Antworten als Markdown.
@@ -130,6 +136,7 @@ export async function answerDocumentChat(
   const retrieval = retrieveForChat(question, 12);
   const triliumNotes = await retrieveTriliumForChat(question, 5);
   const guideSources = await retrieveGuidesForChat(question, 6);
+  const corrections = retrieveCorrectionsForChat(question, 12);
   const triliumIndexed = countSyncedTriliumNotes();
   const guidesIndexed = countIndexedKnowledgeGuides();
 
@@ -144,7 +151,10 @@ export async function answerDocumentChat(
 - Trilium-Notizen lokal indexiert: ${triliumIndexed}
 - Trilium-Notizen (Treffer zur Frage): ${triliumNotes.length}
 - PDF-Guides indexiert: ${guidesIndexed}
-- Guide-Treffer (semantisch): ${guideSources.length}`;
+- Guide-Treffer (semantisch): ${guideSources.length}
+- Gespeicherte Nutzer-Korrekturen: ${corrections.length}`;
+
+  const correctionBlocks = formatCorrectionsForPrompt(corrections);
 
   const factBlocks =
     retrieval.facts.length === 0
@@ -223,6 +233,9 @@ ${guide.excerpt}`;
 
 ${corpusBlock}
 
+GESPEICHERTE NUTZER-KORREKTUREN (haben Vorrang bei Widersprüchen):
+${correctionBlocks}
+
 STRUKTURIERTE FAKTEN AUS DER GESAMTEN BASIS:
 ${factBlocks}
 
@@ -237,6 +250,7 @@ ${guideBlocks}
 
 Beantworte die Frage jetzt anhand der gesamten Wissensbasis.
 Beachte den Kalenderkontext: «dieses Jahr» = ${year}, «kommend/geplant» ab ${toSwissDate(todayIso)}.
+Wenn Korrekturen vorliegen und Dokumente widersprechen, folge den Korrekturen.
 
 Wichtig für Quellen:
 - Gib keinen sichtbaren Quellenabschnitt aus.

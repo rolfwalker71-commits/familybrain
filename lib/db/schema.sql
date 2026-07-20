@@ -255,3 +255,15 @@ CREATE TABLE IF NOT EXISTS knowledge_guide_chunks (
 
 CREATE INDEX IF NOT EXISTS idx_knowledge_guides_status ON knowledge_guides(embedding_status);
 CREATE INDEX IF NOT EXISTS idx_knowledge_guide_chunks_guide ON knowledge_guide_chunks(guide_id);
+
+-- User-provided corrections that override conflicting RAG data in chat
+CREATE TABLE IF NOT EXISTS chat_corrections (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  topic TEXT,
+  content TEXT NOT NULL,
+  active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_chat_corrections_active ON chat_corrections(active);
