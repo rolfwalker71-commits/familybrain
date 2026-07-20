@@ -3,6 +3,10 @@ export const SCHEDULER_INTERVAL_KEY = "scheduler_interval_minutes";
 export const SYNC_MODIFIED_CURSOR_KEY = "sync_modified_cursor";
 export const SYNC_LAST_ID_RECONCILE_KEY = "sync_last_id_reconcile_at";
 export const SYNC_LAST_FULL_RECONCILE_KEY = "sync_last_full_reconcile_at";
+export const TRILIUM_SYNC_MODIFIED_CURSOR_KEY = "trilium_sync_modified_cursor";
+export const TRILIUM_SYNC_LAST_FULL_RECONCILE_KEY =
+  "trilium_sync_last_full_reconcile_at";
+export const TRILIUM_INITIAL_SYNC_COMPLETE_KEY = "trilium_initial_sync_complete";
 export const INITIAL_SYNC_COMPLETE_KEY = "initial_sync_complete";
 export const INITIAL_INGESTION_COMPLETE_KEY = "initial_ingestion_complete";
 

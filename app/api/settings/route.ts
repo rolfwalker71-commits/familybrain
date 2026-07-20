@@ -4,11 +4,13 @@ import {
   getOpenAISettings,
   getPaperlessSettings,
   getTriliumSettings,
+  countSyncedTriliumNotes,
   isTriliumConfigured,
   saveOpenAISettings,
   savePaperlessSettings,
   saveTriliumSettings,
 } from "@/lib/db/queries";
+import { getTriliumInitialSyncComplete } from "@/lib/jobs/queries";
 import { maskToken } from "@/lib/utils/format";
 import { hasOpenAIKey } from "@/lib/ai/client";
 
@@ -33,6 +35,8 @@ export async function GET() {
     triliumPrivatNoteId: trilium.privatNoteId,
     triliumGeschaeftlichNoteId: trilium.geschaeftlichNoteId,
     triliumConfigured: isTriliumConfigured(),
+    triliumSyncedNotes: countSyncedTriliumNotes(),
+    triliumInitialSyncComplete: getTriliumInitialSyncComplete(),
   });
 }
 
@@ -113,5 +117,7 @@ export async function PUT(request: Request) {
     triliumPrivatNoteId: trilium.privatNoteId,
     triliumGeschaeftlichNoteId: trilium.geschaeftlichNoteId,
     triliumConfigured: isTriliumConfigured(),
+    triliumSyncedNotes: countSyncedTriliumNotes(),
+    triliumInitialSyncComplete: getTriliumInitialSyncComplete(),
   });
 }

@@ -299,7 +299,8 @@ export default function SettingsPage() {
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
             Ergänzt den Chat um Notizen aus «Master → Privat» und «Master →
-            Geschäftlich ANG» (inkl. aller Unternotizen).
+            Geschäftlich ANG». Nach «Bereiche erkennen» unter Sync die Notizen
+            lokal synchronisieren.
           </p>
           <div className="space-y-2">
             <Label htmlFor="triliumUrl">Basis-URL</Label>

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Link2, RefreshCw, BrainCircuit } from "lucide-react";
+import { Link2, RefreshCw, BrainCircuit, BookOpen } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,6 +36,16 @@ type SyncProgress = {
   percent: number;
 };
 
+type TriliumSyncResult = {
+  totalRemote: number;
+  processed: number;
+  created: number;
+  updated: number;
+  unchanged: number;
+  missing: number;
+  errors: string[];
+};
+
 export function SyncClient() {
   const {
     pendingCount,
@@ -54,7 +64,15 @@ export function SyncClient() {
   const [error, setError] = useState<string | null>(null);
   const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
   const [syncProgress, setSyncProgress] = useState<SyncProgress | null>(null);
-  const [busy, setBusy] = useState<"save" | "test" | "sync" | null>(null);
+  const [triliumConfigured, setTriliumConfigured] = useState(false);
+  const [triliumSyncedNotes, setTriliumSyncedNotes] = useState(0);
+  const [triliumSyncResult, setTriliumSyncResult] =
+    useState<TriliumSyncResult | null>(null);
+  const [triliumSyncProgress, setTriliumSyncProgress] =
+    useState<SyncProgress | null>(null);
+  const [busy, setBusy] = useState<
+    "save" | "test" | "sync" | "trilium-sync" | null
+  >(null);
 
   useEffect(() => {
     void (async () => {
@@ -63,6 +81,8 @@ export function SyncClient() {
       setBaseUrl(data.paperlessBaseUrl || "");
       setTokenMasked(data.paperlessApiTokenMasked);
       setHasToken(Boolean(data.hasPaperlessToken));
+      setTriliumConfigured(Boolean(data.triliumConfigured));
+      setTriliumSyncedNotes(Number(data.triliumSyncedNotes || 0));
       await refreshStats();
     })();
   }, [refreshStats]);
@@ -216,6 +236,74 @@ export function SyncClient() {
     }
   }
 
+  async function startTriliumSync() {
+    setBusy("trilium-sync");
+    setError(null);
+    setMessage(null);
+    setTriliumSyncResult(null);
+    setTriliumSyncProgress({
+      phase: "connecting",
+      totalRemote: 0,
+      processed: 0,
+      created: 0,
+      updated: 0,
+      unchanged: 0,
+      errors: 0,
+      percent: 0,
+    });
+
+    try {
+      const res = await fetch("/api/trilium/sync", { method: "POST" });
+      if (!res.ok && !res.body) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Trilium-Sync fehlgeschlagen");
+      }
+
+      let finalResult: TriliumSyncResult | undefined;
+      let streamError: string | null = null;
+
+      await readNdjsonStream(res, (event) => {
+        if (event.type === "progress") {
+          setTriliumSyncProgress({
+            phase: String(event.phase),
+            totalRemote: Number(event.totalRemote || 0),
+            processed: Number(event.processed || 0),
+            created: Number(event.created || 0),
+            updated: Number(event.updated || 0),
+            unchanged: Number(event.unchanged || 0),
+            errors: Number(event.errors || 0),
+            currentTitle: (event.currentTitle as string) || null,
+            percent: Number(event.percent || 0),
+          });
+        } else if (event.type === "done") {
+          finalResult = event.result as TriliumSyncResult;
+        } else if (event.type === "error") {
+          streamError = String(event.error || "Trilium-Sync fehlgeschlagen");
+        }
+      });
+
+      if (streamError) throw new Error(streamError);
+      if (!finalResult) throw new Error("Trilium-Sync ohne Ergebnis beendet.");
+
+      setTriliumSyncResult(finalResult);
+      setTriliumSyncProgress((prev) =>
+        prev ? { ...prev, phase: "done", percent: 100 } : null
+      );
+      setMessage(
+        `Trilium-Sync abgeschlossen. ${finalResult.created + finalResult.updated} Notizen aktualisiert.`
+      );
+
+      const settingsRes = await fetch("/api/settings");
+      const settingsData = await settingsRes.json();
+      setTriliumSyncedNotes(Number(settingsData.triliumSyncedNotes || 0));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setTriliumSyncProgress(null);
+    } finally {
+      setBusy(null);
+    }
+  }
+
   const syncLabel =
     syncProgress?.phase === "connecting"
       ? "Verbinde mit Paperless…"
@@ -227,7 +315,7 @@ export function SyncClient() {
     <div className="space-y-6">
       <PageHeader
         title="Sync"
-        description="Paperless verbinden, Dokumente synchronisieren und AI-Analyse starten"
+        description="Paperless und Trilium synchronisieren, dann AI-Analyse starten"
         icon={pageVisuals.sync.icon}
         tone={pageVisuals.sync.tone}
       />
@@ -341,8 +429,91 @@ export function SyncClient() {
       <Card className="border-border/80 shadow-sm">
         <CardHeader>
           <CardTitle className="flex items-center gap-3 text-base">
+            <IconCircle icon={BookOpen} tone="teal" size="sm" />
+            3. Trilium-Notizen synchronisieren
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Lädt Notizen aus «Privat» und «Geschäftlich ANG» in die lokale
+            SQLite-Datenbank. Der Chat nutzt danach den lokalen Index (schneller,
+            auch bei Trilium-Ausfall).
+          </p>
+          <div className="rounded-lg border border-border bg-muted/30 p-4 text-sm">
+            {triliumConfigured ? (
+              <>
+                Trilium konfiguriert · lokal indexiert:{" "}
+                <strong>{triliumSyncedNotes}</strong> Notizen
+              </>
+            ) : (
+              <>
+                Trilium noch nicht bereit. Bitte unter{" "}
+                <Link href="/settings" className="underline">
+                  Einstellungen
+                </Link>{" "}
+                URL, Token und Bereiche hinterlegen.
+              </>
+            )}
+          </div>
+          <Button
+            onClick={() => void startTriliumSync()}
+            disabled={busy !== null || !triliumConfigured || analysisRunning}
+          >
+            {busy === "trilium-sync" ? "Synchronisiert…" : "Trilium-Sync starten"}
+          </Button>
+
+          {triliumSyncProgress ? (
+            <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4">
+              <ProgressBar
+                value={triliumSyncProgress.percent}
+                label={
+                  triliumSyncProgress.phase === "connecting"
+                    ? "Verbinde mit Trilium…"
+                    : triliumSyncProgress.phase === "done"
+                      ? "Trilium-Sync abgeschlossen"
+                      : "Synchronisiere Notizen…"
+                }
+                detail={`${triliumSyncProgress.processed} / ${triliumSyncProgress.totalRemote || "?"} · ${triliumSyncProgress.percent}%`}
+              />
+              {triliumSyncProgress.currentTitle ? (
+                <p className="truncate text-xs text-muted-foreground">
+                  Aktuell: {triliumSyncProgress.currentTitle}
+                </p>
+              ) : null}
+              <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground sm:grid-cols-4">
+                <span>Neu: {triliumSyncProgress.created}</span>
+                <span>Aktualisiert: {triliumSyncProgress.updated}</span>
+                <span>Unverändert: {triliumSyncProgress.unchanged}</span>
+                <span>Fehler: {triliumSyncProgress.errors}</span>
+              </div>
+            </div>
+          ) : null}
+
+          {triliumSyncResult ? (
+            <div className="space-y-1 text-sm">
+              <div>Remote gesamt: {triliumSyncResult.totalRemote}</div>
+              <div>Verarbeitet: {triliumSyncResult.processed}</div>
+              <div>Fehlend markiert: {triliumSyncResult.missing}</div>
+              {triliumSyncResult.errors.length > 0 ? (
+                <div className="space-y-1 pt-2">
+                  <div className="font-medium text-destructive">Fehlerdetails</div>
+                  {triliumSyncResult.errors.slice(0, 10).map((err, i) => (
+                    <div key={i} className="text-destructive">
+                      {err}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      <Card className="border-border/80 shadow-sm">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-3 text-base">
             <IconCircle icon={BrainCircuit} tone="violet" size="sm" />
-            3. AI-Analyse
+            4. AI-Analyse
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">

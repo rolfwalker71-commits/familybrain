@@ -1,6 +1,8 @@
 import { analyzeDocument } from "@/lib/ai/analyze-document";
 import { hasOpenAIKey } from "@/lib/ai/client";
 import { syncPaperlessDocuments } from "@/lib/paperless/sync";
+import { isTriliumConfigured } from "@/lib/db/queries";
+import { syncTriliumNotes } from "@/lib/trilium/sync";
 import {
   INITIAL_ANALYSIS_BATCH_SIZE,
   MAX_ANALYSIS_PER_RUN,
@@ -130,6 +132,60 @@ export async function runSyncAnalyzeJob(
         errors: syncResult.errors.slice(0, 20),
       },
     });
+
+    if (isTriliumConfigured()) {
+      addJobRunItem({
+        runId: run.id,
+        itemKind: "phase",
+        status: "running",
+        title: "Trilium-Sync",
+        message: "Synchronisiere Notizen aus Privat und Geschäftlich ANG",
+      });
+
+      try {
+        const triliumResult = await syncTriliumNotes({
+          onProgress: (progress) => {
+            if (progress.phase === "syncing" && progress.processed % 25 === 0) {
+              heartbeatJobRun(run.id);
+            }
+          },
+        });
+        heartbeatJobRun(run.id);
+
+        summary.triliumSyncMode = triliumResult.mode;
+        summary.triliumTotalRemote = triliumResult.totalRemote;
+        summary.triliumProcessed = triliumResult.processed;
+        summary.triliumCreated = triliumResult.created;
+        summary.triliumUpdated = triliumResult.updated;
+        summary.triliumUnchanged = triliumResult.unchanged;
+        summary.triliumMissing = triliumResult.missing;
+        summary.triliumSyncErrors = triliumResult.errors.length;
+        summary.triliumCursorAdvancedTo = triliumResult.cursorAdvancedTo;
+        summary.triliumFullReconciled = triliumResult.fullReconciled;
+
+        addJobRunItem({
+          runId: run.id,
+          itemKind: "phase",
+          status: triliumResult.errors.length ? "error" : "success",
+          title: "Trilium-Sync",
+          message: `${triliumResult.mode}: ${triliumResult.created} neu, ${triliumResult.updated} aktualisiert, ${triliumResult.missing} fehlend`,
+          payload: {
+            processed: triliumResult.processed,
+            errors: triliumResult.errors.slice(0, 20),
+          },
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        summary.triliumSyncErrors = 1;
+        addJobRunItem({
+          runId: run.id,
+          itemKind: "phase",
+          status: "error",
+          title: "Trilium-Sync",
+          message,
+        });
+      }
+    }
 
     if (!hasOpenAIKey()) {
       throw new Error(

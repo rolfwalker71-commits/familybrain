@@ -1,6 +1,7 @@
 import { currentYear, toSwissDate } from "@/lib/utils/dates";
 import { retrieveTriliumForChat } from "@/lib/trilium/chat-retrieve";
 import type { TriliumNoteSource } from "@/lib/trilium/chat-retrieve";
+import { countSyncedTriliumNotes } from "@/lib/db/queries";
 import { getOpenAIClient, getOpenAIModel } from "./client";
 import { retrieveForChat, type ChatSource } from "./chat-retrieve";
 
@@ -104,6 +105,7 @@ export async function answerDocumentChat(
   const year = currentYear();
   const retrieval = retrieveForChat(question, 12);
   const triliumNotes = await retrieveTriliumForChat(question, 5);
+  const triliumIndexed = countSyncedTriliumNotes();
 
   const corpusBlock = `Gesamte lokale Basis:
 - Heute: ${toSwissDate(todayIso)} · aktuelles Jahr: ${year}
@@ -113,7 +115,8 @@ export async function answerDocumentChat(
 - Fristen: ${retrieval.corpus.deadlines}
 - Finanzpositionen: ${retrieval.corpus.financialItems}
 - Reise-Einträge: ${retrieval.corpus.travelItems}
-- Trilium-Notizen (Privat/Geschäftlich): ${triliumNotes.length} Treffer`;
+- Trilium-Notizen lokal indexiert: ${triliumIndexed}
+- Trilium-Notizen (Treffer zur Frage): ${triliumNotes.length}`;
 
   const factBlocks =
     retrieval.facts.length === 0

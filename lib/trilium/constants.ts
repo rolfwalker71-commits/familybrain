@@ -9,3 +9,8 @@ export const TRILIUM_SETTING_KEYS = {
   privatNoteId: "trilium_scope_privat_note_id",
   geschaeftlichNoteId: "trilium_scope_geschaeftlich_note_id",
 } as const;
+
+export type TriliumScopeKey = "privat" | "geschaeftlich";
+
+/** Matches every note – used for subtree crawls via ETAPI search. */
+export const TRILIUM_ALL_NOTES_SEARCH = "note.dateModified > 1970-01-01";

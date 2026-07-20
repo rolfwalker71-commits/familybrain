@@ -25,8 +25,21 @@ export type TriliumAppInfo = {
 
 export type TriliumSearchOptions = {
   ancestorNoteId?: string;
+  ancestorDepth?: string;
   limit?: number;
   fastSearch?: boolean;
+  orderBy?: string;
+  orderDirection?: "asc" | "desc";
+};
+
+export type TriliumRecentChange = {
+  noteId: string;
+  title?: string;
+  current_title?: string;
+  current_isDeleted?: boolean;
+  current_isProtected?: boolean;
+  utcDate?: string;
+  date?: string;
 };
 
 function normalizeBaseUrl(baseUrl: string): string {
@@ -116,13 +129,33 @@ export class TriliumClient {
     if (options.ancestorNoteId) {
       params.set("ancestorNoteId", options.ancestorNoteId);
     }
+    if (options.ancestorDepth) {
+      params.set("ancestorDepth", options.ancestorDepth);
+    }
     if (options.limit != null) {
       params.set("limit", String(options.limit));
     }
     if (options.fastSearch != null) {
       params.set("fastSearch", String(options.fastSearch));
     }
+    if (options.orderBy) {
+      params.set("orderBy", options.orderBy);
+    }
+    if (options.orderDirection) {
+      params.set("orderDirection", options.orderDirection);
+    }
     return this.request<TriliumSearchResponse>(`/notes?${params.toString()}`);
+  }
+
+  async getNoteHistory(ancestorNoteId?: string): Promise<TriliumRecentChange[]> {
+    const params = new URLSearchParams();
+    if (ancestorNoteId) {
+      params.set("ancestorNoteId", ancestorNoteId);
+    }
+    const query = params.toString();
+    return this.request<TriliumRecentChange[]>(
+      `/notes/history${query ? `?${query}` : ""}`
+    );
   }
 
   async getNoteContent(noteId: string): Promise<string> {

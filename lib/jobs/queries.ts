@@ -15,6 +15,9 @@ import {
   SYNC_LAST_FULL_RECONCILE_KEY,
   SYNC_LAST_ID_RECONCILE_KEY,
   SYNC_MODIFIED_CURSOR_KEY,
+  TRILIUM_INITIAL_SYNC_COMPLETE_KEY,
+  TRILIUM_SYNC_LAST_FULL_RECONCILE_KEY,
+  TRILIUM_SYNC_MODIFIED_CURSOR_KEY,
   clampSchedulerIntervalMinutes,
   parseSchedulerEnabled,
 } from "./constants";
@@ -64,6 +67,16 @@ export type JobRunSummary = {
   cursorAdvancedTo?: string | null;
   idReconciled?: boolean;
   fullReconciled?: boolean;
+  triliumSyncMode?: string;
+  triliumTotalRemote?: number;
+  triliumProcessed?: number;
+  triliumCreated?: number;
+  triliumUpdated?: number;
+  triliumUnchanged?: number;
+  triliumMissing?: number;
+  triliumSyncErrors?: number;
+  triliumCursorAdvancedTo?: string | null;
+  triliumFullReconciled?: boolean;
 };
 
 function newLeaseOwner(): string {
@@ -116,6 +129,30 @@ export function getLastFullReconcileAt(): string | null {
 
 export function setLastFullReconcileAt(value: string) {
   setSetting(SYNC_LAST_FULL_RECONCILE_KEY, value);
+}
+
+export function getTriliumSyncCursor(): string | null {
+  return getSetting(TRILIUM_SYNC_MODIFIED_CURSOR_KEY);
+}
+
+export function setTriliumSyncCursor(value: string | null) {
+  setSetting(TRILIUM_SYNC_MODIFIED_CURSOR_KEY, value);
+}
+
+export function getTriliumLastFullReconcileAt(): string | null {
+  return getSetting(TRILIUM_SYNC_LAST_FULL_RECONCILE_KEY);
+}
+
+export function setTriliumLastFullReconcileAt(value: string) {
+  setSetting(TRILIUM_SYNC_LAST_FULL_RECONCILE_KEY, value);
+}
+
+export function getTriliumInitialSyncComplete(): boolean {
+  return getSetting(TRILIUM_INITIAL_SYNC_COMPLETE_KEY) === "1";
+}
+
+export function setTriliumInitialSyncComplete(value: boolean) {
+  setSetting(TRILIUM_INITIAL_SYNC_COMPLETE_KEY, value ? "1" : "0");
 }
 
 export function getInitialSyncComplete(): boolean {

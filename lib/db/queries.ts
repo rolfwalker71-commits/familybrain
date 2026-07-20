@@ -12,6 +12,12 @@ import {
   suggestTravelLearnMatch,
   upsertTravelTypeRule,
 } from "@/lib/extraction/classification-rules";
+import type { TriliumScopeKey } from "@/lib/trilium/constants";
+import {
+  TRILIUM_SCOPE_GESCHAEFTLICH_TITLE,
+  TRILIUM_SCOPE_PRIVAT_TITLE,
+} from "@/lib/trilium/constants";
+import { hashContent } from "@/lib/utils/hash";
 
 export type PaperlessDocumentRow = {
   id: number;
@@ -977,4 +983,165 @@ export function getKnowledgeAreaCounts() {
 
 export function searchDocuments(query: string, limit = 50) {
   return listDocuments({ search: query, limit });
+}
+
+export type TriliumNoteRow = {
+  note_id: string;
+  scope: TriliumScopeKey;
+  title: string | null;
+  note_type: string | null;
+  content_text: string | null;
+  content_hash: string | null;
+  date_modified: string | null;
+  trilium_url: string | null;
+  is_protected: number;
+  sync_status: string | null;
+  last_synced_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export function getTriliumScopeLabel(scope: TriliumScopeKey): string {
+  return scope === "privat"
+    ? TRILIUM_SCOPE_PRIVAT_TITLE
+    : TRILIUM_SCOPE_GESCHAEFTLICH_TITLE;
+}
+
+export function countSyncedTriliumNotes(): number {
+  const db = getDb();
+  const row = db
+    .prepare(
+      `SELECT COUNT(*) as count FROM trilium_notes WHERE sync_status = 'synced'`
+    )
+    .get() as { count: number };
+  return row.count;
+}
+
+export function listLocalTriliumNoteIds(scope?: TriliumScopeKey): string[] {
+  const db = getDb();
+  if (scope) {
+    return (
+      db
+        .prepare(
+          `SELECT note_id FROM trilium_notes
+           WHERE scope = ? AND sync_status = 'synced'`
+        )
+        .all(scope) as Array<{ note_id: string }>
+    ).map((row) => row.note_id);
+  }
+  return (
+    db
+      .prepare(
+        `SELECT note_id FROM trilium_notes WHERE sync_status = 'synced'`
+      )
+      .all() as Array<{ note_id: string }>
+  ).map((row) => row.note_id);
+}
+
+export function markTriliumNotesMissing(
+  noteIds: string[],
+  scope: TriliumScopeKey
+): number {
+  if (noteIds.length === 0) return 0;
+  const db = getDb();
+  const ts = nowIso();
+  const stmt = db.prepare(
+    `UPDATE trilium_notes
+     SET sync_status = 'missing', updated_at = ?
+     WHERE scope = ? AND note_id = ? AND sync_status = 'synced'`
+  );
+  const tx = db.transaction((ids: string[]) => {
+    let count = 0;
+    for (const noteId of ids) {
+      count += stmt.run(ts, scope, noteId).changes;
+    }
+    return count;
+  });
+  return tx(noteIds);
+}
+
+export function upsertTriliumNote(input: {
+  noteId: string;
+  scope: TriliumScopeKey;
+  title: string | null;
+  noteType: string | null;
+  contentText: string;
+  dateModified: string | null;
+  triliumUrl: string;
+  isProtected?: boolean;
+}): { isNew: boolean; changed: boolean } {
+  const db = getDb();
+  const ts = nowIso();
+  const contentHash = hashContent(input.contentText);
+  const existing = db
+    .prepare(`SELECT content_hash, sync_status FROM trilium_notes WHERE note_id = ?`)
+    .get(input.noteId) as
+    | { content_hash: string | null; sync_status: string | null }
+    | undefined;
+
+  if (!existing) {
+    db.prepare(
+      `INSERT INTO trilium_notes (
+         note_id, scope, title, note_type, content_text, content_hash,
+         date_modified, trilium_url, is_protected, sync_status,
+         last_synced_at, created_at, updated_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced', ?, ?, ?)`
+    ).run(
+      input.noteId,
+      input.scope,
+      input.title,
+      input.noteType,
+      input.contentText,
+      contentHash,
+      input.dateModified,
+      input.triliumUrl,
+      input.isProtected ? 1 : 0,
+      ts,
+      ts,
+      ts
+    );
+    return { isNew: true, changed: true };
+  }
+
+  const changed =
+    existing.content_hash !== contentHash || existing.sync_status === "missing";
+  db.prepare(
+    `UPDATE trilium_notes SET
+       scope = ?,
+       title = ?,
+       note_type = ?,
+       content_text = ?,
+       content_hash = ?,
+       date_modified = ?,
+       trilium_url = ?,
+       is_protected = ?,
+       sync_status = 'synced',
+       last_synced_at = ?,
+       updated_at = ?
+     WHERE note_id = ?`
+  ).run(
+    input.scope,
+    input.title,
+    input.noteType,
+    input.contentText,
+    contentHash,
+    input.dateModified,
+    input.triliumUrl,
+    input.isProtected ? 1 : 0,
+    ts,
+    ts,
+    input.noteId
+  );
+  return { isNew: false, changed };
+}
+
+export function listSyncedTriliumNotesForSearch(): TriliumNoteRow[] {
+  const db = getDb();
+  return db
+    .prepare(
+      `SELECT * FROM trilium_notes
+       WHERE sync_status = 'synced'
+       ORDER BY date_modified DESC`
+    )
+    .all() as TriliumNoteRow[];
 }

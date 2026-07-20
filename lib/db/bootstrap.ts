@@ -70,4 +70,28 @@ export function bootstrapDatabase(db: Database.Database): void {
     }
   });
   seed();
+  ensureTriliumNotesTable(db);
+}
+
+function ensureTriliumNotesTable(db: Database.Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS trilium_notes (
+      note_id TEXT PRIMARY KEY,
+      scope TEXT NOT NULL,
+      title TEXT,
+      note_type TEXT,
+      content_text TEXT,
+      content_hash TEXT,
+      date_modified TEXT,
+      trilium_url TEXT,
+      is_protected INTEGER NOT NULL DEFAULT 0,
+      sync_status TEXT DEFAULT 'synced',
+      last_synced_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_trilium_notes_scope ON trilium_notes(scope);
+    CREATE INDEX IF NOT EXISTS idx_trilium_notes_modified ON trilium_notes(date_modified);
+    CREATE INDEX IF NOT EXISTS idx_trilium_notes_status ON trilium_notes(sync_status);
+  `);
 }
