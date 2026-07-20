@@ -1,5 +1,14 @@
 services:
+  qdrant:
+    image: qdrant/qdrant:v1.13.2
+    container_name: familybrain-qdrant
+    volumes:
+      - ./data/qdrant:/qdrant/storage
+    restart: unless-stopped
+
   familybrain:
+    depends_on:
+      - qdrant
     image: ghcr.io/rolfwalker71-commits/familybrain:${FAMILYBRAIN_IMAGE_TAG:-latest}
     container_name: familybrain
     ports:
@@ -14,6 +23,9 @@ services:
       FAMILYBRAIN_PASSWORD: ${FAMILYBRAIN_PASSWORD:-}
       FAMILYBRAIN_PASSWORD_HASH: ${FAMILYBRAIN_PASSWORD_HASH:-}
       FAMILYBRAIN_SESSION_SECRET: ${FAMILYBRAIN_SESSION_SECRET:-}
+      QDRANT_URL: http://qdrant:6333
+      QDRANT_COLLECTION: ${QDRANT_COLLECTION:-familybrain_chunks}
+      OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
     volumes:
       # Persist SQLite (+ WAL) across restarts / redeploys
       - ./data:/app/data

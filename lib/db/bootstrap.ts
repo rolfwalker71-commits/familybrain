@@ -71,6 +71,41 @@ export function bootstrapDatabase(db: Database.Database): void {
   });
   seed();
   ensureTriliumNotesTable(db);
+  ensureKnowledgeGuidesTables(db);
+}
+
+function ensureKnowledgeGuidesTables(db: Database.Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS knowledge_guides (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      filename TEXT NOT NULL,
+      file_path TEXT NOT NULL,
+      file_hash TEXT NOT NULL,
+      page_count INTEGER,
+      extracted_text TEXT,
+      content_hash TEXT,
+      embedding_status TEXT DEFAULT 'pending',
+      embedding_error TEXT,
+      last_indexed_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS knowledge_guide_chunks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      guide_id INTEGER NOT NULL,
+      chunk_index INTEGER NOT NULL,
+      page_start INTEGER,
+      page_end INTEGER,
+      chunk_text TEXT NOT NULL,
+      content_hash TEXT NOT NULL,
+      qdrant_point_id TEXT NOT NULL,
+      UNIQUE(guide_id, chunk_index),
+      FOREIGN KEY(guide_id) REFERENCES knowledge_guides(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_knowledge_guides_status ON knowledge_guides(embedding_status);
+    CREATE INDEX IF NOT EXISTS idx_knowledge_guide_chunks_guide ON knowledge_guide_chunks(guide_id);
+  `);
 }
 
 function ensureTriliumNotesTable(db: Database.Database): void {

@@ -1145,3 +1145,178 @@ export function listSyncedTriliumNotesForSearch(): TriliumNoteRow[] {
     )
     .all() as TriliumNoteRow[];
 }
+
+export type KnowledgeGuideRow = {
+  id: number;
+  title: string;
+  filename: string;
+  file_path: string;
+  file_hash: string;
+  page_count: number | null;
+  extracted_text: string | null;
+  content_hash: string | null;
+  embedding_status: string | null;
+  embedding_error: string | null;
+  last_indexed_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export function listKnowledgeGuides(): Array<
+  Omit<KnowledgeGuideRow, "extracted_text"> & { extracted_chars: number }
+> {
+  const db = getDb();
+  return db
+    .prepare(
+      `SELECT id, title, filename, file_path, file_hash, page_count,
+              length(COALESCE(extracted_text, '')) as extracted_chars,
+              content_hash, embedding_status, embedding_error, last_indexed_at,
+              created_at, updated_at
+       FROM knowledge_guides
+       ORDER BY created_at DESC`
+    )
+    .all() as Array<
+    Omit<KnowledgeGuideRow, "extracted_text"> & { extracted_chars: number }
+  >;
+}
+
+export function getKnowledgeGuideById(id: number): KnowledgeGuideRow | null {
+  const db = getDb();
+  const row = db
+    .prepare(`SELECT * FROM knowledge_guides WHERE id = ?`)
+    .get(id) as KnowledgeGuideRow | undefined;
+  return row ?? null;
+}
+
+export function countIndexedKnowledgeGuides(): number {
+  const db = getDb();
+  const row = db
+    .prepare(
+      `SELECT COUNT(*) as count FROM knowledge_guides WHERE embedding_status = 'indexed'`
+    )
+    .get() as { count: number };
+  return row.count;
+}
+
+export function createKnowledgeGuide(input: {
+  title: string;
+  filename: string;
+  filePath: string;
+  fileHash: string;
+  pageCount: number | null;
+  extractedText: string;
+}): number {
+  const db = getDb();
+  const ts = nowIso();
+  const result = db
+    .prepare(
+      `INSERT INTO knowledge_guides (
+         title, filename, file_path, file_hash, page_count, extracted_text,
+         embedding_status, created_at, updated_at
+       ) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)`
+    )
+    .run(
+      input.title,
+      input.filename,
+      input.filePath,
+      input.fileHash,
+      input.pageCount,
+      input.extractedText,
+      ts,
+      ts
+    );
+  return Number(result.lastInsertRowid);
+}
+
+export function updateKnowledgeGuideFilePath(
+  guideId: number,
+  filePath: string
+): void {
+  const db = getDb();
+  db.prepare(
+    `UPDATE knowledge_guides SET file_path = ?, updated_at = ? WHERE id = ?`
+  ).run(filePath, nowIso(), guideId);
+}
+
+export function updateKnowledgeGuideIndexing(
+  guideId: number,
+  input: {
+    contentHash?: string | null;
+    embeddingStatus?: string;
+    embeddingError?: string | null;
+    lastIndexedAt?: string | null;
+  }
+): void {
+  const db = getDb();
+  const fields: string[] = ["updated_at = ?"];
+  const values: unknown[] = [nowIso()];
+
+  if (input.contentHash !== undefined) {
+    fields.push("content_hash = ?");
+    values.push(input.contentHash);
+  }
+  if (input.embeddingStatus !== undefined) {
+    fields.push("embedding_status = ?");
+    values.push(input.embeddingStatus);
+  }
+  if (input.embeddingError !== undefined) {
+    fields.push("embedding_error = ?");
+    values.push(input.embeddingError);
+  }
+  if (input.lastIndexedAt !== undefined) {
+    fields.push("last_indexed_at = ?");
+    values.push(input.lastIndexedAt);
+  }
+
+  values.push(guideId);
+  db.prepare(
+    `UPDATE knowledge_guides SET ${fields.join(", ")} WHERE id = ?`
+  ).run(...values);
+}
+
+export function deleteKnowledgeGuide(guideId: number): KnowledgeGuideRow | null {
+  const guide = getKnowledgeGuideById(guideId);
+  if (!guide) return null;
+  const db = getDb();
+  db.prepare(`DELETE FROM knowledge_guides WHERE id = ?`).run(guideId);
+  return guide;
+}
+
+export function deleteGuideChunks(guideId: number): void {
+  const db = getDb();
+  db.prepare(`DELETE FROM knowledge_guide_chunks WHERE guide_id = ?`).run(guideId);
+}
+
+export function replaceGuideChunks(
+  guideId: number,
+  chunks: Array<{
+    chunkIndex: number;
+    chunkText: string;
+    contentHash: string;
+    qdrantPointId: string;
+    pageStart?: number | null;
+    pageEnd?: number | null;
+  }>
+): void {
+  const db = getDb();
+  const insert = db.prepare(
+    `INSERT INTO knowledge_guide_chunks (
+       guide_id, chunk_index, page_start, page_end, chunk_text,
+       content_hash, qdrant_point_id
+     ) VALUES (?, ?, ?, ?, ?, ?, ?)`
+  );
+  const tx = db.transaction((rows: typeof chunks) => {
+    for (const chunk of rows) {
+      insert.run(
+        guideId,
+        chunk.chunkIndex,
+        chunk.pageStart ?? null,
+        chunk.pageEnd ?? null,
+        chunk.chunkText,
+        chunk.contentHash,
+        chunk.qdrantPointId
+      );
+    }
+  });
+  tx(chunks);
+}

@@ -14,6 +14,7 @@ import {
   Settings,
   MessageSquare,
   LogOut,
+  BookOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAnalysis } from "@/components/analysis/analysis-provider";
@@ -74,6 +75,7 @@ const navItems: NavItem[] = [
     countKey: "travelDocuments",
   },
   { href: "/settings", label: "Einstellungen", icon: Settings },
+  { href: "/guides", label: "Guides", icon: BookOpen },
   { href: "/chat", label: "Chat", icon: MessageSquare },
   {
     href: "/sync",

@@ -22,6 +22,7 @@ import {
   Settings,
   Sparkles,
   LayoutDashboard,
+  BookOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -167,6 +168,7 @@ export const pageVisuals = {
   travel: { icon: Plane, tone: "teal" as const },
   settings: { icon: Settings, tone: "slate" as const },
   summaries: { icon: Sparkles, tone: "indigo" as const },
+  guides: { icon: BookOpen, tone: "teal" as const },
 } as const;
 
 export function knowledgeVisual(name: string): {

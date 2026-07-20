@@ -1,7 +1,12 @@
 import { currentYear, toSwissDate } from "@/lib/utils/dates";
 import { retrieveTriliumForChat } from "@/lib/trilium/chat-retrieve";
 import type { TriliumNoteSource } from "@/lib/trilium/chat-retrieve";
-import { countSyncedTriliumNotes } from "@/lib/db/queries";
+import {
+  countIndexedKnowledgeGuides,
+  countSyncedTriliumNotes,
+} from "@/lib/db/queries";
+import { retrieveGuidesForChat } from "@/lib/vectors/retrieve";
+import type { GuideSource } from "@/lib/vectors/types";
 import { getOpenAIClient, getOpenAIModel } from "./client";
 import { retrieveForChat, type ChatSource } from "./chat-retrieve";
 
@@ -14,6 +19,7 @@ export type ChatAnswer = {
   answer: string;
   sources: ChatSource[];
   noteSources: TriliumNoteSource[];
+  guideSources: GuideSource[];
 };
 
 function buildSystemPrompt(todayIso: string, year: number): string {
@@ -23,6 +29,7 @@ function buildSystemPrompt(todayIso: string, year: number): string {
 Die Wissensbasis umfasst:
 1. synchronisierte Paperless-Dokumente mit AI-Analysen (Belege, Verträge, Rechnungen, Reisen, Garantien, Fristen)
 2. Trilium-Notizen aus den Bereichen «Privat» und «Geschäftlich ANG» (manuelle Wissensbasis, How-tos, Homelab, Kundeninfos)
+3. importierte PDF-Guides (Handbücher, Anleitungen, umfangreiche Referenzdokumente)
 
 Kalenderkontext (verbindlich):
 - Heute ist ${todaySwiss} (ISO ${todayIso}).
@@ -33,8 +40,8 @@ Kalenderkontext (verbindlich):
 
 Regeln:
 - Antworte auf Deutsch, klar und konkret.
-- Nutze die gesamte bereitgestellte Basis (Korpus-Statistik, strukturierte Fakten, Dokumentkontexte UND Trilium-Notizen).
-- Unterscheide klar zwischen Belegen (Dokumente) und manuellen Notizen (Trilium).
+- Nutze die gesamte bereitgestellte Basis (Korpus-Statistik, strukturierte Fakten, Dokumentkontexte, Trilium-Notizen UND Guide-Auszüge).
+- Unterscheide klar zwischen Belegen (Dokumente), manuellen Notizen (Trilium) und importierten Guides (PDF-Handbücher).
 - OCR-Auszüge und Abschnitte «Reiseverlauf / Ports of Call» können Tabellen und Tageshäfen enthalten – lies diese sorgfältig aus und zitiere sie.
 - Wenn die Frage ein konkretes Schiff, Produkt oder eine Buchungsnummer nennt, beantworte NUR mit Daten zu genau diesem Objekt.
 - Strukturelle Fakten können unvollständig sein. Bei Widerspruch haben die Dokumentkontexte (OCR / Reiseverlauf) Vorrang vor Kurzfassungen.
@@ -47,13 +54,16 @@ Regeln:
 - Hänge als letzte Zeilen exakt diese Marker an:
   [[SOURCE_IDS:1354,42]]
   [[NOTE_IDS:abc123,def456]]
+  [[GUIDE_IDS:7,12]]
 - In SOURCE_IDS höchstens 4 Dokument-IDs, nur wenn die Antwort direkt daraus belegt ist.
 - In NOTE_IDS höchstens 4 Trilium-Notiz-IDs, nur wenn die Antwort direkt daraus belegt ist.
-- Wenn nichts direkt belegt ist: [[SOURCE_IDS:]] und/oder [[NOTE_IDS:]].`;
+- In GUIDE_IDS höchstens 4 Guide-IDs, nur wenn die Antwort direkt daraus belegt ist.
+- Wenn nichts direkt belegt ist: [[SOURCE_IDS:]], [[NOTE_IDS:]] und/oder [[GUIDE_IDS:]].`;
 }
 
 const SOURCE_IDS_MARKER = /\[\[SOURCE_IDS:\s*([0-9,\s]*)\]\]/i;
 const NOTE_IDS_MARKER = /\[\[NOTE_IDS:\s*([a-zA-Z0-9_,\s]*)\]\]/i;
+const GUIDE_IDS_MARKER = /\[\[GUIDE_IDS:\s*([0-9,\s]*)\]\]/i;
 const TRAILING_SOURCE_SECTION =
   /\n+(?:#{1,6}\s*)?(?:\*\*)?Quellen(?:\*\*)?:?\s*\n[\s\S]*$/i;
 
@@ -61,10 +71,12 @@ export function parseChatAnswerSources(rawAnswer: string): {
   answer: string;
   sourceIds: number[];
   noteIds: string[];
+  guideIds: number[];
 } {
   const trimmed = rawAnswer.trim();
   const sourceMarker = trimmed.match(SOURCE_IDS_MARKER);
   const noteMarker = trimmed.match(NOTE_IDS_MARKER);
+  const guideMarker = trimmed.match(GUIDE_IDS_MARKER);
 
   const sourceIds = sourceMarker
     ? [
@@ -88,13 +100,25 @@ export function parseChatAnswerSources(rawAnswer: string): {
       ].slice(0, 4)
     : [];
 
+  const guideIds = guideMarker
+    ? [
+        ...new Set(
+          guideMarker[1]
+            .split(",")
+            .map((value) => Number(value.trim()))
+            .filter((value) => Number.isInteger(value) && value > 0)
+        ),
+      ].slice(0, 4)
+    : [];
+
   let answer = trimmed
     .replace(SOURCE_IDS_MARKER, "")
     .replace(NOTE_IDS_MARKER, "")
+    .replace(GUIDE_IDS_MARKER, "")
     .trim();
   answer = answer.replace(TRAILING_SOURCE_SECTION, "").trim();
 
-  return { answer, sourceIds, noteIds };
+  return { answer, sourceIds, noteIds, guideIds };
 }
 
 export async function answerDocumentChat(
@@ -105,7 +129,9 @@ export async function answerDocumentChat(
   const year = currentYear();
   const retrieval = retrieveForChat(question, 12);
   const triliumNotes = await retrieveTriliumForChat(question, 5);
+  const guideSources = await retrieveGuidesForChat(question, 6);
   const triliumIndexed = countSyncedTriliumNotes();
+  const guidesIndexed = countIndexedKnowledgeGuides();
 
   const corpusBlock = `Gesamte lokale Basis:
 - Heute: ${toSwissDate(todayIso)} · aktuelles Jahr: ${year}
@@ -116,7 +142,9 @@ export async function answerDocumentChat(
 - Finanzpositionen: ${retrieval.corpus.financialItems}
 - Reise-Einträge: ${retrieval.corpus.travelItems}
 - Trilium-Notizen lokal indexiert: ${triliumIndexed}
-- Trilium-Notizen (Treffer zur Frage): ${triliumNotes.length}`;
+- Trilium-Notizen (Treffer zur Frage): ${triliumNotes.length}
+- PDF-Guides indexiert: ${guidesIndexed}
+- Guide-Treffer (semantisch): ${guideSources.length}`;
 
   const factBlocks =
     retrieval.facts.length === 0
@@ -160,6 +188,23 @@ ${note.excerpt}`
           )
           .join("\n\n---\n\n");
 
+  const guideBlocks =
+    guideSources.length === 0
+      ? "Keine passenden Guide-Auszüge gefunden."
+      : guideSources
+          .map((guide, i) => {
+            const pageInfo =
+              guide.pageStart != null
+                ? `Seite ${guide.pageStart}${guide.pageEnd && guide.pageEnd !== guide.pageStart ? `–${guide.pageEnd}` : ""}`
+                : "–";
+            return `[Guide ${i + 1}] guideId=${guide.id} score=${guide.score.toFixed(2)}
+Titel: ${guide.title}
+Seite: ${pageInfo}
+Inhalt:
+${guide.excerpt}`;
+          })
+          .join("\n\n---\n\n");
+
   const client = getOpenAIClient();
   const model = getOpenAIModel();
 
@@ -187,12 +232,15 @@ ${contextBlocks}
 RELEVANTE TRILIUM-NOTIZEN (Master → Privat / Geschäftlich ANG):
 ${triliumBlocks}
 
+RELEVANTE GUIDE-AUSZÜGE (importierte PDF-Handbücher, semantische Suche):
+${guideBlocks}
+
 Beantworte die Frage jetzt anhand der gesamten Wissensbasis.
 Beachte den Kalenderkontext: «dieses Jahr» = ${year}, «kommend/geplant» ab ${toSwissDate(todayIso)}.
 
 Wichtig für Quellen:
 - Gib keinen sichtbaren Quellenabschnitt aus.
-- Markiere am Ende nur die Dokument-IDs und Notiz-IDs, die deine Antwort unmittelbar belegen.
+- Markiere am Ende nur die Dokument-, Notiz- und Guide-IDs, die deine Antwort unmittelbar belegen.
 - Gib niemals alle Retrieval-Treffer als Quellen an.`,
       },
     ],
@@ -232,5 +280,17 @@ Wichtig für Quellen:
     .map((id) => noteCandidates.get(id))
     .filter((note): note is TriliumNoteSource => Boolean(note));
 
-  return { answer: parsed.answer, sources, noteSources };
+  const guideCandidates = new Map(
+    guideSources.map((guide) => [guide.id, guide])
+  );
+  const citedGuideSources = parsed.guideIds
+    .map((id) => guideCandidates.get(id))
+    .filter((guide): guide is GuideSource => Boolean(guide));
+
+  return {
+    answer: parsed.answer,
+    sources,
+    noteSources,
+    guideSources: citedGuideSources,
+  };
 }

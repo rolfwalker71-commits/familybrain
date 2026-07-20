@@ -26,12 +26,22 @@ type TriliumNoteSource = {
   url: string;
 };
 
+type GuideSource = {
+  id: number;
+  title: string;
+  excerpt: string;
+  score: number;
+  pageStart?: number | null;
+  pageEnd?: number | null;
+};
+
 type Message = {
   id: string;
   role: "user" | "assistant";
   content: string;
   sources?: ChatSource[];
   noteSources?: TriliumNoteSource[];
+  guideSources?: GuideSource[];
 };
 
 const SUGGESTIONS = [
@@ -95,6 +105,7 @@ export function ChatClient() {
           content: data.answer,
           sources: data.sources,
           noteSources: data.noteSources,
+          guideSources: data.guideSources,
         },
       ]);
     } catch (err) {
@@ -108,7 +119,7 @@ export function ChatClient() {
     <div className="flex h-[calc(100dvh-8rem)] min-h-[32rem] flex-col gap-3 sm:gap-4 lg:h-[calc(100dvh-4rem)]">
       <PageHeader
         title="Chat"
-        description="Stelle Fragen zu deinen synchronisierten und analysierten Dokumenten"
+        description="Fragen zu Dokumenten, Notizen und importierten Guides"
         icon={pageVisuals.chat.icon}
         tone={pageVisuals.chat.tone}
       />
@@ -122,7 +133,7 @@ export function ChatClient() {
                 <div>
                   <p className="font-medium">Frage deine Dokumentenbasis</p>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Antworten basieren auf lokalen OCR-Texten und AI-Zusammenfassungen.
+                    Antworten basieren auf Paperless, Trilium und semantisch indexierten PDF-Guides.
                   </p>
                 </div>
                 <div className="flex max-w-2xl flex-wrap justify-center gap-2">
@@ -159,7 +170,8 @@ export function ChatClient() {
                       <div className="whitespace-pre-wrap">{message.content}</div>
                     )}
                     {(message.sources && message.sources.length > 0) ||
-                    (message.noteSources && message.noteSources.length > 0) ? (
+                    (message.noteSources && message.noteSources.length > 0) ||
+                    (message.guideSources && message.guideSources.length > 0) ? (
                       <div className="mt-3 space-y-2 border-t border-border/60 pt-3">
                         <div className="text-xs font-medium text-muted-foreground">
                           Verwendete Quellen
@@ -214,6 +226,27 @@ export function ChatClient() {
                               </Badge>
                             </a>
                           ))}
+                          {message.guideSources?.map((guide) => (
+                            <Link
+                              key={`guide-${guide.id}`}
+                              href={`/guides#guide-${guide.id}`}
+                              title="Guide öffnen"
+                              className="max-w-full"
+                            >
+                              <Badge
+                                variant="secondary"
+                                className="max-w-full cursor-pointer gap-1.5 hover:bg-accent"
+                              >
+                                <span className="truncate">
+                                  {guide.title}
+                                  {guide.pageStart
+                                    ? ` · S. ${guide.pageStart}`
+                                    : " · Guide"}
+                                </span>
+                                <ExternalLink className="size-3 shrink-0" />
+                              </Badge>
+                            </Link>
+                          ))}
                         </div>
                       </div>
                     ) : null}
@@ -224,7 +257,7 @@ export function ChatClient() {
             {loading ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Suche in Dokumenten und Notizen…
+                Suche in Dokumenten, Notizen und Guides…
               </div>
             ) : null}
             <div ref={bottomRef} />
