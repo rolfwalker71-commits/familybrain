@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ExternalLink, Loader2, Send, Sparkles } from "lucide-react";
+import { Check, Copy, ExternalLink, Loader2, Send, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,6 +11,7 @@ import { ChatMarkdown } from "@/components/chat/chat-markdown";
 import { DocumentInfoButton } from "@/components/documents/document-link";
 import { PageHeader } from "@/components/layout/page-primitives";
 import { IconCircle, pageVisuals } from "@/components/layout/icon-circle";
+import { copyMarkdownForEmail } from "@/lib/chat/copy-format";
 
 type ChatSource = {
   id: number;
@@ -56,12 +57,35 @@ export function ChatClient() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const messageSequence = useRef(0);
+  const copiedResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
+
+  useEffect(() => {
+    return () => {
+      if (copiedResetRef.current) clearTimeout(copiedResetRef.current);
+    };
+  }, []);
+
+  async function copyAssistantMessage(message: Message) {
+    try {
+      await copyMarkdownForEmail(message.content);
+      setCopiedId(message.id);
+      if (copiedResetRef.current) clearTimeout(copiedResetRef.current);
+      copiedResetRef.current = setTimeout(() => setCopiedId(null), 2000);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? `Kopieren fehlgeschlagen: ${err.message}`
+          : "Kopieren in die Zwischenablage fehlgeschlagen."
+      );
+    }
+  }
 
   async function send(text: string) {
     const question = text.trim();
@@ -248,6 +272,38 @@ export function ChatClient() {
                             </Link>
                           ))}
                         </div>
+                      </div>
+                    ) : null}
+                    {message.role === "assistant" ? (
+                      <div
+                        className={
+                          (message.sources && message.sources.length > 0) ||
+                          (message.noteSources && message.noteSources.length > 0) ||
+                          (message.guideSources && message.guideSources.length > 0)
+                            ? "mt-2 flex justify-end"
+                            : "mt-3 flex justify-end border-t border-border/60 pt-2"
+                        }
+                      >
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 gap-1.5 text-xs text-muted-foreground"
+                          onClick={() => void copyAssistantMessage(message)}
+                          title="Antwort formatiert in die Zwischenablage kopieren (für E-Mail)"
+                        >
+                          {copiedId === message.id ? (
+                            <>
+                              <Check className="size-3.5" />
+                              Kopiert
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="size-3.5" />
+                              Kopieren
+                            </>
+                          )}
+                        </Button>
                       </div>
                     ) : null}
                   </div>
