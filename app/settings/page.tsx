@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { KeyRound, Server, BookOpen } from "lucide-react";
+import { KeyRound, Server, BookOpen, MessageSquareText } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -38,9 +39,9 @@ export default function SettingsPage() {
   const [customModel, setCustomModel] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState<"paperless" | "openai" | "trilium" | null>(
-    null
-  );
+  const [saving, setSaving] = useState<
+    "paperless" | "openai" | "trilium" | "chat" | null
+  >(null);
   const [triliumBaseUrl, setTriliumBaseUrl] = useState("");
   const [triliumToken, setTriliumToken] = useState("");
   const [triliumTokenMasked, setTriliumTokenMasked] = useState<string | null>(
@@ -58,6 +59,10 @@ export default function SettingsPage() {
     string | null
   >(null);
   const [resolvingScopes, setResolvingScopes] = useState(false);
+  const [chatInstructions, setChatInstructions] = useState("");
+  const [chatInstructionsDefault, setChatInstructionsDefault] = useState("");
+  const [chatInstructionsCustomized, setChatInstructionsCustomized] =
+    useState(false);
 
   useEffect(() => {
     void (async () => {
@@ -82,6 +87,9 @@ export default function SettingsPage() {
       setTriliumMasterNoteId(data.triliumMasterNoteId || null);
       setTriliumPrivatNoteId(data.triliumPrivatNoteId || null);
       setTriliumGeschaeftlichNoteId(data.triliumGeschaeftlichNoteId || null);
+      setChatInstructions(data.chatInstructions || "");
+      setChatInstructionsDefault(data.chatInstructionsDefault || "");
+      setChatInstructionsCustomized(Boolean(data.chatInstructionsCustomized));
     })();
   }, []);
 
@@ -200,6 +208,54 @@ export default function SettingsPage() {
     }
   }
 
+  async function saveChatInstructions() {
+    setSaving("chat");
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chatInstructions }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Speichern fehlgeschlagen");
+      setChatInstructions(data.chatInstructions || "");
+      setChatInstructionsDefault(data.chatInstructionsDefault || "");
+      setChatInstructionsCustomized(Boolean(data.chatInstructionsCustomized));
+      setMessage("Chat-Regeln gespeichert. Gelten ab der nächsten Antwort.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  async function restoreDefaultChatInstructions() {
+    setSaving("chat");
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ resetChatInstructions: true }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Zurücksetzen fehlgeschlagen");
+      setChatInstructions(data.chatInstructions || "");
+      setChatInstructionsDefault(data.chatInstructionsDefault || "");
+      setChatInstructionsCustomized(Boolean(data.chatInstructionsCustomized));
+      setMessage(
+        "Ausgangs-Vorlage wiederhergestellt. Du kannst sie jederzeit erneut anpassen und speichern."
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSaving(null);
+    }
+  }
+
   async function resolveTriliumScopes() {
     setResolvingScopes(true);
     setError(null);
@@ -236,10 +292,74 @@ export default function SettingsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Einstellungen"
-        description="Paperless, Trilium und OpenAI konfigurieren"
+        description="Paperless, Trilium, OpenAI und Chat-Regeln konfigurieren"
         icon={pageVisuals.settings.icon}
         tone={pageVisuals.settings.tone}
       />
+
+      <Card className="border-border/80 shadow-sm">
+        <CardHeader className="flex flex-row items-center justify-between gap-3">
+          <CardTitle className="flex items-center gap-3 text-base">
+            <IconCircle icon={MessageSquareText} tone="indigo" size="sm" />
+            Chat-Regeln
+          </CardTitle>
+          {chatInstructionsCustomized ? (
+            <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">
+              Angepasst
+            </Badge>
+          ) : (
+            <Badge variant="secondary">Vorlage</Badge>
+          )}
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Diese Regeln gelten bei jeder Chat-Antwort und können jederzeit
+            geändert werden. Die Ausgangsvorlage ist nur ein Startpunkt — speichere
+            deine Version, sobald du etwas anpasst.
+          </p>
+          <div className="space-y-2">
+            <Label htmlFor="chatInstructions">Antwortverhalten</Label>
+            <Textarea
+              id="chatInstructions"
+              value={chatInstructions}
+              onChange={(e) => setChatInstructions(e.target.value)}
+              className="min-h-[220px] font-mono text-xs leading-relaxed"
+              placeholder="z. B. Pfade immer vollständig ausgeben…"
+            />
+            <p className="text-xs text-muted-foreground">
+              {chatInstructions.length} Zeichen · max. 8000
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              onClick={() => void saveChatInstructions()}
+              disabled={saving !== null}
+            >
+              {saving === "chat" ? "Speichert…" : "Chat-Regeln speichern"}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                if (chatInstructionsDefault) {
+                  setChatInstructions(chatInstructionsDefault);
+                }
+              }}
+              disabled={saving !== null || !chatInstructionsDefault}
+            >
+              Vorlage in Editor laden
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => void restoreDefaultChatInstructions()}
+              disabled={saving !== null}
+            >
+              Auf Ausgangsvorlage zurücksetzen
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card className="border-border/80 shadow-sm">
         <CardHeader>

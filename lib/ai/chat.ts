@@ -17,6 +17,10 @@ import {
   normalizeChatSources,
   type ChatSourceSelection,
 } from "@/lib/chat/sources";
+import {
+  formatChatInstructionsForPrompt,
+  getChatInstructions,
+} from "@/lib/chat/instructions";
 import { getOpenAIClient, getOpenAIModel } from "./client";
 import {
   retrieveForChat,
@@ -52,7 +56,8 @@ const EMPTY_RETRIEVAL: ChatRetrieval = {
 function buildSystemPrompt(
   todayIso: string,
   year: number,
-  sources: ChatSourceSelection
+  sources: ChatSourceSelection,
+  userInstructions: string
 ): string {
   const todaySwiss = toSwissDate(todayIso);
   const knowledgeParts: string[] = [];
@@ -72,6 +77,8 @@ function buildSystemPrompt(
     );
   }
 
+  const instructionsBlock = formatChatInstructionsForPrompt(userInstructions);
+
   return `Du bist FamilyBrain, ein Assistent für die ausgewählte Wissensbasis einer Familie.
 
 Aktive Quellen für diese Antwort: ${describeChatSources(sources)}.
@@ -85,6 +92,7 @@ Kalenderkontext (verbindlich):
 - «nächstes Jahr» meint ${year + 1}; «letztes Jahr» meint ${year - 1}.
 - «heute», «demnächst», «kommend», «geplant» beziehen sich auf Daten ab ${todaySwiss}. Vergangene Reisen/Fristen nur nennen, wenn die Frage ausdrücklich danach fragt oder nichts Aktuelles vorhanden ist.
 
+${instructionsBlock ? `${instructionsBlock}\n` : ""}
 Regeln:
 - Antworte auf Deutsch, klar und konkret.
 - Nutze NUR die bereitgestellten aktiven Quellen plus gespeicherte Nutzer-Korrekturen. Ignoriere deaktivierte Quellen.
@@ -291,7 +299,15 @@ ${guide.excerpt}`;
     model,
     temperature: 0.1,
     messages: [
-      { role: "system", content: buildSystemPrompt(todayIso, year, sourcesEnabled) },
+      {
+        role: "system",
+        content: buildSystemPrompt(
+          todayIso,
+          year,
+          sourcesEnabled,
+          getChatInstructions()
+        ),
+      },
       ...history.slice(-6).map((m) => ({
         role: m.role as "user" | "assistant",
         content: m.content,

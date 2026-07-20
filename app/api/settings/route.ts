@@ -13,6 +13,13 @@ import {
 import { getTriliumInitialSyncComplete } from "@/lib/jobs/queries";
 import { maskToken } from "@/lib/utils/format";
 import { hasOpenAIKey } from "@/lib/ai/client";
+import {
+  DEFAULT_CHAT_INSTRUCTIONS,
+  getChatInstructions,
+  isChatInstructionsCustomized,
+  resetChatInstructions,
+  saveChatInstructions,
+} from "@/lib/chat/instructions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,6 +44,9 @@ export async function GET() {
     triliumConfigured: isTriliumConfigured(),
     triliumSyncedNotes: countSyncedTriliumNotes(),
     triliumInitialSyncComplete: getTriliumInitialSyncComplete(),
+    chatInstructions: getChatInstructions(),
+    chatInstructionsCustomized: isChatInstructionsCustomized(),
+    chatInstructionsDefault: DEFAULT_CHAT_INSTRUCTIONS,
   });
 }
 
@@ -47,6 +57,8 @@ const PutSchema = z.object({
   openaiModel: z.string().min(1).optional(),
   triliumBaseUrl: z.string().url().optional(),
   triliumApiToken: z.string().optional(),
+  chatInstructions: z.string().max(8000).optional(),
+  resetChatInstructions: z.boolean().optional(),
 });
 
 export async function PUT(request: Request) {
@@ -98,6 +110,18 @@ export async function PUT(request: Request) {
     saveTriliumSettings({ apiToken: parsed.data.triliumApiToken });
   }
 
+  let chatInstructions = getChatInstructions();
+  try {
+    if (parsed.data.resetChatInstructions) {
+      chatInstructions = resetChatInstructions();
+    } else if (parsed.data.chatInstructions !== undefined) {
+      chatInstructions = saveChatInstructions(parsed.data.chatInstructions);
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return NextResponse.json({ error: message }, { status: 400 });
+  }
+
   const paperless = getPaperlessSettings();
   const openai = getOpenAISettings();
   const trilium = getTriliumSettings();
@@ -119,5 +143,8 @@ export async function PUT(request: Request) {
     triliumConfigured: isTriliumConfigured(),
     triliumSyncedNotes: countSyncedTriliumNotes(),
     triliumInitialSyncComplete: getTriliumInitialSyncComplete(),
+    chatInstructions,
+    chatInstructionsCustomized: isChatInstructionsCustomized(),
+    chatInstructionsDefault: DEFAULT_CHAT_INSTRUCTIONS,
   });
 }
