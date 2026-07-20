@@ -11,7 +11,10 @@ import {
   updateKnowledgeGuideFilePath,
 } from "@/lib/db/queries";
 import { removeKnowledgeGuideFully } from "@/lib/guides/delete-guide";
-import { extractTextFromPdf } from "@/lib/guides/extract-pdf";
+import {
+  diagnosePdfBuffer,
+  extractTextFromPdf,
+} from "@/lib/guides/extract-pdf";
 import { guideFilePath, ensureGuidesDirectory } from "@/lib/guides/storage";
 import { indexKnowledgeGuide } from "@/lib/vectors/index-guide";
 import { checkQdrantConnection } from "@/lib/vectors/client";
@@ -138,12 +141,16 @@ export async function POST(request: Request) {
       );
     }
 
-    // Basic PDF magic-byte check
-    if (buffer.subarray(0, 4).toString("utf8") !== "%PDF") {
-      return NextResponse.json(
-        { error: "Datei sieht nicht wie ein PDF aus." },
-        { status: 400 }
-      );
+    console.info(
+      `[guides] upload received filename=${filename} bytes=${buffer.length} contentLength=${contentLength || "n/a"}`
+    );
+
+    const diagnosis = diagnosePdfBuffer(
+      buffer,
+      contentLength > 0 ? contentLength : null
+    );
+    if (diagnosis) {
+      return NextResponse.json({ error: diagnosis }, { status: 400 });
     }
 
     const title =
