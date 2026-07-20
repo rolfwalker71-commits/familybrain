@@ -171,6 +171,10 @@ The reverse proxy should preserve `Host` and send `X-Forwarded-Host`,
 same-origin protection and login throttling. Rotating
 `FAMILYBRAIN_SESSION_SECRET` invalidates all existing sessions.
 
+Qdrant is exposed on host ports `6333` (REST + dashboard) and `6334` (gRPC).
+Open `http://127.0.0.1:6333/dashboard` on the server (or via SSH tunnel). Do **not**
+publish these ports on the public internet — Qdrant has no built-in login.
+
 For PDF guide uploads (up to 50 MB), the UI uploads in **8 MB chunks** so
 common reverse-proxy body cuts around ~10 MB do not truncate the file.
 

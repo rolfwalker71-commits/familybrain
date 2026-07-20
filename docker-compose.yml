@@ -2,6 +2,9 @@ services:
   qdrant:
     image: qdrant/qdrant:v1.13.2
     container_name: familybrain-qdrant
+    ports:
+      - "${QDRANT_HTTP_PORT:-6333}:6333"
+      - "${QDRANT_GRPC_PORT:-6334}:6334"
     volumes:
       - ./data/qdrant:/qdrant/storage
     restart: unless-stopped
