@@ -171,17 +171,18 @@ The reverse proxy should preserve `Host` and send `X-Forwarded-Host`,
 same-origin protection and login throttling. Rotating
 `FAMILYBRAIN_SESSION_SECRET` invalidates all existing sessions.
 
-For PDF guide uploads (up to 50 MB), the app sends the file as a raw PDF body
-(not multipart FormData), which is more reliable behind reverse proxies.
+For PDF guide uploads (up to 50 MB), the UI uploads in **8 MB chunks** so
+common reverse-proxy body cuts around ~10 MB do not truncate the file.
 
-With Nginx Proxy Manager the default `client_max_body_size` is already large
-(2000m). If large uploads still time out, add this in the Proxy Host →
-**Advanced** tab:
+With Nginx Proxy Manager you can still raise timeouts in the Proxy Host →
+**Advanced** tab (useful while indexing large guides):
 
 ```nginx
 proxy_request_buffering off;
 proxy_read_timeout 300s;
 proxy_send_timeout 300s;
+client_body_timeout 300s;
+client_max_body_size 50m;
 ```
 
 **Existing data:** copy `data/familybrain.sqlite` (and stop the app first if WAL files exist) into `./data/` on the host before `up`, or start empty and re-sync from Paperless.

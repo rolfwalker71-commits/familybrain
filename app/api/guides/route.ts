@@ -1,33 +1,21 @@
 import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
-import { createHash } from "crypto";
 import {
   countIndexedKnowledgeGuides,
-  createKnowledgeGuide,
-  findKnowledgeGuideByFilename,
-  findKnowledgeGuideByTitle,
   listKnowledgeGuides,
-  updateKnowledgeGuideFilePath,
 } from "@/lib/db/queries";
-import { removeKnowledgeGuideFully } from "@/lib/guides/delete-guide";
 import {
-  diagnosePdfBuffer,
-  extractTextFromPdf,
-} from "@/lib/guides/extract-pdf";
-import { guideFilePath, ensureGuidesDirectory } from "@/lib/guides/storage";
-import { indexKnowledgeGuide } from "@/lib/vectors/index-guide";
+  importGuideFromPdfBuffer,
+  MAX_GUIDE_UPLOAD_BYTES,
+  sanitizeGuideFilename,
+} from "@/lib/guides/import-guide";
+import { ensureGuidesDirectory } from "@/lib/guides/storage";
 import { checkQdrantConnection } from "@/lib/vectors/client";
 import { hasOpenAIKey } from "@/lib/ai/client";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
-
-const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
-
-function sanitizeFilename(name: string): string {
-  return path.basename(name).replace(/[^a-zA-Z0-9._-]+/g, "_");
-}
 
 type UploadPayload = {
   buffer: Buffer;
@@ -39,7 +27,6 @@ type UploadPayload = {
 async function readUploadPayload(request: Request): Promise<UploadPayload> {
   const contentType = (request.headers.get("content-type") || "").toLowerCase();
 
-  // Prefer raw PDF body — more reliable behind reverse proxies than multipart FormData.
   if (
     contentType.includes("application/pdf") ||
     contentType.includes("application/octet-stream")
@@ -48,7 +35,7 @@ async function readUploadPayload(request: Request): Promise<UploadPayload> {
     const filenameHeader = request.headers.get("x-guide-filename") || "guide.pdf";
     return {
       buffer,
-      filename: sanitizeFilename(filenameHeader),
+      filename: sanitizeGuideFilename(filenameHeader),
       titleInput: String(request.headers.get("x-guide-title") || "").trim(),
       replaceExisting: request.headers.get("x-guide-replace") !== "false",
     };
@@ -65,7 +52,7 @@ async function readUploadPayload(request: Request): Promise<UploadPayload> {
     console.error("[guides] FormData parse failed:", error, cause);
     throw Object.assign(
       new Error(
-        "Upload konnte nicht gelesen werden. Bitte Seite neu laden und erneut versuchen (raw PDF Upload)."
+        "Upload konnte nicht gelesen werden. Bitte den Chunk-Upload nutzen oder Proxy-Limit prüfen."
       ),
       { status: 413 }
     );
@@ -83,7 +70,7 @@ async function readUploadPayload(request: Request): Promise<UploadPayload> {
 
   return {
     buffer: Buffer.from(await file.arrayBuffer()),
-    filename: sanitizeFilename(file.name || "guide.pdf"),
+    filename: sanitizeGuideFilename(file.name || "guide.pdf"),
     titleInput: String(form.get("title") || "").trim(),
     replaceExisting: form.get("replaceExisting") !== "false",
   };
@@ -109,7 +96,7 @@ export async function POST(request: Request) {
     }
 
     const contentLength = Number(request.headers.get("content-length") || 0);
-    if (contentLength > MAX_UPLOAD_BYTES) {
+    if (contentLength > MAX_GUIDE_UPLOAD_BYTES) {
       return NextResponse.json(
         { error: "PDF ist zu gross (max. 50 MB)." },
         { status: 400 }
@@ -128,101 +115,37 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: message }, { status });
     }
 
-    const { buffer, filename, titleInput, replaceExisting } = payload;
-
-    if (buffer.length === 0) {
-      return NextResponse.json({ error: "PDF-Datei fehlt." }, { status: 400 });
-    }
-
-    if (buffer.length > MAX_UPLOAD_BYTES) {
-      return NextResponse.json(
-        { error: "PDF ist zu gross (max. 50 MB)." },
-        { status: 400 }
-      );
-    }
-
     console.info(
-      `[guides] upload received filename=${filename} bytes=${buffer.length} contentLength=${contentLength || "n/a"}`
+      `[guides] upload received filename=${payload.filename} bytes=${payload.buffer.length} contentLength=${contentLength || "n/a"}`
     );
 
-    const diagnosis = diagnosePdfBuffer(
-      buffer,
-      contentLength > 0 ? contentLength : null
-    );
-    if (diagnosis) {
-      return NextResponse.json({ error: diagnosis }, { status: 400 });
-    }
-
-    const title =
-      titleInput ||
-      filename.replace(/\.pdf$/i, "").replace(/[_-]+/g, " ").trim() ||
-      "Guide";
-
-    let replacedGuideId: number | null = null;
-    if (replaceExisting) {
-      const existing =
-        findKnowledgeGuideByFilename(filename) ??
-        (titleInput ? findKnowledgeGuideByTitle(title) : null);
-      if (existing) {
-        await removeKnowledgeGuideFully(existing.id);
-        replacedGuideId = existing.id;
-      }
-    }
-
-    const fileHash = createHash("sha256").update(buffer).digest("hex");
-
-    ensureGuidesDirectory();
-    const tempPath = path.join(
-      ensureGuidesDirectory(),
-      `tmp-${Date.now()}-${filename}`
-    );
-    fs.writeFileSync(tempPath, buffer);
-
-    let extracted;
     try {
-      extracted = await extractTextFromPdf(tempPath);
-    } finally {
-      try {
-        fs.unlinkSync(tempPath);
-      } catch {
-        /* ignore */
-      }
+      const result = await importGuideFromPdfBuffer({
+        ...payload,
+        expectedLength: contentLength > 0 ? contentLength : null,
+      });
+      return NextResponse.json({
+        ok: true,
+        guideId: result.guideId,
+        replacedGuideId: result.replacedGuideId,
+        chunkCount: result.chunkCount,
+        pageCount: result.pageCount,
+      });
+    } catch (error) {
+      const status =
+        error instanceof Error && "status" in error
+          ? Number((error as Error & { status?: number }).status) || 500
+          : 500;
+      const message = error instanceof Error ? error.message : String(error);
+      return NextResponse.json({ error: message }, { status });
     }
-
-    if (!extracted.text.trim()) {
-      return NextResponse.json(
-        {
-          error:
-            "Im PDF wurde kein Text gefunden. Scans oder bildlastige PDFs werden aktuell nicht unterstützt.",
-        },
-        { status: 400 }
-      );
-    }
-
-    const guideId = createKnowledgeGuide({
-      title,
-      filename,
-      filePath: "",
-      fileHash,
-      pageCount: extracted.pageCount || null,
-      extractedText: extracted.text,
-    });
-
-    const finalPath = guideFilePath(guideId, filename);
-    fs.writeFileSync(finalPath, buffer);
-    updateKnowledgeGuideFilePath(guideId, finalPath);
-
-    const indexResult = await indexKnowledgeGuide(guideId);
-
-    return NextResponse.json({
-      ok: true,
-      guideId,
-      replacedGuideId,
-      chunkCount: indexResult.chunkCount,
-      pageCount: extracted.pageCount,
-    });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
+// Keep ensureGuidesDirectory referenced for tree-shaking clarity in Docker builds.
+void ensureGuidesDirectory;
+void fs;
+void path;

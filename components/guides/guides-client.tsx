@@ -94,34 +94,67 @@ export function GuidesClient() {
     setMessage(null);
 
     try {
-      const headers: Record<string, string> = {
-        "Content-Type": "application/pdf",
-        "X-Guide-Filename": file.name || "guide.pdf",
-        "X-Guide-Replace": replaceExisting ? "true" : "false",
-      };
-      if (title.trim()) headers["X-Guide-Title"] = title.trim();
+      // Chunked upload stays under common ~10 MB proxy body cuts.
+      const chunkBytes = 8 * 1024 * 1024;
+      const chunkCount = Math.max(1, Math.ceil(file.size / chunkBytes));
 
-      const res = await fetch("/api/guides", {
+      const initRes = await fetch("/api/guides/upload", {
         method: "POST",
-        headers,
-        body: file,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chunkCount, totalBytes: file.size }),
       });
+      const initData = await initRes.json();
+      if (!initRes.ok) {
+        throw new Error(initData.error || "Upload konnte nicht gestartet werden.");
+      }
+
+      const uploadId = String(initData.uploadId || "");
+      if (!uploadId) throw new Error("Keine Upload-ID vom Server.");
+
       let data: {
         error?: string;
         chunkCount?: number;
         pageCount?: number;
         replacedGuideId?: number | null;
-      };
-      try {
-        data = await res.json();
-      } catch {
-        throw new Error(
-          res.status === 413
-            ? "Upload vom Reverse Proxy abgelehnt (zu gross)."
-            : "Upload fehlgeschlagen (ungültige Serverantwort)."
+      } = {};
+
+      for (let i = 0; i < chunkCount; i++) {
+        const start = i * chunkBytes;
+        const end = Math.min(file.size, start + chunkBytes);
+        const blob = file.slice(start, end);
+
+        setMessage(
+          `Upload… Teil ${i + 1}/${chunkCount} (${Math.round((end / file.size) * 100)}%)`
         );
+
+        const headers: Record<string, string> = {
+          "Content-Type": "application/octet-stream",
+          "X-Guide-Upload-Id": uploadId,
+          "X-Guide-Chunk-Index": String(i),
+          "X-Guide-Chunk-Count": String(chunkCount),
+          "X-Guide-Total-Bytes": String(file.size),
+          "X-Guide-Filename": file.name || "guide.pdf",
+          "X-Guide-Replace": replaceExisting ? "true" : "false",
+        };
+        if (title.trim()) headers["X-Guide-Title"] = title.trim();
+
+        const res = await fetch("/api/guides/upload", {
+          method: "POST",
+          headers,
+          body: blob,
+        });
+
+        try {
+          data = await res.json();
+        } catch {
+          throw new Error(
+            res.status === 413
+              ? "Upload-Chunk vom Reverse Proxy abgelehnt (zu gross)."
+              : "Upload fehlgeschlagen (ungültige Serverantwort)."
+          );
+        }
+        if (!res.ok) throw new Error(data.error || "Upload fehlgeschlagen");
       }
-      if (!res.ok) throw new Error(data.error || "Upload fehlgeschlagen");
 
       const replaced =
         data.replacedGuideId != null
