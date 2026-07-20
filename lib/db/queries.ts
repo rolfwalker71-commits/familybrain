@@ -516,7 +516,8 @@ export function getDashboardStats() {
 
   const recentAnalyses = db
     .prepare(
-      `SELECT d.id, d.title, s.category, s.short_summary, s.analyzed_at, s.confidence
+      `SELECT d.id, d.title, d.correspondent_name, s.category, s.short_summary,
+              s.analyzed_at, s.confidence
        FROM document_summaries s
        JOIN paperless_documents d ON d.id = s.document_id
        WHERE s.analysis_status = 'completed'
@@ -546,7 +547,8 @@ export function listWarranties() {
   const db = getDb();
   return db
     .prepare(
-      `SELECT w.*, d.title as document_title, d.id as document_local_id
+      `SELECT w.*, d.title as document_title, d.id as document_local_id,
+              d.correspondent_name
        FROM devices_and_warranties w
        JOIN paperless_documents d ON d.id = w.document_id
        ORDER BY COALESCE(w.warranty_until, '0000-01-01') DESC`
@@ -559,7 +561,8 @@ export function listDeadlines(status?: string) {
   if (status) {
     return db
       .prepare(
-        `SELECT dl.*, d.title as document_title, d.id as document_local_id
+        `SELECT dl.*, d.title as document_title, d.id as document_local_id,
+                d.correspondent_name
          FROM deadlines dl
          JOIN paperless_documents d ON d.id = dl.document_id
          WHERE dl.status = ?
@@ -569,7 +572,8 @@ export function listDeadlines(status?: string) {
   }
   return db
     .prepare(
-      `SELECT dl.*, d.title as document_title, d.id as document_local_id
+      `SELECT dl.*, d.title as document_title, d.id as document_local_id,
+              d.correspondent_name
        FROM deadlines dl
        JOIN paperless_documents d ON d.id = dl.document_id
        ORDER BY COALESCE(dl.deadline_date, '0000-01-01') DESC`
@@ -601,7 +605,8 @@ export function getTravelItemById(id: number) {
   return (
     (db
       .prepare(
-        `SELECT t.*, d.title as document_title, d.id as document_local_id
+        `SELECT t.*, d.title as document_title, d.id as document_local_id,
+                d.correspondent_name
          FROM travel_items t
          JOIN paperless_documents d ON d.id = t.document_id
          WHERE t.id = ?`
@@ -878,7 +883,7 @@ export function listTravelItems() {
   return db
     .prepare(
       `SELECT t.*, d.title as document_title, d.id as document_local_id,
-              d.content as document_content
+              d.content as document_content, d.correspondent_name
        FROM travel_items t
        JOIN paperless_documents d ON d.id = t.document_id
        ORDER BY COALESCE(t.start_date, '9999-12-31') ASC`

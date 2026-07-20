@@ -62,6 +62,7 @@ export default function DashboardPage() {
       deadline_date: string | null;
       deadline_type: string | null;
       document_local_id: number;
+      correspondent_name: string | null;
     }[]
   )
     .filter((d) => d.deadline_date)
@@ -153,6 +154,7 @@ export default function DashboardPage() {
                   const row = item as {
                     id: number;
                     title: string | null;
+                    correspondent_name: string | null;
                     category: string | null;
                     short_summary: string | null;
                     analyzed_at: string | null;
@@ -171,6 +173,11 @@ export default function DashboardPage() {
                             <div className="truncate text-sm font-medium hover:underline">
                               {row.title || `Dokument #${row.id}`}
                             </div>
+                            {row.correspondent_name ? (
+                              <p className="mt-0.5 truncate text-xs font-medium text-foreground/75">
+                                {row.correspondent_name}
+                              </p>
+                            ) : null}
                             <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
                               {row.short_summary || "Keine Kurzfassung"}
                             </p>
@@ -234,7 +241,12 @@ export default function DashboardPage() {
                           {row.title}
                         </div>
                         <div className="mt-1 truncate text-xs text-muted-foreground">
-                          {row.deadline_type || "Frist"}
+                          {[
+                            row.correspondent_name,
+                            row.deadline_type || "Frist",
+                          ]
+                            .filter(Boolean)
+                            .join(" · ")}
                         </div>
                       </div>
                       <span className="shrink-0 text-sm font-medium">

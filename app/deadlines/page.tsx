@@ -44,6 +44,7 @@ type DeadlineRow = {
   confidence: number | null;
   document_title: string | null;
   document_local_id: number;
+  correspondent_name: string | null;
 };
 
 function deadlineToEvent(row: DeadlineRow): CalendarEvent | null {
@@ -52,6 +53,7 @@ function deadlineToEvent(row: DeadlineRow): CalendarEvent | null {
     uid: `deadline-${row.id}@familybrain.local`,
     title: row.title,
     description: [
+      row.correspondent_name ? `Korrespondent: ${row.correspondent_name}` : null,
       row.deadline_type ? `Typ: ${row.deadline_type}` : null,
       row.description,
       row.document_title ? `Dokument: ${row.document_title}` : null,
@@ -183,11 +185,18 @@ export default function DeadlinesPage() {
                     <DataListMain
                       title={row.title}
                       subtitle={
-                        row.description ? (
-                          <SoftText className="mt-0 text-sm">
-                            {row.description}
-                          </SoftText>
-                        ) : undefined
+                        <div className="space-y-1">
+                          {row.correspondent_name ? (
+                            <SoftText className="mt-0 font-medium text-foreground/80">
+                              {row.correspondent_name}
+                            </SoftText>
+                          ) : null}
+                          {row.description ? (
+                            <SoftText className="mt-0 text-sm">
+                              {row.description}
+                            </SoftText>
+                          ) : null}
+                        </div>
                       }
                       meta={
                         <MetaLine>

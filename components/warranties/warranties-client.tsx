@@ -40,6 +40,7 @@ export type WarrantyRow = {
   status: string | null;
   document_title: string | null;
   document_local_id: number;
+  correspondent_name: string | null;
 };
 
 function warrantyToEvent(row: WarrantyRow): CalendarEvent | null {
@@ -47,6 +48,9 @@ function warrantyToEvent(row: WarrantyRow): CalendarEvent | null {
   const parts = [
     row.manufacturer ? `Hersteller: ${row.manufacturer}` : null,
     row.vendor ? `Händler: ${row.vendor}` : null,
+    row.correspondent_name
+      ? `Korrespondent: ${row.correspondent_name}`
+      : null,
     row.serial_number ? `SN: ${row.serial_number}` : null,
     row.purchase_date
       ? `Kaufdatum: ${toSwissDate(row.purchase_date)}`
@@ -136,8 +140,15 @@ export function WarrantiesClient({ rows }: { rows: WarrantyRow[] }) {
                             <SoftText className="mt-0">{manufacturerLine}</SoftText>
                           ) : null}
                           <VendorText className="text-sm">
-                            {row.vendor || "–"}
+                            {row.vendor || row.correspondent_name || "–"}
                           </VendorText>
+                          {row.correspondent_name &&
+                          row.vendor &&
+                          row.correspondent_name !== row.vendor ? (
+                            <SoftText className="mt-0">
+                              Korrespondent: {row.correspondent_name}
+                            </SoftText>
+                          ) : null}
                         </div>
                       }
                       meta={

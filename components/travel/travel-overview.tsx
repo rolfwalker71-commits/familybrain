@@ -52,6 +52,7 @@ export type TravelRow = {
   document_content?: string | null;
   document_title: string | null;
   document_local_id: number;
+  correspondent_name?: string | null;
 };
 
 type AggRow = { label: string; count: number; total: number };
@@ -115,6 +116,9 @@ function travelToCalendarEvent(row: TravelRow): CalendarEvent | null {
   if (!row.start_date) return null;
   const route = [row.origin, row.destination].filter(Boolean).join(" → ");
   const parts = [
+    row.correspondent_name
+      ? `Korrespondent: ${row.correspondent_name}`
+      : null,
     row.provider ? `Anbieter: ${row.provider}` : null,
     row.booking_reference ? `Buchung: ${row.booking_reference}` : null,
     route ? `Route: ${route}` : null,
@@ -169,7 +173,13 @@ function TravelListRow({
   const event = travelToCalendarEvent(row);
   const route =
     [row.origin, row.destination].filter(Boolean).join(" → ") || null;
-  const softParts = [row.provider, route].filter(Boolean).join(" · ");
+  const party =
+    row.correspondent_name &&
+    row.provider &&
+    row.correspondent_name !== row.provider
+      ? `${row.correspondent_name} · ${row.provider}`
+      : row.correspondent_name || row.provider || null;
+  const softParts = [party, route].filter(Boolean).join(" · ");
 
   return (
     <DataListRow
@@ -586,6 +596,10 @@ export function TravelOverviewClient({ items }: Props) {
                         />
                       }
                     />
+                    <DetailField
+                      label="Korrespondent"
+                      value={openDetail.correspondent_name}
+                    />
                     <DetailField label="Anbieter" value={openDetail.provider} />
                     <DetailField
                       label="Buchungsnr."
@@ -712,6 +726,10 @@ export function TravelOverviewClient({ items }: Props) {
                       learnHint={learnHintFor(openDetail)}
                     />
                   }
+                />
+                <DetailField
+                  label="Korrespondent"
+                  value={openDetail.correspondent_name}
                 />
                 <DetailField label="Anbieter" value={openDetail.provider} />
                 <DetailField
