@@ -216,6 +216,9 @@ CREATE TABLE IF NOT EXISTS trilium_notes (
   is_protected INTEGER NOT NULL DEFAULT 0,
   sync_status TEXT DEFAULT 'synced',
   last_synced_at TEXT,
+  embedding_status TEXT DEFAULT 'pending',
+  embedding_error TEXT,
+  last_indexed_at TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
@@ -223,6 +226,7 @@ CREATE TABLE IF NOT EXISTS trilium_notes (
 CREATE INDEX IF NOT EXISTS idx_trilium_notes_scope ON trilium_notes(scope);
 CREATE INDEX IF NOT EXISTS idx_trilium_notes_modified ON trilium_notes(date_modified);
 CREATE INDEX IF NOT EXISTS idx_trilium_notes_status ON trilium_notes(sync_status);
+CREATE INDEX IF NOT EXISTS idx_trilium_notes_embedding ON trilium_notes(embedding_status);
 
 CREATE TABLE IF NOT EXISTS knowledge_guides (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -1,8 +1,15 @@
 import { analyzeDocument } from "@/lib/ai/analyze-document";
 import { hasOpenAIKey } from "@/lib/ai/client";
 import { syncPaperlessDocuments } from "@/lib/paperless/sync";
-import { isTriliumConfigured } from "@/lib/db/queries";
+import {
+  isTriliumConfigured,
+  listIndexedMissingTriliumNoteIds,
+} from "@/lib/db/queries";
 import { syncTriliumNotes } from "@/lib/trilium/sync";
+import {
+  indexPendingTriliumNotes,
+  removeTriliumNoteVectors,
+} from "@/lib/vectors/index-trilium";
 import {
   INITIAL_ANALYSIS_BATCH_SIZE,
   MAX_ANALYSIS_PER_RUN,
@@ -184,6 +191,61 @@ export async function runSyncAnalyzeJob(
           title: "Trilium-Sync",
           message,
         });
+      }
+
+      if (hasOpenAIKey()) {
+        addJobRunItem({
+          runId: run.id,
+          itemKind: "phase",
+          status: "running",
+          title: "Trilium-Vektorindex",
+          message: "Indexiere geänderte Trilium-Notizen in Qdrant",
+        });
+
+        try {
+          const missingIds = listIndexedMissingTriliumNoteIds(200);
+          let removed = 0;
+          for (const noteId of missingIds) {
+            await removeTriliumNoteVectors(noteId);
+            removed += 1;
+            if (removed % 20 === 0) heartbeatJobRun(run.id);
+          }
+          summary.triliumVectorsRemoved = removed;
+
+          const indexResult = await indexPendingTriliumNotes({
+            limit: 80,
+            onProgress: (processed) => {
+              if (processed % 5 === 0) heartbeatJobRun(run.id);
+            },
+          });
+          heartbeatJobRun(run.id);
+
+          summary.triliumIndexed = indexResult.indexed;
+          summary.triliumIndexSkipped = indexResult.skipped;
+          summary.triliumIndexErrors = indexResult.errors;
+
+          addJobRunItem({
+            runId: run.id,
+            itemKind: "phase",
+            status: indexResult.errors ? "error" : "success",
+            title: "Trilium-Vektorindex",
+            message: `${indexResult.indexed} indexiert, ${indexResult.skipped} übersprungen, ${removed} Vektoren entfernt, ${indexResult.errors} Fehler`,
+            payload: {
+              processed: indexResult.processed,
+              errors: indexResult.errorMessages.slice(0, 20),
+            },
+          });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          summary.triliumIndexErrors = 1;
+          addJobRunItem({
+            runId: run.id,
+            itemKind: "phase",
+            status: "error",
+            title: "Trilium-Vektorindex",
+            message,
+          });
+        }
       }
     }
 

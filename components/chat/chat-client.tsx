@@ -23,6 +23,35 @@ import { DocumentInfoButton } from "@/components/documents/document-link";
 import { PageHeader } from "@/components/layout/page-primitives";
 import { IconCircle, pageVisuals } from "@/components/layout/icon-circle";
 import { copyMarkdownForEmail } from "@/lib/chat/copy-format";
+import {
+  DEFAULT_CHAT_SOURCES,
+  type ChatSourceKey,
+  type ChatSourceSelection,
+} from "@/lib/chat/sources";
+
+const CHAT_SOURCES_STORAGE_KEY = "familybrain.chat.sources";
+
+const SOURCE_OPTIONS: Array<{ key: ChatSourceKey; label: string }> = [
+  { key: "paperless", label: "Paperless" },
+  { key: "trilium", label: "Trilium" },
+  { key: "guides", label: "Guides" },
+];
+
+function loadStoredSources(): ChatSourceSelection {
+  if (typeof window === "undefined") return { ...DEFAULT_CHAT_SOURCES };
+  try {
+    const raw = window.localStorage.getItem(CHAT_SOURCES_STORAGE_KEY);
+    if (!raw) return { ...DEFAULT_CHAT_SOURCES };
+    const parsed = JSON.parse(raw) as Partial<ChatSourceSelection>;
+    const next = { ...DEFAULT_CHAT_SOURCES, ...parsed };
+    if (!next.paperless && !next.trilium && !next.guides) {
+      return { ...DEFAULT_CHAT_SOURCES };
+    }
+    return next;
+  } catch {
+    return { ...DEFAULT_CHAT_SOURCES };
+  }
+}
 
 type ChatSource = {
   id: number;
@@ -87,9 +116,34 @@ export function ChatClient() {
   const [editingFromMessageId, setEditingFromMessageId] = useState<string | null>(
     null
   );
+  const [chatSources, setChatSources] = useState<ChatSourceSelection>({
+    ...DEFAULT_CHAT_SOURCES,
+  });
   const messagesScrollRef = useRef<HTMLDivElement>(null);
   const messageSequence = useRef(0);
   const copiedResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    setChatSources(loadStoredSources());
+  }, []);
+
+  function toggleSource(key: ChatSourceKey) {
+    setChatSources((prev) => {
+      const next = { ...prev, [key]: !prev[key] };
+      if (!next.paperless && !next.trilium && !next.guides) {
+        return prev;
+      }
+      try {
+        window.localStorage.setItem(
+          CHAT_SOURCES_STORAGE_KEY,
+          JSON.stringify(next)
+        );
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }
 
   async function loadCorrections() {
     try {
@@ -219,6 +273,7 @@ export function ChatClient() {
         body: JSON.stringify({
           message: question,
           history: history.slice(0, -1),
+          sources: chatSources,
         }),
       });
       const data = await res.json();
@@ -257,9 +312,27 @@ export function ChatClient() {
       <Card className="flex min-h-0 flex-1 flex-col gap-0 overflow-hidden border-border/80 py-0 shadow-sm">
         <CardContent className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-3 sm:gap-4 sm:p-4">
           <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
-            <p className="text-xs text-muted-foreground">
-              Korrekturen überschreiben bei Widerspruch die Dokumentdaten.
-            </p>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-xs text-muted-foreground">Quellen:</span>
+              {SOURCE_OPTIONS.map((option) => {
+                const active = chatSources[option.key];
+                return (
+                  <button
+                    key={option.key}
+                    type="button"
+                    onClick={() => toggleSource(option.key)}
+                    aria-pressed={active}
+                    className={
+                      active
+                        ? "rounded-full border border-primary/40 bg-primary/10 px-2.5 py-1 text-xs font-medium text-foreground"
+                        : "rounded-full border border-border bg-background px-2.5 py-1 text-xs text-muted-foreground hover:bg-muted"
+                    }
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
             <Button
               type="button"
               variant="outline"
@@ -269,6 +342,10 @@ export function ChatClient() {
               Korrekturen ({corrections.length})
             </Button>
           </div>
+          <p className="shrink-0 text-xs text-muted-foreground">
+            Korrekturen gelten immer; Quellenfilter steuern Paperless, Trilium und
+            Guides.
+          </p>
 
           {showCorrections ? (
             <div className="space-y-3 rounded-lg border border-border/70 bg-muted/20 p-3">
@@ -530,7 +607,7 @@ export function ChatClient() {
             {loading ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Suche in Dokumenten, Notizen, Guides und Korrekturen…
+                Suche in den gewählten Quellen und Korrekturen…
               </div>
             ) : null}
           </div>

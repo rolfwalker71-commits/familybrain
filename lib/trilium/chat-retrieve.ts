@@ -11,16 +11,10 @@ import {
   retrieveLocalTriliumForChat,
 } from "./local-retrieve";
 import { buildSearchStrategies } from "./search-query";
+import { retrieveTriliumNotesForChat } from "@/lib/vectors/retrieve";
+import type { TriliumNoteSource } from "@/lib/vectors/types";
 
-export type TriliumNoteSource = {
-  kind: "trilium";
-  noteId: string;
-  title: string;
-  scopeLabel: string;
-  excerpt: string;
-  url: string;
-  score: number;
-};
+export type { TriliumNoteSource };
 
 export { buildSearchStrategies } from "./search-query";
 
@@ -105,6 +99,9 @@ export async function retrieveTriliumForChat(
   question: string,
   limit = 5
 ): Promise<TriliumNoteSource[]> {
+  const vectorNotes = await retrieveTriliumNotesForChat(question, limit);
+  if (vectorNotes.length > 0) return vectorNotes;
+
   if (hasLocalTriliumIndex()) {
     const local = retrieveLocalTriliumForChat(question, limit);
     if (local.length > 0) return local;

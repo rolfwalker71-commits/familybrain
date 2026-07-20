@@ -137,11 +137,31 @@ function ensureTriliumNotesTable(db: Database.Database): void {
       is_protected INTEGER NOT NULL DEFAULT 0,
       sync_status TEXT DEFAULT 'synced',
       last_synced_at TEXT,
+      embedding_status TEXT DEFAULT 'pending',
+      embedding_error TEXT,
+      last_indexed_at TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_trilium_notes_scope ON trilium_notes(scope);
     CREATE INDEX IF NOT EXISTS idx_trilium_notes_modified ON trilium_notes(date_modified);
     CREATE INDEX IF NOT EXISTS idx_trilium_notes_status ON trilium_notes(sync_status);
+    CREATE INDEX IF NOT EXISTS idx_trilium_notes_embedding ON trilium_notes(embedding_status);
   `);
+
+  const cols = db
+    .prepare(`PRAGMA table_info(trilium_notes)`)
+    .all() as Array<{ name: string }>;
+  const names = new Set(cols.map((c) => c.name));
+  if (!names.has("embedding_status")) {
+    db.exec(
+      `ALTER TABLE trilium_notes ADD COLUMN embedding_status TEXT DEFAULT 'pending'`
+    );
+  }
+  if (!names.has("embedding_error")) {
+    db.exec(`ALTER TABLE trilium_notes ADD COLUMN embedding_error TEXT`);
+  }
+  if (!names.has("last_indexed_at")) {
+    db.exec(`ALTER TABLE trilium_notes ADD COLUMN last_indexed_at TEXT`);
+  }
 }

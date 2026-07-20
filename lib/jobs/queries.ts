@@ -77,6 +77,10 @@ export type JobRunSummary = {
   triliumSyncErrors?: number;
   triliumCursorAdvancedTo?: string | null;
   triliumFullReconciled?: boolean;
+  triliumIndexed?: number;
+  triliumIndexSkipped?: number;
+  triliumIndexErrors?: number;
+  triliumVectorsRemoved?: number;
 };
 
 function newLeaseOwner(): string {

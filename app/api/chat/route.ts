@@ -15,6 +15,13 @@ const BodySchema = z.object({
       })
     )
     .optional(),
+  sources: z
+    .object({
+      paperless: z.boolean().optional(),
+      trilium: z.boolean().optional(),
+      guides: z.boolean().optional(),
+    })
+    .optional(),
 });
 
 export async function POST(request: Request) {
@@ -27,7 +34,8 @@ export async function POST(request: Request) {
 
     const result = await answerDocumentChat(
       parsed.data.message,
-      parsed.data.history ?? []
+      parsed.data.history ?? [],
+      parsed.data.sources
     );
 
     return NextResponse.json({ ok: true, ...result });

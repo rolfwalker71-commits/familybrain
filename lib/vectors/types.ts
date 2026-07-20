@@ -37,3 +37,13 @@ export type GuideSource = {
   pageStart?: number | null;
   pageEnd?: number | null;
 };
+
+export type TriliumNoteSource = {
+  kind: "trilium";
+  noteId: string;
+  title: string;
+  scopeLabel: string;
+  excerpt: string;
+  url: string;
+  score: number;
+};

@@ -3,6 +3,7 @@ import { retrieveTriliumForChat } from "@/lib/trilium/chat-retrieve";
 import type { TriliumNoteSource } from "@/lib/trilium/chat-retrieve";
 import {
   countIndexedKnowledgeGuides,
+  countIndexedTriliumNotes,
   countSyncedTriliumNotes,
 } from "@/lib/db/queries";
 import { retrieveGuidesForChat } from "@/lib/vectors/retrieve";
@@ -11,8 +12,17 @@ import {
   formatCorrectionsForPrompt,
   retrieveCorrectionsForChat,
 } from "@/lib/chat/corrections";
+import {
+  describeChatSources,
+  normalizeChatSources,
+  type ChatSourceSelection,
+} from "@/lib/chat/sources";
 import { getOpenAIClient, getOpenAIModel } from "./client";
-import { retrieveForChat, type ChatSource } from "./chat-retrieve";
+import {
+  retrieveForChat,
+  type ChatRetrieval,
+  type ChatSource,
+} from "./chat-retrieve";
 
 export type ChatMessage = {
   role: "user" | "assistant";
@@ -26,14 +36,47 @@ export type ChatAnswer = {
   guideSources: GuideSource[];
 };
 
-function buildSystemPrompt(todayIso: string, year: number): string {
-  const todaySwiss = toSwissDate(todayIso);
-  return `Du bist FamilyBrain, ein Assistent für die gesamte Wissensbasis einer Familie.
+const EMPTY_RETRIEVAL: ChatRetrieval = {
+  sources: [],
+  facts: [],
+  corpus: {
+    totalDocuments: 0,
+    analyzedDocuments: 0,
+    warranties: 0,
+    deadlines: 0,
+    financialItems: 0,
+    travelItems: 0,
+  },
+};
 
-Die Wissensbasis umfasst:
-1. synchronisierte Paperless-Dokumente mit AI-Analysen (Belege, Verträge, Rechnungen, Reisen, Garantien, Fristen)
-2. Trilium-Notizen aus den Bereichen «Privat» und «Geschäftlich ANG» (manuelle Wissensbasis, How-tos, Homelab, Kundeninfos)
-3. importierte PDF-Guides (Handbücher, Anleitungen, umfangreiche Referenzdokumente)
+function buildSystemPrompt(
+  todayIso: string,
+  year: number,
+  sources: ChatSourceSelection
+): string {
+  const todaySwiss = toSwissDate(todayIso);
+  const knowledgeParts: string[] = [];
+  if (sources.paperless) {
+    knowledgeParts.push(
+      "synchronisierte Paperless-Dokumente mit AI-Analysen (Belege, Verträge, Rechnungen, Reisen, Garantien, Fristen)"
+    );
+  }
+  if (sources.trilium) {
+    knowledgeParts.push(
+      "Trilium-Notizen aus den Bereichen «Privat» und «Geschäftlich ANG» (manuelle Wissensbasis, How-tos, Homelab, Kundeninfos)"
+    );
+  }
+  if (sources.guides) {
+    knowledgeParts.push(
+      "importierte PDF-Guides (Handbücher, Anleitungen, umfangreiche Referenzdokumente)"
+    );
+  }
+
+  return `Du bist FamilyBrain, ein Assistent für die ausgewählte Wissensbasis einer Familie.
+
+Aktive Quellen für diese Antwort: ${describeChatSources(sources)}.
+Die Wissensbasis umfasst in dieser Anfrage:
+${knowledgeParts.map((part, i) => `${i + 1}. ${part}`).join("\n")}
 
 Kalenderkontext (verbindlich):
 - Heute ist ${todaySwiss} (ISO ${todayIso}).
@@ -44,7 +87,7 @@ Kalenderkontext (verbindlich):
 
 Regeln:
 - Antworte auf Deutsch, klar und konkret.
-- Nutze die gesamte bereitgestellte Basis (Korpus-Statistik, strukturierte Fakten, Dokumentkontexte, Trilium-Notizen, Guide-Auszüge UND gespeicherte Nutzer-Korrekturen).
+- Nutze NUR die bereitgestellten aktiven Quellen plus gespeicherte Nutzer-Korrekturen. Ignoriere deaktivierte Quellen.
 - GESPEICHERTE NUTZER-KORREKTUREN haben bei Widerspruch IMMER Vorrang vor Dokumenten, OCR, Fakten, Notizen und Guides.
 - Wenn eine Korrektur einen Termin, ein Schiff, eine Buchung oder ein Datum korrigiert, verwende die Korrektur – nicht die ältere Dokumentangabe.
 - Unterscheide klar zwischen Belegen (Dokumente), manuellen Notizen (Trilium) und importierten Guides (PDF-Handbücher).
@@ -61,9 +104,9 @@ Regeln:
   [[SOURCE_IDS:1354,42]]
   [[NOTE_IDS:abc123,def456]]
   [[GUIDE_IDS:7,12]]
-- In SOURCE_IDS höchstens 4 Dokument-IDs, nur wenn die Antwort direkt daraus belegt ist.
-- In NOTE_IDS höchstens 4 Trilium-Notiz-IDs, nur wenn die Antwort direkt daraus belegt ist.
-- In GUIDE_IDS höchstens 4 Guide-IDs, nur wenn die Antwort direkt daraus belegt ist.
+- In SOURCE_IDS höchstens 4 Dokument-IDs, nur wenn die Antwort direkt daraus belegt ist${sources.paperless ? "" : " (Paperless ist deaktiviert → immer leer)"}.
+- In NOTE_IDS höchstens 4 Trilium-Notiz-IDs, nur wenn die Antwort direkt daraus belegt ist${sources.trilium ? "" : " (Trilium ist deaktiviert → immer leer)"}.
+- In GUIDE_IDS höchstens 4 Guide-IDs, nur wenn die Antwort direkt daraus belegt ist${sources.guides ? "" : " (Guides sind deaktiviert → immer leer)"}.
 - Wenn nichts direkt belegt ist: [[SOURCE_IDS:]], [[NOTE_IDS:]] und/oder [[GUIDE_IDS:]].`;
 }
 
@@ -129,27 +172,41 @@ export function parseChatAnswerSources(rawAnswer: string): {
 
 export async function answerDocumentChat(
   question: string,
-  history: ChatMessage[] = []
+  history: ChatMessage[] = [],
+  sourceSelection?: Partial<ChatSourceSelection> | null
 ): Promise<ChatAnswer> {
+  const sourcesEnabled = normalizeChatSources(sourceSelection);
   const todayIso = new Date().toISOString().slice(0, 10);
   const year = currentYear();
-  const retrieval = retrieveForChat(question, 12);
-  const triliumNotes = await retrieveTriliumForChat(question, 5);
-  const guideSources = await retrieveGuidesForChat(question, 6);
+  const retrieval = sourcesEnabled.paperless
+    ? retrieveForChat(question, 12)
+    : EMPTY_RETRIEVAL;
+  const triliumNotes = sourcesEnabled.trilium
+    ? await retrieveTriliumForChat(question, 5)
+    : [];
+  const guideSources = sourcesEnabled.guides
+    ? await retrieveGuidesForChat(question, 6)
+    : [];
   const corrections = retrieveCorrectionsForChat(question, 12);
-  const triliumIndexed = countSyncedTriliumNotes();
+  const triliumSynced = countSyncedTriliumNotes();
+  const triliumEmbedded = countIndexedTriliumNotes();
   const guidesIndexed = countIndexedKnowledgeGuides();
 
-  const corpusBlock = `Gesamte lokale Basis:
+  const corpusBlock = `Aktive Quellen: ${describeChatSources(sourcesEnabled)}
+Gesamte lokale Basis:
 - Heute: ${toSwissDate(todayIso)} · aktuelles Jahr: ${year}
+- Paperless aktiv: ${sourcesEnabled.paperless ? "ja" : "nein"}
 - Dokumente synchronisiert: ${retrieval.corpus.totalDocuments}
 - Davon analysiert: ${retrieval.corpus.analyzedDocuments}
 - Garantien/Geräte: ${retrieval.corpus.warranties}
 - Fristen: ${retrieval.corpus.deadlines}
 - Finanzpositionen: ${retrieval.corpus.financialItems}
 - Reise-Einträge: ${retrieval.corpus.travelItems}
-- Trilium-Notizen lokal indexiert: ${triliumIndexed}
+- Trilium aktiv: ${sourcesEnabled.trilium ? "ja" : "nein"}
+- Trilium-Notizen synchronisiert: ${triliumSynced}
+- Trilium-Notizen vektorindexiert: ${triliumEmbedded}
 - Trilium-Notizen (Treffer zur Frage): ${triliumNotes.length}
+- Guides aktiv: ${sourcesEnabled.guides ? "ja" : "nein"}
 - PDF-Guides indexiert: ${guidesIndexed}
 - Guide-Treffer (semantisch): ${guideSources.length}
 - Gespeicherte Nutzer-Korrekturen: ${corrections.length}`;
@@ -222,7 +279,7 @@ ${guide.excerpt}`;
     model,
     temperature: 0.1,
     messages: [
-      { role: "system", content: buildSystemPrompt(todayIso, year) },
+      { role: "system", content: buildSystemPrompt(todayIso, year, sourcesEnabled) },
       ...history.slice(-6).map((m) => ({
         role: m.role as "user" | "assistant",
         content: m.content,

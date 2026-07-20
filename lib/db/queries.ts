@@ -997,6 +997,9 @@ export type TriliumNoteRow = {
   is_protected: number;
   sync_status: string | null;
   last_synced_at: string | null;
+  embedding_status: string | null;
+  embedding_error: string | null;
+  last_indexed_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -1084,8 +1087,8 @@ export function upsertTriliumNote(input: {
       `INSERT INTO trilium_notes (
          note_id, scope, title, note_type, content_text, content_hash,
          date_modified, trilium_url, is_protected, sync_status,
-         last_synced_at, created_at, updated_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced', ?, ?, ?)`
+         embedding_status, last_synced_at, created_at, updated_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced', 'pending', ?, ?, ?)`
     ).run(
       input.noteId,
       input.scope,
@@ -1105,34 +1108,137 @@ export function upsertTriliumNote(input: {
 
   const changed =
     existing.content_hash !== contentHash || existing.sync_status === "missing";
+  if (changed) {
+    db.prepare(
+      `UPDATE trilium_notes SET
+         scope = ?,
+         title = ?,
+         note_type = ?,
+         content_text = ?,
+         content_hash = ?,
+         date_modified = ?,
+         trilium_url = ?,
+         is_protected = ?,
+         sync_status = 'synced',
+         embedding_status = 'pending',
+         embedding_error = NULL,
+         last_synced_at = ?,
+         updated_at = ?
+       WHERE note_id = ?`
+    ).run(
+      input.scope,
+      input.title,
+      input.noteType,
+      input.contentText,
+      contentHash,
+      input.dateModified,
+      input.triliumUrl,
+      input.isProtected ? 1 : 0,
+      ts,
+      ts,
+      input.noteId
+    );
+  } else {
+    db.prepare(
+      `UPDATE trilium_notes SET
+         scope = ?,
+         title = ?,
+         note_type = ?,
+         date_modified = ?,
+         trilium_url = ?,
+         is_protected = ?,
+         sync_status = 'synced',
+         last_synced_at = ?,
+         updated_at = ?
+       WHERE note_id = ?`
+    ).run(
+      input.scope,
+      input.title,
+      input.noteType,
+      input.dateModified,
+      input.triliumUrl,
+      input.isProtected ? 1 : 0,
+      ts,
+      ts,
+      input.noteId
+    );
+  }
+  return { isNew: false, changed };
+}
+
+export function getTriliumNoteById(noteId: string): TriliumNoteRow | null {
+  const db = getDb();
+  const row = db
+    .prepare(`SELECT * FROM trilium_notes WHERE note_id = ?`)
+    .get(noteId) as TriliumNoteRow | undefined;
+  return row ?? null;
+}
+
+export function updateTriliumNoteEmbedding(
+  noteId: string,
+  input: {
+    embeddingStatus: string;
+    embeddingError?: string | null;
+    lastIndexedAt?: string | null;
+  }
+): void {
+  const db = getDb();
+  const ts = nowIso();
   db.prepare(
     `UPDATE trilium_notes SET
-       scope = ?,
-       title = ?,
-       note_type = ?,
-       content_text = ?,
-       content_hash = ?,
-       date_modified = ?,
-       trilium_url = ?,
-       is_protected = ?,
-       sync_status = 'synced',
-       last_synced_at = ?,
+       embedding_status = ?,
+       embedding_error = ?,
+       last_indexed_at = COALESCE(?, last_indexed_at),
        updated_at = ?
      WHERE note_id = ?`
   ).run(
-    input.scope,
-    input.title,
-    input.noteType,
-    input.contentText,
-    contentHash,
-    input.dateModified,
-    input.triliumUrl,
-    input.isProtected ? 1 : 0,
+    input.embeddingStatus,
+    input.embeddingError ?? null,
+    input.lastIndexedAt ?? null,
     ts,
-    ts,
-    input.noteId
+    noteId
   );
-  return { isNew: false, changed };
+}
+
+export function listTriliumNotesNeedingEmbedding(limit = 80): TriliumNoteRow[] {
+  const db = getDb();
+  return db
+    .prepare(
+      `SELECT * FROM trilium_notes
+       WHERE sync_status = 'synced'
+         AND (
+           embedding_status IS NULL
+           OR embedding_status IN ('pending', 'error', 'indexing')
+         )
+       ORDER BY date_modified DESC
+       LIMIT ?`
+    )
+    .all(limit) as TriliumNoteRow[];
+}
+
+export function listIndexedMissingTriliumNoteIds(limit = 200): string[] {
+  const db = getDb();
+  return (
+    db
+      .prepare(
+        `SELECT note_id FROM trilium_notes
+         WHERE sync_status = 'missing'
+           AND embedding_status = 'indexed'
+         LIMIT ?`
+      )
+      .all(limit) as Array<{ note_id: string }>
+  ).map((row) => row.note_id);
+}
+
+export function countIndexedTriliumNotes(): number {
+  const db = getDb();
+  const row = db
+    .prepare(
+      `SELECT COUNT(*) as count FROM trilium_notes
+       WHERE sync_status = 'synced' AND embedding_status = 'indexed'`
+    )
+    .get() as { count: number };
+  return row.count;
 }
 
 export function listSyncedTriliumNotesForSearch(): TriliumNoteRow[] {
