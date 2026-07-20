@@ -19,11 +19,19 @@ type ChatSource = {
   shortSummary: string | null;
 };
 
+type TriliumNoteSource = {
+  noteId: string;
+  title: string;
+  scopeLabel: string;
+  url: string;
+};
+
 type Message = {
   id: string;
   role: "user" | "assistant";
   content: string;
   sources?: ChatSource[];
+  noteSources?: TriliumNoteSource[];
 };
 
 const SUGGESTIONS = [
@@ -86,6 +94,7 @@ export function ChatClient() {
           role: "assistant",
           content: data.answer,
           sources: data.sources,
+          noteSources: data.noteSources,
         },
       ]);
     } catch (err) {
@@ -149,15 +158,16 @@ export function ChatClient() {
                     ) : (
                       <div className="whitespace-pre-wrap">{message.content}</div>
                     )}
-                    {message.sources && message.sources.length > 0 ? (
+                    {(message.sources && message.sources.length > 0) ||
+                    (message.noteSources && message.noteSources.length > 0) ? (
                       <div className="mt-3 space-y-2 border-t border-border/60 pt-3">
                         <div className="text-xs font-medium text-muted-foreground">
-                          Verwendete Dokumente
+                          Verwendete Quellen
                         </div>
                         <div className="flex flex-wrap gap-2">
-                          {message.sources.map((source) => (
+                          {message.sources?.map((source) => (
                             <div
-                              key={source.id}
+                              key={`doc-${source.id}`}
                               className="flex max-w-full items-center gap-1.5"
                             >
                               <Link
@@ -184,6 +194,26 @@ export function ChatClient() {
                               />
                             </div>
                           ))}
+                          {message.noteSources?.map((note) => (
+                            <a
+                              key={`note-${note.noteId}`}
+                              href={note.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="Trilium-Notiz öffnen"
+                              className="max-w-full"
+                            >
+                              <Badge
+                                variant="outline"
+                                className="max-w-full cursor-pointer gap-1.5 hover:bg-accent"
+                              >
+                                <span className="truncate">
+                                  {note.title} · {note.scopeLabel}
+                                </span>
+                                <ExternalLink className="size-3 shrink-0" />
+                              </Badge>
+                            </a>
+                          ))}
                         </div>
                       </div>
                     ) : null}
@@ -194,7 +224,7 @@ export function ChatClient() {
             {loading ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Suche in Dokumenten und formuliere Antwort…
+                Suche in Dokumenten und Notizen…
               </div>
             ) : null}
             <div ref={bottomRef} />

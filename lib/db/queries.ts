@@ -63,6 +63,26 @@ export function getOpenAISettings() {
   };
 }
 
+export function getTriliumSettings() {
+  return {
+    baseUrl: getSetting("trilium_base_url"),
+    apiToken: getSetting("trilium_etapi_token"),
+    masterNoteId: getSetting("trilium_master_note_id"),
+    privatNoteId: getSetting("trilium_scope_privat_note_id"),
+    geschaeftlichNoteId: getSetting("trilium_scope_geschaeftlich_note_id"),
+  };
+}
+
+export function isTriliumConfigured(): boolean {
+  const settings = getTriliumSettings();
+  return Boolean(
+    settings.baseUrl &&
+      settings.apiToken &&
+      settings.privatNoteId &&
+      settings.geschaeftlichNoteId
+  );
+}
+
 export function savePaperlessSettings(baseUrl: string, apiToken: string | null) {
   const normalizedUrl = baseUrl.trim().replace(/\/$/, "");
   setSetting("paperless_base_url", normalizedUrl);
@@ -81,6 +101,38 @@ export function saveOpenAISettings(apiKey: string | null, model: string | null) 
   }
   if (model !== null && model.trim() !== "") {
     setSetting("openai_model", model.trim());
+  }
+}
+
+export function saveTriliumSettings(input: {
+  baseUrl?: string | null;
+  apiToken?: string | null;
+  masterNoteId?: string | null;
+  privatNoteId?: string | null;
+  geschaeftlichNoteId?: string | null;
+}) {
+  if (input.baseUrl !== undefined) {
+    const normalized = input.baseUrl?.trim().replace(/\/$/, "") || null;
+    setSetting("trilium_base_url", normalized);
+  }
+  if (input.apiToken !== undefined && input.apiToken?.trim()) {
+    const normalized = input.apiToken
+      .trim()
+      .replace(/^(Bearer|Token)\s+/i, "")
+      .trim();
+    setSetting("trilium_etapi_token", normalized);
+  }
+  if (input.masterNoteId !== undefined) {
+    setSetting("trilium_master_note_id", input.masterNoteId?.trim() || null);
+  }
+  if (input.privatNoteId !== undefined) {
+    setSetting("trilium_scope_privat_note_id", input.privatNoteId?.trim() || null);
+  }
+  if (input.geschaeftlichNoteId !== undefined) {
+    setSetting(
+      "trilium_scope_geschaeftlich_note_id",
+      input.geschaeftlichNoteId?.trim() || null
+    );
   }
 }
 

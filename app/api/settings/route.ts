@@ -3,8 +3,11 @@ import { z } from "zod";
 import {
   getOpenAISettings,
   getPaperlessSettings,
+  getTriliumSettings,
+  isTriliumConfigured,
   saveOpenAISettings,
   savePaperlessSettings,
+  saveTriliumSettings,
 } from "@/lib/db/queries";
 import { maskToken } from "@/lib/utils/format";
 import { hasOpenAIKey } from "@/lib/ai/client";
@@ -15,6 +18,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const paperless = getPaperlessSettings();
   const openai = getOpenAISettings();
+  const trilium = getTriliumSettings();
   return NextResponse.json({
     paperlessBaseUrl: paperless.baseUrl,
     paperlessApiTokenMasked: maskToken(paperless.apiToken),
@@ -22,6 +26,13 @@ export async function GET() {
     openaiApiKeyMasked: maskToken(openai.apiKey),
     hasOpenAIKey: hasOpenAIKey(),
     openaiModel: openai.model,
+    triliumBaseUrl: trilium.baseUrl,
+    triliumApiTokenMasked: maskToken(trilium.apiToken),
+    hasTriliumToken: Boolean(trilium.apiToken),
+    triliumMasterNoteId: trilium.masterNoteId,
+    triliumPrivatNoteId: trilium.privatNoteId,
+    triliumGeschaeftlichNoteId: trilium.geschaeftlichNoteId,
+    triliumConfigured: isTriliumConfigured(),
   });
 }
 
@@ -30,6 +41,8 @@ const PutSchema = z.object({
   paperlessApiToken: z.string().optional(),
   openaiApiKey: z.string().optional(),
   openaiModel: z.string().min(1).optional(),
+  triliumBaseUrl: z.string().url().optional(),
+  triliumApiToken: z.string().optional(),
 });
 
 export async function PUT(request: Request) {
@@ -65,8 +78,25 @@ export async function PUT(request: Request) {
     );
   }
 
+  if (parsed.data.triliumBaseUrl) {
+    saveTriliumSettings({
+      baseUrl: parsed.data.triliumBaseUrl,
+      apiToken: parsed.data.triliumApiToken ?? null,
+    });
+  } else if (parsed.data.triliumApiToken) {
+    const current = getTriliumSettings();
+    if (!current.baseUrl) {
+      return NextResponse.json(
+        { error: "Trilium Basis-URL fehlt." },
+        { status: 400 }
+      );
+    }
+    saveTriliumSettings({ apiToken: parsed.data.triliumApiToken });
+  }
+
   const paperless = getPaperlessSettings();
   const openai = getOpenAISettings();
+  const trilium = getTriliumSettings();
 
   return NextResponse.json({
     ok: true,
@@ -76,5 +106,12 @@ export async function PUT(request: Request) {
     openaiApiKeyMasked: maskToken(openai.apiKey),
     hasOpenAIKey: hasOpenAIKey(),
     openaiModel: openai.model,
+    triliumBaseUrl: trilium.baseUrl,
+    triliumApiTokenMasked: maskToken(trilium.apiToken),
+    hasTriliumToken: Boolean(trilium.apiToken),
+    triliumMasterNoteId: trilium.masterNoteId,
+    triliumPrivatNoteId: trilium.privatNoteId,
+    triliumGeschaeftlichNoteId: trilium.geschaeftlichNoteId,
+    triliumConfigured: isTriliumConfigured(),
   });
 }

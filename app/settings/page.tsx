@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { KeyRound, Server } from "lucide-react";
+import { KeyRound, Server, BookOpen } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,7 +38,26 @@ export default function SettingsPage() {
   const [customModel, setCustomModel] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState<"paperless" | "openai" | null>(null);
+  const [saving, setSaving] = useState<"paperless" | "openai" | "trilium" | null>(
+    null
+  );
+  const [triliumBaseUrl, setTriliumBaseUrl] = useState("");
+  const [triliumToken, setTriliumToken] = useState("");
+  const [triliumTokenMasked, setTriliumTokenMasked] = useState<string | null>(
+    null
+  );
+  const [hasTriliumToken, setHasTriliumToken] = useState(false);
+  const [triliumConfigured, setTriliumConfigured] = useState(false);
+  const [triliumMasterNoteId, setTriliumMasterNoteId] = useState<string | null>(
+    null
+  );
+  const [triliumPrivatNoteId, setTriliumPrivatNoteId] = useState<string | null>(
+    null
+  );
+  const [triliumGeschaeftlichNoteId, setTriliumGeschaeftlichNoteId] = useState<
+    string | null
+  >(null);
+  const [resolvingScopes, setResolvingScopes] = useState(false);
 
   useEffect(() => {
     void (async () => {
@@ -56,6 +75,13 @@ export default function SettingsPage() {
         setOpenaiModel("custom");
         setCustomModel(model);
       }
+      setTriliumBaseUrl(data.triliumBaseUrl || "");
+      setTriliumTokenMasked(data.triliumApiTokenMasked);
+      setHasTriliumToken(Boolean(data.hasTriliumToken));
+      setTriliumConfigured(Boolean(data.triliumConfigured));
+      setTriliumMasterNoteId(data.triliumMasterNoteId || null);
+      setTriliumPrivatNoteId(data.triliumPrivatNoteId || null);
+      setTriliumGeschaeftlichNoteId(data.triliumGeschaeftlichNoteId || null);
     })();
   }, []);
 
@@ -119,11 +145,98 @@ export default function SettingsPage() {
     }
   }
 
+  async function saveTrilium() {
+    setSaving("trilium");
+    setError(null);
+    setMessage(null);
+    try {
+      if (!triliumBaseUrl) {
+        throw new Error("Trilium Basis-URL ist erforderlich.");
+      }
+      const res = await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          triliumBaseUrl,
+          triliumApiToken: triliumToken || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Speichern fehlgeschlagen");
+      setTriliumTokenMasked(data.triliumApiTokenMasked);
+      setHasTriliumToken(data.hasTriliumToken);
+      setTriliumConfigured(Boolean(data.triliumConfigured));
+      setTriliumMasterNoteId(data.triliumMasterNoteId || null);
+      setTriliumPrivatNoteId(data.triliumPrivatNoteId || null);
+      setTriliumGeschaeftlichNoteId(data.triliumGeschaeftlichNoteId || null);
+      setTriliumToken("");
+      setMessage("Trilium-Einstellungen gespeichert.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  async function testTriliumConnection() {
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/trilium/test-connection", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          baseUrl: triliumBaseUrl || undefined,
+          apiToken: triliumToken || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Verbindung fehlgeschlagen");
+      setMessage(
+        `Trilium-Verbindung OK${data.appVersion ? ` (v${data.appVersion})` : ""}.`
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function resolveTriliumScopes() {
+    setResolvingScopes(true);
+    setError(null);
+    setMessage(null);
+    try {
+      if (!triliumBaseUrl) {
+        throw new Error("Bitte zuerst die Trilium Basis-URL speichern.");
+      }
+      const res = await fetch("/api/trilium/resolve-scopes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          baseUrl: triliumBaseUrl || undefined,
+          apiToken: triliumToken || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Bereiche konnten nicht erkannt werden");
+      setTriliumMasterNoteId(data.masterNoteId || null);
+      setTriliumPrivatNoteId(data.privatNoteId || null);
+      setTriliumGeschaeftlichNoteId(data.geschaeftlichNoteId || null);
+      setTriliumConfigured(true);
+      setMessage(
+        "Trilium-Bereiche erkannt: Master → Privat und Geschäftlich ANG."
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setResolvingScopes(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Einstellungen"
-        description="Paperless-Verbindung und OpenAI-Konfiguration"
+        description="Paperless, Trilium und OpenAI konfigurieren"
         icon={pageVisuals.settings.icon}
         tone={pageVisuals.settings.tone}
       />
@@ -166,6 +279,82 @@ export default function SettingsPage() {
           >
             {saving === "paperless" ? "Speichert…" : "Paperless speichern"}
           </Button>
+        </CardContent>
+      </Card>
+
+      <Card className="border-border/80 shadow-sm">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="flex items-center gap-3 text-base">
+            <IconCircle icon={BookOpen} tone="teal" size="sm" />
+            Trilium
+          </CardTitle>
+          {triliumConfigured ? (
+            <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">
+              Chat aktiv
+            </Badge>
+          ) : (
+            <Badge variant="secondary">Optional</Badge>
+          )}
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Ergänzt den Chat um Notizen aus «Master → Privat» und «Master →
+            Geschäftlich ANG» (inkl. aller Unternotizen).
+          </p>
+          <div className="space-y-2">
+            <Label htmlFor="triliumUrl">Basis-URL</Label>
+            <Input
+              id="triliumUrl"
+              value={triliumBaseUrl}
+              onChange={(e) => setTriliumBaseUrl(e.target.value)}
+              placeholder="https://trilium.example.com"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="triliumToken">ETAPI-Token</Label>
+            <Input
+              id="triliumToken"
+              type="password"
+              value={triliumToken}
+              onChange={(e) => setTriliumToken(e.target.value)}
+              placeholder={
+                hasTriliumToken
+                  ? `Gespeichert: ${triliumTokenMasked || "••••"}`
+                  : "Token aus Trilium → Optionen → ETAPI"
+              }
+            />
+          </div>
+          {triliumPrivatNoteId || triliumGeschaeftlichNoteId ? (
+            <div className="rounded-lg border border-border/70 bg-muted/30 p-3 text-xs text-muted-foreground">
+              <div>Master: {triliumMasterNoteId || "–"}</div>
+              <div>Privat: {triliumPrivatNoteId || "–"}</div>
+              <div>Geschäftlich ANG: {triliumGeschaeftlichNoteId || "–"}</div>
+            </div>
+          ) : null}
+          <div className="flex flex-wrap gap-2">
+            <Button
+              onClick={() => void saveTrilium()}
+              disabled={saving !== null || resolvingScopes}
+            >
+              {saving === "trilium" ? "Speichert…" : "Trilium speichern"}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void testTriliumConnection()}
+              disabled={saving !== null || resolvingScopes}
+            >
+              Verbindung testen
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void resolveTriliumScopes()}
+              disabled={saving !== null || resolvingScopes}
+            >
+              {resolvingScopes ? "Erkenne Bereiche…" : "Bereiche erkennen"}
+            </Button>
+          </div>
         </CardContent>
       </Card>
 

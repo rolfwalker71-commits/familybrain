@@ -1,4 +1,6 @@
 import { currentYear, toSwissDate } from "@/lib/utils/dates";
+import { retrieveTriliumForChat } from "@/lib/trilium/chat-retrieve";
+import type { TriliumNoteSource } from "@/lib/trilium/chat-retrieve";
 import { getOpenAIClient, getOpenAIModel } from "./client";
 import { retrieveForChat, type ChatSource } from "./chat-retrieve";
 
@@ -10,13 +12,16 @@ export type ChatMessage = {
 export type ChatAnswer = {
   answer: string;
   sources: ChatSource[];
+  noteSources: TriliumNoteSource[];
 };
 
 function buildSystemPrompt(todayIso: string, year: number): string {
   const todaySwiss = toSwissDate(todayIso);
-  return `Du bist FamilyBrain, ein Assistent für die gesamte lokale Dokumentenbasis einer Familie (Paperless-Sync + AI-Analysen).
+  return `Du bist FamilyBrain, ein Assistent für die gesamte Wissensbasis einer Familie.
 
-Die Wissensbasis umfasst ALLE synchronisierten Dokumente und Extrakte – über alle Kategorien hinweg (Gesundheit, Versicherungen, Wohnen, Steuern, Finanzen, Reisen, Geräte & Garantien, Verträge usw.).
+Die Wissensbasis umfasst:
+1. synchronisierte Paperless-Dokumente mit AI-Analysen (Belege, Verträge, Rechnungen, Reisen, Garantien, Fristen)
+2. Trilium-Notizen aus den Bereichen «Privat» und «Geschäftlich ANG» (manuelle Wissensbasis, How-tos, Homelab, Kundeninfos)
 
 Kalenderkontext (verbindlich):
 - Heute ist ${todaySwiss} (ISO ${todayIso}).
@@ -27,41 +32,43 @@ Kalenderkontext (verbindlich):
 
 Regeln:
 - Antworte auf Deutsch, klar und konkret.
-- Nutze die gesamte bereitgestellte Basis (Korpus-Statistik, strukturierte Fakten UND Dokumentkontexte).
+- Nutze die gesamte bereitgestellte Basis (Korpus-Statistik, strukturierte Fakten, Dokumentkontexte UND Trilium-Notizen).
+- Unterscheide klar zwischen Belegen (Dokumente) und manuellen Notizen (Trilium).
 - OCR-Auszüge und Abschnitte «Reiseverlauf / Ports of Call» können Tabellen und Tageshäfen enthalten – lies diese sorgfältig aus und zitiere sie.
-- Wenn die Frage ein konkretes Schiff, Produkt oder eine Buchungsnummer nennt, beantworte NUR mit Daten zu genau diesem Objekt. Erwähne andere Reisen/Schiffe nur, wenn sie explizit gemeint sind – nicht als Ersatzantwort.
-- Strukturelle Fakten können unvollständig oder zu einem anderen Objekt gehören. Bei Widerspruch haben die Dokumentkontexte (OCR / Reiseverlauf) Vorrang.
-- Beschränke dich NICHT künstlich auf eine Kategorie, wenn die Daten aus mehreren Bereichen relevant sind.
+- Wenn die Frage ein konkretes Schiff, Produkt oder eine Buchungsnummer nennt, beantworte NUR mit Daten zu genau diesem Objekt.
+- Strukturelle Fakten können unvollständig sein. Bei Widerspruch haben die Dokumentkontexte (OCR / Reiseverlauf) Vorrang vor Kurzfassungen.
 - Beträge, Daten, Produktnamen und Fristen nur nennen, wenn sie in den Daten stehen.
 - Wenn etwas fehlt, sage ehrlich, dass es in der aktuellen Basis nicht gefunden wurde.
 - Erfinde nichts.
-- Formatiere Antworten als Markdown: **fett** für Totale/Kernaussagen, *kursiv* sparsam für Hinweise, Aufzählungen mit -, Tabellen mit | wenn mehrere Beträge/Daten/Positionen sinnvoll sind.
-- Schreibe alle Datumsangaben im Schweizer Format **dd.mm.yyyy** (z. B. 06.06.2026). Nie yyyy-mm-dd oder amerikanisch.
+- Formatiere Antworten als Markdown.
+- Schreibe alle Datumsangaben im Schweizer Format **dd.mm.yyyy**.
 - Schreibe KEINEN sichtbaren Abschnitt «Quellen» in die Antwort.
-- Hänge als allerletzte Zeile exakt einen maschinenlesbaren Marker an:
+- Hänge als letzte Zeilen exakt diese Marker an:
   [[SOURCE_IDS:1354,42]]
-- In diesen Marker gehören höchstens 4 Dokument-IDs und NUR Dokumente, deren Inhalt die konkrete Antwort direkt belegt. Ähnliche Treffer, allgemeiner Kontext oder Dokumente, die nicht in der Antwort verwendet wurden, gehören nicht hinein.
-- Wenn kein Dokument die Antwort direkt belegt, verwende [[SOURCE_IDS:]].`;
+  [[NOTE_IDS:abc123,def456]]
+- In SOURCE_IDS höchstens 4 Dokument-IDs, nur wenn die Antwort direkt daraus belegt ist.
+- In NOTE_IDS höchstens 4 Trilium-Notiz-IDs, nur wenn die Antwort direkt daraus belegt ist.
+- Wenn nichts direkt belegt ist: [[SOURCE_IDS:]] und/oder [[NOTE_IDS:]].`;
 }
 
-const SOURCE_IDS_MARKER = /\[\[SOURCE_IDS:\s*([0-9,\s]*)\]\]\s*$/i;
+const SOURCE_IDS_MARKER = /\[\[SOURCE_IDS:\s*([0-9,\s]*)\]\]/i;
+const NOTE_IDS_MARKER = /\[\[NOTE_IDS:\s*([a-zA-Z0-9_,\s]*)\]\]/i;
 const TRAILING_SOURCE_SECTION =
   /\n+(?:#{1,6}\s*)?(?:\*\*)?Quellen(?:\*\*)?:?\s*\n[\s\S]*$/i;
 
-/**
- * The model marks only documents it actually used. Keep this metadata out of
- * the visible answer and discard broad retrieval candidates.
- */
 export function parseChatAnswerSources(rawAnswer: string): {
   answer: string;
   sourceIds: number[];
+  noteIds: string[];
 } {
   const trimmed = rawAnswer.trim();
-  const marker = trimmed.match(SOURCE_IDS_MARKER);
-  const sourceIds = marker
+  const sourceMarker = trimmed.match(SOURCE_IDS_MARKER);
+  const noteMarker = trimmed.match(NOTE_IDS_MARKER);
+
+  const sourceIds = sourceMarker
     ? [
         ...new Set(
-          marker[1]
+          sourceMarker[1]
             .split(",")
             .map((value) => Number(value.trim()))
             .filter((value) => Number.isInteger(value) && value > 0)
@@ -69,13 +76,24 @@ export function parseChatAnswerSources(rawAnswer: string): {
       ].slice(0, 4)
     : [];
 
-  let answer = marker
-    ? trimmed.slice(0, marker.index).trim()
-    : trimmed;
-  // Defensive cleanup for models that still add the old visible source list.
+  const noteIds = noteMarker
+    ? [
+        ...new Set(
+          noteMarker[1]
+            .split(",")
+            .map((value) => value.trim())
+            .filter((value) => /^[a-zA-Z0-9_]{4,32}$/.test(value))
+        ),
+      ].slice(0, 4)
+    : [];
+
+  let answer = trimmed
+    .replace(SOURCE_IDS_MARKER, "")
+    .replace(NOTE_IDS_MARKER, "")
+    .trim();
   answer = answer.replace(TRAILING_SOURCE_SECTION, "").trim();
 
-  return { answer, sourceIds };
+  return { answer, sourceIds, noteIds };
 }
 
 export async function answerDocumentChat(
@@ -85,6 +103,7 @@ export async function answerDocumentChat(
   const todayIso = new Date().toISOString().slice(0, 10);
   const year = currentYear();
   const retrieval = retrieveForChat(question, 12);
+  const triliumNotes = await retrieveTriliumForChat(question, 5);
 
   const corpusBlock = `Gesamte lokale Basis:
 - Heute: ${toSwissDate(todayIso)} · aktuelles Jahr: ${year}
@@ -93,7 +112,8 @@ export async function answerDocumentChat(
 - Garantien/Geräte: ${retrieval.corpus.warranties}
 - Fristen: ${retrieval.corpus.deadlines}
 - Finanzpositionen: ${retrieval.corpus.financialItems}
-- Reise-Einträge: ${retrieval.corpus.travelItems}`;
+- Reise-Einträge: ${retrieval.corpus.travelItems}
+- Trilium-Notizen (Privat/Geschäftlich): ${triliumNotes.length} Treffer`;
 
   const factBlocks =
     retrieval.facts.length === 0
@@ -123,6 +143,20 @@ ${s.excerpt}`
           )
           .join("\n\n---\n\n");
 
+  const triliumBlocks =
+    triliumNotes.length === 0
+      ? "Keine passenden Trilium-Notizen gefunden."
+      : triliumNotes
+          .map(
+            (note, i) =>
+              `[Notiz ${i + 1}] noteId=${note.noteId} score=${note.score.toFixed(1)}
+Titel: ${note.title}
+Bereich: ${note.scopeLabel}
+Inhalt:
+${note.excerpt}`
+          )
+          .join("\n\n---\n\n");
+
   const client = getOpenAIClient();
   const model = getOpenAIModel();
 
@@ -147,13 +181,15 @@ ${factBlocks}
 RELEVANTE DOKUMENTE AUS DER GESAMTEN BASIS:
 ${contextBlocks}
 
-Beantworte die Frage jetzt anhand der gesamten lokalen Wissensbasis.
-Beachte den Kalenderkontext: «dieses Jahr» = ${year}, «kommend/geplant» ab ${toSwissDate(todayIso)}. Vergangene Jahre nur, wenn die Frage danach fragt oder nichts Aktuelles vorhanden ist.
-Wenn die Frage ein bestimmtes Schiff/Produkt nennt: nimm die dazu passenden Dokumente und den Reiseverlauf dort – ignoriere andere Kreuzfahrten als Antwort.
+RELEVANTE TRILIUM-NOTIZEN (Master → Privat / Geschäftlich ANG):
+${triliumBlocks}
+
+Beantworte die Frage jetzt anhand der gesamten Wissensbasis.
+Beachte den Kalenderkontext: «dieses Jahr» = ${year}, «kommend/geplant» ab ${toSwissDate(todayIso)}.
 
 Wichtig für Quellen:
 - Gib keinen sichtbaren Quellenabschnitt aus.
-- Markiere am Ende nur die Dokument-IDs, die deine Antwort unmittelbar belegen.
+- Markiere am Ende nur die Dokument-IDs und Notiz-IDs, die deine Antwort unmittelbar belegen.
 - Gib niemals alle Retrieval-Treffer als Quellen an.`,
       },
     ],
@@ -186,5 +222,12 @@ Wichtig für Quellen:
     .map((id) => sourceCandidates.get(id))
     .filter((source): source is ChatSource => Boolean(source));
 
-  return { answer: parsed.answer, sources };
+  const noteCandidates = new Map(
+    triliumNotes.map((note) => [note.noteId, note])
+  );
+  const noteSources = parsed.noteIds
+    .map((id) => noteCandidates.get(id))
+    .filter((note): note is TriliumNoteSource => Boolean(note));
+
+  return { answer: parsed.answer, sources, noteSources };
 }
