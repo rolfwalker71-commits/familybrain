@@ -6,6 +6,7 @@ import {
   findKnowledgeGuideByFilename,
   findKnowledgeGuideByTitle,
   updateKnowledgeGuideFilePath,
+  updateKnowledgeGuideIndexing,
 } from "@/lib/db/queries";
 import { removeKnowledgeGuideFully } from "@/lib/guides/delete-guide";
 import { diagnosePdfBuffer, extractTextFromPdf } from "@/lib/guides/extract-pdf";
@@ -19,6 +20,28 @@ import { indexKnowledgeGuide } from "@/lib/vectors/index-guide";
 export const MAX_GUIDE_UPLOAD_BYTES = 50 * 1024 * 1024;
 /** Stay under common ~10 MB reverse-proxy cuts. */
 export const GUIDE_UPLOAD_CHUNK_BYTES = 8 * 1024 * 1024;
+
+export type GuideUploadJobStatus =
+  | "uploading"
+  | "processing"
+  | "indexed"
+  | "error";
+
+export type GuideUploadJobMeta = {
+  uploadId: string;
+  status: GuideUploadJobStatus;
+  filename: string;
+  titleInput: string;
+  replaceExisting: boolean;
+  totalBytes: number;
+  createdAt: string;
+  updatedAt: string;
+  guideId?: number;
+  replacedGuideId?: number | null;
+  pageCount?: number;
+  chunkCount?: number;
+  error?: string;
+};
 
 export function sanitizeGuideFilename(name: string): string {
   return path.basename(name).replace(/[^a-zA-Z0-9._-]+/g, "_");
@@ -46,8 +69,25 @@ export function guideUploadAssembledPath(uploadId: string): string {
   return path.join(getGuideUploadsDirectory(), `${uploadId}.pdf`);
 }
 
+export function guideUploadMetaPath(uploadId: string): string {
+  return path.join(getGuideUploadsDirectory(), `${uploadId}.meta.json`);
+}
+
+export function readGuideUploadMeta(uploadId: string): GuideUploadJobMeta | null {
+  try {
+    const raw = fs.readFileSync(guideUploadMetaPath(uploadId), "utf8");
+    return JSON.parse(raw) as GuideUploadJobMeta;
+  } catch {
+    return null;
+  }
+}
+
+export function writeGuideUploadMeta(meta: GuideUploadJobMeta): void {
+  const next = { ...meta, updatedAt: new Date().toISOString() };
+  fs.writeFileSync(guideUploadMetaPath(meta.uploadId), JSON.stringify(next, null, 2));
+}
+
 export function cleanupGuideUpload(uploadId: string, chunkCount?: number): void {
-  const dir = getGuideUploadsDirectory();
   try {
     fs.unlinkSync(guideUploadAssembledPath(uploadId));
   } catch {
@@ -61,9 +101,12 @@ export function cleanupGuideUpload(uploadId: string, chunkCount?: number): void 
       /* ignore */
     }
   }
-  // Also remove any leftover meta file
+}
+
+export function cleanupGuideUploadAll(uploadId: string, chunkCount?: number): void {
+  cleanupGuideUpload(uploadId, chunkCount);
   try {
-    fs.unlinkSync(path.join(dir, `${uploadId}.meta.json`));
+    fs.unlinkSync(guideUploadMetaPath(uploadId));
   } catch {
     /* ignore */
   }
@@ -74,8 +117,9 @@ export type ImportGuideInput = {
   filename: string;
   titleInput: string;
   replaceExisting: boolean;
-  /** When set, diagnose against this expected full size. */
   expectedLength?: number | null;
+  /** When false, skip vector indexing (caller may run it later). */
+  index?: boolean;
 };
 
 export type ImportGuideResult = {
@@ -90,6 +134,7 @@ export async function importGuideFromPdfBuffer(
 ): Promise<ImportGuideResult> {
   const filename = sanitizeGuideFilename(input.filename || "guide.pdf");
   const buffer = input.buffer;
+  const shouldIndex = input.index !== false;
 
   if (buffer.length === 0) {
     throw Object.assign(new Error("PDF-Datei fehlt."), { status: 400 });
@@ -168,6 +213,19 @@ export async function importGuideFromPdfBuffer(
   fs.writeFileSync(finalPath, buffer);
   updateKnowledgeGuideFilePath(guideId, finalPath);
 
+  if (!shouldIndex) {
+    updateKnowledgeGuideIndexing(guideId, {
+      embeddingStatus: "pending",
+      embeddingError: null,
+    });
+    return {
+      guideId,
+      replacedGuideId,
+      chunkCount: 0,
+      pageCount: extracted.pageCount,
+    };
+  }
+
   const indexResult = await indexKnowledgeGuide(guideId);
 
   return {
@@ -176,6 +234,54 @@ export async function importGuideFromPdfBuffer(
     chunkCount: indexResult.chunkCount,
     pageCount: extracted.pageCount,
   };
+}
+
+/** Background job: extract text, create guide, embed into Qdrant. */
+export async function processAssembledGuideUpload(
+  uploadId: string
+): Promise<void> {
+  const meta = readGuideUploadMeta(uploadId);
+  if (!meta) {
+    throw new Error("Upload-Job nicht gefunden.");
+  }
+
+  writeGuideUploadMeta({ ...meta, status: "processing", error: undefined });
+
+  try {
+    const assembledPath = guideUploadAssembledPath(uploadId);
+    if (!fs.existsSync(assembledPath)) {
+      throw new Error("Zusammengeführte PDF fehlt.");
+    }
+    const buffer = fs.readFileSync(assembledPath);
+    const result = await importGuideFromPdfBuffer({
+      buffer,
+      filename: meta.filename,
+      titleInput: meta.titleInput,
+      replaceExisting: meta.replaceExisting,
+      expectedLength: meta.totalBytes,
+      index: true,
+    });
+
+    writeGuideUploadMeta({
+      ...meta,
+      status: "indexed",
+      guideId: result.guideId,
+      replacedGuideId: result.replacedGuideId,
+      pageCount: result.pageCount,
+      chunkCount: result.chunkCount,
+      error: undefined,
+    });
+    cleanupGuideUpload(uploadId);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    writeGuideUploadMeta({
+      ...meta,
+      status: "error",
+      error: message,
+    });
+    cleanupGuideUpload(uploadId);
+    throw error;
+  }
 }
 
 export function assembleGuideUploadParts(

@@ -94,7 +94,6 @@ export function GuidesClient() {
     setMessage(null);
 
     try {
-      // Chunked upload stays under common ~10 MB proxy body cuts.
       const chunkBytes = 8 * 1024 * 1024;
       const chunkCount = Math.max(1, Math.ceil(file.size / chunkBytes));
 
@@ -111,11 +110,12 @@ export function GuidesClient() {
       const uploadId = String(initData.uploadId || "");
       if (!uploadId) throw new Error("Keine Upload-ID vom Server.");
 
-      let data: {
+      let lastData: {
         error?: string;
-        chunkCount?: number;
-        pageCount?: number;
-        replacedGuideId?: number | null;
+        message?: string;
+        accepted?: boolean;
+        uploadId?: string;
+        status?: string;
       } = {};
 
       for (let i = 0; i < chunkCount; i++) {
@@ -145,30 +145,82 @@ export function GuidesClient() {
         });
 
         try {
-          data = await res.json();
+          lastData = await res.json();
         } catch {
           throw new Error(
             res.status === 413
               ? "Upload-Chunk vom Reverse Proxy abgelehnt (zu gross)."
-              : "Upload fehlgeschlagen (ungültige Serverantwort)."
+              : `Upload fehlgeschlagen (HTTP ${res.status} ${res.statusText || ""}).`.trim()
           );
         }
-        if (!res.ok) throw new Error(data.error || "Upload fehlgeschlagen");
+        if (!res.ok) {
+          throw new Error(
+            lastData.error ||
+              lastData.message ||
+              `Upload fehlgeschlagen (HTTP ${res.status}).`
+          );
+        }
       }
 
-      const replaced =
-        data.replacedGuideId != null
-          ? ` Bestehender Guide #${data.replacedGuideId} wurde ersetzt.`
-          : "";
-      setMessage(
-        `Guide importiert und indexiert (${data.chunkCount} Chunks, ${data.pageCount || "?"} Seiten).${replaced}`
+      if (!lastData.accepted) {
+        throw new Error("Upload wurde nicht vollständig angenommen.");
+      }
+
+      setMessage("Upload fertig — PDF wird im Hintergrund indexiert…");
+
+      const deadline = Date.now() + 10 * 60 * 1000;
+      while (Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        const statusRes = await fetch(
+          `/api/guides/upload?uploadId=${encodeURIComponent(uploadId)}`
+        );
+        const statusData = await statusRes.json();
+        if (!statusRes.ok) {
+          throw new Error(
+            statusData.error || "Status der Indexierung konnte nicht gelesen werden."
+          );
+        }
+
+        const job = statusData.job as {
+          status?: string;
+          error?: string;
+          chunkCount?: number;
+          pageCount?: number;
+          replacedGuideId?: number | null;
+        };
+
+        if (job.status === "indexed") {
+          const replaced =
+            job.replacedGuideId != null
+              ? ` Bestehender Guide #${job.replacedGuideId} wurde ersetzt.`
+              : "";
+          setMessage(
+            `Guide importiert und indexiert (${job.chunkCount} Chunks, ${job.pageCount || "?"} Seiten).${replaced}`
+          );
+          setTitle("");
+          setFile(null);
+          if (fileInputRef.current) fileInputRef.current.value = "";
+          await loadGuides();
+          return;
+        }
+
+        if (job.status === "error") {
+          throw new Error(job.error || "Indexierung fehlgeschlagen.");
+        }
+
+        setMessage(
+          job.status === "processing"
+            ? "PDF wird extrahiert und indexiert… (kann bei grossen Guides 1–2 Minuten dauern)"
+            : "Warte auf Indexierung…"
+        );
+      }
+
+      throw new Error(
+        "Indexierung dauert unerwartet lange. Bitte die Guide-Liste später prüfen oder erneut versuchen."
       );
-      setTitle("");
-      setFile(null);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-      await loadGuides();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+      await loadGuides();
     } finally {
       setBusy(null);
     }

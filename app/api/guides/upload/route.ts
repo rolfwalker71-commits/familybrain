@@ -1,16 +1,21 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import fs from "fs";
 import {
   assembleGuideUploadParts,
   cleanupGuideUpload,
   createGuideUploadId,
   GUIDE_UPLOAD_CHUNK_BYTES,
+  guideUploadAssembledPath,
   guideUploadPartPath,
-  importGuideFromPdfBuffer,
   isValidGuideUploadId,
   MAX_GUIDE_UPLOAD_BYTES,
+  processAssembledGuideUpload,
+  readGuideUploadMeta,
   sanitizeGuideFilename,
+  writeGuideUploadMeta,
+  type GuideUploadJobMeta,
 } from "@/lib/guides/import-guide";
+import { diagnosePdfBuffer } from "@/lib/guides/extract-pdf";
 import { hasOpenAIKey } from "@/lib/ai/client";
 
 export const runtime = "nodejs";
@@ -18,12 +23,25 @@ export const maxDuration = 300;
 
 /**
  * Chunked guide upload to bypass ~10 MB reverse-proxy body cuts.
- *
- * 1) POST JSON → { uploadId, chunkBytes }
- * 2) POST octet-stream chunks with X-Guide-Upload-Id (+ chunk headers)
- * 3) Last chunk triggers import + indexing
+ * Heavy PDF extract + embedding runs AFTER the HTTP response (via `after`),
+ * so short reverse-proxy timeouts no longer surface as generic "Bad Request".
  */
-export async function GET() {
+export async function GET(request: Request) {
+  const uploadId = new URL(request.url).searchParams.get("uploadId") || "";
+  if (uploadId) {
+    if (!isValidGuideUploadId(uploadId)) {
+      return NextResponse.json({ error: "Ungültige Upload-ID." }, { status: 400 });
+    }
+    const meta = readGuideUploadMeta(uploadId);
+    if (!meta) {
+      return NextResponse.json(
+        { error: "Upload-Job nicht gefunden." },
+        { status: 404 }
+      );
+    }
+    return NextResponse.json({ ok: true, job: meta });
+  }
+
   return NextResponse.json({
     chunkBytes: GUIDE_UPLOAD_CHUNK_BYTES,
     maxBytes: MAX_GUIDE_UPLOAD_BYTES,
@@ -127,26 +145,53 @@ async function handleChunk(request: Request) {
 
   try {
     const buffer = assembleGuideUploadParts(uploadId, chunkCount, totalBytes);
-    console.info(
-      `[guides] upload assembled id=${uploadId} filename=${filename} bytes=${buffer.length}`
-    );
-
-    const result = await importGuideFromPdfBuffer({
+    const diagnosis = diagnosePdfBuffer(
       buffer,
+      totalBytes > 0 ? totalBytes : null
+    );
+    if (diagnosis) {
+      cleanupGuideUpload(uploadId, chunkCount);
+      return NextResponse.json({ error: diagnosis }, { status: 400 });
+    }
+
+    fs.writeFileSync(guideUploadAssembledPath(uploadId), buffer);
+    for (let i = 0; i < chunkCount; i++) {
+      try {
+        fs.unlinkSync(guideUploadPartPath(uploadId, i));
+      } catch {
+        /* ignore */
+      }
+    }
+
+    const now = new Date().toISOString();
+    const meta: GuideUploadJobMeta = {
+      uploadId,
+      status: "processing",
       filename,
       titleInput,
       replaceExisting,
-      expectedLength: totalBytes > 0 ? totalBytes : buffer.length,
-    });
+      totalBytes: buffer.length,
+      createdAt: now,
+      updatedAt: now,
+    };
+    writeGuideUploadMeta(meta);
 
-    cleanupGuideUpload(uploadId, chunkCount);
+    console.info(
+      `[guides] upload accepted id=${uploadId} filename=${filename} bytes=${buffer.length} (background processing)`
+    );
+
+    after(() => {
+      void processAssembledGuideUpload(uploadId).catch((error) => {
+        console.error(`[guides] background import failed id=${uploadId}:`, error);
+      });
+    });
 
     return NextResponse.json({
       ok: true,
-      guideId: result.guideId,
-      replacedGuideId: result.replacedGuideId,
-      chunkCount: result.chunkCount,
-      pageCount: result.pageCount,
+      accepted: true,
+      uploadId,
+      status: "processing",
+      bytes: buffer.length,
     });
   } catch (error) {
     cleanupGuideUpload(uploadId, chunkCount);

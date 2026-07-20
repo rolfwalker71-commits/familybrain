@@ -42,12 +42,6 @@ export function diagnosePdfBuffer(
     return `PDF scheint unvollständig (kein %%EOF am Ende, ${(buffer.length / (1024 * 1024)).toFixed(1)} MB empfangen). Oft abgeschnittener Upload hinter dem Proxy.`;
   }
 
-  // Heuristic: encryption dictionary present.
-  const head = buffer.subarray(0, Math.min(buffer.length, 512 * 1024)).toString("latin1");
-  if (head.includes("/Encrypt")) {
-    return "PDF ist verschlüsselt oder passwortgeschützt und kann nicht indexiert werden.";
-  }
-
   return null;
 }
 
