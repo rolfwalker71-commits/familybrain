@@ -5,9 +5,12 @@ import { createHash } from "crypto";
 import {
   countIndexedKnowledgeGuides,
   createKnowledgeGuide,
+  findKnowledgeGuideByFilename,
+  findKnowledgeGuideByTitle,
   listKnowledgeGuides,
   updateKnowledgeGuideFilePath,
 } from "@/lib/db/queries";
+import { removeKnowledgeGuideFully } from "@/lib/guides/delete-guide";
 import { extractTextFromPdf } from "@/lib/guides/extract-pdf";
 import { guideFilePath, ensureGuidesDirectory } from "@/lib/guides/storage";
 import { indexKnowledgeGuide } from "@/lib/vectors/index-guide";
@@ -45,6 +48,7 @@ export async function POST(request: Request) {
     const form = await request.formData();
     const file = form.get("file");
     const titleInput = String(form.get("title") || "").trim();
+    const replaceExisting = form.get("replaceExisting") !== "false";
 
     if (!(file instanceof File)) {
       return NextResponse.json({ error: "PDF-Datei fehlt." }, { status: 400 });
@@ -69,6 +73,17 @@ export async function POST(request: Request) {
       titleInput ||
       filename.replace(/\.pdf$/i, "").replace(/[_-]+/g, " ").trim() ||
       "Guide";
+
+    let replacedGuideId: number | null = null;
+    if (replaceExisting) {
+      const existing =
+        findKnowledgeGuideByFilename(filename) ??
+        (titleInput ? findKnowledgeGuideByTitle(title) : null);
+      if (existing) {
+        await removeKnowledgeGuideFully(existing.id);
+        replacedGuideId = existing.id;
+      }
+    }
 
     const buffer = Buffer.from(await file.arrayBuffer());
     const fileHash = createHash("sha256").update(buffer).digest("hex");
@@ -119,6 +134,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       guideId,
+      replacedGuideId,
       chunkCount: indexResult.chunkCount,
       pageCount: extracted.pageCount,
     });

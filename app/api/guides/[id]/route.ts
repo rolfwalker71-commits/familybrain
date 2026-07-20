@@ -1,10 +1,6 @@
 import { NextResponse } from "next/server";
-import {
-  deleteKnowledgeGuide,
-  getKnowledgeGuideById,
-} from "@/lib/db/queries";
-import { deleteGuideFile } from "@/lib/guides/storage";
-import { deleteVectorPointsBySource } from "@/lib/vectors/client";
+import { getKnowledgeGuideById } from "@/lib/db/queries";
+import { removeKnowledgeGuideFully } from "@/lib/guides/delete-guide";
 
 export const runtime = "nodejs";
 
@@ -20,15 +16,16 @@ export async function DELETE(_request: Request, context: RouteContext) {
       return NextResponse.json({ error: "Ungültige Guide-ID." }, { status: 400 });
     }
 
-    const guide = deleteKnowledgeGuide(guideId);
+    const guide = await removeKnowledgeGuideFully(guideId);
     if (!guide) {
       return NextResponse.json({ error: "Guide nicht gefunden." }, { status: 404 });
     }
 
-    deleteGuideFile(guide.file_path);
-    await deleteVectorPointsBySource("guide", String(guideId));
-
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({
+      ok: true,
+      deletedGuideId: guideId,
+      title: guide.title,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return NextResponse.json({ error: message }, { status: 500 });

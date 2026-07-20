@@ -1188,6 +1188,26 @@ export function getKnowledgeGuideById(id: number): KnowledgeGuideRow | null {
   return row ?? null;
 }
 
+export function findKnowledgeGuideByFilename(
+  filename: string
+): KnowledgeGuideRow | null {
+  const db = getDb();
+  const row = db
+    .prepare(`SELECT * FROM knowledge_guides WHERE filename = ? LIMIT 1`)
+    .get(filename) as KnowledgeGuideRow | undefined;
+  return row ?? null;
+}
+
+export function findKnowledgeGuideByTitle(
+  title: string
+): KnowledgeGuideRow | null {
+  const db = getDb();
+  const row = db
+    .prepare(`SELECT * FROM knowledge_guides WHERE title = ? LIMIT 1`)
+    .get(title) as KnowledgeGuideRow | undefined;
+  return row ?? null;
+}
+
 export function countIndexedKnowledgeGuides(): number {
   const db = getDb();
   const row = db

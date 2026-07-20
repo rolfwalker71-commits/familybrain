@@ -55,6 +55,7 @@ export function GuidesClient() {
   const [hasOpenAIKey, setHasOpenAIKey] = useState(false);
   const [title, setTitle] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [replaceExisting, setReplaceExisting] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<"upload" | number | null>(null);
@@ -88,13 +89,18 @@ export function GuidesClient() {
       const form = new FormData();
       form.append("file", file);
       if (title.trim()) form.append("title", title.trim());
+      form.append("replaceExisting", replaceExisting ? "true" : "false");
 
       const res = await fetch("/api/guides", { method: "POST", body: form });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Upload fehlgeschlagen");
 
+      const replaced =
+        data.replacedGuideId != null
+          ? ` Bestehender Guide #${data.replacedGuideId} wurde ersetzt.`
+          : "";
       setMessage(
-        `Guide importiert und indexiert (${data.chunkCount} Chunks, ${data.pageCount || "?"} Seiten).`
+        `Guide importiert und indexiert (${data.chunkCount} Chunks, ${data.pageCount || "?"} Seiten).${replaced}`
       );
       setTitle("");
       setFile(null);
@@ -126,16 +132,22 @@ export function GuidesClient() {
     }
   }
 
-  async function deleteGuide(guideId: number) {
-    if (!window.confirm("Guide wirklich löschen?")) return;
-    setBusy(guideId);
+  async function deleteGuide(guide: GuideRow) {
+    if (
+      !window.confirm(
+        `Guide „${guide.title}“ wirklich entfernen?\n\nDabei werden die PDF-Datei, der Datenbankeintrag und alle zugehörigen Vektoren in Qdrant gelöscht.`
+      )
+    ) {
+      return;
+    }
+    setBusy(guide.id);
     setError(null);
     setMessage(null);
     try {
-      const res = await fetch(`/api/guides/${guideId}`, { method: "DELETE" });
+      const res = await fetch(`/api/guides/${guide.id}`, { method: "DELETE" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Löschen fehlgeschlagen");
-      setMessage(`Guide #${guideId} gelöscht.`);
+      setMessage(`Guide „${guide.title}“ entfernt (inkl. Vektoren).`);
       await loadGuides();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -208,6 +220,19 @@ export function GuidesClient() {
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
             />
           </div>
+          <div className="flex items-start gap-2">
+            <input
+              id="replaceExisting"
+              type="checkbox"
+              checked={replaceExisting}
+              onChange={(e) => setReplaceExisting(e.target.checked)}
+              className="mt-1 size-4 rounded border border-input"
+            />
+            <Label htmlFor="replaceExisting" className="font-normal leading-snug">
+              Bestehenden Guide mit gleichem Dateinamen oder Titel ersetzen
+              (alte PDF, Datenbank und Qdrant-Vektoren werden entfernt)
+            </Label>
+          </div>
           <Button
             onClick={() => void uploadGuide()}
             disabled={busy !== null || !file || !hasOpenAIKey || !qdrantOk}
@@ -269,12 +294,16 @@ export function GuidesClient() {
                     </Button>
                     <Button
                       variant="outline"
-                      size="icon-sm"
-                      title="Löschen"
+                      size="sm"
                       disabled={busy !== null}
-                      onClick={() => void deleteGuide(guide.id)}
+                      onClick={() => void deleteGuide(guide)}
                     >
-                      <Trash2 className="size-4" />
+                      {busy === guide.id ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="size-4" />
+                      )}
+                      Entfernen
                     </Button>
                   </div>
                 </div>
