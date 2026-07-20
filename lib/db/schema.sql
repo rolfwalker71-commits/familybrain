@@ -226,7 +226,7 @@ CREATE TABLE IF NOT EXISTS trilium_notes (
 CREATE INDEX IF NOT EXISTS idx_trilium_notes_scope ON trilium_notes(scope);
 CREATE INDEX IF NOT EXISTS idx_trilium_notes_modified ON trilium_notes(date_modified);
 CREATE INDEX IF NOT EXISTS idx_trilium_notes_status ON trilium_notes(sync_status);
-CREATE INDEX IF NOT EXISTS idx_trilium_notes_embedding ON trilium_notes(embedding_status);
+-- idx_trilium_notes_embedding is created in bootstrap after column migration
 
 CREATE TABLE IF NOT EXISTS knowledge_guides (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

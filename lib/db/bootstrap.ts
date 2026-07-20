@@ -146,7 +146,6 @@ function ensureTriliumNotesTable(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_trilium_notes_scope ON trilium_notes(scope);
     CREATE INDEX IF NOT EXISTS idx_trilium_notes_modified ON trilium_notes(date_modified);
     CREATE INDEX IF NOT EXISTS idx_trilium_notes_status ON trilium_notes(sync_status);
-    CREATE INDEX IF NOT EXISTS idx_trilium_notes_embedding ON trilium_notes(embedding_status);
   `);
 
   const cols = db
@@ -164,4 +163,8 @@ function ensureTriliumNotesTable(db: Database.Database): void {
   if (!names.has("last_indexed_at")) {
     db.exec(`ALTER TABLE trilium_notes ADD COLUMN last_indexed_at TEXT`);
   }
+  // After columns exist (fresh create or ALTER) — safe for older DBs.
+  db.exec(
+    `CREATE INDEX IF NOT EXISTS idx_trilium_notes_embedding ON trilium_notes(embedding_status)`
+  );
 }
