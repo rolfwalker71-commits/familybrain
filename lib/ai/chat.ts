@@ -107,7 +107,10 @@ Regeln:
 - In SOURCE_IDS höchstens 4 Dokument-IDs, nur wenn die Antwort direkt daraus belegt ist${sources.paperless ? "" : " (Paperless ist deaktiviert → immer leer)"}.
 - In NOTE_IDS höchstens 4 Trilium-Notiz-IDs, nur wenn die Antwort direkt daraus belegt ist${sources.trilium ? "" : " (Trilium ist deaktiviert → immer leer)"}.
 - In GUIDE_IDS höchstens 4 Guide-IDs, nur wenn die Antwort direkt daraus belegt ist${sources.guides ? "" : " (Guides sind deaktiviert → immer leer)"}.
-- Wenn nichts direkt belegt ist: [[SOURCE_IDS:]], [[NOTE_IDS:]] und/oder [[GUIDE_IDS:]].`;
+- Wenn nichts direkt belegt ist, hänge trotzdem die drei Marker je auf einer eigenen Zeile an (ohne Kommas dazwischen):
+  [[SOURCE_IDS:]]
+  [[NOTE_IDS:]]
+  [[GUIDE_IDS:]]`;
 }
 
 const SOURCE_IDS_MARKER = /\[\[SOURCE_IDS:\s*([0-9,\s]*)\]\]/i;
@@ -166,6 +169,14 @@ export function parseChatAnswerSources(rawAnswer: string): {
     .replace(GUIDE_IDS_MARKER, "")
     .trim();
   answer = answer.replace(TRAILING_SOURCE_SECTION, "").trim();
+  // Models often emit "[[SOURCE_IDS:]], [[NOTE_IDS:]], [[GUIDE_IDS:]]" —
+  // stripping markers leaves orphan commas like ", ,".
+  answer = answer
+    .replace(/(?:^|\n)\s*,(?:\s*,)*\s*(?=\n|$)/g, "\n")
+    .replace(/[ \t]*,(?:\s*,)+[ \t]*/g, " ")
+    .replace(/[ \t]+,[ \t]*$/gm, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 
   return { answer, sourceIds, noteIds, guideIds };
 }
