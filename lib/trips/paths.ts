@@ -24,11 +24,16 @@ export function getTripMapsDir(): string {
   return path.join(getTripsDataRoot(), "trip-maps");
 }
 
+export function getTripEventAiDir(): string {
+  return path.join(getTripsDataRoot(), "trip-event-ai");
+}
+
 export function ensureTripMediaDirs(): void {
   for (const dir of [
     getTripCoversDir(),
     getTripAircraftDir(),
     getTripMapsDir(),
+    getTripEventAiDir(),
   ]) {
     fs.mkdirSync(dir, { recursive: true });
   }

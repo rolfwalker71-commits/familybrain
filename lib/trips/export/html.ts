@@ -113,6 +113,7 @@ export function renderTripExportHtml(
     .map((event) => {
       const map = abs(event.map_image_url);
       const aircraft = abs(event.aircraft_image_url);
+      const ai = abs(event.ai_image_url);
       const showNotes = claimDocumentNotesForExport(
         event,
         seenNoteDocIds,
@@ -132,6 +133,11 @@ export function renderTripExportHtml(
       ? `<div class="beleg-md"><strong>Beleg-Details</strong><pre class="md">${esc(
           event.document_notes_md
         )}</pre></div>`
+      : ""
+  }
+  ${
+    ai
+      ? `<figure class="media thumb"><img src="${esc(ai)}" alt="KI-Bild" /></figure>`
       : ""
   }
   ${
@@ -237,6 +243,7 @@ export function renderTripExportHtml(
   }
   .media { margin: 0.75rem 0 0; }
   .media img { max-width: 100%; max-height: 12rem; border-radius: 0.35rem; border: 1px solid #e5e5e5; }
+  .media.thumb img { max-width: 5.5rem; max-height: 5.5rem; object-fit: cover; }
   .belege { margin-top: 2rem; border-top: 2px solid #ddd; padding-top: 1rem; }
   .muted { color: #777; font-size: 0.85rem; }
   .toolbar {

@@ -26,7 +26,7 @@ export async function GET(_request: Request, context: Ctx) {
   if (!share) {
     return NextResponse.json({ error: "Ungültiger Share-Link" }, { status: 404 });
   }
-  if (kind !== "cover" && kind !== "aircraft" && kind !== "map") {
+  if (kind !== "cover" && kind !== "aircraft" && kind !== "map" && kind !== "ai") {
     return NextResponse.json({ error: "Ungültiger Medientyp" }, { status: 400 });
   }
   const safe = path.basename(filename);
@@ -44,10 +44,15 @@ export async function GET(_request: Request, context: Ctx) {
   let allowed = false;
   if (kind === "cover" && trip.cover_path && path.basename(trip.cover_path) === base) {
     allowed = true;
-  } else if (kind === "aircraft" || kind === "map") {
+  } else if (kind === "aircraft" || kind === "map" || kind === "ai") {
     const events = listTripEvents(share.trip_id);
     allowed = events.some((e) => {
-      const p = kind === "aircraft" ? e.aircraft_image_path : e.map_image_path;
+      const p =
+        kind === "aircraft"
+          ? e.aircraft_image_path
+          : kind === "map"
+            ? e.map_image_path
+            : e.ai_image_path;
       return p && path.basename(p) === base;
     });
   }

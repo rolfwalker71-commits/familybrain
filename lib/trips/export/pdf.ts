@@ -326,6 +326,9 @@ export async function buildTripPdfBuffer(
     if (event.aircraft_file_exists) {
       await drawEmbeddedImage(ctx, event.aircraft_image_path, 120);
     }
+    if (event.ai_file_exists) {
+      await drawEmbeddedImage(ctx, event.ai_image_path, 96);
+    }
     if (event.map_file_exists) {
       await drawEmbeddedImage(ctx, event.map_image_path, 140);
     }

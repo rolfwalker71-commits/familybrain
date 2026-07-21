@@ -6,6 +6,7 @@ import {
   ensureTripMediaDirs,
   getTripAircraftDir,
   getTripCoversDir,
+  getTripEventAiDir,
   getTripMapsDir,
 } from "@/lib/trips/paths";
 import {
@@ -28,7 +29,7 @@ import { TRIP_STATUSES, type TripStatus } from "@/lib/trips/constants";
 export const TRAVELBRAIN_BACKUP_VERSION = 1;
 
 type MediaBlob = {
-  kind: "cover" | "aircraft" | "map";
+  kind: "cover" | "aircraft" | "map" | "ai";
   filename: string;
   base64: string;
 };
@@ -131,8 +132,10 @@ function serializeEvent(event: TripEventRow): BackupEvent {
   const media: MediaBlob[] = [];
   const aircraft = fileToMedia("aircraft", event.aircraft_image_path);
   const map = fileToMedia("map", event.map_image_path);
+  const ai = fileToMedia("ai", event.ai_image_path);
   if (aircraft) media.push(aircraft);
   if (map) media.push(map);
+  if (ai) media.push(ai);
   return {
     event_type: event.event_type,
     title: event.title,
@@ -216,7 +219,9 @@ function writeMediaBlob(
       ? getTripCoversDir()
       : kind === "aircraft"
         ? getTripAircraftDir()
-        : getTripMapsDir();
+        : kind === "map"
+          ? getTripMapsDir()
+          : getTripEventAiDir();
   const safe = path.basename(blob.filename).replace(/[^a-zA-Z0-9._-]/g, "_");
   const full = path.join(dir, `restore-${Date.now()}-${safe}`);
   fs.writeFileSync(full, Buffer.from(blob.base64, "base64"));
@@ -286,11 +291,13 @@ export function importTravelBrainBackup(payload: TravelBrainBackup): {
     for (const ev of trip.events || []) {
       let aircraftImagePath: string | null = null;
       let mapImagePath: string | null = null;
+      let aiImagePath: string | null = null;
       for (const m of ev.media || []) {
         try {
           const p = writeMediaBlob(m.kind, m);
           if (m.kind === "aircraft") aircraftImagePath = p;
           if (m.kind === "map") mapImagePath = p;
+          if (m.kind === "ai") aiImagePath = p;
         } catch (err) {
           warnings.push(
             `Medien «${ev.title}»: ${
@@ -345,6 +352,7 @@ export function importTravelBrainBackup(payload: TravelBrainBackup): {
         documentNotesMd: ev.document_notes_md,
         showDocumentNotes: ev.show_document_notes !== 0,
         documentNotesEnrichedAt: ev.document_notes_enriched_at,
+        aiImagePath,
       });
       eventsCreated += 1;
 

@@ -9,7 +9,7 @@ type Ctx = { params: Promise<{ kind: string; filename: string }> };
 
 export async function GET(_request: Request, context: Ctx) {
   const { kind, filename } = await context.params;
-  if (kind !== "cover" && kind !== "aircraft" && kind !== "map") {
+  if (kind !== "cover" && kind !== "aircraft" && kind !== "map" && kind !== "ai") {
     return NextResponse.json({ error: "Ungültig" }, { status: 400 });
   }
   const full = resolveMediaPath(kind, decodeURIComponent(filename));

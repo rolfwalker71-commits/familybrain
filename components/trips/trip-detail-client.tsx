@@ -37,6 +37,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Sheet,
   SheetContent,
   SheetDescription,
@@ -64,6 +72,7 @@ import {
   TRIP_STATUSES,
   coerceTripEventType,
 } from "@/lib/trips/constants";
+import { buildEventImagePrompt } from "@/lib/trips/event-image-prompt";
 
 type Trip = {
   id: number;
@@ -123,6 +132,8 @@ type TripEvent = {
   document_notes_md?: string | null;
   show_document_notes?: number | boolean | null;
   document_notes_enriched_at?: string | null;
+  ai_image_url?: string | null;
+  ai_image_prompt?: string | null;
   documents?: Array<{
     id: number;
     paperless_id: number;
@@ -447,6 +458,9 @@ export function TripDetailClient({
   >("place");
   const [dragEventId, setDragEventId] = useState<number | null>(null);
   const [dragOverEventId, setDragOverEventId] = useState<number | null>(null);
+  const [aiImageEventId, setAiImageEventId] = useState<number | null>(null);
+  const [aiImagePrompt, setAiImagePrompt] = useState("");
+  const [aiImageBusy, setAiImageBusy] = useState(false);
 
   const load = useCallback(async () => {
     const res = await fetch(
@@ -959,6 +973,62 @@ export function TripDetailClient({
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setBusy(false);
+    }
+  }
+
+  function openAiImageDialog(event: TripEvent) {
+    setAiImageEventId(event.id);
+    setAiImagePrompt(
+      event.ai_image_prompt?.trim() || buildEventImagePrompt(event)
+    );
+  }
+
+  async function generateAiImage() {
+    if (aiImageEventId == null) return;
+    setAiImageBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/trips/${tripId}/events/${aiImageEventId}/ai-image`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt: aiImagePrompt }),
+        }
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Bildgenerierung fehlgeschlagen");
+      await load();
+      setStatus("KI-Bild erstellt (Thumbnail, low quality).");
+      setAiImageEventId(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setAiImageBusy(false);
+    }
+  }
+
+  async function deleteAiImage(eventId: number) {
+    setAiImageBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/trips/${tripId}/events/${eventId}/ai-image`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ delete: true }),
+        }
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Löschen fehlgeschlagen");
+      await load();
+      setStatus("KI-Bild entfernt.");
+      if (aiImageEventId === eventId) setAiImageEventId(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setAiImageBusy(false);
     }
   }
 
@@ -1864,6 +1934,15 @@ export function TripDetailClient({
                             <Button
                               size="sm"
                               variant="ghost"
+                              title="KI-Bild"
+                              disabled={busy || aiImageBusy}
+                              onClick={() => openAiImageDialog(event)}
+                            >
+                              <ImagePlus className="size-3.5" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
                               onClick={() => startEditEvent(event)}
                             >
                               <Pencil className="size-3.5" />
@@ -1879,6 +1958,29 @@ export function TripDetailClient({
                         ) : null}
                       </div>
                     </div>
+
+                    {event.ai_image_url ? (
+                      <div className="flex items-start gap-3">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={event.ai_image_url}
+                          alt=""
+                          className="h-20 w-20 shrink-0 rounded-md border border-border/70 object-cover"
+                        />
+                        {editMode ? (
+                          <Button
+                            type="button"
+                            size="xs"
+                            variant="ghost"
+                            className="text-muted-foreground"
+                            disabled={aiImageBusy}
+                            onClick={() => void deleteAiImage(event.id)}
+                          >
+                            Bild entfernen
+                          </Button>
+                        ) : null}
+                      </div>
+                    ) : null}
 
                     {(() => {
                       const type = coerceTripEventType(event.event_type);
@@ -1979,6 +2081,7 @@ export function TripDetailClient({
                         !hasGenericDetails &&
                         !hasDocuments &&
                         !event.aircraft_image_url &&
+                        !event.ai_image_url &&
                         !event.notes &&
                         !flightEnrichmentNotice &&
                         !(
@@ -2353,6 +2456,52 @@ export function TripDetailClient({
           </div>
         )}
       </div>
+
+      <Dialog
+        open={aiImageEventId != null}
+        onOpenChange={(open) => {
+          if (!open && !aiImageBusy) setAiImageEventId(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>KI-Bild für Aktivität</DialogTitle>
+            <DialogDescription>
+              Thumbnail-Format (1024², low quality) — günstiger als das
+              Reise-Cover. Prompt ist vorbelegt und anpassbar.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="aiImagePrompt">Prompt</Label>
+            <Textarea
+              id="aiImagePrompt"
+              rows={8}
+              value={aiImagePrompt}
+              onChange={(e) => setAiImagePrompt(e.target.value)}
+              disabled={aiImageBusy}
+            />
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={aiImageBusy}
+              onClick={() => setAiImageEventId(null)}
+            >
+              Abbrechen
+            </Button>
+            <Button
+              type="button"
+              disabled={aiImageBusy || !aiImagePrompt.trim()}
+              onClick={() => void generateAiImage()}
+              className="gap-1.5"
+            >
+              <Sparkles className="size-4" />
+              {aiImageBusy ? "Generiert…" : "Bild erzeugen"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

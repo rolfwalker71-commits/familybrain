@@ -78,6 +78,8 @@ export type TripEventRow = {
   document_notes_md: string | null;
   show_document_notes: number;
   document_notes_enriched_at: string | null;
+  ai_image_path: string | null;
+  ai_image_prompt: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -364,6 +366,8 @@ export type TripEventInput = {
   documentNotesMd?: string | null;
   showDocumentNotes?: boolean | number | null;
   documentNotesEnrichedAt?: string | null;
+  aiImagePath?: string | null;
+  aiImagePrompt?: string | null;
 };
 
 export function createTripEvent(
@@ -568,6 +572,8 @@ export function updateTripEvent(
        document_notes_md = ?,
        show_document_notes = ?,
        document_notes_enriched_at = ?,
+       ai_image_path = ?,
+       ai_image_prompt = ?,
        updated_at = ?
      WHERE id = ?`
   ).run(
@@ -680,6 +686,12 @@ export function updateTripEvent(
     input.documentNotesEnrichedAt !== undefined
       ? input.documentNotesEnrichedAt
       : existing.document_notes_enriched_at,
+    input.aiImagePath !== undefined
+      ? input.aiImagePath
+      : existing.ai_image_path,
+    input.aiImagePrompt !== undefined
+      ? input.aiImagePrompt
+      : existing.ai_image_prompt,
     nowIso(),
     eventId
   );

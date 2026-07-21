@@ -5,7 +5,7 @@ export function rewriteTripMediaUrlForShare(
 ): string | null {
   if (!url) return null;
   const m = url.match(
-    /^\/api\/trips\/media\/(cover|aircraft|map)\/([^/?#]+)/
+    /^\/api\/trips\/media\/(cover|aircraft|map|ai)\/([^/?#]+)/
   );
   if (!m) return url;
   return `/api/share/t/${encodeURIComponent(token)}/media/${m[1]}/${m[2]}`;

@@ -3,6 +3,7 @@ import {
   coverPublicUrl,
   mapPublicUrl,
   aircraftPublicUrl,
+  eventAiImagePublicUrl,
 } from "@/lib/trips/cover";
 import { getTripById, listTripEvents, type TripRow } from "@/lib/trips/queries";
 import {
@@ -28,6 +29,7 @@ export type TripExportEvent = SerializedTripEvent & {
   cover_url: null;
   map_file_exists: boolean;
   aircraft_file_exists: boolean;
+  ai_file_exists: boolean;
 };
 
 export type TripExportModel = {
@@ -68,9 +70,11 @@ export function buildTripExportModel(tripId: number): TripExportModel | null {
     cover_url: null as null,
     map_file_exists: fileExists(event.map_image_path),
     aircraft_file_exists: fileExists(event.aircraft_image_path),
+    ai_file_exists: fileExists(event.ai_image_path),
     // Prefer public URLs for HTML; keep paths for PDF embedding
     map_image_url: mapPublicUrl(event.map_image_path),
     aircraft_image_url: aircraftPublicUrl(event.aircraft_image_path),
+    ai_image_url: eventAiImagePublicUrl(event.ai_image_path),
   }));
 
   const seenDocs = new Set<number>();

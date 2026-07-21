@@ -205,6 +205,8 @@ function ensureTripsTables(db: Database.Database): void {
     ["document_notes_md", "TEXT"],
     ["show_document_notes", "INTEGER NOT NULL DEFAULT 1"],
     ["document_notes_enriched_at", "TEXT"],
+    ["ai_image_path", "TEXT"],
+    ["ai_image_prompt", "TEXT"],
   ];
   for (const [name, type] of flightExtraCols) {
     if (!tripEventColNames.has(name)) {

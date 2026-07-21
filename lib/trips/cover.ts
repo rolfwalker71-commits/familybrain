@@ -6,6 +6,7 @@ import {
   ensureTripMediaDirs,
   getTripAircraftDir,
   getTripCoversDir,
+  getTripEventAiDir,
   getTripMapsDir,
 } from "@/lib/trips/paths";
 import { updateTrip } from "@/lib/trips/queries";
@@ -26,6 +27,13 @@ export function aircraftPublicUrl(
 export function mapPublicUrl(filePath: string | null | undefined): string | null {
   if (!filePath) return null;
   return `/api/trips/media/map/${encodeURIComponent(path.basename(filePath))}`;
+}
+
+export function eventAiImagePublicUrl(
+  filePath: string | null | undefined
+): string | null {
+  if (!filePath) return null;
+  return `/api/trips/media/ai/${encodeURIComponent(path.basename(filePath))}`;
 }
 
 export async function saveTripCoverUpload(
@@ -83,7 +91,7 @@ export async function generateTripCover(
 }
 
 export function resolveMediaPath(
-  kind: "cover" | "aircraft" | "map",
+  kind: "cover" | "aircraft" | "map" | "ai",
   filename: string
 ): string | null {
   const safe = path.basename(filename);
@@ -93,7 +101,9 @@ export function resolveMediaPath(
       ? getTripCoversDir()
       : kind === "aircraft"
         ? getTripAircraftDir()
-        : getTripMapsDir();
+        : kind === "map"
+          ? getTripMapsDir()
+          : getTripEventAiDir();
   const full = path.join(dir, safe);
   if (!fs.existsSync(full)) return null;
   return full;

@@ -29,6 +29,7 @@ export async function GET(_request: Request, context: Ctx) {
         token
       ),
       map_image_url: rewriteTripMediaUrlForShare(event.map_image_url, token),
+      ai_image_url: rewriteTripMediaUrlForShare(event.ai_image_url, token),
     })
   );
   return NextResponse.json({

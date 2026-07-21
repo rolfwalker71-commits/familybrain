@@ -1,6 +1,7 @@
 import { getDb } from "@/lib/db/client";
 import {
   aircraftPublicUrl,
+  eventAiImagePublicUrl,
   mapPublicUrl,
 } from "@/lib/trips/cover";
 import {
@@ -19,6 +20,7 @@ export type TripEventDocumentRef = {
 export type SerializedTripEvent = TripEventRow & {
   aircraft_image_url: string | null;
   map_image_url: string | null;
+  ai_image_url: string | null;
   documents: TripEventDocumentRef[];
 };
 
@@ -89,6 +91,7 @@ export function serializeTripEvent(event: TripEventRow): SerializedTripEvent {
     ...event,
     aircraft_image_url: aircraftPublicUrl(event.aircraft_image_path),
     map_image_url: mapPublicUrl(event.map_image_path),
+    ai_image_url: eventAiImagePublicUrl(event.ai_image_path),
     documents: loadDocumentRefs(ids, removable),
   };
 }
@@ -119,6 +122,7 @@ export function serializeTripEvents(
       ...event,
       aircraft_image_url: aircraftPublicUrl(event.aircraft_image_path),
       map_image_url: mapPublicUrl(event.map_image_path),
+      ai_image_url: eventAiImagePublicUrl(event.ai_image_path),
       documents: ids
         .map((id) => {
           const ref = byId.get(id);
