@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Plus, Trash2 } from "lucide-react";
+import { Download, Plus, Trash2, Upload } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -48,6 +48,8 @@ export function TripsListClient() {
   const [destination, setDestination] = useState("");
   const [status, setStatus] = useState<(typeof TRIP_STATUSES)[number]>("planned");
   const [creating, setCreating] = useState(false);
+  const [statusMsg, setStatusMsg] = useState<string | null>(null);
+  const importRef = useRef<HTMLInputElement>(null);
 
   async function load() {
     setLoading(true);
@@ -102,6 +104,34 @@ export function TripsListClient() {
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function importBackup(file: File) {
+    setError(null);
+    setStatusMsg(null);
+    try {
+      const text = await file.text();
+      const payload = JSON.parse(text) as unknown;
+      const res = await fetch("/api/trips/backup/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Import fehlgeschlagen");
+      await load();
+      const warn =
+        Array.isArray(data.warnings) && data.warnings.length
+          ? ` · ${data.warnings.length} Hinweise`
+          : "";
+      setStatusMsg(
+        `Import: ${data.tripsCreated} Reisen, ${data.eventsCreated} Aktivitäten, ${data.linksRestored} Beleg-Links${warn}.`
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      if (importRef.current) importRef.current.value = "";
     }
   }
 
@@ -168,9 +198,49 @@ export function TripsListClient() {
         </CardContent>
       </Card>
 
+      <Card className="border-border/80 shadow-sm">
+        <CardContent className="flex flex-wrap items-center gap-2 p-4">
+          <p className="mr-auto text-sm text-muted-foreground">
+            TravelBrain-Backup (Reisen, Events, Verlinkungen, Medien)
+          </p>
+          <a
+            href="/api/trips/backup"
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-1.5")}
+          >
+            <Download className="size-3.5" />
+            Backup exportieren
+          </a>
+          <input
+            ref={importRef}
+            type="file"
+            accept="application/json,.json"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void importBackup(file);
+            }}
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            onClick={() => importRef.current?.click()}
+          >
+            <Upload className="size-3.5" />
+            Backup importieren
+          </Button>
+        </CardContent>
+      </Card>
+
       {error ? (
         <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
           {error}
+        </div>
+      ) : null}
+      {statusMsg ? (
+        <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+          {statusMsg}
         </div>
       ) : null}
 

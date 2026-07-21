@@ -336,6 +336,9 @@ CREATE TABLE IF NOT EXISTS trip_events (
   osm_id TEXT,
   enrichment_json TEXT,
   enriched_at TEXT,
+  document_notes_md TEXT,
+  show_document_notes INTEGER NOT NULL DEFAULT 1,
+  document_notes_enriched_at TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   FOREIGN KEY(trip_id) REFERENCES trips(id) ON DELETE CASCADE

@@ -264,6 +264,30 @@ export async function buildTripPdfBuffer(
         { size: 9, color: rgb(0.35, 0.35, 0.35) }
       );
     }
+    if (
+      event.show_document_notes !== 0 &&
+      event.document_notes_md?.trim()
+    ) {
+      drawLine(ctx, "Beleg-Details", {
+        bold: true,
+        size: 10,
+        color: rgb(0.25, 0.25, 0.3),
+      });
+      const plain = event.document_notes_md
+        .replace(/^#+\s*/gm, "")
+        .replace(/\*\*/g, "")
+        .replace(/\*/g, "")
+        .replace(/\|/g, " ")
+        .split("\n")
+        .map((l) => l.trim())
+        .filter(Boolean);
+      for (const line of plain.slice(0, 40)) {
+        drawLine(ctx, line, { size: 9, color: rgb(0.3, 0.3, 0.3) });
+      }
+      if (plain.length > 40) {
+        drawLine(ctx, "…", { size: 9, color: rgb(0.5, 0.5, 0.5) });
+      }
+    }
     if (event.aircraft_file_exists) {
       await drawEmbeddedImage(ctx, event.aircraft_image_path, 120);
     }

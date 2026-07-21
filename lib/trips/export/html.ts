@@ -120,6 +120,14 @@ export function renderTripExportHtml(
   <div class="details">${eventDetailsHtml(event)}</div>
   ${eventDocsHtml(event)}
   ${
+    event.show_document_notes !== 0 &&
+    event.document_notes_md?.trim()
+      ? `<div class="beleg-md"><strong>Beleg-Details</strong><pre class="md">${esc(
+          event.document_notes_md
+        )}</pre></div>`
+      : ""
+  }
+  ${
     aircraft
       ? `<figure class="media"><img src="${esc(aircraft)}" alt="Flugzeug" /></figure>`
       : ""
@@ -213,6 +221,13 @@ export function renderTripExportHtml(
   .k { color: #777; }
   .v { white-space: pre-wrap; }
   .docs { font-size: 0.85rem; margin-top: 0.6rem; }
+  .beleg-md { margin-top: 0.75rem; font-size: 0.85rem; }
+  .beleg-md pre.md {
+    white-space: pre-wrap;
+    font-family: inherit;
+    margin: 0.35rem 0 0;
+    color: #333;
+  }
   .media { margin: 0.75rem 0 0; }
   .media img { max-width: 100%; max-height: 12rem; border-radius: 0.35rem; border: 1px solid #e5e5e5; }
   .belege { margin-top: 2rem; border-top: 2px solid #ddd; padding-top: 1rem; }

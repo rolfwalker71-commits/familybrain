@@ -53,6 +53,7 @@ import {
 import { DocumentPdfThumb } from "@/components/documents/document-pdf-preview";
 import { TripMap } from "@/components/trips/trip-map";
 import { TripExportMenu } from "@/components/trips/trip-export-menu";
+import { BelegNotesBlock } from "@/components/trips/beleg-notes-block";
 import {
   toDateInputValue,
   toSwissDate,
@@ -119,6 +120,9 @@ type TripEvent = {
   osm_id: string | null;
   enrichment_json?: string | null;
   enriched_at?: string | null;
+  document_notes_md?: string | null;
+  show_document_notes?: number | boolean | null;
+  document_notes_enriched_at?: string | null;
   documents?: Array<{
     id: number;
     paperless_id: number;
@@ -364,6 +368,7 @@ function createEmptyEventForm() {
     arrivalGate: "",
     checkInDesk: "",
     baggageBelt: "",
+    showDocumentNotes: true,
   };
 }
 
@@ -403,6 +408,7 @@ function eventToForm(event: TripEvent) {
     arrivalGate: event.arrival_gate || "",
     checkInDesk: event.check_in_desk || "",
     baggageBelt: event.baggage_belt || "",
+    showDocumentNotes: event.show_document_notes !== 0 && event.show_document_notes !== false,
   };
 }
 
@@ -523,6 +529,7 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
         provider: eventForm.provider || null,
         bookingReference: eventForm.bookingReference || null,
         notes: eventForm.notes || null,
+        showDocumentNotes: eventForm.showDocumentNotes,
         flightNumber: eventForm.flightNumber || null,
         departureAirport: dep,
         arrivalAirport: arr,
@@ -872,6 +879,77 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
     }
   }
 
+  async function enrichEventNotes(eventId: number) {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/trips/${tripId}/events/${eventId}/enrich-notes`,
+        { method: "POST" }
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Anreicherung fehlgeschlagen");
+      await load();
+      if (data.event && editingEventId === eventId) {
+        setEventForm(eventToForm(data.event as TripEvent));
+      }
+      setStatus(
+        data.empty
+          ? "Keine zusätzlichen Beleg-Infos gefunden."
+          : "Beleg-Details angereichert."
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function enrichAllEventNotes() {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/trips/${tripId}/enrich-notes`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Anreicherung fehlgeschlagen");
+      await load();
+      setStatus(
+        `Beleg-Details: ${data.updated || 0} mit Inhalt, ${data.empty || 0} ohne.`
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function toggleShowDocumentNotes(
+    eventId: number,
+    show: boolean
+  ) {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/trips/${tripId}/events/${eventId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ showDocumentNotes: show }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Speichern fehlgeschlagen");
+      await load();
+      if (data.event && editingEventId === eventId) {
+        setEventForm(eventToForm(data.event as TripEvent));
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (!trip) {
     return (
       <div className="space-y-4">
@@ -967,6 +1045,14 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
             >
               <Plus className="size-4" />
               Aktivität hinzufügen
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={busy}
+              onClick={() => void enrichAllEventNotes()}
+            >
+              Belege anreichern
             </Button>
             <Button variant="outline" size="sm" onClick={() => exitEditMode()}>
               Ansicht
@@ -1435,13 +1521,31 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
               </>
             ) : null}
             <div className="space-y-1.5 sm:col-span-2">
-              <Label>Notizen</Label>
+              <Label>Notizen (manuell)</Label>
               <Textarea
+                className="min-h-28"
                 value={eventForm.notes}
                 onChange={(e) =>
                   setEventForm((f) => ({ ...f, notes: e.target.value }))
                 }
+                placeholder="Eigene Notizen — unabhängig von Beleg-Details"
               />
+            </div>
+            <div className="flex flex-wrap items-center gap-3 sm:col-span-2">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="size-4 rounded border-border"
+                  checked={eventForm.showDocumentNotes}
+                  onChange={(e) =>
+                    setEventForm((f) => ({
+                      ...f,
+                      showDocumentNotes: e.target.checked,
+                    }))
+                  }
+                />
+                Beleg-Infos auf der Karte anzeigen
+              </label>
             </div>
 
             {editingEventId != null ? (
@@ -1449,6 +1553,14 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                 <div className="text-xs font-medium text-muted-foreground">
                   Anreichern
                 </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() => void enrichEventNotes(editingEventId)}
+                >
+                  Aus Beleg anreichern
+                </Button>
                 {eventForm.eventType === "Flug" ? (
                   <Button
                     size="sm"
@@ -1851,7 +1963,12 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                         !hasDocuments &&
                         !event.aircraft_image_url &&
                         !event.notes &&
-                        !flightEnrichmentNotice
+                        !flightEnrichmentNotice &&
+                        !(
+                          event.document_notes_md?.trim() &&
+                          event.show_document_notes !== 0 &&
+                          event.show_document_notes !== false
+                        )
                       ) {
                         return null;
                       }
@@ -2162,6 +2279,35 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                             <p className="text-sm text-muted-foreground whitespace-pre-wrap">
                               {event.notes}
                             </p>
+                          ) : null}
+
+                          <BelegNotesBlock
+                            markdown={event.document_notes_md || ""}
+                            show={
+                              event.show_document_notes !== 0 &&
+                              event.show_document_notes !== false
+                            }
+                          />
+
+                          {editMode && event.document_notes_md?.trim() ? (
+                            <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <input
+                                type="checkbox"
+                                className="size-3.5 rounded border-border"
+                                checked={
+                                  event.show_document_notes !== 0 &&
+                                  event.show_document_notes !== false
+                                }
+                                disabled={busy}
+                                onChange={(e) =>
+                                  void toggleShowDocumentNotes(
+                                    event.id,
+                                    e.target.checked
+                                  )
+                                }
+                              />
+                              Beleg-Infos anzeigen
+                            </label>
                           ) : null}
                         </div>
                       );

@@ -75,6 +75,9 @@ export type TripEventRow = {
   osm_id: string | null;
   enrichment_json: string | null;
   enriched_at: string | null;
+  document_notes_md: string | null;
+  show_document_notes: number;
+  document_notes_enriched_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -358,6 +361,9 @@ export type TripEventInput = {
   osmId?: string | null;
   enrichmentJson?: string | null;
   enrichedAt?: string | null;
+  documentNotesMd?: string | null;
+  showDocumentNotes?: boolean | number | null;
+  documentNotesEnrichedAt?: string | null;
 };
 
 export function createTripEvent(
@@ -400,7 +406,9 @@ export function createTripEvent(
          departure_lat, departure_lon, arrival_lat, arrival_lon,
          origin_place, destination_place,
          place_name, address, phone, website, lat, lon, map_image_path, osm_id,
-         enrichment_json, enriched_at, created_at, updated_at
+         enrichment_json, enriched_at,
+         document_notes_md, show_document_notes, document_notes_enriched_at,
+         created_at, updated_at
        ) VALUES (
          ?, ?, ?, ?, ?, ?, ?,
          ?, ?, ?, ?, ?,
@@ -412,7 +420,9 @@ export function createTripEvent(
          ?, ?, ?, ?,
          ?, ?,
          ?, ?, ?, ?, ?, ?, ?, ?,
-         ?, ?, ?, ?
+         ?, ?,
+         ?, ?, ?,
+         ?, ?
        )`
     )
     .run(
@@ -463,6 +473,9 @@ export function createTripEvent(
       input.osmId ?? null,
       input.enrichmentJson ?? null,
       input.enrichedAt ?? null,
+      input.documentNotesMd ?? null,
+      input.showDocumentNotes === false || input.showDocumentNotes === 0 ? 0 : 1,
+      input.documentNotesEnrichedAt ?? null,
       ts,
       ts
     );
@@ -552,6 +565,9 @@ export function updateTripEvent(
        osm_id = ?,
        enrichment_json = ?,
        enriched_at = ?,
+       document_notes_md = ?,
+       show_document_notes = ?,
+       document_notes_enriched_at = ?,
        updated_at = ?
      WHERE id = ?`
   ).run(
@@ -653,6 +669,17 @@ export function updateTripEvent(
       ? input.enrichmentJson
       : existing.enrichment_json,
     input.enrichedAt !== undefined ? input.enrichedAt : existing.enriched_at,
+    input.documentNotesMd !== undefined
+      ? input.documentNotesMd
+      : existing.document_notes_md,
+    input.showDocumentNotes !== undefined
+      ? input.showDocumentNotes === false || input.showDocumentNotes === 0
+        ? 0
+        : 1
+      : existing.show_document_notes ?? 1,
+    input.documentNotesEnrichedAt !== undefined
+      ? input.documentNotesEnrichedAt
+      : existing.document_notes_enriched_at,
     nowIso(),
     eventId
   );
