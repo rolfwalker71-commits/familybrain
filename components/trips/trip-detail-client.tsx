@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -1508,13 +1508,12 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
         {events.length === 0 ? (
           <p className="text-sm text-muted-foreground">Noch keine Ereignisse.</p>
         ) : (
-          <div className="flex flex-col">
-          {events.map((event, eventIndex) => {
+          <div className="flex flex-col gap-5">
+          {events.map((event) => {
             const visual = eventVisual(event.event_type);
-            const isLastEvent = eventIndex === events.length - 1;
             return (
-              <Fragment key={event.id}>
               <div
+                key={event.id}
                 className={cn(
                   "relative pt-3 pl-3",
                   editMode && dragOverEventId === event.id && "opacity-80"
@@ -1563,16 +1562,21 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                 <Card
                   tone={visual.tone}
                   className={cn(
-                    "overflow-visible border-border/50",
+                    "relative overflow-visible border-border/50",
                     editingEventId === event.id && "ring-2 ring-foreground/15",
                     editMode &&
                       dragOverEventId === event.id &&
                       "ring-2 ring-teal-400/50"
                   )}
                 >
+                  <div className="pointer-events-none absolute inset-x-0 top-4 z-[1] flex justify-center">
+                    <div className="pointer-events-auto">
+                      <EventDateHeader event={event} />
+                    </div>
+                  </div>
                   <CardContent className="space-y-3 p-4 pl-8">
-                    <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-2">
-                      <div className="flex min-w-0 items-start gap-2">
+                    <div className="flex min-h-[5.75rem] items-start gap-2">
+                      <div className="flex min-w-0 flex-1 items-start gap-2 pr-2">
                         {editMode ? (
                           <button
                             type="button"
@@ -1595,7 +1599,7 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                             <GripVertical className="size-4" />
                           </button>
                         ) : null}
-                        <div className="min-w-0">
+                        <div className="min-w-0 max-w-[min(100%,12rem)] sm:max-w-[min(100%,16rem)] lg:max-w-[min(100%,20rem)]">
                           <div className="text-xl font-black leading-tight tracking-tight sm:text-2xl">
                             {event.title}
                           </div>
@@ -1609,10 +1613,7 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                           })()}
                         </div>
                       </div>
-                      <div className="justify-self-center self-center">
-                        <EventDateHeader event={event} />
-                      </div>
-                      <div className="flex shrink-0 flex-wrap items-center justify-end gap-1 justify-self-end">
+                      <div className="flex min-w-0 flex-1 flex-wrap items-start justify-end gap-1 pl-2">
                         <Badge variant="secondary" className="shrink-0">
                           {coerceTripEventType(event.event_type)}
                         </Badge>
@@ -2019,21 +2020,6 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                   </CardContent>
                 </Card>
               </div>
-              {!isLastEvent ? (
-                <div
-                  aria-hidden
-                  className="pointer-events-none relative z-[1] -mb-3 -mt-px flex h-10 items-stretch justify-center"
-                >
-                  <div
-                    className="h-full w-1.5 rounded-sm sm:w-2"
-                    style={{
-                      backgroundImage:
-                        "repeating-linear-gradient(to bottom, rgb(15 23 42 / 0.6) 0 12px, transparent 12px 18px)",
-                    }}
-                  />
-                </div>
-              ) : null}
-              </Fragment>
             );
           })
           }
