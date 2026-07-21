@@ -2,25 +2,17 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { TRIP_EVENT_TYPES } from "@/lib/trips/constants";
 import {
-  aircraftPublicUrl,
-  mapPublicUrl,
-} from "@/lib/trips/cover";
-import {
   createTripEvent,
   getTripById,
   listTripEvents,
 } from "@/lib/trips/queries";
+import {
+  serializeTripEvent,
+  serializeTripEvents,
+} from "@/lib/trips/serialize-event";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function serializeEvent(event: ReturnType<typeof listTripEvents>[number]) {
-  return {
-    ...event,
-    aircraft_image_url: aircraftPublicUrl(event.aircraft_image_path),
-    map_image_url: mapPublicUrl(event.map_image_path),
-  };
-}
 
 const CreateSchema = z.object({
   eventType: z.string().min(1),
@@ -48,6 +40,12 @@ const CreateSchema = z.object({
   arrivalGate: z.string().nullable().optional(),
   checkInDesk: z.string().nullable().optional(),
   baggageBelt: z.string().nullable().optional(),
+  originPlace: z.string().nullable().optional(),
+  destinationPlace: z.string().nullable().optional(),
+  departureLat: z.number().nullable().optional(),
+  departureLon: z.number().nullable().optional(),
+  arrivalLat: z.number().nullable().optional(),
+  arrivalLon: z.number().nullable().optional(),
 });
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -61,7 +59,9 @@ export async function GET(_request: Request, context: Ctx) {
   if (!getTripById(id)) {
     return NextResponse.json({ error: "Reise nicht gefunden" }, { status: 404 });
   }
-  return NextResponse.json({ events: listTripEvents(id).map(serializeEvent) });
+  return NextResponse.json({
+    events: serializeTripEvents(listTripEvents(id)),
+  });
 }
 
 export async function POST(request: Request, context: Ctx) {
@@ -83,7 +83,7 @@ export async function POST(request: Request, context: Ctx) {
       // still allow via normalize in createTripEvent
     }
     const event = createTripEvent(id, parsed.data);
-    return NextResponse.json({ ok: true, event: serializeEvent(event) });
+    return NextResponse.json({ ok: true, event: serializeTripEvent(event) });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const status = message.includes("nicht gefunden") ? 404 : 500;

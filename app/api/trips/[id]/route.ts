@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import {
-  aircraftPublicUrl,
   coverPublicUrl,
-  mapPublicUrl,
 } from "@/lib/trips/cover";
 import { TRIP_STATUSES } from "@/lib/trips/constants";
 import {
@@ -12,18 +10,11 @@ import {
   listTripEvents,
   updateTrip,
 } from "@/lib/trips/queries";
+import { serializeTripEvents } from "@/lib/trips/serialize-event";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
-
-function serializeEvent(event: ReturnType<typeof listTripEvents>[number]) {
-  return {
-    ...event,
-    aircraft_image_url: aircraftPublicUrl(event.aircraft_image_path),
-    map_image_url: mapPublicUrl(event.map_image_path),
-  };
-}
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -39,7 +30,7 @@ export async function GET(_request: Request, context: Ctx) {
   }
   return NextResponse.json({
     trip: { ...trip, cover_url: coverPublicUrl(trip.cover_path) },
-    events: listTripEvents(id).map(serializeEvent),
+    events: serializeTripEvents(listTripEvents(id)),
   });
 }
 

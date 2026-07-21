@@ -324,6 +324,8 @@ CREATE TABLE IF NOT EXISTS trip_events (
   departure_lon REAL,
   arrival_lat REAL,
   arrival_lon REAL,
+  origin_place TEXT,
+  destination_place TEXT,
   place_name TEXT,
   address TEXT,
   phone TEXT,

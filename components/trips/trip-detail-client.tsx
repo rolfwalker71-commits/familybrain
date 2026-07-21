@@ -48,6 +48,7 @@ import {
   pageVisuals,
   type IconTone,
 } from "@/components/layout/icon-circle";
+import { DocumentPdfThumb } from "@/components/documents/document-pdf-preview";
 import { TripMap } from "@/components/trips/trip-map";
 import {
   toDateInputValue,
@@ -103,6 +104,8 @@ type TripEvent = {
   departure_lon: number | null;
   arrival_lat: number | null;
   arrival_lon: number | null;
+  origin_place: string | null;
+  destination_place: string | null;
   place_name: string | null;
   address: string | null;
   phone: string | null;
@@ -111,6 +114,11 @@ type TripEvent = {
   lon: number | null;
   map_image_url: string | null;
   osm_id: string | null;
+  documents?: Array<{
+    id: number;
+    paperless_id: number;
+    title: string | null;
+  }>;
 };
 
 type PlaceCandidate = {
@@ -181,13 +189,44 @@ function formatEventWhen(event: TripEvent): string | null {
 }
 
 function formatEventMetaLine(event: TripEvent): string | null {
+  const type = coerceTripEventType(event.event_type);
+  const transferRoute =
+    type === "Transfer"
+      ? event.origin_place && event.destination_place
+        ? `${event.origin_place} → ${event.destination_place}`
+        : event.origin_place ||
+          event.destination_place ||
+          (event.location && !textsOverlap(event.location, event.title)
+            ? event.location
+            : null)
+      : null;
   const parts = [
     formatEventWhen(event),
-    event.flight_number && coerceTripEventType(event.event_type) === "Flug"
-      ? event.flight_number
-      : null,
+    event.flight_number && type === "Flug" ? event.flight_number : null,
+    transferRoute,
   ].filter(Boolean);
   return parts.length ? parts.join(" · ") : null;
+}
+
+function splitTransferPlaces(event: TripEvent): {
+  origin: string;
+  destination: string;
+} {
+  if (event.origin_place || event.destination_place) {
+    return {
+      origin: event.origin_place || "",
+      destination: event.destination_place || "",
+    };
+  }
+  const loc = (event.location || "").trim();
+  const parts = loc.split(/\s*(?:→|->|–)\s*/);
+  if (parts.length >= 2) {
+    return {
+      origin: parts[0]?.trim() || "",
+      destination: parts.slice(1).join(" → ").trim(),
+    };
+  }
+  return { origin: loc, destination: "" };
 }
 
 function DetailRow({
@@ -215,6 +254,8 @@ function createEmptyEventForm() {
     startTime: "",
     endTime: "",
     location: "",
+    originPlace: "",
+    destinationPlace: "",
     address: "",
     provider: "",
     bookingReference: "",
@@ -238,6 +279,7 @@ function eventToForm(event: TripEvent) {
   if (startDate && endDate && endDate < startDate) {
     endDate = "";
   }
+  const transfer = splitTransferPlaces(event);
   return {
     eventType: coerceTripEventType(event.event_type),
     title: event.title,
@@ -246,6 +288,8 @@ function eventToForm(event: TripEvent) {
     startTime: toTimeInputValue(event.start_time),
     endTime: toTimeInputValue(event.end_time),
     location: event.location || "",
+    originPlace: transfer.origin,
+    destinationPlace: transfer.destination,
     address: event.address || "",
     provider: event.provider || "",
     bookingReference: event.booking_reference || "",
@@ -288,6 +332,9 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
   const [placeQueries, setPlaceQueries] = useState<Record<number, string>>(
     {}
   );
+  const [placeEnrichTarget, setPlaceEnrichTarget] = useState<
+    "place" | "origin" | "destination"
+  >("place");
   const [dragEventId, setDragEventId] = useState<number | null>(null);
   const [dragOverEventId, setDragOverEventId] = useState<number | null>(null);
 
@@ -349,11 +396,18 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
     try {
       const dep = eventForm.departureAirport.trim().toUpperCase() || null;
       const arr = eventForm.arrivalAirport.trim().toUpperCase() || null;
+      const origin = eventForm.originPlace.trim() || null;
+      const destination = eventForm.destinationPlace.trim() || null;
       const startDate = toDateInputValue(eventForm.startDate) || null;
       let endDate = toDateInputValue(eventForm.endDate) || null;
       if (startDate && endDate && endDate < startDate) {
         endDate = null;
       }
+      const isTransfer = eventForm.eventType === "Transfer";
+      const transferLocation =
+        origin && destination
+          ? `${origin} → ${destination}`
+          : origin || destination || null;
       const payload = {
         eventType: eventForm.eventType,
         title: eventForm.title.trim(),
@@ -361,9 +415,10 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
         endDate,
         startTime: toTimeInputValue(eventForm.startTime) || null,
         endTime: toTimeInputValue(eventForm.endTime) || null,
-        location:
-          eventForm.location ||
-          (dep && arr ? `${dep} → ${arr}` : dep || arr || null),
+        location: isTransfer
+          ? transferLocation
+          : eventForm.location ||
+            (dep && arr ? `${dep} → ${arr}` : dep || arr || null),
         address: eventForm.address || null,
         provider: eventForm.provider || null,
         bookingReference: eventForm.bookingReference || null,
@@ -377,6 +432,14 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
         arrivalGate: eventForm.arrivalGate || null,
         checkInDesk: eventForm.checkInDesk || null,
         baggageBelt: eventForm.baggageBelt || null,
+        originPlace: isTransfer ? origin : null,
+        destinationPlace: isTransfer ? destination : null,
+        ...(isTransfer
+          ? {
+              ...(origin ? {} : { departureLat: null, departureLon: null }),
+              ...(destination ? {} : { arrivalLat: null, arrivalLon: null }),
+            }
+          : {}),
       };
       const url =
         editingEventId != null
@@ -409,16 +472,20 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
     }
   }
 
-  function openNewEvent() {
-    setEditingEventId(null);
-    setEventForm(createEmptyEventForm());
-    setEventSheetOpen(true);
-  }
-
   function startEditEvent(event: TripEvent) {
     setEditingEventId(event.id);
     setEventForm(eventToForm(event));
     setPlaceCandidates((prev) => ({ ...prev, [event.id]: [] }));
+    setPlaceEnrichTarget(
+      coerceTripEventType(event.event_type) === "Transfer" ? "origin" : "place"
+    );
+    setEventSheetOpen(true);
+  }
+
+  function openNewEvent() {
+    setEditingEventId(null);
+    setEventForm(createEmptyEventForm());
+    setPlaceEnrichTarget("place");
     setEventSheetOpen(true);
   }
 
@@ -536,12 +603,29 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
       }
       setBusy(true);
       const event = events.find((e) => e.id === eventId);
-      const defaultQuery = [
-        editingEventId === eventId ? eventForm.title : event?.title,
-        editingEventId === eventId ? eventForm.address : event?.address,
-        editingEventId === eventId ? eventForm.location : event?.location,
-        trip?.destination,
-      ]
+      const isTransfer =
+        (editingEventId === eventId
+          ? eventForm.eventType
+          : coerceTripEventType(event?.event_type || "")) === "Transfer";
+      const target = isTransfer ? placeEnrichTarget : "place";
+      const transferQuery =
+        target === "destination"
+          ? editingEventId === eventId
+            ? eventForm.destinationPlace
+            : event?.destination_place
+          : editingEventId === eventId
+            ? eventForm.originPlace
+            : event?.origin_place;
+      const defaultQuery = (
+        isTransfer
+          ? [transferQuery, trip?.destination]
+          : [
+              editingEventId === eventId ? eventForm.title : event?.title,
+              editingEventId === eventId ? eventForm.address : event?.address,
+              editingEventId === eventId ? eventForm.location : event?.location,
+              trip?.destination,
+            ]
+      )
         .filter(Boolean)
         .join(", ");
       const query = (placeQueries[eventId] ?? defaultQuery).trim();
@@ -550,7 +634,10 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ query: query || undefined }),
+          body: JSON.stringify({
+            query: query || undefined,
+            target,
+          }),
         }
       );
       const data = await res.json();
@@ -576,12 +663,18 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
     setBusy(true);
     setError(null);
     try {
+      const event = events.find((e) => e.id === eventId);
+      const isTransfer =
+        (editingEventId === eventId
+          ? eventForm.eventType
+          : coerceTripEventType(event?.event_type || "")) === "Transfer";
+      const target = isTransfer ? placeEnrichTarget : "place";
       const res = await fetch(
         `/api/trips/${tripId}/events/${eventId}/enrich-place`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ candidate }),
+          body: JSON.stringify({ candidate, target }),
         }
       );
       const data = await res.json();
@@ -591,7 +684,13 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
       if (data.event && editingEventId === eventId) {
         setEventForm(eventToForm(data.event as TripEvent));
       }
-      setStatus("Ort angereichert.");
+      setStatus(
+        target === "origin"
+          ? "Abfahrtsort angereichert."
+          : target === "destination"
+            ? "Zielort angereichert."
+            : "Ort angereichert."
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -905,6 +1004,7 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                 onValueChange={(v) => {
                   if (v == null) return;
                   setEventForm((f) => ({ ...f, eventType: v }));
+                  setPlaceEnrichTarget(v === "Transfer" ? "origin" : "place");
                 }}
               >
                 <SelectTrigger>
@@ -968,15 +1068,46 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                 }
               />
             </div>
-            <div className="space-y-1.5">
-              <Label>Ort</Label>
-              <Input
-                value={eventForm.location}
-                onChange={(e) =>
-                  setEventForm((f) => ({ ...f, location: e.target.value }))
-                }
-              />
-            </div>
+            {eventForm.eventType === "Transfer" ? (
+              <>
+                <div className="space-y-1.5">
+                  <Label>Von</Label>
+                  <Input
+                    value={eventForm.originPlace}
+                    onChange={(e) =>
+                      setEventForm((f) => ({
+                        ...f,
+                        originPlace: e.target.value,
+                      }))
+                    }
+                    placeholder="Abfahrtsort"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Nach</Label>
+                  <Input
+                    value={eventForm.destinationPlace}
+                    onChange={(e) =>
+                      setEventForm((f) => ({
+                        ...f,
+                        destinationPlace: e.target.value,
+                      }))
+                    }
+                    placeholder="Zielort"
+                  />
+                </div>
+              </>
+            ) : (
+              <div className="space-y-1.5">
+                <Label>Ort</Label>
+                <Input
+                  value={eventForm.location}
+                  onChange={(e) =>
+                    setEventForm((f) => ({ ...f, location: e.target.value }))
+                  }
+                />
+              </div>
+            )}
             <div className="space-y-1.5 sm:col-span-2">
               <Label>Adresse</Label>
               <Input
@@ -1167,48 +1298,93 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                 {eventForm.eventType === "Hotel" ||
                 eventForm.eventType === "Unterkunft" ||
                 eventForm.eventType === "Ausflug" ||
-                eventForm.eventType === "Kreuzfahrt" ? (
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-                    <div className="min-w-0 flex-1 space-y-1">
-                      <Label
-                        htmlFor={`place-query-edit-${editingEventId}`}
-                        className="text-xs"
+                eventForm.eventType === "Kreuzfahrt" ||
+                eventForm.eventType === "Transfer" ? (
+                  <div className="space-y-2">
+                    {eventForm.eventType === "Transfer" ? (
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          size="sm"
+                          variant={
+                            placeEnrichTarget === "origin"
+                              ? "secondary"
+                              : "outline"
+                          }
+                          type="button"
+                          onClick={() => setPlaceEnrichTarget("origin")}
+                        >
+                          Von anreichern
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={
+                            placeEnrichTarget === "destination"
+                              ? "secondary"
+                              : "outline"
+                          }
+                          type="button"
+                          onClick={() => setPlaceEnrichTarget("destination")}
+                        >
+                          Nach anreichern
+                        </Button>
+                      </div>
+                    ) : null}
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <Label
+                          htmlFor={`place-query-edit-${editingEventId}`}
+                          className="text-xs"
+                        >
+                          OSM-Suche
+                          {eventForm.eventType === "Transfer"
+                            ? placeEnrichTarget === "destination"
+                              ? " (Nach)"
+                              : " (Von)"
+                            : ""}
+                        </Label>
+                        <Input
+                          id={`place-query-edit-${editingEventId}`}
+                          value={
+                            placeQueries[editingEventId] ??
+                            (eventForm.eventType === "Transfer"
+                              ? [
+                                  placeEnrichTarget === "destination"
+                                    ? eventForm.destinationPlace
+                                    : eventForm.originPlace,
+                                  trip?.destination,
+                                ]
+                                  .filter(Boolean)
+                                  .join(", ")
+                              : [
+                                  eventForm.title,
+                                  eventForm.address,
+                                  eventForm.location,
+                                  trip?.destination,
+                                ]
+                                  .filter(Boolean)
+                                  .join(", "))
+                          }
+                          onChange={(e) =>
+                            setPlaceQueries((prev) => ({
+                              ...prev,
+                              [editingEventId]: e.target.value,
+                            }))
+                          }
+                          placeholder="Name + Stadt reicht oft (fuzzy Suche)"
+                          className="h-8 text-xs"
+                        />
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={busy}
+                        onClick={() => void searchPlace(editingEventId)}
+                        className="gap-1.5 shrink-0"
                       >
-                        OSM-Suche
-                      </Label>
-                      <Input
-                        id={`place-query-edit-${editingEventId}`}
-                        value={
-                          placeQueries[editingEventId] ??
-                          [
-                            eventForm.title,
-                            eventForm.address,
-                            eventForm.location,
-                            trip?.destination,
-                          ]
-                            .filter(Boolean)
-                            .join(", ")
-                        }
-                        onChange={(e) =>
-                          setPlaceQueries((prev) => ({
-                            ...prev,
-                            [editingEventId]: e.target.value,
-                          }))
-                        }
-                        placeholder="Name + Stadt reicht oft (fuzzy Suche)"
-                        className="h-8 text-xs"
-                      />
+                        <MapPin className="size-3.5" />
+                        Ort suchen
+                      </Button>
                     </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={busy}
-                      onClick={() => void searchPlace(editingEventId)}
-                      className="gap-1.5 shrink-0"
-                    >
-                      <MapPin className="size-3.5" />
-                      Ort suchen
-                    </Button>
                   </div>
                 ) : null}
                 {(placeCandidates[editingEventId] || []).length > 0 ? (
@@ -1304,7 +1480,7 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                   icon={visual.icon}
                   tone={visual.tone}
                   size="lg"
-                  className="absolute left-0 top-0 z-10 shadow-md ring-2 ring-background"
+                  className="absolute left-0 top-0 z-10 border-2 border-foreground/20 shadow-md"
                 />
                 <Card
                   tone={visual.tone}
@@ -1380,12 +1556,14 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
 
                     {(() => {
                       const type = coerceTripEventType(event.event_type);
+                      const transferPlaces = splitTransferPlaces(event);
                       const showPlaceName =
                         Boolean(event.place_name) &&
                         !textsOverlap(event.place_name, event.title);
                       const address =
                         event.address ||
-                        (event.location &&
+                        (type !== "Transfer" &&
+                        event.location &&
                         !textsOverlap(event.location, event.title) &&
                         !textsOverlap(event.location, event.place_name)
                           ? event.location
@@ -1404,6 +1582,10 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                           event.check_in_desk ||
                           event.baggage_belt
                       );
+                      const hasTransferDetails = Boolean(
+                        type === "Transfer" &&
+                          (transferPlaces.origin || transferPlaces.destination)
+                      );
                       const hasPlaceDetails = Boolean(
                         showPlaceName ||
                           address ||
@@ -1413,29 +1595,72 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                       const hasMap =
                         (event.lat != null && event.lon != null) ||
                         Boolean(event.map_image_url);
-                      const hasRouteMap =
+                      const hasFlightRouteMap =
                         type === "Flug" &&
                         event.departure_lat != null &&
                         event.departure_lon != null &&
                         event.arrival_lat != null &&
                         event.arrival_lon != null;
+                      const hasTransferRouteMap =
+                        type === "Transfer" &&
+                        event.departure_lat != null &&
+                        event.departure_lon != null &&
+                        event.arrival_lat != null &&
+                        event.arrival_lon != null;
+                      const transferPoint =
+                        type === "Transfer" && !hasTransferRouteMap
+                          ? event.departure_lat != null &&
+                            event.departure_lon != null
+                            ? {
+                                lat: event.departure_lat,
+                                lon: event.departure_lon,
+                                label: transferPlaces.origin || "Von",
+                              }
+                            : event.arrival_lat != null &&
+                                event.arrival_lon != null
+                              ? {
+                                  lat: event.arrival_lat,
+                                  lon: event.arrival_lon,
+                                  label: transferPlaces.destination || "Nach",
+                                }
+                              : null
+                          : null;
+                      const hasRouteMap = hasFlightRouteMap || hasTransferRouteMap;
                       const hasGenericDetails = Boolean(
                         event.provider ||
                           event.booking_reference ||
                           (type !== "Flug" && event.flight_number)
                       );
+                      const documents = event.documents || [];
+                      const hasDocuments = documents.length > 0;
 
                       if (
                         !hasFlightDetails &&
+                        !hasTransferDetails &&
                         !hasPlaceDetails &&
                         !hasMap &&
                         !hasRouteMap &&
+                        !transferPoint &&
                         !hasGenericDetails &&
+                        !hasDocuments &&
                         !event.aircraft_image_url &&
                         !event.notes
                       ) {
                         return null;
                       }
+
+                      const documentThumbs = hasDocuments ? (
+                        <div className="flex flex-wrap gap-2">
+                          {documents.map((doc) => (
+                            <DocumentPdfThumb
+                              key={doc.id}
+                              paperlessId={doc.paperless_id}
+                              title={doc.title}
+                              href={`/documents/${doc.id}`}
+                            />
+                          ))}
+                        </div>
+                      ) : null;
 
                       return (
                         <div className="space-y-3">
@@ -1515,20 +1740,58 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                             </div>
                           )}
 
+                          {(hasTransferDetails ||
+                            (hasGenericDetails && type === "Transfer")) && (
+                            <div className="space-y-1.5 rounded-md bg-background/60 px-3 py-2">
+                              <DetailRow
+                                label="Von"
+                                value={transferPlaces.origin || null}
+                              />
+                              <DetailRow
+                                label="Nach"
+                                value={transferPlaces.destination || null}
+                              />
+                              <DetailRow
+                                label="Anbieter"
+                                value={event.provider}
+                              />
+                              <DetailRow
+                                label="Buchung"
+                                value={event.booking_reference}
+                              />
+                            </div>
+                          )}
+
                           {(hasPlaceDetails ||
                             hasMap ||
-                            (hasGenericDetails && type !== "Flug")) && (
+                            (hasDocuments &&
+                              type !== "Flug" &&
+                              type !== "Transfer") ||
+                            (hasGenericDetails &&
+                              type !== "Flug" &&
+                              type !== "Transfer")) && (
                             <div
                               className={cn(
                                 "grid gap-3",
                                 hasMap &&
                                   (hasPlaceDetails ||
-                                    (hasGenericDetails && type !== "Flug")) &&
+                                    hasDocuments ||
+                                    (hasGenericDetails &&
+                                      type !== "Flug" &&
+                                      type !== "Transfer")) &&
                                   "sm:grid-cols-[minmax(0,1fr)_minmax(11rem,15rem)] sm:items-start"
                               )}
                             >
                               {hasPlaceDetails ||
-                              (hasGenericDetails && type !== "Flug") ? (
+                              hasDocuments ||
+                              (hasGenericDetails &&
+                                type !== "Flug" &&
+                                type !== "Transfer") ? (
+                              <div className="space-y-3">
+                                {hasPlaceDetails ||
+                                (hasGenericDetails &&
+                                  type !== "Flug" &&
+                                  type !== "Transfer") ? (
                               <div className="space-y-1.5 rounded-md bg-background/60 px-3 py-2">
                                 {showPlaceName ? (
                                   <DetailRow
@@ -1568,7 +1831,7 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                                     ) : null
                                   }
                                 />
-                                {type !== "Flug" ? (
+                                {type !== "Flug" && type !== "Transfer" ? (
                                   <>
                                     <DetailRow
                                       label="Anbieter"
@@ -1580,6 +1843,9 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                                     />
                                   </>
                                 ) : null}
+                              </div>
+                                ) : null}
+                                {documentThumbs}
                               </div>
                               ) : null}
                               {event.lat != null && event.lon != null ? (
@@ -1605,7 +1871,12 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                             </div>
                           )}
 
-                          {hasRouteMap ? (
+                          {(type === "Flug" || type === "Transfer") &&
+                          documentThumbs
+                            ? documentThumbs
+                            : null}
+
+                          {hasFlightRouteMap ? (
                             <TripMap
                               points={[
                                 {
@@ -1620,7 +1891,33 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                                 },
                               ]}
                               drawRoute
+                              routeStyle="greatCircle"
                               heightClassName="h-44"
+                            />
+                          ) : null}
+
+                          {hasTransferRouteMap ? (
+                            <TripMap
+                              points={[
+                                {
+                                  lat: event.departure_lat!,
+                                  lon: event.departure_lon!,
+                                  label: transferPlaces.origin || "Von",
+                                },
+                                {
+                                  lat: event.arrival_lat!,
+                                  lon: event.arrival_lon!,
+                                  label: transferPlaces.destination || "Nach",
+                                },
+                              ]}
+                              drawRoute
+                              routeStyle="straight"
+                              heightClassName="h-44"
+                            />
+                          ) : transferPoint ? (
+                            <TripMap
+                              points={[transferPoint]}
+                              heightClassName="h-36"
                             />
                           ) : null}
 

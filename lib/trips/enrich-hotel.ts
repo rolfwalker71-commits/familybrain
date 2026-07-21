@@ -376,12 +376,47 @@ export async function searchHotelPlaces(
 
 export async function applyHotelPlaceEnrichment(
   eventId: number,
-  candidate: PlaceCandidate
+  candidate: PlaceCandidate,
+  target: "place" | "origin" | "destination" = "place"
 ): Promise<TripEventRow> {
   const event = getTripEventById(eventId);
   if (!event) throw new Error("Ereignis nicht gefunden");
 
   const mapPath = await fetchStaticMap(candidate.lat, candidate.lon, eventId);
+
+  if (target === "origin") {
+    const destination = event.destination_place;
+    const location =
+      destination && candidate.name
+        ? `${candidate.name} → ${destination}`
+        : candidate.name;
+    return updateTripEvent(eventId, {
+      originPlace: candidate.name,
+      departureLat: candidate.lat,
+      departureLon: candidate.lon,
+      location,
+      mapImagePath: mapPath ?? event.map_image_path,
+      enrichmentJson: JSON.stringify({ ...candidate, target }),
+      enrichedAt: nowIso(),
+    });
+  }
+
+  if (target === "destination") {
+    const origin = event.origin_place;
+    const location =
+      origin && candidate.name
+        ? `${origin} → ${candidate.name}`
+        : candidate.name;
+    return updateTripEvent(eventId, {
+      destinationPlace: candidate.name,
+      arrivalLat: candidate.lat,
+      arrivalLon: candidate.lon,
+      location,
+      mapImagePath: mapPath ?? event.map_image_path,
+      enrichmentJson: JSON.stringify({ ...candidate, target }),
+      enrichedAt: nowIso(),
+    });
+  }
 
   return updateTripEvent(eventId, {
     placeName: candidate.name,

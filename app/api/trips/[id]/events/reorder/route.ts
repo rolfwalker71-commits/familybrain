@@ -1,26 +1,13 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import {
-  aircraftPublicUrl,
-  mapPublicUrl,
-} from "@/lib/trips/cover";
-import {
   getTripById,
   reorderTripEvents,
 } from "@/lib/trips/queries";
+import { serializeTripEvents } from "@/lib/trips/serialize-event";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function serializeEvent(
-  event: ReturnType<typeof reorderTripEvents>[number]
-) {
-  return {
-    ...event,
-    aircraft_image_url: aircraftPublicUrl(event.aircraft_image_path),
-    map_image_url: mapPublicUrl(event.map_image_path),
-  };
-}
 
 const BodySchema = z.object({
   orderedEventIds: z.array(z.number().int().positive()).min(1),
@@ -46,7 +33,7 @@ export async function POST(request: Request, context: Ctx) {
     const events = reorderTripEvents(tripId, parsed.data.orderedEventIds);
     return NextResponse.json({
       ok: true,
-      events: events.map(serializeEvent),
+      events: serializeTripEvents(events),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

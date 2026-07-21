@@ -5,11 +5,8 @@ import {
   searchHotelPlaces,
   type PlaceCandidate,
 } from "@/lib/trips/enrich-hotel";
-import {
-  aircraftPublicUrl,
-  mapPublicUrl,
-} from "@/lib/trips/cover";
 import { getTripEventById } from "@/lib/trips/queries";
+import { serializeTripEvent } from "@/lib/trips/serialize-event";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,6 +16,7 @@ type Ctx = { params: Promise<{ id: string; eventId: string }> };
 
 const BodySchema = z.object({
   query: z.string().optional(),
+  target: z.enum(["place", "origin", "destination"]).optional(),
   candidate: z
     .object({
       osmId: z.string(),
@@ -48,15 +46,12 @@ export async function POST(request: Request, context: Ctx) {
     if (body.candidate) {
       const event = await applyHotelPlaceEnrichment(
         eventId,
-        body.candidate as PlaceCandidate
+        body.candidate as PlaceCandidate,
+        body.target || "place"
       );
       return NextResponse.json({
         ok: true,
-        event: {
-          ...event,
-          aircraft_image_url: aircraftPublicUrl(event.aircraft_image_path),
-          map_image_url: mapPublicUrl(event.map_image_path),
-        },
+        event: serializeTripEvent(event),
       });
     }
 

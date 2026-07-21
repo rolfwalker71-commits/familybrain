@@ -16,8 +16,10 @@ export type TripMapPoint = {
 
 type Props = {
   points: TripMapPoint[];
-  /** Draw a great-circle route when two points are provided */
+  /** Draw a route when two points are provided */
   drawRoute?: boolean;
+  /** Flight routes use great-circle; transfers use a straight line */
+  routeStyle?: "greatCircle" | "straight";
   className?: string;
   heightClassName?: string;
   /** Override settings; otherwise loaded from /api/settings */
@@ -109,6 +111,7 @@ async function loadMapStyle(): Promise<MapStyleId> {
 export function TripMap({
   points,
   drawRoute = false,
+  routeStyle = "greatCircle",
   className,
   heightClassName = "h-40",
   mapStyle: mapStyleProp,
@@ -197,7 +200,15 @@ export function TripMap({
       });
 
       if (drawRoute && current.length >= 2) {
-        const path = greatCircleLatLngs(current[0], current[current.length - 1]);
+        const a = current[0];
+        const b = current[current.length - 1];
+        const path: [number, number][] =
+          routeStyle === "straight"
+            ? [
+                [a.lat, a.lon],
+                [b.lat, b.lon],
+              ]
+            : greatCircleLatLngs(a, b);
         L.polyline(path, {
           color: "#0f766e",
           weight: 3,
@@ -222,7 +233,7 @@ export function TripMap({
         mapRef.current = null;
       }
     };
-  }, [pointsKey, drawRoute, mapId, resolvedStyle]);
+  }, [pointsKey, drawRoute, routeStyle, mapId, resolvedStyle]);
 
   if (valid.length === 0) return null;
 

@@ -1,10 +1,7 @@
 import { NextResponse } from "next/server";
 import { enrichFlightEvent } from "@/lib/trips/enrich-flight";
-import {
-  aircraftPublicUrl,
-  mapPublicUrl,
-} from "@/lib/trips/cover";
 import { getTripEventById } from "@/lib/trips/queries";
+import { serializeTripEvent } from "@/lib/trips/serialize-event";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,11 +21,7 @@ export async function POST(_request: Request, context: Ctx) {
     const event = await enrichFlightEvent(eventId);
     return NextResponse.json({
       ok: true,
-      event: {
-        ...event,
-        aircraft_image_url: aircraftPublicUrl(event.aircraft_image_path),
-        map_image_url: mapPublicUrl(event.map_image_path),
-      },
+      event: serializeTripEvent(event),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

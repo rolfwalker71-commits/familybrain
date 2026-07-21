@@ -1,25 +1,14 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import {
-  aircraftPublicUrl,
-  mapPublicUrl,
-} from "@/lib/trips/cover";
-import {
   deleteTripEvent,
   getTripEventById,
   updateTripEvent,
 } from "@/lib/trips/queries";
+import { serializeTripEvent } from "@/lib/trips/serialize-event";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function serializeEvent(event: NonNullable<ReturnType<typeof getTripEventById>>) {
-  return {
-    ...event,
-    aircraft_image_url: aircraftPublicUrl(event.aircraft_image_path),
-    map_image_url: mapPublicUrl(event.map_image_path),
-  };
-}
 
 const PatchSchema = z.object({
   eventType: z.string().min(1).optional(),
@@ -43,6 +32,12 @@ const PatchSchema = z.object({
   arrivalGate: z.string().nullable().optional(),
   checkInDesk: z.string().nullable().optional(),
   baggageBelt: z.string().nullable().optional(),
+  originPlace: z.string().nullable().optional(),
+  destinationPlace: z.string().nullable().optional(),
+  departureLat: z.number().nullable().optional(),
+  departureLon: z.number().nullable().optional(),
+  arrivalLat: z.number().nullable().optional(),
+  arrivalLon: z.number().nullable().optional(),
 });
 
 type Ctx = { params: Promise<{ id: string; eventId: string }> };
@@ -70,7 +65,7 @@ export async function PATCH(request: Request, context: Ctx) {
       return NextResponse.json({ error: "Ungültige Eingabe" }, { status: 400 });
     }
     const event = updateTripEvent(eventId, parsed.data);
-    return NextResponse.json({ ok: true, event: serializeEvent(event) });
+    return NextResponse.json({ ok: true, event: serializeTripEvent(event) });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return NextResponse.json({ error: message }, { status: 500 });

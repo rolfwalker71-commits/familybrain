@@ -11,6 +11,128 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { IconCircle } from "@/components/layout/icon-circle";
+import { cn } from "@/lib/utils";
+
+function PdfPreviewDialog({
+  open,
+  onOpenChange,
+  paperlessId,
+  title,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  paperlessId: number;
+  title?: string | null;
+}) {
+  const pdfUrl = `/api/paperless/documents/${paperlessId}/file?type=pdf`;
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        className="flex h-dvh w-screen max-w-none flex-col gap-3 rounded-none p-3 sm:h-[90dvh] sm:w-[min(1100px,95vw)] sm:max-w-none sm:rounded-xl sm:p-4"
+        showCloseButton
+      >
+        <DialogHeader>
+          <DialogTitle className="truncate pr-8">
+            {title || `Dokument ${paperlessId}`}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="min-h-0 flex-1 overflow-hidden rounded-lg border border-border bg-muted/30">
+          <iframe
+            title={title || "PDF"}
+            src={pdfUrl}
+            className="h-full w-full"
+          />
+        </div>
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Schliessen
+          </Button>
+          <a
+            href={pdfUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex min-h-11 items-center rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          >
+            In neuem Tab öffnen
+          </a>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Compact PDF thumbnail for cards — click opens enlarge dialog. */
+export function DocumentPdfThumb({
+  paperlessId,
+  title,
+  href,
+  className,
+}: {
+  paperlessId: number;
+  title?: string | null;
+  /** Optional link under the thumb (e.g. document detail page) */
+  href?: string;
+  className?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [thumbError, setThumbError] = useState(false);
+  const thumbUrl = `/api/paperless/documents/${paperlessId}/file?type=thumb`;
+
+  return (
+    <>
+      <div className={cn("w-[5.5rem] shrink-0 sm:w-28", className)}>
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          title={title || "PDF öffnen"}
+          className="group relative block w-full overflow-hidden rounded-md border border-border/70 bg-muted/40 text-left transition-colors hover:bg-muted"
+        >
+          {!thumbError ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={thumbUrl}
+              alt={title || "PDF Vorschau"}
+              className="aspect-[3/4] w-full object-cover object-top"
+              onError={() => setThumbError(true)}
+            />
+          ) : (
+            <div className="flex aspect-[3/4] w-full flex-col items-center justify-center gap-1 text-muted-foreground">
+              <FileText className="size-6" />
+              <span className="px-1 text-center text-[10px] leading-tight">
+                PDF
+              </span>
+            </div>
+          )}
+          <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 bg-gradient-to-t from-black/55 to-transparent px-1 py-1.5 text-[10px] text-white opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
+            <Maximize2 className="size-3" />
+            Öffnen
+          </div>
+        </button>
+        {title || href ? (
+          <div className="mt-1 truncate text-[10px] leading-tight text-muted-foreground">
+            {href ? (
+              <a
+                href={href}
+                className="underline-offset-2 hover:underline"
+                title={title || undefined}
+              >
+                {title || "Dokument"}
+              </a>
+            ) : (
+              <span title={title || undefined}>{title}</span>
+            )}
+          </div>
+        ) : null}
+      </div>
+      <PdfPreviewDialog
+        open={open}
+        onOpenChange={setOpen}
+        paperlessId={paperlessId}
+        title={title}
+      />
+    </>
+  );
+}
 
 export function DocumentPdfPreview({
   paperlessId,
@@ -81,38 +203,12 @@ export function DocumentPdfPreview({
         </CardContent>
       </Card>
 
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent
-          className="flex h-dvh w-screen max-w-none flex-col gap-3 rounded-none p-3 sm:h-[90dvh] sm:w-[min(1100px,95vw)] sm:max-w-none sm:rounded-xl sm:p-4"
-          showCloseButton
-        >
-          <DialogHeader>
-            <DialogTitle className="truncate pr-8">
-              {title || `Dokument ${paperlessId}`}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="min-h-0 flex-1 overflow-hidden rounded-lg border border-border bg-muted/30">
-            <iframe
-              title={title || "PDF"}
-              src={pdfUrl}
-              className="h-full w-full"
-            />
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setOpen(false)}>
-              Schliessen
-            </Button>
-            <a
-              href={pdfUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex min-h-11 items-center rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-            >
-              In neuem Tab öffnen
-            </a>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <PdfPreviewDialog
+        open={open}
+        onOpenChange={setOpen}
+        paperlessId={paperlessId}
+        title={title}
+      />
     </>
   );
 }

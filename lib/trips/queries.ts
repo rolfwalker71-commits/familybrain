@@ -63,6 +63,8 @@ export type TripEventRow = {
   departure_lon: number | null;
   arrival_lat: number | null;
   arrival_lon: number | null;
+  origin_place: string | null;
+  destination_place: string | null;
   place_name: string | null;
   address: string | null;
   phone: string | null;
@@ -344,6 +346,8 @@ export type TripEventInput = {
   departureLon?: number | null;
   arrivalLat?: number | null;
   arrivalLon?: number | null;
+  originPlace?: string | null;
+  destinationPlace?: string | null;
   placeName?: string | null;
   address?: string | null;
   phone?: string | null;
@@ -371,9 +375,16 @@ export function createTripEvent(
 
   const dep = normalizeIataCode(input.departureAirport);
   const arr = normalizeIataCode(input.arrivalAirport);
+  const origin = input.originPlace?.trim() || null;
+  const destination = input.destinationPlace?.trim() || null;
+  const transferRoute =
+    origin && destination
+      ? `${origin} → ${destination}`
+      : origin || destination || null;
   const location =
     input.location?.trim() ||
     formatAirportRoute(dep, arr) ||
+    transferRoute ||
     null;
 
   const result = db
@@ -387,6 +398,7 @@ export function createTripEvent(
          departure_terminal, arrival_terminal, departure_gate, arrival_gate,
          check_in_desk, baggage_belt,
          departure_lat, departure_lon, arrival_lat, arrival_lon,
+         origin_place, destination_place,
          place_name, address, phone, website, lat, lon, map_image_path, osm_id,
          enrichment_json, enriched_at, created_at, updated_at
        ) VALUES (
@@ -398,6 +410,7 @@ export function createTripEvent(
          ?, ?, ?, ?,
          ?, ?,
          ?, ?, ?, ?,
+         ?, ?,
          ?, ?, ?, ?, ?, ?, ?, ?,
          ?, ?, ?, ?
        )`
@@ -438,6 +451,8 @@ export function createTripEvent(
       input.departureLon ?? null,
       input.arrivalLat ?? null,
       input.arrivalLon ?? null,
+      origin,
+      destination,
       input.placeName?.trim() || null,
       input.address?.trim() || null,
       input.phone?.trim() || null,
@@ -464,6 +479,25 @@ export function updateTripEvent(
 ): TripEventRow {
   const existing = getTripEventById(eventId);
   if (!existing) throw new Error("Ereignis nicht gefunden");
+
+  const nextOrigin =
+    input.originPlace !== undefined
+      ? input.originPlace?.trim() || null
+      : existing.origin_place;
+  const nextDestination =
+    input.destinationPlace !== undefined
+      ? input.destinationPlace?.trim() || null
+      : existing.destination_place;
+  const transferRoute =
+    nextOrigin && nextDestination
+      ? `${nextOrigin} → ${nextDestination}`
+      : nextOrigin || nextDestination || null;
+  const nextLocation =
+    input.location !== undefined
+      ? input.location?.trim() || null
+      : input.originPlace !== undefined || input.destinationPlace !== undefined
+        ? transferRoute || existing.location
+        : existing.location;
 
   const db = getDb();
   db.prepare(
@@ -502,6 +536,8 @@ export function updateTripEvent(
        departure_lon = ?,
        arrival_lat = ?,
        arrival_lon = ?,
+       origin_place = ?,
+       destination_place = ?,
        place_name = ?,
        address = ?,
        phone = ?,
@@ -523,9 +559,7 @@ export function updateTripEvent(
     input.endDate !== undefined ? input.endDate : existing.end_date,
     input.startTime !== undefined ? input.startTime : existing.start_time,
     input.endTime !== undefined ? input.endTime : existing.end_time,
-    input.location !== undefined
-      ? input.location?.trim() || null
-      : existing.location,
+    nextLocation,
     input.provider !== undefined
       ? input.provider?.trim() || null
       : existing.provider,
@@ -593,6 +627,8 @@ export function updateTripEvent(
       : existing.departure_lon,
     input.arrivalLat !== undefined ? input.arrivalLat : existing.arrival_lat,
     input.arrivalLon !== undefined ? input.arrivalLon : existing.arrival_lon,
+    nextOrigin,
+    nextDestination,
     input.placeName !== undefined
       ? input.placeName?.trim() || null
       : existing.place_name,
