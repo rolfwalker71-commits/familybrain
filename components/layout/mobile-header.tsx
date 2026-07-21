@@ -47,7 +47,7 @@ export function MobileHeader() {
         </SheetTrigger>
         <SheetContent
           side="left"
-          className="w-[min(86vw,20rem)] gap-0 border-sidebar-border bg-sidebar p-0 text-sidebar-foreground"
+          className="w-[min(86vw,20rem)] gap-0 overflow-y-auto border-sidebar-border bg-sidebar p-0 text-sidebar-foreground"
         >
           <SheetHeader className="sr-only">
             <SheetTitle>Navigation</SheetTitle>

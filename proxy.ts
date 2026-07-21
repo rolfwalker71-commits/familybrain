@@ -20,7 +20,10 @@ const PUBLIC_PATHS = new Set([
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
 function isPublicPath(pathname: string): boolean {
-  return PUBLIC_PATHS.has(pathname);
+  if (PUBLIC_PATHS.has(pathname)) return true;
+  if (pathname.startsWith("/share/t/")) return true;
+  if (pathname.startsWith("/api/share/t/")) return true;
+  return false;
 }
 
 function hasValidOrigin(request: NextRequest): boolean {
@@ -69,6 +72,13 @@ export async function proxy(request: NextRequest) {
   }
 
   if (isPublicPath(pathname) && pathname !== "/login") {
+    // Public share APIs are read-only.
+    if (
+      pathname.startsWith("/api/share/t/") &&
+      !SAFE_METHODS.has(request.method)
+    ) {
+      return NextResponse.json({ error: "Methode nicht erlaubt." }, { status: 405 });
+    }
     return NextResponse.next();
   }
 

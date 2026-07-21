@@ -136,7 +136,7 @@ export function Sidebar({
         </Link>
       </div>
 
-      <nav className="flex-1 space-y-1 px-3 pb-4">
+      <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto px-3 pb-4">
         {navItems.map((item) => {
           const active =
             pathname === item.href || pathname.startsWith(`${item.href}/`);

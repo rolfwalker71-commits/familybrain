@@ -161,6 +161,20 @@ function ensureTripsTables(db: Database.Database): void {
       ON trip_event_documents(trip_event_id);
     CREATE INDEX IF NOT EXISTS idx_trip_event_documents_doc
       ON trip_event_documents(document_id);
+    CREATE TABLE IF NOT EXISTS trip_share_links (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      trip_id INTEGER NOT NULL,
+      token TEXT NOT NULL UNIQUE,
+      label TEXT,
+      created_at TEXT NOT NULL,
+      expires_at TEXT,
+      revoked_at TEXT,
+      FOREIGN KEY(trip_id) REFERENCES trips(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_trip_share_links_trip
+      ON trip_share_links(trip_id);
+    CREATE INDEX IF NOT EXISTS idx_trip_share_links_token
+      ON trip_share_links(token);
   `);
 
   // Backfill primary document_id into junction (once).

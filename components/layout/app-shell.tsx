@@ -11,6 +11,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isLogin = pathname === "/login";
   const isChat = pathname === "/chat";
+  const isBareChrome =
+    isLogin ||
+    (pathname.startsWith("/trips/") && pathname.endsWith("/print")) ||
+    pathname.startsWith("/share/");
 
   useEffect(() => {
     if (!isChat) return;
@@ -26,7 +30,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     };
   }, [isChat]);
 
-  if (isLogin) {
+  if (isBareChrome) {
     return <>{children}</>;
   }
 

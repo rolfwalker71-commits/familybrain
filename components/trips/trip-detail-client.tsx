@@ -6,8 +6,9 @@ import {
   ArrowLeft,
   BedDouble,
   Bus,
-  CalendarPlus,
   Car,
+  ChevronDown,
+  ChevronUp,
   GripVertical,
   ImagePlus,
   Info,
@@ -51,6 +52,7 @@ import {
 } from "@/components/layout/icon-circle";
 import { DocumentPdfThumb } from "@/components/documents/document-pdf-preview";
 import { TripMap } from "@/components/trips/trip-map";
+import { TripExportMenu } from "@/components/trips/trip-export-menu";
 import {
   toDateInputValue,
   toSwissDate,
@@ -838,6 +840,18 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
     }
   }
 
+  function moveEvent(eventId: number, delta: -1 | 1) {
+    const fromIndex = events.findIndex((x) => x.id === eventId);
+    if (fromIndex < 0) return;
+    const toIndex = fromIndex + delta;
+    if (toIndex < 0 || toIndex >= events.length) return;
+    const next = [...events];
+    const [moved] = next.splice(fromIndex, 1);
+    next.splice(toIndex, 0, moved);
+    setEvents(next);
+    void persistEventOrder(next);
+  }
+
   async function unlinkEventDocument(eventId: number, documentId: number) {
     if (!window.confirm("Verknüpfung dieses Belegs entfernen?")) return;
     setBusy(true);
@@ -934,13 +948,15 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
       ) : null}
 
       <div className="flex flex-wrap gap-2">
-        <a
-          href={`/api/trips/${tripId}/ics`}
-          className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-        >
-          <CalendarPlus className="mr-1.5 size-4" />
-          Kalender (ICS)
-        </a>
+        <TripExportMenu
+          tripId={tripId}
+          title={trip.title}
+          destination={trip.destination}
+          startDate={trip.start_date}
+          endDate={trip.end_date}
+          onStatus={setStatus}
+          onError={setError}
+        />
         {editMode ? (
           <>
             <Button
@@ -1077,7 +1093,7 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
               }}
             />
           </div>
-          <div className="min-w-[16rem] flex-1 space-y-1.5">
+          <div className="min-w-0 w-full flex-1 space-y-1.5 sm:min-w-[16rem]">
             <Label>AI-Prompt (optional)</Label>
             <Input
               value={coverPrompt}
@@ -1112,9 +1128,9 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
       >
         <SheetContent
           side="right"
-          className="w-full gap-0 overflow-y-auto sm:max-w-lg"
+          className="flex h-dvh max-h-dvh w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-lg"
         >
-          <SheetHeader className="border-b border-border/70">
+          <SheetHeader className="shrink-0 border-b border-border/70 px-4 pt-4">
             <SheetTitle>
               {editingEventId != null
                 ? "Aktivität bearbeiten"
@@ -1124,7 +1140,7 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
               Typ, Zeiten und Details der Aktivität anpassen.
             </SheetDescription>
           </SheetHeader>
-          <div className="grid gap-3 p-4 sm:grid-cols-2">
+          <div className="grid min-h-0 flex-1 gap-3 overflow-y-auto p-4 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label>Typ</Label>
               <Select
@@ -1556,7 +1572,7 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
               </div>
             ) : null}
           </div>
-          <SheetFooter className="border-t border-border/70">
+          <SheetFooter className="mt-auto shrink-0 flex-row gap-2 border-t border-border/70 bg-background p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
             <Button
               disabled={busy || !eventForm.title.trim()}
               onClick={() => void saveEvent()}
@@ -1574,7 +1590,7 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
         <h2 className="text-lg font-semibold">Timeline</h2>
         {editMode ? (
           <p className="text-xs text-muted-foreground">
-            Ziehe Ereignisse am Griff, um die Reihenfolge zu ändern.
+            Reihenfolge per ▲/▼ oder am Griff ziehen (Desktop).
           </p>
         ) : null}
         {events.length === 0 ? (
@@ -1641,37 +1657,62 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                       "ring-2 ring-teal-400/50"
                   )}
                 >
-                  <div className="pointer-events-none absolute inset-x-0 top-4 z-[1] flex justify-center">
-                    <div className="pointer-events-auto">
+                  <CardContent className="space-y-3 p-4 pl-8">
+                    <div className="flex justify-center">
                       <EventDateHeader event={event} />
                     </div>
-                  </div>
-                  <CardContent className="space-y-3 p-4 pl-8">
-                    <div className="flex min-h-[5.75rem] items-start gap-2">
+                    <div className="flex items-start gap-2">
                       <div className="flex min-w-0 flex-1 items-start gap-2 pr-2">
                         {editMode ? (
-                          <button
-                            type="button"
-                            draggable
-                            title="Ziehen zum Sortieren"
-                            className="mt-1.5 cursor-grab touch-none rounded p-1 text-muted-foreground hover:bg-background/70 active:cursor-grabbing"
-                            onDragStart={(e) => {
-                              setDragEventId(event.id);
-                              e.dataTransfer.effectAllowed = "move";
-                              e.dataTransfer.setData(
-                                "text/plain",
-                                String(event.id)
-                              );
-                            }}
-                            onDragEnd={() => {
-                              setDragEventId(null);
-                              setDragOverEventId(null);
-                            }}
-                          >
-                            <GripVertical className="size-4" />
-                          </button>
+                          <div className="mt-0.5 flex shrink-0 flex-col items-center gap-0.5">
+                            <Button
+                              type="button"
+                              size="icon-xs"
+                              variant="ghost"
+                              className="sm:hidden"
+                              disabled={busy || events[0]?.id === event.id}
+                              onClick={() => moveEvent(event.id, -1)}
+                              title="Nach oben"
+                            >
+                              <ChevronUp className="size-3.5" />
+                            </Button>
+                            <button
+                              type="button"
+                              draggable
+                              title="Ziehen zum Sortieren"
+                              className="hidden cursor-grab touch-none rounded p-1 text-muted-foreground hover:bg-background/70 active:cursor-grabbing sm:inline-flex"
+                              onDragStart={(e) => {
+                                setDragEventId(event.id);
+                                e.dataTransfer.effectAllowed = "move";
+                                e.dataTransfer.setData(
+                                  "text/plain",
+                                  String(event.id)
+                                );
+                              }}
+                              onDragEnd={() => {
+                                setDragEventId(null);
+                                setDragOverEventId(null);
+                              }}
+                            >
+                              <GripVertical className="size-4" />
+                            </button>
+                            <Button
+                              type="button"
+                              size="icon-xs"
+                              variant="ghost"
+                              className="sm:hidden"
+                              disabled={
+                                busy ||
+                                events[events.length - 1]?.id === event.id
+                              }
+                              onClick={() => moveEvent(event.id, 1)}
+                              title="Nach unten"
+                            >
+                              <ChevronDown className="size-3.5" />
+                            </Button>
+                          </div>
                         ) : null}
-                        <div className="min-w-0 max-w-[min(100%,12rem)] sm:max-w-[min(100%,16rem)] lg:max-w-[min(100%,20rem)]">
+                        <div className="min-w-0 flex-1">
                           <div className="text-xl font-black leading-tight tracking-tight sm:text-2xl">
                             {event.title}
                           </div>
@@ -1685,7 +1726,7 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                           })()}
                         </div>
                       </div>
-                      <div className="flex min-w-0 flex-1 flex-wrap items-start justify-end gap-1 pl-2">
+                      <div className="flex shrink-0 flex-wrap items-start justify-end gap-1">
                         <Badge variant="secondary" className="shrink-0">
                           {coerceTripEventType(event.event_type)}
                         </Badge>
@@ -1816,10 +1857,11 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                       }
 
                       const documentThumbs = hasDocuments ? (
-                        <div
-                          className="grid grid-flow-col justify-start gap-2"
-                          style={{ gridAutoColumns: "3.5rem" }}
-                        >
+                        <div className="max-w-full overflow-x-auto pb-1">
+                          <div
+                            className="grid w-max grid-flow-col justify-start gap-2"
+                            style={{ gridAutoColumns: "3.5rem" }}
+                          >
                           {documents.map((doc) => (
                             <DocumentPdfThumb
                               key={doc.id}
@@ -1835,6 +1877,7 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                               }
                             />
                           ))}
+                          </div>
                         </div>
                       ) : null;
 
