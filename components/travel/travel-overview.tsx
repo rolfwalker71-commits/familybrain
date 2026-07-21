@@ -22,6 +22,8 @@ import {
 import { PageHeader, TileTitleBar, MetricTile } from "@/components/layout/page-primitives";
 import { IconCircle, pageVisuals, toneSurface, type IconTone } from "@/components/layout/icon-circle";
 import { AddToCalendarButton } from "@/components/calendar/add-to-calendar-button";
+import { AddToTripButton } from "@/components/trips/add-to-trip-button";
+import type { TripEventDraft } from "@/lib/trips/constants";
 import {
   DocumentInfoButton,
   DocumentTitleLink,
@@ -94,6 +96,24 @@ function learnHintFor(row: {
     return `Künftig: Titel enthält «${phrase}»`;
   }
   return null;
+}
+
+function travelRowToDraft(row: TravelRow): TripEventDraft {
+  const type = typeLabel(row);
+  const route =
+    [row.origin, row.destination].filter(Boolean).join(" → ") || null;
+  return {
+    type,
+    title: row.title || route || type,
+    start_date: row.start_date,
+    end_date: row.end_date,
+    location: row.destination || row.origin || null,
+    provider: row.provider,
+    booking_reference: row.booking_reference,
+    document_id: row.document_local_id,
+    travel_item_id: row.id,
+    source_excerpt: row.title || route || null,
+  };
 }
 
 function percent(part: number, whole: number) {
@@ -218,6 +238,7 @@ function TravelListRow({
             onKeyDown={(e) => e.stopPropagation()}
           >
             <DocumentInfoButton documentId={row.document_local_id} />
+            <AddToTripButton draft={travelRowToDraft(row)} />
             {event ? (
               <AddToCalendarButton
                 events={[event]}

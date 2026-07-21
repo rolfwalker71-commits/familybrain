@@ -21,6 +21,8 @@ import {
   formatChatInstructionsForPrompt,
   getChatInstructions,
 } from "@/lib/chat/instructions";
+import { parseTripEventsMarker } from "@/lib/trips/parse-trip-events";
+import type { TripEventDraft } from "@/lib/trips/constants";
 import { getOpenAIClient, getOpenAIModel } from "./client";
 import {
   retrieveForChat,
@@ -38,6 +40,7 @@ export type ChatAnswer = {
   sources: ChatSource[];
   noteSources: TriliumNoteSource[];
   guideSources: GuideSource[];
+  tripEvents: TripEventDraft[];
 };
 
 const EMPTY_RETRIEVAL: ChatRetrieval = {
@@ -118,7 +121,11 @@ Regeln:
 - Wenn nichts direkt belegt ist, hänge trotzdem die drei Marker je auf einer eigenen Zeile an (ohne Kommas dazwischen):
   [[SOURCE_IDS:]]
   [[NOTE_IDS:]]
-  [[GUIDE_IDS:]]`;
+  [[GUIDE_IDS:]]
+- Wenn die Antwort Reise-Ereignisse enthält (Flug, Hotel, Bahn, Transfer, Kreuzfahrt usw.), hänge ZUSÄTZLICH als letzte Zeile einen TRIP_EVENTS-Marker an (JSON-Array, ISO-Daten yyyy-mm-dd, Zeiten HH:mm). Nur klar belegte Events, max. 8:
+  [[TRIP_EVENTS:[{"type":"Flug","title":"Zürich–Miami","start_date":"2026-10-23","start_time":"10:15","flight_number":"LX80","provider":"SWISS"}]]]
+- type muss einer von: Flug, Hotel, Bahn, Kreuzfahrt, Mietwagen, Transfer, Parking, Visa / Einreise, Pauschalreise / Urlaub, Reiseversicherung, Aktivität, Notiz, Sonstiges sein.
+- Wenn keine Reise-Events: keinen TRIP_EVENTS-Marker setzen.`;
 }
 
 const SOURCE_IDS_MARKER = /\[\[SOURCE_IDS:\s*([0-9,\s]*)\]\]/i;
@@ -348,7 +355,9 @@ Wichtig für Quellen:
   const rawAnswer =
     completion.choices[0]?.message?.content?.trim() ||
     "Ich konnte keine Antwort erzeugen.";
-  const parsed = parseChatAnswerSources(rawAnswer);
+  const { answer: withoutTripEvents, tripEvents } =
+    parseTripEventsMarker(rawAnswer);
+  const parsed = parseChatAnswerSources(withoutTripEvents);
 
   const sourceCandidates = new Map<number, ChatSource>(
     retrieval.sources.map((source) => [source.id, source])
@@ -391,5 +400,6 @@ Wichtig für Quellen:
     sources,
     noteSources,
     guideSources: citedGuideSources,
+    tripEvents,
   };
 }

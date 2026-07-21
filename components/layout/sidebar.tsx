@@ -15,6 +15,7 @@ import {
   MessageSquare,
   LogOut,
   BookOpen,
+  Luggage,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -82,6 +83,12 @@ const navItems: NavItem[] = [
     icon: Plane,
     tone: "teal",
     countKey: "travelDocuments",
+  },
+  {
+    href: "/trips",
+    label: "TravelBrain",
+    icon: Luggage,
+    tone: "indigo",
   },
   { href: "/guides", label: "Guides", icon: BookOpen, tone: "teal" },
   { href: "/chat", label: "Chat", icon: MessageSquare, tone: "indigo" },

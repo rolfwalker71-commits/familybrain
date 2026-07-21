@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { KeyRound, Server, BookOpen, MessageSquareText } from "lucide-react";
+import { KeyRound, Server, BookOpen, MessageSquareText, Luggage } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,7 +40,7 @@ export default function SettingsPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState<
-    "paperless" | "openai" | "trilium" | "chat" | null
+    "paperless" | "openai" | "trilium" | "chat" | "travelbrain" | null
   >(null);
   const [triliumBaseUrl, setTriliumBaseUrl] = useState("");
   const [triliumToken, setTriliumToken] = useState("");
@@ -63,6 +63,11 @@ export default function SettingsPage() {
   const [chatInstructionsDefault, setChatInstructionsDefault] = useState("");
   const [chatInstructionsCustomized, setChatInstructionsCustomized] =
     useState(false);
+  const [aerodataboxKey, setAerodataboxKey] = useState("");
+  const [aerodataboxKeyMasked, setAerodataboxKeyMasked] = useState<string | null>(
+    null
+  );
+  const [hasAerodataboxKey, setHasAerodataboxKey] = useState(false);
 
   useEffect(() => {
     void (async () => {
@@ -90,6 +95,8 @@ export default function SettingsPage() {
       setChatInstructions(data.chatInstructions || "");
       setChatInstructionsDefault(data.chatInstructionsDefault || "");
       setChatInstructionsCustomized(Boolean(data.chatInstructionsCustomized));
+      setAerodataboxKeyMasked(data.aerodataboxApiKeyMasked || null);
+      setHasAerodataboxKey(Boolean(data.hasAerodataboxKey));
     })();
   }, []);
 
@@ -249,6 +256,31 @@ export default function SettingsPage() {
       setMessage(
         "Ausgangs-Vorlage wiederhergestellt. Du kannst sie jederzeit erneut anpassen und speichern."
       );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  async function saveTravelBrainSettings() {
+    setSaving("travelbrain");
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          aerodataboxApiKey: aerodataboxKey || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Speichern fehlgeschlagen");
+      setAerodataboxKeyMasked(data.aerodataboxApiKeyMasked || null);
+      setHasAerodataboxKey(Boolean(data.hasAerodataboxKey));
+      setAerodataboxKey("");
+      setMessage("TravelBrain-Einstellungen gespeichert.");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -476,6 +508,49 @@ export default function SettingsPage() {
               {resolvingScopes ? "Erkenne Bereiche…" : "Bereiche erkennen"}
             </Button>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-border/80 shadow-sm">
+        <CardHeader className="flex flex-row items-center justify-between gap-3">
+          <CardTitle className="flex items-center gap-3 text-base">
+            <IconCircle icon={Luggage} tone="indigo" size="sm" />
+            TravelBrain
+          </CardTitle>
+          {hasAerodataboxKey ? (
+            <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">
+              Flug-API ok
+            </Badge>
+          ) : (
+            <Badge variant="secondary">Flug-API optional</Badge>
+          )}
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Optionaler AeroDataBox-Key (RapidAPI) für Flug-Anreicherung in
+            TravelBrain. Hotel-Orte nutzen öffentlich OpenStreetMap/Nominatim
+            ohne Key.
+          </p>
+          <div className="space-y-2">
+            <Label htmlFor="aeroKey">AeroDataBox / RapidAPI-Key</Label>
+            <Input
+              id="aeroKey"
+              type="password"
+              value={aerodataboxKey}
+              onChange={(e) => setAerodataboxKey(e.target.value)}
+              placeholder={
+                hasAerodataboxKey
+                  ? `Gespeichert: ${aerodataboxKeyMasked || "••••"}`
+                  : "RapidAPI-Key"
+              }
+            />
+          </div>
+          <Button
+            onClick={() => void saveTravelBrainSettings()}
+            disabled={saving !== null}
+          >
+            {saving === "travelbrain" ? "Speichert…" : "TravelBrain speichern"}
+          </Button>
         </CardContent>
       </Card>
 

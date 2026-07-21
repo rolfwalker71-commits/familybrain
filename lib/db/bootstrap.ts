@@ -73,6 +73,71 @@ export function bootstrapDatabase(db: Database.Database): void {
   ensureTriliumNotesTable(db);
   ensureKnowledgeGuidesTables(db);
   ensureChatCorrectionsTable(db);
+  ensureTripsTables(db);
+}
+
+function ensureTripsTables(db: Database.Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS trips (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'planned',
+      start_date TEXT,
+      end_date TEXT,
+      destination TEXT,
+      summary TEXT,
+      cover_path TEXT,
+      cover_prompt TEXT,
+      notes TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS trip_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      trip_id INTEGER NOT NULL,
+      event_type TEXT NOT NULL,
+      title TEXT NOT NULL,
+      start_date TEXT,
+      end_date TEXT,
+      start_time TEXT,
+      end_time TEXT,
+      location TEXT,
+      provider TEXT,
+      booking_reference TEXT,
+      notes TEXT,
+      sort_key INTEGER NOT NULL DEFAULT 0,
+      document_id INTEGER,
+      travel_item_id INTEGER,
+      guide_id INTEGER,
+      note_id TEXT,
+      source_excerpt TEXT,
+      flight_number TEXT,
+      airline TEXT,
+      aircraft_reg TEXT,
+      aircraft_type TEXT,
+      departure_airport TEXT,
+      arrival_airport TEXT,
+      duration_minutes INTEGER,
+      aircraft_image_path TEXT,
+      place_name TEXT,
+      address TEXT,
+      phone TEXT,
+      website TEXT,
+      lat REAL,
+      lon REAL,
+      map_image_path TEXT,
+      osm_id TEXT,
+      enrichment_json TEXT,
+      enriched_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY(trip_id) REFERENCES trips(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_trips_start_date ON trips(start_date);
+    CREATE INDEX IF NOT EXISTS idx_trips_status ON trips(status);
+    CREATE INDEX IF NOT EXISTS idx_trip_events_trip ON trip_events(trip_id);
+    CREATE INDEX IF NOT EXISTS idx_trip_events_start ON trip_events(start_date);
+  `);
 }
 
 function ensureChatCorrectionsTable(db: Database.Database): void {

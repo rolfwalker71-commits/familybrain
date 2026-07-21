@@ -9,6 +9,7 @@ Local-first MVP: connect Paperless-ngx, sync documents into SQLite, and extract 
 - Document list + detail views
 - AI summaries (category, dates, amounts, deadlines, warranties, finance, travel)
 - Dashboards for warranties, deadlines, finance and travel
+- TravelBrain: trip planning (`/trips`) with timeline, covers, ICS, chat capture; optional flight/hotel enrichment
 - Single-user login for every page and API route
 - Installable online PWA for iOS, iPadOS and Android
 
@@ -228,4 +229,5 @@ git push origin v0.2.0
 - One FamilyBrain instance is enough for a home Paperless host
 - Default Docker host port: **3100** (avoids conflicts with other apps on 3000)
 - Travel/finance/deadline labels are normalized semantically on read and on new analyses (e.g. Cruise→Kreuzfahrt); finance overview uses display buckets
+- **TravelBrain** (`/trips`): planned trips with timeline, cover images, ICS export, chat capture (`TRIP_EVENTS` / Quellen / Belege). Optional flight enrichment via AeroDataBox (Settings); hotel/place enrichment via OpenStreetMap/Nominatim + cached map snapshot
 - App version (`YYYYMMDD-HHMM`) is shown at the bottom of the sidebar; enable auto-bump on commit once with `npm run hooks:install`

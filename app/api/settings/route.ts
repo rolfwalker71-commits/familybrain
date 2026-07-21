@@ -20,6 +20,10 @@ import {
   resetChatInstructions,
   saveChatInstructions,
 } from "@/lib/chat/instructions";
+import {
+  getAeroDataBoxApiKey,
+  saveAeroDataBoxApiKey,
+} from "@/lib/trips/settings";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,6 +32,7 @@ export async function GET() {
   const paperless = getPaperlessSettings();
   const openai = getOpenAISettings();
   const trilium = getTriliumSettings();
+  const aeroKey = getAeroDataBoxApiKey();
   return NextResponse.json({
     paperlessBaseUrl: paperless.baseUrl,
     paperlessApiTokenMasked: maskToken(paperless.apiToken),
@@ -47,6 +52,8 @@ export async function GET() {
     chatInstructions: getChatInstructions(),
     chatInstructionsCustomized: isChatInstructionsCustomized(),
     chatInstructionsDefault: DEFAULT_CHAT_INSTRUCTIONS,
+    aerodataboxApiKeyMasked: maskToken(aeroKey),
+    hasAerodataboxKey: Boolean(aeroKey),
   });
 }
 
@@ -59,6 +66,7 @@ const PutSchema = z.object({
   triliumApiToken: z.string().optional(),
   chatInstructions: z.string().max(8000).optional(),
   resetChatInstructions: z.boolean().optional(),
+  aerodataboxApiKey: z.string().optional(),
 });
 
 export async function PUT(request: Request) {
@@ -122,9 +130,14 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: message }, { status: 400 });
   }
 
+  if (parsed.data.aerodataboxApiKey !== undefined) {
+    saveAeroDataBoxApiKey(parsed.data.aerodataboxApiKey || null);
+  }
+
   const paperless = getPaperlessSettings();
   const openai = getOpenAISettings();
   const trilium = getTriliumSettings();
+  const aeroKey = getAeroDataBoxApiKey();
 
   return NextResponse.json({
     ok: true,
@@ -146,5 +159,7 @@ export async function PUT(request: Request) {
     chatInstructions,
     chatInstructionsCustomized: isChatInstructionsCustomized(),
     chatInstructionsDefault: DEFAULT_CHAT_INSTRUCTIONS,
+    aerodataboxApiKeyMasked: maskToken(aeroKey),
+    hasAerodataboxKey: Boolean(aeroKey),
   });
 }

@@ -45,6 +45,9 @@ next-env.d.ts
 # local sqlite database
 /data/*.sqlite
 /data/*.sqlite-*
+/data/trip-covers/
+/data/trip-aircraft/
+/data/trip-maps/
 /familybrain.sqlite
 /familybrain.sqlite-*
 !.gitkeep
