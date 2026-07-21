@@ -13,6 +13,7 @@ import {
   ImagePlus,
   Info,
   MapPin,
+  Maximize2,
   Pencil,
   Plane,
   Plus,
@@ -20,6 +21,7 @@ import {
   Sparkles,
   Ticket,
   Trash2,
+  X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -461,6 +463,10 @@ export function TripDetailClient({
   const [aiImageEventId, setAiImageEventId] = useState<number | null>(null);
   const [aiImagePrompt, setAiImagePrompt] = useState("");
   const [aiImageBusy, setAiImageBusy] = useState(false);
+  const [aiZoom, setAiZoom] = useState<{
+    url: string;
+    title: string;
+  } | null>(null);
 
   const load = useCallback(async () => {
     const res = await fetch(
@@ -1855,8 +1861,35 @@ export function TripDetailClient({
                   )}
                 >
                   <div className="rounded-t-[0.7rem] bg-slate-300/80 px-4 pb-3 pl-8 pt-4">
-                    <div className="flex justify-center">
-                      <EventDateHeader event={event} />
+                    <div className="flex items-center gap-2">
+                      <div className="flex min-w-0 flex-1 justify-center">
+                        <EventDateHeader event={event} />
+                      </div>
+                      {event.ai_image_url ? (
+                        <div className="relative shrink-0">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={event.ai_image_url}
+                            alt=""
+                            className="h-16 w-16 rounded-md border border-border/60 object-cover shadow-sm sm:h-[4.5rem] sm:w-[4.5rem]"
+                          />
+                          <Button
+                            type="button"
+                            size="icon-xs"
+                            variant="secondary"
+                            className="absolute bottom-1 right-1 size-6 border border-border/70 bg-background/90 shadow-sm"
+                            title="Vergrössern"
+                            onClick={() =>
+                              setAiZoom({
+                                url: event.ai_image_url!,
+                                title: event.title,
+                              })
+                            }
+                          >
+                            <Maximize2 className="size-3" />
+                          </Button>
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                   <CardContent className="space-y-3 p-4 pl-8">
@@ -1940,6 +1973,17 @@ export function TripDetailClient({
                             >
                               <ImagePlus className="size-3.5" />
                             </Button>
+                            {event.ai_image_url ? (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                title="KI-Bild entfernen"
+                                disabled={aiImageBusy}
+                                onClick={() => void deleteAiImage(event.id)}
+                              >
+                                <X className="size-3.5 text-muted-foreground" />
+                              </Button>
+                            ) : null}
                             <Button
                               size="sm"
                               variant="ghost"
@@ -1958,29 +2002,6 @@ export function TripDetailClient({
                         ) : null}
                       </div>
                     </div>
-
-                    {event.ai_image_url ? (
-                      <div className="flex items-start gap-3">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={event.ai_image_url}
-                          alt=""
-                          className="h-20 w-20 shrink-0 rounded-md border border-border/70 object-cover"
-                        />
-                        {editMode ? (
-                          <Button
-                            type="button"
-                            size="xs"
-                            variant="ghost"
-                            className="text-muted-foreground"
-                            disabled={aiImageBusy}
-                            onClick={() => void deleteAiImage(event.id)}
-                          >
-                            Bild entfernen
-                          </Button>
-                        ) : null}
-                      </div>
-                    ) : null}
 
                     {(() => {
                       const type = coerceTripEventType(event.event_type);
@@ -2442,6 +2463,28 @@ export function TripDetailClient({
           </div>
         )}
       </div>
+
+      <Dialog
+        open={aiZoom != null}
+        onOpenChange={(open) => {
+          if (!open) setAiZoom(null);
+        }}
+      >
+        <DialogContent className="max-h-[90dvh] w-[min(96vw,40rem)] overflow-y-auto sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>{aiZoom?.title || "KI-Bild"}</DialogTitle>
+            <DialogDescription>Vergrösserte Ansicht</DialogDescription>
+          </DialogHeader>
+          {aiZoom ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={aiZoom.url}
+              alt={aiZoom.title}
+              className="mx-auto max-h-[min(70dvh,36rem)] w-full rounded-md object-contain"
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={aiImageEventId != null}
