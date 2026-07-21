@@ -202,11 +202,7 @@ function parseFlightEnrichmentNotice(
       message?: string;
     };
     if (parsed.status === "route_only") {
-      return (
-        parsed.notice ||
-        parsed.message ||
-        "Flugdaten noch nicht verfügbar — Kartenroute aus Flughafen-Codes."
-      );
+      return "Flugdaten sind noch nicht verfügbar.";
     }
   } catch {
     /* legacy flight payload */
@@ -412,7 +408,15 @@ function eventToForm(event: TripEvent) {
   };
 }
 
-export function TripDetailClient({ tripId }: { tripId: number }) {
+export function TripDetailClient({
+  tripId,
+  shareToken,
+}: {
+  tripId: number;
+  /** Public share view: read-only timeline matching Ansicht mode. */
+  shareToken?: string;
+}) {
+  const readOnly = Boolean(shareToken);
   const [trip, setTrip] = useState<Trip | null>(null);
   const [events, setEvents] = useState<TripEvent[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -445,7 +449,11 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
   const [dragOverEventId, setDragOverEventId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
-    const res = await fetch(`/api/trips/${tripId}`);
+    const res = await fetch(
+      shareToken
+        ? `/api/share/t/${encodeURIComponent(shareToken)}`
+        : `/api/trips/${tripId}`
+    );
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Laden fehlgeschlagen");
     setTrip(data.trip);
@@ -459,13 +467,17 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
       startDate: toDateInputValue(data.trip.start_date),
       endDate: toDateInputValue(data.trip.end_date),
     });
-  }, [tripId]);
+  }, [tripId, shareToken]);
 
   useEffect(() => {
     void load().catch((err) =>
       setError(err instanceof Error ? err.message : String(err))
     );
   }, [load]);
+
+  useEffect(() => {
+    if (readOnly) setEditMode(false);
+  }, [readOnly]);
 
   async function saveMeta() {
     setBusy(true);
@@ -970,15 +982,17 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center gap-2">
-        <Link
-          href="/trips"
-          className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "gap-1.5")}
-        >
-          <ArrowLeft className="size-4" />
-          Alle Reisen
-        </Link>
-      </div>
+      {!readOnly ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href="/trips"
+            className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "gap-1.5")}
+          >
+            <ArrowLeft className="size-4" />
+            Alle Reisen
+          </Link>
+        </div>
+      ) : null}
 
       <div
         className="relative h-48 overflow-hidden rounded-xl bg-gradient-to-br from-teal-100 to-sky-100 bg-cover bg-center sm:h-64"
@@ -1025,6 +1039,7 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
         </div>
       ) : null}
 
+      {!readOnly ? (
       <div className="flex flex-wrap gap-2">
         <TripExportMenu
           tripId={tripId}
@@ -1073,6 +1088,7 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
           </Button>
         )}
       </div>
+      ) : null}
 
       {editMode ? (
         <>
@@ -1760,19 +1776,20 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                   className="absolute left-0 top-0 z-10 border-2 border-foreground/20 shadow-md"
                 />
                 <Card
-                  tone={visual.tone}
                   className={cn(
-                    "relative overflow-visible border-border/50",
+                    "relative gap-0 overflow-visible border-border/50 bg-card py-0",
                     editingEventId === event.id && "ring-2 ring-foreground/15",
                     editMode &&
                       dragOverEventId === event.id &&
                       "ring-2 ring-teal-400/50"
                   )}
                 >
-                  <CardContent className="space-y-3 p-4 pl-8">
+                  <div className="rounded-t-[0.7rem] bg-slate-300/80 px-4 pb-3 pl-8 pt-4">
                     <div className="flex justify-center">
                       <EventDateHeader event={event} />
                     </div>
+                  </div>
+                  <CardContent className="space-y-3 p-4 pl-8">
                     <div className="flex items-start gap-2">
                       <div className="flex min-w-0 flex-1 items-start gap-2 pr-2">
                         {editMode ? (
@@ -1975,6 +1992,20 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
 
                       const documentThumbs = hasDocuments ? (
                         <div className="max-w-full overflow-x-auto pb-1">
+                          {readOnly ? (
+                            <div className="flex flex-wrap gap-1.5">
+                              {documents.map((doc) => (
+                                <Badge
+                                  key={doc.id}
+                                  variant="secondary"
+                                  className="max-w-[12rem] truncate"
+                                  title={doc.title || `Dokument #${doc.id}`}
+                                >
+                                  {doc.title || `Dokument #${doc.id}`}
+                                </Badge>
+                              ))}
+                            </div>
+                          ) : (
                           <div
                             className="grid w-max grid-flow-col justify-start gap-2"
                             style={{ gridAutoColumns: "3.5rem" }}
@@ -1995,6 +2026,7 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                             />
                           ))}
                           </div>
+                          )}
                         </div>
                       ) : null;
 

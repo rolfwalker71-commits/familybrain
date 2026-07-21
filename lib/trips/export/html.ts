@@ -1,5 +1,6 @@
 import { toSwissDate, toTimeInputValue } from "@/lib/utils/dates";
 import type { TripExportEvent, TripExportModel } from "@/lib/trips/export/model";
+import { claimDocumentNotesForExport } from "@/lib/trips/export/document-notes";
 
 function esc(raw: string | null | undefined): string {
   if (!raw) return "";
@@ -106,10 +107,17 @@ export function renderTripExportHtml(
   };
 
   const cover = abs(model.coverUrl);
+  const seenNoteDocIds = new Set<number>();
+  const seenNotesMd = new Set<string>();
   const eventsHtml = model.events
     .map((event) => {
       const map = abs(event.map_image_url);
       const aircraft = abs(event.aircraft_image_url);
+      const showNotes = claimDocumentNotesForExport(
+        event,
+        seenNoteDocIds,
+        seenNotesMd
+      );
       return `
 <section class="event">
   <header>
@@ -120,8 +128,7 @@ export function renderTripExportHtml(
   <div class="details">${eventDetailsHtml(event)}</div>
   ${eventDocsHtml(event)}
   ${
-    event.show_document_notes !== 0 &&
-    event.document_notes_md?.trim()
+    showNotes
       ? `<div class="beleg-md"><strong>Beleg-Details</strong><pre class="md">${esc(
           event.document_notes_md
         )}</pre></div>`

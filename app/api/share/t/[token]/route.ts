@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getActiveTripShareLinkByToken } from "@/lib/trips/share";
+import { rewriteTripMediaUrlForShare } from "@/lib/trips/share-media";
 import { serializeTripEvents } from "@/lib/trips/serialize-event";
 import { listTripEvents } from "@/lib/trips/queries";
 import { coverPublicUrl } from "@/lib/trips/cover";
@@ -21,10 +22,13 @@ export async function GET(_request: Request, context: Ctx) {
   const events = serializeTripEvents(listTripEvents(share.trip_id)).map(
     (event) => ({
       ...event,
-      // Hide internal paths on public payload
       aircraft_image_path: null,
       map_image_path: null,
-      enrichment_json: null,
+      aircraft_image_url: rewriteTripMediaUrlForShare(
+        event.aircraft_image_url,
+        token
+      ),
+      map_image_url: rewriteTripMediaUrlForShare(event.map_image_url, token),
     })
   );
   return NextResponse.json({
@@ -32,7 +36,10 @@ export async function GET(_request: Request, context: Ctx) {
     trip: {
       ...share.trip,
       cover_path: null,
-      cover_url: coverPublicUrl(share.trip.cover_path),
+      cover_url: rewriteTripMediaUrlForShare(
+        coverPublicUrl(share.trip.cover_path),
+        token
+      ),
     },
     events,
     share: {

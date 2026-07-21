@@ -139,9 +139,7 @@ async function applyIataRouteOnly(
   ]);
   if (!depCoords || !arrCoords) return null;
 
-  const notice =
-    `Flugdaten nicht verfügbar (${context.reason}). ` +
-    `Kartenroute aus ${dep} → ${arr} gezeichnet.`;
+  const notice = "Flugdaten sind noch nicht verfügbar.";
 
   const updated = updateTripEvent(event.id, {
     departureLat: depCoords.lat,
@@ -153,6 +151,7 @@ async function applyIataRouteOnly(
       status: "route_only",
       source: "iata_route_only",
       notice,
+      reason: context.reason,
       provider,
       flightNumber: context.flightNumber,
       date: context.dateLocal,

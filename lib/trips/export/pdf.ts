@@ -13,6 +13,7 @@ import type {
   TripExportEvent,
   TripExportModel,
 } from "@/lib/trips/export/model";
+import { claimDocumentNotesForExport } from "@/lib/trips/export/document-notes";
 
 const MARGIN = 48;
 const PAGE_W = 595.28; // A4
@@ -59,6 +60,38 @@ function wrapText(
   return lines.length ? lines : [""];
 }
 
+/** Helvetica/WinAnsi can't encode arrows, emoji, etc. — map or drop them. */
+function toPdfSafeText(raw: string): string {
+  const mapped = raw
+    .replace(/\u2192/g, "->") // →
+    .replace(/\u2190/g, "<-") // ←
+    .replace(/\u2194/g, "<->") // ↔
+    .replace(/\u21D2/g, "=>") // ⇒
+    .replace(/\u00A0/g, " ")
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/\u2026/g, "...")
+    .replace(/\u2022/g, "-")
+    .replace(/\u00B7/g, "-")
+    // emoji + variation selectors / ZWJ sequences
+    .replace(/\p{Extended_Pictographic}\s*/gu, "")
+    .replace(/[\uFE0E\uFE0F\u200D]/g, "")
+    .replace(/[\u{1F3FB}-\u{1F3FF}]/gu, ""); // skin tones
+
+  let out = "";
+  for (const ch of mapped) {
+    const code = ch.codePointAt(0) ?? 0;
+    // Drop leftover chars outside Latin-1; keep en/em dash via Latin-1 proxies
+    if (code === 0x2013 || code === 0x2014) {
+      out += "-";
+      continue;
+    }
+    if (code > 0xff) continue;
+    out += ch;
+  }
+  return out.replace(/[ \t]{2,}/g, " ").trim();
+}
+
 type DrawCtx = {
   pdf: PDFDocument;
   page: PDFPage;
@@ -83,7 +116,9 @@ function drawLine(
   const font = opts?.bold ? ctx.fontBold : ctx.font;
   const color = opts?.color ?? rgb(0.12, 0.12, 0.12);
   const maxW = PAGE_W - MARGIN * 2;
-  const lines = wrapText(text, font, size, maxW);
+  const safe = toPdfSafeText(text);
+  if (!safe.trim()) return;
+  const lines = wrapText(safe, font, size, maxW);
   for (const line of lines) {
     ensureSpace(ctx, size + 4);
     ctx.page.drawText(line, {
@@ -241,6 +276,9 @@ export async function buildTripPdfBuffer(
   });
   ctx.y -= 16;
 
+  const seenNoteDocIds = new Set<number>();
+  const seenNotesMd = new Set<string>();
+
   for (const event of model.events) {
     ensureSpace(ctx, 80);
     drawLine(ctx, event.event_type.toUpperCase(), {
@@ -264,16 +302,13 @@ export async function buildTripPdfBuffer(
         { size: 9, color: rgb(0.35, 0.35, 0.35) }
       );
     }
-    if (
-      event.show_document_notes !== 0 &&
-      event.document_notes_md?.trim()
-    ) {
+    if (claimDocumentNotesForExport(event, seenNoteDocIds, seenNotesMd)) {
       drawLine(ctx, "Beleg-Details", {
         bold: true,
         size: 10,
         color: rgb(0.25, 0.25, 0.3),
       });
-      const plain = event.document_notes_md
+      const plain = (event.document_notes_md || "")
         .replace(/^#+\s*/gm, "")
         .replace(/\*\*/g, "")
         .replace(/\*/g, "")
