@@ -508,13 +508,14 @@ export function listTravelItemsForDocument(documentId: number) {
   const db = getDb();
   return db
     .prepare(
-      `SELECT id, travel_type, provider, title, start_date, end_date,
-              origin, destination, booking_reference
+      `SELECT id, travel_type, travel_type_override, provider, title, start_date, end_date,
+              origin, destination, booking_reference, extracted_data
        FROM travel_items WHERE document_id = ?`
     )
     .all(documentId) as Array<{
     id: number;
     travel_type: string | null;
+    travel_type_override: string | null;
     provider: string | null;
     title: string | null;
     start_date: string | null;
@@ -522,5 +523,6 @@ export function listTravelItemsForDocument(documentId: number) {
     origin: string | null;
     destination: string | null;
     booking_reference: string | null;
+    extracted_data: string | null;
   }>;
 }

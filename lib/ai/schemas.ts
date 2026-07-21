@@ -75,9 +75,13 @@ export const TravelItemSchema = z.object({
   title: z.string().nullable(),
   start_date: z.string().nullable(),
   end_date: z.string().nullable(),
+  start_time: z.string().nullable().optional(),
+  end_time: z.string().nullable().optional(),
   origin: z.string().nullable(),
   destination: z.string().nullable(),
+  address: z.string().nullable().optional(),
   booking_reference: z.string().nullable(),
+  flight_number: z.string().nullable().optional(),
   price: z.number().nullable(),
   currency: z.string().nullable(),
   /** Ports of call / daily stops (cruise, multi-city trips, etc.) */

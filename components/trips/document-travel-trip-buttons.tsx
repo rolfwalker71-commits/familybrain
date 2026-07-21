@@ -3,10 +3,15 @@
 import { useEffect, useState } from "react";
 import { AddToTripButton } from "@/components/trips/add-to-trip-button";
 import type { TripEventDraft } from "@/lib/trips/constants";
+import {
+  summarizeDraftBatch,
+  travelItemToEventDrafts,
+} from "@/lib/trips/from-travel-item";
 
 type TravelItem = {
   id: number;
   travel_type: string | null;
+  travel_type_override?: string | null;
   provider: string | null;
   title: string | null;
   start_date: string | null;
@@ -14,6 +19,7 @@ type TravelItem = {
   origin: string | null;
   destination: string | null;
   booking_reference: string | null;
+  extracted_data?: string | null;
 };
 
 export function DocumentTravelTripButtons({
@@ -58,27 +64,20 @@ export function DocumentTravelTripButtons({
   return (
     <div className="flex flex-col gap-1.5">
       {items.map((item) => {
-        const draft: TripEventDraft = {
-          type: item.travel_type || "Sonstiges",
-          title:
-            item.title ||
-            [item.origin, item.destination].filter(Boolean).join(" → ") ||
-            documentTitle ||
-            `Dokument #${documentId}`,
-          start_date: item.start_date,
-          end_date: item.end_date,
-          provider: item.provider,
-          booking_reference: item.booking_reference,
-          location: [item.origin, item.destination].filter(Boolean).join(" → "),
+        const drafts: TripEventDraft[] = travelItemToEventDrafts({
+          ...item,
           document_id: documentId,
-          travel_item_id: item.id,
-        };
+        });
         return (
           <div key={item.id} className="flex flex-wrap items-center gap-2">
             <span className="text-xs text-muted-foreground">
-              Beleg: {draft.type} · {draft.title}
+              Beleg: {summarizeDraftBatch(drafts)}
             </span>
-            <AddToTripButton draft={draft} onDone={onDone} onError={onError} />
+            <AddToTripButton
+              drafts={drafts}
+              onDone={onDone}
+              onError={onError}
+            />
           </div>
         );
       })}

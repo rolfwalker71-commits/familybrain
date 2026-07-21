@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Luggage } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,16 +13,46 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { TripEventDraft } from "@/lib/trips/constants";
+import { summarizeDraftBatch } from "@/lib/trips/from-travel-item";
 
 type TripOption = { id: number; title: string };
 
 type Props = {
-  draft: TripEventDraft;
+  draft?: TripEventDraft;
+  drafts?: TripEventDraft[];
   onDone?: (message: string) => void;
   onError?: (message: string) => void;
 };
 
-export function AddToTripButton({ draft, onDone, onError }: Props) {
+function draftToPayload(draft: TripEventDraft) {
+  return {
+    eventType: draft.type,
+    title: draft.title,
+    startDate: draft.start_date ?? null,
+    endDate: draft.end_date ?? null,
+    startTime: draft.start_time ?? null,
+    endTime: draft.end_time ?? null,
+    location: draft.location ?? null,
+    address: draft.address ?? null,
+    provider: draft.provider ?? null,
+    bookingReference: draft.booking_reference ?? null,
+    notes: draft.notes ?? null,
+    flightNumber: draft.flight_number ?? null,
+    documentId: draft.document_id ?? null,
+    travelItemId: draft.travel_item_id ?? null,
+    guideId: draft.guide_id ?? null,
+    noteId: draft.note_id ?? null,
+    sourceExcerpt: draft.source_excerpt ?? null,
+  };
+}
+
+export function AddToTripButton({ draft, drafts, onDone, onError }: Props) {
+  const batch = useMemo(() => {
+    if (drafts && drafts.length > 0) return drafts;
+    if (draft) return [draft];
+    return [];
+  }, [draft, drafts]);
+
   const [open, setOpen] = useState(false);
   const [trips, setTrips] = useState<TripOption[]>([]);
   const [tripId, setTripId] = useState<string>("");
@@ -46,6 +76,10 @@ export function AddToTripButton({ draft, onDone, onError }: Props) {
   }, [open]);
 
   async function submit() {
+    if (batch.length === 0) {
+      onError?.("Keine Ereignisse zum Hinzufügen.");
+      return;
+    }
     setSaving(true);
     try {
       let targetTripId = Number(tripId);
@@ -65,39 +99,34 @@ export function AddToTripButton({ draft, onDone, onError }: Props) {
         throw new Error("Bitte Reise wählen oder neu anlegen.");
       }
 
-      const res = await fetch(`/api/trips/${targetTripId}/events`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          eventType: draft.type,
-          title: draft.title,
-          startDate: draft.start_date ?? null,
-          endDate: draft.end_date ?? null,
-          startTime: draft.start_time ?? null,
-          endTime: draft.end_time ?? null,
-          location: draft.location ?? null,
-          provider: draft.provider ?? null,
-          bookingReference: draft.booking_reference ?? null,
-          notes: draft.notes ?? null,
-          flightNumber: draft.flight_number ?? null,
-          documentId: draft.document_id ?? null,
-          travelItemId: draft.travel_item_id ?? null,
-          guideId: draft.guide_id ?? null,
-          noteId: draft.note_id ?? null,
-          sourceExcerpt: draft.source_excerpt ?? null,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Hinzufügen fehlgeschlagen");
+      for (const item of batch) {
+        const res = await fetch(`/api/trips/${targetTripId}/events`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(draftToPayload(item)),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Hinzufügen fehlgeschlagen");
+      }
+
       setOpen(false);
       setNewTitle("");
-      onDone?.(`Zu TravelBrain hinzugefügt.`);
+      onDone?.(
+        batch.length > 1
+          ? `${batch.length} Ereignisse zu TravelBrain hinzugefügt.`
+          : "Zu TravelBrain hinzugefügt."
+      );
     } catch (err) {
       onError?.(err instanceof Error ? err.message : String(err));
     } finally {
       setSaving(false);
     }
   }
+
+  const label =
+    batch.length > 1
+      ? `Zur Reise (${batch.length})`
+      : "Zur Reise";
 
   if (!open) {
     return (
@@ -108,18 +137,17 @@ export function AddToTripButton({ draft, onDone, onError }: Props) {
         className="h-8 gap-1.5 text-xs"
         onClick={() => setOpen(true)}
         title="Zu TravelBrain hinzufügen"
+        disabled={batch.length === 0}
       >
         <Luggage className="size-3.5" />
-        Zur Reise
+        {label}
       </Button>
     );
   }
 
   return (
     <div className="w-full space-y-2 rounded-lg border border-border/70 bg-background p-2.5 text-xs">
-      <div className="font-medium">
-        Zur Reise: {draft.type} · {draft.title}
-      </div>
+      <div className="font-medium">Zur Reise: {summarizeDraftBatch(batch)}</div>
       <div className="space-y-1.5">
         <Label>Bestehende Reise</Label>
         <Select
@@ -151,7 +179,11 @@ export function AddToTripButton({ draft, onDone, onError }: Props) {
       </div>
       <div className="flex gap-2">
         <Button size="sm" disabled={saving} onClick={() => void submit()}>
-          {saving ? "Speichert…" : "Hinzufügen"}
+          {saving
+            ? "Speichert…"
+            : batch.length > 1
+              ? `${batch.length} hinzufügen`
+              : "Hinzufügen"}
         </Button>
         <Button
           size="sm"

@@ -34,6 +34,7 @@ const PatchSchema = z.object({
   notes: z.string().nullable().optional(),
   sortKey: z.number().optional(),
   flightNumber: z.string().nullable().optional(),
+  address: z.string().nullable().optional(),
 });
 
 type Ctx = { params: Promise<{ id: string; eventId: string }> };

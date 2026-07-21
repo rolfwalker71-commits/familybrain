@@ -39,6 +39,7 @@ const CreateSchema = z.object({
   noteId: z.string().nullable().optional(),
   sourceExcerpt: z.string().nullable().optional(),
   flightNumber: z.string().nullable().optional(),
+  address: z.string().nullable().optional(),
 });
 
 type Ctx = { params: Promise<{ id: string }> };

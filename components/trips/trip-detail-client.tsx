@@ -100,6 +100,7 @@ const emptyEventForm = {
   startTime: "",
   endTime: "",
   location: "",
+  address: "",
   provider: "",
   bookingReference: "",
   notes: "",
@@ -197,6 +198,7 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
         startTime: eventForm.startTime || null,
         endTime: eventForm.endTime || null,
         location: eventForm.location || null,
+        address: eventForm.address || null,
         provider: eventForm.provider || null,
         bookingReference: eventForm.bookingReference || null,
         notes: eventForm.notes || null,
@@ -234,6 +236,7 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
       startTime: event.start_time || "",
       endTime: event.end_time || "",
       location: event.location || "",
+      address: event.address || "",
       provider: event.provider || "",
       bookingReference: event.booking_reference || "",
       notes: event.notes || "",
@@ -339,6 +342,7 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
       const event = events.find((e) => e.id === eventId);
       const defaultQuery = [
         event?.title,
+        event?.address,
         event?.location,
         trip?.destination,
       ]
@@ -707,6 +711,16 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
               }
             />
           </div>
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label>Adresse</Label>
+            <Input
+              value={eventForm.address}
+              onChange={(e) =>
+                setEventForm((f) => ({ ...f, address: e.target.value }))
+              }
+              placeholder="Straße, PLZ Ort"
+            />
+          </div>
           <div className="space-y-1.5">
             <Label>Anbieter</Label>
             <Input
@@ -913,7 +927,12 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                           id={`place-query-${event.id}`}
                           value={
                             placeQueries[event.id] ??
-                            [event.title, event.location, trip.destination]
+                            [
+                              event.title,
+                              event.address,
+                              event.location,
+                              trip.destination,
+                            ]
                               .filter(Boolean)
                               .join(", ")
                           }

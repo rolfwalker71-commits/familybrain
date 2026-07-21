@@ -18,6 +18,7 @@ export type TripEventDraft = {
   start_time?: string | null;
   end_time?: string | null;
   location?: string | null;
+  address?: string | null;
   provider?: string | null;
   booking_reference?: string | null;
   notes?: string | null;

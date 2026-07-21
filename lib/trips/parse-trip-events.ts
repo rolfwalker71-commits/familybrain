@@ -46,6 +46,7 @@ export function parseTripEventsMarker(rawAnswer: string): {
             start_time: asNullableString(row.start_time),
             end_time: asNullableString(row.end_time),
             location: asNullableString(row.location),
+            address: asNullableString(row.address),
             provider: asNullableString(row.provider),
             booking_reference: asNullableString(row.booking_reference),
             notes: asNullableString(row.notes),

@@ -20,6 +20,9 @@ Rules:
 - Extract CHF amounts carefully.
 - Identify whether the document is Rechnung, Vertrag, Versicherung, Garantie, Reiseunterlage, Arztbericht, Steuerdokument or Sonstiges.
 - For travel/cruise documents, extract the full itinerary (ports of call / Kreuzfahrtverlauf / daily stops) into travel_items[].itinerary AND also list each stop date in important_dates.
+- For flights, always extract flight_number (e.g. LX80, LH400) and booking_reference when present in the OCR.
+- For hotels, extract the street address into travel_items[].address when present; also capture check-in/out times as start_time/end_time when known.
+- Always extract booking_reference / confirmation / PNR / reservation code into booking_reference when present.
 - Also capture other date-relevant fields in important_dates: payment due, cancellation deadline, boarding, check-in, flight departure/arrival, hotel check-in/out, appointment dates, warranty end, contract start/end.
 - category MUST be one of: ${categoriesList}
 - travel_items[].travel_type SHOULD be one of: ${travelTypesList} (use German labels; map Cruise→Kreuzfahrt, Hotelaufenthalt→Hotel, Visa Waiver→Visa / Einreise). Flights/air tickets/e-tickets MUST be "Flug" (never Kreuzfahrt). Kreuzfahrt is ONLY for ship cruises (ports of call / Kreuzfahrtverlauf). Package PDFs may contain multiple travel_items — classify each item by its own segment (flight vs hotel vs cruise vs transfer).
@@ -95,9 +98,13 @@ Required JSON shape:
     "title": null,
     "start_date": null,
     "end_date": null,
+    "start_time": null,
+    "end_time": null,
     "origin": null,
     "destination": null,
+    "address": null,
     "booking_reference": null,
+    "flight_number": null,
     "price": null,
     "currency": null,
     "itinerary": [{
@@ -117,6 +124,8 @@ Travel/cruise specifics:
 - Put cruising/sea days as location "Cruising" with note "Seetag".
 - Mirror each itinerary stop with a date into important_dates (label like "Anlaufhafen: Barcelona").
 - Also put payment due dates, cancellation deadlines, boarding/sailing times into important_dates.
+- For Flug items: set flight_number (IATA+digits) and booking_reference/PNR when visible; set start_time/end_time from scheduled departure/arrival when known.
+- For Hotel items: set address to the full street address when present; destination can be the city.
 - Sections titled Flüge / Flugarrangements / Flight / E-Ticket are separate travel_items with travel_type "Flug", even when the same PDF also describes a cruise or hotel stay.`;
 }
 

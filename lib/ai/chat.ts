@@ -123,8 +123,9 @@ Regeln:
   [[NOTE_IDS:]]
   [[GUIDE_IDS:]]
 - Wenn die Antwort Reise-Ereignisse enthält (Flug, Hotel, Bahn, Transfer, Kreuzfahrt usw.), hänge ZUSÄTZLICH als letzte Zeile einen TRIP_EVENTS-Marker an (JSON-Array, ISO-Daten yyyy-mm-dd, Zeiten HH:mm). Nur klar belegte Events, max. 8:
-  [[TRIP_EVENTS:[{"type":"Flug","title":"Zürich–Miami","start_date":"2026-10-23","start_time":"10:15","flight_number":"LX80","provider":"SWISS"}]]]
+  [[TRIP_EVENTS:[{"type":"Flug","title":"Zürich–Miami","start_date":"2026-10-23","start_time":"10:15","flight_number":"LX80","booking_reference":"ABC123","provider":"SWISS"},{"type":"Hotel","title":"Example Hotel","start_date":"2026-10-24","address":"Main St 1, Miami","location":"Miami"}]]]
 - type muss einer von: Flug, Hotel, Bahn, Kreuzfahrt, Mietwagen, Transfer, Parking, Visa / Einreise, Pauschalreise / Urlaub, Reiseversicherung, Aktivität, Notiz, Sonstiges sein.
+- Bei Flügen flight_number und booking_reference setzen; bei Hotels address wenn bekannt. Kreuzfahrt-Häfen nicht einzeln im Marker listen (Häfen kommen aus dem Beleg-Handoff).
 - Wenn keine Reise-Events: keinen TRIP_EVENTS-Marker setzen.`;
 }
 
