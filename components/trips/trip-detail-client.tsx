@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -118,6 +118,7 @@ type TripEvent = {
     id: number;
     paperless_id: number;
     title: string | null;
+    removable?: boolean;
   }>;
 };
 
@@ -170,22 +171,78 @@ function textsOverlap(
   return na === nb || na.includes(nb) || nb.includes(na);
 }
 
-function formatEventWhen(event: TripEvent): string | null {
-  const start = event.start_date
-    ? `${toSwissDate(event.start_date)}${
-        event.start_time ? ` ${event.start_time}` : ""
-      }`
-    : null;
-  const startIso = toDateInputValue(event.start_date);
-  const endIso = toDateInputValue(event.end_date);
-  const end =
-    endIso && (!startIso || endIso >= startIso)
-      ? `bis ${toSwissDate(endIso)}${
-          event.end_time ? ` ${event.end_time}` : ""
-        }`
-      : null;
-  const parts = [start, end].filter(Boolean);
-  return parts.length ? parts.join(" · ") : null;
+function parseEventIsoDate(raw: string | null | undefined): string | null {
+  const iso = toDateInputValue(raw);
+  return iso || null;
+}
+
+function weekdayDe(isoDate: string): string {
+  const [y, m, d] = isoDate.split("-").map(Number);
+  const date = new Date(y, m - 1, d);
+  return new Intl.DateTimeFormat("de-CH", { weekday: "long" }).format(date);
+}
+
+function monthShortDe(isoDate: string): string {
+  const [y, m, d] = isoDate.split("-").map(Number);
+  const date = new Date(y, m - 1, d);
+  return new Intl.DateTimeFormat("de-CH", { month: "short" })
+    .format(date)
+    .replace(/\./g, "")
+    .toUpperCase();
+}
+
+function dayNumber(isoDate: string): string {
+  return String(Number(isoDate.slice(8, 10)));
+}
+
+function EventCalendarBadge({
+  isoDate,
+  time,
+}: {
+  isoDate: string;
+  time?: string | null;
+}) {
+  return (
+    <div className="flex w-[4.25rem] shrink-0 flex-col overflow-hidden rounded-xl border border-border/70 bg-background shadow-sm sm:w-[4.75rem]">
+      <div className="bg-red-600 px-1 py-1 text-center text-[10px] font-black tracking-wide text-white sm:text-[11px]">
+        {monthShortDe(isoDate)}
+      </div>
+      <div className="flex flex-col items-center px-1 pb-1.5 pt-1.5">
+        <div className="text-[10px] font-black leading-none text-foreground sm:text-[11px]">
+          {weekdayDe(isoDate)}
+        </div>
+        <div className="mt-1 text-2xl font-black leading-none tabular-nums text-foreground sm:text-3xl">
+          {dayNumber(isoDate)}
+        </div>
+        {time ? (
+          <div className="mt-1 text-[10px] font-semibold tabular-nums text-muted-foreground">
+            {time}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function EventDateHeader({ event }: { event: TripEvent }) {
+  const startIso = parseEventIsoDate(event.start_date);
+  if (!startIso) return null;
+  const endIso = parseEventIsoDate(event.end_date);
+  const showEnd = Boolean(endIso && endIso !== startIso && endIso >= startIso);
+  const startTime = toTimeInputValue(event.start_time) || null;
+  const endTime = toTimeInputValue(event.end_time) || null;
+
+  return (
+    <div className="flex shrink-0 items-center gap-2">
+      <EventCalendarBadge isoDate={startIso} time={startTime} />
+      {showEnd && endIso ? (
+        <>
+          <span className="text-xs font-bold text-muted-foreground">bis</span>
+          <EventCalendarBadge isoDate={endIso} time={endTime} />
+        </>
+      ) : null}
+    </div>
+  );
 }
 
 function formatEventMetaLine(event: TripEvent): string | null {
@@ -201,7 +258,6 @@ function formatEventMetaLine(event: TripEvent): string | null {
             : null)
       : null;
   const parts = [
-    formatEventWhen(event),
     event.flight_number && type === "Flug" ? event.flight_number : null,
     transferRoute,
   ].filter(Boolean);
@@ -725,6 +781,26 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       await load();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function unlinkEventDocument(eventId: number, documentId: number) {
+    if (!window.confirm("Verknüpfung dieses Belegs entfernen?")) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/trips/${tripId}/events/${eventId}/documents?documentId=${documentId}`,
+        { method: "DELETE" }
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Entfernen fehlgeschlagen");
+      await load();
+      setStatus("Beleg-Verknüpfung entfernt.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setBusy(false);
     }
@@ -1432,12 +1508,13 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
         {events.length === 0 ? (
           <p className="text-sm text-muted-foreground">Noch keine Ereignisse.</p>
         ) : (
-          events.map((event, eventIndex) => {
+          <div className="flex flex-col">
+          {events.map((event, eventIndex) => {
             const visual = eventVisual(event.event_type);
             const isLastEvent = eventIndex === events.length - 1;
             return (
+              <Fragment key={event.id}>
               <div
-                key={event.id}
                 className={cn(
                   "relative pt-3 pl-3",
                   editMode && dragOverEventId === event.id && "opacity-80"
@@ -1477,12 +1554,6 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                     : undefined
                 }
               >
-                {!isLastEvent ? (
-                  <div
-                    aria-hidden
-                    className="pointer-events-none absolute left-1/2 top-full z-0 h-5 -translate-x-1/2 border-l-[2.5px] border-dashed border-foreground/50"
-                  />
-                ) : null}
                 <IconCircle
                   icon={visual.icon}
                   tone={visual.tone}
@@ -1500,43 +1571,48 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                   )}
                 >
                   <CardContent className="space-y-3 p-4 pl-8">
-                    <div className="flex items-start gap-2">
-                      {editMode ? (
-                        <button
-                          type="button"
-                          draggable
-                          title="Ziehen zum Sortieren"
-                          className="mt-1.5 cursor-grab touch-none rounded p-1 text-muted-foreground hover:bg-background/70 active:cursor-grabbing"
-                          onDragStart={(e) => {
-                            setDragEventId(event.id);
-                            e.dataTransfer.effectAllowed = "move";
-                            e.dataTransfer.setData(
-                              "text/plain",
-                              String(event.id)
-                            );
-                          }}
-                          onDragEnd={() => {
-                            setDragEventId(null);
-                            setDragOverEventId(null);
-                          }}
-                        >
-                          <GripVertical className="size-4" />
-                        </button>
-                      ) : null}
-                      <div className="min-w-0 flex-1">
-                        <div className="text-xl font-black leading-tight tracking-tight sm:text-2xl">
-                          {event.title}
+                    <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-2">
+                      <div className="flex min-w-0 items-start gap-2">
+                        {editMode ? (
+                          <button
+                            type="button"
+                            draggable
+                            title="Ziehen zum Sortieren"
+                            className="mt-1.5 cursor-grab touch-none rounded p-1 text-muted-foreground hover:bg-background/70 active:cursor-grabbing"
+                            onDragStart={(e) => {
+                              setDragEventId(event.id);
+                              e.dataTransfer.effectAllowed = "move";
+                              e.dataTransfer.setData(
+                                "text/plain",
+                                String(event.id)
+                              );
+                            }}
+                            onDragEnd={() => {
+                              setDragEventId(null);
+                              setDragOverEventId(null);
+                            }}
+                          >
+                            <GripVertical className="size-4" />
+                          </button>
+                        ) : null}
+                        <div className="min-w-0">
+                          <div className="text-xl font-black leading-tight tracking-tight sm:text-2xl">
+                            {event.title}
+                          </div>
+                          {(() => {
+                            const meta = formatEventMetaLine(event);
+                            return meta ? (
+                              <div className="mt-1 text-xs text-muted-foreground">
+                                {meta}
+                              </div>
+                            ) : null;
+                          })()}
                         </div>
-                        {(() => {
-                          const meta = formatEventMetaLine(event);
-                          return meta ? (
-                            <div className="mt-1 text-xs text-muted-foreground">
-                              {meta}
-                            </div>
-                          ) : null;
-                        })()}
                       </div>
-                      <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
+                      <div className="justify-self-center self-center">
+                        <EventDateHeader event={event} />
+                      </div>
+                      <div className="flex shrink-0 flex-wrap items-center justify-end gap-1 justify-self-end">
                         <Badge variant="secondary" className="shrink-0">
                           {coerceTripEventType(event.event_type)}
                         </Badge>
@@ -1668,6 +1744,13 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                               paperlessId={doc.paperless_id}
                               title={doc.title}
                               href={`/documents/${doc.id}`}
+                              removing={busy}
+                              onRemove={
+                                doc.removable !== false
+                                  ? () =>
+                                      void unlinkEventDocument(event.id, doc.id)
+                                  : undefined
+                              }
                             />
                           ))}
                         </div>
@@ -1936,8 +2019,25 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                   </CardContent>
                 </Card>
               </div>
+              {!isLastEvent ? (
+                <div
+                  aria-hidden
+                  className="pointer-events-none relative z-[1] -mb-3 -mt-px flex h-10 items-stretch justify-center"
+                >
+                  <div
+                    className="h-full w-1.5 rounded-sm sm:w-2"
+                    style={{
+                      backgroundImage:
+                        "repeating-linear-gradient(to bottom, rgb(15 23 42 / 0.6) 0 12px, transparent 12px 18px)",
+                    }}
+                  />
+                </div>
+              ) : null}
+              </Fragment>
             );
           })
+          }
+          </div>
         )}
       </div>
     </div>

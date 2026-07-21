@@ -149,6 +149,26 @@ function ensureTripsTables(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_trips_status ON trips(status);
     CREATE INDEX IF NOT EXISTS idx_trip_events_trip ON trip_events(trip_id);
     CREATE INDEX IF NOT EXISTS idx_trip_events_start ON trip_events(start_date);
+    CREATE TABLE IF NOT EXISTS trip_event_documents (
+      trip_event_id INTEGER NOT NULL,
+      document_id INTEGER NOT NULL,
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (trip_event_id, document_id),
+      FOREIGN KEY(trip_event_id) REFERENCES trip_events(id) ON DELETE CASCADE,
+      FOREIGN KEY(document_id) REFERENCES paperless_documents(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_trip_event_documents_event
+      ON trip_event_documents(trip_event_id);
+    CREATE INDEX IF NOT EXISTS idx_trip_event_documents_doc
+      ON trip_event_documents(document_id);
+  `);
+
+  // Backfill primary document_id into junction (once).
+  db.exec(`
+    INSERT OR IGNORE INTO trip_event_documents (trip_event_id, document_id, created_at)
+    SELECT id, document_id, COALESCE(created_at, datetime('now'))
+    FROM trip_events
+    WHERE document_id IS NOT NULL AND document_id > 0
   `);
 
   const tripEventCols = db

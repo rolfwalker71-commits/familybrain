@@ -240,7 +240,7 @@ export function TripMap({
   const attribution = getMapTileConfig(resolvedStyle).attribution;
 
   return (
-    <div className={cn("overflow-hidden rounded-md border border-border/70", className)}>
+    <div className={cn("relative z-0 isolate overflow-hidden rounded-md border border-border/70", className)}>
       <div
         ref={containerRef}
         id={`trip-map-${mapId}`}

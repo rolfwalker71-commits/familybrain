@@ -50,13 +50,6 @@ const navItems: NavItem[] = [
     countKey: "totalDocuments",
   },
   {
-    href: "/knowledge",
-    label: "Wissensbereiche",
-    icon: Brain,
-    tone: "violet",
-    countKey: "knowledgeDocuments",
-  },
-  {
     href: "/warranties",
     label: "Garantien",
     icon: Shield,
@@ -83,6 +76,13 @@ const navItems: NavItem[] = [
     icon: Plane,
     tone: "teal",
     countKey: "travelDocuments",
+  },
+  {
+    href: "/knowledge",
+    label: "Wissen",
+    icon: Brain,
+    tone: "violet",
+    countKey: "knowledgeDocuments",
   },
   {
     href: "/trips",

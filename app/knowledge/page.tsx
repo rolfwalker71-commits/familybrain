@@ -16,7 +16,7 @@ export default function KnowledgePage() {
   return (
     <div className="min-w-0 space-y-6">
       <PageHeader
-        title="Wissensbereiche"
+        title="Wissen"
         description="Automatisch klassifizierte Lebensbereiche"
         icon={pageVisuals.knowledge.icon}
         tone={pageVisuals.knowledge.tone}

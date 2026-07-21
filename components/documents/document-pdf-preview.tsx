@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ExternalLink, FileText, Maximize2 } from "lucide-react";
+import { ExternalLink, FileText, Maximize2, XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -67,12 +67,17 @@ export function DocumentPdfThumb({
   title,
   href,
   className,
+  onRemove,
+  removing,
 }: {
   paperlessId: number;
   title?: string | null;
   /** Optional link under the thumb (e.g. document detail page) */
   href?: string;
   className?: string;
+  /** Show remove control to unlink from event */
+  onRemove?: () => void;
+  removing?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [thumbError, setThumbError] = useState(false);
@@ -80,9 +85,25 @@ export function DocumentPdfThumb({
 
   return (
     <div
-      className={cn("w-14 shrink-0", className)}
+      className={cn("relative w-14 shrink-0", className)}
       style={{ width: "3.5rem" }}
     >
+      {onRemove ? (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onRemove();
+          }}
+          disabled={removing}
+          title="Verknüpfung entfernen"
+          className="absolute -right-1.5 -top-1.5 z-10 flex size-5 items-center justify-center rounded-full border border-border bg-background text-muted-foreground shadow-sm hover:bg-destructive hover:text-destructive-foreground disabled:opacity-50"
+        >
+          <XIcon className="size-3" />
+          <span className="sr-only">Verknüpfung entfernen</span>
+        </button>
+      ) : null}
       <button
         type="button"
         onClick={() => setOpen(true)}

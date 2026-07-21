@@ -23,6 +23,7 @@ import { PageHeader, TileTitleBar, MetricTile } from "@/components/layout/page-p
 import { IconCircle, pageVisuals, toneSurface, type IconTone } from "@/components/layout/icon-circle";
 import { AddToCalendarButton } from "@/components/calendar/add-to-calendar-button";
 import { AddToTripButton } from "@/components/trips/add-to-trip-button";
+import { LinkBelegToEventButton } from "@/components/trips/link-beleg-to-event-button";
 import { travelItemToEventDrafts } from "@/lib/trips/from-travel-item";
 import {
   DocumentInfoButton,
@@ -236,6 +237,7 @@ function TravelListRow({
                 document_local_id: row.document_local_id,
               })}
             />
+            <LinkBelegToEventButton documentId={row.document_local_id} />
             {event ? (
               <AddToCalendarButton
                 events={[event]}

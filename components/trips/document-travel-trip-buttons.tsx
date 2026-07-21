@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AddToTripButton } from "@/components/trips/add-to-trip-button";
+import { LinkBelegToEventButton } from "@/components/trips/link-beleg-to-event-button";
 import type { TripEventDraft } from "@/lib/trips/constants";
 import {
   summarizeDraftBatch,
@@ -47,17 +48,28 @@ export function DocumentTravelTripButtons({
     })();
   }, [documentId]);
 
+  const belegButton = (
+    <LinkBelegToEventButton
+      documentId={documentId}
+      onDone={onDone}
+      onError={onError}
+    />
+  );
+
   if (items.length === 0) {
     return (
-      <AddToTripButton
-        draft={{
-          type: "Sonstiges",
-          title: documentTitle || `Dokument #${documentId}`,
-          document_id: documentId,
-        }}
-        onDone={onDone}
-        onError={onError}
-      />
+      <div className="flex flex-wrap items-center gap-2">
+        <AddToTripButton
+          draft={{
+            type: "Sonstiges",
+            title: documentTitle || `Dokument #${documentId}`,
+            document_id: documentId,
+          }}
+          onDone={onDone}
+          onError={onError}
+        />
+        {belegButton}
+      </div>
     );
   }
 
@@ -81,6 +93,7 @@ export function DocumentTravelTripButtons({
           </div>
         );
       })}
+      <div className="flex flex-wrap items-center gap-2">{belegButton}</div>
     </div>
   );
 }

@@ -469,8 +469,12 @@ export function createTripEvent(
 
   const event = getTripEventById(Number(result.lastInsertRowid));
   if (!event) throw new Error("Ereignis konnte nicht angelegt werden");
+  const docId = input.documentId ?? null;
+  if (docId != null && docId > 0) {
+    linkTripEventDocument(event.id, docId);
+  }
   syncTripDatesFromEvents(tripId);
-  return event;
+  return getTripEventById(event.id) ?? event;
 }
 
 export function updateTripEvent(
@@ -665,6 +669,93 @@ export function deleteTripEvent(eventId: number): void {
   const db = getDb();
   db.prepare(`DELETE FROM trip_events WHERE id = ?`).run(eventId);
   syncTripDatesFromEvents(existing.trip_id);
+}
+
+export function listLinkedDocumentIdsForEvents(
+  eventIds: number[]
+): Map<number, number[]> {
+  const map = new Map<number, number[]>();
+  if (eventIds.length === 0) return map;
+  const db = getDb();
+  const placeholders = eventIds.map(() => "?").join(",");
+  const rows = db
+    .prepare(
+      `SELECT trip_event_id, document_id
+       FROM trip_event_documents
+       WHERE trip_event_id IN (${placeholders})
+       ORDER BY created_at ASC, document_id ASC`
+    )
+    .all(...eventIds) as Array<{ trip_event_id: number; document_id: number }>;
+  for (const row of rows) {
+    const list = map.get(row.trip_event_id) || [];
+    list.push(row.document_id);
+    map.set(row.trip_event_id, list);
+  }
+  return map;
+}
+
+export function linkTripEventDocument(
+  eventId: number,
+  documentId: number
+): TripEventRow {
+  const event = getTripEventById(eventId);
+  if (!event) throw new Error("Ereignis nicht gefunden");
+  if (!Number.isInteger(documentId) || documentId <= 0) {
+    throw new Error("Ungültiges Dokument");
+  }
+  const db = getDb();
+  const doc = db
+    .prepare(`SELECT id FROM paperless_documents WHERE id = ?`)
+    .get(documentId) as { id: number } | undefined;
+  if (!doc) throw new Error("Dokument nicht gefunden");
+
+  db.prepare(
+    `INSERT OR IGNORE INTO trip_event_documents (trip_event_id, document_id, created_at)
+     VALUES (?, ?, ?)`
+  ).run(eventId, documentId, nowIso());
+
+  // Keep primary document_id filled when empty (first beleg).
+  if (event.document_id == null) {
+    db.prepare(
+      `UPDATE trip_events SET document_id = ?, updated_at = ? WHERE id = ?`
+    ).run(documentId, nowIso(), eventId);
+  }
+
+  const updated = getTripEventById(eventId);
+  if (!updated) throw new Error("Ereignis nicht gefunden");
+  return updated;
+}
+
+export function unlinkTripEventDocument(
+  eventId: number,
+  documentId: number
+): TripEventRow {
+  const event = getTripEventById(eventId);
+  if (!event) throw new Error("Ereignis nicht gefunden");
+  const db = getDb();
+
+  db.prepare(
+    `DELETE FROM trip_event_documents
+     WHERE trip_event_id = ? AND document_id = ?`
+  ).run(eventId, documentId);
+
+  if (event.document_id === documentId) {
+    const next = db
+      .prepare(
+        `SELECT document_id FROM trip_event_documents
+         WHERE trip_event_id = ?
+         ORDER BY created_at ASC, document_id ASC
+         LIMIT 1`
+      )
+      .get(eventId) as { document_id: number } | undefined;
+    db.prepare(
+      `UPDATE trip_events SET document_id = ?, updated_at = ? WHERE id = ?`
+    ).run(next?.document_id ?? null, nowIso(), eventId);
+  }
+
+  const updated = getTripEventById(eventId);
+  if (!updated) throw new Error("Ereignis nicht gefunden");
+  return updated;
 }
 
 function syncTripDatesFromEvents(tripId: number): void {
