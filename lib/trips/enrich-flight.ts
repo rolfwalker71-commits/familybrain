@@ -15,6 +15,12 @@ import {
   type TripEventRow,
 } from "@/lib/trips/queries";
 
+function asApiString(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed || null;
+}
+
 function normalizeFlightNumber(raw: string): string {
   return raw.replace(/\s+/g, "").toUpperCase();
 }
@@ -159,6 +165,21 @@ export async function enrichFlightEvent(eventId: number): Promise<TripEventRow> 
     (aircraft.type as string | undefined) ||
     null;
 
+  const departureTerminal =
+    asApiString(departure.terminal) || event.departure_terminal;
+  const arrivalTerminal =
+    asApiString(arrival.terminal) || event.arrival_terminal;
+  const departureGate = asApiString(departure.gate) || event.departure_gate;
+  const arrivalGate = asApiString(arrival.gate) || event.arrival_gate;
+  const checkInDesk =
+    asApiString(departure.checkInDesk) ||
+    asApiString(departure.check_in_desk) ||
+    event.check_in_desk;
+  const baggageBelt =
+    asApiString(arrival.baggageBelt) ||
+    asApiString(arrival.baggage_belt) ||
+    event.baggage_belt;
+
   let durationMinutes: number | null = null;
   if (depLocal && arrLocal) {
     const a = Date.parse(depLocal);
@@ -191,6 +212,12 @@ export async function enrichFlightEvent(eventId: number): Promise<TripEventRow> 
     endDate: endDate || null,
     durationMinutes,
     aircraftImagePath,
+    departureTerminal,
+    arrivalTerminal,
+    departureGate,
+    arrivalGate,
+    checkInDesk,
+    baggageBelt,
     location:
       formatAirportRoute(depAirport, arrAirport) || event.location,
     enrichmentJson: JSON.stringify(flight),

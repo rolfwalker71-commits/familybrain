@@ -64,6 +64,12 @@ type TripEvent = {
   arrival_airport: string | null;
   duration_minutes: number | null;
   aircraft_image_url: string | null;
+  departure_terminal: string | null;
+  arrival_terminal: string | null;
+  departure_gate: string | null;
+  arrival_gate: string | null;
+  check_in_desk: string | null;
+  baggage_belt: string | null;
   place_name: string | null;
   address: string | null;
   phone: string | null;
@@ -107,6 +113,12 @@ const emptyEventForm = {
   flightNumber: "",
   departureAirport: "",
   arrivalAirport: "",
+  departureTerminal: "",
+  arrivalTerminal: "",
+  departureGate: "",
+  arrivalGate: "",
+  checkInDesk: "",
+  baggageBelt: "",
 };
 
 export function TripDetailClient({ tripId }: { tripId: number }) {
@@ -211,6 +223,12 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
         flightNumber: eventForm.flightNumber || null,
         departureAirport: dep,
         arrivalAirport: arr,
+        departureTerminal: eventForm.departureTerminal || null,
+        arrivalTerminal: eventForm.arrivalTerminal || null,
+        departureGate: eventForm.departureGate || null,
+        arrivalGate: eventForm.arrivalGate || null,
+        checkInDesk: eventForm.checkInDesk || null,
+        baggageBelt: eventForm.baggageBelt || null,
       };
       const url =
         editingEventId != null
@@ -251,6 +269,12 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
       flightNumber: event.flight_number || "",
       departureAirport: event.departure_airport || "",
       arrivalAirport: event.arrival_airport || "",
+      departureTerminal: event.departure_terminal || "",
+      arrivalTerminal: event.arrival_terminal || "",
+      departureGate: event.departure_gate || "",
+      arrivalGate: event.arrival_gate || "",
+      checkInDesk: event.check_in_desk || "",
+      baggageBelt: event.baggage_belt || "",
     });
   }
 
@@ -797,6 +821,82 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                   className="font-mono uppercase"
                 />
               </div>
+              <div className="space-y-1.5">
+                <Label>Terminal Abflug</Label>
+                <Input
+                  value={eventForm.departureTerminal}
+                  onChange={(e) =>
+                    setEventForm((f) => ({
+                      ...f,
+                      departureTerminal: e.target.value,
+                    }))
+                  }
+                  placeholder="z. B. 1"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Gate Abflug</Label>
+                <Input
+                  value={eventForm.departureGate}
+                  onChange={(e) =>
+                    setEventForm((f) => ({
+                      ...f,
+                      departureGate: e.target.value,
+                    }))
+                  }
+                  placeholder="z. B. A12"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Terminal Ankunft</Label>
+                <Input
+                  value={eventForm.arrivalTerminal}
+                  onChange={(e) =>
+                    setEventForm((f) => ({
+                      ...f,
+                      arrivalTerminal: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Gate Ankunft</Label>
+                <Input
+                  value={eventForm.arrivalGate}
+                  onChange={(e) =>
+                    setEventForm((f) => ({
+                      ...f,
+                      arrivalGate: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Check-in</Label>
+                <Input
+                  value={eventForm.checkInDesk}
+                  onChange={(e) =>
+                    setEventForm((f) => ({
+                      ...f,
+                      checkInDesk: e.target.value,
+                    }))
+                  }
+                  placeholder="z. B. 120–150"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Gepäckband</Label>
+                <Input
+                  value={eventForm.baggageBelt}
+                  onChange={(e) =>
+                    setEventForm((f) => ({
+                      ...f,
+                      baggageBelt: e.target.value,
+                    }))
+                  }
+                  placeholder="z. B. 3"
+                />
+              </div>
             </>
           ) : null}
           <div className="space-y-1.5 sm:col-span-2">
@@ -882,21 +982,58 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                 {(event.airline ||
                   event.departure_airport ||
                   event.duration_minutes ||
-                  event.aircraft_reg) && (
-                  <div className="rounded-md bg-muted/40 px-3 py-2 text-xs">
-                    {[
-                      event.airline,
-                      event.departure_airport && event.arrival_airport
-                        ? `${event.departure_airport} → ${event.arrival_airport}`
-                        : null,
-                      event.duration_minutes
-                        ? `${event.duration_minutes} Min.`
-                        : null,
-                      event.aircraft_type,
-                      event.aircraft_reg,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
+                  event.aircraft_reg ||
+                  event.departure_terminal ||
+                  event.departure_gate ||
+                  event.check_in_desk ||
+                  event.baggage_belt) && (
+                  <div className="space-y-1 rounded-md bg-muted/40 px-3 py-2 text-xs">
+                    <div>
+                      {[
+                        event.airline,
+                        event.departure_airport && event.arrival_airport
+                          ? `${event.departure_airport} → ${event.arrival_airport}`
+                          : null,
+                        event.duration_minutes
+                          ? `${event.duration_minutes} Min.`
+                          : null,
+                        event.aircraft_type,
+                        event.aircraft_reg,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </div>
+                    {(event.departure_terminal ||
+                      event.departure_gate ||
+                      event.arrival_terminal ||
+                      event.arrival_gate ||
+                      event.check_in_desk ||
+                      event.baggage_belt) && (
+                      <div className="text-muted-foreground">
+                        {[
+                          event.departure_terminal
+                            ? `Terminal Abflug ${event.departure_terminal}`
+                            : null,
+                          event.departure_gate
+                            ? `Gate ${event.departure_gate}`
+                            : null,
+                          event.check_in_desk
+                            ? `Check-in ${event.check_in_desk}`
+                            : null,
+                          event.arrival_terminal
+                            ? `Terminal Ankunft ${event.arrival_terminal}`
+                            : null,
+                          event.arrival_gate
+                            ? `Gate Ankunft ${event.arrival_gate}`
+                            : null,
+                          event.baggage_belt
+                            ? `Gepäck ${event.baggage_belt}`
+                            : null,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </div>
+                    )}
                   </div>
                 )}
 

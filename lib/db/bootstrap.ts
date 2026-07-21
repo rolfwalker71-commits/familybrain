@@ -119,6 +119,12 @@ function ensureTripsTables(db: Database.Database): void {
       arrival_airport TEXT,
       duration_minutes INTEGER,
       aircraft_image_path TEXT,
+      departure_terminal TEXT,
+      arrival_terminal TEXT,
+      departure_gate TEXT,
+      arrival_gate TEXT,
+      check_in_desk TEXT,
+      baggage_belt TEXT,
       place_name TEXT,
       address TEXT,
       phone TEXT,
@@ -138,6 +144,24 @@ function ensureTripsTables(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_trip_events_trip ON trip_events(trip_id);
     CREATE INDEX IF NOT EXISTS idx_trip_events_start ON trip_events(start_date);
   `);
+
+  const tripEventCols = db
+    .prepare(`PRAGMA table_info(trip_events)`)
+    .all() as Array<{ name: string }>;
+  const tripEventColNames = new Set(tripEventCols.map((c) => c.name));
+  const flightExtraCols: Array<[string, string]> = [
+    ["departure_terminal", "TEXT"],
+    ["arrival_terminal", "TEXT"],
+    ["departure_gate", "TEXT"],
+    ["arrival_gate", "TEXT"],
+    ["check_in_desk", "TEXT"],
+    ["baggage_belt", "TEXT"],
+  ];
+  for (const [name, type] of flightExtraCols) {
+    if (!tripEventColNames.has(name)) {
+      db.exec(`ALTER TABLE trip_events ADD COLUMN ${name} ${type}`);
+    }
+  }
 }
 
 function ensureChatCorrectionsTable(db: Database.Database): void {

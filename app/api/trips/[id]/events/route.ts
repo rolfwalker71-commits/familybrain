@@ -42,6 +42,12 @@ const CreateSchema = z.object({
   address: z.string().nullable().optional(),
   departureAirport: z.string().nullable().optional(),
   arrivalAirport: z.string().nullable().optional(),
+  departureTerminal: z.string().nullable().optional(),
+  arrivalTerminal: z.string().nullable().optional(),
+  departureGate: z.string().nullable().optional(),
+  arrivalGate: z.string().nullable().optional(),
+  checkInDesk: z.string().nullable().optional(),
+  baggageBelt: z.string().nullable().optional(),
 });
 
 type Ctx = { params: Promise<{ id: string }> };

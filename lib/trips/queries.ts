@@ -51,6 +51,12 @@ export type TripEventRow = {
   arrival_airport: string | null;
   duration_minutes: number | null;
   aircraft_image_path: string | null;
+  departure_terminal: string | null;
+  arrival_terminal: string | null;
+  departure_gate: string | null;
+  arrival_gate: string | null;
+  check_in_desk: string | null;
+  baggage_belt: string | null;
   place_name: string | null;
   address: string | null;
   phone: string | null;
@@ -252,6 +258,12 @@ export type TripEventInput = {
   arrivalAirport?: string | null;
   durationMinutes?: number | null;
   aircraftImagePath?: string | null;
+  departureTerminal?: string | null;
+  arrivalTerminal?: string | null;
+  departureGate?: string | null;
+  arrivalGate?: string | null;
+  checkInDesk?: string | null;
+  baggageBelt?: string | null;
   placeName?: string | null;
   address?: string | null;
   phone?: string | null;
@@ -292,6 +304,8 @@ export function createTripEvent(
          document_id, travel_item_id, guide_id, note_id, source_excerpt,
          flight_number, airline, aircraft_reg, aircraft_type,
          departure_airport, arrival_airport, duration_minutes, aircraft_image_path,
+         departure_terminal, arrival_terminal, departure_gate, arrival_gate,
+         check_in_desk, baggage_belt,
          place_name, address, phone, website, lat, lon, map_image_path, osm_id,
          enrichment_json, enriched_at, created_at, updated_at
        ) VALUES (
@@ -300,6 +314,8 @@ export function createTripEvent(
          ?, ?, ?, ?, ?,
          ?, ?, ?, ?,
          ?, ?, ?, ?,
+         ?, ?, ?, ?,
+         ?, ?,
          ?, ?, ?, ?, ?, ?, ?, ?,
          ?, ?, ?, ?
        )`
@@ -330,6 +346,12 @@ export function createTripEvent(
       arr,
       input.durationMinutes ?? null,
       input.aircraftImagePath ?? null,
+      input.departureTerminal?.trim() || null,
+      input.arrivalTerminal?.trim() || null,
+      input.departureGate?.trim() || null,
+      input.arrivalGate?.trim() || null,
+      input.checkInDesk?.trim() || null,
+      input.baggageBelt?.trim() || null,
       input.placeName?.trim() || null,
       input.address?.trim() || null,
       input.phone?.trim() || null,
@@ -384,6 +406,12 @@ export function updateTripEvent(
        arrival_airport = ?,
        duration_minutes = ?,
        aircraft_image_path = ?,
+       departure_terminal = ?,
+       arrival_terminal = ?,
+       departure_gate = ?,
+       arrival_gate = ?,
+       check_in_desk = ?,
+       baggage_belt = ?,
        place_name = ?,
        address = ?,
        phone = ?,
@@ -449,6 +477,24 @@ export function updateTripEvent(
     input.aircraftImagePath !== undefined
       ? input.aircraftImagePath
       : existing.aircraft_image_path,
+    input.departureTerminal !== undefined
+      ? input.departureTerminal?.trim() || null
+      : existing.departure_terminal,
+    input.arrivalTerminal !== undefined
+      ? input.arrivalTerminal?.trim() || null
+      : existing.arrival_terminal,
+    input.departureGate !== undefined
+      ? input.departureGate?.trim() || null
+      : existing.departure_gate,
+    input.arrivalGate !== undefined
+      ? input.arrivalGate?.trim() || null
+      : existing.arrival_gate,
+    input.checkInDesk !== undefined
+      ? input.checkInDesk?.trim() || null
+      : existing.check_in_desk,
+    input.baggageBelt !== undefined
+      ? input.baggageBelt?.trim() || null
+      : existing.baggage_belt,
     input.placeName !== undefined
       ? input.placeName?.trim() || null
       : existing.place_name,
