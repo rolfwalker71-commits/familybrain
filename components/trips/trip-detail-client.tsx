@@ -2093,22 +2093,9 @@ export function TripDetailClient({
                         return null;
                       }
 
-                      const documentThumbs = hasDocuments ? (
+                      const documentThumbs =
+                        !readOnly && hasDocuments ? (
                         <div className="max-w-full overflow-x-auto pb-1">
-                          {readOnly ? (
-                            <div className="flex flex-wrap gap-1.5">
-                              {documents.map((doc) => (
-                                <Badge
-                                  key={doc.id}
-                                  variant="secondary"
-                                  className="max-w-[12rem] truncate"
-                                  title={doc.title || `Dokument #${doc.id}`}
-                                >
-                                  {doc.title || `Dokument #${doc.id}`}
-                                </Badge>
-                              ))}
-                            </div>
-                          ) : (
                           <div
                             className="grid w-max grid-flow-col justify-start gap-2"
                             style={{ gridAutoColumns: "3.5rem" }}
@@ -2129,7 +2116,6 @@ export function TripDetailClient({
                             />
                           ))}
                           </div>
-                          )}
                         </div>
                       ) : null;
 
@@ -2419,6 +2405,7 @@ export function TripDetailClient({
                           <BelegNotesBlock
                             markdown={event.document_notes_md || ""}
                             show={
+                              !readOnly &&
                               event.show_document_notes !== 0 &&
                               event.show_document_notes !== false
                             }
