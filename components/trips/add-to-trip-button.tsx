@@ -38,6 +38,8 @@ function draftToPayload(draft: TripEventDraft) {
     bookingReference: draft.booking_reference ?? null,
     notes: draft.notes ?? null,
     flightNumber: draft.flight_number ?? null,
+    departureAirport: draft.departure_airport ?? null,
+    arrivalAirport: draft.arrival_airport ?? null,
     documentId: draft.document_id ?? null,
     travelItemId: draft.travel_item_id ?? null,
     guideId: draft.guide_id ?? null,

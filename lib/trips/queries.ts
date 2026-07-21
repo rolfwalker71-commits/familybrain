@@ -6,6 +6,7 @@ import {
   type TripEventType,
   type TripStatus,
 } from "@/lib/trips/constants";
+import { formatAirportRoute, normalizeIataCode } from "@/lib/trips/iata";
 
 export type TripRow = {
   id: number;
@@ -276,6 +277,13 @@ export function createTripEvent(
     )
     .get(tripId) as { m: number };
 
+  const dep = normalizeIataCode(input.departureAirport);
+  const arr = normalizeIataCode(input.arrivalAirport);
+  const location =
+    input.location?.trim() ||
+    formatAirportRoute(dep, arr) ||
+    null;
+
   const result = db
     .prepare(
       `INSERT INTO trip_events (
@@ -304,7 +312,7 @@ export function createTripEvent(
       input.endDate || null,
       input.startTime || null,
       input.endTime || null,
-      input.location?.trim() || null,
+      location,
       input.provider?.trim() || null,
       input.bookingReference?.trim() || null,
       input.notes?.trim() || null,
@@ -318,8 +326,8 @@ export function createTripEvent(
       input.airline?.trim() || null,
       input.aircraftReg?.trim() || null,
       input.aircraftType?.trim() || null,
-      input.departureAirport?.trim() || null,
-      input.arrivalAirport?.trim() || null,
+      dep,
+      arr,
       input.durationMinutes ?? null,
       input.aircraftImagePath ?? null,
       input.placeName?.trim() || null,
@@ -430,10 +438,10 @@ export function updateTripEvent(
       ? input.aircraftType?.trim() || null
       : existing.aircraft_type,
     input.departureAirport !== undefined
-      ? input.departureAirport?.trim() || null
+      ? normalizeIataCode(input.departureAirport)
       : existing.departure_airport,
     input.arrivalAirport !== undefined
-      ? input.arrivalAirport?.trim() || null
+      ? normalizeIataCode(input.arrivalAirport)
       : existing.arrival_airport,
     input.durationMinutes !== undefined
       ? input.durationMinutes

@@ -105,6 +105,8 @@ const emptyEventForm = {
   bookingReference: "",
   notes: "",
   flightNumber: "",
+  departureAirport: "",
+  arrivalAirport: "",
 };
 
 export function TripDetailClient({ tripId }: { tripId: number }) {
@@ -190,6 +192,8 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
     setBusy(true);
     setError(null);
     try {
+      const dep = eventForm.departureAirport.trim().toUpperCase() || null;
+      const arr = eventForm.arrivalAirport.trim().toUpperCase() || null;
       const payload = {
         eventType: eventForm.eventType,
         title: eventForm.title.trim(),
@@ -197,12 +201,16 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
         endDate: eventForm.endDate || null,
         startTime: eventForm.startTime || null,
         endTime: eventForm.endTime || null,
-        location: eventForm.location || null,
+        location:
+          eventForm.location ||
+          (dep && arr ? `${dep} → ${arr}` : dep || arr || null),
         address: eventForm.address || null,
         provider: eventForm.provider || null,
         bookingReference: eventForm.bookingReference || null,
         notes: eventForm.notes || null,
         flightNumber: eventForm.flightNumber || null,
+        departureAirport: dep,
+        arrivalAirport: arr,
       };
       const url =
         editingEventId != null
@@ -241,6 +249,8 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
       bookingReference: event.booking_reference || "",
       notes: event.notes || "",
       flightNumber: event.flight_number || "",
+      departureAirport: event.departure_airport || "",
+      arrivalAirport: event.arrival_airport || "",
     });
   }
 
@@ -746,9 +756,49 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
               onChange={(e) =>
                 setEventForm((f) => ({ ...f, flightNumber: e.target.value }))
               }
-              placeholder="z. B. LX123"
+              placeholder="z. B. LX80"
             />
           </div>
+          {eventForm.eventType === "Flug" ? (
+            <>
+              <div className="space-y-1.5">
+                <Label>Von (IATA)</Label>
+                <Input
+                  value={eventForm.departureAirport}
+                  onChange={(e) =>
+                    setEventForm((f) => ({
+                      ...f,
+                      departureAirport: e.target.value
+                        .toUpperCase()
+                        .replace(/[^A-Z]/g, "")
+                        .slice(0, 3),
+                    }))
+                  }
+                  placeholder="ZRH"
+                  maxLength={3}
+                  className="font-mono uppercase"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Nach (IATA)</Label>
+                <Input
+                  value={eventForm.arrivalAirport}
+                  onChange={(e) =>
+                    setEventForm((f) => ({
+                      ...f,
+                      arrivalAirport: e.target.value
+                        .toUpperCase()
+                        .replace(/[^A-Z]/g, "")
+                        .slice(0, 3),
+                    }))
+                  }
+                  placeholder="BCN"
+                  maxLength={3}
+                  className="font-mono uppercase"
+                />
+              </div>
+            </>
+          ) : null}
           <div className="space-y-1.5 sm:col-span-2">
             <Label>Notizen</Label>
             <Textarea
@@ -855,31 +905,73 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                   event.website ||
                   event.place_name ||
                   event.map_image_url ||
-                  event.osm_id) && (
-                  <div className="space-y-1 text-xs text-muted-foreground">
-                    {event.place_name ? (
-                      <div className="font-medium text-foreground">
-                        {event.place_name}
+                  event.osm_id ||
+                  (event.lat != null && event.lon != null)) && (
+                  <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(11rem,15rem)] sm:items-start">
+                    <div className="space-y-1 text-xs text-muted-foreground">
+                      {event.place_name ? (
+                        <div className="font-medium text-foreground">
+                          {event.place_name}
+                        </div>
+                      ) : null}
+                      {event.address ? <div>{event.address}</div> : null}
+                      {event.phone ? <div>Tel: {event.phone}</div> : null}
+                      {event.website ? (
+                        <a
+                          href={event.website}
+                          className="text-blue-700 underline"
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          Website
+                        </a>
+                      ) : null}
+                      {event.lat != null && event.lon != null ? (
+                        <div className="tabular-nums">
+                          {event.lat.toFixed(5)}, {event.lon.toFixed(5)}
+                        </div>
+                      ) : null}
+                      <div className="text-[10px]">© OpenStreetMap</div>
+                    </div>
+                    {event.map_image_url ||
+                    (event.lat != null && event.lon != null) ? (
+                      <div className="overflow-hidden rounded-md border border-border/70 bg-muted/30">
+                        {event.lat != null && event.lon != null ? (
+                          <iframe
+                            title={`Karte ${event.place_name || event.title}`}
+                            className="h-36 w-full border-0"
+                            loading="lazy"
+                            referrerPolicy="no-referrer-when-downgrade"
+                            src={`https://www.openstreetmap.org/export/embed.html?bbox=${(
+                              event.lon - 0.012
+                            ).toFixed(5)}%2C${(event.lat - 0.008).toFixed(
+                              5
+                            )}%2C${(event.lon + 0.012).toFixed(5)}%2C${(
+                              event.lat + 0.008
+                            ).toFixed(5)}&layer=mapnik&marker=${event.lat.toFixed(
+                              5
+                            )}%2C${event.lon.toFixed(5)}`}
+                          />
+                        ) : event.map_image_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={event.map_image_url}
+                            alt="Kartenausschnitt"
+                            className="h-36 w-full object-cover"
+                          />
+                        ) : null}
+                        {event.lat != null && event.lon != null ? (
+                          <a
+                            href={`https://www.openstreetmap.org/?mlat=${event.lat}&mlon=${event.lon}#map=16/${event.lat}/${event.lon}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="block px-2 py-1 text-[10px] text-muted-foreground hover:underline"
+                          >
+                            Grössere Karte
+                          </a>
+                        ) : null}
                       </div>
                     ) : null}
-                    {event.address ? <div>{event.address}</div> : null}
-                    {event.phone ? <div>Tel: {event.phone}</div> : null}
-                    {event.website ? (
-                      <a
-                        href={event.website}
-                        className="text-blue-700 underline"
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        Website
-                      </a>
-                    ) : null}
-                    {event.lat != null && event.lon != null ? (
-                      <div className="tabular-nums">
-                        {event.lat.toFixed(5)}, {event.lon.toFixed(5)}
-                      </div>
-                    ) : null}
-                    <div className="text-[10px]">© OpenStreetMap</div>
                   </div>
                 )}
 
@@ -889,14 +981,6 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                     src={event.aircraft_image_url}
                     alt={event.aircraft_reg || "Flugzeug"}
                     className="max-h-40 rounded-md object-cover"
-                  />
-                ) : null}
-                {event.map_image_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={event.map_image_url}
-                    alt="Kartenausschnitt"
-                    className="max-h-48 w-full rounded-md object-cover"
                   />
                 ) : null}
 

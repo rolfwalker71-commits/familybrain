@@ -23,6 +23,8 @@ export type TripEventDraft = {
   booking_reference?: string | null;
   notes?: string | null;
   flight_number?: string | null;
+  departure_airport?: string | null;
+  arrival_airport?: string | null;
   document_id?: number | null;
   travel_item_id?: number | null;
   guide_id?: number | null;

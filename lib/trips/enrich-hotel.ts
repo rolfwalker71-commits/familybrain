@@ -184,11 +184,21 @@ async function fetchStaticMap(
   eventId: number
 ): Promise<string | null> {
   ensureTripMediaDirs();
-  // OpenStreetMap static map via staticmap.openstreetmap.de (public community service)
-  const url = `https://staticmap.openstreetmap.de/staticmap.php?center=${lat},${lon}&zoom=15&size=640x360&markers=${lat},${lon},red-pushpin`;
+  // staticmap.openstreetmap.de is often unavailable — cache a single OSM tile instead.
+  const zoom = 15;
+  const n = 2 ** zoom;
+  const x = Math.floor(((lon + 180) / 360) * n);
+  const latRad = (lat * Math.PI) / 180;
+  const y = Math.floor(
+    ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * n
+  );
+  const url = `https://tile.openstreetmap.org/${zoom}/${x}/${y}.png`;
   try {
     const response = await fetch(url, {
-      headers: { "User-Agent": "FamilyBrain-TravelBrain/1.0" },
+      headers: {
+        "User-Agent":
+          "FamilyBrain-TravelBrain/1.0 (https://github.com/rolfwalker71-commits/familybrain)",
+      },
     });
     if (!response.ok) return null;
     const buffer = Buffer.from(await response.arrayBuffer());

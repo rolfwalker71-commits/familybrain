@@ -68,6 +68,9 @@ export default function SettingsPage() {
     null
   );
   const [hasAerodataboxKey, setHasAerodataboxKey] = useState(false);
+  const [aerodataboxProvider, setAerodataboxProvider] = useState<
+    "apimarket" | "rapidapi"
+  >("apimarket");
   const [nominatimBaseUrl, setNominatimBaseUrl] = useState(
     "https://nominatim.openstreetmap.org"
   );
@@ -100,6 +103,9 @@ export default function SettingsPage() {
       setChatInstructionsCustomized(Boolean(data.chatInstructionsCustomized));
       setAerodataboxKeyMasked(data.aerodataboxApiKeyMasked || null);
       setHasAerodataboxKey(Boolean(data.hasAerodataboxKey));
+      setAerodataboxProvider(
+        data.aerodataboxProvider === "rapidapi" ? "rapidapi" : "apimarket"
+      );
       setNominatimBaseUrl(
         data.nominatimBaseUrl || "https://nominatim.openstreetmap.org"
       );
@@ -276,6 +282,7 @@ export default function SettingsPage() {
     try {
       const payload: Record<string, unknown> = {
         nominatimBaseUrl: nominatimBaseUrl.trim(),
+        aerodataboxProvider,
       };
       if (aerodataboxKey.trim()) {
         payload.aerodataboxApiKey = aerodataboxKey.trim();
@@ -289,6 +296,9 @@ export default function SettingsPage() {
       if (!res.ok) throw new Error(data.error || "Speichern fehlgeschlagen");
       setAerodataboxKeyMasked(data.aerodataboxApiKeyMasked || null);
       setHasAerodataboxKey(Boolean(data.hasAerodataboxKey));
+      setAerodataboxProvider(
+        data.aerodataboxProvider === "rapidapi" ? "rapidapi" : "apimarket"
+      );
       setAerodataboxKey("");
       setNominatimBaseUrl(
         data.nominatimBaseUrl || "https://nominatim.openstreetmap.org"
@@ -563,12 +573,35 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            Optionaler AeroDataBox-Key (RapidAPI) für Flug-Anreicherung.
-            Hotel-Orte nutzen OpenStreetMap/Nominatim (ohne Key); optional
-            eigene Nominatim-Instanz.
+            Optionaler AeroDataBox-Key für Flug-Anreicherung (API.Market oder
+            RapidAPI). Hotel-Orte nutzen OpenStreetMap/Nominatim (ohne Key);
+            optional eigene Nominatim-Instanz.
           </p>
           <div className="space-y-2">
-            <Label htmlFor="aeroKey">AeroDataBox / RapidAPI-Key</Label>
+            <Label>Flug-API Anbieter</Label>
+            <Select
+              value={aerodataboxProvider}
+              onValueChange={(v) => {
+                if (v === "apimarket" || v === "rapidapi") {
+                  setAerodataboxProvider(v);
+                }
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="apimarket">API.Market</SelectItem>
+                <SelectItem value="rapidapi">RapidAPI</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="aeroKey">
+              {aerodataboxProvider === "apimarket"
+                ? "API.Market-Key"
+                : "RapidAPI-Key"}
+            </Label>
             <Input
               id="aeroKey"
               type="password"
@@ -577,7 +610,9 @@ export default function SettingsPage() {
               placeholder={
                 hasAerodataboxKey
                   ? `Gespeichert: ${aerodataboxKeyMasked || "••••"}`
-                  : "RapidAPI-Key"
+                  : aerodataboxProvider === "apimarket"
+                    ? "API.Market Key"
+                    : "RapidAPI-Key"
               }
             />
           </div>

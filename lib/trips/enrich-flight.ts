@@ -2,19 +2,18 @@ import fs from "fs";
 import path from "path";
 import { nowIso } from "@/lib/utils/dates";
 import { ensureTripMediaDirs, getTripAircraftDir } from "@/lib/trips/paths";
-import { getAeroDataBoxApiKey } from "@/lib/trips/settings";
+import { formatAirportRoute, normalizeIataCode } from "@/lib/trips/iata";
+import {
+  getAeroDataBoxApiKey,
+  getAeroDataBoxBaseUrl,
+  getAeroDataBoxHeaders,
+  getAeroDataBoxProvider,
+} from "@/lib/trips/settings";
 import {
   getTripEventById,
   updateTripEvent,
   type TripEventRow,
 } from "@/lib/trips/queries";
-
-function aeroHeaders(apiKey: string): HeadersInit {
-  return {
-    "X-RapidAPI-Key": apiKey,
-    "X-RapidAPI-Host": "aerodatabox.p.rapidapi.com",
-  };
-}
 
 function normalizeFlightNumber(raw: string): string {
   return raw.replace(/\s+/g, "").toUpperCase();
@@ -40,16 +39,20 @@ export async function enrichFlightEvent(eventId: number): Promise<TripEventRow> 
     );
   }
 
+  const provider = getAeroDataBoxProvider();
+  const base = getAeroDataBoxBaseUrl(provider);
+  const headers = getAeroDataBoxHeaders(apiKey, provider);
+
   const number = normalizeFlightNumber(flightNumber);
-  const url = `https://aerodatabox.p.rapidapi.com/flights/number/${encodeURIComponent(
+  const url = `${base}/flights/number/${encodeURIComponent(
     number
   )}/${encodeURIComponent(date)}`;
 
-  const response = await fetch(url, { headers: aeroHeaders(apiKey) });
+  const response = await fetch(url, { headers });
   if (!response.ok) {
     const text = await response.text().catch(() => "");
     throw new Error(
-      `Fluglookup fehlgeschlagen (${response.status}): ${text.slice(0, 200)}`
+      `Fluglookup fehlgeschlagen (${response.status}, ${provider}): ${text.slice(0, 200)}`
     );
   }
 
@@ -85,20 +88,20 @@ export async function enrichFlightEvent(eventId: number): Promise<TripEventRow> 
     : event.end_date;
 
   const depAirport =
-    ((departure.airport as Record<string, unknown> | undefined)?.iata as
-      | string
-      | undefined) ||
-    ((departure.airport as Record<string, unknown> | undefined)?.icao as
-      | string
-      | undefined) ||
+    normalizeIataCode(
+      ((departure.airport as Record<string, unknown> | undefined)?.iata as
+        | string
+        | undefined) || null
+    ) ||
+    normalizeIataCode(event.departure_airport) ||
     null;
   const arrAirport =
-    ((arrival.airport as Record<string, unknown> | undefined)?.iata as
-      | string
-      | undefined) ||
-    ((arrival.airport as Record<string, unknown> | undefined)?.icao as
-      | string
-      | undefined) ||
+    normalizeIataCode(
+      ((arrival.airport as Record<string, unknown> | undefined)?.iata as
+        | string
+        | undefined) || null
+    ) ||
+    normalizeIataCode(event.arrival_airport) ||
     null;
 
   const reg =
@@ -122,7 +125,7 @@ export async function enrichFlightEvent(eventId: number): Promise<TripEventRow> 
   let aircraftImagePath: string | null = event.aircraft_image_path;
   if (reg) {
     try {
-      const downloaded = await fetchAircraftImage(apiKey, reg);
+      const downloaded = await fetchAircraftImage(base, headers, reg);
       if (downloaded) {
         aircraftImagePath = downloaded;
       }
@@ -143,23 +146,20 @@ export async function enrichFlightEvent(eventId: number): Promise<TripEventRow> 
     durationMinutes,
     aircraftImagePath,
     location:
-      depAirport && arrAirport
-        ? `${depAirport} → ${arrAirport}`
-        : event.location,
+      formatAirportRoute(depAirport, arrAirport) || event.location,
     enrichmentJson: JSON.stringify(flight),
     enrichedAt: nowIso(),
   });
 }
 
 async function fetchAircraftImage(
-  apiKey: string,
+  base: string,
+  headers: HeadersInit,
   reg: string
 ): Promise<string | null> {
   ensureTripMediaDirs();
-  const url = `https://aerodatabox.p.rapidapi.com/aircrafts/reg/${encodeURIComponent(
-    reg
-  )}/image/beta`;
-  const response = await fetch(url, { headers: aeroHeaders(apiKey) });
+  const url = `${base}/aircrafts/reg/${encodeURIComponent(reg)}/image/beta`;
+  const response = await fetch(url, { headers });
   if (!response.ok) return null;
   const data = (await response.json()) as { url?: string };
   if (!data.url) return null;

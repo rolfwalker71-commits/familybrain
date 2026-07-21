@@ -5,6 +5,7 @@ import {
   type ItineraryStop,
 } from "@/lib/extraction/itinerary";
 import type { TripEventDraft } from "@/lib/trips/constants";
+import { formatAirportRoute, normalizeIataCode } from "@/lib/trips/iata";
 
 export type TravelItemLike = {
   id?: number | null;
@@ -145,6 +146,17 @@ export function travelItemToEventDrafts(item: TravelItemLike): TripEventDraft[] 
   const documentId = item.document_id ?? item.document_local_id ?? null;
   const travelItemId = item.id ?? null;
 
+  const depIata =
+    type === "Flug"
+      ? normalizeIataCode(item.origin || asString(extracted?.origin))
+      : null;
+  const arrIata =
+    type === "Flug"
+      ? normalizeIataCode(
+          item.destination || asString(extracted?.destination)
+        )
+      : null;
+
   const main: TripEventDraft = {
     type,
     title,
@@ -156,11 +168,16 @@ export function travelItemToEventDrafts(item: TravelItemLike): TripEventDraft[] 
     end_time: normalizeClock(
       asString(extracted?.end_time) || asString(extracted?.endTime)
     ),
-    location,
+    location:
+      type === "Flug"
+        ? formatAirportRoute(depIata, arrIata) || location
+        : location,
     address: hotelAddress,
     provider: item.provider || asString(extracted?.provider),
     booking_reference: bookingReference,
     flight_number: type === "Flug" ? flightNumber : null,
+    departure_airport: depIata,
+    arrival_airport: arrIata,
     document_id: documentId,
     travel_item_id: travelItemId,
     source_excerpt: title,

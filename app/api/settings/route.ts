@@ -22,9 +22,12 @@ import {
 } from "@/lib/chat/instructions";
 import {
   getAeroDataBoxApiKey,
+  getAeroDataBoxProvider,
   getNominatimBaseUrl,
   saveAeroDataBoxApiKey,
+  saveAeroDataBoxProvider,
   saveNominatimBaseUrl,
+  AERODATABOX_PROVIDERS,
 } from "@/lib/trips/settings";
 
 export const runtime = "nodejs";
@@ -57,6 +60,7 @@ export async function GET() {
     chatInstructionsDefault: DEFAULT_CHAT_INSTRUCTIONS,
     aerodataboxApiKeyMasked: maskToken(aeroKey),
     hasAerodataboxKey: Boolean(aeroKey),
+    aerodataboxProvider: getAeroDataBoxProvider(),
     nominatimBaseUrl,
   });
 }
@@ -72,6 +76,7 @@ const PutSchema = z.object({
   resetChatInstructions: z.boolean().optional(),
   aerodataboxApiKey: z.string().optional(),
   clearAerodataboxApiKey: z.boolean().optional(),
+  aerodataboxProvider: z.enum(AERODATABOX_PROVIDERS).optional(),
   nominatimBaseUrl: z.string().optional(),
 });
 
@@ -142,6 +147,10 @@ export async function PUT(request: Request) {
     saveAeroDataBoxApiKey(parsed.data.aerodataboxApiKey || null);
   }
 
+  if (parsed.data.aerodataboxProvider !== undefined) {
+    saveAeroDataBoxProvider(parsed.data.aerodataboxProvider);
+  }
+
   if (parsed.data.nominatimBaseUrl !== undefined) {
     const raw = parsed.data.nominatimBaseUrl.trim();
     if (raw) {
@@ -188,6 +197,7 @@ export async function PUT(request: Request) {
     chatInstructionsDefault: DEFAULT_CHAT_INSTRUCTIONS,
     aerodataboxApiKeyMasked: maskToken(aeroKey),
     hasAerodataboxKey: Boolean(aeroKey),
+    aerodataboxProvider: getAeroDataBoxProvider(),
     nominatimBaseUrl,
   });
 }
