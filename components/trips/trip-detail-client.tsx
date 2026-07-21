@@ -255,11 +255,27 @@ function EventCalendarBadge({
   time?: string | null;
 }) {
   return (
-    <div className="flex w-[4.25rem] shrink-0 flex-col overflow-hidden rounded-xl border border-border/70 bg-background shadow-sm sm:w-[4.75rem]">
-      <div className="bg-red-600 px-1 py-1 text-center text-[10px] font-black tracking-wide text-white sm:text-[11px]">
+    <div
+      className={cn(
+        "flex w-[4.25rem] shrink-0 flex-col overflow-hidden rounded-xl border border-black/10 bg-background sm:w-[4.75rem]",
+        "shadow-[0_1px_0_rgba(255,255,255,0.85)_inset,0_1px_2px_rgba(15,23,42,0.08),0_4px_10px_rgba(15,23,42,0.14),0_10px_18px_-6px_rgba(15,23,42,0.22)]",
+        "ring-1 ring-black/5"
+      )}
+    >
+      <div
+        className={cn(
+          "bg-gradient-to-b from-red-500 to-red-700 px-1 py-1 text-center text-[10px] font-black tracking-wide text-white sm:text-[11px]",
+          "shadow-[0_1px_0_rgba(255,255,255,0.28)_inset,0_2px_3px_rgba(127,29,29,0.35)]"
+        )}
+      >
         {monthShortDe(isoDate)}
       </div>
-      <div className="flex flex-col items-center px-1 pb-1.5 pt-1.5">
+      <div
+        className={cn(
+          "flex flex-col items-center bg-gradient-to-b from-white to-slate-100 px-1 pb-1.5 pt-1.5",
+          "shadow-[0_1px_0_rgba(255,255,255,0.9)_inset]"
+        )}
+      >
         <div className="text-[10px] font-black leading-none text-foreground sm:text-[11px]">
           {weekdayDe(isoDate)}
         </div>
