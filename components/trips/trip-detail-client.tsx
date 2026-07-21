@@ -372,6 +372,11 @@ function eventToForm(event: TripEvent) {
   if (startDate && endDate && endDate < startDate) {
     endDate = "";
   }
+  // Empty date inputs show "today" as a fake placeholder in Safari — always
+  // surface a real stored date (end, otherwise start) so the field is correct.
+  if (!endDate) {
+    endDate = startDate;
+  }
   const transfer = splitTransferPlaces(event);
   return {
     eventType: coerceTripEventType(event.event_type),
@@ -1156,16 +1161,28 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
             <div className="space-y-1.5">
               <Label>Datum von</Label>
               <Input
+                key={`start-${editingEventId ?? "new"}`}
                 type="date"
                 value={eventForm.startDate}
-                onChange={(e) =>
-                  setEventForm((f) => ({ ...f, startDate: e.target.value }))
-                }
+                onChange={(e) => {
+                  const startDate = e.target.value;
+                  setEventForm((f) => ({
+                    ...f,
+                    startDate,
+                    // Keep end in sync when it was empty or before the new start
+                    // (avoids Safari showing "today" in an empty bis field).
+                    endDate:
+                      !f.endDate || f.endDate < startDate
+                        ? startDate
+                        : f.endDate,
+                  }));
+                }}
               />
             </div>
             <div className="space-y-1.5">
               <Label>Datum bis</Label>
               <Input
+                key={`end-${editingEventId ?? "new"}`}
                 type="date"
                 value={eventForm.endDate}
                 onChange={(e) =>
