@@ -18,10 +18,11 @@ export async function POST(_request: Request, context: Ctx) {
     if (!existing || existing.trip_id !== tripId) {
       return NextResponse.json({ error: "Ereignis nicht gefunden" }, { status: 404 });
     }
-    const event = await enrichFlightEvent(eventId);
+    const result = await enrichFlightEvent(eventId);
     return NextResponse.json({
       ok: true,
-      event: serializeTripEvent(event),
+      event: serializeTripEvent(result.event),
+      warning: result.warning || null,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

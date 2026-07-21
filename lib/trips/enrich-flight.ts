@@ -113,7 +113,62 @@ async function fetchAirportCoords(
   }
 }
 
-export async function enrichFlightEvent(eventId: number): Promise<TripEventRow> {
+export type FlightEnrichResult = {
+  event: TripEventRow;
+  warning?: string;
+};
+
+async function applyIataRouteOnly(
+  event: TripEventRow,
+  base: string,
+  headers: HeadersInit,
+  provider: string,
+  context: {
+    flightNumber: string;
+    dateLocal: string;
+    reason: string;
+  }
+): Promise<FlightEnrichResult | null> {
+  const dep = normalizeIataCode(event.departure_airport);
+  const arr = normalizeIataCode(event.arrival_airport);
+  if (!dep || !arr) return null;
+
+  const [depCoords, arrCoords] = await Promise.all([
+    fetchAirportCoords(base, headers, dep),
+    fetchAirportCoords(base, headers, arr),
+  ]);
+  if (!depCoords || !arrCoords) return null;
+
+  const notice =
+    `Flugdaten nicht verfügbar (${context.reason}). ` +
+    `Kartenroute aus ${dep} → ${arr} gezeichnet.`;
+
+  const updated = updateTripEvent(event.id, {
+    departureLat: depCoords.lat,
+    departureLon: depCoords.lon,
+    arrivalLat: arrCoords.lat,
+    arrivalLon: arrCoords.lon,
+    location: formatAirportRoute(dep, arr) || event.location,
+    enrichmentJson: JSON.stringify({
+      status: "route_only",
+      source: "iata_route_only",
+      notice,
+      provider,
+      flightNumber: context.flightNumber,
+      date: context.dateLocal,
+      departureAirport: dep,
+      arrivalAirport: arr,
+      lookedUpAt: nowIso(),
+    }),
+    enrichedAt: nowIso(),
+  });
+
+  return { event: updated, warning: notice };
+}
+
+export async function enrichFlightEvent(
+  eventId: number
+): Promise<FlightEnrichResult> {
   const event = getTripEventById(eventId);
   if (!event) throw new Error("Ereignis nicht gefunden");
   if (event.event_type !== "Flug") {
@@ -146,6 +201,12 @@ export async function enrichFlightEvent(eventId: number): Promise<TripEventRow> 
     );
   }
 
+  const routeContext = {
+    flightNumber: number,
+    dateLocal,
+    reason: "API ohne Treffer",
+  };
+
   const url =
     `${base}/flights/number/${encodeURIComponent(number)}/` +
     `${encodeURIComponent(dateLocal)}` +
@@ -153,10 +214,15 @@ export async function enrichFlightEvent(eventId: number): Promise<TripEventRow> 
 
   const response = await fetch(url, { headers });
   if (response.status === 204) {
+    const partial = await applyIataRouteOnly(event, base, headers, provider, {
+      ...routeContext,
+      reason: "noch keine Flugdaten / HTTP 204",
+    });
+    if (partial) return partial;
     throw new Error(
       `Keine Flugdaten für ${number} am ${dateLocal} (${provider}). ` +
-        `API meldet «kein Treffer» (HTTP 204) — oft falsches Datum/Flugnummer, ` +
-        `Flug fliegt an dem Tag nicht, oder der Tarif deckt das Datum nicht ab.`
+        `API meldet «kein Treffer» (HTTP 204) — oft zu früh vor Abflug, ` +
+        `falsches Datum/Flugnummer, oder fehlende Von/Nach-IATA für die Karte.`
     );
   }
   if (!response.ok) {
@@ -168,6 +234,11 @@ export async function enrichFlightEvent(eventId: number): Promise<TripEventRow> 
     } catch {
       /* keep raw */
     }
+    const partial = await applyIataRouteOnly(event, base, headers, provider, {
+      ...routeContext,
+      reason: `API-Fehler ${response.status}`,
+    });
+    if (partial) return partial;
     throw new Error(
       `Fluglookup fehlgeschlagen (${response.status}, ${provider}): ${detail || "keine Details"}`
     );
@@ -176,6 +247,11 @@ export async function enrichFlightEvent(eventId: number): Promise<TripEventRow> 
   const data = await readJsonBody(response, `Fluglookup (${provider})`);
   const flights = extractFlightsList(data);
   if (flights.length === 0) {
+    const partial = await applyIataRouteOnly(event, base, headers, provider, {
+      ...routeContext,
+      reason: "keine Flugdaten in der Antwort",
+    });
+    if (partial) return partial;
     throw new Error(
       `Keine Flugdaten für ${number} am ${dateLocal} gefunden (${provider}).`
     );
@@ -288,7 +364,7 @@ export async function enrichFlightEvent(eventId: number): Promise<TripEventRow> 
     }
   }
 
-  return updateTripEvent(eventId, {
+  const updated = updateTripEvent(eventId, {
     airline: (airline.name as string | undefined) || event.airline,
     aircraftReg: reg,
     aircraftType,
@@ -309,11 +385,17 @@ export async function enrichFlightEvent(eventId: number): Promise<TripEventRow> 
     departureLon: depCoords?.lon ?? null,
     arrivalLat: arrCoords?.lat ?? null,
     arrivalLon: arrCoords?.lon ?? null,
-    location:
-      formatAirportRoute(depAirport, arrAirport) || event.location,
-    enrichmentJson: JSON.stringify(flight),
+    location: formatAirportRoute(depAirport, arrAirport) || event.location,
+    enrichmentJson: JSON.stringify({
+      status: "complete",
+      source: "aerodatabox",
+      provider,
+      flight,
+    }),
     enrichedAt: nowIso(),
   });
+
+  return { event: updated };
 }
 
 async function fetchAircraftImage(

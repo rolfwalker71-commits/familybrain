@@ -10,6 +10,7 @@ import {
   Car,
   GripVertical,
   ImagePlus,
+  Info,
   MapPin,
   Pencil,
   Plane,
@@ -114,6 +115,8 @@ type TripEvent = {
   lon: number | null;
   map_image_url: string | null;
   osm_id: string | null;
+  enrichment_json?: string | null;
+  enriched_at?: string | null;
   documents?: Array<{
     id: number;
     paperless_id: number;
@@ -180,6 +183,29 @@ function dualPlaceLabels(type: string): { origin: string; destination: string } 
     return { origin: "Abholung", destination: "Rückgabe" };
   }
   return { origin: "Von", destination: "Nach" };
+}
+
+function parseFlightEnrichmentNotice(
+  enrichmentJson: string | null | undefined
+): string | null {
+  if (!enrichmentJson?.trim()) return null;
+  try {
+    const parsed = JSON.parse(enrichmentJson) as {
+      status?: string;
+      notice?: string;
+      message?: string;
+    };
+    if (parsed.status === "route_only") {
+      return (
+        parsed.notice ||
+        parsed.message ||
+        "Flugdaten noch nicht verfügbar — Kartenroute aus Flughafen-Codes."
+      );
+    }
+  } catch {
+    /* legacy flight payload */
+  }
+  return null;
 }
 
 function parseEventIsoDate(raw: string | null | undefined): string | null {
@@ -655,7 +681,11 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
       if (data.event && editingEventId === eventId) {
         setEventForm(eventToForm(data.event as TripEvent));
       }
-      setStatus("Flugdaten angereichert.");
+      setStatus(
+        typeof data.warning === "string" && data.warning.trim()
+          ? data.warning
+          : "Flugdaten angereichert."
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -1749,6 +1779,10 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                       );
                       const documents = event.documents || [];
                       const hasDocuments = documents.length > 0;
+                      const flightEnrichmentNotice =
+                        type === "Flug"
+                          ? parseFlightEnrichmentNotice(event.enrichment_json)
+                          : null;
 
                       if (
                         !hasFlightDetails &&
@@ -1758,7 +1792,8 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                         !hasGenericDetails &&
                         !hasDocuments &&
                         !event.aircraft_image_url &&
-                        !event.notes
+                        !event.notes &&
+                        !flightEnrichmentNotice
                       ) {
                         return null;
                       }
@@ -1788,6 +1823,21 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
 
                       return (
                         <div className="space-y-3">
+                          {flightEnrichmentNotice ? (
+                            <div
+                              role="status"
+                              className="flex gap-2 rounded-md border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-sm text-amber-950 dark:text-amber-100"
+                            >
+                              <Info
+                                className="mt-0.5 size-4 shrink-0 text-amber-700 dark:text-amber-300"
+                                aria-hidden
+                              />
+                              <p className="leading-snug">
+                                {flightEnrichmentNotice}
+                              </p>
+                            </div>
+                          ) : null}
+
                           {(hasFlightDetails ||
                             (hasGenericDetails && type === "Flug")) && (
                             <div className="space-y-1.5 rounded-md bg-background/60 px-3 py-2">
@@ -1887,7 +1937,7 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                           )}
 
                           {(hasPlaceDetails ||
-                            hasPlaceMap ||
+                            (hasPlaceMap && !dual && !hasStraightRouteMap) ||
                             (hasGenericDetails &&
                               type !== "Flug" &&
                               !dual)) && (
@@ -1895,6 +1945,8 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                               className={cn(
                                 "grid gap-3",
                                 hasPlaceMap &&
+                                  !dual &&
+                                  !hasStraightRouteMap &&
                                   (hasPlaceDetails ||
                                     (hasGenericDetails &&
                                       type !== "Flug" &&
@@ -1959,7 +2011,10 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                                 ) : null}
                               </div>
                               ) : null}
-                              {event.lat != null && event.lon != null ? (
+                              {!dual &&
+                              !hasStraightRouteMap &&
+                              event.lat != null &&
+                              event.lon != null ? (
                                 <TripMap
                                   points={[
                                     {
@@ -1969,7 +2024,9 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                                   ]}
                                   heightClassName="h-36"
                                 />
-                              ) : event.map_image_url ? (
+                              ) : !dual &&
+                                !hasStraightRouteMap &&
+                                event.map_image_url ? (
                                 <div className="overflow-hidden rounded-md border border-border/70 bg-muted/30">
                                   {/* eslint-disable-next-line @next/next/no-img-element */}
                                   <img
