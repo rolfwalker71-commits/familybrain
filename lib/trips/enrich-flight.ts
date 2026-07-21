@@ -19,6 +19,43 @@ function normalizeFlightNumber(raw: string): string {
   return raw.replace(/\s+/g, "").toUpperCase();
 }
 
+async function readJsonBody(
+  response: Response,
+  context: string
+): Promise<unknown> {
+  const text = await response.text().catch(() => "");
+  if (!text.trim()) {
+    throw new Error(
+      `${context}: leere Antwort von der Flug-API (HTTP ${response.status}). Bitte Key/Subscription und Quota prüfen.`
+    );
+  }
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    throw new Error(
+      `${context}: ungültige JSON-Antwort (HTTP ${response.status}): ${text.slice(0, 180)}`
+    );
+  }
+}
+
+function extractFlightsList(data: unknown): Record<string, unknown>[] {
+  if (Array.isArray(data)) {
+    return data as Record<string, unknown>[];
+  }
+  if (data && typeof data === "object") {
+    const obj = data as Record<string, unknown>;
+    for (const key of ["flights", "data", "items", "results"]) {
+      const value = obj[key];
+      if (Array.isArray(value)) return value as Record<string, unknown>[];
+    }
+    // Single flight object
+    if (obj.departure || obj.arrival || obj.number || obj.airline) {
+      return [obj];
+    }
+  }
+  return [];
+}
+
 export async function enrichFlightEvent(eventId: number): Promise<TripEventRow> {
   const event = getTripEventById(eventId);
   if (!event) throw new Error("Ereignis nicht gefunden");
@@ -51,18 +88,27 @@ export async function enrichFlightEvent(eventId: number): Promise<TripEventRow> 
   const response = await fetch(url, { headers });
   if (!response.ok) {
     const text = await response.text().catch(() => "");
+    let detail = text.slice(0, 200);
+    try {
+      const parsed = JSON.parse(text) as { message?: string; error?: string };
+      detail = parsed.message || parsed.error || detail;
+    } catch {
+      /* keep raw */
+    }
     throw new Error(
-      `Fluglookup fehlgeschlagen (${response.status}, ${provider}): ${text.slice(0, 200)}`
+      `Fluglookup fehlgeschlagen (${response.status}, ${provider}): ${detail || "keine Details"}`
     );
   }
 
-  const data = (await response.json()) as unknown;
-  const flights = Array.isArray(data) ? data : [];
+  const data = await readJsonBody(response, `Fluglookup (${provider})`);
+  const flights = extractFlightsList(data);
   if (flights.length === 0) {
-    throw new Error("Keine Flugdaten für diese Nummer/Datum gefunden.");
+    throw new Error(
+      `Keine Flugdaten für ${number} am ${date} gefunden (${provider}).`
+    );
   }
 
-  const flight = flights[0] as Record<string, unknown>;
+  const flight = flights[0];
   const departure = (flight.departure || {}) as Record<string, unknown>;
   const arrival = (flight.arrival || {}) as Record<string, unknown>;
   const airline = (flight.airline || {}) as Record<string, unknown>;
@@ -161,7 +207,14 @@ async function fetchAircraftImage(
   const url = `${base}/aircrafts/reg/${encodeURIComponent(reg)}/image/beta`;
   const response = await fetch(url, { headers });
   if (!response.ok) return null;
-  const data = (await response.json()) as { url?: string };
+  const text = await response.text().catch(() => "");
+  if (!text.trim()) return null;
+  let data: { url?: string };
+  try {
+    data = JSON.parse(text) as { url?: string };
+  } catch {
+    return null;
+  }
   if (!data.url) return null;
 
   const imageRes = await fetch(data.url);
