@@ -7,7 +7,7 @@ import {
   getTripAircraftDir,
   getTripCoversDir,
   getTripMapsDir,
-} from "@/lib/trips/constants";
+} from "@/lib/trips/paths";
 import { updateTrip } from "@/lib/trips/queries";
 
 export function coverPublicUrl(coverPath: string | null | undefined): string | null {

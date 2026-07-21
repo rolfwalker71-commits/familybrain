@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { nowIso } from "@/lib/utils/dates";
-import { ensureTripMediaDirs, getTripMapsDir } from "@/lib/trips/constants";
+import { ensureTripMediaDirs, getTripMapsDir } from "@/lib/trips/paths";
 import { getNominatimBaseUrl } from "@/lib/trips/settings";
 import {
   getTripById,

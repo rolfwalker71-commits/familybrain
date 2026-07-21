@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { nowIso } from "@/lib/utils/dates";
-import { ensureTripMediaDirs, getTripAircraftDir } from "@/lib/trips/constants";
+import { ensureTripMediaDirs, getTripAircraftDir } from "@/lib/trips/paths";
 import { getAeroDataBoxApiKey } from "@/lib/trips/settings";
 import {
   getTripEventById,
