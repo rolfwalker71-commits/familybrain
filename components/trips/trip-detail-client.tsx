@@ -2405,7 +2405,6 @@ export function TripDetailClient({
                           <BelegNotesBlock
                             markdown={event.document_notes_md || ""}
                             show={
-                              !readOnly &&
                               event.show_document_notes !== 0 &&
                               event.show_document_notes !== false
                             }
