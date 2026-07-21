@@ -68,7 +68,10 @@ type TripEvent = {
   address: string | null;
   phone: string | null;
   website: string | null;
+  lat: number | null;
+  lon: number | null;
   map_image_url: string | null;
+  osm_id: string | null;
 };
 
 type PlaceCandidate = {
@@ -125,6 +128,9 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
   const [placeCandidates, setPlaceCandidates] = useState<
     Record<number, PlaceCandidate[]>
   >({});
+  const [placeQueries, setPlaceQueries] = useState<Record<number, string>>(
+    {}
+  );
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/trips/${tripId}`);
@@ -330,22 +336,34 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
     setBusy(true);
     setError(null);
     try {
+      const event = events.find((e) => e.id === eventId);
+      const defaultQuery = [
+        event?.title,
+        event?.location,
+        trip?.destination,
+      ]
+        .filter(Boolean)
+        .join(", ");
+      const query = (placeQueries[eventId] ?? defaultQuery).trim();
       const res = await fetch(
         `/api/trips/${tripId}/events/${eventId}/enrich-place`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({}),
+          body: JSON.stringify({ query: query || undefined }),
         }
       );
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Suche fehlgeschlagen");
+      const candidates = (data.candidates || []) as PlaceCandidate[];
       setPlaceCandidates((prev) => ({
         ...prev,
-        [eventId]: data.candidates || [],
+        [eventId]: candidates,
       }));
-      if ((data.candidates || []).length === 0) {
+      if (candidates.length === 0) {
         setStatus("Keine OSM-Treffer gefunden.");
+      } else {
+        setStatus(`${candidates.length} OSM-Treffer — bitte auswählen.`);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -356,6 +374,7 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
 
   async function applyPlace(eventId: number, candidate: PlaceCandidate) {
     setBusy(true);
+    setError(null);
     try {
       const res = await fetch(
         `/api/trips/${tripId}/events/${eventId}/enrich-place`,
@@ -817,7 +836,12 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                   </div>
                 )}
 
-                {(event.address || event.phone || event.website) && (
+                {(event.address ||
+                  event.phone ||
+                  event.website ||
+                  event.place_name ||
+                  event.map_image_url ||
+                  event.osm_id) && (
                   <div className="space-y-1 text-xs text-muted-foreground">
                     {event.place_name ? (
                       <div className="font-medium text-foreground">
@@ -835,6 +859,11 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                       >
                         Website
                       </a>
+                    ) : null}
+                    {event.lat != null && event.lon != null ? (
+                      <div className="tabular-nums">
+                        {event.lat.toFixed(5)}, {event.lon.toFixed(5)}
+                      </div>
                     ) : null}
                     <div className="text-[10px]">© OpenStreetMap</div>
                   </div>
@@ -872,16 +901,43 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                   ) : null}
                   {event.event_type === "Hotel" ||
                   event.event_type === "Aktivität" ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={busy}
-                      onClick={() => void searchPlace(event.id)}
-                      className="gap-1.5"
-                    >
-                      <MapPin className="size-3.5" />
-                      Ort anreichern
-                    </Button>
+                    <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-end">
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <Label
+                          htmlFor={`place-query-${event.id}`}
+                          className="text-xs"
+                        >
+                          OSM-Suche
+                        </Label>
+                        <Input
+                          id={`place-query-${event.id}`}
+                          value={
+                            placeQueries[event.id] ??
+                            [event.title, event.location, trip.destination]
+                              .filter(Boolean)
+                              .join(", ")
+                          }
+                          onChange={(e) =>
+                            setPlaceQueries((prev) => ({
+                              ...prev,
+                              [event.id]: e.target.value,
+                            }))
+                          }
+                          placeholder="Hotelname, Ort…"
+                          className="h-8 text-xs"
+                        />
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={busy}
+                        onClick={() => void searchPlace(event.id)}
+                        className="gap-1.5 shrink-0"
+                      >
+                        <MapPin className="size-3.5" />
+                        Ort anreichern
+                      </Button>
+                    </div>
                   ) : null}
                 </div>
 

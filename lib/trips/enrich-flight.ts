@@ -122,9 +122,12 @@ export async function enrichFlightEvent(eventId: number): Promise<TripEventRow> 
   let aircraftImagePath: string | null = event.aircraft_image_path;
   if (reg) {
     try {
-      aircraftImagePath = await fetchAircraftImage(apiKey, reg);
+      const downloaded = await fetchAircraftImage(apiKey, reg);
+      if (downloaded) {
+        aircraftImagePath = downloaded;
+      }
     } catch {
-      /* optional */
+      /* optional — keep previous path */
     }
   }
 

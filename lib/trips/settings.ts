@@ -2,6 +2,8 @@ import { getSetting, setSetting } from "@/lib/db/migrations";
 
 export const AERODATABOX_KEY_SETTING = "aerodatabox_api_key";
 export const NOMINATIM_URL_SETTING = "nominatim_base_url";
+export const DEFAULT_NOMINATIM_BASE_URL =
+  "https://nominatim.openstreetmap.org";
 
 export function getAeroDataBoxApiKey(): string | null {
   return (
@@ -19,7 +21,7 @@ export function getNominatimBaseUrl(): string {
   return (
     getSetting(NOMINATIM_URL_SETTING) ||
     process.env.NOMINATIM_BASE_URL ||
-    "https://nominatim.openstreetmap.org"
+    DEFAULT_NOMINATIM_BASE_URL
   ).replace(/\/$/, "");
 }
 

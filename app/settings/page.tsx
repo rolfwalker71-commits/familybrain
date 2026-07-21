@@ -68,6 +68,9 @@ export default function SettingsPage() {
     null
   );
   const [hasAerodataboxKey, setHasAerodataboxKey] = useState(false);
+  const [nominatimBaseUrl, setNominatimBaseUrl] = useState(
+    "https://nominatim.openstreetmap.org"
+  );
 
   useEffect(() => {
     void (async () => {
@@ -97,6 +100,9 @@ export default function SettingsPage() {
       setChatInstructionsCustomized(Boolean(data.chatInstructionsCustomized));
       setAerodataboxKeyMasked(data.aerodataboxApiKeyMasked || null);
       setHasAerodataboxKey(Boolean(data.hasAerodataboxKey));
+      setNominatimBaseUrl(
+        data.nominatimBaseUrl || "https://nominatim.openstreetmap.org"
+      );
     })();
   }, []);
 
@@ -268,19 +274,49 @@ export default function SettingsPage() {
     setError(null);
     setMessage(null);
     try {
+      const payload: Record<string, unknown> = {
+        nominatimBaseUrl: nominatimBaseUrl.trim(),
+      };
+      if (aerodataboxKey.trim()) {
+        payload.aerodataboxApiKey = aerodataboxKey.trim();
+      }
       const res = await fetch("/api/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          aerodataboxApiKey: aerodataboxKey || undefined,
-        }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Speichern fehlgeschlagen");
       setAerodataboxKeyMasked(data.aerodataboxApiKeyMasked || null);
       setHasAerodataboxKey(Boolean(data.hasAerodataboxKey));
       setAerodataboxKey("");
+      setNominatimBaseUrl(
+        data.nominatimBaseUrl || "https://nominatim.openstreetmap.org"
+      );
       setMessage("TravelBrain-Einstellungen gespeichert.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  async function clearAerodataboxKey() {
+    setSaving("travelbrain");
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clearAerodataboxApiKey: true }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Löschen fehlgeschlagen");
+      setAerodataboxKeyMasked(data.aerodataboxApiKeyMasked || null);
+      setHasAerodataboxKey(Boolean(data.hasAerodataboxKey));
+      setAerodataboxKey("");
+      setMessage("AeroDataBox-Key entfernt.");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -527,9 +563,9 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            Optionaler AeroDataBox-Key (RapidAPI) für Flug-Anreicherung in
-            TravelBrain. Hotel-Orte nutzen öffentlich OpenStreetMap/Nominatim
-            ohne Key.
+            Optionaler AeroDataBox-Key (RapidAPI) für Flug-Anreicherung.
+            Hotel-Orte nutzen OpenStreetMap/Nominatim (ohne Key); optional
+            eigene Nominatim-Instanz.
           </p>
           <div className="space-y-2">
             <Label htmlFor="aeroKey">AeroDataBox / RapidAPI-Key</Label>
@@ -545,12 +581,37 @@ export default function SettingsPage() {
               }
             />
           </div>
-          <Button
-            onClick={() => void saveTravelBrainSettings()}
-            disabled={saving !== null}
-          >
-            {saving === "travelbrain" ? "Speichert…" : "TravelBrain speichern"}
-          </Button>
+          <div className="space-y-2">
+            <Label htmlFor="nominatimUrl">Nominatim Base URL</Label>
+            <Input
+              id="nominatimUrl"
+              type="url"
+              value={nominatimBaseUrl}
+              onChange={(e) => setNominatimBaseUrl(e.target.value)}
+              placeholder="https://nominatim.openstreetmap.org"
+            />
+            <p className="text-xs text-muted-foreground">
+              Leer speichern stellt den öffentlichen OSM-Default wieder her.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              onClick={() => void saveTravelBrainSettings()}
+              disabled={saving !== null}
+            >
+              {saving === "travelbrain" ? "Speichert…" : "TravelBrain speichern"}
+            </Button>
+            {hasAerodataboxKey ? (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={saving !== null}
+                onClick={() => void clearAerodataboxKey()}
+              >
+                Flug-API-Key entfernen
+              </Button>
+            ) : null}
+          </div>
         </CardContent>
       </Card>
 

@@ -21,6 +21,28 @@ export type PlaceCandidate = {
   lon: number;
 };
 
+const PREFERRED_TYPES = new Set([
+  "hotel",
+  "guest_house",
+  "hostel",
+  "motel",
+  "apartment",
+  "chalet",
+  "resort",
+  "camp_site",
+  "caravan_site",
+  "alpine_hut",
+  "attraction",
+  "museum",
+  "gallery",
+  "viewpoint",
+  "theme_park",
+  "zoo",
+  "aquarium",
+]);
+
+const PREFERRED_CLASSES = new Set(["tourism", "amenity", "leisure"]);
+
 let lastNominatimAt = 0;
 
 async function nominatimFetch(url: string): Promise<Response> {
@@ -33,6 +55,21 @@ async function nominatimFetch(url: string): Promise<Response> {
       Accept: "application/json",
     },
   });
+}
+
+function isPreferredPlace(row: {
+  type?: string;
+  class?: string;
+}): boolean {
+  const type = (row.type || "").toLowerCase();
+  const cls = (row.class || "").toLowerCase();
+  if (PREFERRED_TYPES.has(type)) return true;
+  if (cls === "tourism") return true;
+  if (cls === "amenity" && (type === "restaurant" || type === "cafe")) {
+    return true;
+  }
+  if (PREFERRED_CLASSES.has(cls) && type !== "yes") return true;
+  return false;
 }
 
 export async function searchHotelPlaces(
@@ -59,7 +96,7 @@ export async function searchHotelPlaces(
     format: "jsonv2",
     addressdetails: "1",
     extratags: "1",
-    limit: "8",
+    limit: "12",
   }).toString()}`;
 
   const response = await nominatimFetch(url);
@@ -79,8 +116,10 @@ export async function searchHotelPlaces(
     class?: string;
   }>;
 
-  return rows
-    .map((row): PlaceCandidate | null => {
+  type Ranked = PlaceCandidate & { preferred: boolean };
+
+  const mapped: Ranked[] = rows
+    .map((row): Ranked | null => {
       const lat = Number(row.lat);
       const lon = Number(row.lon);
       if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
@@ -102,9 +141,17 @@ export async function searchHotelPlaces(
         website,
         lat,
         lon,
+        preferred: isPreferredPlace(row),
       };
     })
-    .filter((x): x is PlaceCandidate => Boolean(x));
+    .filter((x): x is Ranked => Boolean(x));
+
+  const preferred = mapped.filter((c) => c.preferred);
+  const others = mapped.filter((c) => !c.preferred);
+  const ranked =
+    preferred.length >= 3 ? preferred : [...preferred, ...others];
+
+  return ranked.slice(0, 8).map(({ preferred: _p, ...candidate }) => candidate);
 }
 
 export async function applyHotelPlaceEnrichment(
@@ -125,7 +172,7 @@ export async function applyHotelPlaceEnrichment(
     lon: candidate.lon,
     osmId: candidate.osmId,
     location: candidate.address || candidate.name,
-    mapImagePath: mapPath,
+    mapImagePath: mapPath ?? event.map_image_path,
     enrichmentJson: JSON.stringify(candidate),
     enrichedAt: nowIso(),
   });

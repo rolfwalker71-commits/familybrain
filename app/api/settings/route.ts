@@ -22,7 +22,9 @@ import {
 } from "@/lib/chat/instructions";
 import {
   getAeroDataBoxApiKey,
+  getNominatimBaseUrl,
   saveAeroDataBoxApiKey,
+  saveNominatimBaseUrl,
 } from "@/lib/trips/settings";
 
 export const runtime = "nodejs";
@@ -33,6 +35,7 @@ export async function GET() {
   const openai = getOpenAISettings();
   const trilium = getTriliumSettings();
   const aeroKey = getAeroDataBoxApiKey();
+  const nominatimBaseUrl = getNominatimBaseUrl();
   return NextResponse.json({
     paperlessBaseUrl: paperless.baseUrl,
     paperlessApiTokenMasked: maskToken(paperless.apiToken),
@@ -54,6 +57,7 @@ export async function GET() {
     chatInstructionsDefault: DEFAULT_CHAT_INSTRUCTIONS,
     aerodataboxApiKeyMasked: maskToken(aeroKey),
     hasAerodataboxKey: Boolean(aeroKey),
+    nominatimBaseUrl,
   });
 }
 
@@ -67,6 +71,8 @@ const PutSchema = z.object({
   chatInstructions: z.string().max(8000).optional(),
   resetChatInstructions: z.boolean().optional(),
   aerodataboxApiKey: z.string().optional(),
+  clearAerodataboxApiKey: z.boolean().optional(),
+  nominatimBaseUrl: z.string().optional(),
 });
 
 export async function PUT(request: Request) {
@@ -130,14 +136,35 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: message }, { status: 400 });
   }
 
-  if (parsed.data.aerodataboxApiKey !== undefined) {
+  if (parsed.data.clearAerodataboxApiKey) {
+    saveAeroDataBoxApiKey(null);
+  } else if (parsed.data.aerodataboxApiKey !== undefined) {
     saveAeroDataBoxApiKey(parsed.data.aerodataboxApiKey || null);
+  }
+
+  if (parsed.data.nominatimBaseUrl !== undefined) {
+    const raw = parsed.data.nominatimBaseUrl.trim();
+    if (raw) {
+      try {
+        // eslint-disable-next-line no-new
+        new URL(raw);
+      } catch {
+        return NextResponse.json(
+          { error: "Nominatim-URL ist ungültig." },
+          { status: 400 }
+        );
+      }
+      saveNominatimBaseUrl(raw);
+    } else {
+      saveNominatimBaseUrl(null);
+    }
   }
 
   const paperless = getPaperlessSettings();
   const openai = getOpenAISettings();
   const trilium = getTriliumSettings();
   const aeroKey = getAeroDataBoxApiKey();
+  const nominatimBaseUrl = getNominatimBaseUrl();
 
   return NextResponse.json({
     ok: true,
@@ -161,5 +188,6 @@ export async function PUT(request: Request) {
     chatInstructionsDefault: DEFAULT_CHAT_INSTRUCTIONS,
     aerodataboxApiKeyMasked: maskToken(aeroKey),
     hasAerodataboxKey: Boolean(aeroKey),
+    nominatimBaseUrl,
   });
 }
