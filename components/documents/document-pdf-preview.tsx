@@ -79,58 +79,56 @@ export function DocumentPdfThumb({
   const thumbUrl = `/api/paperless/documents/${paperlessId}/file?type=thumb`;
 
   return (
-    <>
-      <div className={cn("w-[5.5rem] shrink-0 sm:w-28", className)}>
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          title={title || "PDF öffnen"}
-          className="group relative block w-full overflow-hidden rounded-md border border-border/70 bg-muted/40 text-left transition-colors hover:bg-muted"
-        >
-          {!thumbError ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={thumbUrl}
-              alt={title || "PDF Vorschau"}
-              className="aspect-[3/4] w-full object-cover object-top"
-              onError={() => setThumbError(true)}
-            />
+    <div className={cn("w-14 shrink-0 sm:w-16", className)}>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        title={title || "PDF öffnen"}
+        className="group relative block w-full overflow-hidden rounded-md border border-border/70 bg-muted/40 text-left transition-colors hover:bg-muted"
+      >
+        {!thumbError ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={thumbUrl}
+            alt={title || "PDF Vorschau"}
+            className="aspect-[3/4] h-20 w-full object-cover object-top sm:h-24"
+            onError={() => setThumbError(true)}
+          />
+        ) : (
+          <div className="flex h-20 w-full flex-col items-center justify-center gap-0.5 text-muted-foreground sm:h-24">
+            <FileText className="size-4" />
+            <span className="px-0.5 text-center text-[9px] leading-tight">
+              PDF
+            </span>
+          </div>
+        )}
+        <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-0.5 bg-gradient-to-t from-black/55 to-transparent px-0.5 py-1 text-[9px] text-white opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
+          <Maximize2 className="size-2.5" />
+          Öffnen
+        </div>
+      </button>
+      {title || href ? (
+        <div className="mt-0.5 truncate text-[9px] leading-tight text-muted-foreground">
+          {href ? (
+            <a
+              href={href}
+              className="underline-offset-2 hover:underline"
+              title={title || undefined}
+            >
+              {title || "Dokument"}
+            </a>
           ) : (
-            <div className="flex aspect-[3/4] w-full flex-col items-center justify-center gap-1 text-muted-foreground">
-              <FileText className="size-6" />
-              <span className="px-1 text-center text-[10px] leading-tight">
-                PDF
-              </span>
-            </div>
+            <span title={title || undefined}>{title}</span>
           )}
-          <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 bg-gradient-to-t from-black/55 to-transparent px-1 py-1.5 text-[10px] text-white opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
-            <Maximize2 className="size-3" />
-            Öffnen
-          </div>
-        </button>
-        {title || href ? (
-          <div className="mt-1 truncate text-[10px] leading-tight text-muted-foreground">
-            {href ? (
-              <a
-                href={href}
-                className="underline-offset-2 hover:underline"
-                title={title || undefined}
-              >
-                {title || "Dokument"}
-              </a>
-            ) : (
-              <span title={title || undefined}>{title}</span>
-            )}
-          </div>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
       <PdfPreviewDialog
         open={open}
         onOpenChange={setOpen}
         paperlessId={paperlessId}
         title={title}
       />
-    </>
+    </div>
   );
 }
 

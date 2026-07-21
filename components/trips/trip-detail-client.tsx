@@ -1493,65 +1493,65 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                   )}
                 >
                   <CardContent className="space-y-3 p-4 pl-8">
-                    <div className="flex flex-wrap items-start justify-between gap-2">
-                      <div className="flex min-w-0 flex-1 items-start gap-2">
-                        {editMode ? (
-                          <button
-                            type="button"
-                            draggable
-                            title="Ziehen zum Sortieren"
-                            className="mt-0.5 cursor-grab touch-none rounded p-1 text-muted-foreground hover:bg-background/70 active:cursor-grabbing"
-                            onDragStart={(e) => {
-                              setDragEventId(event.id);
-                              e.dataTransfer.effectAllowed = "move";
-                              e.dataTransfer.setData(
-                                "text/plain",
-                                String(event.id)
-                              );
-                            }}
-                            onDragEnd={() => {
-                              setDragEventId(null);
-                              setDragOverEventId(null);
-                            }}
-                          >
-                            <GripVertical className="size-4" />
-                          </button>
-                        ) : null}
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Badge variant="secondary">
-                              {coerceTripEventType(event.event_type)}
-                            </Badge>
-                            <span className="font-medium">{event.title}</span>
-                          </div>
-                          {(() => {
-                            const meta = formatEventMetaLine(event);
-                            return meta ? (
-                              <div className="mt-1 text-xs text-muted-foreground">
-                                {meta}
-                              </div>
-                            ) : null;
-                          })()}
-                        </div>
-                      </div>
+                    <div className="flex items-start gap-2">
                       {editMode ? (
-                        <div className="flex flex-wrap gap-1">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => startEditEvent(event)}
-                          >
-                            <Pencil className="size-3.5" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => void removeEvent(event.id)}
-                          >
-                            <Trash2 className="size-3.5" />
-                          </Button>
-                        </div>
+                        <button
+                          type="button"
+                          draggable
+                          title="Ziehen zum Sortieren"
+                          className="mt-1.5 cursor-grab touch-none rounded p-1 text-muted-foreground hover:bg-background/70 active:cursor-grabbing"
+                          onDragStart={(e) => {
+                            setDragEventId(event.id);
+                            e.dataTransfer.effectAllowed = "move";
+                            e.dataTransfer.setData(
+                              "text/plain",
+                              String(event.id)
+                            );
+                          }}
+                          onDragEnd={() => {
+                            setDragEventId(null);
+                            setDragOverEventId(null);
+                          }}
+                        >
+                          <GripVertical className="size-4" />
+                        </button>
                       ) : null}
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xl font-black leading-tight tracking-tight sm:text-2xl">
+                          {event.title}
+                        </div>
+                        {(() => {
+                          const meta = formatEventMetaLine(event);
+                          return meta ? (
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              {meta}
+                            </div>
+                          ) : null;
+                        })()}
+                      </div>
+                      <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
+                        <Badge variant="secondary" className="shrink-0">
+                          {coerceTripEventType(event.event_type)}
+                        </Badge>
+                        {editMode ? (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => startEditEvent(event)}
+                            >
+                              <Pencil className="size-3.5" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => void removeEvent(event.id)}
+                            >
+                              <Trash2 className="size-3.5" />
+                            </Button>
+                          </>
+                        ) : null}
+                      </div>
                     </div>
 
                     {(() => {
@@ -1650,7 +1650,7 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                       }
 
                       const documentThumbs = hasDocuments ? (
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex flex-row flex-wrap items-start gap-2">
                           {documents.map((doc) => (
                             <DocumentPdfThumb
                               key={doc.id}
