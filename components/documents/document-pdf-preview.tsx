@@ -79,7 +79,10 @@ export function DocumentPdfThumb({
   const thumbUrl = `/api/paperless/documents/${paperlessId}/file?type=thumb`;
 
   return (
-    <div className={cn("w-14 shrink-0 sm:w-16", className)}>
+    <div
+      className={cn("w-14 shrink-0", className)}
+      style={{ width: "3.5rem" }}
+    >
       <button
         type="button"
         onClick={() => setOpen(true)}
@@ -91,11 +94,11 @@ export function DocumentPdfThumb({
           <img
             src={thumbUrl}
             alt={title || "PDF Vorschau"}
-            className="aspect-[3/4] h-20 w-full object-cover object-top sm:h-24"
+            className="h-20 w-full object-cover object-top"
             onError={() => setThumbError(true)}
           />
         ) : (
-          <div className="flex h-20 w-full flex-col items-center justify-center gap-0.5 text-muted-foreground sm:h-24">
+          <div className="flex h-20 w-full flex-col items-center justify-center gap-0.5 text-muted-foreground">
             <FileText className="size-4" />
             <span className="px-0.5 text-center text-[9px] leading-tight">
               PDF

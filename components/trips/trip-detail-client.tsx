@@ -1432,8 +1432,9 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
         {events.length === 0 ? (
           <p className="text-sm text-muted-foreground">Noch keine Ereignisse.</p>
         ) : (
-          events.map((event) => {
+          events.map((event, eventIndex) => {
             const visual = eventVisual(event.event_type);
+            const isLastEvent = eventIndex === events.length - 1;
             return (
               <div
                 key={event.id}
@@ -1476,6 +1477,12 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                     : undefined
                 }
               >
+                {!isLastEvent ? (
+                  <div
+                    aria-hidden
+                    className="pointer-events-none absolute left-1/2 top-full z-0 h-5 -translate-x-1/2 border-l-[2.5px] border-dashed border-foreground/50"
+                  />
+                ) : null}
                 <IconCircle
                   icon={visual.icon}
                   tone={visual.tone}
@@ -1561,13 +1568,14 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                         Boolean(event.place_name) &&
                         !textsOverlap(event.place_name, event.title);
                       const address =
-                        event.address ||
-                        (type !== "Transfer" &&
-                        event.location &&
-                        !textsOverlap(event.location, event.title) &&
-                        !textsOverlap(event.location, event.place_name)
-                          ? event.location
-                          : null);
+                        type === "Flug" || type === "Transfer"
+                          ? event.address
+                          : event.address ||
+                            (event.location &&
+                            !textsOverlap(event.location, event.title) &&
+                            !textsOverlap(event.location, event.place_name)
+                              ? event.location
+                              : null);
                       const hasFlightDetails = Boolean(
                         event.airline ||
                           event.departure_airport ||
@@ -1650,7 +1658,10 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                       }
 
                       const documentThumbs = hasDocuments ? (
-                        <div className="flex flex-row flex-wrap items-start gap-2">
+                        <div
+                          className="grid grid-flow-col justify-start gap-2"
+                          style={{ gridAutoColumns: "3.5rem" }}
+                        >
                           {documents.map((doc) => (
                             <DocumentPdfThumb
                               key={doc.id}
@@ -1764,9 +1775,6 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
 
                           {(hasPlaceDetails ||
                             hasMap ||
-                            (hasDocuments &&
-                              type !== "Flug" &&
-                              type !== "Transfer") ||
                             (hasGenericDetails &&
                               type !== "Flug" &&
                               type !== "Transfer")) && (
@@ -1775,7 +1783,6 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                                 "grid gap-3",
                                 hasMap &&
                                   (hasPlaceDetails ||
-                                    hasDocuments ||
                                     (hasGenericDetails &&
                                       type !== "Flug" &&
                                       type !== "Transfer")) &&
@@ -1783,15 +1790,9 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                               )}
                             >
                               {hasPlaceDetails ||
-                              hasDocuments ||
                               (hasGenericDetails &&
                                 type !== "Flug" &&
                                 type !== "Transfer") ? (
-                              <div className="space-y-3">
-                                {hasPlaceDetails ||
-                                (hasGenericDetails &&
-                                  type !== "Flug" &&
-                                  type !== "Transfer") ? (
                               <div className="space-y-1.5 rounded-md bg-background/60 px-3 py-2">
                                 {showPlaceName ? (
                                   <DetailRow
@@ -1844,9 +1845,6 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                                   </>
                                 ) : null}
                               </div>
-                                ) : null}
-                                {documentThumbs}
-                              </div>
                               ) : null}
                               {event.lat != null && event.lon != null ? (
                                 <TripMap
@@ -1871,10 +1869,7 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                             </div>
                           )}
 
-                          {(type === "Flug" || type === "Transfer") &&
-                          documentThumbs
-                            ? documentThumbs
-                            : null}
+                          {documentThumbs}
 
                           {hasFlightRouteMap ? (
                             <TripMap
