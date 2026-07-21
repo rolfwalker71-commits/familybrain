@@ -108,6 +108,52 @@ async function loadMapStyle(): Promise<MapStyleId> {
   return mapStylePromise;
 }
 
+const MAP_VIEW_STORAGE_PREFIX = "travelbrain.mapView.";
+
+function readSavedMapView(
+  pointsKey: string
+): { lat: number; lon: number; zoom: number } | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(MAP_VIEW_STORAGE_PREFIX + pointsKey);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as {
+      lat?: number;
+      lon?: number;
+      zoom?: number;
+    };
+    if (
+      !Number.isFinite(parsed.lat) ||
+      !Number.isFinite(parsed.lon) ||
+      !Number.isFinite(parsed.zoom)
+    ) {
+      return null;
+    }
+    return {
+      lat: parsed.lat as number,
+      lon: parsed.lon as number,
+      zoom: parsed.zoom as number,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeSavedMapView(
+  pointsKey: string,
+  view: { lat: number; lon: number; zoom: number }
+) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(
+      MAP_VIEW_STORAGE_PREFIX + pointsKey,
+      JSON.stringify(view)
+    );
+  } catch {
+    /* ignore quota */
+  }
+}
+
 export function TripMap({
   points,
   drawRoute = false,
@@ -218,10 +264,31 @@ export function TripMap({
       }
 
       if (current.length === 1) {
-        map.setView([current[0].lat, current[0].lon], 14);
+        const saved = readSavedMapView(pointsKey);
+        if (saved) {
+          map.setView([saved.lat, saved.lon], saved.zoom);
+        } else {
+          map.setView([current[0].lat, current[0].lon], 14);
+        }
       } else {
-        map.fitBounds(bounds.pad(0.2));
+        const saved = readSavedMapView(pointsKey);
+        if (saved) {
+          map.setView([saved.lat, saved.lon], saved.zoom);
+        } else {
+          map.fitBounds(bounds.pad(0.2));
+        }
       }
+
+      const persistView = () => {
+        const c = map.getCenter();
+        writeSavedMapView(pointsKey, {
+          lat: c.lat,
+          lon: c.lng,
+          zoom: map.getZoom(),
+        });
+      };
+      map.on("zoomend", persistView);
+      map.on("moveend", persistView);
 
       requestAnimationFrame(() => map.invalidateSize());
     })();

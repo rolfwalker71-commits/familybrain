@@ -1,5 +1,10 @@
 import { getDb } from "@/lib/db/client";
-import { nowIso } from "@/lib/utils/dates";
+import {
+  formatDatesInText,
+  nowIso,
+  toSwissDate,
+  toSwissTime,
+} from "@/lib/utils/dates";
 import {
   getTripEventById,
   listLinkedDocumentIdsForEvents,
@@ -212,7 +217,7 @@ function buildDocMarkdown(
 
     for (const [label, value] of candidates) {
       if (!value || overlapsKnown(event, value)) continue;
-      travelLines.push(`- **${label}:** ${value}`);
+      travelLines.push(`- **${label}:** ${formatDatesInText(value)}`);
     }
 
     if (travelLines.length) {
@@ -227,13 +232,23 @@ function buildDocMarkdown(
           if (overlapsKnown(event, loc) && !s.note && !s.arrive && !s.depart) {
             return null;
           }
-          return `| ${mdEscapeCell(s.date || s.day_label || "—")} | ${mdEscapeCell(
+          const when = s.date
+            ? toSwissDate(s.date)
+            : s.day_label
+              ? formatDatesInText(s.day_label)
+              : "—";
+          return `| ${mdEscapeCell(when)} | ${mdEscapeCell(
             loc
           )} | ${mdEscapeCell(
-            [s.arrive ? `An ${s.arrive}` : null, s.depart ? `Ab ${s.depart}` : null]
+            [
+              s.arrive ? `An ${toSwissTime(s.arrive)}` : null,
+              s.depart ? `Ab ${toSwissTime(s.depart)}` : null,
+            ]
               .filter(Boolean)
               .join(" · ") || "—"
-          )} | ${mdEscapeCell(s.note || "—")} |`;
+          )} | ${mdEscapeCell(
+            s.note ? formatDatesInText(s.note) : "—"
+          )} |`;
         })
         .filter((x): x is string => Boolean(x));
       if (rows.length) {
@@ -253,14 +268,14 @@ function buildDocMarkdown(
     const short = asString(summary.short_summary);
     const detailed = asString(summary.detailed_summary);
     if (short && !overlapsKnown(event, short)) {
-      parts.push(section("📝 Kurzfassung", [`*${short}*`]));
+      parts.push(section("📝 Kurzfassung", [`*${formatDatesInText(short)}*`]));
     }
     if (
       detailed &&
       detailed !== short &&
       !overlapsKnown(event, detailed.slice(0, 80))
     ) {
-      parts.push(section("📋 Zusammenfassung", [detailed]));
+      parts.push(section("📋 Zusammenfassung", [formatDatesInText(detailed)]));
     }
 
     const points = parseJsonArray<string>(summary.important_points)
@@ -270,7 +285,7 @@ function buildDocMarkdown(
       parts.push(
         section(
           "⭐ Wichtige Punkte",
-          points.map((p) => `- ${p}`)
+          points.map((p) => `- ${formatDatesInText(p)}`)
         )
       );
     }
@@ -288,9 +303,11 @@ function buildDocMarkdown(
         if (date && overlapsKnown(event, date) && overlapsKnown(event, label)) {
           return null;
         }
-        return `| ${mdEscapeCell(date || "—")} | ${mdEscapeCell(label)} | ${mdEscapeCell(
-          asString(d.description) || "—"
-        )} |`;
+        const dateLabel = date ? toSwissDate(date) : "—";
+        const desc = asString(d.description);
+        return `| ${mdEscapeCell(dateLabel)} | ${mdEscapeCell(
+          formatDatesInText(label)
+        )} | ${mdEscapeCell(desc ? formatDatesInText(desc) : "—")} |`;
       })
       .filter((x): x is string => Boolean(x));
     if (dateRows.length) {
@@ -334,10 +351,10 @@ function buildDocMarkdown(
       const notice = asString(cancel.notice_period);
       const latest = asString(cancel.latest_cancellation_date);
       if (notice && !overlapsKnown(event, notice)) {
-        lines.push(`- **Frist:** ${notice}`);
+        lines.push(`- **Frist:** ${formatDatesInText(notice)}`);
       }
       if (latest && !overlapsKnown(event, latest)) {
-        lines.push(`- **Späteste Storno:** ${latest}`);
+        lines.push(`- **Späteste Storno:** ${toSwissDate(latest)}`);
       }
       if (lines.length) parts.push(section("🚫 Storno", lines));
     }
@@ -353,9 +370,9 @@ function buildDocMarkdown(
         if (!title || overlapsKnown(event, title)) return null;
         const due = asString(t.due_date);
         const prio = asString(t.priority);
-        return `- **${title}**${due ? ` _(bis ${due})_` : ""}${
-          prio ? ` · ${prio}` : ""
-        }`;
+        return `- **${formatDatesInText(title)}**${
+          due ? ` _(bis ${toSwissDate(due)})_` : ""
+        }${prio ? ` · ${prio}` : ""}`;
       })
       .filter(Boolean);
     if (todoLines.length) {

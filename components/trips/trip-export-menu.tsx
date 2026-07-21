@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   CalendarPlus,
+  ChevronDown,
   Copy,
   Download,
   FileText,
@@ -12,15 +13,7 @@ import {
   Share2,
   Trash2,
 } from "lucide-react";
-import { buttonVariants } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { toSwissDate } from "@/lib/utils/dates";
 
@@ -57,8 +50,10 @@ export function TripExportMenu({
   onStatus,
   onError,
 }: TripExportMenuProps) {
+  const [open, setOpen] = useState(false);
   const [links, setLinks] = useState<ShareLink[]>([]);
   const [busy, setBusy] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   const activeLink = links.find((l) => !l.revoked_at) || null;
 
@@ -69,14 +64,30 @@ export function TripExportMenu({
       if (!res.ok) throw new Error(data.error || "Share-Links laden fehlgeschlagen");
       setLinks(data.links || []);
     } catch (err) {
-      // Non-fatal on open
       console.error(err);
     }
   }, [tripId]);
 
   useEffect(() => {
+    if (!open) return;
     void loadLinks();
-  }, [loadLinks]);
+  }, [open, loadLinks]);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDoc(e: MouseEvent) {
+      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
 
   async function createShareLink() {
     setBusy(true);
@@ -152,10 +163,9 @@ export function TripExportMenu({
     ]
       .filter(Boolean)
       .join("\n");
-    const href = `mailto:?subject=${encodeURIComponent(
+    window.location.href = `mailto:?subject=${encodeURIComponent(
       `Reise: ${title}`
     )}&body=${encodeURIComponent(body)}`;
-    window.location.href = href;
   }
 
   async function webShare() {
@@ -173,29 +183,7 @@ export function TripExportMenu({
 
     try {
       if (typeof navigator.share === "function") {
-        let files: File[] | undefined;
-        try {
-          const pdfRes = await fetch(`/api/trips/${tripId}/pdf`);
-          if (pdfRes.ok) {
-            const blob = await pdfRes.blob();
-            const file = new File([blob], `reise-${tripId}.pdf`, {
-              type: "application/pdf",
-            });
-            if (
-              !navigator.canShare ||
-              navigator.canShare({ files: [file] })
-            ) {
-              files = [file];
-            }
-          }
-        } catch {
-          /* text-only share */
-        }
-        await navigator.share(
-          files
-            ? { title, text, url: shareLine, files }
-            : { title, text, url: shareLine }
-        );
+        await navigator.share({ title, text, url: shareLine });
         onStatus?.("Geteilt.");
         return;
       }
@@ -207,78 +195,124 @@ export function TripExportMenu({
     }
   }
 
+  const itemClass =
+    "flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm hover:bg-muted";
+
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
+    <div ref={rootRef} className="relative">
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="gap-1.5"
         disabled={busy}
-        className={cn(
-          buttonVariants({ variant: "outline", size: "sm" }),
-          "gap-1.5"
-        )}
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
       >
         <Share2 className="size-4" />
         Export & Teilen
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="min-w-56">
-        <DropdownMenuLabel>Export</DropdownMenuLabel>
-        <DropdownMenuItem
-          onClick={() => {
-            window.location.href = `/api/trips/${tripId}/pdf`;
-          }}
+        <ChevronDown
+          className={cn("size-3.5 opacity-70 transition", open && "rotate-180")}
+        />
+      </Button>
+      {open ? (
+        <div
+          role="menu"
+          className="absolute left-0 top-[calc(100%+0.35rem)] z-[1200] min-w-56 rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-md"
         >
-          <Download className="size-4" />
-          PDF herunterladen
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onClick={() => {
-            window.open(`/trips/${tripId}/print?autoprint=1`, "_blank");
-          }}
-        >
-          <Printer className="size-4" />
-          Drucken
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onClick={() => {
-            window.location.href = `/api/trips/${tripId}/export.html`;
-          }}
-        >
-          <FileText className="size-4" />
-          HTML herunterladen
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onClick={() => {
-            window.location.href = `/api/trips/${tripId}/ics`;
-          }}
-        >
-          <CalendarPlus className="size-4" />
-          Alle Termine in Kalender
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuLabel>Teilen</DropdownMenuLabel>
-        <DropdownMenuItem onClick={() => void copyShareLink()}>
-          <Link2 className="size-4" />
-          {activeLink ? "Share-Link kopieren" : "Share-Link erzeugen"}
-        </DropdownMenuItem>
-        {activeLink ? (
-          <DropdownMenuItem onClick={() => void revokeShareLink()}>
-            <Trash2 className="size-4" />
-            Share-Link widerrufen
-          </DropdownMenuItem>
-        ) : null}
-        <DropdownMenuItem onClick={() => mailPrepare()}>
-          <Mail className="size-4" />
-          Per Mail vorbereiten
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => void webShare()}>
-          <Copy className="size-4" />
-          Teilen…
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+          <p className="px-2.5 py-1 text-xs font-medium text-muted-foreground">
+            Export
+          </p>
+          <a
+            role="menuitem"
+            href={`/api/trips/${tripId}/pdf`}
+            className={itemClass}
+            onClick={() => setOpen(false)}
+          >
+            <Download className="size-4" />
+            PDF herunterladen
+          </a>
+          <button
+            type="button"
+            role="menuitem"
+            className={itemClass}
+            onClick={() => {
+              setOpen(false);
+              window.open(`/trips/${tripId}/print?autoprint=1`, "_blank");
+            }}
+          >
+            <Printer className="size-4" />
+            Drucken
+          </button>
+          <a
+            role="menuitem"
+            href={`/api/trips/${tripId}/export.html`}
+            className={itemClass}
+            onClick={() => setOpen(false)}
+          >
+            <FileText className="size-4" />
+            HTML herunterladen
+          </a>
+          <a
+            role="menuitem"
+            href={`/api/trips/${tripId}/ics`}
+            className={itemClass}
+            onClick={() => setOpen(false)}
+          >
+            <CalendarPlus className="size-4" />
+            Alle Termine in Kalender
+          </a>
+          <div className="my-1 h-px bg-border" />
+          <p className="px-2.5 py-1 text-xs font-medium text-muted-foreground">
+            Teilen
+          </p>
+          <button
+            type="button"
+            role="menuitem"
+            className={itemClass}
+            onClick={() => void copyShareLink()}
+          >
+            <Link2 className="size-4" />
+            {activeLink ? "Share-Link kopieren" : "Share-Link erzeugen"}
+          </button>
+          {activeLink ? (
+            <button
+              type="button"
+              role="menuitem"
+              className={itemClass}
+              onClick={() => void revokeShareLink()}
+            >
+              <Trash2 className="size-4" />
+              Share-Link widerrufen
+            </button>
+          ) : null}
+          <button
+            type="button"
+            role="menuitem"
+            className={itemClass}
+            onClick={() => {
+              setOpen(false);
+              mailPrepare();
+            }}
+          >
+            <Mail className="size-4" />
+            Per Mail vorbereiten
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            className={itemClass}
+            onClick={() => void webShare()}
+          >
+            <Copy className="size-4" />
+            Teilen…
+          </button>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
-/** Compact ICS link kept for layouts that still want a direct chip. */
 export function TripIcsLink({ tripId }: { tripId: number }) {
   return (
     <a
