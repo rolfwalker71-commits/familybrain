@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -8,18 +8,15 @@ import {
   Bus,
   CalendarPlus,
   Car,
-  CircleParking,
-  FileText,
+  GripVertical,
   ImagePlus,
   MapPin,
-  NotebookPen,
   Pencil,
   Plane,
-  Shield,
+  Plus,
   Ship,
   Sparkles,
   Ticket,
-  TrainFront,
   Trash2,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -37,6 +34,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { PageHeader } from "@/components/layout/page-primitives";
 import {
   IconCircle,
@@ -49,7 +54,11 @@ import {
   toSwissDate,
   toTimeInputValue,
 } from "@/lib/utils/dates";
-import { TRIP_EVENT_TYPES, TRIP_STATUSES } from "@/lib/trips/constants";
+import {
+  TRIP_EVENT_TYPES,
+  TRIP_STATUSES,
+  coerceTripEventType,
+} from "@/lib/trips/constants";
 
 type Trip = {
   id: number;
@@ -124,27 +133,82 @@ const STATUS_LABEL: Record<string, string> = {
 
 const EVENT_VISUALS: Record<string, { icon: LucideIcon; tone: IconTone }> = {
   Flug: { icon: Plane, tone: "sky" },
-  Hotel: { icon: BedDouble, tone: "amber" },
-  Kreuzfahrt: { icon: Ship, tone: "indigo" },
-  Bahn: { icon: TrainFront, tone: "violet" },
+  Mietauto: { icon: Car, tone: "teal" },
   Mietwagen: { icon: Car, tone: "teal" },
   Transfer: { icon: Bus, tone: "slate" },
-  Parking: { icon: CircleParking, tone: "slate" },
-  "Visa / Einreise": { icon: FileText, tone: "orange" },
-  "Pauschalreise / Urlaub": { icon: Ticket, tone: "green" },
-  Reiseversicherung: { icon: Shield, tone: "blue" },
+  Hotel: { icon: BedDouble, tone: "amber" },
+  Unterkunft: { icon: BedDouble, tone: "orange" },
+  Kreuzfahrt: { icon: Ship, tone: "indigo" },
+  Ausflug: { icon: MapPin, tone: "green" },
   Aktivität: { icon: MapPin, tone: "green" },
-  Notiz: { icon: NotebookPen, tone: "slate" },
   Sonstiges: { icon: Ticket, tone: "slate" },
 };
 
 function eventVisual(type: string) {
-  return EVENT_VISUALS[type] || EVENT_VISUALS.Sonstiges;
+  return EVENT_VISUALS[type] || EVENT_VISUALS.Ausflug;
+}
+
+function normText(value: string | null | undefined): string {
+  return (value || "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function textsOverlap(
+  a: string | null | undefined,
+  b: string | null | undefined
+): boolean {
+  const na = normText(a);
+  const nb = normText(b);
+  if (!na || !nb) return false;
+  return na === nb || na.includes(nb) || nb.includes(na);
+}
+
+function formatEventWhen(event: TripEvent): string | null {
+  const start = event.start_date
+    ? `${toSwissDate(event.start_date)}${
+        event.start_time ? ` ${event.start_time}` : ""
+      }`
+    : null;
+  const startIso = toDateInputValue(event.start_date);
+  const endIso = toDateInputValue(event.end_date);
+  const end =
+    endIso && (!startIso || endIso >= startIso)
+      ? `bis ${toSwissDate(endIso)}${
+          event.end_time ? ` ${event.end_time}` : ""
+        }`
+      : null;
+  const parts = [start, end].filter(Boolean);
+  return parts.length ? parts.join(" · ") : null;
+}
+
+function formatEventMetaLine(event: TripEvent): string | null {
+  const parts = [
+    formatEventWhen(event),
+    event.flight_number && coerceTripEventType(event.event_type) === "Flug"
+      ? event.flight_number
+      : null,
+  ].filter(Boolean);
+  return parts.length ? parts.join(" · ") : null;
+}
+
+function DetailRow({
+  label,
+  value,
+}: {
+  label: string;
+  value: ReactNode;
+}) {
+  if (value == null || value === "") return null;
+  return (
+    <div className="grid grid-cols-[6.5rem_minmax(0,1fr)] gap-x-2 gap-y-0.5 text-xs">
+      <div className="text-muted-foreground">{label}</div>
+      <div className="min-w-0 text-foreground">{value}</div>
+    </div>
+  );
 }
 
 function createEmptyEventForm() {
   return {
-    eventType: "Flug",
+    eventType: "Ausflug",
     title: "",
     startDate: "",
     endDate: "",
@@ -175,7 +239,7 @@ function eventToForm(event: TripEvent) {
     endDate = "";
   }
   return {
-    eventType: event.event_type,
+    eventType: coerceTripEventType(event.event_type),
     title: event.title,
     startDate,
     endDate,
@@ -203,7 +267,7 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
   const [events, setEvents] = useState<TripEvent[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
-  const [editingMeta, setEditingMeta] = useState(false);
+  const [editMode, setEditMode] = useState(false);
   const [meta, setMeta] = useState({
     title: "",
     destination: "",
@@ -215,6 +279,7 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
   });
   const [eventForm, setEventForm] = useState(createEmptyEventForm);
   const [editingEventId, setEditingEventId] = useState<number | null>(null);
+  const [eventSheetOpen, setEventSheetOpen] = useState(false);
   const [coverPrompt, setCoverPrompt] = useState("");
   const [busy, setBusy] = useState(false);
   const [placeCandidates, setPlaceCandidates] = useState<
@@ -223,6 +288,8 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
   const [placeQueries, setPlaceQueries] = useState<Record<number, string>>(
     {}
   );
+  const [dragEventId, setDragEventId] = useState<number | null>(null);
+  const [dragOverEventId, setDragOverEventId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/trips/${tripId}`);
@@ -266,7 +333,6 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Speichern fehlgeschlagen");
-      setEditingMeta(false);
       setStatus("Reise gespeichert.");
       await load();
     } catch (err) {
@@ -328,6 +394,7 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
       if (!options?.keepEditing) {
         setEventForm(createEmptyEventForm());
         setEditingEventId(null);
+        setEventSheetOpen(false);
       }
       setStatus(
         editingEventId != null ? "Ereignis aktualisiert." : "Ereignis hinzugefügt."
@@ -342,11 +409,23 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
     }
   }
 
+  function openNewEvent() {
+    setEditingEventId(null);
+    setEventForm(createEmptyEventForm());
+    setEventSheetOpen(true);
+  }
+
   function startEditEvent(event: TripEvent) {
     setEditingEventId(event.id);
     setEventForm(eventToForm(event));
     setPlaceCandidates((prev) => ({ ...prev, [event.id]: [] }));
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    setEventSheetOpen(true);
+  }
+
+  function closeEventSheet() {
+    setEventSheetOpen(false);
+    setEditingEventId(null);
+    setEventForm(createEmptyEventForm());
   }
 
   async function removeEvent(eventId: number) {
@@ -520,6 +599,38 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
     }
   }
 
+  function exitEditMode() {
+    setEditMode(false);
+    closeEventSheet();
+    setDragEventId(null);
+    setDragOverEventId(null);
+  }
+
+  async function persistEventOrder(nextEvents: TripEvent[]) {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/trips/${tripId}/events/reorder`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderedEventIds: nextEvents.map((e) => e.id),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Reihenfolge speichern fehlgeschlagen");
+      if (Array.isArray(data.events)) {
+        setEvents(data.events);
+      }
+      setStatus("Reihenfolge gespeichert.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (!trip) {
     return (
       <div className="space-y-4">
@@ -603,21 +714,39 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
           <CalendarPlus className="mr-1.5 size-4" />
           Kalender (ICS)
         </a>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setEditingMeta((v) => !v)}
-        >
-          <Pencil className="mr-1.5 size-4" />
-          Reise bearbeiten
-        </Button>
-        <Button variant="ghost" size="sm" onClick={() => void deleteTrip()}>
-          <Trash2 className="mr-1.5 size-4" />
-          Reise löschen
-        </Button>
+        {editMode ? (
+          <>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => openNewEvent()}
+              className="gap-1.5"
+            >
+              <Plus className="size-4" />
+              Aktivität hinzufügen
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => exitEditMode()}>
+              Ansicht
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => void deleteTrip()}>
+              <Trash2 className="mr-1.5 size-4" />
+              Reise löschen
+            </Button>
+          </>
+        ) : (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setEditMode(true)}
+          >
+            <Pencil className="mr-1.5 size-4" />
+            Reise bearbeiten
+          </Button>
+        )}
       </div>
 
-      {editingMeta ? (
+      {editMode ? (
+        <>
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Reise bearbeiten</CardTitle>
@@ -703,7 +832,6 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
             </div>
           </CardContent>
         </Card>
-      ) : null}
 
       <Card>
         <CardHeader>
@@ -745,372 +873,433 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">
-            {editingEventId != null ? "Ereignis bearbeiten" : "Ereignis hinzufügen"}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-3 sm:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label>Typ</Label>
-            <Select
-              value={eventForm.eventType}
-              onValueChange={(v) => {
-                if (v == null) return;
-                setEventForm((f) => ({ ...f, eventType: v }));
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {TRIP_EVENT_TYPES.map((t) => (
-                  <SelectItem key={t} value={t}>
-                    {t}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1.5">
-            <Label>Titel</Label>
-            <Input
-              value={eventForm.title}
-              onChange={(e) =>
-                setEventForm((f) => ({ ...f, title: e.target.value }))
-              }
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Datum von</Label>
-            <Input
-              type="date"
-              value={eventForm.startDate}
-              onChange={(e) =>
-                setEventForm((f) => ({ ...f, startDate: e.target.value }))
-              }
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Datum bis</Label>
-            <Input
-              type="date"
-              value={eventForm.endDate}
-              onChange={(e) =>
-                setEventForm((f) => ({ ...f, endDate: e.target.value }))
-              }
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Zeit von</Label>
-            <Input
-              type="time"
-              value={eventForm.startTime}
-              onChange={(e) =>
-                setEventForm((f) => ({ ...f, startTime: e.target.value }))
-              }
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Zeit bis</Label>
-            <Input
-              type="time"
-              value={eventForm.endTime}
-              onChange={(e) =>
-                setEventForm((f) => ({ ...f, endTime: e.target.value }))
-              }
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Ort</Label>
-            <Input
-              value={eventForm.location}
-              onChange={(e) =>
-                setEventForm((f) => ({ ...f, location: e.target.value }))
-              }
-            />
-          </div>
-          <div className="space-y-1.5 sm:col-span-2">
-            <Label>Adresse</Label>
-            <Input
-              value={eventForm.address}
-              onChange={(e) =>
-                setEventForm((f) => ({ ...f, address: e.target.value }))
-              }
-              placeholder="Straße, PLZ Ort"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Anbieter</Label>
-            <Input
-              value={eventForm.provider}
-              onChange={(e) =>
-                setEventForm((f) => ({ ...f, provider: e.target.value }))
-              }
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Buchungsnr.</Label>
-            <Input
-              value={eventForm.bookingReference}
-              onChange={(e) =>
-                setEventForm((f) => ({ ...f, bookingReference: e.target.value }))
-              }
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Flugnummer</Label>
-            <Input
-              value={eventForm.flightNumber}
-              onChange={(e) =>
-                setEventForm((f) => ({ ...f, flightNumber: e.target.value }))
-              }
-              placeholder="z. B. LX80"
-            />
-          </div>
-          {eventForm.eventType === "Flug" ? (
-            <>
-              <div className="space-y-1.5">
-                <Label>Von (IATA)</Label>
-                <Input
-                  value={eventForm.departureAirport}
-                  onChange={(e) =>
-                    setEventForm((f) => ({
-                      ...f,
-                      departureAirport: e.target.value
-                        .toUpperCase()
-                        .replace(/[^A-Z]/g, "")
-                        .slice(0, 3),
-                    }))
-                  }
-                  placeholder="ZRH"
-                  maxLength={3}
-                  className="font-mono uppercase"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Nach (IATA)</Label>
-                <Input
-                  value={eventForm.arrivalAirport}
-                  onChange={(e) =>
-                    setEventForm((f) => ({
-                      ...f,
-                      arrivalAirport: e.target.value
-                        .toUpperCase()
-                        .replace(/[^A-Z]/g, "")
-                        .slice(0, 3),
-                    }))
-                  }
-                  placeholder="BCN"
-                  maxLength={3}
-                  className="font-mono uppercase"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Terminal Abflug</Label>
-                <Input
-                  value={eventForm.departureTerminal}
-                  onChange={(e) =>
-                    setEventForm((f) => ({
-                      ...f,
-                      departureTerminal: e.target.value,
-                    }))
-                  }
-                  placeholder="z. B. 1"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Gate Abflug</Label>
-                <Input
-                  value={eventForm.departureGate}
-                  onChange={(e) =>
-                    setEventForm((f) => ({
-                      ...f,
-                      departureGate: e.target.value,
-                    }))
-                  }
-                  placeholder="z. B. A12"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Terminal Ankunft</Label>
-                <Input
-                  value={eventForm.arrivalTerminal}
-                  onChange={(e) =>
-                    setEventForm((f) => ({
-                      ...f,
-                      arrivalTerminal: e.target.value,
-                    }))
-                  }
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Gate Ankunft</Label>
-                <Input
-                  value={eventForm.arrivalGate}
-                  onChange={(e) =>
-                    setEventForm((f) => ({
-                      ...f,
-                      arrivalGate: e.target.value,
-                    }))
-                  }
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Check-in</Label>
-                <Input
-                  value={eventForm.checkInDesk}
-                  onChange={(e) =>
-                    setEventForm((f) => ({
-                      ...f,
-                      checkInDesk: e.target.value,
-                    }))
-                  }
-                  placeholder="z. B. 120–150"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Gepäckband</Label>
-                <Input
-                  value={eventForm.baggageBelt}
-                  onChange={(e) =>
-                    setEventForm((f) => ({
-                      ...f,
-                      baggageBelt: e.target.value,
-                    }))
-                  }
-                  placeholder="z. B. 3"
-                />
-              </div>
-            </>
-          ) : null}
-          <div className="space-y-1.5 sm:col-span-2">
-            <Label>Notizen</Label>
-            <Textarea
-              value={eventForm.notes}
-              onChange={(e) =>
-                setEventForm((f) => ({ ...f, notes: e.target.value }))
-              }
-            />
-          </div>
+      </>
+      ) : null}
 
-          {editingEventId != null ? (
-            <div className="space-y-3 rounded-lg border border-border/70 bg-muted/20 p-3 sm:col-span-2">
-              <div className="text-xs font-medium text-muted-foreground">
-                Anreichern
-              </div>
-              {eventForm.eventType === "Flug" ? (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={busy || !eventForm.flightNumber.trim()}
-                  onClick={() => void enrichFlight(editingEventId)}
-                  className="gap-1.5"
-                >
-                  <Plane className="size-3.5" />
-                  Mit Fluginfos anreichern
-                </Button>
-              ) : null}
-              {eventForm.eventType === "Hotel" ||
-              eventForm.eventType === "Aktivität" ? (
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-                  <div className="min-w-0 flex-1 space-y-1">
-                    <Label
-                      htmlFor={`place-query-edit-${editingEventId}`}
-                      className="text-xs"
-                    >
-                      OSM-Suche
-                    </Label>
-                    <Input
-                      id={`place-query-edit-${editingEventId}`}
-                      value={
-                        placeQueries[editingEventId] ??
-                        [
-                          eventForm.title,
-                          eventForm.address,
-                          eventForm.location,
-                          trip?.destination,
-                        ]
-                          .filter(Boolean)
-                          .join(", ")
-                      }
-                      onChange={(e) =>
-                        setPlaceQueries((prev) => ({
-                          ...prev,
-                          [editingEventId]: e.target.value,
-                        }))
-                      }
-                      placeholder="Hotelname, Ort…"
-                      className="h-8 text-xs"
-                    />
-                  </div>
+      <Sheet
+        open={eventSheetOpen}
+        onOpenChange={(open) => {
+          if (open) setEventSheetOpen(true);
+          else closeEventSheet();
+        }}
+      >
+        <SheetContent
+          side="right"
+          className="w-full gap-0 overflow-y-auto sm:max-w-lg"
+        >
+          <SheetHeader className="border-b border-border/70">
+            <SheetTitle>
+              {editingEventId != null
+                ? "Aktivität bearbeiten"
+                : "Aktivität hinzufügen"}
+            </SheetTitle>
+            <SheetDescription>
+              Typ, Zeiten und Details der Aktivität anpassen.
+            </SheetDescription>
+          </SheetHeader>
+          <div className="grid gap-3 p-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label>Typ</Label>
+              <Select
+                value={eventForm.eventType}
+                onValueChange={(v) => {
+                  if (v == null) return;
+                  setEventForm((f) => ({ ...f, eventType: v }));
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TRIP_EVENT_TYPES.map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {t}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Titel</Label>
+              <Input
+                value={eventForm.title}
+                onChange={(e) =>
+                  setEventForm((f) => ({ ...f, title: e.target.value }))
+                }
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Datum von</Label>
+              <Input
+                type="date"
+                value={eventForm.startDate}
+                onChange={(e) =>
+                  setEventForm((f) => ({ ...f, startDate: e.target.value }))
+                }
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Datum bis</Label>
+              <Input
+                type="date"
+                value={eventForm.endDate}
+                onChange={(e) =>
+                  setEventForm((f) => ({ ...f, endDate: e.target.value }))
+                }
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Zeit von</Label>
+              <Input
+                type="time"
+                value={eventForm.startTime}
+                onChange={(e) =>
+                  setEventForm((f) => ({ ...f, startTime: e.target.value }))
+                }
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Zeit bis</Label>
+              <Input
+                type="time"
+                value={eventForm.endTime}
+                onChange={(e) =>
+                  setEventForm((f) => ({ ...f, endTime: e.target.value }))
+                }
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Ort</Label>
+              <Input
+                value={eventForm.location}
+                onChange={(e) =>
+                  setEventForm((f) => ({ ...f, location: e.target.value }))
+                }
+              />
+            </div>
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label>Adresse</Label>
+              <Input
+                value={eventForm.address}
+                onChange={(e) =>
+                  setEventForm((f) => ({ ...f, address: e.target.value }))
+                }
+                placeholder="Strasse, PLZ Ort"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Anbieter</Label>
+              <Input
+                value={eventForm.provider}
+                onChange={(e) =>
+                  setEventForm((f) => ({ ...f, provider: e.target.value }))
+                }
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Buchungsnr.</Label>
+              <Input
+                value={eventForm.bookingReference}
+                onChange={(e) =>
+                  setEventForm((f) => ({
+                    ...f,
+                    bookingReference: e.target.value,
+                  }))
+                }
+              />
+            </div>
+            {eventForm.eventType === "Flug" ? (
+              <>
+                <div className="space-y-1.5">
+                  <Label>Flugnummer</Label>
+                  <Input
+                    value={eventForm.flightNumber}
+                    onChange={(e) =>
+                      setEventForm((f) => ({
+                        ...f,
+                        flightNumber: e.target.value,
+                      }))
+                    }
+                    placeholder="z. B. LX80"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Von (IATA)</Label>
+                  <Input
+                    value={eventForm.departureAirport}
+                    onChange={(e) =>
+                      setEventForm((f) => ({
+                        ...f,
+                        departureAirport: e.target.value
+                          .toUpperCase()
+                          .replace(/[^A-Z]/g, "")
+                          .slice(0, 3),
+                      }))
+                    }
+                    placeholder="ZRH"
+                    maxLength={3}
+                    className="font-mono uppercase"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Nach (IATA)</Label>
+                  <Input
+                    value={eventForm.arrivalAirport}
+                    onChange={(e) =>
+                      setEventForm((f) => ({
+                        ...f,
+                        arrivalAirport: e.target.value
+                          .toUpperCase()
+                          .replace(/[^A-Z]/g, "")
+                          .slice(0, 3),
+                      }))
+                    }
+                    placeholder="BCN"
+                    maxLength={3}
+                    className="font-mono uppercase"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Terminal Abflug</Label>
+                  <Input
+                    value={eventForm.departureTerminal}
+                    onChange={(e) =>
+                      setEventForm((f) => ({
+                        ...f,
+                        departureTerminal: e.target.value,
+                      }))
+                    }
+                    placeholder="z. B. 1"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Gate Abflug</Label>
+                  <Input
+                    value={eventForm.departureGate}
+                    onChange={(e) =>
+                      setEventForm((f) => ({
+                        ...f,
+                        departureGate: e.target.value,
+                      }))
+                    }
+                    placeholder="z. B. A12"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Terminal Ankunft</Label>
+                  <Input
+                    value={eventForm.arrivalTerminal}
+                    onChange={(e) =>
+                      setEventForm((f) => ({
+                        ...f,
+                        arrivalTerminal: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Gate Ankunft</Label>
+                  <Input
+                    value={eventForm.arrivalGate}
+                    onChange={(e) =>
+                      setEventForm((f) => ({
+                        ...f,
+                        arrivalGate: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Check-in</Label>
+                  <Input
+                    value={eventForm.checkInDesk}
+                    onChange={(e) =>
+                      setEventForm((f) => ({
+                        ...f,
+                        checkInDesk: e.target.value,
+                      }))
+                    }
+                    placeholder="z. B. 120–150"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Gepäckband</Label>
+                  <Input
+                    value={eventForm.baggageBelt}
+                    onChange={(e) =>
+                      setEventForm((f) => ({
+                        ...f,
+                        baggageBelt: e.target.value,
+                      }))
+                    }
+                    placeholder="z. B. 3"
+                  />
+                </div>
+              </>
+            ) : null}
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label>Notizen</Label>
+              <Textarea
+                value={eventForm.notes}
+                onChange={(e) =>
+                  setEventForm((f) => ({ ...f, notes: e.target.value }))
+                }
+              />
+            </div>
+
+            {editingEventId != null ? (
+              <div className="space-y-3 rounded-lg border border-border/70 bg-muted/20 p-3 sm:col-span-2">
+                <div className="text-xs font-medium text-muted-foreground">
+                  Anreichern
+                </div>
+                {eventForm.eventType === "Flug" ? (
                   <Button
                     size="sm"
                     variant="outline"
-                    disabled={busy}
-                    onClick={() => void searchPlace(editingEventId)}
-                    className="gap-1.5 shrink-0"
+                    disabled={busy || !eventForm.flightNumber.trim()}
+                    onClick={() => void enrichFlight(editingEventId)}
+                    className="gap-1.5"
                   >
-                    <MapPin className="size-3.5" />
-                    Ort anreichern
+                    <Plane className="size-3.5" />
+                    Mit Fluginfos anreichern
                   </Button>
-                </div>
-              ) : null}
-              {(placeCandidates[editingEventId] || []).length > 0 ? (
-                <div className="space-y-2 rounded-md border border-border/70 bg-background p-2">
-                  <div className="text-xs font-medium">OSM-Treffer wählen</div>
-                  {placeCandidates[editingEventId].map((c) => (
-                    <button
-                      key={c.osmId}
-                      type="button"
-                      className="block w-full rounded-md px-2 py-1.5 text-left text-xs hover:bg-muted"
-                      onClick={() => void applyPlace(editingEventId, c)}
+                ) : null}
+                {eventForm.eventType === "Hotel" ||
+                eventForm.eventType === "Unterkunft" ||
+                eventForm.eventType === "Ausflug" ||
+                eventForm.eventType === "Kreuzfahrt" ? (
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <Label
+                        htmlFor={`place-query-edit-${editingEventId}`}
+                        className="text-xs"
+                      >
+                        OSM-Suche
+                      </Label>
+                      <Input
+                        id={`place-query-edit-${editingEventId}`}
+                        value={
+                          placeQueries[editingEventId] ??
+                          [
+                            eventForm.title,
+                            eventForm.address,
+                            eventForm.location,
+                            trip?.destination,
+                          ]
+                            .filter(Boolean)
+                            .join(", ")
+                        }
+                        onChange={(e) =>
+                          setPlaceQueries((prev) => ({
+                            ...prev,
+                            [editingEventId]: e.target.value,
+                          }))
+                        }
+                        placeholder="Name, Ort…"
+                        className="h-8 text-xs"
+                      />
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={busy}
+                      onClick={() => void searchPlace(editingEventId)}
+                      className="gap-1.5 shrink-0"
                     >
-                      <div className="font-medium">{c.name}</div>
-                      <div className="text-muted-foreground">
-                        {c.displayName}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-
-          <div className="flex flex-wrap gap-2 sm:col-span-2">
+                      <MapPin className="size-3.5" />
+                      Ort anreichern
+                    </Button>
+                  </div>
+                ) : null}
+                {(placeCandidates[editingEventId] || []).length > 0 ? (
+                  <div className="space-y-2 rounded-md border border-border/70 bg-background p-2">
+                    <div className="text-xs font-medium">OSM-Treffer wählen</div>
+                    {placeCandidates[editingEventId].map((c) => (
+                      <button
+                        key={c.osmId}
+                        type="button"
+                        className="block w-full rounded-md px-2 py-1.5 text-left text-xs hover:bg-muted"
+                        onClick={() => void applyPlace(editingEventId, c)}
+                      >
+                        <div className="font-medium">{c.name}</div>
+                        <div className="text-muted-foreground">
+                          {c.displayName}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+          <SheetFooter className="border-t border-border/70">
             <Button
               disabled={busy || !eventForm.title.trim()}
               onClick={() => void saveEvent()}
             >
-              {editingEventId != null
-                ? "Ereignis speichern"
-                : "Ereignis hinzufügen"}
+              {editingEventId != null ? "Speichern" : "Hinzufügen"}
             </Button>
-            {editingEventId != null ? (
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  setEditingEventId(null);
-                  setEventForm(createEmptyEventForm());
-                }}
-              >
-                Abbrechen
-              </Button>
-            ) : null}
-          </div>
-        </CardContent>
-      </Card>
+            <Button variant="ghost" onClick={() => closeEventSheet()}>
+              Abbrechen
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
 
       <div className="space-y-5">
         <h2 className="text-lg font-semibold">Timeline</h2>
+        {editMode ? (
+          <p className="text-xs text-muted-foreground">
+            Ziehe Ereignisse am Griff, um die Reihenfolge zu ändern.
+          </p>
+        ) : null}
         {events.length === 0 ? (
           <p className="text-sm text-muted-foreground">Noch keine Ereignisse.</p>
         ) : (
           events.map((event) => {
             const visual = eventVisual(event.event_type);
             return (
-              <div key={event.id} className="relative pt-3 pl-3">
+              <div
+                key={event.id}
+                className={cn(
+                  "relative pt-3 pl-3",
+                  editMode && dragOverEventId === event.id && "opacity-80"
+                )}
+                onDragOver={
+                  editMode
+                    ? (e) => {
+                        e.preventDefault();
+                        if (dragEventId != null && dragEventId !== event.id) {
+                          setDragOverEventId(event.id);
+                        }
+                      }
+                    : undefined
+                }
+                onDrop={
+                  editMode
+                    ? (e) => {
+                        e.preventDefault();
+                        if (dragEventId == null || dragEventId === event.id) {
+                          setDragEventId(null);
+                          setDragOverEventId(null);
+                          return;
+                        }
+                        const fromId = dragEventId;
+                        const toId = event.id;
+                        setDragEventId(null);
+                        setDragOverEventId(null);
+                        const fromIndex = events.findIndex((x) => x.id === fromId);
+                        const toIndex = events.findIndex((x) => x.id === toId);
+                        if (fromIndex < 0 || toIndex < 0) return;
+                        const next = [...events];
+                        const [moved] = next.splice(fromIndex, 1);
+                        next.splice(toIndex, 0, moved);
+                        setEvents(next);
+                        void persistEventOrder(next);
+                      }
+                    : undefined
+                }
+              >
                 <IconCircle
                   icon={visual.icon}
                   tone={visual.tone}
@@ -1121,208 +1310,337 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                   tone={visual.tone}
                   className={cn(
                     "overflow-visible border-border/50",
-                    editingEventId === event.id && "ring-2 ring-foreground/15"
+                    editingEventId === event.id && "ring-2 ring-foreground/15",
+                    editMode &&
+                      dragOverEventId === event.id &&
+                      "ring-2 ring-teal-400/50"
                   )}
                 >
                   <CardContent className="space-y-3 p-4 pl-8">
                     <div className="flex flex-wrap items-start justify-between gap-2">
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Badge variant="secondary">{event.event_type}</Badge>
-                          <span className="font-medium">{event.title}</span>
-                        </div>
-                        <div className="mt-1 text-xs text-muted-foreground">
-                          {[
-                            event.start_date
-                              ? `${toSwissDate(event.start_date)}${
-                                  event.start_time ? ` ${event.start_time}` : ""
-                                }`
-                              : null,
-                            (() => {
-                              const start = toDateInputValue(event.start_date);
-                              const end = toDateInputValue(event.end_date);
-                              if (!end || (start && end < start)) return null;
-                              return `bis ${toSwissDate(end)}${
-                                event.end_time ? ` ${event.end_time}` : ""
-                              }`;
-                            })(),
-                            event.location,
-                            event.provider,
-                            event.flight_number,
-                          ]
-                            .filter(Boolean)
-                            .join(" · ")}
+                      <div className="flex min-w-0 flex-1 items-start gap-2">
+                        {editMode ? (
+                          <button
+                            type="button"
+                            draggable
+                            title="Ziehen zum Sortieren"
+                            className="mt-0.5 cursor-grab touch-none rounded p-1 text-muted-foreground hover:bg-background/70 active:cursor-grabbing"
+                            onDragStart={(e) => {
+                              setDragEventId(event.id);
+                              e.dataTransfer.effectAllowed = "move";
+                              e.dataTransfer.setData(
+                                "text/plain",
+                                String(event.id)
+                              );
+                            }}
+                            onDragEnd={() => {
+                              setDragEventId(null);
+                              setDragOverEventId(null);
+                            }}
+                          >
+                            <GripVertical className="size-4" />
+                          </button>
+                        ) : null}
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge variant="secondary">
+                              {coerceTripEventType(event.event_type)}
+                            </Badge>
+                            <span className="font-medium">{event.title}</span>
+                          </div>
+                          {(() => {
+                            const meta = formatEventMetaLine(event);
+                            return meta ? (
+                              <div className="mt-1 text-xs text-muted-foreground">
+                                {meta}
+                              </div>
+                            ) : null;
+                          })()}
                         </div>
                       </div>
-                      <div className="flex flex-wrap gap-1">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => startEditEvent(event)}
-                        >
-                          <Pencil className="size-3.5" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => void removeEvent(event.id)}
-                        >
-                          <Trash2 className="size-3.5" />
-                        </Button>
-                      </div>
+                      {editMode ? (
+                        <div className="flex flex-wrap gap-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => startEditEvent(event)}
+                          >
+                            <Pencil className="size-3.5" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => void removeEvent(event.id)}
+                          >
+                            <Trash2 className="size-3.5" />
+                          </Button>
+                        </div>
+                      ) : null}
                     </div>
 
-                    {(event.airline ||
-                      event.departure_airport ||
-                      event.duration_minutes ||
-                      event.aircraft_reg ||
-                      event.departure_terminal ||
-                      event.departure_gate ||
-                      event.check_in_desk ||
-                      event.baggage_belt) && (
-                      <div className="space-y-1 rounded-md bg-background/60 px-3 py-2 text-xs">
-                        <div>
-                          {[
-                            event.airline,
-                            event.departure_airport && event.arrival_airport
-                              ? `${event.departure_airport} → ${event.arrival_airport}`
-                              : null,
-                            event.duration_minutes
-                              ? `${event.duration_minutes} Min.`
-                              : null,
-                            event.aircraft_type,
-                            event.aircraft_reg,
-                          ]
-                            .filter(Boolean)
-                            .join(" · ")}
-                        </div>
-                        {(event.departure_terminal ||
-                          event.departure_gate ||
+                    {(() => {
+                      const type = coerceTripEventType(event.event_type);
+                      const showPlaceName =
+                        Boolean(event.place_name) &&
+                        !textsOverlap(event.place_name, event.title);
+                      const address =
+                        event.address ||
+                        (event.location &&
+                        !textsOverlap(event.location, event.title) &&
+                        !textsOverlap(event.location, event.place_name)
+                          ? event.location
+                          : null);
+                      const hasFlightDetails = Boolean(
+                        event.airline ||
+                          event.departure_airport ||
+                          event.arrival_airport ||
+                          event.duration_minutes ||
+                          event.aircraft_reg ||
+                          event.aircraft_type ||
+                          event.departure_terminal ||
                           event.arrival_terminal ||
+                          event.departure_gate ||
                           event.arrival_gate ||
                           event.check_in_desk ||
-                          event.baggage_belt) && (
-                          <div className="text-muted-foreground">
-                            {[
-                              event.departure_terminal
-                                ? `Terminal Abflug ${event.departure_terminal}`
-                                : null,
-                              event.departure_gate
-                                ? `Gate ${event.departure_gate}`
-                                : null,
-                              event.check_in_desk
-                                ? `Check-in ${event.check_in_desk}`
-                                : null,
-                              event.arrival_terminal
-                                ? `Terminal Ankunft ${event.arrival_terminal}`
-                                : null,
-                              event.arrival_gate
-                                ? `Gate Ankunft ${event.arrival_gate}`
-                                : null,
-                              event.baggage_belt
-                                ? `Gepäck ${event.baggage_belt}`
-                                : null,
-                            ]
-                              .filter(Boolean)
-                              .join(" · ")}
-                          </div>
-                        )}
-                      </div>
-                    )}
+                          event.baggage_belt
+                      );
+                      const hasPlaceDetails = Boolean(
+                        showPlaceName ||
+                          address ||
+                          event.phone ||
+                          event.website
+                      );
+                      const hasMap =
+                        (event.lat != null && event.lon != null) ||
+                        Boolean(event.map_image_url);
+                      const hasRouteMap =
+                        type === "Flug" &&
+                        event.departure_lat != null &&
+                        event.departure_lon != null &&
+                        event.arrival_lat != null &&
+                        event.arrival_lon != null;
+                      const hasGenericDetails = Boolean(
+                        event.provider ||
+                          event.booking_reference ||
+                          (type !== "Flug" && event.flight_number)
+                      );
 
-                    {(event.address ||
-                      event.phone ||
-                      event.website ||
-                      event.place_name ||
-                      event.map_image_url ||
-                      event.osm_id ||
-                      (event.lat != null && event.lon != null)) && (
-                      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(11rem,15rem)] sm:items-start">
-                        <div className="space-y-1 text-xs text-muted-foreground">
-                          {event.place_name ? (
-                            <div className="font-medium text-foreground">
-                              {event.place_name}
+                      if (
+                        !hasFlightDetails &&
+                        !hasPlaceDetails &&
+                        !hasMap &&
+                        !hasRouteMap &&
+                        !hasGenericDetails &&
+                        !event.aircraft_image_url &&
+                        !event.notes
+                      ) {
+                        return null;
+                      }
+
+                      return (
+                        <div className="space-y-3">
+                          {(hasFlightDetails ||
+                            (hasGenericDetails && type === "Flug")) && (
+                            <div className="space-y-1.5 rounded-md bg-background/60 px-3 py-2">
+                              <DetailRow label="Airline" value={event.airline} />
+                              <DetailRow
+                                label="Strecke"
+                                value={
+                                  event.departure_airport ||
+                                  event.arrival_airport
+                                    ? `${event.departure_airport || "—"} → ${
+                                        event.arrival_airport || "—"
+                                      }`
+                                    : null
+                                }
+                              />
+                              <DetailRow
+                                label="Flugnr."
+                                value={event.flight_number}
+                              />
+                              <DetailRow
+                                label="Dauer"
+                                value={
+                                  event.duration_minutes != null
+                                    ? `${event.duration_minutes} Min.`
+                                    : null
+                                }
+                              />
+                              <DetailRow
+                                label="Flugzeug"
+                                value={[event.aircraft_type, event.aircraft_reg]
+                                  .filter(Boolean)
+                                  .join(" · ")}
+                              />
+                              <DetailRow
+                                label="Abflug"
+                                value={[
+                                  event.departure_terminal
+                                    ? `Terminal ${event.departure_terminal}`
+                                    : null,
+                                  event.departure_gate
+                                    ? `Gate ${event.departure_gate}`
+                                    : null,
+                                  event.check_in_desk
+                                    ? `Check-in ${event.check_in_desk}`
+                                    : null,
+                                ]
+                                  .filter(Boolean)
+                                  .join(" · ")}
+                              />
+                              <DetailRow
+                                label="Ankunft"
+                                value={[
+                                  event.arrival_terminal
+                                    ? `Terminal ${event.arrival_terminal}`
+                                    : null,
+                                  event.arrival_gate
+                                    ? `Gate ${event.arrival_gate}`
+                                    : null,
+                                  event.baggage_belt
+                                    ? `Gepäck ${event.baggage_belt}`
+                                    : null,
+                                ]
+                                  .filter(Boolean)
+                                  .join(" · ")}
+                              />
+                              <DetailRow
+                                label="Buchung"
+                                value={event.booking_reference}
+                              />
+                              <DetailRow
+                                label="Anbieter"
+                                value={event.provider}
+                              />
                             </div>
-                          ) : null}
-                          {event.address ? <div>{event.address}</div> : null}
-                          {event.phone ? <div>Tel: {event.phone}</div> : null}
-                          {event.website ? (
-                            <a
-                              href={event.website}
-                              className="text-blue-700 underline"
-                              target="_blank"
-                              rel="noreferrer"
+                          )}
+
+                          {(hasPlaceDetails ||
+                            hasMap ||
+                            (hasGenericDetails && type !== "Flug")) && (
+                            <div
+                              className={cn(
+                                "grid gap-3",
+                                hasMap &&
+                                  (hasPlaceDetails ||
+                                    (hasGenericDetails && type !== "Flug")) &&
+                                  "sm:grid-cols-[minmax(0,1fr)_minmax(11rem,15rem)] sm:items-start"
+                              )}
                             >
-                              Website
-                            </a>
-                          ) : null}
-                          {event.lat != null && event.lon != null ? (
-                            <div className="tabular-nums">
-                              {event.lat.toFixed(5)}, {event.lon.toFixed(5)}
+                              {hasPlaceDetails ||
+                              (hasGenericDetails && type !== "Flug") ? (
+                              <div className="space-y-1.5 rounded-md bg-background/60 px-3 py-2">
+                                {showPlaceName ? (
+                                  <DetailRow
+                                    label="Name"
+                                    value={event.place_name}
+                                  />
+                                ) : null}
+                                <DetailRow label="Adresse" value={address} />
+                                <DetailRow
+                                  label="Telefon"
+                                  value={
+                                    event.phone ? (
+                                      <a
+                                        href={`tel:${event.phone}`}
+                                        className="underline-offset-2 hover:underline"
+                                      >
+                                        {event.phone}
+                                      </a>
+                                    ) : null
+                                  }
+                                />
+                                <DetailRow
+                                  label="Website"
+                                  value={
+                                    event.website ? (
+                                      <a
+                                        href={event.website}
+                                        className="break-all text-blue-700 underline"
+                                        target="_blank"
+                                        rel="noreferrer"
+                                      >
+                                        {event.website.replace(
+                                          /^https?:\/\//,
+                                          ""
+                                        )}
+                                      </a>
+                                    ) : null
+                                  }
+                                />
+                                {type !== "Flug" ? (
+                                  <>
+                                    <DetailRow
+                                      label="Anbieter"
+                                      value={event.provider}
+                                    />
+                                    <DetailRow
+                                      label="Buchung"
+                                      value={event.booking_reference}
+                                    />
+                                  </>
+                                ) : null}
+                              </div>
+                              ) : null}
+                              {event.lat != null && event.lon != null ? (
+                                <TripMap
+                                  points={[
+                                    {
+                                      lat: event.lat,
+                                      lon: event.lon,
+                                    },
+                                  ]}
+                                  heightClassName="h-36"
+                                />
+                              ) : event.map_image_url ? (
+                                <div className="overflow-hidden rounded-md border border-border/70 bg-muted/30">
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img
+                                    src={event.map_image_url}
+                                    alt="Kartenausschnitt"
+                                    className="h-36 w-full object-cover"
+                                  />
+                                </div>
+                              ) : null}
                             </div>
+                          )}
+
+                          {hasRouteMap ? (
+                            <TripMap
+                              points={[
+                                {
+                                  lat: event.departure_lat!,
+                                  lon: event.departure_lon!,
+                                  label: event.departure_airport || "Von",
+                                },
+                                {
+                                  lat: event.arrival_lat!,
+                                  lon: event.arrival_lon!,
+                                  label: event.arrival_airport || "Nach",
+                                },
+                              ]}
+                              drawRoute
+                              heightClassName="h-44"
+                            />
+                          ) : null}
+
+                          {event.aircraft_image_url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={event.aircraft_image_url}
+                              alt={event.aircraft_reg || "Flugzeug"}
+                              className="max-h-40 rounded-md object-cover"
+                            />
+                          ) : null}
+
+                          {event.notes ? (
+                            <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                              {event.notes}
+                            </p>
                           ) : null}
                         </div>
-                        {event.lat != null && event.lon != null ? (
-                          <TripMap
-                            points={[
-                              {
-                                lat: event.lat,
-                                lon: event.lon,
-                                label: event.place_name || undefined,
-                              },
-                            ]}
-                            heightClassName="h-36"
-                          />
-                        ) : event.map_image_url ? (
-                          <div className="overflow-hidden rounded-md border border-border/70 bg-muted/30">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={event.map_image_url}
-                              alt="Kartenausschnitt"
-                              className="h-36 w-full object-cover"
-                            />
-                          </div>
-                        ) : null}
-                      </div>
-                    )}
-
-                    {event.event_type === "Flug" &&
-                    event.departure_lat != null &&
-                    event.departure_lon != null &&
-                    event.arrival_lat != null &&
-                    event.arrival_lon != null ? (
-                      <TripMap
-                        points={[
-                          {
-                            lat: event.departure_lat,
-                            lon: event.departure_lon,
-                            label: event.departure_airport || "Von",
-                          },
-                          {
-                            lat: event.arrival_lat,
-                            lon: event.arrival_lon,
-                            label: event.arrival_airport || "Nach",
-                          },
-                        ]}
-                        drawRoute
-                        heightClassName="h-44"
-                      />
-                    ) : null}
-
-                    {event.aircraft_image_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={event.aircraft_image_url}
-                        alt={event.aircraft_reg || "Flugzeug"}
-                        className="max-h-40 rounded-md object-cover"
-                      />
-                    ) : null}
-
-                    {event.notes ? (
-                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                        {event.notes}
-                      </p>
-                    ) : null}
+                      );
+                    })()}
                   </CardContent>
                 </Card>
               </div>

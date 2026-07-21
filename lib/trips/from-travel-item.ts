@@ -93,7 +93,7 @@ function portNote(stop: ItineraryStop): string | null {
 
 /**
  * Map a Paperless travel_item (+ extracted_data / itinerary) to one or more
- * TravelBrain event drafts. Cruises expand ports of call into Aktivität events.
+ * TravelBrain event drafts. Cruises expand ports of call into Kreuzfahrt events.
  */
 export function travelItemToEventDrafts(item: TravelItemLike): TripEventDraft[] {
   const extracted = parseExtracted(item.extracted_data);
@@ -194,7 +194,7 @@ export function travelItemToEventDrafts(item: TravelItemLike): TripEventDraft[] 
     for (const stop of itinerary) {
       const stopTitle = stop.location.trim() || "Hafen";
       drafts.push({
-        type: "Aktivität",
+        type: "Kreuzfahrt",
         title: stopTitle,
         start_date: stop.date,
         end_date: stop.date,

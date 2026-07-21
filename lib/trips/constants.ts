@@ -1,14 +1,38 @@
-import { TRAVEL_TYPES } from "@/lib/extraction/normalize-categories";
-
 export const TRIP_STATUSES = ["planned", "active", "done", "cancelled"] as const;
 export type TripStatus = (typeof TRIP_STATUSES)[number];
 
+/** Selectable TravelBrain event types (edit UI). */
 export const TRIP_EVENT_TYPES = [
-  ...TRAVEL_TYPES,
-  "Aktivität",
-  "Notiz",
+  "Flug",
+  "Mietauto",
+  "Transfer",
+  "Hotel",
+  "Unterkunft",
+  "Kreuzfahrt",
+  "Ausflug",
 ] as const;
 export type TripEventType = (typeof TRIP_EVENT_TYPES)[number];
+
+const EVENT_TYPE_ALIASES: Record<string, TripEventType> = {
+  Mietwagen: "Mietauto",
+  Aktivität: "Ausflug",
+  Notiz: "Ausflug",
+  Sonstiges: "Ausflug",
+  Bahn: "Transfer",
+  Parking: "Transfer",
+  "Visa / Einreise": "Ausflug",
+  "Pauschalreise / Urlaub": "Ausflug",
+  Reiseversicherung: "Ausflug",
+};
+
+/** Map legacy / free-text types onto the selectable set. */
+export function coerceTripEventType(raw: string | null | undefined): TripEventType {
+  const trimmed = (raw || "").trim();
+  if ((TRIP_EVENT_TYPES as readonly string[]).includes(trimmed)) {
+    return trimmed as TripEventType;
+  }
+  return EVENT_TYPE_ALIASES[trimmed] || "Ausflug";
+}
 
 export type TripEventDraft = {
   type: string;

@@ -1,8 +1,10 @@
 import { getDb } from "@/lib/db/client";
+import { getSetting, setSetting } from "@/lib/db/migrations";
 import { nowIso } from "@/lib/utils/dates";
 import {
   TRIP_EVENT_TYPES,
   TRIP_STATUSES,
+  coerceTripEventType,
   type TripEventType,
   type TripStatus,
 } from "@/lib/trips/constants";
@@ -206,19 +208,93 @@ export function deleteTrip(id: number): void {
 }
 
 export function listTripEvents(tripId: number): TripEventRow[] {
+  ensureTripEventDataMigrations();
   const db = getDb();
   return db
     .prepare(
       `SELECT * FROM trip_events
        WHERE trip_id = ?
-       ORDER BY
-         CASE WHEN start_date IS NULL OR start_date = '' THEN 1 ELSE 0 END,
-         start_date ASC,
-         COALESCE(start_time, '99:99') ASC,
-         sort_key ASC,
-         id ASC`
+       ORDER BY sort_key ASC, id ASC`
     )
     .all(tripId) as TripEventRow[];
+}
+
+function ensureTripEventDataMigrations(): void {
+  if (getSetting("trip_events_order_v1") === "1") return;
+  migrateCruisePortEventTypes();
+  resequenceAllTripEventsByDate();
+  setSetting("trip_events_order_v1", "1");
+}
+
+export function reorderTripEvents(
+  tripId: number,
+  orderedEventIds: number[]
+): TripEventRow[] {
+  if (!getTripById(tripId)) throw new Error("Reise nicht gefunden");
+  const db = getDb();
+  const existing = listTripEvents(tripId);
+  const existingIds = new Set(existing.map((e) => e.id));
+  if (
+    orderedEventIds.length !== existing.length ||
+    orderedEventIds.some((id) => !existingIds.has(id))
+  ) {
+    throw new Error("Ungültige Ereignis-Reihenfolge");
+  }
+
+  const update = db.prepare(
+    `UPDATE trip_events SET sort_key = ?, updated_at = ? WHERE id = ? AND trip_id = ?`
+  );
+  const ts = nowIso();
+  const tx = db.transaction(() => {
+    orderedEventIds.forEach((id, index) => {
+      update.run((index + 1) * 10, ts, id, tripId);
+    });
+  });
+  tx();
+  return listTripEvents(tripId);
+}
+
+/** One-time: order events chronologically into sort_key gaps. */
+export function resequenceAllTripEventsByDate(): void {
+  const db = getDb();
+  const trips = db.prepare(`SELECT id FROM trips`).all() as Array<{ id: number }>;
+  const update = db.prepare(
+    `UPDATE trip_events SET sort_key = ? WHERE id = ?`
+  );
+  const tx = db.transaction(() => {
+    for (const trip of trips) {
+      const rows = db
+        .prepare(
+          `SELECT id FROM trip_events
+           WHERE trip_id = ?
+           ORDER BY
+             CASE WHEN start_date IS NULL OR start_date = '' THEN 1 ELSE 0 END,
+             start_date ASC,
+             COALESCE(start_time, '99:99') ASC,
+             sort_key ASC,
+             id ASC`
+        )
+        .all(trip.id) as Array<{ id: number }>;
+      rows.forEach((row, index) => {
+        update.run((index + 1) * 10, row.id);
+      });
+    }
+  });
+  tx();
+}
+
+/** Ports of call were previously stored as Aktivität — promote to Kreuzfahrt. */
+export function migrateCruisePortEventTypes(): number {
+  const db = getDb();
+  const result = db
+    .prepare(
+      `UPDATE trip_events
+       SET event_type = 'Kreuzfahrt', updated_at = ?
+       WHERE event_type = 'Aktivität'
+         AND source_excerpt LIKE 'Anlaufhafen:%'`
+    )
+    .run(nowIso());
+  return result.changes;
 }
 
 export function getTripEventById(eventId: number): TripEventRow | null {
@@ -230,11 +306,7 @@ export function getTripEventById(eventId: number): TripEventRow | null {
 }
 
 function normalizeEventType(raw: string): TripEventType {
-  const trimmed = raw.trim();
-  if ((TRIP_EVENT_TYPES as readonly string[]).includes(trimmed)) {
-    return trimmed as TripEventType;
-  }
-  return "Sonstiges";
+  return coerceTripEventType(raw);
 }
 
 export type TripEventInput = {
