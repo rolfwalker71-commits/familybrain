@@ -74,6 +74,9 @@ export default function SettingsPage() {
   const [nominatimBaseUrl, setNominatimBaseUrl] = useState(
     "https://nominatim.openstreetmap.org"
   );
+  const [tripMapStyle, setTripMapStyle] = useState<
+    "voyager" | "positron" | "osm"
+  >("voyager");
   const [flightTestNumber, setFlightTestNumber] = useState("LX1594");
   const [flightTestDate, setFlightTestDate] = useState("2026-10-23");
   const [flightTestBusy, setFlightTestBusy] = useState(false);
@@ -112,6 +115,11 @@ export default function SettingsPage() {
       );
       setNominatimBaseUrl(
         data.nominatimBaseUrl || "https://nominatim.openstreetmap.org"
+      );
+      setTripMapStyle(
+        data.tripMapStyle === "positron" || data.tripMapStyle === "osm"
+          ? data.tripMapStyle
+          : "voyager"
       );
     })();
   }, []);
@@ -287,6 +295,7 @@ export default function SettingsPage() {
       const payload: Record<string, unknown> = {
         nominatimBaseUrl: nominatimBaseUrl.trim(),
         aerodataboxProvider,
+        tripMapStyle,
       };
       if (aerodataboxKey.trim()) {
         payload.aerodataboxApiKey = aerodataboxKey.trim();
@@ -307,7 +316,13 @@ export default function SettingsPage() {
       setNominatimBaseUrl(
         data.nominatimBaseUrl || "https://nominatim.openstreetmap.org"
       );
+      setTripMapStyle(
+        data.tripMapStyle === "positron" || data.tripMapStyle === "osm"
+          ? data.tripMapStyle
+          : "voyager"
+      );
       setMessage("TravelBrain-Einstellungen gespeichert.");
+      window.dispatchEvent(new Event("trip-map-style-changed"));
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -614,8 +629,9 @@ export default function SettingsPage() {
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
             Optionaler AeroDataBox-Key für Flug-Anreicherung (API.Market oder
-            RapidAPI). Hotel-Orte nutzen OpenStreetMap/Nominatim (ohne Key);
-            optional eigene Nominatim-Instanz.
+            RapidAPI). Orts-Suche nutzt Photon (Komoot, fuzzy) und fällt auf
+            OpenStreetMap/Nominatim zurück — ohne Key. Optional eigene
+            Nominatim-Instanz.
           </p>
           <div className="space-y-2">
             <Label>Flug-API Anbieter</Label>
@@ -655,6 +671,35 @@ export default function SettingsPage() {
                     : "RapidAPI-Key"
               }
             />
+          </div>
+          <div className="space-y-2">
+            <Label>Kartenstil</Label>
+            <Select
+              value={tripMapStyle}
+              onValueChange={(v) => {
+                if (v === "voyager" || v === "positron" || v === "osm") {
+                  setTripMapStyle(v);
+                }
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="voyager">
+                  Carto Voyager (farbig)
+                </SelectItem>
+                <SelectItem value="positron">
+                  Carto Positron (hell)
+                </SelectItem>
+                <SelectItem value="osm">
+                  OpenStreetMap (klassisch)
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Kostenlose Kacheln auf OSM-Basis. Default: Voyager.
+            </p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="nominatimUrl">Nominatim Base URL</Label>

@@ -1,7 +1,12 @@
 "use client";
 
-import { useEffect, useId, useRef } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import {
+  coerceMapStyle,
+  getMapTileConfig,
+  type MapStyleId,
+} from "@/lib/trips/map-tiles";
 
 export type TripMapPoint = {
   lat: number;
@@ -15,6 +20,8 @@ type Props = {
   drawRoute?: boolean;
   className?: string;
   heightClassName?: string;
+  /** Override settings; otherwise loaded from /api/settings */
+  mapStyle?: MapStyleId;
 };
 
 function toRad(d: number) {
@@ -71,15 +78,47 @@ function markerHtml(label?: string) {
   return `<div style="position:relative;width:14px;height:14px;">${tip}<div style="width:14px;height:14px;border-radius:50%;background:#0f766e;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35);"></div></div>`;
 }
 
+let cachedMapStyle: MapStyleId | null = null;
+let mapStylePromise: Promise<MapStyleId> | null = null;
+
+export function clearTripMapStyleCache() {
+  cachedMapStyle = null;
+  mapStylePromise = null;
+}
+
+async function loadMapStyle(): Promise<MapStyleId> {
+  if (cachedMapStyle) return cachedMapStyle;
+  if (!mapStylePromise) {
+    mapStylePromise = fetch("/api/settings")
+      .then(async (res) => {
+        const data = await res.json().catch(() => ({}));
+        cachedMapStyle = coerceMapStyle(data.tripMapStyle);
+        return cachedMapStyle;
+      })
+      .catch(() => {
+        cachedMapStyle = "voyager";
+        return cachedMapStyle as MapStyleId;
+      })
+      .finally(() => {
+        mapStylePromise = null;
+      });
+  }
+  return mapStylePromise;
+}
+
 export function TripMap({
   points,
   drawRoute = false,
   className,
   heightClassName = "h-40",
+  mapStyle: mapStyleProp,
 }: Props) {
   const mapId = useId().replace(/:/g, "");
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<{ remove: () => void } | null>(null);
+  const [resolvedStyle, setResolvedStyle] = useState<MapStyleId>(
+    mapStyleProp || cachedMapStyle || "voyager"
+  );
 
   const valid = points.filter(
     (p) => Number.isFinite(p.lat) && Number.isFinite(p.lon)
@@ -87,6 +126,27 @@ export function TripMap({
   const pointsKey = JSON.stringify(
     valid.map((p) => [p.lat, p.lon, p.label ?? ""])
   );
+
+  useEffect(() => {
+    if (mapStyleProp) {
+      setResolvedStyle(mapStyleProp);
+      return;
+    }
+    let cancelled = false;
+    const apply = (style: MapStyleId) => {
+      if (!cancelled) setResolvedStyle(style);
+    };
+    void loadMapStyle().then(apply);
+    const onChanged = () => {
+      clearTripMapStyleCache();
+      void loadMapStyle().then(apply);
+    };
+    window.addEventListener("trip-map-style-changed", onChanged);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("trip-map-style-changed", onChanged);
+    };
+  }, [mapStyleProp]);
 
   useEffect(() => {
     const current = (
@@ -98,6 +158,7 @@ export function TripMap({
     }));
     if (!containerRef.current || current.length === 0) return;
     let cancelled = false;
+    const tile = getMapTileConfig(resolvedStyle);
 
     void (async () => {
       const L = (await import("leaflet")).default;
@@ -116,8 +177,9 @@ export function TripMap({
       });
       mapRef.current = map;
 
-      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        maxZoom: 19,
+      L.tileLayer(tile.url, {
+        maxZoom: tile.maxZoom,
+        subdomains: tile.subdomains,
       }).addTo(map);
 
       const bounds = L.latLngBounds([]);
@@ -160,9 +222,11 @@ export function TripMap({
         mapRef.current = null;
       }
     };
-  }, [pointsKey, drawRoute, mapId]);
+  }, [pointsKey, drawRoute, mapId, resolvedStyle]);
 
   if (valid.length === 0) return null;
+
+  const attribution = getMapTileConfig(resolvedStyle).attribution;
 
   return (
     <div className={cn("overflow-hidden rounded-md border border-border/70", className)}>
@@ -172,7 +236,7 @@ export function TripMap({
         className={cn("w-full bg-muted/30", heightClassName)}
       />
       <div className="flex items-center justify-between gap-2 px-2 py-1 text-[10px] text-muted-foreground">
-        <span>© OpenStreetMap</span>
+        <span>{attribution}</span>
         {valid.length === 1 ? (
           <a
             href={`https://www.openstreetmap.org/?mlat=${valid[0].lat}&mlon=${valid[0].lon}#map=15/${valid[0].lat}/${valid[0].lon}`}

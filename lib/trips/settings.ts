@@ -1,13 +1,21 @@
 import { getSetting, setSetting } from "@/lib/db/migrations";
+import {
+  coerceMapStyle,
+  type MapStyleId,
+  MAP_STYLES,
+} from "@/lib/trips/map-tiles";
 
 export const AERODATABOX_KEY_SETTING = "aerodatabox_api_key";
 export const AERODATABOX_PROVIDER_SETTING = "aerodatabox_provider";
 export const NOMINATIM_URL_SETTING = "nominatim_base_url";
+export const MAP_STYLE_SETTING = "trip_map_style";
 export const DEFAULT_NOMINATIM_BASE_URL =
   "https://nominatim.openstreetmap.org";
 
 export const AERODATABOX_PROVIDERS = ["apimarket", "rapidapi"] as const;
 export type AeroDataBoxProvider = (typeof AERODATABOX_PROVIDERS)[number];
+
+export { MAP_STYLES, type MapStyleId };
 
 const RAPIDAPI_BASE = "https://aerodatabox.p.rapidapi.com";
 const APIMARKET_BASE =
@@ -74,4 +82,14 @@ export function getNominatimBaseUrl(): string {
 
 export function saveNominatimBaseUrl(url: string | null): void {
   setSetting(NOMINATIM_URL_SETTING, url?.trim() || null);
+}
+
+export function getTripMapStyle(): MapStyleId {
+  const fromEnv = process.env.TRIP_MAP_STYLE?.trim();
+  if (fromEnv) return coerceMapStyle(fromEnv);
+  return coerceMapStyle(getSetting(MAP_STYLE_SETTING));
+}
+
+export function saveTripMapStyle(style: MapStyleId): void {
+  setSetting(MAP_STYLE_SETTING, coerceMapStyle(style));
 }

@@ -24,10 +24,13 @@ import {
   getAeroDataBoxApiKey,
   getAeroDataBoxProvider,
   getNominatimBaseUrl,
+  getTripMapStyle,
   saveAeroDataBoxApiKey,
   saveAeroDataBoxProvider,
   saveNominatimBaseUrl,
+  saveTripMapStyle,
   AERODATABOX_PROVIDERS,
+  MAP_STYLES,
 } from "@/lib/trips/settings";
 
 export const runtime = "nodejs";
@@ -62,6 +65,7 @@ export async function GET() {
     hasAerodataboxKey: Boolean(aeroKey),
     aerodataboxProvider: getAeroDataBoxProvider(),
     nominatimBaseUrl,
+    tripMapStyle: getTripMapStyle(),
   });
 }
 
@@ -78,6 +82,7 @@ const PutSchema = z.object({
   clearAerodataboxApiKey: z.boolean().optional(),
   aerodataboxProvider: z.enum(AERODATABOX_PROVIDERS).optional(),
   nominatimBaseUrl: z.string().optional(),
+  tripMapStyle: z.enum(MAP_STYLES).optional(),
 });
 
 export async function PUT(request: Request) {
@@ -169,6 +174,10 @@ export async function PUT(request: Request) {
     }
   }
 
+  if (parsed.data.tripMapStyle !== undefined) {
+    saveTripMapStyle(parsed.data.tripMapStyle);
+  }
+
   const paperless = getPaperlessSettings();
   const openai = getOpenAISettings();
   const trilium = getTriliumSettings();
@@ -199,5 +208,6 @@ export async function PUT(request: Request) {
     hasAerodataboxKey: Boolean(aeroKey),
     aerodataboxProvider: getAeroDataBoxProvider(),
     nominatimBaseUrl,
+    tripMapStyle: getTripMapStyle(),
   });
 }

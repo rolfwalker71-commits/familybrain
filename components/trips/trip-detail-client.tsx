@@ -1195,7 +1195,7 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                             [editingEventId]: e.target.value,
                           }))
                         }
-                        placeholder="Name, Ort…"
+                        placeholder="Name + Stadt reicht oft (fuzzy Suche)"
                         className="h-8 text-xs"
                       />
                     </div>
@@ -1207,7 +1207,7 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                       className="gap-1.5 shrink-0"
                     >
                       <MapPin className="size-3.5" />
-                      Ort anreichern
+                      Ort suchen
                     </Button>
                   </div>
                 ) : null}
