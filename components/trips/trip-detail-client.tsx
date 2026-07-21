@@ -4,14 +4,25 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
+  BedDouble,
+  Bus,
   CalendarPlus,
+  Car,
+  CircleParking,
+  FileText,
   ImagePlus,
   MapPin,
+  NotebookPen,
   Pencil,
   Plane,
+  Shield,
+  Ship,
   Sparkles,
+  Ticket,
+  TrainFront,
   Trash2,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -27,9 +38,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PageHeader } from "@/components/layout/page-primitives";
-import { pageVisuals } from "@/components/layout/icon-circle";
+import {
+  IconCircle,
+  pageVisuals,
+  type IconTone,
+} from "@/components/layout/icon-circle";
 import { TripMap } from "@/components/trips/trip-map";
-import { toSwissDate } from "@/lib/utils/dates";
+import {
+  toDateInputValue,
+  toSwissDate,
+  toTimeInputValue,
+} from "@/lib/utils/dates";
 import { TRIP_EVENT_TYPES, TRIP_STATUSES } from "@/lib/trips/constants";
 
 type Trip = {
@@ -103,28 +122,81 @@ const STATUS_LABEL: Record<string, string> = {
   cancelled: "Abgesagt",
 };
 
-const emptyEventForm = {
-  eventType: "Flug",
-  title: "",
-  startDate: "",
-  endDate: "",
-  startTime: "",
-  endTime: "",
-  location: "",
-  address: "",
-  provider: "",
-  bookingReference: "",
-  notes: "",
-  flightNumber: "",
-  departureAirport: "",
-  arrivalAirport: "",
-  departureTerminal: "",
-  arrivalTerminal: "",
-  departureGate: "",
-  arrivalGate: "",
-  checkInDesk: "",
-  baggageBelt: "",
+const EVENT_VISUALS: Record<string, { icon: LucideIcon; tone: IconTone }> = {
+  Flug: { icon: Plane, tone: "sky" },
+  Hotel: { icon: BedDouble, tone: "amber" },
+  Kreuzfahrt: { icon: Ship, tone: "indigo" },
+  Bahn: { icon: TrainFront, tone: "violet" },
+  Mietwagen: { icon: Car, tone: "teal" },
+  Transfer: { icon: Bus, tone: "slate" },
+  Parking: { icon: CircleParking, tone: "slate" },
+  "Visa / Einreise": { icon: FileText, tone: "orange" },
+  "Pauschalreise / Urlaub": { icon: Ticket, tone: "green" },
+  Reiseversicherung: { icon: Shield, tone: "blue" },
+  Aktivität: { icon: MapPin, tone: "green" },
+  Notiz: { icon: NotebookPen, tone: "slate" },
+  Sonstiges: { icon: Ticket, tone: "slate" },
 };
+
+function eventVisual(type: string) {
+  return EVENT_VISUALS[type] || EVENT_VISUALS.Sonstiges;
+}
+
+function createEmptyEventForm() {
+  return {
+    eventType: "Flug",
+    title: "",
+    startDate: "",
+    endDate: "",
+    startTime: "",
+    endTime: "",
+    location: "",
+    address: "",
+    provider: "",
+    bookingReference: "",
+    notes: "",
+    flightNumber: "",
+    departureAirport: "",
+    arrivalAirport: "",
+    departureTerminal: "",
+    arrivalTerminal: "",
+    departureGate: "",
+    arrivalGate: "",
+    checkInDesk: "",
+    baggageBelt: "",
+  };
+}
+
+function eventToForm(event: TripEvent) {
+  const startDate = toDateInputValue(event.start_date);
+  let endDate = toDateInputValue(event.end_date);
+  // Drop nonsense ranges (often caused by ISO timestamps / accidental defaults).
+  if (startDate && endDate && endDate < startDate) {
+    endDate = "";
+  }
+  return {
+    eventType: event.event_type,
+    title: event.title,
+    startDate,
+    endDate,
+    startTime: toTimeInputValue(event.start_time),
+    endTime: toTimeInputValue(event.end_time),
+    location: event.location || "",
+    address: event.address || "",
+    provider: event.provider || "",
+    bookingReference: event.booking_reference || "",
+    notes: event.notes || "",
+    flightNumber: event.flight_number || "",
+    departureAirport: event.departure_airport || "",
+    arrivalAirport: event.arrival_airport || "",
+    departureTerminal: event.departure_terminal || "",
+    arrivalTerminal: event.arrival_terminal || "",
+    departureGate: event.departure_gate || "",
+    arrivalGate: event.arrival_gate || "",
+    checkInDesk: event.check_in_desk || "",
+    baggageBelt: event.baggage_belt || "",
+  };
+}
 
 export function TripDetailClient({ tripId }: { tripId: number }) {
   const [trip, setTrip] = useState<Trip | null>(null);
@@ -141,7 +213,7 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
     startDate: "",
     endDate: "",
   });
-  const [eventForm, setEventForm] = useState(emptyEventForm);
+  const [eventForm, setEventForm] = useState(createEmptyEventForm);
   const [editingEventId, setEditingEventId] = useState<number | null>(null);
   const [coverPrompt, setCoverPrompt] = useState("");
   const [busy, setBusy] = useState(false);
@@ -164,8 +236,8 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
       summary: data.trip.summary || "",
       notes: data.trip.notes || "",
       status: data.trip.status || "planned",
-      startDate: data.trip.start_date || "",
-      endDate: data.trip.end_date || "",
+      startDate: toDateInputValue(data.trip.start_date),
+      endDate: toDateInputValue(data.trip.end_date),
     });
   }, [tripId]);
 
@@ -204,20 +276,25 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
     }
   }
 
-  async function saveEvent() {
-    if (!eventForm.title.trim()) return;
+  async function saveEvent(options?: { keepEditing?: boolean }) {
+    if (!eventForm.title.trim()) return null;
     setBusy(true);
     setError(null);
     try {
       const dep = eventForm.departureAirport.trim().toUpperCase() || null;
       const arr = eventForm.arrivalAirport.trim().toUpperCase() || null;
+      const startDate = toDateInputValue(eventForm.startDate) || null;
+      let endDate = toDateInputValue(eventForm.endDate) || null;
+      if (startDate && endDate && endDate < startDate) {
+        endDate = null;
+      }
       const payload = {
         eventType: eventForm.eventType,
         title: eventForm.title.trim(),
-        startDate: eventForm.startDate || null,
-        endDate: eventForm.endDate || null,
-        startTime: eventForm.startTime || null,
-        endTime: eventForm.endTime || null,
+        startDate,
+        endDate,
+        startTime: toTimeInputValue(eventForm.startTime) || null,
+        endTime: toTimeInputValue(eventForm.endTime) || null,
         location:
           eventForm.location ||
           (dep && arr ? `${dep} → ${arr}` : dep || arr || null),
@@ -246,12 +323,20 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Speichern fehlgeschlagen");
-      setEventForm(emptyEventForm);
-      setEditingEventId(null);
-      setStatus(editingEventId != null ? "Ereignis aktualisiert." : "Ereignis hinzugefügt.");
+      const savedId =
+        (data.event?.id as number | undefined) ?? editingEventId;
+      if (!options?.keepEditing) {
+        setEventForm(createEmptyEventForm());
+        setEditingEventId(null);
+      }
+      setStatus(
+        editingEventId != null ? "Ereignis aktualisiert." : "Ereignis hinzugefügt."
+      );
       await load();
+      return savedId;
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+      return null;
     } finally {
       setBusy(false);
     }
@@ -259,28 +344,9 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
 
   function startEditEvent(event: TripEvent) {
     setEditingEventId(event.id);
-    setEventForm({
-      eventType: event.event_type,
-      title: event.title,
-      startDate: event.start_date || "",
-      endDate: event.end_date || "",
-      startTime: event.start_time || "",
-      endTime: event.end_time || "",
-      location: event.location || "",
-      address: event.address || "",
-      provider: event.provider || "",
-      bookingReference: event.booking_reference || "",
-      notes: event.notes || "",
-      flightNumber: event.flight_number || "",
-      departureAirport: event.departure_airport || "",
-      arrivalAirport: event.arrival_airport || "",
-      departureTerminal: event.departure_terminal || "",
-      arrivalTerminal: event.arrival_terminal || "",
-      departureGate: event.departure_gate || "",
-      arrivalGate: event.arrival_gate || "",
-      checkInDesk: event.check_in_desk || "",
-      baggageBelt: event.baggage_belt || "",
-    });
+    setEventForm(eventToForm(event));
+    setPlaceCandidates((prev) => ({ ...prev, [event.id]: [] }));
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   async function removeEvent(eventId: number) {
@@ -294,7 +360,7 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
       if (!res.ok) throw new Error(data.error || "Löschen fehlgeschlagen");
       if (editingEventId === eventId) {
         setEditingEventId(null);
-        setEventForm(emptyEventForm);
+        setEventForm(createEmptyEventForm());
       }
       await load();
     } catch (err) {
@@ -356,9 +422,14 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
   }
 
   async function enrichFlight(eventId: number) {
-    setBusy(true);
     setError(null);
     try {
+      // Persist form values first so lookup uses the dates/flight number on screen.
+      if (editingEventId === eventId) {
+        const saved = await saveEvent({ keepEditing: true });
+        if (saved == null) return;
+      }
+      setBusy(true);
       const res = await fetch(
         `/api/trips/${tripId}/events/${eventId}/enrich-flight`,
         { method: "POST" }
@@ -366,6 +437,9 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Anreicherung fehlgeschlagen");
       await load();
+      if (data.event && editingEventId === eventId) {
+        setEventForm(eventToForm(data.event as TripEvent));
+      }
       setStatus("Flugdaten angereichert.");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -375,14 +449,18 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
   }
 
   async function searchPlace(eventId: number) {
-    setBusy(true);
     setError(null);
     try {
+      if (editingEventId === eventId) {
+        const saved = await saveEvent({ keepEditing: true });
+        if (saved == null) return;
+      }
+      setBusy(true);
       const event = events.find((e) => e.id === eventId);
       const defaultQuery = [
-        event?.title,
-        event?.address,
-        event?.location,
+        editingEventId === eventId ? eventForm.title : event?.title,
+        editingEventId === eventId ? eventForm.address : event?.address,
+        editingEventId === eventId ? eventForm.location : event?.location,
         trip?.destination,
       ]
         .filter(Boolean)
@@ -431,6 +509,9 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
       if (!res.ok) throw new Error(data.error || "Übernehmen fehlgeschlagen");
       setPlaceCandidates((prev) => ({ ...prev, [eventId]: [] }));
       await load();
+      if (data.event && editingEventId === eventId) {
+        setEventForm(eventToForm(data.event as TripEvent));
+      }
       setStatus("Ort angereichert.");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -913,16 +994,105 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
               }
             />
           </div>
+
+          {editingEventId != null ? (
+            <div className="space-y-3 rounded-lg border border-border/70 bg-muted/20 p-3 sm:col-span-2">
+              <div className="text-xs font-medium text-muted-foreground">
+                Anreichern
+              </div>
+              {eventForm.eventType === "Flug" ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={busy || !eventForm.flightNumber.trim()}
+                  onClick={() => void enrichFlight(editingEventId)}
+                  className="gap-1.5"
+                >
+                  <Plane className="size-3.5" />
+                  Mit Fluginfos anreichern
+                </Button>
+              ) : null}
+              {eventForm.eventType === "Hotel" ||
+              eventForm.eventType === "Aktivität" ? (
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <Label
+                      htmlFor={`place-query-edit-${editingEventId}`}
+                      className="text-xs"
+                    >
+                      OSM-Suche
+                    </Label>
+                    <Input
+                      id={`place-query-edit-${editingEventId}`}
+                      value={
+                        placeQueries[editingEventId] ??
+                        [
+                          eventForm.title,
+                          eventForm.address,
+                          eventForm.location,
+                          trip?.destination,
+                        ]
+                          .filter(Boolean)
+                          .join(", ")
+                      }
+                      onChange={(e) =>
+                        setPlaceQueries((prev) => ({
+                          ...prev,
+                          [editingEventId]: e.target.value,
+                        }))
+                      }
+                      placeholder="Hotelname, Ort…"
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={busy}
+                    onClick={() => void searchPlace(editingEventId)}
+                    className="gap-1.5 shrink-0"
+                  >
+                    <MapPin className="size-3.5" />
+                    Ort anreichern
+                  </Button>
+                </div>
+              ) : null}
+              {(placeCandidates[editingEventId] || []).length > 0 ? (
+                <div className="space-y-2 rounded-md border border-border/70 bg-background p-2">
+                  <div className="text-xs font-medium">OSM-Treffer wählen</div>
+                  {placeCandidates[editingEventId].map((c) => (
+                    <button
+                      key={c.osmId}
+                      type="button"
+                      className="block w-full rounded-md px-2 py-1.5 text-left text-xs hover:bg-muted"
+                      onClick={() => void applyPlace(editingEventId, c)}
+                    >
+                      <div className="font-medium">{c.name}</div>
+                      <div className="text-muted-foreground">
+                        {c.displayName}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
           <div className="flex flex-wrap gap-2 sm:col-span-2">
-            <Button disabled={busy || !eventForm.title.trim()} onClick={() => void saveEvent()}>
-              {editingEventId != null ? "Ereignis speichern" : "Ereignis hinzufügen"}
+            <Button
+              disabled={busy || !eventForm.title.trim()}
+              onClick={() => void saveEvent()}
+            >
+              {editingEventId != null
+                ? "Ereignis speichern"
+                : "Ereignis hinzufügen"}
             </Button>
             {editingEventId != null ? (
               <Button
                 variant="ghost"
                 onClick={() => {
                   setEditingEventId(null);
-                  setEventForm(emptyEventForm);
+                  setEventForm(createEmptyEventForm());
                 }}
               >
                 Abbrechen
@@ -932,291 +1102,232 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
         </CardContent>
       </Card>
 
-      <div className="space-y-3">
+      <div className="space-y-5">
         <h2 className="text-lg font-semibold">Timeline</h2>
         {events.length === 0 ? (
           <p className="text-sm text-muted-foreground">Noch keine Ereignisse.</p>
         ) : (
-          events.map((event) => (
-            <Card key={event.id} className="border-border/80">
-              <CardContent className="space-y-3 p-4">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant="secondary">{event.event_type}</Badge>
-                      <span className="font-medium">{event.title}</span>
+          events.map((event) => {
+            const visual = eventVisual(event.event_type);
+            return (
+              <div key={event.id} className="relative pt-3 pl-3">
+                <IconCircle
+                  icon={visual.icon}
+                  tone={visual.tone}
+                  size="lg"
+                  className="absolute left-0 top-0 z-10 shadow-md ring-2 ring-background"
+                />
+                <Card
+                  tone={visual.tone}
+                  className={cn(
+                    "overflow-visible border-border/50",
+                    editingEventId === event.id && "ring-2 ring-foreground/15"
+                  )}
+                >
+                  <CardContent className="space-y-3 p-4 pl-8">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant="secondary">{event.event_type}</Badge>
+                          <span className="font-medium">{event.title}</span>
+                        </div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          {[
+                            event.start_date
+                              ? `${toSwissDate(event.start_date)}${
+                                  event.start_time ? ` ${event.start_time}` : ""
+                                }`
+                              : null,
+                            (() => {
+                              const start = toDateInputValue(event.start_date);
+                              const end = toDateInputValue(event.end_date);
+                              if (!end || (start && end < start)) return null;
+                              return `bis ${toSwissDate(end)}${
+                                event.end_time ? ` ${event.end_time}` : ""
+                              }`;
+                            })(),
+                            event.location,
+                            event.provider,
+                            event.flight_number,
+                          ]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => startEditEvent(event)}
+                        >
+                          <Pencil className="size-3.5" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => void removeEvent(event.id)}
+                        >
+                          <Trash2 className="size-3.5" />
+                        </Button>
+                      </div>
                     </div>
-                    <div className="mt-1 text-xs text-muted-foreground">
-                      {[
-                        event.start_date
-                          ? `${toSwissDate(event.start_date)}${
-                              event.start_time ? ` ${event.start_time}` : ""
-                            }`
-                          : null,
-                        event.end_date
-                          ? `bis ${toSwissDate(event.end_date)}${
-                              event.end_time ? ` ${event.end_time}` : ""
-                            }`
-                          : null,
-                        event.location,
-                        event.provider,
-                        event.flight_number,
-                      ]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap gap-1">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => startEditEvent(event)}
-                    >
-                      <Pencil className="size-3.5" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => void removeEvent(event.id)}
-                    >
-                      <Trash2 className="size-3.5" />
-                    </Button>
-                  </div>
-                </div>
 
-                {(event.airline ||
-                  event.departure_airport ||
-                  event.duration_minutes ||
-                  event.aircraft_reg ||
-                  event.departure_terminal ||
-                  event.departure_gate ||
-                  event.check_in_desk ||
-                  event.baggage_belt) && (
-                  <div className="space-y-1 rounded-md bg-muted/40 px-3 py-2 text-xs">
-                    <div>
-                      {[
-                        event.airline,
-                        event.departure_airport && event.arrival_airport
-                          ? `${event.departure_airport} → ${event.arrival_airport}`
-                          : null,
-                        event.duration_minutes
-                          ? `${event.duration_minutes} Min.`
-                          : null,
-                        event.aircraft_type,
-                        event.aircraft_reg,
-                      ]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    </div>
-                    {(event.departure_terminal ||
+                    {(event.airline ||
+                      event.departure_airport ||
+                      event.duration_minutes ||
+                      event.aircraft_reg ||
+                      event.departure_terminal ||
                       event.departure_gate ||
-                      event.arrival_terminal ||
-                      event.arrival_gate ||
                       event.check_in_desk ||
                       event.baggage_belt) && (
-                      <div className="text-muted-foreground">
-                        {[
-                          event.departure_terminal
-                            ? `Terminal Abflug ${event.departure_terminal}`
-                            : null,
-                          event.departure_gate
-                            ? `Gate ${event.departure_gate}`
-                            : null,
-                          event.check_in_desk
-                            ? `Check-in ${event.check_in_desk}`
-                            : null,
-                          event.arrival_terminal
-                            ? `Terminal Ankunft ${event.arrival_terminal}`
-                            : null,
-                          event.arrival_gate
-                            ? `Gate Ankunft ${event.arrival_gate}`
-                            : null,
-                          event.baggage_belt
-                            ? `Gepäck ${event.baggage_belt}`
-                            : null,
-                        ]
-                          .filter(Boolean)
-                          .join(" · ")}
+                      <div className="space-y-1 rounded-md bg-background/60 px-3 py-2 text-xs">
+                        <div>
+                          {[
+                            event.airline,
+                            event.departure_airport && event.arrival_airport
+                              ? `${event.departure_airport} → ${event.arrival_airport}`
+                              : null,
+                            event.duration_minutes
+                              ? `${event.duration_minutes} Min.`
+                              : null,
+                            event.aircraft_type,
+                            event.aircraft_reg,
+                          ]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </div>
+                        {(event.departure_terminal ||
+                          event.departure_gate ||
+                          event.arrival_terminal ||
+                          event.arrival_gate ||
+                          event.check_in_desk ||
+                          event.baggage_belt) && (
+                          <div className="text-muted-foreground">
+                            {[
+                              event.departure_terminal
+                                ? `Terminal Abflug ${event.departure_terminal}`
+                                : null,
+                              event.departure_gate
+                                ? `Gate ${event.departure_gate}`
+                                : null,
+                              event.check_in_desk
+                                ? `Check-in ${event.check_in_desk}`
+                                : null,
+                              event.arrival_terminal
+                                ? `Terminal Ankunft ${event.arrival_terminal}`
+                                : null,
+                              event.arrival_gate
+                                ? `Gate Ankunft ${event.arrival_gate}`
+                                : null,
+                              event.baggage_belt
+                                ? `Gepäck ${event.baggage_belt}`
+                                : null,
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </div>
+                        )}
                       </div>
                     )}
-                  </div>
-                )}
 
-                {(event.address ||
-                  event.phone ||
-                  event.website ||
-                  event.place_name ||
-                  event.map_image_url ||
-                  event.osm_id ||
-                  (event.lat != null && event.lon != null)) && (
-                  <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(11rem,15rem)] sm:items-start">
-                    <div className="space-y-1 text-xs text-muted-foreground">
-                      {event.place_name ? (
-                        <div className="font-medium text-foreground">
-                          {event.place_name}
+                    {(event.address ||
+                      event.phone ||
+                      event.website ||
+                      event.place_name ||
+                      event.map_image_url ||
+                      event.osm_id ||
+                      (event.lat != null && event.lon != null)) && (
+                      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(11rem,15rem)] sm:items-start">
+                        <div className="space-y-1 text-xs text-muted-foreground">
+                          {event.place_name ? (
+                            <div className="font-medium text-foreground">
+                              {event.place_name}
+                            </div>
+                          ) : null}
+                          {event.address ? <div>{event.address}</div> : null}
+                          {event.phone ? <div>Tel: {event.phone}</div> : null}
+                          {event.website ? (
+                            <a
+                              href={event.website}
+                              className="text-blue-700 underline"
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              Website
+                            </a>
+                          ) : null}
+                          {event.lat != null && event.lon != null ? (
+                            <div className="tabular-nums">
+                              {event.lat.toFixed(5)}, {event.lon.toFixed(5)}
+                            </div>
+                          ) : null}
                         </div>
-                      ) : null}
-                      {event.address ? <div>{event.address}</div> : null}
-                      {event.phone ? <div>Tel: {event.phone}</div> : null}
-                      {event.website ? (
-                        <a
-                          href={event.website}
-                          className="text-blue-700 underline"
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          Website
-                        </a>
-                      ) : null}
-                      {event.lat != null && event.lon != null ? (
-                        <div className="tabular-nums">
-                          {event.lat.toFixed(5)}, {event.lon.toFixed(5)}
-                        </div>
-                      ) : null}
-                    </div>
-                    {event.lat != null && event.lon != null ? (
+                        {event.lat != null && event.lon != null ? (
+                          <TripMap
+                            points={[
+                              {
+                                lat: event.lat,
+                                lon: event.lon,
+                                label: event.place_name || undefined,
+                              },
+                            ]}
+                            heightClassName="h-36"
+                          />
+                        ) : event.map_image_url ? (
+                          <div className="overflow-hidden rounded-md border border-border/70 bg-muted/30">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={event.map_image_url}
+                              alt="Kartenausschnitt"
+                              className="h-36 w-full object-cover"
+                            />
+                          </div>
+                        ) : null}
+                      </div>
+                    )}
+
+                    {event.event_type === "Flug" &&
+                    event.departure_lat != null &&
+                    event.departure_lon != null &&
+                    event.arrival_lat != null &&
+                    event.arrival_lon != null ? (
                       <TripMap
                         points={[
                           {
-                            lat: event.lat,
-                            lon: event.lon,
-                            label: event.place_name || undefined,
+                            lat: event.departure_lat,
+                            lon: event.departure_lon,
+                            label: event.departure_airport || "Von",
+                          },
+                          {
+                            lat: event.arrival_lat,
+                            lon: event.arrival_lon,
+                            label: event.arrival_airport || "Nach",
                           },
                         ]}
-                        heightClassName="h-36"
+                        drawRoute
+                        heightClassName="h-44"
                       />
-                    ) : event.map_image_url ? (
-                      <div className="overflow-hidden rounded-md border border-border/70 bg-muted/30">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={event.map_image_url}
-                          alt="Kartenausschnitt"
-                          className="h-36 w-full object-cover"
-                        />
-                      </div>
                     ) : null}
-                  </div>
-                )}
 
-                {event.event_type === "Flug" &&
-                event.departure_lat != null &&
-                event.departure_lon != null &&
-                event.arrival_lat != null &&
-                event.arrival_lon != null ? (
-                  <TripMap
-                    points={[
-                      {
-                        lat: event.departure_lat,
-                        lon: event.departure_lon,
-                        label: event.departure_airport || "Von",
-                      },
-                      {
-                        lat: event.arrival_lat,
-                        lon: event.arrival_lon,
-                        label: event.arrival_airport || "Nach",
-                      },
-                    ]}
-                    drawRoute
-                    heightClassName="h-44"
-                  />
-                ) : null}
+                    {event.aircraft_image_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={event.aircraft_image_url}
+                        alt={event.aircraft_reg || "Flugzeug"}
+                        className="max-h-40 rounded-md object-cover"
+                      />
+                    ) : null}
 
-                {event.aircraft_image_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={event.aircraft_image_url}
-                    alt={event.aircraft_reg || "Flugzeug"}
-                    className="max-h-40 rounded-md object-cover"
-                  />
-                ) : null}
-
-                <div className="flex flex-wrap gap-2">
-                  {event.event_type === "Flug" ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={busy}
-                      onClick={() => void enrichFlight(event.id)}
-                      className="gap-1.5"
-                    >
-                      <Plane className="size-3.5" />
-                      Mit Fluginfos anreichern
-                    </Button>
-                  ) : null}
-                  {event.event_type === "Hotel" ||
-                  event.event_type === "Aktivität" ? (
-                    <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-end">
-                      <div className="min-w-0 flex-1 space-y-1">
-                        <Label
-                          htmlFor={`place-query-${event.id}`}
-                          className="text-xs"
-                        >
-                          OSM-Suche
-                        </Label>
-                        <Input
-                          id={`place-query-${event.id}`}
-                          value={
-                            placeQueries[event.id] ??
-                            [
-                              event.title,
-                              event.address,
-                              event.location,
-                              trip.destination,
-                            ]
-                              .filter(Boolean)
-                              .join(", ")
-                          }
-                          onChange={(e) =>
-                            setPlaceQueries((prev) => ({
-                              ...prev,
-                              [event.id]: e.target.value,
-                            }))
-                          }
-                          placeholder="Hotelname, Ort…"
-                          className="h-8 text-xs"
-                        />
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={busy}
-                        onClick={() => void searchPlace(event.id)}
-                        className="gap-1.5 shrink-0"
-                      >
-                        <MapPin className="size-3.5" />
-                        Ort anreichern
-                      </Button>
-                    </div>
-                  ) : null}
-                </div>
-
-                {(placeCandidates[event.id] || []).length > 0 ? (
-                  <div className="space-y-2 rounded-md border border-border/70 p-2">
-                    <div className="text-xs font-medium">OSM-Treffer wählen</div>
-                    {placeCandidates[event.id].map((c) => (
-                      <button
-                        key={c.osmId}
-                        type="button"
-                        className="block w-full rounded-md px-2 py-1.5 text-left text-xs hover:bg-muted"
-                        onClick={() => void applyPlace(event.id, c)}
-                      >
-                        <div className="font-medium">{c.name}</div>
-                        <div className="text-muted-foreground">
-                          {c.displayName}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-
-                {event.notes ? (
-                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                    {event.notes}
-                  </p>
-                ) : null}
-              </CardContent>
-            </Card>
-          ))
+                    {event.notes ? (
+                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                        {event.notes}
+                      </p>
+                    ) : null}
+                  </CardContent>
+                </Card>
+              </div>
+            );
+          })
         )}
       </div>
     </div>

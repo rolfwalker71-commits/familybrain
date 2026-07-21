@@ -74,6 +74,10 @@ export default function SettingsPage() {
   const [nominatimBaseUrl, setNominatimBaseUrl] = useState(
     "https://nominatim.openstreetmap.org"
   );
+  const [flightTestNumber, setFlightTestNumber] = useState("LX1594");
+  const [flightTestDate, setFlightTestDate] = useState("2026-10-23");
+  const [flightTestBusy, setFlightTestBusy] = useState(false);
+  const [flightTestResult, setFlightTestResult] = useState<string | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -331,6 +335,42 @@ export default function SettingsPage() {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setSaving(null);
+    }
+  }
+
+  async function testFlightApi() {
+    setFlightTestBusy(true);
+    setFlightTestResult(null);
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/trips/test-flight", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          flightNumber: flightTestNumber.trim(),
+          date: flightTestDate.trim(),
+        }),
+      });
+      const data = await res.json();
+      setFlightTestResult(JSON.stringify(data, null, 2));
+      if (!res.ok || data.ok === false) {
+        setError(
+          data.error ||
+            data.hint ||
+            `Flug-API-Test: HTTP ${data.response?.status ?? res.status}`
+        );
+      } else {
+        setMessage(
+          `Flug-API-Test ok (${data.provider}, HTTP ${data.response?.status}).`
+        );
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message);
+      setFlightTestResult(JSON.stringify({ ok: false, error: message }, null, 2));
+    } finally {
+      setFlightTestBusy(false);
     }
   }
 
@@ -645,6 +685,53 @@ export default function SettingsPage() {
               >
                 Flug-API-Key entfernen
               </Button>
+            ) : null}
+          </div>
+
+          <div className="space-y-3 rounded-lg border border-border/70 bg-muted/20 p-3">
+            <div className="text-sm font-medium">Flug-API testen</div>
+            <p className="text-xs text-muted-foreground">
+              Sendet dieselbe Lookup-Anfrage wie die Anreicherung und zeigt die
+              Rohantwort (Status, Body). Nutzt den gespeicherten Key/Anbieter.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="flightTestNumber">Flugnummer</Label>
+                <Input
+                  id="flightTestNumber"
+                  value={flightTestNumber}
+                  onChange={(e) => setFlightTestNumber(e.target.value)}
+                  placeholder="z. B. LX1594"
+                  className="uppercase"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="flightTestDate">Datum</Label>
+                <Input
+                  id="flightTestDate"
+                  type="date"
+                  value={flightTestDate}
+                  onChange={(e) => setFlightTestDate(e.target.value)}
+                />
+              </div>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={
+                flightTestBusy ||
+                saving !== null ||
+                !flightTestNumber.trim() ||
+                !flightTestDate
+              }
+              onClick={() => void testFlightApi()}
+            >
+              {flightTestBusy ? "Fragt API…" : "API-Anfrage starten"}
+            </Button>
+            {flightTestResult ? (
+              <pre className="max-h-80 overflow-auto rounded-md border border-border/70 bg-background p-3 text-[11px] leading-relaxed whitespace-pre-wrap break-all">
+                {flightTestResult}
+              </pre>
             ) : null}
           </div>
         </CardContent>

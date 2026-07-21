@@ -32,7 +32,7 @@ async function readJsonBody(
   const text = await response.text().catch(() => "");
   if (!text.trim()) {
     throw new Error(
-      `${context}: leere Antwort von der Flug-API (HTTP ${response.status}). Bitte Key/Subscription und Quota prüfen.`
+      `${context}: leere Antwort von der Flug-API (HTTP ${response.status}).`
     );
   }
   try {
@@ -138,11 +138,27 @@ export async function enrichFlightEvent(eventId: number): Promise<TripEventRow> 
   const headers = getAeroDataBoxHeaders(apiKey, provider);
 
   const number = normalizeFlightNumber(flightNumber);
-  const url = `${base}/flights/number/${encodeURIComponent(
-    number
-  )}/${encodeURIComponent(date)}`;
+  // AeroDataBox: YYYY-MM-DD only; 204 = no matching flight (not necessarily auth).
+  const dateLocal = date.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateLocal)) {
+    throw new Error(
+      `Ungültiges Flugdatum «${date}». Bitte als JJJJ-MM-TT speichern und erneut anreichern.`
+    );
+  }
+
+  const url =
+    `${base}/flights/number/${encodeURIComponent(number)}/` +
+    `${encodeURIComponent(dateLocal)}` +
+    `?dateLocalRole=Both&withAircraftImage=true&withLocation=true`;
 
   const response = await fetch(url, { headers });
+  if (response.status === 204) {
+    throw new Error(
+      `Keine Flugdaten für ${number} am ${dateLocal} (${provider}). ` +
+        `API meldet «kein Treffer» (HTTP 204) — oft falsches Datum/Flugnummer, ` +
+        `Flug fliegt an dem Tag nicht, oder der Tarif deckt das Datum nicht ab.`
+    );
+  }
   if (!response.ok) {
     const text = await response.text().catch(() => "");
     let detail = text.slice(0, 200);
@@ -161,7 +177,7 @@ export async function enrichFlightEvent(eventId: number): Promise<TripEventRow> 
   const flights = extractFlightsList(data);
   if (flights.length === 0) {
     throw new Error(
-      `Keine Flugdaten für ${number} am ${date} gefunden (${provider}).`
+      `Keine Flugdaten für ${number} am ${dateLocal} gefunden (${provider}).`
     );
   }
 
