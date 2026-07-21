@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/select";
 import { PageHeader } from "@/components/layout/page-primitives";
 import { pageVisuals } from "@/components/layout/icon-circle";
+import { TripMap } from "@/components/trips/trip-map";
 import { toSwissDate } from "@/lib/utils/dates";
 import { TRIP_EVENT_TYPES, TRIP_STATUSES } from "@/lib/trips/constants";
 
@@ -70,6 +71,10 @@ type TripEvent = {
   arrival_gate: string | null;
   check_in_desk: string | null;
   baggage_belt: string | null;
+  departure_lat: number | null;
+  departure_lon: number | null;
+  arrival_lat: number | null;
+  arrival_lon: number | null;
   place_name: string | null;
   address: string | null;
   phone: string | null;
@@ -1068,49 +1073,53 @@ export function TripDetailClient({ tripId }: { tripId: number }) {
                           {event.lat.toFixed(5)}, {event.lon.toFixed(5)}
                         </div>
                       ) : null}
-                      <div className="text-[10px]">© OpenStreetMap</div>
                     </div>
-                    {event.map_image_url ||
-                    (event.lat != null && event.lon != null) ? (
+                    {event.lat != null && event.lon != null ? (
+                      <TripMap
+                        points={[
+                          {
+                            lat: event.lat,
+                            lon: event.lon,
+                            label: event.place_name || undefined,
+                          },
+                        ]}
+                        heightClassName="h-36"
+                      />
+                    ) : event.map_image_url ? (
                       <div className="overflow-hidden rounded-md border border-border/70 bg-muted/30">
-                        {event.lat != null && event.lon != null ? (
-                          <iframe
-                            title={`Karte ${event.place_name || event.title}`}
-                            className="h-36 w-full border-0"
-                            loading="lazy"
-                            referrerPolicy="no-referrer-when-downgrade"
-                            src={`https://www.openstreetmap.org/export/embed.html?bbox=${(
-                              event.lon - 0.012
-                            ).toFixed(5)}%2C${(event.lat - 0.008).toFixed(
-                              5
-                            )}%2C${(event.lon + 0.012).toFixed(5)}%2C${(
-                              event.lat + 0.008
-                            ).toFixed(5)}&layer=mapnik&marker=${event.lat.toFixed(
-                              5
-                            )}%2C${event.lon.toFixed(5)}`}
-                          />
-                        ) : event.map_image_url ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={event.map_image_url}
-                            alt="Kartenausschnitt"
-                            className="h-36 w-full object-cover"
-                          />
-                        ) : null}
-                        {event.lat != null && event.lon != null ? (
-                          <a
-                            href={`https://www.openstreetmap.org/?mlat=${event.lat}&mlon=${event.lon}#map=16/${event.lat}/${event.lon}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="block px-2 py-1 text-[10px] text-muted-foreground hover:underline"
-                          >
-                            Grössere Karte
-                          </a>
-                        ) : null}
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={event.map_image_url}
+                          alt="Kartenausschnitt"
+                          className="h-36 w-full object-cover"
+                        />
                       </div>
                     ) : null}
                   </div>
                 )}
+
+                {event.event_type === "Flug" &&
+                event.departure_lat != null &&
+                event.departure_lon != null &&
+                event.arrival_lat != null &&
+                event.arrival_lon != null ? (
+                  <TripMap
+                    points={[
+                      {
+                        lat: event.departure_lat,
+                        lon: event.departure_lon,
+                        label: event.departure_airport || "Von",
+                      },
+                      {
+                        lat: event.arrival_lat,
+                        lon: event.arrival_lon,
+                        label: event.arrival_airport || "Nach",
+                      },
+                    ]}
+                    drawRoute
+                    heightClassName="h-44"
+                  />
+                ) : null}
 
                 {event.aircraft_image_url ? (
                   // eslint-disable-next-line @next/next/no-img-element

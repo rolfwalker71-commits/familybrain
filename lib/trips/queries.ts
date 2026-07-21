@@ -57,6 +57,10 @@ export type TripEventRow = {
   arrival_gate: string | null;
   check_in_desk: string | null;
   baggage_belt: string | null;
+  departure_lat: number | null;
+  departure_lon: number | null;
+  arrival_lat: number | null;
+  arrival_lon: number | null;
   place_name: string | null;
   address: string | null;
   phone: string | null;
@@ -264,6 +268,10 @@ export type TripEventInput = {
   arrivalGate?: string | null;
   checkInDesk?: string | null;
   baggageBelt?: string | null;
+  departureLat?: number | null;
+  departureLon?: number | null;
+  arrivalLat?: number | null;
+  arrivalLon?: number | null;
   placeName?: string | null;
   address?: string | null;
   phone?: string | null;
@@ -306,6 +314,7 @@ export function createTripEvent(
          departure_airport, arrival_airport, duration_minutes, aircraft_image_path,
          departure_terminal, arrival_terminal, departure_gate, arrival_gate,
          check_in_desk, baggage_belt,
+         departure_lat, departure_lon, arrival_lat, arrival_lon,
          place_name, address, phone, website, lat, lon, map_image_path, osm_id,
          enrichment_json, enriched_at, created_at, updated_at
        ) VALUES (
@@ -316,6 +325,7 @@ export function createTripEvent(
          ?, ?, ?, ?,
          ?, ?, ?, ?,
          ?, ?,
+         ?, ?, ?, ?,
          ?, ?, ?, ?, ?, ?, ?, ?,
          ?, ?, ?, ?
        )`
@@ -352,6 +362,10 @@ export function createTripEvent(
       input.arrivalGate?.trim() || null,
       input.checkInDesk?.trim() || null,
       input.baggageBelt?.trim() || null,
+      input.departureLat ?? null,
+      input.departureLon ?? null,
+      input.arrivalLat ?? null,
+      input.arrivalLon ?? null,
       input.placeName?.trim() || null,
       input.address?.trim() || null,
       input.phone?.trim() || null,
@@ -412,6 +426,10 @@ export function updateTripEvent(
        arrival_gate = ?,
        check_in_desk = ?,
        baggage_belt = ?,
+       departure_lat = ?,
+       departure_lon = ?,
+       arrival_lat = ?,
+       arrival_lon = ?,
        place_name = ?,
        address = ?,
        phone = ?,
@@ -495,6 +513,14 @@ export function updateTripEvent(
     input.baggageBelt !== undefined
       ? input.baggageBelt?.trim() || null
       : existing.baggage_belt,
+    input.departureLat !== undefined
+      ? input.departureLat
+      : existing.departure_lat,
+    input.departureLon !== undefined
+      ? input.departureLon
+      : existing.departure_lon,
+    input.arrivalLat !== undefined ? input.arrivalLat : existing.arrival_lat,
+    input.arrivalLon !== undefined ? input.arrivalLon : existing.arrival_lon,
     input.placeName !== undefined
       ? input.placeName?.trim() || null
       : existing.place_name,

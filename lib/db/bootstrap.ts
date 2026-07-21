@@ -125,6 +125,10 @@ function ensureTripsTables(db: Database.Database): void {
       arrival_gate TEXT,
       check_in_desk TEXT,
       baggage_belt TEXT,
+      departure_lat REAL,
+      departure_lon REAL,
+      arrival_lat REAL,
+      arrival_lon REAL,
       place_name TEXT,
       address TEXT,
       phone TEXT,
@@ -156,6 +160,10 @@ function ensureTripsTables(db: Database.Database): void {
     ["arrival_gate", "TEXT"],
     ["check_in_desk", "TEXT"],
     ["baggage_belt", "TEXT"],
+    ["departure_lat", "REAL"],
+    ["departure_lon", "REAL"],
+    ["arrival_lat", "REAL"],
+    ["arrival_lon", "REAL"],
   ];
   for (const [name, type] of flightExtraCols) {
     if (!tripEventColNames.has(name)) {

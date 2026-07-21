@@ -62,6 +62,57 @@ function extractFlightsList(data: unknown): Record<string, unknown>[] {
   return [];
 }
 
+function asCoord(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
+/** Extract lat/lon from AeroDataBox airport / location objects. */
+function extractLatLon(source: unknown): { lat: number; lon: number } | null {
+  if (!source || typeof source !== "object") return null;
+  const obj = source as Record<string, unknown>;
+  const location =
+    obj.location && typeof obj.location === "object"
+      ? (obj.location as Record<string, unknown>)
+      : obj;
+  const lat =
+    asCoord(location.lat) ??
+    asCoord(location.latitude) ??
+    asCoord(obj.lat) ??
+    asCoord(obj.latitude);
+  const lon =
+    asCoord(location.lon) ??
+    asCoord(location.lng) ??
+    asCoord(location.longitude) ??
+    asCoord(obj.lon) ??
+    asCoord(obj.lng) ??
+    asCoord(obj.longitude);
+  if (lat == null || lon == null) return null;
+  if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;
+  return { lat, lon };
+}
+
+async function fetchAirportCoords(
+  base: string,
+  headers: HeadersInit,
+  iata: string | null
+): Promise<{ lat: number; lon: number } | null> {
+  if (!iata) return null;
+  try {
+    const url = `${base}/airports/iata/${encodeURIComponent(iata)}`;
+    const response = await fetch(url, { headers });
+    if (!response.ok) return null;
+    const data = await readJsonBody(response, `Airport ${iata}`);
+    return extractLatLon(data);
+  } catch {
+    return null;
+  }
+}
+
 export async function enrichFlightEvent(eventId: number): Promise<TripEventRow> {
   const event = getTripEventById(eventId);
   if (!event) throw new Error("Ereignis nicht gefunden");
@@ -180,6 +231,26 @@ export async function enrichFlightEvent(eventId: number): Promise<TripEventRow> 
     asApiString(arrival.baggage_belt) ||
     event.baggage_belt;
 
+  const depAirportObj = departure.airport as Record<string, unknown> | undefined;
+  const arrAirportObj = arrival.airport as Record<string, unknown> | undefined;
+  let depCoords =
+    extractLatLon(depAirportObj) ||
+    (event.departure_lat != null && event.departure_lon != null
+      ? { lat: event.departure_lat, lon: event.departure_lon }
+      : null);
+  let arrCoords =
+    extractLatLon(arrAirportObj) ||
+    (event.arrival_lat != null && event.arrival_lon != null
+      ? { lat: event.arrival_lat, lon: event.arrival_lon }
+      : null);
+
+  if (!depCoords && depAirport) {
+    depCoords = await fetchAirportCoords(base, headers, depAirport);
+  }
+  if (!arrCoords && arrAirport) {
+    arrCoords = await fetchAirportCoords(base, headers, arrAirport);
+  }
+
   let durationMinutes: number | null = null;
   if (depLocal && arrLocal) {
     const a = Date.parse(depLocal);
@@ -218,6 +289,10 @@ export async function enrichFlightEvent(eventId: number): Promise<TripEventRow> 
     arrivalGate,
     checkInDesk,
     baggageBelt,
+    departureLat: depCoords?.lat ?? null,
+    departureLon: depCoords?.lon ?? null,
+    arrivalLat: arrCoords?.lat ?? null,
+    arrivalLon: arrCoords?.lon ?? null,
     location:
       formatAirportRoute(depAirport, arrAirport) || event.location,
     enrichmentJson: JSON.stringify(flight),
