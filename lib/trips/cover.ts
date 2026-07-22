@@ -9,7 +9,7 @@ import {
   getTripEventAiDir,
   getTripMapsDir,
 } from "@/lib/trips/paths";
-import { updateTrip } from "@/lib/trips/queries";
+import { updateTrip, getTripById } from "@/lib/trips/queries";
 
 export function coverPublicUrl(coverPath: string | null | undefined): string | null {
   if (!coverPath) return null;
@@ -42,6 +42,8 @@ export async function saveTripCoverUpload(
   mimeType: string
 ): Promise<string> {
   ensureTripMediaDirs();
+  const trip = getTripById(tripId);
+  const previous = trip?.cover_path || null;
   const ext =
     mimeType.includes("png")
       ? "png"
@@ -52,6 +54,13 @@ export async function saveTripCoverUpload(
   const fullPath = path.join(getTripCoversDir(), filename);
   fs.writeFileSync(fullPath, buffer);
   updateTrip(tripId, { coverPath: fullPath, coverPrompt: null });
+  if (previous && previous !== fullPath && fs.existsSync(previous)) {
+    try {
+      fs.unlinkSync(previous);
+    } catch {
+      /* ignore */
+    }
+  }
   return fullPath;
 }
 
@@ -86,7 +95,15 @@ export async function generateTripCover(
   const filename = `trip-${tripId}-${randomUUID().slice(0, 8)}.png`;
   const fullPath = path.join(getTripCoversDir(), filename);
   fs.writeFileSync(fullPath, buffer);
+  const previous = getTripById(tripId)?.cover_path || null;
   updateTrip(tripId, { coverPath: fullPath, coverPrompt: prompt });
+  if (previous && previous !== fullPath && fs.existsSync(previous)) {
+    try {
+      fs.unlinkSync(previous);
+    } catch {
+      /* ignore */
+    }
+  }
   return fullPath;
 }
 

@@ -9,6 +9,7 @@ import {
   Car,
   ChevronDown,
   ChevronUp,
+  Download,
   GripVertical,
   ImagePlus,
   Info,
@@ -17,6 +18,7 @@ import {
   Pencil,
   Plane,
   Plus,
+  Replace,
   Ship,
   Sparkles,
   Ticket,
@@ -549,10 +551,13 @@ export function TripDetailClient({
   const [aiImagePrompt, setAiImagePrompt] = useState("");
   const [aiImagePromptDirty, setAiImagePromptDirty] = useState(false);
   const [aiImagePromptLoading, setAiImagePromptLoading] = useState(false);
+  const [aiReplaceEventId, setAiReplaceEventId] = useState<number | null>(null);
+  const aiReplaceInputRef = useRef<HTMLInputElement | null>(null);
   const [aiImageBusy, setAiImageBusy] = useState(false);
   const [aiZoom, setAiZoom] = useState<{
     url: string;
     title: string;
+    eventId: number;
   } | null>(null);
 
   const load = useCallback(async () => {
@@ -787,6 +792,110 @@ export function TripDetailClient({
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function downloadCover() {
+    setError(null);
+    try {
+      const res = await fetch(`/api/trips/${tripId}/cover?download=1`);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Download fehlgeschlagen");
+      }
+      const blob = await res.blob();
+      const cd = res.headers.get("Content-Disposition") || "";
+      const match = /filename="([^"]+)"/.exec(cd);
+      const filename = match?.[1] || "titelbild.png";
+      const href = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = href;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(href);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function downloadEventAiImage(eventId: number) {
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/trips/${tripId}/events/${eventId}/ai-image?download=1`
+      );
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Download fehlgeschlagen");
+      }
+      const blob = await res.blob();
+      const cd = res.headers.get("Content-Disposition") || "";
+      const match = /filename="([^"]+)"/.exec(cd);
+      const filename = match?.[1] || `event-${eventId}.png`;
+      const href = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = href;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(href);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function downloadAllAiImages() {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/trips/${tripId}/ai-images/zip`);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Download fehlgeschlagen");
+      }
+      const blob = await res.blob();
+      const cd = res.headers.get("Content-Disposition") || "";
+      const match = /filename="([^"]+)"/.exec(cd);
+      const filename = match?.[1] || "ki-bilder.zip";
+      const href = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = href;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(href);
+      setStatus("KI-Bilder heruntergeladen.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function pickReplaceAiImage(eventId: number) {
+    setAiReplaceEventId(eventId);
+    queueMicrotask(() => aiReplaceInputRef.current?.click());
+  }
+
+  async function replaceAiImage(eventId: number, file: File) {
+    setAiImageBusy(true);
+    setError(null);
+    try {
+      const form = new FormData();
+      form.set("file", file);
+      const res = await fetch(
+        `/api/trips/${tripId}/events/${eventId}/ai-image`,
+        { method: "POST", body: form }
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Ersetzen fehlgeschlagen");
+      await load();
+      setStatus("KI-Bild ersetzt.");
+      if (aiImageEventId === eventId) setAiImageEventId(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setAiImageBusy(false);
+      setAiReplaceEventId(null);
+      if (aiReplaceInputRef.current) aiReplaceInputRef.current.value = "";
     }
   }
 
@@ -1317,6 +1426,20 @@ export function TripDetailClient({
           onStatus={setStatus}
           onError={setError}
         />
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={
+            busy ||
+            aiImageBusy ||
+            (!trip.cover_url && !events.some((e) => e.ai_image_url))
+          }
+          onClick={() => void downloadAllAiImages()}
+          className="gap-1.5"
+        >
+          <Download className="size-4" />
+          KI-Bilder laden
+        </Button>
         {editMode ? (
           <>
             <Button
@@ -1515,8 +1638,14 @@ export function TripDetailClient({
             <Sparkles className="size-4" />
             Mit AI erzeugen
           </Button>
-          <Button variant="ghost" size="icon" disabled title="Upload">
-            <ImagePlus className="size-4" />
+          <Button
+            variant="outline"
+            disabled={busy || !trip.cover_url}
+            onClick={() => void downloadCover()}
+            className="gap-1.5"
+          >
+            <Download className="size-4" />
+            Herunterladen
           </Button>
         </CardContent>
       </Card>
@@ -2229,6 +2358,7 @@ export function TripDetailClient({
                               setAiZoom({
                                 url: event.ai_image_url!,
                                 title: event.title,
+                                eventId: event.id,
                               })
                             }
                           >
@@ -2252,6 +2382,30 @@ export function TripDetailClient({
                           >
                             <ImagePlus className="size-3.5" />
                           </Button>
+                          {event.ai_image_url ? (
+                            <>
+                              <Button
+                                size="icon-xs"
+                                variant="ghost"
+                                title="Herunterladen"
+                                disabled={aiImageBusy}
+                                onClick={() =>
+                                  void downloadEventAiImage(event.id)
+                                }
+                              >
+                                <Download className="size-3.5" />
+                              </Button>
+                              <Button
+                                size="icon-xs"
+                                variant="ghost"
+                                title="Ersetzen"
+                                disabled={aiImageBusy}
+                                onClick={() => pickReplaceAiImage(event.id)}
+                              >
+                                <Replace className="size-3.5" />
+                              </Button>
+                            </>
+                          ) : null}
                           <Button
                             size="icon-xs"
                             variant="ghost"
@@ -2348,6 +2502,7 @@ export function TripDetailClient({
                                 setAiZoom({
                                   url: event.ai_image_url!,
                                   title: event.title,
+                                  eventId: event.id,
                                 })
                               }
                             >
@@ -2440,15 +2595,37 @@ export function TripDetailClient({
                               <ImagePlus className="size-3.5" />
                             </Button>
                             {event.ai_image_url ? (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                title="KI-Bild entfernen"
-                                disabled={aiImageBusy}
-                                onClick={() => void deleteAiImage(event.id)}
-                              >
-                                <X className="size-3.5 text-muted-foreground" />
-                              </Button>
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  title="KI-Bild herunterladen"
+                                  disabled={aiImageBusy}
+                                  onClick={() =>
+                                    void downloadEventAiImage(event.id)
+                                  }
+                                >
+                                  <Download className="size-3.5" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  title="KI-Bild ersetzen"
+                                  disabled={aiImageBusy}
+                                  onClick={() => pickReplaceAiImage(event.id)}
+                                >
+                                  <Replace className="size-3.5" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  title="KI-Bild entfernen"
+                                  disabled={aiImageBusy}
+                                  onClick={() => void deleteAiImage(event.id)}
+                                >
+                                  <X className="size-3.5 text-muted-foreground" />
+                                </Button>
+                              </>
                             ) : null}
                             <Button
                               size="sm"
@@ -2955,6 +3132,31 @@ export function TripDetailClient({
               className="mx-auto max-h-[min(70dvh,36rem)] w-full rounded-md object-contain"
             />
           ) : null}
+          {!readOnly && aiZoom?.eventId != null ? (
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button
+                type="button"
+                variant="outline"
+                className="gap-1.5"
+                onClick={() => void downloadEventAiImage(aiZoom.eventId!)}
+              >
+                <Download className="size-4" />
+                Herunterladen
+              </Button>
+              {editMode ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="gap-1.5"
+                  disabled={aiImageBusy}
+                  onClick={() => pickReplaceAiImage(aiZoom.eventId!)}
+                >
+                  <Replace className="size-4" />
+                  Ersetzen
+                </Button>
+              ) : null}
+            </DialogFooter>
+          ) : null}
         </DialogContent>
       </Dialog>
 
@@ -2970,7 +3172,8 @@ export function TripDetailClient({
             <DialogDescription>
               Thumbnail-Format (1024², low quality). Prompt wird aus den
               aktuellen Einstellungen und den Aktivitätsdaten neu aufgebaut —
-              anpassbar vor dem Erzeugen.
+              anpassbar vor dem Erzeugen. Du kannst auch ein gespeichertes Bild
+              hochladen.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
@@ -2986,6 +3189,22 @@ export function TripDetailClient({
               disabled={aiImageBusy || aiImagePromptLoading}
             />
           </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="aiImageReplaceFile">Bild ersetzen / hochladen</Label>
+            <Input
+              id="aiImageReplaceFile"
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/*"
+              disabled={aiImageBusy || aiImageEventId == null}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file && aiImageEventId != null) {
+                  void replaceAiImage(aiImageEventId, file);
+                }
+                e.target.value = "";
+              }}
+            />
+          </div>
           <DialogFooter className="gap-2 sm:gap-0">
             <Button
               type="button"
@@ -2995,6 +3214,19 @@ export function TripDetailClient({
             >
               Abbrechen
             </Button>
+            {aiImageEventId != null &&
+            events.some((e) => e.id === aiImageEventId && e.ai_image_url) ? (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={aiImageBusy}
+                className="gap-1.5"
+                onClick={() => void downloadEventAiImage(aiImageEventId)}
+              >
+                <Download className="size-4" />
+                Laden
+              </Button>
+            ) : null}
             <Button
               type="button"
               disabled={
@@ -3011,6 +3243,22 @@ export function TripDetailClient({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <input
+        ref={aiReplaceInputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp,image/*"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file && aiReplaceEventId != null) {
+            void replaceAiImage(aiReplaceEventId, file);
+          } else {
+            setAiReplaceEventId(null);
+            e.target.value = "";
+          }
+        }}
+      />
     </div>
   );
 }
