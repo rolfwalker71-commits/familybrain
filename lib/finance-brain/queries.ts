@@ -738,7 +738,6 @@ export function getFinanceSettlementById(
 export function markFinanceExpenseNotified(expenseId: number): void {
   const existing = getFinanceExpenseById(expenseId);
   if (!existing) return;
-  if (existing.notified_at) return;
   getDb()
     .prepare(
       `UPDATE finance_expenses SET notified_at = ?, updated_at = ? WHERE id = ?`

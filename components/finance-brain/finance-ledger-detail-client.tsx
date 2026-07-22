@@ -148,6 +148,7 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
   const [rateLoading, setRateLoading] = useState(false);
   const [pendingReceipt, setPendingReceipt] = useState<File | null>(null);
   const [aiImageBusyId, setAiImageBusyId] = useState<number | null>(null);
+  const [mailBusyId, setMailBusyId] = useState<number | null>(null);
   const [editBusyId, setEditBusyId] = useState<number | null>(null);
   const aiAttemptedRef = useRef<Set<number>>(new Set());
 
@@ -424,6 +425,30 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setAiImageBusyId(null);
+    }
+  }
+
+  async function resendExpenseMail(expenseId: number) {
+    setMailBusyId(expenseId);
+    setError(null);
+    setStatus(null);
+    try {
+      const res = await fetch(
+        `/api/finance-ledgers/${ledgerId}/expenses/${expenseId}/notify`,
+        { method: "POST" }
+      );
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Mailversand fehlgeschlagen");
+      const sent = typeof json.sent === "number" ? json.sent : 0;
+      setStatus(
+        sent > 0
+          ? `Belegmail erneut gesendet (${sent} Empfänger).`
+          : "Belegmail erneut gesendet."
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setMailBusyId(null);
     }
   }
 
@@ -1117,8 +1142,10 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
           onReceiptChanged={() => void load()}
           onGenerateAiImage={(id) => void generateAiImage(id)}
           onDeleteAiImage={(id) => void deleteAiImage(id)}
+          onResendMail={(id) => void resendExpenseMail(id)}
           onUpdateExpense={(id, payload) => updateExpense(id, payload)}
           aiImageBusyId={aiImageBusyId}
+          mailBusyId={mailBusyId}
           editBusyId={editBusyId}
         />
       </SectionCard>

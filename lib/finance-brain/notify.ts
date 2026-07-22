@@ -41,14 +41,18 @@ export function notifyFailed(result: NotifyResult): boolean {
 }
 
 export async function notifyLedgerExpense(
-  expenseId: number
+  expenseId: number,
+  options?: { force?: boolean }
 ): Promise<NotifyResult> {
   if (!isEmailConfigured()) {
+    if (options?.force) {
+      return { ok: false, sent: 0, error: "E-Mail nicht konfiguriert" };
+    }
     return { ok: true, sent: 0, skipped: "E-Mail nicht konfiguriert" };
   }
   const expense = getFinanceExpenseById(expenseId);
   if (!expense) return { ok: false, sent: 0, error: "Ausgabe nicht gefunden" };
-  if (expense.notified_at) {
+  if (expense.notified_at && !options?.force) {
     return { ok: true, sent: 0, skipped: "bereits benachrichtigt" };
   }
   const ledger = getFinanceLedgerById(expense.ledger_id);
@@ -57,6 +61,9 @@ export async function notifyLedgerExpense(
   const recipients = memberEmails(expense.ledger_id);
   if (recipients.length === 0) {
     markFinanceExpenseNotified(expenseId);
+    if (options?.force) {
+      return { ok: false, sent: 0, error: "Keine Empfänger mit E-Mail-Adresse" };
+    }
     return { ok: true, sent: 0, skipped: "keine Empfänger mit E-Mail" };
   }
 

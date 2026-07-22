@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   ArrowLeftRight,
+  Mail,
   MapPin,
   Maximize2,
   Pencil,
@@ -188,8 +189,10 @@ function ExpenseCard({
   onReceiptChanged,
   onGenerateAiImage,
   onDeleteAiImage,
+  onResendMail,
   onUpdate,
   aiImageBusy,
+  mailBusy,
   editBusy,
 }: {
   exp: ExpenseListItem;
@@ -202,8 +205,10 @@ function ExpenseCard({
   onReceiptChanged?: () => void;
   onGenerateAiImage?: (expenseId: number) => void;
   onDeleteAiImage?: (expenseId: number) => void;
+  onResendMail?: (expenseId: number) => void;
   onUpdate?: (expenseId: number, payload: ExpenseEditPayload) => Promise<void>;
   aiImageBusy?: boolean;
+  mailBusy?: boolean;
   editBusy?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
@@ -468,6 +473,23 @@ function ExpenseCard({
             </Button>
           ) : null}
 
+          {onResendMail ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-7 px-2 text-xs"
+              disabled={mailBusy || aiImageBusy}
+              onClick={() => onResendMail(exp.id)}
+              title="Belegmail erneut an die Gruppe senden"
+            >
+              <Mail
+                className={cn("mr-1 size-3.5", mailBusy && "animate-pulse")}
+              />
+              {mailBusy ? "Sendet…" : "Mail erneut"}
+            </Button>
+          ) : null}
+
           {exp.ai_image_url && onDeleteAiImage ? (
             <Button
               type="button"
@@ -558,8 +580,10 @@ export function ExpenseList({
   onReceiptChanged,
   onGenerateAiImage,
   onDeleteAiImage,
+  onResendMail,
   onUpdateExpense,
   aiImageBusyId,
+  mailBusyId,
   editBusyId,
 }: {
   expenses: ExpenseListItem[];
@@ -572,11 +596,13 @@ export function ExpenseList({
   onReceiptChanged?: () => void;
   onGenerateAiImage?: (expenseId: number) => void;
   onDeleteAiImage?: (expenseId: number) => void;
+  onResendMail?: (expenseId: number) => void;
   onUpdateExpense?: (
     expenseId: number,
     payload: ExpenseEditPayload
   ) => Promise<void>;
   aiImageBusyId?: number | null;
+  mailBusyId?: number | null;
   editBusyId?: number | null;
 }) {
   return (
@@ -599,8 +625,10 @@ export function ExpenseList({
             onReceiptChanged={onReceiptChanged}
             onGenerateAiImage={onGenerateAiImage}
             onDeleteAiImage={onDeleteAiImage}
+            onResendMail={onResendMail}
             onUpdate={onUpdateExpense}
             aiImageBusy={aiImageBusyId === exp.id}
+            mailBusy={mailBusyId === exp.id}
             editBusy={editBusyId === exp.id}
           />
         ))
