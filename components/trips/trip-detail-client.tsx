@@ -235,7 +235,14 @@ function parseEventIsoDate(raw: string | null | undefined): string | null {
   return iso || null;
 }
 
-function EventDateHeader({ event }: { event: TripEvent }) {
+function EventDateHeader({
+  event,
+  reserveEndSlot = false,
+}: {
+  event: TripEvent;
+  /** Keep title columns aligned when some events only have a start date. */
+  reserveEndSlot?: boolean;
+}) {
   const startIso = parseEventIsoDate(event.start_date);
   if (!startIso) return null;
   const endIso = parseEventIsoDate(event.end_date);
@@ -244,12 +251,32 @@ function EventDateHeader({ event }: { event: TripEvent }) {
   const endTime = toTimeInputValue(event.end_time) || null;
 
   return (
-    <div className="flex shrink-0 items-center gap-2">
+    <div
+      className={cn(
+        "flex shrink-0 items-center gap-2",
+        reserveEndSlot && "w-[11.25rem] sm:w-[12.25rem]"
+      )}
+    >
       <CalendarDateBadge isoDate={startIso} time={startTime} />
       {showEnd && endIso ? (
         <>
-          <span className="text-xs font-bold text-muted-foreground">bis</span>
+          <span className="w-5 shrink-0 text-center text-xs font-bold text-muted-foreground">
+            bis
+          </span>
           <CalendarDateBadge isoDate={endIso} time={endTime} />
+        </>
+      ) : reserveEndSlot ? (
+        <>
+          <span
+            className="invisible w-5 shrink-0 text-center text-xs font-bold"
+            aria-hidden
+          >
+            bis
+          </span>
+          <div
+            className="invisible h-0 w-[4.5rem] shrink-0 sm:w-[4.85rem]"
+            aria-hidden
+          />
         </>
       ) : null}
     </div>
@@ -2220,7 +2247,7 @@ export function TripDetailClient({
                   >
                     <CardContent className="flex items-center gap-4 p-2.5 pl-9 sm:gap-5 sm:p-3 sm:pl-10">
                       <div className="flex shrink-0 items-center">
-                        <EventDateHeader event={event} />
+                        <EventDateHeader event={event} reserveEndSlot />
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-start gap-2">
