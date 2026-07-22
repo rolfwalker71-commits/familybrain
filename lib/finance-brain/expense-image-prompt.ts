@@ -11,6 +11,11 @@ export const EXPENSE_AI_IMAGE_PROMPT_PLACEHOLDERS = [
   "{{details}}",
   "{{amount}}",
   "{{currency}}",
+  "{{fw_amount}}",
+  "{{fw_currency}}",
+  "{{amount_base}}",
+  "{{base_currency}}",
+  "{{exchange_rate}}",
   "{{date}}",
   "{{place}}",
   "{{scene}}",
@@ -21,6 +26,9 @@ export type ExpenseImagePromptInput = {
   description?: string | null;
   amount?: number | null;
   currency?: string | null;
+  amountBase?: number | null;
+  baseCurrency?: string | null;
+  exchangeRate?: number | null;
   expenseDate?: string | null;
   place?: string | null;
   paidByName?: string | null;
@@ -40,17 +48,27 @@ function applyTemplate(template: string, vars: Record<string, string>): string {
   return out.replace(/\s+/g, " ").trim();
 }
 
+function formatAmount(n: number | null | undefined): string {
+  if (n == null || !Number.isFinite(n)) return "";
+  return String(Math.round(n * 100) / 100);
+}
+
 export function buildExpenseImagePrompt(
   input: ExpenseImagePromptInput & { scene?: string },
   template: string = DEFAULT_EXPENSE_AI_IMAGE_PROMPT
 ): string {
   const category = clip(input.category, 40) || "Ausgabe";
   const description = clip(input.description, 120) || "Expense";
-  const amount =
-    input.amount != null && Number.isFinite(input.amount)
-      ? String(input.amount)
+  const currency = clip(input.currency, 8).toUpperCase();
+  const baseCurrency = clip(input.baseCurrency, 8).toUpperCase();
+  const amount = formatAmount(input.amount);
+  const amountBase = formatAmount(input.amountBase);
+  const exchangeRate =
+    input.exchangeRate != null &&
+    Number.isFinite(input.exchangeRate) &&
+    input.exchangeRate > 0
+      ? String(Math.round(input.exchangeRate * 10000) / 10000)
       : "";
-  const currency = clip(input.currency, 8);
   const date = clip(input.expenseDate, 20);
   const place = clip(input.place, 80);
   const paidBy = clip(input.paidByName, 40);
@@ -58,6 +76,17 @@ export function buildExpenseImagePrompt(
   const detailParts: string[] = [];
   if (amount && currency) detailParts.push(`amount ${amount} ${currency}`);
   else if (amount) detailParts.push(`amount ${amount}`);
+  if (
+    amountBase &&
+    baseCurrency &&
+    currency &&
+    baseCurrency !== currency
+  ) {
+    detailParts.push(`base ${amountBase} ${baseCurrency}`);
+    if (exchangeRate) {
+      detailParts.push(`rate 1 ${currency} = ${exchangeRate} ${baseCurrency}`);
+    }
+  }
   if (date) detailParts.push(`date ${date}`);
   if (place) detailParts.push(`place ${place}`);
   if (paidBy) detailParts.push(`paid by ${paidBy}`);
@@ -68,6 +97,11 @@ export function buildExpenseImagePrompt(
     details: detailParts.join("; "),
     amount,
     currency,
+    fw_amount: amount,
+    fw_currency: currency,
+    amount_base: amountBase,
+    base_currency: baseCurrency,
+    exchange_rate: exchangeRate,
     date,
     place,
     scene: clip(input.scene, 160) || "friendly shared travel expense atmosphere",

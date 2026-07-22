@@ -7,6 +7,7 @@ import { getExpenseAiImagePromptTemplate } from "@/lib/finance-brain/expense-ima
 import { sceneForExpenseCategory } from "@/lib/finance-brain/expense-category";
 import {
   getFinanceExpenseById,
+  getFinanceLedgerById,
   getFinanceLedgerMemberById,
   setFinanceExpenseAiImage,
   type FinanceExpenseRow,
@@ -68,6 +69,7 @@ export async function generateExpenseAiImage(
   if (!expense) throw new Error("Ausgabe nicht gefunden");
 
   const payer = getFinanceLedgerMemberById(expense.paid_by_member_id);
+  const ledger = getFinanceLedgerById(expense.ledger_id);
   const category = expense.category_label || "Ausgabe";
   const prompt =
     options?.userPrompt?.trim() ||
@@ -77,6 +79,9 @@ export async function generateExpenseAiImage(
         description: expense.description,
         amount: expense.amount,
         currency: expense.currency,
+        amountBase: expense.amount_base,
+        baseCurrency: ledger?.base_currency ?? null,
+        exchangeRate: expense.exchange_rate,
         expenseDate: expense.expense_date,
         place: options?.place ?? expense.place_name,
         paidByName: payer?.display_name,
