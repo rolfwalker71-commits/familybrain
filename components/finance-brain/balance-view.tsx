@@ -42,6 +42,10 @@ import {
   toneSurface,
   type IconTone,
 } from "@/components/layout/icon-circle";
+import {
+  CalendarDateBadge,
+  toIsoDateOnly,
+} from "@/components/layout/calendar-date-badge";
 import { cn } from "@/lib/utils";
 
 type Balance = {
@@ -214,6 +218,7 @@ function ExpenseCard({
 
   const visual = expenseVisualForExpense(exp);
   const surface = toneSurface(visual.tone);
+  const isoDate = toIsoDateOnly(exp.expense_date);
 
   function startEdit() {
     setEditDesc(exp.description || "");
@@ -244,16 +249,70 @@ function ExpenseCard({
       />
       <div
         className={cn(
-          "rounded-md border-2 py-2.5 pl-7 pr-3 text-sm shadow-sm sm:pl-8",
+          "overflow-hidden rounded-md border-2 text-sm shadow-sm",
           surface.body
         )}
       >
-        <div className="flex items-start gap-3">
-          <div className="min-w-0 flex-1">
-            <p className="text-base font-bold leading-snug text-foreground">
+        <div
+          className={cn(
+            "border-b px-3 py-2.5 pl-7 sm:pl-8",
+            surface.title
+          )}
+        >
+          <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
+            <div aria-hidden className="min-w-0" />
+            <div className="justify-self-center">
+              {isoDate ? (
+                <CalendarDateBadge isoDate={isoDate} />
+              ) : (
+                <span className="text-xs font-medium text-muted-foreground">
+                  Ohne Datum
+                </span>
+              )}
+            </div>
+            <div className="justify-self-end">
+              {exp.ai_image_url ? (
+                <div className="relative">
+                  <button
+                    type="button"
+                    title="Vergrössern"
+                    className="block"
+                    onClick={() => setZoomOpen(true)}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={exp.ai_image_url}
+                      alt=""
+                      className="h-20 w-20 rounded-md border border-foreground/10 object-cover shadow-sm sm:h-24 sm:w-24"
+                    />
+                  </button>
+                  <Button
+                    type="button"
+                    size="icon-xs"
+                    variant="secondary"
+                    className="absolute bottom-1 right-1 size-6 border border-border/70 bg-background/90 shadow-sm"
+                    title="Vergrössern"
+                    onClick={() => setZoomOpen(true)}
+                  >
+                    <Maximize2 className="size-3" />
+                  </Button>
+                </div>
+              ) : aiImageBusy ? (
+                <div className="flex h-20 w-20 items-center justify-center rounded-md border border-dashed border-foreground/20 bg-background/50 text-[10px] text-muted-foreground sm:h-24 sm:w-24">
+                  KI…
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </div>
+
+        <div className="px-3 py-2.5 pl-7 sm:pl-8">
+          {/* Fixed block for title / meta / place so cards align without shifting the header */}
+          <div className="flex min-h-[4.5rem] flex-col justify-center gap-1">
+            <p className="line-clamp-1 text-base font-bold leading-snug text-foreground">
               {exp.description || "Ausgabe"}
             </p>
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="line-clamp-1 text-xs text-muted-foreground">
               <span
                 className={cn(
                   "mr-1.5 inline-flex rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
@@ -267,14 +326,18 @@ function ExpenseCard({
               {exp.currency !== baseCurrency
                 ? ` (${formatMoney(exp.amount_base, baseCurrency)})`
                 : ""}
-              {exp.expense_date ? ` · ${exp.expense_date}` : ""}
             </p>
-            {exp.place_name ? (
-              <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-                <MapPin className="size-3 shrink-0" />
-                <span className="truncate">{exp.place_name}</span>
-              </p>
-            ) : null}
+            <p className="flex min-h-[1rem] items-center gap-1 text-xs text-muted-foreground">
+              {exp.place_name ? (
+                <>
+                  <MapPin className="size-3 shrink-0" />
+                  <span className="truncate">{exp.place_name}</span>
+                </>
+              ) : (
+                <span className="invisible select-none">—</span>
+              )}
+            </p>
+          </div>
 
             {editing && canEdit && onUpdate ? (
               <div className="mt-3 grid gap-2 rounded-md border border-border/50 bg-background/60 p-2.5 sm:grid-cols-2">
@@ -345,42 +408,6 @@ function ExpenseCard({
                 </div>
               </div>
             ) : null}
-          </div>
-
-          <div className="ml-auto flex shrink-0 items-start">
-            {exp.ai_image_url ? (
-              <div className="relative">
-                <button
-                  type="button"
-                  title="Vergrössern"
-                  className="block"
-                  onClick={() => setZoomOpen(true)}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={exp.ai_image_url}
-                    alt=""
-                    className="h-20 w-20 rounded-md border border-foreground/10 object-cover shadow-sm sm:h-24 sm:w-24"
-                  />
-                </button>
-                <Button
-                  type="button"
-                  size="icon-xs"
-                  variant="secondary"
-                  className="absolute bottom-1 right-1 size-6 border border-border/70 bg-background/90 shadow-sm"
-                  title="Vergrössern"
-                  onClick={() => setZoomOpen(true)}
-                >
-                  <Maximize2 className="size-3" />
-                </Button>
-              </div>
-            ) : aiImageBusy ? (
-              <div className="flex h-20 w-20 items-center justify-center rounded-md border border-dashed border-foreground/20 bg-background/40 text-[10px] text-muted-foreground sm:h-24 sm:w-24">
-                KI…
-              </div>
-            ) : null}
-          </div>
-        </div>
 
         <div className="mt-2.5 flex flex-wrap items-center gap-2 border-t border-foreground/10 pt-2">
           {receiptUploadUrl ? (
@@ -465,6 +492,7 @@ function ExpenseCard({
               </Button>
             ) : null}
           </div>
+        </div>
         </div>
       </div>
 

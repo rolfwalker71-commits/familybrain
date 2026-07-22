@@ -63,6 +63,7 @@ import {
   toneSurface,
   type IconTone,
 } from "@/components/layout/icon-circle";
+import { CalendarDateBadge } from "@/components/layout/calendar-date-badge";
 import { DocumentPdfThumb } from "@/components/documents/document-pdf-preview";
 import { TripMap } from "@/components/trips/trip-map";
 import { TripExportMenu } from "@/components/trips/trip-export-menu";
@@ -234,81 +235,6 @@ function parseEventIsoDate(raw: string | null | undefined): string | null {
   return iso || null;
 }
 
-function weekdayDe(isoDate: string): string {
-  const [y, m, d] = isoDate.split("-").map(Number);
-  const date = new Date(y, m - 1, d);
-  return new Intl.DateTimeFormat("de-CH", { weekday: "long" }).format(date);
-}
-
-const MONTH_SHORT_DE = [
-  "JAN",
-  "FEB",
-  "MÄR",
-  "APR",
-  "MAI",
-  "JUN",
-  "JUL",
-  "AUG",
-  "SEP",
-  "OKT",
-  "NOV",
-  "DEZ",
-] as const;
-
-function monthShortDe(isoDate: string): string {
-  const month = Number(isoDate.slice(5, 7));
-  return MONTH_SHORT_DE[month - 1] ?? "";
-}
-
-function dayNumber(isoDate: string): string {
-  return String(Number(isoDate.slice(8, 10)));
-}
-
-function EventCalendarBadge({
-  isoDate,
-  time,
-}: {
-  isoDate: string;
-  time?: string | null;
-}) {
-  return (
-    <div
-      className={cn(
-        "flex w-[4rem] shrink-0 flex-col overflow-hidden rounded-lg border border-black/10 bg-background sm:w-[4.35rem]",
-        "shadow-[0_1px_0_rgba(255,255,255,0.85)_inset,0_1px_2px_rgba(15,23,42,0.08),0_3px_8px_rgba(15,23,42,0.12),0_8px_14px_-6px_rgba(15,23,42,0.18)]",
-        "ring-1 ring-black/5"
-      )}
-    >
-      <div
-        className={cn(
-          "bg-gradient-to-b from-red-500 to-red-700 px-0.5 py-1 text-center text-[9px] font-extrabold uppercase leading-none tracking-wide text-white sm:text-[10px]",
-          "shadow-[0_1px_0_rgba(255,255,255,0.28)_inset,0_1px_2px_rgba(127,29,29,0.3)]"
-        )}
-      >
-        {monthShortDe(isoDate)}
-      </div>
-      <div
-        className={cn(
-          "flex flex-col items-center bg-gradient-to-b from-white to-slate-100 px-0.5 pb-1 pt-1",
-          "shadow-[0_1px_0_rgba(255,255,255,0.9)_inset]"
-        )}
-      >
-        <div className="text-[9px] font-extrabold leading-none text-foreground sm:text-[10px]">
-          {weekdayDe(isoDate)}
-        </div>
-        <div className="mt-0.5 text-xl font-extrabold leading-none tabular-nums text-foreground sm:text-2xl">
-          {dayNumber(isoDate)}
-        </div>
-        {time ? (
-          <div className="mt-0.5 text-[9px] font-bold tabular-nums text-muted-foreground">
-            {time}
-          </div>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
 function EventDateHeader({ event }: { event: TripEvent }) {
   const startIso = parseEventIsoDate(event.start_date);
   if (!startIso) return null;
@@ -319,11 +245,11 @@ function EventDateHeader({ event }: { event: TripEvent }) {
 
   return (
     <div className="flex shrink-0 items-center gap-2">
-      <EventCalendarBadge isoDate={startIso} time={startTime} />
+      <CalendarDateBadge isoDate={startIso} time={startTime} />
       {showEnd && endIso ? (
         <>
           <span className="text-xs font-bold text-muted-foreground">bis</span>
-          <EventCalendarBadge isoDate={endIso} time={endTime} />
+          <CalendarDateBadge isoDate={endIso} time={endTime} />
         </>
       ) : null}
     </div>
