@@ -257,33 +257,33 @@ function EventCalendarBadge({
   return (
     <div
       className={cn(
-        "flex w-[6.75rem] shrink-0 flex-col overflow-hidden rounded-xl border border-black/10 bg-background sm:w-[7.25rem]",
-        "shadow-[0_1px_0_rgba(255,255,255,0.85)_inset,0_1px_2px_rgba(15,23,42,0.08),0_4px_10px_rgba(15,23,42,0.14),0_10px_18px_-6px_rgba(15,23,42,0.22)]",
+        "flex w-[5.75rem] shrink-0 flex-col overflow-hidden rounded-lg border border-black/10 bg-background sm:w-[6.25rem]",
+        "shadow-[0_1px_0_rgba(255,255,255,0.85)_inset,0_1px_2px_rgba(15,23,42,0.08),0_3px_8px_rgba(15,23,42,0.12),0_8px_14px_-6px_rgba(15,23,42,0.18)]",
         "ring-1 ring-black/5"
       )}
     >
       <div
         className={cn(
-          "bg-gradient-to-b from-red-500 to-red-700 px-1 py-0.5 text-center text-[9px] font-black uppercase leading-tight tracking-wide text-white sm:text-[10px]",
-          "shadow-[0_1px_0_rgba(255,255,255,0.28)_inset,0_2px_3px_rgba(127,29,29,0.35)]"
+          "bg-gradient-to-b from-red-500 to-red-700 px-0.5 py-px text-center text-[8px] font-extrabold uppercase leading-none tracking-tight text-white sm:text-[9px]",
+          "shadow-[0_1px_0_rgba(255,255,255,0.28)_inset,0_1px_2px_rgba(127,29,29,0.3)]"
         )}
       >
         {monthFullDe(isoDate)}
       </div>
       <div
         className={cn(
-          "flex flex-col items-center bg-gradient-to-b from-white to-slate-100 px-1 pb-1.5 pt-1.5",
+          "flex flex-col items-center bg-gradient-to-b from-white to-slate-100 px-0.5 pb-1 pt-1",
           "shadow-[0_1px_0_rgba(255,255,255,0.9)_inset]"
         )}
       >
-        <div className="text-[10px] font-black leading-none text-foreground sm:text-[11px]">
+        <div className="text-[9px] font-extrabold leading-none text-foreground sm:text-[10px]">
           {weekdayDe(isoDate)}
         </div>
-        <div className="mt-1 text-2xl font-black leading-none tabular-nums text-foreground sm:text-3xl">
+        <div className="mt-0.5 text-xl font-extrabold leading-none tabular-nums text-foreground sm:text-2xl">
           {dayNumber(isoDate)}
         </div>
         {time ? (
-          <div className="mt-1 text-[10px] font-semibold tabular-nums text-muted-foreground">
+          <div className="mt-0.5 text-[9px] font-bold tabular-nums text-muted-foreground">
             {time}
           </div>
         ) : null}
@@ -2067,7 +2067,7 @@ export function TripDetailClient({
                     )}
                   >
                     <CardContent className="flex items-center gap-3 p-2.5 pl-7 sm:gap-4 sm:p-3 sm:pl-8">
-                      <div className="flex w-[15.5rem] shrink-0 items-center sm:w-[17rem]">
+                      <div className="flex w-[13.5rem] shrink-0 items-center sm:w-[14.75rem]">
                         <EventDateHeader event={event} />
                       </div>
                       <div className="min-w-0 flex-1">
