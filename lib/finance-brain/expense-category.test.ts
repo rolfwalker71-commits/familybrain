@@ -9,6 +9,17 @@ describe("expenseVisualFromText", () => {
     assert.equal(v.tone, "orange");
   });
 
+  it("detects Frühstück as food without saying Essen", () => {
+    const v = expenseVisualFromText("Frühstück Hotel");
+    assert.equal(v.label, "Essen");
+    assert.equal(v.tone, "orange");
+  });
+
+  it("detects Fruehstueck without umlauts", () => {
+    const v = expenseVisualFromText("Fruehstueck");
+    assert.equal(v.label, "Essen");
+  });
+
   it("detects hotel text", () => {
     const v = expenseVisualFromText("Marriott Hotel Buchung");
     assert.equal(v.label, "Hotel");

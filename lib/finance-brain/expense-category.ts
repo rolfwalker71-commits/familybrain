@@ -43,10 +43,22 @@ const RULES: Rule[] = [
       "restaurant",
       "essen",
       "food",
+      "fruehstueck",
+      "frühstück",
+      "breakfast",
+      "brunch",
+      "mittagessen",
       "mittag",
       "abendessen",
+      "nachtessen",
+      "znacht",
+      "znüni",
+      "znuni",
+      "zvieri",
       "lunch",
       "dinner",
+      "supper",
+      "meal",
       "pizza",
       "burger",
       "sushi",
@@ -57,6 +69,10 @@ const RULES: Rule[] = [
       "starbucks",
       "menü",
       "menu",
+      "buffet",
+      "cantine",
+      "kantine",
+      "mensa",
     ],
   },
   {
@@ -223,12 +239,12 @@ const DEFAULT_VISUAL: ExpenseVisual = {
 function normalize(text: string): string {
   return text
     .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
     .replace(/ä/g, "ae")
     .replace(/ö/g, "oe")
     .replace(/ü/g, "ue")
-    .replace(/ß/g, "ss");
+    .replace(/ß/g, "ss")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
 }
 
 /** Infer a TravelBrain-style icon/tone from free-text expense description. */
