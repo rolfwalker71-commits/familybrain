@@ -389,17 +389,24 @@ function ExpenseCard({
               Bezahlt von {memberName(exp.paid_by_member_id)} · {fx.primary}
             </p>
             {fx.detail ? (
-              <p className="break-words text-[11px] leading-snug text-muted-foreground">
-                {formatMoney(exp.amount_base, baseCurrency)}
-                {" · "}
-                {formatExchangeRateLine({
-                  currency: exp.currency,
-                  baseCurrency,
-                  exchangeRate: exp.exchange_rate,
-                  amount: exp.amount,
-                  amountBase: exp.amount_base,
-                })}
-              </p>
+              <div className="space-y-0.5 text-[11px] leading-snug text-muted-foreground">
+                <p>Währung: {exp.currency.toUpperCase()}</p>
+                <p>FW Betrag: {fx.primary}</p>
+                <p>
+                  Betrag {baseCurrency}:{" "}
+                  {formatMoney(exp.amount_base, baseCurrency)}
+                </p>
+                <p>
+                  Kurs:{" "}
+                  {formatExchangeRateLine({
+                    currency: exp.currency,
+                    baseCurrency,
+                    exchangeRate: exp.exchange_rate,
+                    amount: exp.amount,
+                    amountBase: exp.amount_base,
+                  })}
+                </p>
+              </div>
             ) : null}
             <p className="flex min-h-[1rem] items-center gap-1 text-xs text-muted-foreground">
               {exp.place_name ? (
@@ -964,17 +971,24 @@ function SettlementCard({
               {settledLabel ? ` · ${settledLabel}` : ""}
             </p>
             {fx.detail ? (
-              <p className="mt-0.5 break-words text-[11px] leading-snug text-muted-foreground">
-                {formatMoney(s.amount_base, baseCurrency)}
-                {" · "}
-                {formatExchangeRateLine({
-                  currency: s.currency,
-                  baseCurrency,
-                  exchangeRate: s.exchange_rate,
-                  amount: s.amount,
-                  amountBase: s.amount_base,
-                })}
-              </p>
+              <div className="mt-0.5 space-y-0.5 text-[11px] leading-snug text-muted-foreground">
+                <p>Währung: {s.currency.toUpperCase()}</p>
+                <p>FW Betrag: {fx.primary}</p>
+                <p>
+                  Betrag {baseCurrency}:{" "}
+                  {formatMoney(s.amount_base, baseCurrency)}
+                </p>
+                <p>
+                  Kurs:{" "}
+                  {formatExchangeRateLine({
+                    currency: s.currency,
+                    baseCurrency,
+                    exchangeRate: s.exchange_rate,
+                    amount: s.amount,
+                    amountBase: s.amount_base,
+                  })}
+                </p>
+              </div>
             ) : null}
             {s.note ? (
               <p className="mt-1 text-xs text-muted-foreground">{s.note}</p>

@@ -88,15 +88,23 @@ function moneyLines(input: {
     ...input,
     exchangeRate: rate,
   });
+  const cur = input.currency.toUpperCase();
+  const base = input.baseCurrency.toUpperCase();
   return {
     money,
     fxHtml: `
-      <div style="margin-top:4px;font-size:12px;color:#64748b;">
-        ${escapeHtml(input.currency)}: <strong>${escapeHtml(money)}</strong>
-        · ${escapeHtml(input.baseCurrency)}: <strong>${escapeHtml(baseMoney)}</strong>
-        · Kurs: ${escapeHtml(rateLine)}
+      <div style="margin-top:8px;font-size:13px;color:#64748b;line-height:1.55;">
+        <div>Währung: <strong style="color:#0f172a;">${escapeHtml(cur)}</strong></div>
+        <div>FW Betrag: <strong style="color:#0f172a;">${escapeHtml(money)}</strong></div>
+        <div>Betrag ${escapeHtml(base)}: <strong style="color:#0f172a;">${escapeHtml(baseMoney)}</strong></div>
+        <div>Kurs: <strong style="color:#0f172a;">${escapeHtml(rateLine)}</strong></div>
       </div>`,
-    fxText: `${input.currency}: ${money}; ${input.baseCurrency}: ${baseMoney}; Kurs: ${rateLine}`,
+    fxText: [
+      `Währung: ${cur}`,
+      `FW Betrag: ${money}`,
+      `Betrag ${base}: ${baseMoney}`,
+      `Kurs: ${rateLine}`,
+    ].join("\n"),
   };
 }
 
@@ -105,6 +113,7 @@ function expenseCardHtml(input: ExpenseMailFields): string {
   const category = input.categoryLabel || "Ausgabe";
   const { money, fxHtml } = moneyLines(input);
   const cid = input.aiCid || `expense-ai-${input.expenseId}`;
+  const hasFx = Boolean(fxHtml);
   return `
     <div style="background:#fff;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;margin-bottom:16px;">
       <div style="padding:14px 16px;display:flex;gap:14px;align-items:flex-start;">
@@ -113,7 +122,7 @@ function expenseCardHtml(input: ExpenseMailFields): string {
           <div style="font-size:17px;font-weight:800;line-height:1.25;color:#0f172a;">${escapeHtml(title)}</div>
           <div style="margin-top:8px;font-size:13px;color:#475569;">
             <span style="display:inline-block;background:#ffedd5;color:#9a3412;border-radius:4px;padding:2px 6px;font-size:10px;font-weight:700;text-transform:uppercase;margin-right:6px;">${escapeHtml(category)}</span>
-            Bezahlt von ${escapeHtml(input.paidByName)} · <strong>${escapeHtml(money)}</strong>
+            Bezahlt von ${escapeHtml(input.paidByName)}${hasFx ? "" : ` · <strong>${escapeHtml(money)}</strong>`}
           </div>
           ${fxHtml}
           ${
@@ -129,7 +138,7 @@ function expenseCardHtml(input: ExpenseMailFields): string {
         </div>
         ${
           input.hasAiImage
-            ? `<img src="cid:${escapeHtml(cid)}" alt="" width="96" height="96" style="width:96px;height:96px;border-radius:8px;object-fit:cover;border:1px solid #e2e8f0;flex-shrink:0;" />`
+            ? `<img src="cid:${escapeHtml(cid)}" alt="" width="72" height="72" style="width:72px;height:72px;border-radius:8px;object-fit:cover;border:1px solid #e2e8f0;flex-shrink:0;" />`
             : ""
         }
       </div>
@@ -154,7 +163,7 @@ export function buildExpenseMailHtml(
 
   const html = `<!DOCTYPE html>
 <html><body style="margin:0;padding:24px;background:#f8fafc;font-family:system-ui,-apple-system,sans-serif;color:#0f172a;">
-  <div style="max-width:560px;margin:0 auto;">
+  <div style="max-width:640px;margin:0 auto;">
     <div style="padding:14px 18px;background:#ffedd5;border:1px solid #fdba74;border-radius:12px 12px 0 0;">
       <div style="font-size:12px;font-weight:700;color:#9a3412;letter-spacing:.04em;text-transform:uppercase;">FinanzBrain · Neue Ausgabe</div>
       <div style="font-size:14px;color:#7c2d12;margin-top:2px;">${escapeHtml(input.ledgerTitle)}</div>

@@ -475,7 +475,7 @@ export async function buildExpensePdfBuffer(input: {
   });
 
   const img = await embedOptionalPng(pdf, input.aiImagePath);
-  const imgMax = 260;
+  const imgMax = 160;
   let imgW = 0;
   let imgH = 0;
   if (img) {
@@ -484,12 +484,9 @@ export async function buildExpensePdfBuffer(input: {
     imgH = img.height * scale;
   }
 
-  const labelW = 168;
-  // Leave room on the right for the bottom AI image when present
-  const valueMaxW = Math.max(
-    140,
-    contentW - labelW - (img ? imgW + 24 : 0)
-  );
+  // Detail rows use full content width — AI image sits bottom-right, not beside values
+  const labelW = 140;
+  const valueMaxW = Math.max(220, contentW - labelW - 12);
   const hasFx = isForeignCurrency(input.currency, input.baseCurrency);
   const rate = resolveExchangeRate({
     amount: input.amount,
@@ -503,16 +500,14 @@ export async function buildExpensePdfBuffer(input: {
     ["Wer hat bezahlt", input.paidByName],
   ];
   if (hasFx) {
+    rows.push(["Währung", input.currency.toUpperCase()]);
+    rows.push(["FW Betrag", formatMoney(input.amount, input.currency)]);
     rows.push([
-      `Betrag (${input.currency})`,
-      formatMoney(input.amount, input.currency),
-    ]);
-    rows.push([
-      `Betrag (${input.baseCurrency})`,
+      `Betrag ${input.baseCurrency.toUpperCase()}`,
       formatMoney(input.amountBase, input.baseCurrency),
     ]);
     rows.push([
-      "Wechselkurs",
+      "Kurs",
       formatExchangeRateLine({
         currency: input.currency,
         baseCurrency: input.baseCurrency,
@@ -688,13 +683,14 @@ export async function buildSettlementPdfBuffer(input: {
     ["An", input.toName],
   ];
   if (hasFx) {
-    rows.push([`Betrag (${input.currency})`, money]);
+    rows.push(["Währung", input.currency.toUpperCase()]);
+    rows.push(["FW Betrag", money]);
     rows.push([
-      `Betrag (${input.baseCurrency})`,
+      `Betrag ${input.baseCurrency.toUpperCase()}`,
       formatMoney(input.amountBase, input.baseCurrency),
     ]);
     rows.push([
-      "Wechselkurs",
+      "Kurs",
       formatExchangeRateLine({
         currency: input.currency,
         baseCurrency: input.baseCurrency,
@@ -862,23 +858,25 @@ export async function buildLedgerExpensesPdfBuffer(input: {
 
     const detailRaw = [
       `Bezahlt von: ${exp.paidByName}`,
-      hasFx
-        ? `Betrag: ${formatMoney(exp.amount, exp.currency)} / ${formatMoney(exp.amountBase, exp.baseCurrency)}`
-        : `Betrag: ${formatMoney(exp.amount, exp.currency)}`,
-      hasFx
-        ? `Kurs: ${formatExchangeRateLine({
-            currency: exp.currency,
-            baseCurrency: exp.baseCurrency,
-            exchangeRate: rate,
-          })}`
-        : null,
+      ...(hasFx
+        ? [
+            `Währung: ${exp.currency.toUpperCase()}`,
+            `FW Betrag: ${formatMoney(exp.amount, exp.currency)}`,
+            `Betrag ${exp.baseCurrency.toUpperCase()}: ${formatMoney(exp.amountBase, exp.baseCurrency)}`,
+            `Kurs: ${formatExchangeRateLine({
+              currency: exp.currency,
+              baseCurrency: exp.baseCurrency,
+              exchangeRate: rate,
+            })}`,
+          ]
+        : [`Betrag: ${formatMoney(exp.amount, exp.currency)}`]),
       exp.placeName?.trim() ? `Ort: ${exp.placeName.trim()}` : null,
       exp.note?.trim() ? `Notiz: ${exp.note.trim()}` : null,
       `Beleg-ID: ${exp.expenseId}`,
     ].filter(Boolean) as string[];
 
     const detailWrapped = detailRaw.flatMap((line) =>
-      wrapText(line, font, 10, textW).slice(0, 2)
+      wrapText(line, font, 10, textW)
     );
 
     // Measure text column: title (16/line) + category (20) + details (13/line)
