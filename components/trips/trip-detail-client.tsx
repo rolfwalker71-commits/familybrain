@@ -234,10 +234,10 @@ function weekdayDe(isoDate: string): string {
   return new Intl.DateTimeFormat("de-CH", { weekday: "long" }).format(date);
 }
 
-function monthShortDe(isoDate: string): string {
+function monthFullDe(isoDate: string): string {
   const [y, m, d] = isoDate.split("-").map(Number);
   const date = new Date(y, m - 1, d);
-  return new Intl.DateTimeFormat("de-CH", { month: "short" })
+  return new Intl.DateTimeFormat("de-CH", { month: "long" })
     .format(date)
     .replace(/\./g, "")
     .toUpperCase();
@@ -257,18 +257,18 @@ function EventCalendarBadge({
   return (
     <div
       className={cn(
-        "flex w-[4.25rem] shrink-0 flex-col overflow-hidden rounded-xl border border-black/10 bg-background sm:w-[4.75rem]",
+        "flex w-[6.75rem] shrink-0 flex-col overflow-hidden rounded-xl border border-black/10 bg-background sm:w-[7.25rem]",
         "shadow-[0_1px_0_rgba(255,255,255,0.85)_inset,0_1px_2px_rgba(15,23,42,0.08),0_4px_10px_rgba(15,23,42,0.14),0_10px_18px_-6px_rgba(15,23,42,0.22)]",
         "ring-1 ring-black/5"
       )}
     >
       <div
         className={cn(
-          "flex min-h-[1.75rem] items-center justify-center bg-gradient-to-b from-red-500 to-red-700 px-1 py-1.5 text-center text-[10px] font-black tracking-wide text-white sm:min-h-8 sm:text-[11px]",
+          "bg-gradient-to-b from-red-500 to-red-700 px-1 py-0.5 text-center text-[9px] font-black uppercase leading-tight tracking-wide text-white sm:text-[10px]",
           "shadow-[0_1px_0_rgba(255,255,255,0.28)_inset,0_2px_3px_rgba(127,29,29,0.35)]"
         )}
       >
-        {monthShortDe(isoDate)}
+        {monthFullDe(isoDate)}
       </div>
       <div
         className={cn(
@@ -2207,13 +2207,14 @@ export function TripDetailClient({
                       "ring-2 ring-teal-400/50"
                   )}
                 >
-                  <div className="rounded-t-[0.7rem] bg-slate-300/80 px-4 pb-3 pl-8 pt-4">
-                    <div className="relative min-h-[4.75rem]">
-                      <div className="absolute left-1/2 top-1/2 z-0 -translate-x-1/2 -translate-y-1/2">
+                  <div className="rounded-t-[0.7rem] bg-slate-300/80 px-4 py-3 pl-8">
+                    <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
+                      <div aria-hidden className="min-w-0" />
+                      <div className="justify-self-center">
                         <EventDateHeader event={event} />
                       </div>
-                      {event.ai_image_url ? (
-                        <div className="absolute right-0 top-1/2 z-10 -translate-y-1/2">
+                      <div className="justify-self-end">
+                        {event.ai_image_url ? (
                           <div className="relative">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
@@ -2237,8 +2238,8 @@ export function TripDetailClient({
                               <Maximize2 className="size-3" />
                             </Button>
                           </div>
-                        </div>
-                      ) : null}
+                        ) : null}
+                      </div>
                     </div>
                   </div>
                   <CardContent className="space-y-3 p-4 pl-8">
