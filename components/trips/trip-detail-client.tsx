@@ -60,6 +60,7 @@ import { PageHeader } from "@/components/layout/page-primitives";
 import {
   IconCircle,
   pageVisuals,
+  toneSurface,
   type IconTone,
 } from "@/components/layout/icon-circle";
 import { DocumentPdfThumb } from "@/components/documents/document-pdf-preview";
@@ -2280,8 +2281,9 @@ export function TripDetailClient({
                     className="absolute left-0 top-1 z-10 border-2 border-foreground/20 shadow-md"
                   />
                   <Card
+                    tone={visual.tone}
                     className={cn(
-                      "relative gap-0 overflow-visible border-border/50 bg-card py-0",
+                      "relative gap-0 overflow-visible py-0",
                       editMode &&
                         dragOverEventId === event.id &&
                         "ring-2 ring-teal-400/50"
@@ -2469,15 +2471,21 @@ export function TripDetailClient({
                   className="absolute left-0 top-0 z-10 border-2 border-foreground/20 shadow-md"
                 />
                 <Card
+                  tone={visual.tone}
                   className={cn(
-                    "relative gap-0 overflow-visible border-border/50 bg-card py-0",
+                    "relative gap-0 overflow-visible py-0",
                     editingEventId === event.id && "ring-2 ring-foreground/15",
                     editMode &&
                       dragOverEventId === event.id &&
                       "ring-2 ring-teal-400/50"
                   )}
                 >
-                  <div className="rounded-t-[0.7rem] bg-slate-300/80 px-4 py-3 pl-8">
+                  <div
+                    className={cn(
+                      "rounded-t-[0.7rem] px-4 py-3 pl-8",
+                      toneSurface(visual.tone).title
+                    )}
+                  >
                     <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
                       <div aria-hidden className="min-w-0" />
                       <div className="justify-self-center">
@@ -2804,7 +2812,12 @@ export function TripDetailClient({
 
                           {(hasFlightDetails ||
                             (hasGenericDetails && type === "Flug")) && (
-                            <div className="space-y-1.5 rounded-md bg-background/60 px-3 py-2">
+                            <div
+                              className={cn(
+                                "space-y-1.5 rounded-md px-3 py-2",
+                                toneSurface(visual.tone).soft
+                              )}
+                            >
                               <DetailRow label="Airline" value={event.airline} />
                               <DetailRow
                                 label="Strecke"
@@ -2884,7 +2897,12 @@ export function TripDetailClient({
 
                           {(hasDualPlaceDetails ||
                             (hasGenericDetails && dual)) && (
-                            <div className="space-y-1.5 rounded-md bg-background/60 px-3 py-2">
+                            <div
+                              className={cn(
+                                "space-y-1.5 rounded-md px-3 py-2",
+                                toneSurface(visual.tone).soft
+                              )}
+                            >
                               <DetailRow
                                 label={dualLabels.origin}
                                 value={routePlaces.origin || null}
@@ -2926,7 +2944,12 @@ export function TripDetailClient({
                               (hasGenericDetails &&
                                 type !== "Flug" &&
                                 !dual) ? (
-                              <div className="space-y-1.5 rounded-md bg-background/60 px-3 py-2">
+                              <div
+                                className={cn(
+                                  "space-y-1.5 rounded-md px-3 py-2",
+                                  toneSurface(visual.tone).soft
+                                )}
+                              >
                                 {showPlaceName ? (
                                   <DetailRow
                                     label="Name"
