@@ -9,14 +9,17 @@ import {
   ChevronUp,
   Copy,
   Download,
+  FileDown,
   Link2,
+  Luggage,
   Mail,
   Plus,
+  Receipt,
   RefreshCw,
   RotateCw,
-  Users,
-  FileDown,
+  ArrowLeftRight,
   Unlink,
+  Users,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -499,7 +502,7 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
       {status ? <p className="text-sm text-muted-foreground">{status}</p> : null}
 
-      <SectionCard title="Reise verknüpfen">
+      <SectionCard title="Reise verknüpfen" tone="indigo" icon={Luggage}>
         <p className="mb-3 text-sm text-muted-foreground">
           Optional mit einer TravelBrain-Reise verbinden – dann erscheinen
           Reise-Belege zum Import und die Abrechnung auf der Reise-Detailseite.
@@ -592,7 +595,7 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
       </div>
 
       {panel === "members" ? (
-        <SectionCard title="Teilnehmer & Einladungs-Links">
+        <SectionCard title="Teilnehmer & Einladungs-Links" tone="sky" icon={Users}>
           <div className="mb-4 grid gap-2 sm:grid-cols-3">
             <Input
               placeholder="Name"
@@ -658,7 +661,7 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
       ) : null}
 
       {panel === "import" ? (
-        <SectionCard title="Belege importieren">
+        <SectionCard title="Belege importieren" tone="violet" icon={FileDown}>
           {!hasImport ? (
             <p className="text-sm text-muted-foreground">
               Keine Belege gefunden. Verknüpfe eine Reise (oben) für
@@ -722,7 +725,7 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
         </SectionCard>
       ) : null}
 
-      <SectionCard title="Ausgabe erfassen">
+      <SectionCard title="Ausgabe erfassen" tone="orange" icon={Receipt}>
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           <div className="space-y-1">
             <Label>Betrag</Label>
@@ -833,7 +836,7 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
         </p>
       </SectionCard>
 
-      <SectionCard title="Rückzahlung">
+      <SectionCard title="Rückzahlung" tone="teal" icon={ArrowLeftRight}>
         <p className="mb-3 text-sm text-muted-foreground">
           Wer hat wem Geld zurückbezahlt? («Von» = Person, die zahlt und damit
           ihre Schuld reduziert.)
@@ -909,7 +912,7 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
         </div>
       </SectionCard>
 
-      <SectionCard title="Ausgaben">
+      <SectionCard title="Ausgaben" tone="green" icon={Receipt}>
         <ExpenseList
           expenses={expenses}
           members={members}
@@ -923,7 +926,7 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
         />
       </SectionCard>
 
-      <SectionCard title="Rückzahlungen">
+      <SectionCard title="Rückzahlungen" tone="teal" icon={ArrowLeftRight}>
         <SettlementList
           settlements={settlements}
           members={members}

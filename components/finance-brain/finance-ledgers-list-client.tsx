@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PageHeader } from "@/components/layout/page-primitives";
-import { pageVisuals } from "@/components/layout/icon-circle";
+import { IconCircle, pageVisuals } from "@/components/layout/icon-circle";
 import { COMMON_CURRENCIES } from "@/lib/finance-brain/constants";
 import { cn } from "@/lib/utils";
 
@@ -110,7 +110,7 @@ export function FinanceLedgersListClient() {
         tone={pageVisuals.financeBrain.tone}
       />
 
-      <Card className="rounded-md border-border/80 shadow-sm">
+      <Card tone="green" className="rounded-md shadow-sm">
         <CardContent className="grid gap-3 p-4 sm:grid-cols-2">
           <div className="space-y-1.5 sm:col-span-2">
             <Label htmlFor="ledgerTitle">Neue Abrechnung</Label>
@@ -171,9 +171,13 @@ export function FinanceLedgersListClient() {
       ) : (
         <div className="grid gap-3">
           {ledgers.map((ledger) => (
-            <Card key={ledger.id} className="rounded-md border-border/80 shadow-sm">
+            <Card key={ledger.id} tone="green" className="rounded-md shadow-sm">
               <CardContent className="flex flex-wrap items-center gap-3 p-4">
-                <Receipt className="size-5 text-emerald-600" />
+                <IconCircle
+                  icon={pageVisuals.financeBrain.icon}
+                  tone="green"
+                  size="sm"
+                />
                 <div className="min-w-0 flex-1">
                   <Link
                     href={`/finance-brain/${ledger.id}`}

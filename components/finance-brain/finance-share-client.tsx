@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Download, Plus, RefreshCw } from "lucide-react";
+import { Download, Plus, Receipt, RefreshCw, ArrowLeftRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -255,7 +255,7 @@ export function FinanceShareClient({ token }: { token: string }) {
         highlightMemberId={member.id}
       />
 
-      <SectionCard title="Ausgabe erfassen">
+      <SectionCard title="Ausgabe erfassen" tone="orange" icon={Receipt}>
         <div className="space-y-3">
           <div className="space-y-1">
             <Label>Betrag</Label>
@@ -368,7 +368,7 @@ export function FinanceShareClient({ token }: { token: string }) {
       </SectionCard>
 
       {others.length > 0 ? (
-        <SectionCard title="Rückzahlung">
+        <SectionCard title="Rückzahlung" tone="teal" icon={ArrowLeftRight}>
           <p className="mb-2 text-sm text-muted-foreground">
             Du zahlst jemandem Geld zurück (reduziert deine Schuld).
           </p>
@@ -423,7 +423,7 @@ export function FinanceShareClient({ token }: { token: string }) {
         </SectionCard>
       ) : null}
 
-      <SectionCard title="Ausgaben">
+      <SectionCard title="Ausgaben" tone="green" icon={Receipt}>
         <ExpenseList
           expenses={expenses}
           members={members}
@@ -435,7 +435,7 @@ export function FinanceShareClient({ token }: { token: string }) {
         />
       </SectionCard>
 
-      <SectionCard title="Rückzahlungen">
+      <SectionCard title="Rückzahlungen" tone="teal" icon={ArrowLeftRight}>
         <SettlementList
           settlements={settlements}
           members={members}

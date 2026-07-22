@@ -5,6 +5,7 @@ import Link from "next/link";
 import { HandCoins, Plus } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { IconCircle } from "@/components/layout/icon-circle";
 import { formatSignedMoney } from "@/lib/finance-brain/format";
 import { cn } from "@/lib/utils";
 
@@ -69,10 +70,13 @@ export function TripFinanceLedgerCard({ tripId }: { tripId: number }) {
   if (loading) return null;
 
   return (
-    <Card className="rounded-md border-border/80 shadow-sm">
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
+    <Card tone="green" className="rounded-md shadow-sm">
+      <CardHeader
+        tone="green"
+        className="flex flex-row items-center justify-between pb-2"
+      >
         <CardTitle className="flex items-center gap-2 text-base">
-          <HandCoins className="size-4 text-emerald-600" />
+          <IconCircle icon={HandCoins} tone="green" size="sm" />
           Abrechnung
         </CardTitle>
         {ledger ? (
@@ -83,7 +87,12 @@ export function TripFinanceLedgerCard({ tripId }: { tripId: number }) {
             Öffnen
           </Link>
         ) : (
-          <Button size="sm" variant="outline" onClick={() => void createLedger()} disabled={creating}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => void createLedger()}
+            disabled={creating}
+          >
             <Plus className="mr-1 size-4" />
             Anlegen
           </Button>
@@ -97,15 +106,15 @@ export function TripFinanceLedgerCard({ tripId }: { tripId: number }) {
               {balances.slice(0, 4).map((b) => (
                 <div
                   key={b.memberId}
-                  className="flex justify-between text-sm"
+                  className="flex justify-between rounded-md border border-emerald-200/70 bg-white/70 px-2 py-1 text-sm"
                 >
                   <span>{b.displayName}</span>
                   <span
                     className={
                       b.netBalance > 0
-                        ? "text-emerald-600"
+                        ? "font-semibold text-emerald-700"
                         : b.netBalance < 0
-                          ? "text-rose-600"
+                          ? "font-semibold text-rose-600"
                           : "text-muted-foreground"
                     }
                   >
