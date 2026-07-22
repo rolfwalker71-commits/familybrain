@@ -762,6 +762,10 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
 
       {panel === "members" ? (
         <SectionCard title="Teilnehmer & Einladungs-Links" tone="sky" icon={Users}>
+          <p className="mb-3 text-sm text-muted-foreground">
+            E-Mail-Adresse eintragen, damit Beleg-Mails (Ausgabe / Rückzahlung)
+            an die ganze Gruppe gehen können.
+          </p>
           <div className="mb-4 grid gap-2 sm:grid-cols-3">
             <Input
               placeholder="Name"
@@ -769,7 +773,7 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
               onChange={(e) => setMemberName(e.target.value)}
             />
             <Input
-              placeholder="E-Mail (optional)"
+              placeholder="E-Mail (für Beleg-Mails)"
               type="email"
               value={memberEmail}
               onChange={(e) => setMemberEmail(e.target.value)}

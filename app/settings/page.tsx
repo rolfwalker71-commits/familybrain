@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { KeyRound, Server, BookOpen, MessageSquareText, Luggage, HandCoins } from "lucide-react";
+import { KeyRound, Server, BookOpen, MessageSquareText, Luggage, HandCoins, Mail } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -46,6 +46,7 @@ export default function SettingsPage() {
     | "chat"
     | "travelbrain"
     | "finanzbrain"
+    | "email"
     | null
   >(null);
   const [triliumBaseUrl, setTriliumBaseUrl] = useState("");
@@ -120,6 +121,14 @@ export default function SettingsPage() {
     "{{place}}",
     "{{scene}}",
   ]);
+  const [resendApiKey, setResendApiKey] = useState("");
+  const [resendApiKeyMasked, setResendApiKeyMasked] = useState<string | null>(
+    null
+  );
+  const [hasResendApiKey, setHasResendApiKey] = useState(false);
+  const [resendFrom, setResendFrom] = useState("");
+  const [testMailTo, setTestMailTo] = useState("");
+  const [testMailBusy, setTestMailBusy] = useState(false);
   const [flightTestNumber, setFlightTestNumber] = useState("LX1594");
   const [flightTestDate, setFlightTestDate] = useState("2026-10-23");
   const [flightTestBusy, setFlightTestBusy] = useState(false);
@@ -190,6 +199,9 @@ export default function SettingsPage() {
           )
         );
       }
+      setResendApiKeyMasked(data.resendApiKeyMasked || null);
+      setHasResendApiKey(Boolean(data.hasResendApiKey));
+      setResendFrom(data.resendFrom || "");
     })();
   }, []);
 
@@ -493,6 +505,79 @@ export default function SettingsPage() {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setSaving(null);
+    }
+  }
+
+  async function saveEmailSettings() {
+    setSaving("email");
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          resendApiKey: resendApiKey || undefined,
+          resendFrom: resendFrom.trim() || null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Speichern fehlgeschlagen");
+      setResendApiKeyMasked(data.resendApiKeyMasked || null);
+      setHasResendApiKey(Boolean(data.hasResendApiKey));
+      setResendFrom(data.resendFrom || "");
+      setResendApiKey("");
+      setMessage("E-Mail-Einstellungen gespeichert.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  async function clearResendApiKey() {
+    setSaving("email");
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clearResendApiKey: true }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Löschen fehlgeschlagen");
+      setResendApiKeyMasked(data.resendApiKeyMasked || null);
+      setHasResendApiKey(Boolean(data.hasResendApiKey));
+      setResendApiKey("");
+      setMessage("Resend API-Key gelöscht.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  async function sendSettingsTestMail() {
+    setTestMailBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      if (!testMailTo.trim()) {
+        throw new Error("Bitte Empfänger-Adresse für die Testmail angeben.");
+      }
+      const res = await fetch("/api/settings/test-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to: testMailTo.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Testmail fehlgeschlagen");
+      setMessage(`Testmail an ${testMailTo.trim()} gesendet.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setTestMailBusy(false);
     }
   }
 
@@ -984,6 +1069,96 @@ export default function SettingsPage() {
                 {flightTestResult}
               </pre>
             ) : null}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-border/80 shadow-sm">
+        <CardHeader className="flex flex-row items-center justify-between gap-3">
+          <CardTitle className="flex items-center gap-3 text-base">
+            <IconCircle icon={Mail} tone="sky" size="sm" />
+            E-Mail (Resend)
+          </CardTitle>
+          {hasResendApiKey ? (
+            <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">
+              Konfiguriert
+            </Badge>
+          ) : (
+            <Badge variant="secondary">Nicht konfiguriert</Badge>
+          )}
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Für FinanzBrain-Belegmails (Ausgabe / Rückzahlung) inkl. PDF-Anhang.
+            Ohne API-Key werden keine Mails versendet. Schlüssel kann auch per
+            Umgebungsvariable <code className="text-[11px]">RESEND_API_KEY</code>{" "}
+            gesetzt sein.
+          </p>
+          <div className="space-y-2">
+            <Label htmlFor="resendApiKey">Resend API-Key</Label>
+            <Input
+              id="resendApiKey"
+              type="password"
+              autoComplete="off"
+              value={resendApiKey}
+              onChange={(e) => setResendApiKey(e.target.value)}
+              placeholder={
+                hasResendApiKey
+                  ? resendApiKeyMasked || "••••••••"
+                  : "re_…"
+              }
+            />
+            {hasResendApiKey ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={saving !== null}
+                onClick={() => void clearResendApiKey()}
+              >
+                API-Key löschen
+              </Button>
+            ) : null}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="resendFrom">Absender (From)</Label>
+            <Input
+              id="resendFrom"
+              value={resendFrom}
+              onChange={(e) => setResendFrom(e.target.value)}
+              placeholder="FamilyBrain <noreply@deine-domain.ch>"
+            />
+            <p className="text-xs text-muted-foreground">
+              Domain muss bei Resend verifiziert sein. Optional auch{" "}
+              <code className="text-[11px]">RESEND_FROM</code>.
+            </p>
+          </div>
+          <Button
+            onClick={() => void saveEmailSettings()}
+            disabled={saving !== null}
+          >
+            {saving === "email" ? "Speichert…" : "E-Mail speichern"}
+          </Button>
+          <div className="space-y-2 border-t border-border/60 pt-4">
+            <Label htmlFor="testMailTo">Testmail senden</Label>
+            <div className="flex flex-wrap gap-2">
+              <Input
+                id="testMailTo"
+                type="email"
+                className="min-w-[14rem] flex-1"
+                value={testMailTo}
+                onChange={(e) => setTestMailTo(e.target.value)}
+                placeholder="du@example.com"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                disabled={testMailBusy || saving !== null || !hasResendApiKey}
+                onClick={() => void sendSettingsTestMail()}
+              >
+                {testMailBusy ? "Sendet…" : "Testmail"}
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>

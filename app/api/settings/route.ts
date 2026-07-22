@@ -52,6 +52,10 @@ import {
   resetExpenseAiImagePromptTemplate,
   saveExpenseAiImagePromptTemplate,
 } from "@/lib/finance-brain/expense-image-settings";
+import {
+  getResendSettingsPublic,
+  saveResendSettings,
+} from "@/lib/finance-brain/mail-settings";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -94,6 +98,7 @@ export async function GET() {
     financeExpenseAiImagePromptCustomized: isExpenseAiImagePromptCustomized(),
     financeExpenseAiImagePromptDefault: DEFAULT_EXPENSE_AI_IMAGE_PROMPT,
     financeExpenseAiImagePromptPlaceholders: EXPENSE_AI_IMAGE_PROMPT_PLACEHOLDERS,
+    ...getResendSettingsPublic(),
   });
 }
 
@@ -115,6 +120,9 @@ const PutSchema = z.object({
   resetEventAiImagePrompt: z.boolean().optional(),
   financeExpenseAiImagePrompt: z.string().max(4000).optional(),
   resetFinanceExpenseAiImagePrompt: z.boolean().optional(),
+  resendApiKey: z.string().optional(),
+  clearResendApiKey: z.boolean().optional(),
+  resendFrom: z.string().max(200).nullable().optional(),
 });
 
 export async function PUT(request: Request) {
@@ -238,6 +246,18 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: message }, { status: 400 });
   }
 
+  if (
+    parsed.data.clearResendApiKey ||
+    parsed.data.resendApiKey !== undefined ||
+    parsed.data.resendFrom !== undefined
+  ) {
+    saveResendSettings({
+      clearApiKey: parsed.data.clearResendApiKey,
+      apiKey: parsed.data.resendApiKey,
+      from: parsed.data.resendFrom,
+    });
+  }
+
   const paperless = getPaperlessSettings();
   const openai = getOpenAISettings();
   const trilium = getTriliumSettings();
@@ -277,5 +297,6 @@ export async function PUT(request: Request) {
     financeExpenseAiImagePromptCustomized: isExpenseAiImagePromptCustomized(),
     financeExpenseAiImagePromptDefault: DEFAULT_EXPENSE_AI_IMAGE_PROMPT,
     financeExpenseAiImagePromptPlaceholders: EXPENSE_AI_IMAGE_PROMPT_PLACEHOLDERS,
+    ...getResendSettingsPublic(),
   });
 }

@@ -7,6 +7,7 @@ import {
 import { buildExpenseImagePrompt } from "@/lib/finance-brain/expense-image-prompt";
 import { getExpenseAiImagePromptTemplate } from "@/lib/finance-brain/expense-image-settings";
 import { sceneForExpenseCategory } from "@/lib/finance-brain/expense-category";
+import { notifyLedgerExpense } from "@/lib/finance-brain/notify";
 import {
   getFinanceExpenseById,
   getFinanceLedgerById,
@@ -53,10 +54,12 @@ export async function GET(_request: Request, context: Ctx) {
 }
 
 export async function POST(request: Request, context: Ctx) {
+  const { id: idRaw, expenseId: expenseIdRaw } = await context.params;
+  const ledgerId = Number(idRaw);
+  const expenseId = Number(expenseIdRaw);
+  let generateAttempted = false;
+
   try {
-    const { id: idRaw, expenseId: expenseIdRaw } = await context.params;
-    const ledgerId = Number(idRaw);
-    const expenseId = Number(expenseIdRaw);
     if (!getFinanceLedgerById(ledgerId)) {
       return NextResponse.json({ error: "Abrechnung nicht gefunden" }, { status: 404 });
     }
@@ -95,15 +98,28 @@ export async function POST(request: Request, context: Ctx) {
       body.useSettings === false && body.prompt?.trim()
         ? body.prompt.trim()
         : null;
+    generateAttempted = true;
     expense = await generateExpenseAiImage(expenseId, {
       userPrompt: prompt,
       place: body.place,
     });
+    try {
+      await notifyLedgerExpense(expenseId);
+    } catch (mailError) {
+      console.error("[finance-brain] expense mail failed:", mailError);
+    }
     return NextResponse.json({
       ok: true,
       expense: serializeExpense(expense, listFinanceExpenseSplits(expenseId)),
     });
   } catch (error) {
+    if (generateAttempted) {
+      try {
+        await notifyLedgerExpense(expenseId);
+      } catch {
+        /* ignore */
+      }
+    }
     const message = error instanceof Error ? error.message : String(error);
     return NextResponse.json({ error: message }, { status: 500 });
   }

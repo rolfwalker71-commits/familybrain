@@ -4,6 +4,7 @@ import {
   clearExpenseAiImage,
   generateExpenseAiImage,
 } from "@/lib/finance-brain/expense-image";
+import { notifyLedgerExpense } from "@/lib/finance-brain/notify";
 import {
   getFinanceExpenseById,
   getFinanceLedgerMemberByToken,
@@ -18,8 +19,11 @@ export const maxDuration = 120;
 type Ctx = { params: Promise<{ token: string; expenseId: string }> };
 
 export async function POST(request: Request, context: Ctx) {
+  const { token, expenseId: expenseIdRaw } = await context.params;
+  const expenseId = Number(expenseIdRaw);
+  let generateAttempted = false;
+
   try {
-    const { token, expenseId: expenseIdRaw } = await context.params;
     const member = getFinanceLedgerMemberByToken(token);
     if (!member) {
       return NextResponse.json(
@@ -27,7 +31,6 @@ export async function POST(request: Request, context: Ctx) {
         { status: 404 }
       );
     }
-    const expenseId = Number(expenseIdRaw);
     let expense = getFinanceExpenseById(expenseId);
     if (!expense || expense.ledger_id !== member.ledger_id) {
       return NextResponse.json({ error: "Ausgabe nicht gefunden" }, { status: 404 });
@@ -61,7 +64,13 @@ export async function POST(request: Request, context: Ctx) {
       });
     }
 
+    generateAttempted = true;
     expense = await generateExpenseAiImage(expenseId, { place: body.place });
+    try {
+      await notifyLedgerExpense(expenseId);
+    } catch (mailError) {
+      console.error("[finance-brain] expense mail failed:", mailError);
+    }
     return NextResponse.json({
       ok: true,
       expense: serializeExpense(expense, listFinanceExpenseSplits(expenseId), {
@@ -69,6 +78,13 @@ export async function POST(request: Request, context: Ctx) {
       }),
     });
   } catch (error) {
+    if (generateAttempted) {
+      try {
+        await notifyLedgerExpense(expenseId);
+      } catch {
+        /* ignore */
+      }
+    }
     const message = error instanceof Error ? error.message : String(error);
     return NextResponse.json({ error: message }, { status: 500 });
   }

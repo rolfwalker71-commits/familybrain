@@ -394,6 +394,7 @@ function ensureFinanceBrainTables(db: Database.Database): void {
       note TEXT,
       settled_at TEXT NOT NULL,
       created_by_member_id INTEGER,
+      notified_at TEXT,
       created_at TEXT NOT NULL,
       FOREIGN KEY(ledger_id) REFERENCES finance_ledgers(id) ON DELETE CASCADE,
       FOREIGN KEY(from_member_id) REFERENCES finance_ledger_members(id),
@@ -430,5 +431,16 @@ function ensureFinanceBrainTables(db: Database.Database): void {
   }
   if (!expenseColNames.has("place_lon")) {
     db.exec(`ALTER TABLE finance_expenses ADD COLUMN place_lon REAL`);
+  }
+  if (!expenseColNames.has("notified_at")) {
+    db.exec(`ALTER TABLE finance_expenses ADD COLUMN notified_at TEXT`);
+  }
+
+  const settlementCols = db
+    .prepare(`PRAGMA table_info(finance_settlements)`)
+    .all() as Array<{ name: string }>;
+  const settlementColNames = new Set(settlementCols.map((c) => c.name));
+  if (!settlementColNames.has("notified_at")) {
+    db.exec(`ALTER TABLE finance_settlements ADD COLUMN notified_at TEXT`);
   }
 }

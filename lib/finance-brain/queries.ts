@@ -53,6 +53,7 @@ export type FinanceExpenseRow = {
   place_name: string | null;
   place_lat: number | null;
   place_lon: number | null;
+  notified_at: string | null;
   split_mode: string;
   created_at: string;
   updated_at: string;
@@ -77,6 +78,7 @@ export type FinanceSettlementRow = {
   note: string | null;
   settled_at: string;
   created_by_member_id: number | null;
+  notified_at: string | null;
   created_at: string;
 };
 
@@ -731,6 +733,28 @@ export function getFinanceSettlementById(
     .prepare(`SELECT * FROM finance_settlements WHERE id = ?`)
     .get(settlementId) as FinanceSettlementRow | undefined;
   return row ?? null;
+}
+
+export function markFinanceExpenseNotified(expenseId: number): void {
+  const existing = getFinanceExpenseById(expenseId);
+  if (!existing) return;
+  if (existing.notified_at) return;
+  getDb()
+    .prepare(
+      `UPDATE finance_expenses SET notified_at = ?, updated_at = ? WHERE id = ?`
+    )
+    .run(nowIso(), nowIso(), expenseId);
+  touchLedger(existing.ledger_id);
+}
+
+export function markFinanceSettlementNotified(settlementId: number): void {
+  const existing = getFinanceSettlementById(settlementId);
+  if (!existing) return;
+  if (existing.notified_at) return;
+  getDb()
+    .prepare(`UPDATE finance_settlements SET notified_at = ? WHERE id = ?`)
+    .run(nowIso(), settlementId);
+  touchLedger(existing.ledger_id);
 }
 
 export function updateFinanceSettlement(

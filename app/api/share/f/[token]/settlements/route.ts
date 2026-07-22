@@ -45,6 +45,14 @@ export async function POST(request: Request, context: Ctx) {
       settledAt: parsed.data.settledAt ?? null,
       createdByMemberId: member.id,
     });
+    try {
+      const { notifyLedgerSettlement } = await import(
+        "@/lib/finance-brain/notify"
+      );
+      await notifyLedgerSettlement(settlement.id);
+    } catch (mailError) {
+      console.error("[finance-brain] settlement mail failed:", mailError);
+    }
     return NextResponse.json({
       ok: true,
       settlement: serializeSettlement(settlement),

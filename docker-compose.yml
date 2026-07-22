@@ -29,6 +29,9 @@ services:
       QDRANT_URL: http://qdrant:6333
       QDRANT_COLLECTION: ${QDRANT_COLLECTION:-familybrain_chunks}
       OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
+      # Optional FinanzBrain mail (or set in UI Einstellungen)
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_FROM: ${RESEND_FROM:-}
     volumes:
       # Persist SQLite (+ WAL) across restarts / redeploys
       - ./data:/app/data
