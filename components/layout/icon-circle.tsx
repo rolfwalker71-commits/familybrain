@@ -23,6 +23,7 @@ import {
   Sparkles,
   LayoutDashboard,
   BookOpen,
+  HandCoins,
   Luggage,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -166,6 +167,7 @@ export const pageVisuals = {
   warranties: { icon: Shield, tone: "orange" as const },
   deadlines: { icon: CalendarClock, tone: "rose" as const },
   finance: { icon: Wallet, tone: "green" as const },
+  financeBrain: { icon: HandCoins, tone: "green" as const },
   travel: { icon: Plane, tone: "teal" as const },
   trips: { icon: Luggage, tone: "indigo" as const },
   settings: { icon: Settings, tone: "slate" as const },

@@ -66,6 +66,7 @@ import {
 import { DocumentPdfThumb } from "@/components/documents/document-pdf-preview";
 import { TripMap } from "@/components/trips/trip-map";
 import { TripExportMenu } from "@/components/trips/trip-export-menu";
+import { TripFinanceLedgerCard } from "@/components/finance-brain/trip-finance-ledger-card";
 import { BelegNotesBlock } from "@/components/trips/beleg-notes-block";
 import {
   toDateInputValue,
@@ -1415,6 +1416,8 @@ export function TripDetailClient({
           {status}
         </div>
       ) : null}
+
+      {!readOnly ? <TripFinanceLedgerCard tripId={tripId} /> : null}
 
       {!readOnly ? (
       <div className="flex flex-wrap gap-2">

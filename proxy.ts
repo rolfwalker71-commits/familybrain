@@ -23,6 +23,8 @@ function isPublicPath(pathname: string): boolean {
   if (PUBLIC_PATHS.has(pathname)) return true;
   if (pathname.startsWith("/share/t/")) return true;
   if (pathname.startsWith("/api/share/t/")) return true;
+  if (pathname.startsWith("/share/f/")) return true;
+  if (pathname.startsWith("/api/share/f/")) return true;
   return false;
 }
 
@@ -72,7 +74,7 @@ export async function proxy(request: NextRequest) {
   }
 
   if (isPublicPath(pathname) && pathname !== "/login") {
-    // Public share APIs are read-only.
+    // Trip share APIs are read-only; finance member share allows POST.
     if (
       pathname.startsWith("/api/share/t/") &&
       !SAFE_METHODS.has(request.method)

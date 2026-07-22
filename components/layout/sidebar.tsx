@@ -10,6 +10,7 @@ import {
   Shield,
   CalendarClock,
   Wallet,
+  HandCoins,
   Plane,
   Settings,
   MessageSquare,
@@ -69,6 +70,12 @@ const navItems: NavItem[] = [
     icon: Wallet,
     tone: "green",
     countKey: "financialItemsTotal",
+  },
+  {
+    href: "/finance-brain",
+    label: "FinanzBrain",
+    icon: HandCoins,
+    tone: "green",
   },
   {
     href: "/travel",

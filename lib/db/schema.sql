@@ -376,3 +376,85 @@ CREATE TABLE IF NOT EXISTS trip_share_links (
 CREATE INDEX IF NOT EXISTS idx_trip_share_links_trip ON trip_share_links(trip_id);
 CREATE INDEX IF NOT EXISTS idx_trip_share_links_token ON trip_share_links(token);
 
+-- FinanzBrain: group expense ledgers (Settle-Up style)
+CREATE TABLE IF NOT EXISTS finance_ledgers (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  base_currency TEXT NOT NULL DEFAULT 'CHF',
+  trip_id INTEGER,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  archived_at TEXT,
+  FOREIGN KEY(trip_id) REFERENCES trips(id) ON DELETE SET NULL
+);
+CREATE INDEX IF NOT EXISTS idx_finance_ledgers_trip ON finance_ledgers(trip_id);
+
+CREATE TABLE IF NOT EXISTS finance_ledger_members (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ledger_id INTEGER NOT NULL,
+  display_name TEXT NOT NULL,
+  email TEXT,
+  invite_token TEXT NOT NULL UNIQUE,
+  invite_revoked_at TEXT,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY(ledger_id) REFERENCES finance_ledgers(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_finance_ledger_members_ledger
+  ON finance_ledger_members(ledger_id);
+CREATE INDEX IF NOT EXISTS idx_finance_ledger_members_token
+  ON finance_ledger_members(invite_token);
+
+CREATE TABLE IF NOT EXISTS finance_expenses (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ledger_id INTEGER NOT NULL,
+  paid_by_member_id INTEGER NOT NULL,
+  created_by_member_id INTEGER,
+  amount REAL NOT NULL,
+  currency TEXT NOT NULL,
+  exchange_rate REAL NOT NULL DEFAULT 1,
+  amount_base REAL NOT NULL,
+  description TEXT,
+  expense_date TEXT,
+  document_id INTEGER,
+  trip_event_id INTEGER,
+  split_mode TEXT NOT NULL DEFAULT 'equal',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY(ledger_id) REFERENCES finance_ledgers(id) ON DELETE CASCADE,
+  FOREIGN KEY(paid_by_member_id) REFERENCES finance_ledger_members(id),
+  FOREIGN KEY(created_by_member_id) REFERENCES finance_ledger_members(id),
+  FOREIGN KEY(document_id) REFERENCES paperless_documents(id) ON DELETE SET NULL,
+  FOREIGN KEY(trip_event_id) REFERENCES trip_events(id) ON DELETE SET NULL
+);
+CREATE INDEX IF NOT EXISTS idx_finance_expenses_ledger ON finance_expenses(ledger_id);
+
+CREATE TABLE IF NOT EXISTS finance_expense_splits (
+  expense_id INTEGER NOT NULL,
+  member_id INTEGER NOT NULL,
+  share_amount_base REAL NOT NULL,
+  share_units REAL,
+  PRIMARY KEY (expense_id, member_id),
+  FOREIGN KEY(expense_id) REFERENCES finance_expenses(id) ON DELETE CASCADE,
+  FOREIGN KEY(member_id) REFERENCES finance_ledger_members(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS finance_settlements (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ledger_id INTEGER NOT NULL,
+  from_member_id INTEGER NOT NULL,
+  to_member_id INTEGER NOT NULL,
+  amount REAL NOT NULL,
+  currency TEXT NOT NULL,
+  exchange_rate REAL NOT NULL DEFAULT 1,
+  amount_base REAL NOT NULL,
+  note TEXT,
+  settled_at TEXT NOT NULL,
+  created_by_member_id INTEGER,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY(ledger_id) REFERENCES finance_ledgers(id) ON DELETE CASCADE,
+  FOREIGN KEY(from_member_id) REFERENCES finance_ledger_members(id),
+  FOREIGN KEY(to_member_id) REFERENCES finance_ledger_members(id),
+  FOREIGN KEY(created_by_member_id) REFERENCES finance_ledger_members(id)
+);
+CREATE INDEX IF NOT EXISTS idx_finance_settlements_ledger ON finance_settlements(ledger_id);
+

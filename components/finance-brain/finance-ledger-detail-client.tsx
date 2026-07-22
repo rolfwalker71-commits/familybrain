@@ -1,0 +1,716 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import {
+  ArrowLeft,
+  Bell,
+  Copy,
+  Link2,
+  Mail,
+  Plus,
+  RefreshCw,
+  RotateCw,
+} from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { PageHeader } from "@/components/layout/page-primitives";
+import { pageVisuals } from "@/components/layout/icon-circle";
+import {
+  BalanceView,
+  ExpenseList,
+  SectionCard,
+  SettlementList,
+} from "@/components/finance-brain/balance-view";
+import { COMMON_CURRENCIES } from "@/lib/finance-brain/constants";
+import { cn } from "@/lib/utils";
+
+type Member = {
+  id: number;
+  display_name: string;
+  email: string | null;
+  share_url: string;
+  invite_token?: string;
+  invite_revoked_at: string | null;
+};
+
+type LedgerDetail = {
+  ledger: {
+    id: number;
+    title: string;
+    base_currency: string;
+    trip_id: number | null;
+    trip_title: string | null;
+  };
+  members: Member[];
+  expenses: Array<{
+    id: number;
+    description: string | null;
+    amount: number;
+    currency: string;
+    amount_base: number;
+    expense_date: string | null;
+    paid_by_member_id: number;
+    splits: Array<{ member_id: number; share_amount_base: number }>;
+  }>;
+  settlements: Array<{
+    id: number;
+    from_member_id: number;
+    to_member_id: number;
+    amount: number;
+    currency: string;
+    amount_base: number;
+    note: string | null;
+    settled_at: string;
+  }>;
+  balances: Array<{
+    memberId: number;
+    displayName: string;
+    paidBase: number;
+    owedBase: number;
+    settlementsReceivedBase: number;
+    settlementsPaidBase: number;
+    netBalance: number;
+  }>;
+  simplifiedDebts: Array<{
+    fromMemberId: number;
+    fromDisplayName: string;
+    toMemberId: number;
+    toDisplayName: string;
+    amount: number;
+  }>;
+};
+
+type ImportDoc = {
+  document_id: number;
+  title: string | null;
+  amount: number | null;
+  currency: string | null;
+  vendor: string | null;
+  invoice_date: string | null;
+  trip_event_title?: string | null;
+};
+
+export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
+  const [data, setData] = useState<LedgerDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
+
+  const [memberName, setMemberName] = useState("");
+  const [memberEmail, setMemberEmail] = useState("");
+
+  const [expAmount, setExpAmount] = useState("");
+  const [expCurrency, setExpCurrency] = useState("CHF");
+  const [expRate, setExpRate] = useState("1");
+  const [expDesc, setExpDesc] = useState("");
+  const [expDate, setExpDate] = useState("");
+  const [expPayer, setExpPayer] = useState<string>("");
+
+  const [setAmount, setSetAmount] = useState("");
+  const [setTo, setSetTo] = useState<string>("");
+  const [setNote, setSetNote] = useState("");
+
+  const [importDocs, setImportDocs] = useState<{
+    tripDocuments: ImportDoc[];
+    paperlessItems: ImportDoc[];
+  }>({ tripDocuments: [], paperlessItems: [] });
+  const [importPayer, setImportPayer] = useState<string>("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/finance-ledgers/${ledgerId}`);
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Laden fehlgeschlagen");
+      setData(json);
+      setExpCurrency(json.ledger.base_currency);
+      if (json.members?.length && !expPayer) {
+        setExpPayer(String(json.members[0].id));
+        setImportPayer(String(json.members[0].id));
+      }
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoading(false);
+    }
+  }, [expPayer, ledgerId]);
+
+  const loadImport = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/finance-ledgers/${ledgerId}/import`);
+      const json = await res.json();
+      if (res.ok) {
+        setImportDocs({
+          tripDocuments: json.tripDocuments || [],
+          paperlessItems: json.paperlessItems || [],
+        });
+      }
+    } catch {
+      /* optional */
+    }
+  }, [ledgerId]);
+
+  useEffect(() => {
+    void load();
+    void loadImport();
+  }, [load, loadImport]);
+
+  async function addMember() {
+    if (!memberName.trim()) return;
+    try {
+      const res = await fetch(`/api/finance-ledgers/${ledgerId}/members`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          displayName: memberName.trim(),
+          email: memberEmail.trim() || null,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Fehler");
+      setMemberName("");
+      setMemberEmail("");
+      setStatus(`Teilnehmer «${json.member.display_name}» hinzugefügt.`);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function copyShareUrl(path: string) {
+    const url = `${window.location.origin}${path}`;
+    await navigator.clipboard.writeText(url);
+    setStatus("Link kopiert.");
+  }
+
+  async function rotateToken(memberId: number) {
+    try {
+      const res = await fetch(
+        `/api/finance-ledgers/${ledgerId}/members/${memberId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ rotateToken: true }),
+        }
+      );
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Fehler");
+      setStatus("Einladungs-Link erneuert.");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function addExpense() {
+    const amount = Number(expAmount);
+    if (!amount || !expPayer) return;
+    try {
+      const res = await fetch(`/api/finance-ledgers/${ledgerId}/expenses`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          paidByMemberId: Number(expPayer),
+          amount,
+          currency: expCurrency,
+          exchangeRate: Number(expRate) || 1,
+          description: expDesc.trim() || null,
+          expenseDate: expDate || null,
+          split: { mode: "equal" },
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Fehler");
+      setExpAmount("");
+      setExpDesc("");
+      setExpDate("");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function addSettlement() {
+    const amount = Number(setAmount);
+    if (!amount || !expPayer || !setTo) return;
+    try {
+      const res = await fetch(`/api/finance-ledgers/${ledgerId}/settlements`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fromMemberId: Number(expPayer),
+          toMemberId: Number(setTo),
+          amount,
+          currency: data?.ledger.base_currency ?? "CHF",
+          note: setNote.trim() || null,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Fehler");
+      setSetAmount("");
+      setSetNote("");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function deleteExpense(expenseId: number) {
+    if (!window.confirm("Ausgabe löschen?")) return;
+    try {
+      const res = await fetch(
+        `/api/finance-ledgers/${ledgerId}/expenses/${expenseId}`,
+        { method: "DELETE" }
+      );
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Fehler");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function importDocument(doc: ImportDoc) {
+    if (!importPayer) return;
+    try {
+      const res = await fetch(`/api/finance-ledgers/${ledgerId}/import`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          documentId: doc.document_id,
+          paidByMemberId: Number(importPayer),
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Import fehlgeschlagen");
+      setStatus("Beleg importiert.");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function sendReminders() {
+    try {
+      const res = await fetch(`/api/finance-ledgers/${ledgerId}/remind`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Fehler");
+      const sent = (json.results || []).filter(
+        (r: { ok: boolean }) => r.ok
+      ).length;
+      setStatus(
+        json.emailConfigured
+          ? `${sent} Erinnerung(en) gesendet.`
+          : "E-Mail nicht konfiguriert – mailto-Links in Teilnehmer-Karten nutzen."
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  if (loading && !data) {
+    return <p className="p-6 text-sm text-muted-foreground">Lade Abrechnung…</p>;
+  }
+  if (!data) {
+    return (
+      <p className="p-6 text-sm text-destructive">
+        {error || "Abrechnung nicht gefunden."}
+      </p>
+    );
+  }
+
+  const { ledger, members, expenses, settlements, balances, simplifiedDebts } =
+    data;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center gap-2">
+        <Link
+          href="/finance-brain"
+          className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
+        >
+          <ArrowLeft className="mr-1 size-4" />
+          Zurück
+        </Link>
+        {ledger.trip_id ? (
+          <Link
+            href={`/trips/${ledger.trip_id}`}
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+          >
+            Reise öffnen
+          </Link>
+        ) : null}
+        <Button variant="outline" size="sm" onClick={() => void load()}>
+          <RefreshCw className="mr-1 size-4" />
+          Aktualisieren
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => void sendReminders()}>
+          <Bell className="mr-1 size-4" />
+          Saldo-Erinnerungen
+        </Button>
+      </div>
+
+      <PageHeader
+        title={ledger.title}
+        description={
+          ledger.trip_title
+            ? `Basiswährung ${ledger.base_currency} · Reise: ${ledger.trip_title}`
+            : `Basiswährung ${ledger.base_currency}`
+        }
+        icon={pageVisuals.financeBrain.icon}
+        tone={pageVisuals.financeBrain.tone}
+      />
+
+      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      {status ? <p className="text-sm text-muted-foreground">{status}</p> : null}
+
+      <BalanceView
+        balances={balances}
+        simplifiedDebts={simplifiedDebts}
+        baseCurrency={ledger.base_currency}
+      />
+
+      <SectionCard title="Teilnehmer & Einladungs-Links">
+        <div className="mb-4 grid gap-2 sm:grid-cols-3">
+          <Input
+            placeholder="Name"
+            value={memberName}
+            onChange={(e) => setMemberName(e.target.value)}
+          />
+          <Input
+            placeholder="E-Mail (optional)"
+            type="email"
+            value={memberEmail}
+            onChange={(e) => setMemberEmail(e.target.value)}
+          />
+          <Button onClick={() => void addMember()} disabled={!memberName.trim()}>
+            <Plus className="mr-1 size-4" />
+            Hinzufügen
+          </Button>
+        </div>
+        <div className="space-y-2">
+          {members.map((m) => (
+            <div
+              key={m.id}
+              className="flex flex-wrap items-center gap-2 rounded-lg border border-border/60 px-3 py-2 text-sm"
+            >
+              <span className="font-medium">{m.display_name}</span>
+              {m.email ? (
+                <Badge variant="secondary">{m.email}</Badge>
+              ) : null}
+              {m.invite_revoked_at ? (
+                <Badge variant="destructive">Widerrufen</Badge>
+              ) : null}
+              <div className="ml-auto flex flex-wrap gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => void copyShareUrl(m.share_url)}
+                >
+                  <Copy className="mr-1 size-3" />
+                  Link
+                </Button>
+                <a
+                  href={`mailto:?subject=${encodeURIComponent(`FinanzBrain: ${ledger.title}`)}&body=${encodeURIComponent(`Dein Link: ${window.location.origin}${m.share_url}`)}`}
+                  className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
+                >
+                  <Mail className="mr-1 size-3" />
+                  mailto
+                </a>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => void rotateToken(m.id)}
+                >
+                  <RotateCw className="mr-1 size-3" />
+                  Token
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Ausgabe erfassen">
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="space-y-1">
+            <Label>Betrag</Label>
+            <Input
+              type="number"
+              step="0.01"
+              value={expAmount}
+              onChange={(e) => setExpAmount(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label>Währung</Label>
+            <Select
+              value={expCurrency}
+              onValueChange={(v) => {
+                if (v == null) return;
+                setExpCurrency(v);
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {COMMON_CURRENCIES.map((c) => (
+                  <SelectItem key={c} value={c}>
+                    {c}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label>Kurs → {ledger.base_currency}</Label>
+            <Input
+              type="number"
+              step="0.0001"
+              value={expRate}
+              onChange={(e) => setExpRate(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label>Bezahlt von</Label>
+            <Select
+              value={expPayer}
+              onValueChange={(v) => {
+                if (v == null) return;
+                setExpPayer(v);
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Person" />
+              </SelectTrigger>
+              <SelectContent>
+                {members.map((m) => (
+                  <SelectItem key={m.id} value={String(m.id)}>
+                    {m.display_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1 sm:col-span-2">
+            <Label>Beschreibung</Label>
+            <Input
+              value={expDesc}
+              onChange={(e) => setExpDesc(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label>Datum</Label>
+            <Input
+              type="date"
+              value={expDate}
+              onChange={(e) => setExpDate(e.target.value)}
+            />
+          </div>
+          <div className="flex items-end">
+            <Button onClick={() => void addExpense()} disabled={!expAmount}>
+              Speichern
+            </Button>
+          </div>
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Aufteilung: gleichmässig auf alle Teilnehmer.
+        </p>
+      </SectionCard>
+
+      <SectionCard title="Rückzahlung">
+        <div className="grid gap-2 sm:grid-cols-4">
+          <div className="space-y-1">
+            <Label>Von</Label>
+            <Select
+              value={expPayer}
+              onValueChange={(v) => {
+                if (v == null) return;
+                setExpPayer(v);
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {members.map((m) => (
+                  <SelectItem key={m.id} value={String(m.id)}>
+                    {m.display_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label>An</Label>
+            <Select
+              value={setTo}
+              onValueChange={(v) => {
+                if (v == null) return;
+                setSetTo(v);
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Empfänger" />
+              </SelectTrigger>
+              <SelectContent>
+                {members.map((m) => (
+                  <SelectItem key={m.id} value={String(m.id)}>
+                    {m.display_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label>Betrag ({ledger.base_currency})</Label>
+            <Input
+              type="number"
+              step="0.01"
+              value={setAmount}
+              onChange={(e) => setSetAmount(e.target.value)}
+            />
+          </div>
+          <div className="flex items-end">
+            <Button onClick={() => void addSettlement()} disabled={!setAmount}>
+              Erfassen
+            </Button>
+          </div>
+          <div className="space-y-1 sm:col-span-4">
+            <Label>Notiz</Label>
+            <Textarea
+              rows={2}
+              value={setNote}
+              onChange={(e) => setSetNote(e.target.value)}
+            />
+          </div>
+        </div>
+      </SectionCard>
+
+      {(importDocs.tripDocuments.length > 0 ||
+        importDocs.paperlessItems.length > 0) && (
+        <SectionCard title="Belege importieren">
+          <div className="mb-3 space-y-1">
+            <Label>Bezahlt von</Label>
+            <Select
+              value={importPayer}
+              onValueChange={(v) => {
+                if (v == null) return;
+                setImportPayer(v);
+              }}
+            >
+              <SelectTrigger className="max-w-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {members.map((m) => (
+                  <SelectItem key={m.id} value={String(m.id)}>
+                    {m.display_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {importDocs.tripDocuments.length > 0 ? (
+            <div className="mb-4 space-y-2">
+              <p className="text-xs font-medium text-muted-foreground">
+                Reise-Belege
+              </p>
+              {importDocs.tripDocuments.map((doc) => (
+                <ImportRow
+                  key={`trip-${doc.document_id}`}
+                  doc={doc}
+                  baseCurrency={ledger.base_currency}
+                  onImport={() => void importDocument(doc)}
+                />
+              ))}
+            </div>
+          ) : null}
+          {importDocs.paperlessItems.length > 0 ? (
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground">
+                Paperless (Finanzblick)
+              </p>
+              {importDocs.paperlessItems.slice(0, 20).map((doc) => (
+                <ImportRow
+                  key={`pl-${doc.document_id}`}
+                  doc={doc}
+                  baseCurrency={ledger.base_currency}
+                  onImport={() => void importDocument(doc)}
+                />
+              ))}
+            </div>
+          ) : null}
+        </SectionCard>
+      )}
+
+      <SectionCard title="Ausgaben">
+        <ExpenseList
+          expenses={expenses}
+          members={members}
+          baseCurrency={ledger.base_currency}
+          canDelete
+          onDelete={(id) => void deleteExpense(id)}
+        />
+      </SectionCard>
+
+      <SectionCard title="Rückzahlungen">
+        <SettlementList
+          settlements={settlements}
+          members={members}
+          baseCurrency={ledger.base_currency}
+        />
+      </SectionCard>
+    </div>
+  );
+}
+
+function ImportRow({
+  doc,
+  baseCurrency,
+  onImport,
+}: {
+  doc: ImportDoc;
+  baseCurrency: string;
+  onImport: () => void;
+}) {
+  const label =
+    [doc.vendor, doc.title].filter(Boolean).join(" · ") ||
+    doc.title ||
+    `Beleg #${doc.document_id}`;
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border/60 px-3 py-2 text-sm">
+      <Link2 className="size-4 shrink-0 text-muted-foreground" />
+      <div className="min-w-0 flex-1">
+        <p className="truncate font-medium">{label}</p>
+        <p className="text-xs text-muted-foreground">
+          {doc.amount != null
+            ? `${doc.amount} ${doc.currency || baseCurrency}`
+            : "Betrag unbekannt"}
+          {doc.trip_event_title ? ` · ${doc.trip_event_title}` : ""}
+        </p>
+      </div>
+      <Button size="sm" variant="outline" onClick={onImport}>
+        Importieren
+      </Button>
+    </div>
+  );
+}
