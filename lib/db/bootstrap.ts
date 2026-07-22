@@ -354,6 +354,10 @@ function ensureFinanceBrainTables(db: Database.Database): void {
       document_id INTEGER,
       trip_event_id INTEGER,
       receipt_path TEXT,
+      category_label TEXT,
+      category_tone TEXT,
+      ai_image_path TEXT,
+      ai_image_prompt TEXT,
       split_mode TEXT NOT NULL DEFAULT 'equal',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
@@ -399,7 +403,20 @@ function ensureFinanceBrainTables(db: Database.Database): void {
   const expenseCols = db
     .prepare(`PRAGMA table_info(finance_expenses)`)
     .all() as Array<{ name: string }>;
-  if (!expenseCols.some((c) => c.name === "receipt_path")) {
+  const expenseColNames = new Set(expenseCols.map((c) => c.name));
+  if (!expenseColNames.has("receipt_path")) {
     db.exec(`ALTER TABLE finance_expenses ADD COLUMN receipt_path TEXT`);
+  }
+  if (!expenseColNames.has("category_label")) {
+    db.exec(`ALTER TABLE finance_expenses ADD COLUMN category_label TEXT`);
+  }
+  if (!expenseColNames.has("category_tone")) {
+    db.exec(`ALTER TABLE finance_expenses ADD COLUMN category_tone TEXT`);
+  }
+  if (!expenseColNames.has("ai_image_path")) {
+    db.exec(`ALTER TABLE finance_expenses ADD COLUMN ai_image_path TEXT`);
+  }
+  if (!expenseColNames.has("ai_image_prompt")) {
+    db.exec(`ALTER TABLE finance_expenses ADD COLUMN ai_image_prompt TEXT`);
   }
 }

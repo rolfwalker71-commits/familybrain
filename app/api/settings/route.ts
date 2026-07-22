@@ -42,6 +42,16 @@ import {
   resetEventAiImagePromptTemplate,
   saveEventAiImagePromptTemplate,
 } from "@/lib/trips/event-image-settings";
+import {
+  DEFAULT_EXPENSE_AI_IMAGE_PROMPT,
+  EXPENSE_AI_IMAGE_PROMPT_PLACEHOLDERS,
+} from "@/lib/finance-brain/expense-image-prompt";
+import {
+  getExpenseAiImagePromptTemplate,
+  isExpenseAiImagePromptCustomized,
+  resetExpenseAiImagePromptTemplate,
+  saveExpenseAiImagePromptTemplate,
+} from "@/lib/finance-brain/expense-image-settings";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -80,6 +90,10 @@ export async function GET() {
     eventAiImagePromptCustomized: isEventAiImagePromptCustomized(),
     eventAiImagePromptDefault: DEFAULT_EVENT_AI_IMAGE_PROMPT,
     eventAiImagePromptPlaceholders: EVENT_AI_IMAGE_PROMPT_PLACEHOLDERS,
+    financeExpenseAiImagePrompt: getExpenseAiImagePromptTemplate(),
+    financeExpenseAiImagePromptCustomized: isExpenseAiImagePromptCustomized(),
+    financeExpenseAiImagePromptDefault: DEFAULT_EXPENSE_AI_IMAGE_PROMPT,
+    financeExpenseAiImagePromptPlaceholders: EXPENSE_AI_IMAGE_PROMPT_PLACEHOLDERS,
   });
 }
 
@@ -99,6 +113,8 @@ const PutSchema = z.object({
   tripMapStyle: z.enum(MAP_STYLES).optional(),
   eventAiImagePrompt: z.string().max(4000).optional(),
   resetEventAiImagePrompt: z.boolean().optional(),
+  financeExpenseAiImagePrompt: z.string().max(4000).optional(),
+  resetFinanceExpenseAiImagePrompt: z.boolean().optional(),
 });
 
 export async function PUT(request: Request) {
@@ -208,6 +224,20 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: message }, { status: 400 });
   }
 
+  let financeExpenseAiImagePrompt = getExpenseAiImagePromptTemplate();
+  try {
+    if (parsed.data.resetFinanceExpenseAiImagePrompt) {
+      financeExpenseAiImagePrompt = resetExpenseAiImagePromptTemplate();
+    } else if (parsed.data.financeExpenseAiImagePrompt !== undefined) {
+      financeExpenseAiImagePrompt = saveExpenseAiImagePromptTemplate(
+        parsed.data.financeExpenseAiImagePrompt
+      );
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return NextResponse.json({ error: message }, { status: 400 });
+  }
+
   const paperless = getPaperlessSettings();
   const openai = getOpenAISettings();
   const trilium = getTriliumSettings();
@@ -243,5 +273,9 @@ export async function PUT(request: Request) {
     eventAiImagePromptCustomized: isEventAiImagePromptCustomized(),
     eventAiImagePromptDefault: DEFAULT_EVENT_AI_IMAGE_PROMPT,
     eventAiImagePromptPlaceholders: EVENT_AI_IMAGE_PROMPT_PLACEHOLDERS,
+    financeExpenseAiImagePrompt,
+    financeExpenseAiImagePromptCustomized: isExpenseAiImagePromptCustomized(),
+    financeExpenseAiImagePromptDefault: DEFAULT_EXPENSE_AI_IMAGE_PROMPT,
+    financeExpenseAiImagePromptPlaceholders: EXPENSE_AI_IMAGE_PROMPT_PLACEHOLDERS,
   });
 }

@@ -71,8 +71,12 @@ type LedgerDetail = {
     amount_base: number;
     expense_date: string | null;
     paid_by_member_id: number;
+    category_label?: string | null;
+    category_tone?: string | null;
     receipt_url?: string | null;
     has_receipt?: boolean;
+    ai_image_url?: string | null;
+    has_ai_image?: boolean;
     splits: Array<{ member_id: number; share_amount_base: number }>;
   }>;
   settlements: Array<{
@@ -138,6 +142,7 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
   const [expPayer, setExpPayer] = useState<string>("");
   const [rateLoading, setRateLoading] = useState(false);
   const [pendingReceipt, setPendingReceipt] = useState<File | null>(null);
+  const [aiImageBusyId, setAiImageBusyId] = useState<number | null>(null);
 
   const [setAmount, setSetAmount] = useState("");
   const [setFrom, setSetFrom] = useState<string>("");
@@ -342,6 +347,9 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
           throw new Error(upJson.error || "Foto-Upload fehlgeschlagen");
         }
       }
+      if (json.expense?.id) {
+        void generateAiImage(json.expense.id);
+      }
       setExpAmount("");
       setExpDesc("");
       setExpDate("");
@@ -349,6 +357,27 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function generateAiImage(expenseId: number) {
+    setAiImageBusyId(expenseId);
+    try {
+      const res = await fetch(
+        `/api/finance-ledgers/${ledgerId}/expenses/${expenseId}/ai-image`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ useSettings: true }),
+        }
+      );
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "KI-Bild fehlgeschlagen");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setAiImageBusyId(null);
     }
   }
 
@@ -923,6 +952,8 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
             `/api/finance-ledgers/${ledgerId}/expenses/${expenseId}/receipt`
           }
           onReceiptChanged={() => void load()}
+          onGenerateAiImage={(id) => void generateAiImage(id)}
+          aiImageBusyId={aiImageBusyId}
         />
       </SectionCard>
 

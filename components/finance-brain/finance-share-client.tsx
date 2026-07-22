@@ -41,8 +41,12 @@ type ShareData = {
     amount_base: number;
     expense_date: string | null;
     paid_by_member_id: number;
+    category_label?: string | null;
+    category_tone?: string | null;
     receipt_url?: string | null;
     has_receipt?: boolean;
+    ai_image_url?: string | null;
+    has_ai_image?: boolean;
     splits: Array<{ member_id: number; share_amount_base: number }>;
   }>;
   settlements: Array<{
@@ -90,6 +94,7 @@ export function FinanceShareClient({ token }: { token: string }) {
   const [setNote, setSetNote] = useState("");
   const [rateLoading, setRateLoading] = useState(false);
   const [pendingReceipt, setPendingReceipt] = useState<File | null>(null);
+  const [aiImageBusyId, setAiImageBusyId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -170,6 +175,9 @@ export function FinanceShareClient({ token }: { token: string }) {
           throw new Error(upJson.error || "Foto-Upload fehlgeschlagen");
         }
       }
+      if (json.expense?.id) {
+        void generateAiImage(json.expense.id);
+      }
       setExpAmount("");
       setExpDesc("");
       setExpDate("");
@@ -177,6 +185,27 @@ export function FinanceShareClient({ token }: { token: string }) {
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function generateAiImage(expenseId: number) {
+    setAiImageBusyId(expenseId);
+    try {
+      const res = await fetch(
+        `/api/share/f/${encodeURIComponent(token)}/expenses/${expenseId}/ai-image`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        }
+      );
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "KI-Bild fehlgeschlagen");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setAiImageBusyId(null);
     }
   }
 
@@ -432,6 +461,8 @@ export function FinanceShareClient({ token }: { token: string }) {
             `/api/share/f/${encodeURIComponent(token)}/expenses/${expenseId}/receipt`
           }
           onReceiptChanged={() => void load()}
+          onGenerateAiImage={(id) => void generateAiImage(id)}
+          aiImageBusyId={aiImageBusyId}
         />
       </SectionCard>
 

@@ -6,7 +6,7 @@ import { ArrowLeftRight, Scale, Users } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatMoney, formatSignedMoney } from "@/lib/finance-brain/format";
 import {
-  expenseVisualFromText,
+  expenseVisualForExpense,
   settlementVisual,
 } from "@/lib/finance-brain/expense-category";
 import { ExpenseReceiptControls } from "@/components/finance-brain/expense-receipt-controls";
@@ -127,6 +127,8 @@ export function ExpenseList({
   canDelete,
   receiptUploadUrl,
   onReceiptChanged,
+  onGenerateAiImage,
+  aiImageBusyId,
 }: {
   expenses: Array<{
     id: number;
@@ -136,8 +138,12 @@ export function ExpenseList({
     amount_base: number;
     expense_date: string | null;
     paid_by_member_id: number;
+    category_label?: string | null;
+    category_tone?: string | null;
     receipt_url?: string | null;
     has_receipt?: boolean;
+    ai_image_url?: string | null;
+    has_ai_image?: boolean;
     splits: Array<{ member_id: number; share_amount_base: number }>;
   }>;
   members: Array<{ id: number; display_name: string }>;
@@ -146,6 +152,8 @@ export function ExpenseList({
   canDelete?: boolean;
   receiptUploadUrl?: (expenseId: number) => string;
   onReceiptChanged?: () => void;
+  onGenerateAiImage?: (expenseId: number) => void;
+  aiImageBusyId?: number | null;
 }) {
   const memberName = (id: number) =>
     members.find((m) => m.id === id)?.display_name ?? `#${id}`;
@@ -156,7 +164,7 @@ export function ExpenseList({
         <p className="text-sm text-muted-foreground">Noch keine Ausgaben.</p>
       ) : (
         expenses.map((exp) => {
-          const visual = expenseVisualFromText(exp.description);
+          const visual = expenseVisualForExpense(exp);
           const surface = toneSurface(visual.tone);
           return (
             <div key={exp.id} className="relative pl-5 sm:pl-6">
@@ -174,52 +182,80 @@ export function ExpenseList({
               >
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
-                    <p className="font-semibold">
-                      {exp.description || "Ausgabe"}
-                      {exp.expense_date ? (
-                        <span className="ml-2 text-xs font-normal text-muted-foreground">
-                          {exp.expense_date}
-                        </span>
-                      ) : null}
-                    </p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      <span
-                        className={cn(
-                          "mr-1.5 inline-flex rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
-                          surface.soft
-                        )}
-                      >
-                        {visual.label}
-                      </span>
-                      Bezahlt von {memberName(exp.paid_by_member_id)} ·{" "}
-                      {formatMoney(exp.amount, exp.currency)}
-                      {exp.currency !== baseCurrency
-                        ? ` (${formatMoney(exp.amount_base, baseCurrency)})`
-                        : ""}
-                    </p>
-                    {receiptUploadUrl ? (
-                      <ExpenseReceiptControls
-                        expenseId={exp.id}
-                        receiptUrl={exp.receipt_url}
-                        uploadUrl={receiptUploadUrl(exp.id)}
-                        onChanged={onReceiptChanged}
-                        compact
-                      />
-                    ) : exp.receipt_url ? (
-                      <a
-                        href={exp.receipt_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="mt-1 inline-block"
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <div className="flex flex-wrap items-start gap-3">
+                      {exp.ai_image_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
                         <img
-                          src={exp.receipt_url}
-                          alt="Beleg"
-                          className="h-10 w-10 rounded border border-border/60 object-cover"
+                          src={exp.ai_image_url}
+                          alt=""
+                          className="h-14 w-14 shrink-0 rounded-md border border-foreground/10 object-cover shadow-sm"
                         />
-                      </a>
-                    ) : null}
+                      ) : null}
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold">
+                          {exp.description || "Ausgabe"}
+                          {exp.expense_date ? (
+                            <span className="ml-2 text-xs font-normal text-muted-foreground">
+                              {exp.expense_date}
+                            </span>
+                          ) : null}
+                        </p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          <span
+                            className={cn(
+                              "mr-1.5 inline-flex rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+                              surface.soft
+                            )}
+                          >
+                            {visual.label}
+                          </span>
+                          Bezahlt von {memberName(exp.paid_by_member_id)} ·{" "}
+                          {formatMoney(exp.amount, exp.currency)}
+                          {exp.currency !== baseCurrency
+                            ? ` (${formatMoney(exp.amount_base, baseCurrency)})`
+                            : ""}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                      {receiptUploadUrl ? (
+                        <ExpenseReceiptControls
+                          expenseId={exp.id}
+                          receiptUrl={exp.receipt_url}
+                          uploadUrl={receiptUploadUrl(exp.id)}
+                          onChanged={onReceiptChanged}
+                          compact
+                        />
+                      ) : exp.receipt_url ? (
+                        <a
+                          href={exp.receipt_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-block"
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={exp.receipt_url}
+                            alt="Beleg"
+                            className="h-10 w-10 rounded border border-border/60 object-cover"
+                          />
+                        </a>
+                      ) : null}
+                      {onGenerateAiImage ? (
+                        <button
+                          type="button"
+                          className="text-xs font-medium text-foreground/80 underline-offset-2 hover:underline"
+                          disabled={aiImageBusyId === exp.id}
+                          onClick={() => onGenerateAiImage(exp.id)}
+                        >
+                          {aiImageBusyId === exp.id
+                            ? "KI-Bild…"
+                            : exp.ai_image_url
+                              ? "KI-Bild neu"
+                              : "KI-Bild"}
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
                   {canDelete && onDelete ? (
                     <button

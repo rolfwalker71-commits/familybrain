@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { classifyAndStoreExpenseCategory } from "@/lib/finance-brain/expense-classify";
 import {
   createFinanceExpense,
   getFinanceLedgerMemberByToken,
@@ -9,6 +10,7 @@ import { serializeExpense } from "@/lib/finance-brain/serialize";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 type Ctx = { params: Promise<{ token: string }> };
 
@@ -20,6 +22,7 @@ const CreateSchema = z.object({
   expenseDate: z.string().nullable().optional(),
   paidByMemberId: z.number().int().positive().optional(),
   memberIds: z.array(z.number().int().positive()).optional(),
+  place: z.string().max(200).nullable().optional(),
 });
 
 export async function POST(request: Request, context: Ctx) {
@@ -38,7 +41,7 @@ export async function POST(request: Request, context: Ctx) {
       return NextResponse.json({ error: "Ungültige Eingabe" }, { status: 400 });
     }
     const paidByMemberId = parsed.data.paidByMemberId ?? member.id;
-    const expense = createFinanceExpense(member.ledger_id, {
+    let expense = createFinanceExpense(member.ledger_id, {
       paidByMemberId,
       createdByMemberId: member.id,
       amount: parsed.data.amount,
@@ -51,6 +54,10 @@ export async function POST(request: Request, context: Ctx) {
         memberIds: parsed.data.memberIds ?? [],
       },
     });
+    expense = await classifyAndStoreExpenseCategory(
+      expense,
+      parsed.data.place
+    );
     return NextResponse.json({
       ok: true,
       expense: serializeExpense(expense, listFinanceExpenseSplits(expense.id), {

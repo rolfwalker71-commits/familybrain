@@ -27,18 +27,20 @@ export type ExpenseVisual = {
   label: string;
 };
 
-type Rule = {
+type CategoryDef = {
   label: string;
   tone: IconTone;
   icon: LucideIcon;
   keywords: string[];
+  scene: string;
 };
 
-const RULES: Rule[] = [
+export const EXPENSE_CATEGORIES: CategoryDef[] = [
   {
     label: "Essen",
     tone: "orange",
     icon: UtensilsCrossed,
+    scene: "cozy meal or breakfast table atmosphere",
     keywords: [
       "restaurant",
       "essen",
@@ -65,12 +67,9 @@ const RULES: Rule[] = [
       "imbiss",
       "takeaway",
       "delivery",
-      "mcdonald",
-      "starbucks",
       "menü",
       "menu",
       "buffet",
-      "cantine",
       "kantine",
       "mensa",
     ],
@@ -79,18 +78,21 @@ const RULES: Rule[] = [
     label: "Café",
     tone: "amber",
     icon: Coffee,
+    scene: "warm café counter with coffee cup atmosphere",
     keywords: ["café", "cafe", "kaffee", "coffee", "bäckerei", "bakery"],
   },
   {
     label: "Bar",
     tone: "rose",
     icon: Wine,
+    scene: "friendly evening bar or aperitif atmosphere",
     keywords: ["bar", "drink", "getränk", "wein", "bier", "cocktail", "pub"],
   },
   {
     label: "Hotel",
     tone: "indigo",
     icon: BedDouble,
+    scene: "welcoming hotel exterior or lobby atmosphere",
     keywords: [
       "hotel",
       "übernacht",
@@ -108,30 +110,35 @@ const RULES: Rule[] = [
     label: "Flug",
     tone: "sky",
     icon: Plane,
+    scene: "airport terminal or aircraft cabin travel atmosphere",
     keywords: ["flug", "flight", "airline", "airport", "boarding", "swiss", "lufthansa"],
   },
   {
     label: "Bahn",
     tone: "teal",
     icon: TrainFront,
-    keywords: ["bahn", "zug", "train", "sbb", "öbb", "rail", "ticket zug"],
+    scene: "train station or scenic train journey atmosphere",
+    keywords: ["bahn", "zug", "train", "sbb", "öbb", "rail"],
   },
   {
     label: "Bus",
     tone: "teal",
     icon: Bus,
+    scene: "city bus or transit atmosphere",
     keywords: ["bus", "tram", "metro", "u-bahn", "subway", "öpnv"],
   },
   {
     label: "Taxi / Transfer",
     tone: "teal",
     icon: Car,
+    scene: "city transfer or taxi ride atmosphere",
     keywords: ["taxi", "uber", "lyft", "transfer", "shuttle", "bolt"],
   },
   {
     label: "Mietwagen",
     tone: "teal",
     icon: Car,
+    scene: "scenic road trip rental car atmosphere",
     keywords: [
       "mietwagen",
       "mietauto",
@@ -147,18 +154,21 @@ const RULES: Rule[] = [
     label: "Tanken",
     tone: "amber",
     icon: Fuel,
+    scene: "roadside fuel stop travel atmosphere",
     keywords: ["tank", "benzin", "diesel", "fuel", "gas station", "shell", "esso"],
   },
   {
     label: "Parken",
     tone: "slate",
     icon: ParkingCircle,
+    scene: "parking garage or city parking atmosphere",
     keywords: ["park", "parking", "parkhaus"],
   },
   {
     label: "Einkauf",
     tone: "violet",
     icon: ShoppingBag,
+    scene: "market or grocery shopping atmosphere",
     keywords: [
       "einkauf",
       "shop",
@@ -176,6 +186,7 @@ const RULES: Rule[] = [
     label: "Ticket / Kultur",
     tone: "rose",
     icon: Ticket,
+    scene: "museum ticket desk or cultural venue atmosphere",
     keywords: [
       "ticket",
       "eintritt",
@@ -192,6 +203,7 @@ const RULES: Rule[] = [
     label: "Aktivität",
     tone: "green",
     icon: Mountain,
+    scene: "outdoor activity or sightseeing atmosphere",
     keywords: [
       "wanderung",
       "ski",
@@ -208,33 +220,50 @@ const RULES: Rule[] = [
     label: "Schiff",
     tone: "sky",
     icon: Ship,
+    scene: "ferry deck or harbor atmosphere",
     keywords: ["schiff", "ferry", "fähre", "boot", "boat", "cruise"],
   },
   {
     label: "Versicherung",
     tone: "slate",
     icon: Shield,
+    scene: "calm administrative paperwork atmosphere, no logos",
     keywords: ["versicherung", "prämie", "insurance", "concordia", "css", "helvetia"],
   },
   {
     label: "Bank / Gebühr",
     tone: "slate",
     icon: Landmark,
+    scene: "subtle banking / currency exchange atmosphere, no logos",
     keywords: ["gebühr", "fee", "bank", "wechsel", "atm", "bancomat"],
   },
   {
     label: "Rückzahlung",
     tone: "green",
     icon: ArrowLeftRight,
-    keywords: ["rückzahlung", "ausgleich", "settle", "repayment", "bezahlt zurück"],
+    scene: "friendly handshake settlement atmosphere",
+    keywords: ["rückzahlung", "ausgleich", "settle", "repayment"],
+  },
+  {
+    label: "Ausgabe",
+    tone: "green",
+    icon: Banknote,
+    scene: "friendly shared travel expense atmosphere",
+    keywords: [],
   },
 ];
+
+export const EXPENSE_CATEGORY_LABELS = EXPENSE_CATEGORIES.map((c) => c.label);
 
 const DEFAULT_VISUAL: ExpenseVisual = {
   icon: Banknote,
   tone: "green",
   label: "Ausgabe",
 };
+
+const BY_LABEL = new Map(
+  EXPENSE_CATEGORIES.map((c) => [c.label.toLowerCase(), c])
+);
 
 function normalize(text: string): string {
   return text
@@ -247,7 +276,39 @@ function normalize(text: string): string {
     .replace(/[\u0300-\u036f]/g, "");
 }
 
-/** Infer a TravelBrain-style icon/tone from free-text expense description. */
+export function expenseVisualFromLabel(
+  label: string | null | undefined,
+  toneOverride?: string | null
+): ExpenseVisual {
+  const key = (label || "").trim().toLowerCase();
+  const cat = BY_LABEL.get(key);
+  if (!cat) return DEFAULT_VISUAL;
+  const tone =
+    toneOverride && toneOverride in iconToneGuard
+      ? (toneOverride as IconTone)
+      : cat.tone;
+  return { icon: cat.icon, tone, label: cat.label };
+}
+
+const iconToneGuard: Record<string, true> = {
+  blue: true,
+  amber: true,
+  rose: true,
+  orange: true,
+  green: true,
+  teal: true,
+  sky: true,
+  indigo: true,
+  violet: true,
+  slate: true,
+};
+
+export function sceneForExpenseCategory(label: string | null | undefined): string {
+  const cat = BY_LABEL.get((label || "").trim().toLowerCase());
+  return cat?.scene ?? "friendly shared travel expense atmosphere";
+}
+
+/** Keyword fallback when AI is unavailable. */
 export function expenseVisualFromText(
   description: string | null | undefined
 ): ExpenseVisual {
@@ -255,7 +316,7 @@ export function expenseVisualFromText(
   if (!raw) return DEFAULT_VISUAL;
   const hay = normalize(raw);
 
-  for (const rule of RULES) {
+  for (const rule of EXPENSE_CATEGORIES) {
     for (const keyword of rule.keywords) {
       if (hay.includes(normalize(keyword))) {
         return {
@@ -269,10 +330,35 @@ export function expenseVisualFromText(
   return DEFAULT_VISUAL;
 }
 
+export function expenseVisualForExpense(expense: {
+  description?: string | null;
+  category_label?: string | null;
+  category_tone?: string | null;
+}): ExpenseVisual {
+  if (expense.category_label?.trim()) {
+    return expenseVisualFromLabel(
+      expense.category_label,
+      expense.category_tone
+    );
+  }
+  return expenseVisualFromText(expense.description);
+}
+
 export function settlementVisual(): ExpenseVisual {
   return {
     icon: ArrowLeftRight,
     tone: "teal",
     label: "Rückzahlung",
   };
+}
+
+export function resolveCategoryLabel(raw: string | null | undefined): string {
+  const key = (raw || "").trim().toLowerCase();
+  if (!key) return "Ausgabe";
+  const exact = BY_LABEL.get(key);
+  if (exact) return exact.label;
+  for (const cat of EXPENSE_CATEGORIES) {
+    if (key.includes(cat.label.toLowerCase())) return cat.label;
+  }
+  return "Ausgabe";
 }

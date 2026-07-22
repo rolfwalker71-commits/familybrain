@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { SPLIT_MODES } from "@/lib/finance-brain/constants";
+import { classifyAndStoreExpenseCategory } from "@/lib/finance-brain/expense-classify";
 import {
   createFinanceExpense,
-  deleteFinanceExpense,
   getFinanceLedgerById,
   listFinanceExpenseSplits,
 } from "@/lib/finance-brain/queries";
@@ -11,6 +11,7 @@ import { serializeExpense } from "@/lib/finance-brain/serialize";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -49,6 +50,7 @@ const CreateSchema = z.object({
   expenseDate: z.string().nullable().optional(),
   documentId: z.number().int().positive().nullable().optional(),
   tripEventId: z.number().int().positive().nullable().optional(),
+  place: z.string().max(200).nullable().optional(),
   split: SplitSchema,
 });
 
@@ -67,7 +69,7 @@ export async function POST(request: Request, context: Ctx) {
     if (!SPLIT_MODES.includes(parsed.data.split.mode)) {
       return NextResponse.json({ error: "Ungültiger Split-Modus" }, { status: 400 });
     }
-    const expense = createFinanceExpense(id, {
+    let expense = createFinanceExpense(id, {
       paidByMemberId: parsed.data.paidByMemberId,
       createdByMemberId: parsed.data.createdByMemberId ?? null,
       amount: parsed.data.amount,
@@ -85,6 +87,10 @@ export async function POST(request: Request, context: Ctx) {
             : undefined,
       } as import("@/lib/finance-brain/queries").ExpenseSplitInput,
     });
+    expense = await classifyAndStoreExpenseCategory(
+      expense,
+      parsed.data.place
+    );
     return NextResponse.json({
       ok: true,
       expense: serializeExpense(expense, listFinanceExpenseSplits(expense.id)),

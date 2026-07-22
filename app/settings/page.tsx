@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { KeyRound, Server, BookOpen, MessageSquareText, Luggage } from "lucide-react";
+import { KeyRound, Server, BookOpen, MessageSquareText, Luggage, HandCoins } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,7 +40,13 @@ export default function SettingsPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState<
-    "paperless" | "openai" | "trilium" | "chat" | "travelbrain" | null
+    | "paperless"
+    | "openai"
+    | "trilium"
+    | "chat"
+    | "travelbrain"
+    | "finanzbrain"
+    | null
   >(null);
   const [triliumBaseUrl, setTriliumBaseUrl] = useState("");
   const [triliumToken, setTriliumToken] = useState("");
@@ -91,6 +97,29 @@ export default function SettingsPage() {
       "{{beleg}}",
       "{{scene}}",
     ]);
+  const [financeExpenseAiImagePrompt, setFinanceExpenseAiImagePrompt] =
+    useState("");
+  const [
+    financeExpenseAiImagePromptDefault,
+    setFinanceExpenseAiImagePromptDefault,
+  ] = useState("");
+  const [
+    financeExpenseAiImagePromptCustomized,
+    setFinanceExpenseAiImagePromptCustomized,
+  ] = useState(false);
+  const [
+    financeExpenseAiImagePromptPlaceholders,
+    setFinanceExpenseAiImagePromptPlaceholders,
+  ] = useState<string[]>([
+    "{{category}}",
+    "{{description}}",
+    "{{details}}",
+    "{{amount}}",
+    "{{currency}}",
+    "{{date}}",
+    "{{place}}",
+    "{{scene}}",
+  ]);
   const [flightTestNumber, setFlightTestNumber] = useState("LX1594");
   const [flightTestDate, setFlightTestDate] = useState("2026-10-23");
   const [flightTestBusy, setFlightTestBusy] = useState(false);
@@ -143,6 +172,20 @@ export default function SettingsPage() {
       if (Array.isArray(data.eventAiImagePromptPlaceholders)) {
         setEventAiImagePromptPlaceholders(
           data.eventAiImagePromptPlaceholders.filter(
+            (p: unknown): p is string => typeof p === "string"
+          )
+        );
+      }
+      setFinanceExpenseAiImagePrompt(data.financeExpenseAiImagePrompt || "");
+      setFinanceExpenseAiImagePromptDefault(
+        data.financeExpenseAiImagePromptDefault || ""
+      );
+      setFinanceExpenseAiImagePromptCustomized(
+        Boolean(data.financeExpenseAiImagePromptCustomized)
+      );
+      if (Array.isArray(data.financeExpenseAiImagePromptPlaceholders)) {
+        setFinanceExpenseAiImagePromptPlaceholders(
+          data.financeExpenseAiImagePromptPlaceholders.filter(
             (p: unknown): p is string => typeof p === "string"
           )
         );
@@ -385,6 +428,67 @@ export default function SettingsPage() {
       setEventAiImagePromptDefault(data.eventAiImagePromptDefault || "");
       setEventAiImagePromptCustomized(false);
       setMessage("KI-Bild-Prompt auf Standard zurückgesetzt.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  async function saveFinanzBrainSettings() {
+    setSaving("finanzbrain");
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          financeExpenseAiImagePrompt,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Speichern fehlgeschlagen");
+      setFinanceExpenseAiImagePrompt(data.financeExpenseAiImagePrompt || "");
+      setFinanceExpenseAiImagePromptDefault(
+        data.financeExpenseAiImagePromptDefault || ""
+      );
+      setFinanceExpenseAiImagePromptCustomized(
+        Boolean(data.financeExpenseAiImagePromptCustomized)
+      );
+      if (Array.isArray(data.financeExpenseAiImagePromptPlaceholders)) {
+        setFinanceExpenseAiImagePromptPlaceholders(
+          data.financeExpenseAiImagePromptPlaceholders.filter(
+            (p: unknown): p is string => typeof p === "string"
+          )
+        );
+      }
+      setMessage("FinanzBrain-Einstellungen gespeichert.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  async function resetFinanceExpenseAiImagePrompt() {
+    setSaving("finanzbrain");
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ resetFinanceExpenseAiImagePrompt: true }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Zurücksetzen fehlgeschlagen");
+      setFinanceExpenseAiImagePrompt(data.financeExpenseAiImagePrompt || "");
+      setFinanceExpenseAiImagePromptDefault(
+        data.financeExpenseAiImagePromptDefault || ""
+      );
+      setFinanceExpenseAiImagePromptCustomized(false);
+      setMessage("FinanzBrain KI-Bild-Prompt auf Standard zurückgesetzt.");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -881,6 +985,67 @@ export default function SettingsPage() {
               </pre>
             ) : null}
           </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-border/80 shadow-sm">
+        <CardHeader className="flex flex-row items-center justify-between gap-3">
+          <CardTitle className="flex items-center gap-3 text-base">
+            <IconCircle icon={HandCoins} tone="green" size="sm" />
+            FinanzBrain
+          </CardTitle>
+          {financeExpenseAiImagePromptCustomized ? (
+            <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">
+              Angepasst
+            </Badge>
+          ) : (
+            <Badge variant="secondary">Standard</Badge>
+          )}
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Ausgaben werden per KI kategorisiert (Icon oben links). Zusätzlich
+            kann ein kleines Illustrationsbild erzeugt werden – analog
+            TravelBrain, mit eigenem Prompt.
+          </p>
+          <div className="space-y-2">
+            <Label htmlFor="financeExpenseAiImagePrompt">
+              Default-Prompt für Ausgaben-KI-Bilder
+            </Label>
+            <Textarea
+              id="financeExpenseAiImagePrompt"
+              rows={7}
+              value={financeExpenseAiImagePrompt}
+              onChange={(e) => setFinanceExpenseAiImagePrompt(e.target.value)}
+              placeholder={financeExpenseAiImagePromptDefault}
+            />
+            <p className="text-xs text-muted-foreground">
+              Platzhalter:{" "}
+              <code className="text-[11px]">
+                {financeExpenseAiImagePromptPlaceholders.join(" ")}
+              </code>
+              . In {"{{details}}"} landen Betrag, Datum, Ort und Zahler.
+              Kategorie-Icons setzt die KI beim Speichern; Modell für Bilder:{" "}
+              <code className="text-[11px]">gpt-image-2</code>.
+            </p>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={saving !== null}
+              onClick={() => void resetFinanceExpenseAiImagePrompt()}
+            >
+              Prompt zurücksetzen
+            </Button>
+          </div>
+          <Button
+            onClick={() => void saveFinanzBrainSettings()}
+            disabled={saving !== null}
+          >
+            {saving === "finanzbrain"
+              ? "Speichert…"
+              : "FinanzBrain speichern"}
+          </Button>
         </CardContent>
       </Card>
 

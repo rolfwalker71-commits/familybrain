@@ -14,6 +14,10 @@ import {
   receiptPublicUrl,
   receiptSharePublicUrl,
 } from "@/lib/finance-brain/receipts";
+import {
+  expenseAiImagePublicUrl,
+  expenseAiImageSharePublicUrl,
+} from "@/lib/finance-brain/expense-image";
 import { getTripById } from "@/lib/trips/queries";
 
 export function serializeLedger(ledger: FinanceLedgerRow) {
@@ -49,14 +53,20 @@ export function serializeExpense(
   splits: FinanceExpenseSplitRow[],
   options?: { shareToken?: string }
 ) {
-  const { receipt_path, ...rest } = expense;
+  const { receipt_path, ai_image_path, ai_image_prompt: _prompt, ...rest } =
+    expense;
   const receipt_url = options?.shareToken
     ? receiptSharePublicUrl(options.shareToken, receipt_path)
     : receiptPublicUrl(receipt_path);
+  const ai_image_url = options?.shareToken
+    ? expenseAiImageSharePublicUrl(options.shareToken, ai_image_path)
+    : expenseAiImagePublicUrl(ai_image_path);
   return {
     ...rest,
     has_receipt: Boolean(receipt_path),
     receipt_url,
+    has_ai_image: Boolean(ai_image_path),
+    ai_image_url,
     splits,
   };
 }

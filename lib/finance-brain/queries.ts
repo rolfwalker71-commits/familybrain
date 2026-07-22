@@ -46,6 +46,10 @@ export type FinanceExpenseRow = {
   document_id: number | null;
   trip_event_id: number | null;
   receipt_path: string | null;
+  category_label: string | null;
+  category_tone: string | null;
+  ai_image_path: string | null;
+  ai_image_prompt: string | null;
   split_mode: string;
   created_at: string;
   updated_at: string;
@@ -491,6 +495,42 @@ function insertSplits(
   }
 }
 
+export function setFinanceExpenseCategory(
+  expenseId: number,
+  input: { categoryLabel: string; categoryTone: string }
+): FinanceExpenseRow {
+  const existing = getFinanceExpenseById(expenseId);
+  if (!existing) throw new Error("Ausgabe nicht gefunden");
+  const db = getDb();
+  db.prepare(
+    `UPDATE finance_expenses SET
+       category_label = ?,
+       category_tone = ?,
+       updated_at = ?
+     WHERE id = ?`
+  ).run(input.categoryLabel, input.categoryTone, nowIso(), expenseId);
+  touchLedger(existing.ledger_id);
+  return getFinanceExpenseById(expenseId)!;
+}
+
+export function setFinanceExpenseAiImage(
+  expenseId: number,
+  input: { aiImagePath: string | null; aiImagePrompt: string | null }
+): FinanceExpenseRow {
+  const existing = getFinanceExpenseById(expenseId);
+  if (!existing) throw new Error("Ausgabe nicht gefunden");
+  const db = getDb();
+  db.prepare(
+    `UPDATE finance_expenses SET
+       ai_image_path = ?,
+       ai_image_prompt = ?,
+       updated_at = ?
+     WHERE id = ?`
+  ).run(input.aiImagePath, input.aiImagePrompt, nowIso(), expenseId);
+  touchLedger(existing.ledger_id);
+  return getFinanceExpenseById(expenseId)!;
+}
+
 export function setFinanceExpenseReceiptPath(
   expenseId: number,
   receiptPath: string | null
@@ -514,11 +554,13 @@ export function deleteFinanceExpense(expenseId: number): void {
   );
   db.prepare(`DELETE FROM finance_expenses WHERE id = ?`).run(expenseId);
   touchLedger(existing.ledger_id);
-  if (existing.receipt_path && fs.existsSync(existing.receipt_path)) {
-    try {
-      fs.unlinkSync(existing.receipt_path);
-    } catch {
-      /* ignore */
+  for (const p of [existing.receipt_path, existing.ai_image_path]) {
+    if (p && fs.existsSync(p)) {
+      try {
+        fs.unlinkSync(p);
+      } catch {
+        /* ignore */
+      }
     }
   }
 }
