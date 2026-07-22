@@ -111,6 +111,7 @@ export function FinanceShareClient({ token }: { token: string }) {
   const [mailBusyId, setMailBusyId] = useState<number | null>(null);
   const [editBusyId, setEditBusyId] = useState<number | null>(null);
   const aiAttemptedRef = useRef<Set<number>>(new Set());
+  const formDefaultsSeededRef = useRef(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -119,9 +120,12 @@ export function FinanceShareClient({ token }: { token: string }) {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Laden fehlgeschlagen");
       setData(json);
-      setExpCurrency(json.ledger.base_currency);
-      setSetCurrency(json.ledger.base_currency);
-      setSetRate("1");
+      if (!formDefaultsSeededRef.current) {
+        setExpCurrency(json.ledger.base_currency);
+        setSetCurrency(json.ledger.base_currency);
+        setSetRate("1");
+        formDefaultsSeededRef.current = true;
+      }
       setExpPayer(String(json.member.id));
       setError(null);
     } catch (err) {
@@ -228,6 +232,8 @@ export function FinanceShareClient({ token }: { token: string }) {
       setExpDate(todayDateInputValue());
       setExpPlace("");
       setExpNote("");
+      setExpCurrency(data?.ledger.base_currency ?? "CHF");
+      setExpRate("1");
       setPendingReceipt(null);
       await load();
     } catch (err) {
@@ -312,6 +318,9 @@ export function FinanceShareClient({ token }: { token: string }) {
       paidByMemberId: number;
       place: string | null;
       note: string | null;
+      amount: number;
+      currency: string;
+      exchangeRate: number;
     }
   ) {
     setEditBusyId(expenseId);

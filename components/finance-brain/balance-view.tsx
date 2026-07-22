@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   ArrowLeftRight,
+  Download,
   Mail,
   MapPin,
   Maximize2,
@@ -102,6 +103,9 @@ export type ExpenseEditPayload = {
   paidByMemberId: number;
   place: string | null;
   note: string | null;
+  amount: number;
+  currency: string;
+  exchangeRate: number;
 };
 
 export function BalanceView({
@@ -228,6 +232,10 @@ function ExpenseCard({
   const [editPayer, setEditPayer] = useState(String(exp.paid_by_member_id));
   const [editPlace, setEditPlace] = useState(exp.place_name || "");
   const [editNote, setEditNote] = useState(exp.note || "");
+  const [editAmount, setEditAmount] = useState(String(exp.amount));
+  const [editCurrency, setEditCurrency] = useState(exp.currency);
+  const [editRate, setEditRate] = useState(String(exp.exchange_rate ?? 1));
+  const [editRateLoading, setEditRateLoading] = useState(false);
 
   const memberName = (id: number) =>
     members.find((m) => m.id === id)?.display_name ?? `#${id}`;
@@ -249,17 +257,46 @@ function ExpenseCard({
     setEditPayer(String(exp.paid_by_member_id));
     setEditPlace(exp.place_name || "");
     setEditNote(exp.note || "");
+    setEditAmount(String(exp.amount));
+    setEditCurrency(exp.currency);
+    setEditRate(String(exp.exchange_rate ?? 1));
     setEditing(true);
+  }
+
+  async function fetchEditRate(from: string) {
+    if (from === baseCurrency) {
+      setEditRate("1");
+      return;
+    }
+    setEditRateLoading(true);
+    try {
+      const params = new URLSearchParams({ from, to: baseCurrency });
+      if (editDate) params.set("date", editDate);
+      const res = await fetch(`/api/finance-ledgers/exchange-rate?${params}`);
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Kurs laden fehlgeschlagen");
+      setEditRate(String(json.rate));
+    } catch {
+      /* keep previous rate */
+    } finally {
+      setEditRateLoading(false);
+    }
   }
 
   async function saveEdit() {
     if (!onUpdate) return;
+    const parsedAmount = Number(editAmount);
+    const parsedRate = Number(editRate) || 1;
+    if (!(parsedAmount > 0)) return;
     await onUpdate(exp.id, {
       description: editDesc.trim() || null,
       expenseDate: editDate || null,
       paidByMemberId: Number(editPayer),
       place: editPlace.trim() || null,
       note: editNote.trim() || null,
+      amount: parsedAmount,
+      currency: editCurrency,
+      exchangeRate: editCurrency === baseCurrency ? 1 : parsedRate,
     });
     setEditing(false);
   }
@@ -385,6 +422,73 @@ function ExpenseCard({
                   />
                 </div>
                 <div className="space-y-1">
+                  <Label className="text-xs">Betrag</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={editAmount}
+                    onChange={(e) => setEditAmount(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Währung</Label>
+                  <Select
+                    value={editCurrency}
+                    onValueChange={(v) => {
+                      if (v == null) return;
+                      setEditCurrency(v);
+                      if (v === baseCurrency) {
+                        setEditRate("1");
+                      } else {
+                        void fetchEditRate(v);
+                      }
+                    }}
+                    items={Object.fromEntries(
+                      COMMON_CURRENCIES.map((c) => [c, c])
+                    )}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {COMMON_CURRENCIES.map((c) => (
+                        <SelectItem key={c} value={c}>
+                          {c}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Kurs → {baseCurrency}</Label>
+                  <div className="flex gap-1.5">
+                    <Input
+                      type="number"
+                      step="0.0001"
+                      value={editRate}
+                      disabled={editCurrency === baseCurrency}
+                      onChange={(e) => setEditRate(e.target.value)}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      title="EZB-Kurs laden"
+                      disabled={
+                        editRateLoading || editCurrency === baseCurrency
+                      }
+                      onClick={() => void fetchEditRate(editCurrency)}
+                    >
+                      <Download
+                        className={cn(
+                          "size-4",
+                          editRateLoading && "animate-pulse"
+                        )}
+                      />
+                    </Button>
+                  </div>
+                </div>
+                <div className="space-y-1">
                   <Label className="text-xs">Datum</Label>
                   <Input
                     type="date"
@@ -433,14 +537,20 @@ function ExpenseCard({
                     placeholder="Optional"
                   />
                 </div>
-                <p className="text-[11px] text-muted-foreground sm:col-span-2">
-                  Betrag kann nicht geändert werden — dazu Ausgabe löschen und
-                  neu erfassen.
-                </p>
+                {editCurrency !== baseCurrency && Number(editAmount) > 0 ? (
+                  <p className="text-[11px] text-muted-foreground sm:col-span-2">
+                    ≈{" "}
+                    {formatMoney(
+                      Number(editAmount) * (Number(editRate) || 1),
+                      baseCurrency
+                    )}{" "}
+                    bei Kurs {editRate || "—"}
+                  </p>
+                ) : null}
                 <div className="flex flex-wrap gap-2 sm:col-span-2">
                   <Button
                     size="sm"
-                    disabled={editBusy}
+                    disabled={editBusy || !(Number(editAmount) > 0)}
                     onClick={() => void saveEdit()}
                   >
                     Speichern

@@ -528,7 +528,7 @@ export function setFinanceExpenseCategory(
   return getFinanceExpenseById(expenseId)!;
 }
 
-/** Update metadata only — amount/currency/splits stay fixed. */
+/** Update expense metadata and optionally amount/currency (recalculates equal splits). */
 export function updateFinanceExpense(
   expenseId: number,
   input: {
@@ -539,10 +539,15 @@ export function updateFinanceExpense(
     placeLat?: number | null;
     placeLon?: number | null;
     note?: string | null;
+    amount?: number;
+    currency?: string;
+    exchangeRate?: number;
   }
 ): FinanceExpenseRow {
   const existing = getFinanceExpenseById(expenseId);
   if (!existing) throw new Error("Ausgabe nicht gefunden");
+  const ledger = getFinanceLedgerById(existing.ledger_id);
+  if (!ledger) throw new Error("Abrechnung nicht gefunden");
 
   const paidByMemberId = input.paidByMemberId ?? existing.paid_by_member_id;
   const payer = getFinanceLedgerMemberById(paidByMemberId);
@@ -578,10 +583,35 @@ export function updateFinanceExpense(
     placeLon = input.placeLon ?? null;
   }
 
+  const amount = input.amount ?? existing.amount;
+  if (!(amount > 0)) throw new Error("Betrag muss positiv sein");
+  const currency = (input.currency ?? existing.currency).trim().toUpperCase();
+  const exchangeRate =
+    currency === ledger.base_currency.trim().toUpperCase()
+      ? 1
+      : (input.exchangeRate ?? existing.exchange_rate);
+  if (!(exchangeRate > 0)) throw new Error("Wechselkurs muss positiv sein");
+  const amountBase = toBaseAmount(
+    amount,
+    currency,
+    ledger.base_currency,
+    exchangeRate
+  );
+
+  const moneyChanged =
+    amount !== existing.amount ||
+    currency !== existing.currency.trim().toUpperCase() ||
+    exchangeRate !== existing.exchange_rate ||
+    amountBase !== existing.amount_base;
+
   const db = getDb();
   db.prepare(
     `UPDATE finance_expenses SET
        paid_by_member_id = ?,
+       amount = ?,
+       currency = ?,
+       exchange_rate = ?,
+       amount_base = ?,
        description = ?,
        expense_date = ?,
        place_name = ?,
@@ -592,6 +622,10 @@ export function updateFinanceExpense(
      WHERE id = ?`
   ).run(
     paidByMemberId,
+    amount,
+    currency,
+    exchangeRate,
+    amountBase,
     description,
     expenseDate,
     placeName,
@@ -601,6 +635,55 @@ export function updateFinanceExpense(
     nowIso(),
     expenseId
   );
+
+  if (moneyChanged) {
+    const existingSplits = listFinanceExpenseSplits(expenseId);
+    const memberIds =
+      existingSplits.length > 0
+        ? existingSplits.map((s) => s.member_id)
+        : listFinanceLedgerMembers(existing.ledger_id).map((m) => m.id);
+    const splitInput: ExpenseSplitInput =
+      existing.split_mode === "shares" &&
+      existingSplits.some((s) => s.share_units != null && s.share_units > 0)
+        ? {
+            mode: "shares",
+            shares: existingSplits.map((s) => ({
+              memberId: s.member_id,
+              units: s.share_units && s.share_units > 0 ? s.share_units : 1,
+            })),
+          }
+        : existing.split_mode === "exact"
+          ? {
+              mode: "exact",
+              amounts: (() => {
+                const oldBase = existing.amount_base || 1;
+                return existingSplits.map((s) => ({
+                  memberId: s.member_id,
+                  amountBase: roundMoney(
+                    (s.share_amount_base / oldBase) * amountBase
+                  ),
+                }));
+              })(),
+            }
+          : { mode: "equal", memberIds };
+
+    const splitMap = buildSplitMap(amountBase, splitInput, existing.ledger_id);
+    // Fix rounding drift for exact proportional rescale
+    if (splitInput.mode === "exact" && splitMap.size > 0) {
+      const sum = [...splitMap.values()].reduce((a, b) => a + b, 0);
+      const drift = roundMoney(amountBase - sum);
+      if (drift !== 0) {
+        const firstId = [...splitMap.keys()][0];
+        splitMap.set(firstId, roundMoney((splitMap.get(firstId) ?? 0) + drift));
+      }
+    }
+    validateSplitTotal(amountBase, splitMap);
+    db.prepare(`DELETE FROM finance_expense_splits WHERE expense_id = ?`).run(
+      expenseId
+    );
+    insertSplits(expenseId, splitInput, splitMap);
+  }
+
   touchLedger(existing.ledger_id);
   return getFinanceExpenseById(expenseId)!;
 }

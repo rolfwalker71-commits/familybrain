@@ -156,6 +156,7 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
   const [summaryMailBusy, setSummaryMailBusy] = useState(false);
   const [editBusyId, setEditBusyId] = useState<number | null>(null);
   const aiAttemptedRef = useRef<Set<number>>(new Set());
+  const formDefaultsSeededRef = useRef(false);
 
   const [setAmount, setSetAmount] = useState("");
   const [setCurrency, setSetCurrency] = useState("CHF");
@@ -181,9 +182,12 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Laden fehlgeschlagen");
       setData(json);
-      setExpCurrency(json.ledger.base_currency);
-      setSetCurrency(json.ledger.base_currency);
-      setSetRate("1");
+      if (!formDefaultsSeededRef.current) {
+        setExpCurrency(json.ledger.base_currency);
+        setSetCurrency(json.ledger.base_currency);
+        setSetRate("1");
+        formDefaultsSeededRef.current = true;
+      }
       if (json.members?.length && !expPayer) {
         setExpPayer(String(json.members[0].id));
         setImportPayer(String(json.members[0].id));
@@ -404,6 +408,8 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
       setExpDate(todayDateInputValue());
       setExpPlace("");
       setExpNote("");
+      setExpCurrency(data?.ledger.base_currency ?? "CHF");
+      setExpRate("1");
       setPendingReceipt(null);
       await load();
     } catch (err) {
@@ -512,6 +518,9 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
       paidByMemberId: number;
       place: string | null;
       note: string | null;
+      amount: number;
+      currency: string;
+      exchangeRate: number;
     }
   ) {
     setEditBusyId(expenseId);
@@ -1110,6 +1119,13 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
               onChange={(e) => setExpDate(e.target.value)}
             />
           </div>
+          {expCurrency !== ledger.base_currency && Number(expAmount) > 0 ? (
+            <p className="text-xs text-muted-foreground sm:col-span-2 lg:col-span-4">
+              Fremdwährung {expCurrency}: {expAmount} → ≈{" "}
+              {(Number(expAmount) * (Number(expRate) || 1)).toFixed(2)}{" "}
+              {ledger.base_currency} (Kurs {expRate || "—"})
+            </p>
+          ) : null}
           <div className="flex items-end">
             <Button onClick={() => void addExpense()} disabled={!expAmount}>
               Speichern

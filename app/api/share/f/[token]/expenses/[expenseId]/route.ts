@@ -22,6 +22,9 @@ const PatchSchema = z.object({
   paidByMemberId: z.number().int().positive().optional(),
   place: z.string().max(200).nullable().optional(),
   note: z.string().max(1000).nullable().optional(),
+  amount: z.number().positive().optional(),
+  currency: z.string().min(3).max(3).optional(),
+  exchangeRate: z.number().positive().optional(),
 });
 
 export async function PATCH(request: Request, context: Ctx) {
@@ -58,6 +61,15 @@ export async function PATCH(request: Request, context: Ctx) {
     }
     if (parsed.data.note !== undefined) {
       patch.note = parsed.data.note;
+    }
+    if (parsed.data.amount !== undefined) {
+      patch.amount = parsed.data.amount;
+    }
+    if (parsed.data.currency !== undefined) {
+      patch.currency = parsed.data.currency.toUpperCase();
+    }
+    if (parsed.data.exchangeRate !== undefined) {
+      patch.exchangeRate = parsed.data.exchangeRate;
     }
 
     if (parsed.data.place !== undefined) {
