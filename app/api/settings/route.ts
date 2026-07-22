@@ -53,8 +53,8 @@ import {
   saveExpenseAiImagePromptTemplate,
 } from "@/lib/finance-brain/expense-image-settings";
 import {
-  getResendSettingsPublic,
-  saveResendSettings,
+  getSmtpSettingsPublic,
+  saveSmtpSettings,
 } from "@/lib/finance-brain/mail-settings";
 
 export const runtime = "nodejs";
@@ -98,7 +98,7 @@ export async function GET() {
     financeExpenseAiImagePromptCustomized: isExpenseAiImagePromptCustomized(),
     financeExpenseAiImagePromptDefault: DEFAULT_EXPENSE_AI_IMAGE_PROMPT,
     financeExpenseAiImagePromptPlaceholders: EXPENSE_AI_IMAGE_PROMPT_PLACEHOLDERS,
-    ...getResendSettingsPublic(),
+    ...getSmtpSettingsPublic(),
   });
 }
 
@@ -120,9 +120,13 @@ const PutSchema = z.object({
   resetEventAiImagePrompt: z.boolean().optional(),
   financeExpenseAiImagePrompt: z.string().max(4000).optional(),
   resetFinanceExpenseAiImagePrompt: z.boolean().optional(),
-  resendApiKey: z.string().optional(),
-  clearResendApiKey: z.boolean().optional(),
-  resendFrom: z.string().max(200).nullable().optional(),
+  smtpHost: z.string().max(200).nullable().optional(),
+  smtpPort: z.number().int().min(1).max(65535).nullable().optional(),
+  smtpSecure: z.boolean().nullable().optional(),
+  smtpUser: z.string().max(320).nullable().optional(),
+  smtpPassword: z.string().optional(),
+  clearSmtpPassword: z.boolean().optional(),
+  smtpFrom: z.string().max(320).nullable().optional(),
 });
 
 export async function PUT(request: Request) {
@@ -247,14 +251,22 @@ export async function PUT(request: Request) {
   }
 
   if (
-    parsed.data.clearResendApiKey ||
-    parsed.data.resendApiKey !== undefined ||
-    parsed.data.resendFrom !== undefined
+    parsed.data.clearSmtpPassword ||
+    parsed.data.smtpHost !== undefined ||
+    parsed.data.smtpPort !== undefined ||
+    parsed.data.smtpSecure !== undefined ||
+    parsed.data.smtpUser !== undefined ||
+    parsed.data.smtpPassword !== undefined ||
+    parsed.data.smtpFrom !== undefined
   ) {
-    saveResendSettings({
-      clearApiKey: parsed.data.clearResendApiKey,
-      apiKey: parsed.data.resendApiKey,
-      from: parsed.data.resendFrom,
+    saveSmtpSettings({
+      host: parsed.data.smtpHost,
+      port: parsed.data.smtpPort,
+      secure: parsed.data.smtpSecure,
+      user: parsed.data.smtpUser,
+      password: parsed.data.smtpPassword,
+      clearPassword: parsed.data.clearSmtpPassword,
+      from: parsed.data.smtpFrom,
     });
   }
 
@@ -297,6 +309,6 @@ export async function PUT(request: Request) {
     financeExpenseAiImagePromptCustomized: isExpenseAiImagePromptCustomized(),
     financeExpenseAiImagePromptDefault: DEFAULT_EXPENSE_AI_IMAGE_PROMPT,
     financeExpenseAiImagePromptPlaceholders: EXPENSE_AI_IMAGE_PROMPT_PLACEHOLDERS,
-    ...getResendSettingsPublic(),
+    ...getSmtpSettingsPublic(),
   });
 }

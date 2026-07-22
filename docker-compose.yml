@@ -30,8 +30,12 @@ services:
       QDRANT_COLLECTION: ${QDRANT_COLLECTION:-familybrain_chunks}
       OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
       # Optional FinanzBrain mail (or set in UI Einstellungen)
-      RESEND_API_KEY: ${RESEND_API_KEY:-}
-      RESEND_FROM: ${RESEND_FROM:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-}
+      SMTP_SECURE: ${SMTP_SECURE:-}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
     volumes:
       # Persist SQLite (+ WAL) across restarts / redeploys
       - ./data:/app/data

@@ -14,7 +14,10 @@ export async function POST(request: Request) {
   try {
     if (!isEmailConfigured()) {
       return NextResponse.json(
-        { error: "Resend ist nicht konfiguriert (API-Key fehlt)." },
+        {
+          error:
+            "SMTP ist nicht konfiguriert (Host, Benutzer, Passwort und Absender).",
+        },
         { status: 400 }
       );
     }

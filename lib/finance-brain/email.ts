@@ -1,63 +1,63 @@
-/** Optional email notifications for FinanzBrain (Resend). */
+/** Optional email notifications for FinanzBrain (SMTP, e.g. iCloud+). */
 
+import nodemailer from "nodemailer";
 import {
-  getResendApiKey,
-  getResendFrom,
+  getSmtpSettings,
   isEmailConfigured,
 } from "@/lib/finance-brain/mail-settings";
 
 export { isEmailConfigured };
 
-export type ResendAttachment = {
+export type MailAttachment = {
   filename: string;
   content: string; // base64
   content_id?: string;
 };
 
-export async function sendResendEmail(input: {
+export async function sendMail(input: {
   to: string | string[];
   subject: string;
   text: string;
   html?: string;
-  attachments?: ResendAttachment[];
+  attachments?: MailAttachment[];
 }): Promise<{ ok: boolean; error?: string }> {
-  const apiKey = getResendApiKey();
-  if (!apiKey) {
-    return { ok: false, error: "E-Mail nicht konfiguriert (Resend API-Key fehlt)" };
+  if (!isEmailConfigured()) {
+    return {
+      ok: false,
+      error: "E-Mail nicht konfiguriert (SMTP-Zugangsdaten fehlen)",
+    };
   }
-  const from = getResendFrom();
+  const smtp = getSmtpSettings();
   const to = Array.isArray(input.to) ? input.to : [input.to];
   if (to.length === 0) {
     return { ok: false, error: "Keine Empfänger" };
   }
 
   try {
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
+    const transporter = nodemailer.createTransport({
+      host: smtp.host,
+      port: smtp.port,
+      secure: smtp.secure,
+      auth: {
+        user: smtp.user,
+        pass: smtp.password!,
       },
-      body: JSON.stringify({
-        from,
-        to,
-        subject: input.subject,
-        text: input.text,
-        html: input.html,
-        attachments: input.attachments?.map((a) => ({
-          filename: a.filename,
-          content: a.content,
-          ...(a.content_id ? { content_id: a.content_id } : {}),
-        })),
-      }),
     });
-    if (!res.ok) {
-      const data = (await res.json().catch(() => ({}))) as { message?: string };
-      return {
-        ok: false,
-        error: data.message || `Resend-Fehler (${res.status})`,
-      };
-    }
+
+    await transporter.sendMail({
+      from: smtp.from,
+      to: to.join(", "),
+      subject: input.subject,
+      text: input.text,
+      html: input.html,
+      attachments: input.attachments?.map((a) => ({
+        filename: a.filename,
+        content: Buffer.from(a.content, "base64"),
+        ...(a.content_id
+          ? { cid: a.content_id, contentDisposition: "inline" as const }
+          : {}),
+      })),
+    });
     return { ok: true };
   } catch (error) {
     return {
@@ -88,7 +88,7 @@ export async function sendFinanceInviteEmail(input: {
   ledgerTitle: string;
   shareUrl: string;
 }): Promise<{ ok: boolean; error?: string }> {
-  return sendResendEmail({
+  return sendMail({
     to: input.to,
     subject: `FinanzBrain: ${input.ledgerTitle}`,
     text:
@@ -113,7 +113,7 @@ export async function sendBalanceReminderEmail(input: {
         ? `Dir werden ${input.netBalance.toFixed(2)} ${input.baseCurrency} geschuldet.`
         : "Dein Saldo ist ausgeglichen.";
 
-  return sendResendEmail({
+  return sendMail({
     to: input.to,
     subject: `FinanzBrain Saldo: ${input.ledgerTitle}`,
     text:
@@ -124,15 +124,15 @@ export async function sendBalanceReminderEmail(input: {
 }
 
 export async function sendTestEmail(to: string): Promise<{ ok: boolean; error?: string }> {
-  return sendResendEmail({
+  return sendMail({
     to,
     subject: "FamilyBrain Testmail",
     text:
       "Hallo,\n\ndies ist eine Testmail aus den FamilyBrain-Einstellungen.\n" +
-      "Wenn du diese Nachricht siehst, ist Resend korrekt konfiguriert.\n",
+      "Wenn du diese Nachricht siehst, ist SMTP korrekt konfiguriert.\n",
     html: `<!DOCTYPE html><body style="font-family:system-ui,sans-serif;padding:24px;">
       <h2>FamilyBrain Testmail</h2>
-      <p>Resend ist korrekt konfiguriert. FinanzBrain kann Beleg-Mails versenden.</p>
+      <p>SMTP ist korrekt konfiguriert. FinanzBrain kann Beleg-Mails versenden.</p>
     </body>`,
   });
 }

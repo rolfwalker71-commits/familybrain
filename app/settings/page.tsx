@@ -19,6 +19,12 @@ import {
 import { PageHeader } from "@/components/layout/page-primitives";
 import { IconCircle, pageVisuals } from "@/components/layout/icon-circle";
 
+const ICLOUD_SMTP = {
+  host: "smtp.mail.me.com",
+  port: 587,
+  secure: false,
+} as const;
+
 const OPENAI_MODELS = [
   "gpt-4o-mini",
   "gpt-4o",
@@ -121,12 +127,17 @@ export default function SettingsPage() {
     "{{place}}",
     "{{scene}}",
   ]);
-  const [resendApiKey, setResendApiKey] = useState("");
-  const [resendApiKeyMasked, setResendApiKeyMasked] = useState<string | null>(
+  const [smtpHost, setSmtpHost] = useState<string>(ICLOUD_SMTP.host);
+  const [smtpPort, setSmtpPort] = useState(String(ICLOUD_SMTP.port));
+  const [smtpSecure, setSmtpSecure] = useState(Boolean(ICLOUD_SMTP.secure));
+  const [smtpUser, setSmtpUser] = useState("");
+  const [smtpPassword, setSmtpPassword] = useState("");
+  const [smtpPasswordMasked, setSmtpPasswordMasked] = useState<string | null>(
     null
   );
-  const [hasResendApiKey, setHasResendApiKey] = useState(false);
-  const [resendFrom, setResendFrom] = useState("");
+  const [hasSmtpPassword, setHasSmtpPassword] = useState(false);
+  const [smtpFrom, setSmtpFrom] = useState("");
+  const [emailConfigured, setEmailConfigured] = useState(false);
   const [testMailTo, setTestMailTo] = useState("");
   const [testMailBusy, setTestMailBusy] = useState(false);
   const [flightTestNumber, setFlightTestNumber] = useState("LX1594");
@@ -199,9 +210,14 @@ export default function SettingsPage() {
           )
         );
       }
-      setResendApiKeyMasked(data.resendApiKeyMasked || null);
-      setHasResendApiKey(Boolean(data.hasResendApiKey));
-      setResendFrom(data.resendFrom || "");
+      setSmtpHost(data.smtpHost || ICLOUD_SMTP.host);
+      setSmtpPort(String(data.smtpPort || ICLOUD_SMTP.port));
+      setSmtpSecure(Boolean(data.smtpSecure));
+      setSmtpUser(data.smtpUser || "");
+      setSmtpPasswordMasked(data.smtpPasswordMasked || null);
+      setHasSmtpPassword(Boolean(data.hasSmtpPassword));
+      setSmtpFrom(data.smtpFrom || "");
+      setEmailConfigured(Boolean(data.emailConfigured));
     })();
   }, []);
 
@@ -513,21 +529,34 @@ export default function SettingsPage() {
     setError(null);
     setMessage(null);
     try {
+      const port = Number(smtpPort);
+      if (!Number.isFinite(port) || port < 1 || port > 65535) {
+        throw new Error("SMTP-Port muss zwischen 1 und 65535 liegen.");
+      }
       const res = await fetch("/api/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          resendApiKey: resendApiKey || undefined,
-          resendFrom: resendFrom.trim() || null,
+          smtpHost: smtpHost.trim() || null,
+          smtpPort: port,
+          smtpSecure,
+          smtpUser: smtpUser.trim() || null,
+          smtpPassword: smtpPassword || undefined,
+          smtpFrom: smtpFrom.trim() || null,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Speichern fehlgeschlagen");
-      setResendApiKeyMasked(data.resendApiKeyMasked || null);
-      setHasResendApiKey(Boolean(data.hasResendApiKey));
-      setResendFrom(data.resendFrom || "");
-      setResendApiKey("");
-      setMessage("E-Mail-Einstellungen gespeichert.");
+      setSmtpHost(data.smtpHost || ICLOUD_SMTP.host);
+      setSmtpPort(String(data.smtpPort || ICLOUD_SMTP.port));
+      setSmtpSecure(Boolean(data.smtpSecure));
+      setSmtpUser(data.smtpUser || "");
+      setSmtpPasswordMasked(data.smtpPasswordMasked || null);
+      setHasSmtpPassword(Boolean(data.hasSmtpPassword));
+      setSmtpFrom(data.smtpFrom || "");
+      setEmailConfigured(Boolean(data.emailConfigured));
+      setSmtpPassword("");
+      setMessage("SMTP-Einstellungen gespeichert.");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -535,7 +564,7 @@ export default function SettingsPage() {
     }
   }
 
-  async function clearResendApiKey() {
+  async function clearSmtpPassword() {
     setSaving("email");
     setError(null);
     setMessage(null);
@@ -543,19 +572,32 @@ export default function SettingsPage() {
       const res = await fetch("/api/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clearResendApiKey: true }),
+        body: JSON.stringify({ clearSmtpPassword: true }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Löschen fehlgeschlagen");
-      setResendApiKeyMasked(data.resendApiKeyMasked || null);
-      setHasResendApiKey(Boolean(data.hasResendApiKey));
-      setResendApiKey("");
-      setMessage("Resend API-Key gelöscht.");
+      setSmtpPasswordMasked(data.smtpPasswordMasked || null);
+      setHasSmtpPassword(Boolean(data.hasSmtpPassword));
+      setEmailConfigured(Boolean(data.emailConfigured));
+      setSmtpPassword("");
+      setMessage("SMTP-Passwort gelöscht.");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setSaving(null);
     }
+  }
+
+  function applyIcloudPreset() {
+    setSmtpHost(ICLOUD_SMTP.host);
+    setSmtpPort(String(ICLOUD_SMTP.port));
+    setSmtpSecure(ICLOUD_SMTP.secure);
+    if (smtpUser.trim() && !smtpFrom.trim()) {
+      setSmtpFrom(`FamilyBrain <${smtpUser.trim()}>`);
+    }
+    setMessage(
+      "iCloud+-Preset gesetzt. Als Passwort ein App-spezifisches Passwort von appleid.apple.com verwenden."
+    );
   }
 
   async function sendSettingsTestMail() {
@@ -1077,9 +1119,9 @@ export default function SettingsPage() {
         <CardHeader className="flex flex-row items-center justify-between gap-3">
           <CardTitle className="flex items-center gap-3 text-base">
             <IconCircle icon={Mail} tone="sky" size="sm" />
-            E-Mail (Resend)
+            E-Mail (SMTP)
           </CardTitle>
-          {hasResendApiKey ? (
+          {emailConfigured ? (
             <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">
               Konfiguriert
             </Badge>
@@ -1090,54 +1132,122 @@ export default function SettingsPage() {
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
             Für FinanzBrain-Belegmails (Ausgabe / Rückzahlung) inkl. PDF-Anhang.
-            Ohne API-Key werden keine Mails versendet. Schlüssel kann auch per
-            Umgebungsvariable <code className="text-[11px]">RESEND_API_KEY</code>{" "}
-            gesetzt sein.
+            Empfohlen: iCloud+ mit App-spezifischem Passwort. Werte können auch
+            per Env gesetzt sein (
+            <code className="text-[11px]">SMTP_HOST</code>,{" "}
+            <code className="text-[11px]">SMTP_USER</code>, …).
           </p>
-          <div className="space-y-2">
-            <Label htmlFor="resendApiKey">Resend API-Key</Label>
-            <Input
-              id="resendApiKey"
-              type="password"
-              autoComplete="off"
-              value={resendApiKey}
-              onChange={(e) => setResendApiKey(e.target.value)}
-              placeholder={
-                hasResendApiKey
-                  ? resendApiKeyMasked || "••••••••"
-                  : "re_…"
-              }
-            />
-            {hasResendApiKey ? (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                disabled={saving !== null}
-                onClick={() => void clearResendApiKey()}
-              >
-                API-Key löschen
-              </Button>
-            ) : null}
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={saving !== null}
+              onClick={applyIcloudPreset}
+            >
+              iCloud+ Preset
+            </Button>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="resendFrom">Absender (From)</Label>
-            <Input
-              id="resendFrom"
-              value={resendFrom}
-              onChange={(e) => setResendFrom(e.target.value)}
-              placeholder="FamilyBrain <noreply@deine-domain.ch>"
-            />
-            <p className="text-xs text-muted-foreground">
-              Domain muss bei Resend verifiziert sein. Optional auch{" "}
-              <code className="text-[11px]">RESEND_FROM</code>.
-            </p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="smtpHost">SMTP-Host</Label>
+              <Input
+                id="smtpHost"
+                value={smtpHost}
+                onChange={(e) => setSmtpHost(e.target.value)}
+                placeholder="smtp.mail.me.com"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="smtpPort">Port</Label>
+              <Input
+                id="smtpPort"
+                inputMode="numeric"
+                value={smtpPort}
+                onChange={(e) => setSmtpPort(e.target.value)}
+                placeholder="587"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="smtpSecure">Verschlüsselung</Label>
+              <Select
+                value={smtpSecure ? "ssl" : "starttls"}
+                onValueChange={(v) => setSmtpSecure(v === "ssl")}
+              >
+                <SelectTrigger id="smtpSecure" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="starttls">STARTTLS (587)</SelectItem>
+                  <SelectItem value="ssl">SSL/TLS (465)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="smtpUser">Benutzer (E-Mail)</Label>
+              <Input
+                id="smtpUser"
+                type="email"
+                autoComplete="username"
+                value={smtpUser}
+                onChange={(e) => setSmtpUser(e.target.value)}
+                placeholder="name@icloud.com"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="smtpPassword">Passwort</Label>
+              <Input
+                id="smtpPassword"
+                type="password"
+                autoComplete="new-password"
+                value={smtpPassword}
+                onChange={(e) => setSmtpPassword(e.target.value)}
+                placeholder={
+                  hasSmtpPassword
+                    ? smtpPasswordMasked || "••••••••"
+                    : "App-spezifisches Passwort"
+                }
+              />
+              {hasSmtpPassword ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={saving !== null}
+                  onClick={() => void clearSmtpPassword()}
+                >
+                  Passwort löschen
+                </Button>
+              ) : null}
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="smtpFrom">Absender (From)</Label>
+              <Input
+                id="smtpFrom"
+                value={smtpFrom}
+                onChange={(e) => setSmtpFrom(e.target.value)}
+                placeholder="FamilyBrain <name@icloud.com>"
+              />
+              <p className="text-xs text-muted-foreground">
+                Bei iCloud muss die From-Adresse deine iCloud-Mail (oder eine
+                iCloud+-Custom-Domain) sein. App-Passwort unter{" "}
+                <a
+                  className="underline underline-offset-2"
+                  href="https://appleid.apple.com/account/manage"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  appleid.apple.com
+                </a>{" "}
+                → Anmeldung und Sicherheit → App-spezifische Passwörter.
+              </p>
+            </div>
           </div>
           <Button
             onClick={() => void saveEmailSettings()}
             disabled={saving !== null}
           >
-            {saving === "email" ? "Speichert…" : "E-Mail speichern"}
+            {saving === "email" ? "Speichert…" : "SMTP speichern"}
           </Button>
           <div className="space-y-2 border-t border-border/60 pt-4">
             <Label htmlFor="testMailTo">Testmail senden</Label>
@@ -1153,7 +1263,7 @@ export default function SettingsPage() {
               <Button
                 type="button"
                 variant="outline"
-                disabled={testMailBusy || saving !== null || !hasResendApiKey}
+                disabled={testMailBusy || saving !== null || !emailConfigured}
                 onClick={() => void sendSettingsTestMail()}
               >
                 {testMailBusy ? "Sendet…" : "Testmail"}

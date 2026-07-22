@@ -1,8 +1,8 @@
 import fs from "fs";
 import {
   isEmailConfigured,
-  sendResendEmail,
-  type ResendAttachment,
+  sendMail,
+  type MailAttachment,
 } from "@/lib/finance-brain/email";
 import {
   buildExpenseMailHtml,
@@ -78,7 +78,7 @@ export async function notifyLedgerExpense(
     expenseId: expense.id,
   });
 
-  const attachments: ResendAttachment[] = [
+  const attachments: MailAttachment[] = [
     {
       filename: `finanzbrain-ausgabe-${expense.id}.pdf`,
       content: pdf.toString("base64"),
@@ -92,7 +92,7 @@ export async function notifyLedgerExpense(
     });
   }
 
-  const result = await sendResendEmail({
+  const result = await sendMail({
     to: recipients,
     subject: mail.subject,
     text: mail.text,
@@ -155,7 +155,7 @@ export async function notifyLedgerSettlement(
     settlementId: settlement.id,
   });
 
-  const result = await sendResendEmail({
+  const result = await sendMail({
     to: recipients,
     subject: mail.subject,
     text: mail.text,
