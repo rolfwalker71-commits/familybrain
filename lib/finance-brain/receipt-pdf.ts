@@ -152,13 +152,11 @@ function drawDateBadge(
   h = 118
 ) {
   const bottom = topY - h;
-  const rr = 12;
+  const rr = Math.min(12, w / 4, h / 6);
   const border = rgb(0.85, 0.87, 0.9);
 
-  // Rounded white body (no square border overlay).
   drawRoundedRect(page, x, bottom, w, h, rr, C.white);
 
-  // Soft outer ring via slightly larger rounded stroke approximation
   page.drawRectangle({
     x: x + rr,
     y: bottom,
@@ -188,9 +186,8 @@ function drawDateBadge(
     color: border,
   });
 
-  const headerH = 28;
+  const headerH = Math.max(18, Math.min(28, Math.round(h * 0.27)));
   const headerBottom = topY - headerH;
-  // Red header with rounded top corners
   page.drawRectangle({
     x: x + rr,
     y: headerBottom,
@@ -220,38 +217,53 @@ function drawDateBadge(
   const year = iso ? iso.slice(0, 4) : "----";
   const weekday = iso ? toPdfSafeText(weekdayDe(iso)) : "Ohne Datum";
 
-  const monthSize = 12;
+  const bodyH = h - headerH;
+  const monthSize = headerH >= 24 ? 11 : 9;
+  const wdSize = bodyH >= 80 ? 10 : 8;
+  const daySize = bodyH >= 80 ? 28 : bodyH >= 65 ? 20 : 16;
+  const yearSize = bodyH >= 80 ? 11 : 9;
+  const pad = 3;
+
   page.drawText(month, {
     x: x + (w - bold.widthOfTextAtSize(month, monthSize)) / 2,
-    y: topY - headerH + 9,
+    y: topY - headerH + Math.max(4, (headerH - monthSize) / 2),
     size: monthSize,
     font: bold,
     color: C.white,
   });
 
-  const bodyTop = topY - headerH - 10;
-  const wdSize = 11;
+  // Stack weekday → day → year inside the body without overlap
+  const weekdayY = topY - headerH - pad - wdSize;
+  const yearY = bottom + pad + 2;
+  const minDayY = yearY + yearSize + 3;
+  const maxDayY = weekdayY - daySize - 2;
+  let fittedDaySize = daySize;
+  let dayY = minDayY;
+  if (maxDayY >= minDayY) {
+    dayY = (minDayY + maxDayY) / 2;
+  } else {
+    // Shrink day numeral until it fits between weekday and year
+    fittedDaySize = Math.max(12, weekdayY - 2 - minDayY);
+    dayY = minDayY;
+  }
+
   page.drawText(weekday, {
-    x: x + Math.max(4, (w - bold.widthOfTextAtSize(weekday, wdSize)) / 2),
-    y: bodyTop - wdSize,
+    x: x + Math.max(2, (w - bold.widthOfTextAtSize(weekday, wdSize)) / 2),
+    y: weekdayY,
     size: wdSize,
     font: bold,
     color: C.ink,
   });
-
-  const daySize = 34;
   page.drawText(day, {
-    x: x + (w - bold.widthOfTextAtSize(day, daySize)) / 2,
-    y: bodyTop - wdSize - daySize - 6,
-    size: daySize,
+    x: x + (w - bold.widthOfTextAtSize(day, fittedDaySize)) / 2,
+    y: dayY,
+    size: fittedDaySize,
     font: bold,
     color: C.ink,
   });
-
-  const yearSize = 13;
   page.drawText(year, {
     x: x + (w - bold.widthOfTextAtSize(year, yearSize)) / 2,
-    y: bottom + 14,
+    y: yearY,
     size: yearSize,
     font: bold,
     color: C.ink,

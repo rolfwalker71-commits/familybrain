@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/select";
 import {
   formatDateDe,
+  formatExchangeRateLine,
   formatMoney,
   formatMoneyFxSummary,
   formatSignedMoney,
@@ -373,10 +374,10 @@ function ExpenseCard({
         <div className="px-3 py-2.5 pl-7 sm:pl-8">
           {/* Fixed block for title / meta / place so cards align without shifting the header */}
           <div className="flex min-h-[4.5rem] flex-col justify-center gap-1">
-            <p className="line-clamp-1 text-base font-bold leading-snug text-foreground">
+            <p className="text-base font-bold leading-snug text-foreground">
               {exp.description || "Ausgabe"}
             </p>
-            <p className="line-clamp-2 text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               <span
                 className={cn(
                   "mr-1.5 inline-flex rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
@@ -386,27 +387,32 @@ function ExpenseCard({
                 {visual.label}
               </span>
               Bezahlt von {memberName(exp.paid_by_member_id)} · {fx.primary}
-              {fx.detail ? (
-                <>
-                  <br />
-                  <span className="text-[11px]">
-                    {exp.currency.toUpperCase()} → {baseCurrency}: {fx.detail}
-                  </span>
-                </>
-              ) : null}
             </p>
+            {fx.detail ? (
+              <p className="break-words text-[11px] leading-snug text-muted-foreground">
+                {formatMoney(exp.amount_base, baseCurrency)}
+                {" · "}
+                {formatExchangeRateLine({
+                  currency: exp.currency,
+                  baseCurrency,
+                  exchangeRate: exp.exchange_rate,
+                  amount: exp.amount,
+                  amountBase: exp.amount_base,
+                })}
+              </p>
+            ) : null}
             <p className="flex min-h-[1rem] items-center gap-1 text-xs text-muted-foreground">
               {exp.place_name ? (
                 <>
                   <MapPin className="size-3 shrink-0" />
-                  <span className="truncate">{exp.place_name}</span>
+                  <span className="break-words">{exp.place_name}</span>
                 </>
               ) : (
                 <span className="invisible select-none">—</span>
               )}
             </p>
             {exp.note?.trim() ? (
-              <p className="line-clamp-2 text-xs text-muted-foreground">
+              <p className="break-words text-xs text-muted-foreground">
                 Notiz: {exp.note.trim()}
               </p>
             ) : null}
@@ -958,8 +964,16 @@ function SettlementCard({
               {settledLabel ? ` · ${settledLabel}` : ""}
             </p>
             {fx.detail ? (
-              <p className="mt-0.5 text-[11px] text-muted-foreground">
-                {s.currency.toUpperCase()} → {baseCurrency}: {fx.detail}
+              <p className="mt-0.5 break-words text-[11px] leading-snug text-muted-foreground">
+                {formatMoney(s.amount_base, baseCurrency)}
+                {" · "}
+                {formatExchangeRateLine({
+                  currency: s.currency,
+                  baseCurrency,
+                  exchangeRate: s.exchange_rate,
+                  amount: s.amount,
+                  amountBase: s.amount_base,
+                })}
               </p>
             ) : null}
             {s.note ? (
