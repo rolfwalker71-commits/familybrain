@@ -15,6 +15,7 @@ import {
   buildLedgerExpensesPdfBuffer,
   buildSettlementPdfBuffer,
 } from "@/lib/finance-brain/receipt-pdf";
+import { loadScaledJpeg } from "@/lib/finance-brain/image-scale";
 import {
   getFinanceExpenseById,
   getFinanceLedgerById,
@@ -211,13 +212,13 @@ export async function notifyLedgerExpensesSummary(
     },
   ];
   for (const expense of expenses) {
-    if (expense.ai_image_path && fs.existsSync(expense.ai_image_path)) {
-      attachments.push({
-        filename: `expense-${expense.id}-ai.png`,
-        content: fs.readFileSync(expense.ai_image_path).toString("base64"),
-        content_id: `expense-ai-${expense.id}`,
-      });
-    }
+    const thumb = await loadScaledJpeg(expense.ai_image_path);
+    if (!thumb) continue;
+    attachments.push({
+      filename: `expense-${expense.id}-ai.jpg`,
+      content: thumb.toString("base64"),
+      content_id: `expense-ai-${expense.id}`,
+    });
   }
 
   const result = await sendMail({

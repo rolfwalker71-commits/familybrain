@@ -14,6 +14,7 @@ import {
   isForeignCurrency,
   resolveExchangeRate,
 } from "@/lib/finance-brain/format";
+import { LEDGER_SUMMARY_AI_THUMB_PX, loadScaledJpeg } from "@/lib/finance-brain/image-scale";
 
 const PAGE_W = 595.28;
 const PAGE_H = 841.89;
@@ -306,6 +307,20 @@ async function embedOptionalPng(
     } catch {
       return null;
     }
+  }
+}
+
+async function embedOptionalScaledJpeg(
+  pdf: PDFDocument,
+  filePath: string | null | undefined,
+  maxEdge: number
+): Promise<PDFImage | null> {
+  const bytes = await loadScaledJpeg(filePath, maxEdge);
+  if (!bytes) return null;
+  try {
+    return await pdf.embedJpg(bytes);
+  } catch {
+    return null;
   }
 }
 
@@ -804,8 +819,12 @@ export async function buildLedgerExpensesPdfBuffer(input: {
     const badgeH = 96;
     const padX = 12;
     const padY = 12;
-    const img = await embedOptionalPng(pdf, exp.aiImagePath);
-    const imgSize = 88;
+    const img = await embedOptionalScaledJpeg(
+      pdf,
+      exp.aiImagePath,
+      LEDGER_SUMMARY_AI_THUMB_PX
+    );
+    const imgSize = LEDGER_SUMMARY_AI_THUMB_PX;
     let imgW = 0;
     let imgH = 0;
     if (img) {
