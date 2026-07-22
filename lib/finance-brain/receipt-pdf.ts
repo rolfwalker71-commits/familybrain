@@ -281,27 +281,31 @@ function drawLabeledRow(
   labelW: number,
   valueMaxW: number,
   labelSize = 12,
-  valueSize = 15
+  valueSize = 15,
+  emphasize = false
 ): number {
   const safeLabel = toPdfSafeText(label);
-  const lines = wrapText(value, bold, valueSize, valueMaxW);
+  const useLabelSize = emphasize ? labelSize + 1 : labelSize;
+  const useValueSize = emphasize ? valueSize + 1 : valueSize;
+  const labelFont = emphasize ? bold : font;
+  const lines = wrapText(value, bold, useValueSize, valueMaxW);
   page.drawText(safeLabel, {
     x,
     y,
-    size: labelSize,
-    font,
-    color: C.muted,
+    size: useLabelSize,
+    font: labelFont,
+    color: emphasize ? C.ink : C.muted,
   });
   let yy = y;
   for (const line of lines) {
     page.drawText(line, {
       x: x + labelW,
       y: yy,
-      size: valueSize,
+      size: useValueSize,
       font: bold,
       color: C.ink,
     });
-    yy -= valueSize + 4;
+    yy -= useValueSize + 4;
   }
   return yy - 10;
 }
@@ -496,7 +500,7 @@ export async function buildExpensePdfBuffer(input: {
     exchangeRate: input.exchangeRate,
   });
 
-  const rows: Array<[string, string]> = [
+  const rows: Array<[string, string, boolean?]> = [
     ["Wer hat bezahlt", input.paidByName],
   ];
   if (hasFx) {
@@ -505,6 +509,7 @@ export async function buildExpensePdfBuffer(input: {
     rows.push([
       `Betrag ${input.baseCurrency.toUpperCase()}`,
       formatMoney(input.amountBase, input.baseCurrency),
+      true,
     ]);
     rows.push([
       "Kurs",
@@ -515,7 +520,7 @@ export async function buildExpensePdfBuffer(input: {
       }),
     ]);
   } else {
-    rows.push(["Betrag", formatMoney(input.amount, input.currency)]);
+    rows.push(["Betrag", formatMoney(input.amount, input.currency), true]);
   }
   rows.push(["Wann", formatDateDe(input.expenseDate) || "-"]);
   rows.push(["Wo", input.placeName?.trim() || "-"]);
@@ -527,7 +532,7 @@ export async function buildExpensePdfBuffer(input: {
 
   y -= 12;
   const detailsBottomMin = cardBottom + footH + (img ? imgH + 28 : 16);
-  for (const [label, value] of rows) {
+  for (const [label, value, emphasize] of rows) {
     y = drawLabeledRow(
       page,
       font,
@@ -539,7 +544,8 @@ export async function buildExpensePdfBuffer(input: {
       labelW,
       valueMaxW,
       13,
-      16
+      16,
+      Boolean(emphasize)
     );
     if (y < detailsBottomMin) break;
   }
@@ -678,7 +684,7 @@ export async function buildSettlementPdfBuffer(input: {
   y = y - 150;
   const labelW = 168;
   const valueMaxW = PAGE_W - OUTER * 2 - pad * 2 - labelW;
-  const rows: Array<[string, string]> = [
+  const rows: Array<[string, string, boolean?]> = [
     ["Von", input.fromName],
     ["An", input.toName],
   ];
@@ -688,6 +694,7 @@ export async function buildSettlementPdfBuffer(input: {
     rows.push([
       `Betrag ${input.baseCurrency.toUpperCase()}`,
       formatMoney(input.amountBase, input.baseCurrency),
+      true,
     ]);
     rows.push([
       "Kurs",
@@ -700,13 +707,13 @@ export async function buildSettlementPdfBuffer(input: {
       }),
     ]);
   } else {
-    rows.push(["Betrag", money]);
+    rows.push(["Betrag", money, true]);
   }
   rows.push(["Wann", formatDateDe(input.settledAt) || "-"]);
   rows.push(["Notiz", input.note?.trim() || "-"]);
   rows.push(["Beleg-ID", String(input.settlementId)]);
 
-  for (const [label, value] of rows) {
+  for (const [label, value, emphasize] of rows) {
     y = drawLabeledRow(
       page,
       font,
@@ -718,7 +725,8 @@ export async function buildSettlementPdfBuffer(input: {
       labelW,
       valueMaxW,
       13,
-      16
+      16,
+      Boolean(emphasize)
     );
   }
 
@@ -856,36 +864,50 @@ export async function buildLedgerExpensesPdfBuffer(input: {
       exchangeRate: exp.exchangeRate,
     });
 
-    const detailRaw = [
-      `Bezahlt von: ${exp.paidByName}`,
+    const detailLines: Array<{ text: string; emphasize?: boolean }> = [
+      { text: `Bezahlt von: ${exp.paidByName}` },
       ...(hasFx
         ? [
-            `Währung: ${exp.currency.toUpperCase()}`,
-            `FW Betrag: ${formatMoney(exp.amount, exp.currency)}`,
-            `Betrag ${exp.baseCurrency.toUpperCase()}: ${formatMoney(exp.amountBase, exp.baseCurrency)}`,
-            `Kurs: ${formatExchangeRateLine({
-              currency: exp.currency,
-              baseCurrency: exp.baseCurrency,
-              exchangeRate: rate,
-            })}`,
+            { text: `Währung: ${exp.currency.toUpperCase()}` },
+            { text: `FW Betrag: ${formatMoney(exp.amount, exp.currency)}` },
+            {
+              text: `Betrag ${exp.baseCurrency.toUpperCase()}: ${formatMoney(exp.amountBase, exp.baseCurrency)}`,
+              emphasize: true,
+            },
+            {
+              text: `Kurs: ${formatExchangeRateLine({
+                currency: exp.currency,
+                baseCurrency: exp.baseCurrency,
+                exchangeRate: rate,
+              })}`,
+            },
           ]
-        : [`Betrag: ${formatMoney(exp.amount, exp.currency)}`]),
-      exp.placeName?.trim() ? `Ort: ${exp.placeName.trim()}` : null,
-      exp.note?.trim() ? `Notiz: ${exp.note.trim()}` : null,
-      `Beleg-ID: ${exp.expenseId}`,
-    ].filter(Boolean) as string[];
+        : [
+            {
+              text: `Betrag: ${formatMoney(exp.amount, exp.currency)}`,
+              emphasize: true,
+            },
+          ]),
+      ...(exp.placeName?.trim()
+        ? [{ text: `Ort: ${exp.placeName.trim()}` }]
+        : []),
+      ...(exp.note?.trim() ? [{ text: `Notiz: ${exp.note.trim()}` }] : []),
+      { text: `Beleg-ID: ${exp.expenseId}` },
+    ];
 
-    const detailWrapped = detailRaw.flatMap((line) =>
-      wrapText(line, font, 10, textW)
+    const detailWrapped = detailLines.flatMap((line) =>
+      wrapText(line.text, line.emphasize ? bold : font, line.emphasize ? 11 : 10, textW).map(
+        (wline) => ({ text: wline, emphasize: Boolean(line.emphasize) })
+      )
     );
 
-    // Measure text column: title (16/line) + category (20) + details (13/line)
+    // Measure text column: title (16/line) + category (20) + details
     const textColH =
-      4 + // top inset before title
+      4 +
       titleLinesExp.length * 16 +
-      20 + // category
-      detailWrapped.length * 13 +
-      8; // bottom breathing room
+      20 +
+      detailWrapped.reduce((h, line) => h + (line.emphasize ? 14 : 13), 0) +
+      8;
 
     const cardH =
       Math.max(badgeH, imgH, textColH) + padY * 2;
@@ -931,14 +953,14 @@ export async function buildLedgerExpensesPdfBuffer(input: {
     ty -= 20;
 
     for (const wline of detailWrapped) {
-      page.drawText(wline, {
+      page.drawText(wline.text, {
         x: textX,
-        y: ty - 10,
-        size: 10,
-        font,
-        color: C.muted,
+        y: ty - (wline.emphasize ? 11 : 10),
+        size: wline.emphasize ? 11 : 10,
+        font: wline.emphasize ? bold : font,
+        color: C.ink,
       });
-      ty -= 13;
+      ty -= wline.emphasize ? 14 : 13;
     }
 
     if (img && imgW > 0) {

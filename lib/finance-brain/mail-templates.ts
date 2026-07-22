@@ -96,7 +96,7 @@ function moneyLines(input: {
       <div style="margin-top:8px;font-size:13px;color:#64748b;line-height:1.55;">
         <div>Währung: <strong style="color:#0f172a;">${escapeHtml(cur)}</strong></div>
         <div>FW Betrag: <strong style="color:#0f172a;">${escapeHtml(money)}</strong></div>
-        <div>Betrag ${escapeHtml(base)}: <strong style="color:#0f172a;">${escapeHtml(baseMoney)}</strong></div>
+        <div style="font-size:14px;font-weight:700;color:#0f172a;">Betrag ${escapeHtml(base)}: ${escapeHtml(baseMoney)}</div>
         <div>Kurs: <strong style="color:#0f172a;">${escapeHtml(rateLine)}</strong></div>
       </div>`,
     fxText: [

@@ -392,7 +392,7 @@ function ExpenseCard({
               <div className="space-y-0.5 text-[11px] leading-snug text-muted-foreground">
                 <p>Währung: {exp.currency.toUpperCase()}</p>
                 <p>FW Betrag: {fx.primary}</p>
-                <p>
+                <p className="text-[12px] font-bold text-foreground">
                   Betrag {baseCurrency}:{" "}
                   {formatMoney(exp.amount_base, baseCurrency)}
                 </p>
@@ -974,7 +974,7 @@ function SettlementCard({
               <div className="mt-0.5 space-y-0.5 text-[11px] leading-snug text-muted-foreground">
                 <p>Währung: {s.currency.toUpperCase()}</p>
                 <p>FW Betrag: {fx.primary}</p>
-                <p>
+                <p className="text-[12px] font-bold text-foreground">
                   Betrag {baseCurrency}:{" "}
                   {formatMoney(s.amount_base, baseCurrency)}
                 </p>
