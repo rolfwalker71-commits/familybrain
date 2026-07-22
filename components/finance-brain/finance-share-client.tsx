@@ -369,6 +369,9 @@ export function FinanceShareClient({ token }: { token: string }) {
 
       {others.length > 0 ? (
         <SectionCard title="Rückzahlung">
+          <p className="mb-2 text-sm text-muted-foreground">
+            Du zahlst jemandem Geld zurück (reduziert deine Schuld).
+          </p>
           <div className="space-y-3">
             <div className="space-y-1">
               <Label>An</Label>

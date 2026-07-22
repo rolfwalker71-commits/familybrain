@@ -22,11 +22,13 @@ export type SimplifiedDebt = {
 export function computeMemberBalances(rows: BalanceInput[]): MemberBalance[] {
   return rows.map((row) => ({
     ...row,
+    // Settle-Up: paying someone back reduces your debt (improves net);
+    // receiving a repayment reduces what others owe you.
     net:
       row.paidBase -
       row.owedBase +
-      row.settlementsReceivedBase -
-      row.settlementsPaidBase,
+      row.settlementsPaidBase -
+      row.settlementsReceivedBase,
   }));
 }
 

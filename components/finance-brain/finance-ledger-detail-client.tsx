@@ -137,6 +137,7 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
   const [pendingReceipt, setPendingReceipt] = useState<File | null>(null);
 
   const [setAmount, setSetAmount] = useState("");
+  const [setFrom, setSetFrom] = useState<string>("");
   const [setTo, setSetTo] = useState<string>("");
   const [setNote, setSetNote] = useState("");
 
@@ -160,6 +161,7 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
       if (json.members?.length && !expPayer) {
         setExpPayer(String(json.members[0].id));
         setImportPayer(String(json.members[0].id));
+        setSetFrom(String(json.members[0].id));
       }
       setLinkTripId(
         json.ledger.trip_id != null ? String(json.ledger.trip_id) : ""
@@ -349,13 +351,17 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
 
   async function addSettlement() {
     const amount = Number(setAmount);
-    if (!amount || !expPayer || !setTo) return;
+    if (!amount || !setFrom || !setTo) return;
+    if (setFrom === setTo) {
+      setError("Zahler und Empfänger müssen unterschiedlich sein.");
+      return;
+    }
     try {
       const res = await fetch(`/api/finance-ledgers/${ledgerId}/settlements`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          fromMemberId: Number(expPayer),
+          fromMemberId: Number(setFrom),
           toMemberId: Number(setTo),
           amount,
           currency: data?.ledger.base_currency ?? "CHF",
@@ -366,6 +372,7 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
       if (!res.ok) throw new Error(json.error || "Fehler");
       setSetAmount("");
       setSetNote("");
+      setStatus("Rückzahlung erfasst – Saldo aktualisiert.");
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -827,14 +834,18 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
       </SectionCard>
 
       <SectionCard title="Rückzahlung">
+        <p className="mb-3 text-sm text-muted-foreground">
+          Wer hat wem Geld zurückbezahlt? («Von» = Person, die zahlt und damit
+          ihre Schuld reduziert.)
+        </p>
         <div className="grid gap-2 sm:grid-cols-4">
           <div className="space-y-1">
-            <Label>Von</Label>
+            <Label>Von (zahlt)</Label>
             <Select
-              value={expPayer}
+              value={setFrom}
               onValueChange={(v) => {
                 if (v == null) return;
-                setExpPayer(v);
+                setSetFrom(v);
               }}
             >
               <SelectTrigger>
@@ -850,7 +861,7 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
             </Select>
           </div>
           <div className="space-y-1">
-            <Label>An</Label>
+            <Label>An (empfängt)</Label>
             <Select
               value={setTo}
               onValueChange={(v) => {
@@ -880,7 +891,10 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
             />
           </div>
           <div className="flex items-end">
-            <Button onClick={() => void addSettlement()} disabled={!setAmount}>
+            <Button
+              onClick={() => void addSettlement()}
+              disabled={!setAmount || !setFrom || !setTo}
+            >
               Erfassen
             </Button>
           </div>
