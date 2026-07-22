@@ -1003,6 +1003,19 @@ export function TripDetailClient({
     setAiImagePrompt(
       event.ai_image_prompt?.trim() || buildEventImagePrompt(event)
     );
+    if (!event.ai_image_prompt?.trim()) {
+      void fetch(`/api/trips/${tripId}/events/${event.id}/ai-image`)
+        .then(async (res) => {
+          const data = await res.json();
+          if (!res.ok) return;
+          if (typeof data.prompt === "string" && data.prompt.trim()) {
+            setAiImagePrompt(data.prompt);
+          }
+        })
+        .catch(() => {
+          /* keep client fallback */
+        });
+    }
   }
 
   async function generateAiImage() {
@@ -1021,7 +1034,7 @@ export function TripDetailClient({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Bildgenerierung fehlgeschlagen");
       await load();
-      setStatus("KI-Bild erstellt (Thumbnail, low quality).");
+      setStatus("KI-Bild erstellt (Illustration, low quality).");
       setAiImageEventId(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -1877,33 +1890,35 @@ export function TripDetailClient({
                   )}
                 >
                   <div className="rounded-t-[0.7rem] bg-slate-300/80 px-4 pb-3 pl-8 pt-4">
-                    <div className="flex items-center gap-2">
-                      <div className="flex min-w-0 flex-1 justify-center">
+                    <div className="relative min-h-[4.75rem]">
+                      <div className="absolute left-1/2 top-1/2 z-0 -translate-x-1/2 -translate-y-1/2">
                         <EventDateHeader event={event} />
                       </div>
                       {event.ai_image_url ? (
-                        <div className="relative shrink-0">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={event.ai_image_url}
-                            alt=""
-                            className="h-16 w-16 rounded-md border border-border/60 object-cover shadow-sm sm:h-[4.5rem] sm:w-[4.5rem]"
-                          />
-                          <Button
-                            type="button"
-                            size="icon-xs"
-                            variant="secondary"
-                            className="absolute bottom-1 right-1 size-6 border border-border/70 bg-background/90 shadow-sm"
-                            title="Vergrössern"
-                            onClick={() =>
-                              setAiZoom({
-                                url: event.ai_image_url!,
-                                title: event.title,
-                              })
-                            }
-                          >
-                            <Maximize2 className="size-3" />
-                          </Button>
+                        <div className="absolute right-0 top-1/2 z-10 -translate-y-1/2">
+                          <div className="relative">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={event.ai_image_url}
+                              alt=""
+                              className="h-16 w-16 rounded-md border border-border/60 object-cover shadow-sm sm:h-[4.5rem] sm:w-[4.5rem]"
+                            />
+                            <Button
+                              type="button"
+                              size="icon-xs"
+                              variant="secondary"
+                              className="absolute bottom-1 right-1 size-6 border border-border/70 bg-background/90 shadow-sm"
+                              title="Vergrössern"
+                              onClick={() =>
+                                setAiZoom({
+                                  url: event.ai_image_url!,
+                                  title: event.title,
+                                })
+                              }
+                            >
+                              <Maximize2 className="size-3" />
+                            </Button>
+                          </div>
                         </div>
                       ) : null}
                     </div>

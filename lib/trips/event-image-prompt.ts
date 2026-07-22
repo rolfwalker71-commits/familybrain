@@ -1,4 +1,22 @@
-import type { TripEventRow } from "@/lib/trips/queries";
+/** Built-in default: illustration style; placeholders filled per activity. */
+export const DEFAULT_EVENT_AI_IMAGE_PROMPT = `Square travel illustration (not photorealistic) for a «{{type}}» activity.
+Title: {{title}}.
+Place/context: {{place}}.
+Provider: {{provider}}.
+Traveler notes: {{notes}}.
+Receipt context: {{beleg}}.
+Scene idea: {{scene}}.
+Style: clean modern editorial illustration, soft flat colors with gentle shading, friendly travel poster vibe. Any text in the image must be spelled correctly and clearly readable. No logos, watermarks, or UI chrome. Suitable as a small card thumbnail.`;
+
+export const EVENT_AI_IMAGE_PROMPT_PLACEHOLDERS = [
+  "{{type}}",
+  "{{title}}",
+  "{{place}}",
+  "{{provider}}",
+  "{{notes}}",
+  "{{beleg}}",
+  "{{scene}}",
+] as const;
 
 function clip(raw: string | null | undefined, max: number): string | null {
   const t = (raw || "").replace(/\s+/g, " ").trim();
@@ -6,16 +24,15 @@ function clip(raw: string | null | undefined, max: number): string | null {
   return t.length > max ? `${t.slice(0, max - 1)}…` : t;
 }
 
-function placeHint(event: Pick<
-  TripEventRow,
-  | "place_name"
-  | "location"
-  | "address"
-  | "origin_place"
-  | "destination_place"
-  | "departure_airport"
-  | "arrival_airport"
->): string | null {
+function placeHint(event: {
+  place_name?: string | null;
+  location?: string | null;
+  address?: string | null;
+  origin_place?: string | null;
+  destination_place?: string | null;
+  departure_airport?: string | null;
+  arrival_airport?: string | null;
+}): string | null {
   if (event.place_name?.trim()) return event.place_name.trim();
   if (event.location?.trim()) return event.location.trim();
   if (event.address?.trim()) return event.address.trim();
@@ -54,8 +71,7 @@ function sceneForType(eventType: string): string {
   }
 }
 
-/** Prefill prompt for selective per-activity AI thumbnails. */
-export function buildEventImagePrompt(event: {
+export type EventImagePromptInput = {
   event_type?: string | null;
   title: string;
   place_name?: string | null;
@@ -68,17 +84,26 @@ export function buildEventImagePrompt(event: {
   provider?: string | null;
   notes?: string | null;
   document_notes_md?: string | null;
-}): string {
+};
+
+function applyTemplate(
+  template: string,
+  vars: Record<string, string>
+): string {
+  let out = template;
+  for (const [key, value] of Object.entries(vars)) {
+    out = out.replaceAll(`{{${key}}}`, value || "—");
+  }
+  return out.replace(/\s+/g, " ").trim();
+}
+
+/** Prefill prompt for selective per-activity AI thumbnails. */
+export function buildEventImagePrompt(
+  event: EventImagePromptInput,
+  template: string = DEFAULT_EVENT_AI_IMAGE_PROMPT
+): string {
   const type = event.event_type || "Sonstiges";
-  const place = placeHint({
-    place_name: event.place_name ?? null,
-    location: event.location ?? null,
-    address: event.address ?? null,
-    origin_place: event.origin_place ?? null,
-    destination_place: event.destination_place ?? null,
-    departure_airport: event.departure_airport ?? null,
-    arrival_airport: event.arrival_airport ?? null,
-  });
+  const place = placeHint(event);
   const notes = clip(event.notes, 180);
   const beleg = clip(
     (event.document_notes_md || "")
@@ -87,16 +112,13 @@ export function buildEventImagePrompt(event: {
     160
   );
 
-  const bits = [
-    `Photorealistic square travel thumbnail for a «${type}» activity.`,
-    `Title: ${event.title}.`,
-    place ? `Place/context: ${place}.` : null,
-    event.provider?.trim() ? `Provider: ${event.provider.trim()}.` : null,
-    notes ? `Traveler notes: ${notes}.` : null,
-    beleg ? `Receipt context: ${beleg}.` : null,
-    `Scene: ${sceneForType(type)}.`,
-    "No text, logos, watermarks, or UI chrome. Natural light, soft depth of field, suitable as a small card thumbnail.",
-  ].filter(Boolean);
-
-  return bits.join(" ");
+  return applyTemplate(template.trim() || DEFAULT_EVENT_AI_IMAGE_PROMPT, {
+    type,
+    title: event.title,
+    place: place || "",
+    provider: event.provider?.trim() || "",
+    notes: notes || "",
+    beleg: beleg || "",
+    scene: sceneForType(type),
+  });
 }

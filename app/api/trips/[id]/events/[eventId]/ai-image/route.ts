@@ -4,6 +4,7 @@ import {
   generateEventAiImage,
 } from "@/lib/trips/event-image";
 import { buildEventImagePrompt } from "@/lib/trips/event-image-prompt";
+import { getEventAiImagePromptTemplate } from "@/lib/trips/event-image-settings";
 import { getTripEventById } from "@/lib/trips/queries";
 import { serializeTripEvent } from "@/lib/trips/serialize-event";
 
@@ -24,7 +25,9 @@ export async function GET(_request: Request, context: Ctx) {
     }
     return NextResponse.json({
       ok: true,
-      prompt: existing.ai_image_prompt || buildEventImagePrompt(existing),
+      prompt:
+        existing.ai_image_prompt ||
+        buildEventImagePrompt(existing, getEventAiImagePromptTemplate()),
       hasImage: Boolean(existing.ai_image_path),
     });
   } catch (error) {

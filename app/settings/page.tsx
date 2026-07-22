@@ -77,6 +77,11 @@ export default function SettingsPage() {
   const [tripMapStyle, setTripMapStyle] = useState<
     "voyager" | "positron" | "osm"
   >("voyager");
+  const [eventAiImagePrompt, setEventAiImagePrompt] = useState("");
+  const [eventAiImagePromptDefault, setEventAiImagePromptDefault] =
+    useState("");
+  const [eventAiImagePromptCustomized, setEventAiImagePromptCustomized] =
+    useState(false);
   const [flightTestNumber, setFlightTestNumber] = useState("LX1594");
   const [flightTestDate, setFlightTestDate] = useState("2026-10-23");
   const [flightTestBusy, setFlightTestBusy] = useState(false);
@@ -120,6 +125,11 @@ export default function SettingsPage() {
         data.tripMapStyle === "positron" || data.tripMapStyle === "osm"
           ? data.tripMapStyle
           : "voyager"
+      );
+      setEventAiImagePrompt(data.eventAiImagePrompt || "");
+      setEventAiImagePromptDefault(data.eventAiImagePromptDefault || "");
+      setEventAiImagePromptCustomized(
+        Boolean(data.eventAiImagePromptCustomized)
       );
     })();
   }, []);
@@ -296,6 +306,7 @@ export default function SettingsPage() {
         nominatimBaseUrl: nominatimBaseUrl.trim(),
         aerodataboxProvider,
         tripMapStyle,
+        eventAiImagePrompt,
       };
       if (aerodataboxKey.trim()) {
         payload.aerodataboxApiKey = aerodataboxKey.trim();
@@ -321,8 +332,36 @@ export default function SettingsPage() {
           ? data.tripMapStyle
           : "voyager"
       );
+      setEventAiImagePrompt(data.eventAiImagePrompt || "");
+      setEventAiImagePromptDefault(data.eventAiImagePromptDefault || "");
+      setEventAiImagePromptCustomized(
+        Boolean(data.eventAiImagePromptCustomized)
+      );
       setMessage("TravelBrain-Einstellungen gespeichert.");
       window.dispatchEvent(new Event("trip-map-style-changed"));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  async function resetEventAiImagePrompt() {
+    setSaving("travelbrain");
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ resetEventAiImagePrompt: true }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Zurücksetzen fehlgeschlagen");
+      setEventAiImagePrompt(data.eventAiImagePrompt || "");
+      setEventAiImagePromptDefault(data.eventAiImagePromptDefault || "");
+      setEventAiImagePromptCustomized(false);
+      setMessage("KI-Bild-Prompt auf Standard zurückgesetzt.");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -713,6 +752,44 @@ export default function SettingsPage() {
             <p className="text-xs text-muted-foreground">
               Leer speichern stellt den öffentlichen OSM-Default wieder her.
             </p>
+          </div>
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <Label htmlFor="eventAiImagePrompt">
+                Default-Prompt für Aktivitäts-KI-Bilder
+              </Label>
+              {eventAiImagePromptCustomized ? (
+                <Badge variant="secondary">Angepasst</Badge>
+              ) : (
+                <Badge variant="outline">Standard</Badge>
+              )}
+            </div>
+            <Textarea
+              id="eventAiImagePrompt"
+              rows={8}
+              value={eventAiImagePrompt}
+              onChange={(e) => setEventAiImagePrompt(e.target.value)}
+              placeholder={eventAiImagePromptDefault}
+            />
+            <p className="text-xs text-muted-foreground">
+              Platzhalter:{" "}
+              <code className="text-[11px]">
+                {"{{type}} {{title}} {{place}} {{provider}} {{notes}} {{beleg}} {{scene}}"}
+              </code>
+              . Beim Erzeugen kannst du den Prompt pro Aktivität noch anpassen.
+              Stil steckt im Prompt; Modell:{" "}
+              <code className="text-[11px]">gpt-image-2</code> (besser lesbarer
+              Text).
+            </p>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={saving !== null}
+              onClick={() => void resetEventAiImagePrompt()}
+            >
+              Prompt zurücksetzen
+            </Button>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button

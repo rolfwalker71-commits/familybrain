@@ -32,6 +32,16 @@ import {
   AERODATABOX_PROVIDERS,
   MAP_STYLES,
 } from "@/lib/trips/settings";
+import {
+  DEFAULT_EVENT_AI_IMAGE_PROMPT,
+  EVENT_AI_IMAGE_PROMPT_PLACEHOLDERS,
+} from "@/lib/trips/event-image-prompt";
+import {
+  getEventAiImagePromptTemplate,
+  isEventAiImagePromptCustomized,
+  resetEventAiImagePromptTemplate,
+  saveEventAiImagePromptTemplate,
+} from "@/lib/trips/event-image-settings";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -66,6 +76,10 @@ export async function GET() {
     aerodataboxProvider: getAeroDataBoxProvider(),
     nominatimBaseUrl,
     tripMapStyle: getTripMapStyle(),
+    eventAiImagePrompt: getEventAiImagePromptTemplate(),
+    eventAiImagePromptCustomized: isEventAiImagePromptCustomized(),
+    eventAiImagePromptDefault: DEFAULT_EVENT_AI_IMAGE_PROMPT,
+    eventAiImagePromptPlaceholders: EVENT_AI_IMAGE_PROMPT_PLACEHOLDERS,
   });
 }
 
@@ -83,6 +97,8 @@ const PutSchema = z.object({
   aerodataboxProvider: z.enum(AERODATABOX_PROVIDERS).optional(),
   nominatimBaseUrl: z.string().optional(),
   tripMapStyle: z.enum(MAP_STYLES).optional(),
+  eventAiImagePrompt: z.string().max(4000).optional(),
+  resetEventAiImagePrompt: z.boolean().optional(),
 });
 
 export async function PUT(request: Request) {
@@ -178,6 +194,20 @@ export async function PUT(request: Request) {
     saveTripMapStyle(parsed.data.tripMapStyle);
   }
 
+  let eventAiImagePrompt = getEventAiImagePromptTemplate();
+  try {
+    if (parsed.data.resetEventAiImagePrompt) {
+      eventAiImagePrompt = resetEventAiImagePromptTemplate();
+    } else if (parsed.data.eventAiImagePrompt !== undefined) {
+      eventAiImagePrompt = saveEventAiImagePromptTemplate(
+        parsed.data.eventAiImagePrompt
+      );
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return NextResponse.json({ error: message }, { status: 400 });
+  }
+
   const paperless = getPaperlessSettings();
   const openai = getOpenAISettings();
   const trilium = getTriliumSettings();
@@ -209,5 +239,9 @@ export async function PUT(request: Request) {
     aerodataboxProvider: getAeroDataBoxProvider(),
     nominatimBaseUrl,
     tripMapStyle: getTripMapStyle(),
+    eventAiImagePrompt,
+    eventAiImagePromptCustomized: isEventAiImagePromptCustomized(),
+    eventAiImagePromptDefault: DEFAULT_EVENT_AI_IMAGE_PROMPT,
+    eventAiImagePromptPlaceholders: EVENT_AI_IMAGE_PROMPT_PLACEHOLDERS,
   });
 }

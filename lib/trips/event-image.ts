@@ -3,6 +3,7 @@ import path from "path";
 import { randomUUID } from "crypto";
 import { getOpenAIClient, hasOpenAIKey } from "@/lib/ai/client";
 import { buildEventImagePrompt } from "@/lib/trips/event-image-prompt";
+import { getEventAiImagePromptTemplate } from "@/lib/trips/event-image-settings";
 import {
   ensureTripMediaDirs,
   getTripEventAiDir,
@@ -33,12 +34,14 @@ export async function generateEventAiImage(
   if (!event) throw new Error("Ereignis nicht gefunden");
 
   ensureTripMediaDirs();
-  const prompt = userPrompt?.trim() || buildEventImagePrompt(event);
+  const prompt =
+    userPrompt?.trim() ||
+    buildEventImagePrompt(event, getEventAiImagePromptTemplate());
 
   const client = getOpenAIClient();
-  // Low quality + square is much cheaper than trip-cover (high/landscape).
+  // gpt-image-2: better readable text; low+square keeps cost down vs trip cover.
   const result = await client.images.generate({
-    model: "gpt-image-1",
+    model: "gpt-image-2",
     prompt,
     size: "1024x1024",
     quality: "low",
