@@ -234,13 +234,24 @@ function weekdayDe(isoDate: string): string {
   return new Intl.DateTimeFormat("de-CH", { weekday: "long" }).format(date);
 }
 
-function monthFullDe(isoDate: string): string {
-  const [y, m, d] = isoDate.split("-").map(Number);
-  const date = new Date(y, m - 1, d);
-  return new Intl.DateTimeFormat("de-CH", { month: "long" })
-    .format(date)
-    .replace(/\./g, "")
-    .toUpperCase();
+const MONTH_SHORT_DE = [
+  "JAN",
+  "FEB",
+  "MÄR",
+  "APR",
+  "MAI",
+  "JUN",
+  "JUL",
+  "AUG",
+  "SEP",
+  "OKT",
+  "NOV",
+  "DEZ",
+] as const;
+
+function monthShortDe(isoDate: string): string {
+  const month = Number(isoDate.slice(5, 7));
+  return MONTH_SHORT_DE[month - 1] ?? "";
 }
 
 function dayNumber(isoDate: string): string {
@@ -257,18 +268,18 @@ function EventCalendarBadge({
   return (
     <div
       className={cn(
-        "flex w-[5.75rem] shrink-0 flex-col overflow-hidden rounded-lg border border-black/10 bg-background sm:w-[6.25rem]",
+        "flex w-[4rem] shrink-0 flex-col overflow-hidden rounded-lg border border-black/10 bg-background sm:w-[4.35rem]",
         "shadow-[0_1px_0_rgba(255,255,255,0.85)_inset,0_1px_2px_rgba(15,23,42,0.08),0_3px_8px_rgba(15,23,42,0.12),0_8px_14px_-6px_rgba(15,23,42,0.18)]",
         "ring-1 ring-black/5"
       )}
     >
       <div
         className={cn(
-          "bg-gradient-to-b from-red-500 to-red-700 px-0.5 py-px text-center text-[8px] font-extrabold uppercase leading-none tracking-tight text-white sm:text-[9px]",
+          "bg-gradient-to-b from-red-500 to-red-700 px-0.5 py-1 text-center text-[9px] font-extrabold uppercase leading-none tracking-wide text-white sm:text-[10px]",
           "shadow-[0_1px_0_rgba(255,255,255,0.28)_inset,0_1px_2px_rgba(127,29,29,0.3)]"
         )}
       >
-        {monthFullDe(isoDate)}
+        {monthShortDe(isoDate)}
       </div>
       <div
         className={cn(
@@ -2067,7 +2078,7 @@ export function TripDetailClient({
                     )}
                   >
                     <CardContent className="flex items-center gap-3 p-2.5 pl-7 sm:gap-4 sm:p-3 sm:pl-8">
-                      <div className="flex w-[13.5rem] shrink-0 items-center sm:w-[14.75rem]">
+                      <div className="flex w-[9.75rem] shrink-0 items-center sm:w-[10.75rem]">
                         <EventDateHeader event={event} />
                       </div>
                       <div className="min-w-0 flex-1">
