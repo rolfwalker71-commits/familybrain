@@ -86,14 +86,10 @@ export default function SettingsPage() {
     useState<string[]>([
       "{{type}}",
       "{{title}}",
-      "{{place}}",
-      "{{when}}",
-      "{{provider}}",
-      "{{booking}}",
+      "{{details}}",
       "{{notes}}",
       "{{beleg}}",
       "{{scene}}",
-      "{{details}}",
     ]);
   const [flightTestNumber, setFlightTestNumber] = useState("LX1594");
   const [flightTestDate, setFlightTestDate] = useState("2026-10-23");
@@ -803,11 +799,10 @@ export default function SettingsPage() {
               <code className="text-[11px]">
                 {eventAiImagePromptPlaceholders.join(" ")}
               </code>
-              . Gefüllte Aktivitätskarten-Felder fließen über{" "}
-              {"{{details}}"} ein (u. a. Buchung, Airline, Flugnr., Klasse,
-              Terminals); einzeln auch über {"{{booking}}"}, {"{{flight}}"},{" "}
-              {"{{airline}}"}, {"{{cabin}}"} usw. Beim Erzeugen kannst du den
-              Prompt pro Aktivität noch anpassen. Stil steckt im Prompt; Modell:{" "}
+              . In {"{{details}}"} landen automatisch alle ausgefüllten Felder
+              der Aktivität (Datum, Ort, Buchung, Flugdaten, Adresse usw.). Beim
+              Erzeugen kannst du den Prompt pro Aktivität noch anpassen. Stil
+              steckt im Prompt; Modell:{" "}
               <code className="text-[11px]">gpt-image-2</code> (besser lesbarer
               Text).
             </p>

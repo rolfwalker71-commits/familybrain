@@ -1,37 +1,20 @@
-/** Built-in default: illustration style; placeholders filled per activity. */
+/** Built-in default: illustration style; activity card fields go into {{details}}. */
 export const DEFAULT_EVENT_AI_IMAGE_PROMPT = `Square travel illustration (not photorealistic) for a «{{type}}» activity.
 Title: {{title}}.
-Place/context: {{place}}.
-Date/time: {{when}}.
 Activity details: {{details}}.
 Traveler notes: {{notes}}.
 Receipt context: {{beleg}}.
 Scene idea: {{scene}}.
 Style: clean modern editorial illustration, soft flat colors with gentle shading, friendly travel poster vibe. Any text in the image must be spelled correctly and clearly readable. No logos, watermarks, prices, or UI chrome. Suitable as a small card thumbnail.`;
 
+/** Public placeholders for the settings UI / custom templates. */
 export const EVENT_AI_IMAGE_PROMPT_PLACEHOLDERS = [
   "{{type}}",
   "{{title}}",
-  "{{place}}",
-  "{{when}}",
-  "{{provider}}",
-  "{{booking}}",
+  "{{details}}",
   "{{notes}}",
   "{{beleg}}",
   "{{scene}}",
-  "{{address}}",
-  "{{phone}}",
-  "{{website}}",
-  "{{flight}}",
-  "{{airline}}",
-  "{{cabin}}",
-  "{{route}}",
-  "{{aircraft}}",
-  "{{duration}}",
-  "{{departure}}",
-  "{{arrival}}",
-  "{{flight_info}}",
-  "{{details}}",
 ] as const;
 
 function clip(raw: string | null | undefined, max: number): string | null {
@@ -42,155 +25,6 @@ function clip(raw: string | null | undefined, max: number): string | null {
 
 function trimOrEmpty(raw: string | null | undefined): string {
   return (raw || "").trim();
-}
-
-function placeHint(event: {
-  place_name?: string | null;
-  location?: string | null;
-  address?: string | null;
-  origin_place?: string | null;
-  destination_place?: string | null;
-  departure_airport?: string | null;
-  arrival_airport?: string | null;
-}): string | null {
-  if (event.place_name?.trim()) return event.place_name.trim();
-  if (event.location?.trim()) return event.location.trim();
-  if (event.address?.trim()) return event.address.trim();
-  if (event.origin_place || event.destination_place) {
-    return [event.origin_place, event.destination_place]
-      .filter(Boolean)
-      .join(" → ");
-  }
-  if (event.departure_airport || event.arrival_airport) {
-    return [event.departure_airport, event.arrival_airport]
-      .filter(Boolean)
-      .join(" → ");
-  }
-  return null;
-}
-
-function airportRoute(event: {
-  departure_airport?: string | null;
-  arrival_airport?: string | null;
-}): string {
-  const dep = trimOrEmpty(event.departure_airport);
-  const arr = trimOrEmpty(event.arrival_airport);
-  if (dep && arr) return `${dep} → ${arr}`;
-  return dep || arr || "";
-}
-
-function aircraftLabel(event: EventImagePromptInput): string {
-  return [event.aircraft_type, event.aircraft_reg]
-    .map((x) => trimOrEmpty(x))
-    .filter(Boolean)
-    .join(" · ");
-}
-
-function durationLabel(event: EventImagePromptInput): string {
-  return event.duration_minutes != null && Number.isFinite(event.duration_minutes)
-    ? `${event.duration_minutes} min`
-    : "";
-}
-
-function departureLabel(event: EventImagePromptInput): string {
-  return [
-    event.departure_terminal
-      ? `Terminal ${trimOrEmpty(event.departure_terminal)}`
-      : null,
-    event.departure_gate
-      ? `Gate ${trimOrEmpty(event.departure_gate)}`
-      : null,
-    event.check_in_desk
-      ? `Check-in ${trimOrEmpty(event.check_in_desk)}`
-      : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
-}
-
-function arrivalLabel(event: EventImagePromptInput): string {
-  return [
-    event.arrival_terminal
-      ? `Terminal ${trimOrEmpty(event.arrival_terminal)}`
-      : null,
-    event.arrival_gate ? `Gate ${trimOrEmpty(event.arrival_gate)}` : null,
-    event.baggage_belt
-      ? `Baggage ${trimOrEmpty(event.baggage_belt)}`
-      : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
-}
-
-function whenLabel(event: EventImagePromptInput): string {
-  const date = trimOrEmpty(event.start_date);
-  const endDate = trimOrEmpty(event.end_date);
-  const startT = trimOrEmpty(event.start_time);
-  const endT = trimOrEmpty(event.end_time);
-  const datePart =
-    date && endDate && endDate !== date
-      ? `${date} – ${endDate}`
-      : date || endDate || "";
-  const timePart =
-    startT || endT ? [startT, endT].filter(Boolean).join("–") : "";
-  return [datePart, timePart].filter(Boolean).join(" ");
-}
-
-function flightInfoLine(event: EventImagePromptInput): string {
-  const parts: string[] = [];
-  const flight = trimOrEmpty(event.flight_number);
-  const airline = trimOrEmpty(event.airline);
-  const cabin = trimOrEmpty(event.cabin_class);
-  const booking = trimOrEmpty(event.booking_reference);
-  const route = airportRoute(event);
-  const aircraft = aircraftLabel(event);
-  const duration = durationLabel(event);
-  const dep = departureLabel(event);
-  const arr = arrivalLabel(event);
-  if (flight) parts.push(`flight ${flight}`);
-  if (airline) parts.push(`airline ${airline}`);
-  if (cabin) parts.push(`cabin ${cabin}`);
-  if (booking) parts.push(`booking ${booking}`);
-  if (route) parts.push(`route ${route}`);
-  if (aircraft) parts.push(`aircraft ${aircraft}`);
-  if (duration) parts.push(`duration ${duration}`);
-  if (dep) parts.push(`departure ${dep}`);
-  if (arr) parts.push(`arrival ${arr}`);
-  return parts.join(", ");
-}
-
-/** Compact summary of filled activity-card fields (mirrors card details). */
-function detailsLine(event: EventImagePromptInput): string {
-  const parts: string[] = [];
-  const push = (label: string, value: string) => {
-    const v = value.trim();
-    if (v) parts.push(`${label}: ${v}`);
-  };
-
-  push("provider", trimOrEmpty(event.provider));
-  push("booking", trimOrEmpty(event.booking_reference));
-  push("airline", trimOrEmpty(event.airline));
-  push("flight", trimOrEmpty(event.flight_number));
-  push("cabin", trimOrEmpty(event.cabin_class));
-  push("route", airportRoute(event));
-  push("aircraft", aircraftLabel(event));
-  push("duration", durationLabel(event));
-  push("departure", departureLabel(event));
-  push("arrival", arrivalLabel(event));
-  push("address", trimOrEmpty(event.address));
-  push("phone", trimOrEmpty(event.phone));
-  push("website", trimOrEmpty(event.website));
-  if (event.origin_place || event.destination_place) {
-    push(
-      "transfer",
-      [event.origin_place, event.destination_place]
-        .map((x) => trimOrEmpty(x))
-        .filter(Boolean)
-        .join(" → ")
-    );
-  }
-
-  return parts.join("; ");
 }
 
 function sceneForType(
@@ -257,6 +91,104 @@ export type EventImagePromptInput = {
   website?: string | null;
 };
 
+/** All filled activity-card fields as one prompt fragment. */
+function buildActivityDetails(event: EventImagePromptInput): string {
+  const parts: string[] = [];
+  const push = (label: string, value: string | null | undefined) => {
+    const v = trimOrEmpty(value);
+    if (v) parts.push(`${label}: ${v}`);
+  };
+
+  const startDate = trimOrEmpty(event.start_date);
+  const endDate = trimOrEmpty(event.end_date);
+  const startT = trimOrEmpty(event.start_time);
+  const endT = trimOrEmpty(event.end_time);
+  const datePart =
+    startDate && endDate && endDate !== startDate
+      ? `${startDate} – ${endDate}`
+      : startDate || endDate || "";
+  const timePart =
+    startT || endT ? [startT, endT].filter(Boolean).join("–") : "";
+  push("when", [datePart, timePart].filter(Boolean).join(" "));
+
+  push("place", trimOrEmpty(event.place_name));
+  push("location", trimOrEmpty(event.location));
+  push("address", trimOrEmpty(event.address));
+
+  if (event.origin_place || event.destination_place) {
+    push(
+      "route",
+      [event.origin_place, event.destination_place]
+        .map((x) => trimOrEmpty(x))
+        .filter(Boolean)
+        .join(" → ")
+    );
+  }
+
+  const depAirport = trimOrEmpty(event.departure_airport);
+  const arrAirport = trimOrEmpty(event.arrival_airport);
+  if (depAirport || arrAirport) {
+    push(
+      "airports",
+      depAirport && arrAirport
+        ? `${depAirport} → ${arrAirport}`
+        : depAirport || arrAirport
+    );
+  }
+
+  push("provider", event.provider);
+  push("booking", event.booking_reference);
+  push("airline", event.airline);
+  push("flight", event.flight_number);
+  push("cabin", event.cabin_class);
+  push(
+    "aircraft",
+    [event.aircraft_type, event.aircraft_reg]
+      .map((x) => trimOrEmpty(x))
+      .filter(Boolean)
+      .join(" · ")
+  );
+  if (event.duration_minutes != null && Number.isFinite(event.duration_minutes)) {
+    push("duration", `${event.duration_minutes} min`);
+  }
+
+  push(
+    "departure",
+    [
+      event.departure_terminal
+        ? `Terminal ${trimOrEmpty(event.departure_terminal)}`
+        : null,
+      event.departure_gate
+        ? `Gate ${trimOrEmpty(event.departure_gate)}`
+        : null,
+      event.check_in_desk
+        ? `Check-in ${trimOrEmpty(event.check_in_desk)}`
+        : null,
+    ]
+      .filter(Boolean)
+      .join(" · ")
+  );
+  push(
+    "arrival",
+    [
+      event.arrival_terminal
+        ? `Terminal ${trimOrEmpty(event.arrival_terminal)}`
+        : null,
+      event.arrival_gate ? `Gate ${trimOrEmpty(event.arrival_gate)}` : null,
+      event.baggage_belt
+        ? `Baggage ${trimOrEmpty(event.baggage_belt)}`
+        : null,
+    ]
+      .filter(Boolean)
+      .join(" · ")
+  );
+
+  push("phone", event.phone);
+  push("website", event.website);
+
+  return parts.join("; ");
+}
+
 function applyTemplate(
   template: string,
   vars: Record<string, string>
@@ -274,7 +206,6 @@ export function buildEventImagePrompt(
   template: string = DEFAULT_EVENT_AI_IMAGE_PROMPT
 ): string {
   const type = event.event_type || "Sonstiges";
-  const place = placeHint(event);
   const notes = clip(event.notes, 180);
   const beleg = clip(
     (event.document_notes_md || "")
@@ -286,25 +217,9 @@ export function buildEventImagePrompt(
   return applyTemplate(template.trim() || DEFAULT_EVENT_AI_IMAGE_PROMPT, {
     type,
     title: event.title,
-    place: place || "",
-    when: whenLabel(event),
-    provider: trimOrEmpty(event.provider),
-    booking: trimOrEmpty(event.booking_reference),
+    details: buildActivityDetails(event),
     notes: notes || "",
     beleg: beleg || "",
     scene: sceneForType(type, event.cabin_class),
-    address: trimOrEmpty(event.address),
-    phone: trimOrEmpty(event.phone),
-    website: trimOrEmpty(event.website),
-    flight: trimOrEmpty(event.flight_number),
-    airline: trimOrEmpty(event.airline),
-    cabin: trimOrEmpty(event.cabin_class),
-    route: airportRoute(event),
-    aircraft: aircraftLabel(event),
-    duration: durationLabel(event),
-    departure: departureLabel(event),
-    arrival: arrivalLabel(event),
-    flight_info: flightInfoLine(event),
-    details: detailsLine(event),
   });
 }
