@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -80,6 +81,7 @@ export type ExpenseListItem = {
   place_name?: string | null;
   place_lat?: number | null;
   place_lon?: number | null;
+  note?: string | null;
   receipt_url?: string | null;
   has_receipt?: boolean;
   ai_image_url?: string | null;
@@ -92,6 +94,7 @@ export type ExpenseEditPayload = {
   expenseDate: string | null;
   paidByMemberId: number;
   place: string | null;
+  note: string | null;
 };
 
 export function BalanceView({
@@ -217,6 +220,7 @@ function ExpenseCard({
   const [editDate, setEditDate] = useState(exp.expense_date || "");
   const [editPayer, setEditPayer] = useState(String(exp.paid_by_member_id));
   const [editPlace, setEditPlace] = useState(exp.place_name || "");
+  const [editNote, setEditNote] = useState(exp.note || "");
 
   const memberName = (id: number) =>
     members.find((m) => m.id === id)?.display_name ?? `#${id}`;
@@ -230,6 +234,7 @@ function ExpenseCard({
     setEditDate(exp.expense_date || "");
     setEditPayer(String(exp.paid_by_member_id));
     setEditPlace(exp.place_name || "");
+    setEditNote(exp.note || "");
     setEditing(true);
   }
 
@@ -240,6 +245,7 @@ function ExpenseCard({
       expenseDate: editDate || null,
       paidByMemberId: Number(editPayer),
       place: editPlace.trim() || null,
+      note: editNote.trim() || null,
     });
     setEditing(false);
   }
@@ -344,6 +350,11 @@ function ExpenseCard({
                 <span className="invisible select-none">—</span>
               )}
             </p>
+            {exp.note?.trim() ? (
+              <p className="line-clamp-2 text-xs text-muted-foreground">
+                Notiz: {exp.note.trim()}
+              </p>
+            ) : null}
           </div>
 
             {editing && canEdit && onUpdate ? (
@@ -393,6 +404,15 @@ function ExpenseCard({
                     value={editPlace}
                     onChange={(e) => setEditPlace(e.target.value)}
                     placeholder="z. B. Denny’s, Las Vegas"
+                  />
+                </div>
+                <div className="space-y-1 sm:col-span-2">
+                  <Label className="text-xs">Notiz</Label>
+                  <Textarea
+                    rows={2}
+                    value={editNote}
+                    onChange={(e) => setEditNote(e.target.value)}
+                    placeholder="Optional"
                   />
                 </div>
                 <p className="text-[11px] text-muted-foreground sm:col-span-2">

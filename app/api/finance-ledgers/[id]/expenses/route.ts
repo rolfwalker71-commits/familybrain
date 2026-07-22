@@ -52,6 +52,7 @@ const CreateSchema = z.object({
   documentId: z.number().int().positive().nullable().optional(),
   tripEventId: z.number().int().positive().nullable().optional(),
   place: z.string().max(200).nullable().optional(),
+  note: z.string().max(1000).nullable().optional(),
   split: SplitSchema,
 });
 
@@ -97,6 +98,7 @@ export async function POST(request: Request, context: Ctx) {
       placeName,
       placeLat,
       placeLon,
+      note: parsed.data.note ?? null,
       split: {
         ...parsed.data.split,
         memberIds:

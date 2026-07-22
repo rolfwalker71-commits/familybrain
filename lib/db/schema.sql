@@ -426,6 +426,7 @@ CREATE TABLE IF NOT EXISTS finance_expenses (
   place_lat REAL,
   place_lon REAL,
   notified_at TEXT,
+  note TEXT,
   split_mode TEXT NOT NULL DEFAULT 'equal',
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,

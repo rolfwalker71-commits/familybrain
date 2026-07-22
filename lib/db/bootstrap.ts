@@ -361,6 +361,8 @@ function ensureFinanceBrainTables(db: Database.Database): void {
       place_name TEXT,
       place_lat REAL,
       place_lon REAL,
+      notified_at TEXT,
+      note TEXT,
       split_mode TEXT NOT NULL DEFAULT 'equal',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
@@ -434,6 +436,9 @@ function ensureFinanceBrainTables(db: Database.Database): void {
   }
   if (!expenseColNames.has("notified_at")) {
     db.exec(`ALTER TABLE finance_expenses ADD COLUMN notified_at TEXT`);
+  }
+  if (!expenseColNames.has("note")) {
+    db.exec(`ALTER TABLE finance_expenses ADD COLUMN note TEXT`);
   }
 
   const settlementCols = db

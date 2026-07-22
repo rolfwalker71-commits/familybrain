@@ -77,6 +77,7 @@ type LedgerDetail = {
     place_name?: string | null;
     place_lat?: number | null;
     place_lon?: number | null;
+    note?: string | null;
     receipt_url?: string | null;
     has_receipt?: boolean;
     ai_image_url?: string | null;
@@ -144,11 +145,13 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
   const [expDesc, setExpDesc] = useState("");
   const [expDate, setExpDate] = useState(todayDateInputValue);
   const [expPlace, setExpPlace] = useState("");
+  const [expNote, setExpNote] = useState("");
   const [expPayer, setExpPayer] = useState<string>("");
   const [rateLoading, setRateLoading] = useState(false);
   const [pendingReceipt, setPendingReceipt] = useState<File | null>(null);
   const [aiImageBusyId, setAiImageBusyId] = useState<number | null>(null);
   const [mailBusyId, setMailBusyId] = useState<number | null>(null);
+  const [summaryMailBusy, setSummaryMailBusy] = useState(false);
   const [editBusyId, setEditBusyId] = useState<number | null>(null);
   const aiAttemptedRef = useRef<Set<number>>(new Set());
 
@@ -351,6 +354,7 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
           description: expDesc.trim() || null,
           expenseDate: expDate || null,
           place: expPlace.trim() || null,
+          note: expNote.trim() || null,
           split: { mode: "equal" },
         }),
       });
@@ -376,6 +380,7 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
       setExpDesc("");
       setExpDate(todayDateInputValue());
       setExpPlace("");
+      setExpNote("");
       setPendingReceipt(null);
       await load();
     } catch (err) {
@@ -452,6 +457,30 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
     }
   }
 
+  async function sendExpensesSummaryMail() {
+    setSummaryMailBusy(true);
+    setError(null);
+    setStatus(null);
+    try {
+      const res = await fetch(
+        `/api/finance-ledgers/${ledgerId}/expenses-summary-mail`,
+        { method: "POST" }
+      );
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Mailversand fehlgeschlagen");
+      const sent = typeof json.sent === "number" ? json.sent : 0;
+      setStatus(
+        sent > 0
+          ? `Ausgaben-Übersicht gesendet (${sent} Empfänger).`
+          : "Ausgaben-Übersicht gesendet."
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSummaryMailBusy(false);
+    }
+  }
+
   async function updateExpense(
     expenseId: number,
     payload: {
@@ -459,6 +488,7 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
       expenseDate: string | null;
       paidByMemberId: number;
       place: string | null;
+      note: string | null;
     }
   ) {
     setEditBusyId(expenseId);
@@ -791,6 +821,17 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
             <ChevronDown className="size-3.5 opacity-70" />
           )}
         </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-1.5"
+          disabled={summaryMailBusy || expenses.length === 0}
+          onClick={() => void sendExpensesSummaryMail()}
+          title="Alle Ausgaben per Mail inkl. PDF an die Gruppe senden"
+        >
+          <Mail className={cn("size-4", summaryMailBusy && "animate-pulse")} />
+          {summaryMailBusy ? "Sendet…" : "Ausgaben-Mail"}
+        </Button>
       </div>
 
       {panel === "members" ? (
@@ -1021,6 +1062,15 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
               value={expPlace}
               onChange={(e) => setExpPlace(e.target.value)}
               placeholder="Restaurant, Stadt…"
+            />
+          </div>
+          <div className="space-y-1 sm:col-span-2 lg:col-span-4">
+            <Label>Notiz (optional)</Label>
+            <Textarea
+              rows={2}
+              value={expNote}
+              onChange={(e) => setExpNote(e.target.value)}
+              placeholder="Zusätzliche Infos zur Ausgabe"
             />
           </div>
           <div className="space-y-1">

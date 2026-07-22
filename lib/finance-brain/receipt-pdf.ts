@@ -156,22 +156,64 @@ function drawDateBadge(
   h = 118
 ) {
   const bottom = topY - h;
+  const rr = 12;
+  const border = rgb(0.85, 0.87, 0.9);
+
+  // Rounded white body (no square border overlay).
+  drawRoundedRect(page, x, bottom, w, h, rr, C.white);
+
+  // Soft outer ring via slightly larger rounded stroke approximation
+  page.drawRectangle({
+    x: x + rr,
+    y: bottom,
+    width: w - 2 * rr,
+    height: 1,
+    color: border,
+  });
+  page.drawRectangle({
+    x: x + rr,
+    y: topY - 1,
+    width: w - 2 * rr,
+    height: 1,
+    color: border,
+  });
   page.drawRectangle({
     x,
-    y: bottom,
-    width: w,
-    height: h,
-    color: C.white,
-    borderColor: rgb(0.85, 0.87, 0.9),
-    borderWidth: 1.25,
+    y: bottom + rr,
+    width: 1,
+    height: h - 2 * rr,
+    color: border,
+  });
+  page.drawRectangle({
+    x: x + w - 1,
+    y: bottom + rr,
+    width: 1,
+    height: h - 2 * rr,
+    color: border,
   });
 
   const headerH = 28;
+  const headerBottom = topY - headerH;
+  // Red header with rounded top corners
+  page.drawRectangle({
+    x: x + rr,
+    y: headerBottom,
+    width: w - 2 * rr,
+    height: headerH,
+    color: C.redTop,
+  });
   page.drawRectangle({
     x,
-    y: topY - headerH,
+    y: headerBottom,
     width: w,
-    height: headerH,
+    height: Math.max(0, headerH - rr),
+    color: C.redTop,
+  });
+  page.drawCircle({ x: x + rr, y: topY - rr, size: rr, color: C.redTop });
+  page.drawCircle({
+    x: x + w - rr,
+    y: topY - rr,
+    size: rr,
     color: C.redTop,
   });
 
@@ -284,6 +326,7 @@ export async function buildExpensePdfBuffer(input: {
   paidByName: string;
   placeName: string | null;
   expenseDate: string | null;
+  note?: string | null;
   aiImagePath?: string | null;
   expenseId: number;
 }): Promise<Buffer> {
@@ -310,6 +353,7 @@ export async function buildExpensePdfBuffer(input: {
   const contentX = cardX + pad;
   const contentRight = cardX + cardW - pad;
   const contentW = contentRight - contentX;
+  const footH = 52;
 
   drawRoundedRect(page, cardX, cardBottom, cardW, cardH, 14, C.card, C.border);
 
@@ -353,40 +397,14 @@ export async function buildExpensePdfBuffer(input: {
     ledgerY -= 26;
   }
 
-  // Body
+  // Top body: date badge + title (no AI image here)
   let y = headerBottom - 36;
   const badgeW = 100;
   const badgeH = 128;
   drawDateBadge(page, bold, input.expenseDate, contentX, y, badgeW, badgeH);
 
-  const img = await embedOptionalPng(pdf, input.aiImagePath);
-  const imgMax = 220;
-  let imgW = 0;
-  let imgH = 0;
-  if (img) {
-    const scale = Math.min(imgMax / img.width, imgMax / img.height, 1);
-    imgW = img.width * scale;
-    imgH = img.height * scale;
-    page.drawRectangle({
-      x: contentRight - imgW - 4,
-      y: y - imgH - 4,
-      width: imgW + 8,
-      height: imgH + 8,
-      color: C.soft,
-      borderColor: C.border,
-      borderWidth: 1,
-    });
-    page.drawImage(img, {
-      x: contentRight - imgW,
-      y: y - imgH,
-      width: imgW,
-      height: imgH,
-    });
-  }
-
   const titleX = contentX + badgeW + 22;
-  const titleRight = img ? contentRight - imgW - 20 : contentRight;
-  const titleMaxW = Math.max(160, titleRight - titleX);
+  const titleMaxW = Math.max(160, contentRight - titleX);
   const title = input.description?.trim() || "Ausgabe";
   const titleSize = 26;
   const titleLines = wrapText(title, bold, titleSize, titleMaxW);
@@ -402,11 +420,11 @@ export async function buildExpensePdfBuffer(input: {
     titleY -= titleSize + 6;
   }
 
-  // Category chip
   const category = toPdfSafeText(input.categoryLabel || "Ausgabe");
   const chipPadX = 10;
   const chipSize = 11;
-  const chipW = bold.widthOfTextAtSize(category.toUpperCase(), chipSize) + chipPadX * 2;
+  const chipW =
+    bold.widthOfTextAtSize(category.toUpperCase(), chipSize) + chipPadX * 2;
   const chipH = 22;
   const chipY = titleY - chipH - 8;
   page.drawRectangle({
@@ -424,10 +442,8 @@ export async function buildExpensePdfBuffer(input: {
     color: C.badgeFg,
   });
 
-  // Detail section below badge / image
-  const detailsTop = Math.min(y - badgeH, img ? y - imgH : y - badgeH) - 36;
-  y = detailsTop;
-
+  // Detail rows below badge
+  y = y - badgeH - 28;
   page.drawRectangle({
     x: contentX,
     y: y + 8,
@@ -436,9 +452,24 @@ export async function buildExpensePdfBuffer(input: {
     color: C.border,
   });
 
+  const img = await embedOptionalPng(pdf, input.aiImagePath);
+  const imgMax = 260;
+  let imgW = 0;
+  let imgH = 0;
+  if (img) {
+    const scale = Math.min(imgMax / img.width, imgMax / img.height, 1);
+    imgW = img.width * scale;
+    imgH = img.height * scale;
+  }
+
   const labelW = 168;
-  const valueMaxW = contentW - labelW;
-  const hasFx = input.currency.toUpperCase() !== input.baseCurrency.toUpperCase();
+  // Leave room on the right for the bottom AI image when present
+  const valueMaxW = Math.max(
+    140,
+    contentW - labelW - (img ? imgW + 24 : 0)
+  );
+  const hasFx =
+    input.currency.toUpperCase() !== input.baseCurrency.toUpperCase();
   const rate =
     typeof input.exchangeRate === "number" && input.exchangeRate > 0
       ? input.exchangeRate
@@ -468,9 +499,13 @@ export async function buildExpensePdfBuffer(input: {
   rows.push(["Wann", formatDateDe(input.expenseDate)]);
   rows.push(["Wo", input.placeName?.trim() || "-"]);
   rows.push(["Kategorie", input.categoryLabel || "Ausgabe"]);
+  if (input.note?.trim()) {
+    rows.push(["Notiz", input.note.trim()]);
+  }
   rows.push(["Beleg-ID", String(input.expenseId)]);
 
   y -= 12;
+  const detailsBottomMin = cardBottom + footH + (img ? imgH + 28 : 16);
   for (const [label, value] of rows) {
     y = drawLabeledRow(
       page,
@@ -485,11 +520,30 @@ export async function buildExpensePdfBuffer(input: {
       13,
       16
     );
-    if (y < cardBottom + 70) break;
+    if (y < detailsBottomMin) break;
+  }
+
+  // AI image bottom-right, above footer
+  if (img && imgW > 0 && imgH > 0) {
+    const imgBottom = cardBottom + footH + 16;
+    page.drawRectangle({
+      x: contentRight - imgW - 4,
+      y: imgBottom - 4,
+      width: imgW + 8,
+      height: imgH + 8,
+      color: C.soft,
+      borderColor: C.border,
+      borderWidth: 1,
+    });
+    page.drawImage(img, {
+      x: contentRight - imgW,
+      y: imgBottom,
+      width: imgW,
+      height: imgH,
+    });
   }
 
   // Footer
-  const footH = 52;
   page.drawRectangle({
     x: cardX,
     y: cardBottom,
@@ -504,9 +558,7 @@ export async function buildExpensePdfBuffer(input: {
     height: 1,
     color: C.border,
   });
-  const foot =
-    "Beleg-PDF - geeignet fuer Paperless / FamilyBrain";
-  page.drawText(foot, {
+  page.drawText("Beleg-PDF - geeignet fuer Paperless / FamilyBrain", {
     x: contentX,
     y: cardBottom + 22,
     size: 11,
@@ -650,6 +702,206 @@ export async function buildSettlementPdfBuffer(input: {
     font,
     color: C.muted,
   });
+
+  return Buffer.from(await pdf.save());
+}
+
+export type LedgerExpensePdfItem = {
+  expenseId: number;
+  description: string | null;
+  categoryLabel: string | null;
+  amount: number;
+  currency: string;
+  amountBase: number;
+  baseCurrency: string;
+  exchangeRate?: number;
+  paidByName: string;
+  placeName: string | null;
+  expenseDate: string | null;
+  note?: string | null;
+  aiImagePath?: string | null;
+};
+
+export async function buildLedgerExpensesPdfBuffer(input: {
+  ledgerTitle: string;
+  baseCurrency: string;
+  expenses: LedgerExpensePdfItem[];
+}): Promise<Buffer> {
+  const pdf = await PDFDocument.create();
+  const font = await pdf.embedFont(StandardFonts.Helvetica);
+  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const totalBase = input.expenses.reduce((s, e) => s + e.amountBase, 0);
+
+  function newPage() {
+    const p = pdf.addPage([PAGE_W, PAGE_H]);
+    p.drawRectangle({
+      x: 0,
+      y: 0,
+      width: PAGE_W,
+      height: PAGE_H,
+      color: C.pageBg,
+    });
+    return p;
+  }
+
+  let page = newPage();
+  const margin = OUTER;
+  const contentW = PAGE_W - margin * 2;
+  let y = PAGE_H - margin;
+
+  page.drawRectangle({
+    x: margin,
+    y: y - 78,
+    width: contentW,
+    height: 78,
+    color: C.headerBg,
+    borderColor: C.headerBorder,
+    borderWidth: 1,
+  });
+  page.drawText("FINANZBRAIN  ·  ALLE AUSGABEN", {
+    x: margin + 16,
+    y: y - 28,
+    size: 12,
+    font: bold,
+    color: C.headerLabel,
+  });
+  const titleLines = wrapText(input.ledgerTitle, bold, 20, contentW - 32);
+  page.drawText(titleLines[0] || toPdfSafeText(input.ledgerTitle), {
+    x: margin + 16,
+    y: y - 52,
+    size: 20,
+    font: bold,
+    color: C.headerTitle,
+  });
+  page.drawText(
+    toPdfSafeText(
+      `${input.expenses.length} Ausgaben · Summe ${formatMoney(totalBase, input.baseCurrency)}`
+    ),
+    {
+      x: margin + 16,
+      y: y - 70,
+      size: 11,
+      font,
+      color: C.headerLabel,
+    }
+  );
+  y -= 98;
+
+  for (const exp of input.expenses) {
+    const badgeW = 72;
+    const badgeH = 96;
+    const img = await embedOptionalPng(pdf, exp.aiImagePath);
+    const imgSize = 88;
+    let imgW = 0;
+    let imgH = 0;
+    if (img) {
+      const scale = Math.min(imgSize / img.width, imgSize / img.height, 1);
+      imgW = img.width * scale;
+      imgH = img.height * scale;
+    }
+
+    const cardH = Math.max(badgeH + 28, 130) + (exp.note?.trim() ? 18 : 0);
+    if (y - cardH < margin + 24) {
+      page = newPage();
+      y = PAGE_H - margin;
+    }
+
+    page.drawRectangle({
+      x: margin,
+      y: y - cardH,
+      width: contentW,
+      height: cardH,
+      color: C.card,
+      borderColor: C.border,
+      borderWidth: 1,
+    });
+
+    const innerX = margin + 12;
+    const innerTop = y - 12;
+    drawDateBadge(page, bold, exp.expenseDate, innerX, innerTop, badgeW, badgeH);
+
+    const textX = innerX + badgeW + 14;
+    const textRight = margin + contentW - 12 - (img ? imgW + 12 : 0);
+    const textW = Math.max(120, textRight - textX);
+    const title = exp.description?.trim() || "Ausgabe";
+    const titleLinesExp = wrapText(title, bold, 14, textW);
+    let ty = innerTop - 4;
+    for (const line of titleLinesExp.slice(0, 2)) {
+      page.drawText(line, {
+        x: textX,
+        y: ty - 14,
+        size: 14,
+        font: bold,
+        color: C.ink,
+      });
+      ty -= 16;
+    }
+
+    page.drawText(toPdfSafeText(exp.categoryLabel || "Ausgabe").toUpperCase(), {
+      x: textX,
+      y: ty - 12,
+      size: 9,
+      font: bold,
+      color: C.badgeFg,
+    });
+    ty -= 20;
+
+    const hasFx =
+      exp.currency.toUpperCase() !== exp.baseCurrency.toUpperCase();
+    const rate =
+      typeof exp.exchangeRate === "number" && exp.exchangeRate > 0
+        ? exp.exchangeRate
+        : hasFx && exp.amount !== 0
+          ? exp.amountBase / exp.amount
+          : 1;
+
+    const detailLines = [
+      `Bezahlt von: ${exp.paidByName}`,
+      hasFx
+        ? `Betrag: ${formatMoney(exp.amount, exp.currency)} / ${formatMoney(exp.amountBase, exp.baseCurrency)}`
+        : `Betrag: ${formatMoney(exp.amount, exp.currency)}`,
+      hasFx
+        ? `Kurs: 1 ${exp.currency} = ${rate.toFixed(4)} ${exp.baseCurrency}`
+        : null,
+      exp.placeName?.trim() ? `Ort: ${exp.placeName.trim()}` : null,
+      exp.note?.trim() ? `Notiz: ${exp.note.trim()}` : null,
+      `Beleg-ID: ${exp.expenseId}`,
+    ].filter(Boolean) as string[];
+
+    for (const line of detailLines) {
+      for (const wline of wrapText(line, font, 10, textW).slice(0, 2)) {
+        page.drawText(wline, {
+          x: textX,
+          y: ty - 10,
+          size: 10,
+          font,
+          color: C.muted,
+        });
+        ty -= 13;
+      }
+    }
+
+    if (img && imgW > 0) {
+      page.drawImage(img, {
+        x: margin + contentW - 12 - imgW,
+        y: innerTop - imgH,
+        width: imgW,
+        height: imgH,
+      });
+    }
+
+    y -= cardH + 12;
+  }
+
+  if (input.expenses.length === 0) {
+    page.drawText("Noch keine Ausgaben.", {
+      x: margin,
+      y: y - 20,
+      size: 12,
+      font,
+      color: C.muted,
+    });
+  }
 
   return Buffer.from(await pdf.save());
 }

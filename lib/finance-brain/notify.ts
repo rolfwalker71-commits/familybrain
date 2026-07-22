@@ -6,10 +6,13 @@ import {
 } from "@/lib/finance-brain/email";
 import {
   buildExpenseMailHtml,
+  buildLedgerExpensesMailHtml,
   buildSettlementMailHtml,
+  type ExpenseMailFields,
 } from "@/lib/finance-brain/mail-templates";
 import {
   buildExpensePdfBuffer,
+  buildLedgerExpensesPdfBuffer,
   buildSettlementPdfBuffer,
 } from "@/lib/finance-brain/receipt-pdf";
 import {
@@ -17,6 +20,7 @@ import {
   getFinanceLedgerById,
   getFinanceLedgerMemberById,
   getFinanceSettlementById,
+  listFinanceExpenses,
   listFinanceLedgerMembers,
   markFinanceExpenseNotified,
   markFinanceSettlementNotified,
@@ -38,6 +42,29 @@ export type NotifyResult = {
 /** True when mail was attempted and failed (not merely skipped / unconfigured). */
 export function notifyFailed(result: NotifyResult): boolean {
   return !result.ok && Boolean(result.error);
+}
+
+function toExpenseMailFields(
+  expense: NonNullable<ReturnType<typeof getFinanceExpenseById>>,
+  ledger: NonNullable<ReturnType<typeof getFinanceLedgerById>>,
+  paidByName: string
+): ExpenseMailFields {
+  return {
+    expenseId: expense.id,
+    description: expense.description,
+    categoryLabel: expense.category_label,
+    amount: expense.amount,
+    currency: expense.currency,
+    amountBase: expense.amount_base,
+    baseCurrency: ledger.base_currency,
+    exchangeRate: expense.exchange_rate,
+    paidByName,
+    placeName: expense.place_name,
+    expenseDate: expense.expense_date,
+    note: expense.note,
+    hasAiImage: Boolean(expense.ai_image_path),
+    aiCid: `expense-ai-${expense.id}`,
+  };
 }
 
 export async function notifyLedgerExpense(
@@ -68,18 +95,11 @@ export async function notifyLedgerExpense(
   }
 
   const payer = getFinanceLedgerMemberById(expense.paid_by_member_id);
+  const paidByName = payer?.display_name || `#${expense.paid_by_member_id}`;
+  const fields = toExpenseMailFields(expense, ledger, paidByName);
   const mail = buildExpenseMailHtml({
     ledgerTitle: ledger.title,
-    description: expense.description,
-    categoryLabel: expense.category_label,
-    amount: expense.amount,
-    currency: expense.currency,
-    amountBase: expense.amount_base,
-    baseCurrency: ledger.base_currency,
-    paidByName: payer?.display_name || `#${expense.paid_by_member_id}`,
-    placeName: expense.place_name,
-    expenseDate: expense.expense_date,
-    hasAiImage: Boolean(expense.ai_image_path),
+    ...fields,
   });
 
   const pdf = await buildExpensePdfBuffer({
@@ -91,9 +111,10 @@ export async function notifyLedgerExpense(
     amountBase: expense.amount_base,
     baseCurrency: ledger.base_currency,
     exchangeRate: expense.exchange_rate,
-    paidByName: payer?.display_name || `#${expense.paid_by_member_id}`,
+    paidByName,
     placeName: expense.place_name,
     expenseDate: expense.expense_date,
+    note: expense.note,
     aiImagePath: expense.ai_image_path,
     expenseId: expense.id,
   });
@@ -123,6 +144,92 @@ export async function notifyLedgerExpense(
     return { ok: false, sent: 0, error: result.error };
   }
   markFinanceExpenseNotified(expenseId);
+  return { ok: true, sent: recipients.length };
+}
+
+export async function notifyLedgerExpensesSummary(
+  ledgerId: number
+): Promise<NotifyResult> {
+  if (!isEmailConfigured()) {
+    return { ok: false, sent: 0, error: "E-Mail nicht konfiguriert" };
+  }
+  const ledger = getFinanceLedgerById(ledgerId);
+  if (!ledger) return { ok: false, sent: 0, error: "Abrechnung nicht gefunden" };
+
+  const recipients = memberEmails(ledgerId);
+  if (recipients.length === 0) {
+    return { ok: false, sent: 0, error: "Keine Empfänger mit E-Mail-Adresse" };
+  }
+
+  const expenses = listFinanceExpenses(ledgerId);
+  if (expenses.length === 0) {
+    return { ok: false, sent: 0, error: "Keine Ausgaben vorhanden" };
+  }
+
+  const fields = expenses.map((expense) => {
+    const payer = getFinanceLedgerMemberById(expense.paid_by_member_id);
+    return toExpenseMailFields(
+      expense,
+      ledger,
+      payer?.display_name || `#${expense.paid_by_member_id}`
+    );
+  });
+
+  const mail = buildLedgerExpensesMailHtml({
+    ledgerTitle: ledger.title,
+    baseCurrency: ledger.base_currency,
+    expenses: fields,
+  });
+
+  const pdf = await buildLedgerExpensesPdfBuffer({
+    ledgerTitle: ledger.title,
+    baseCurrency: ledger.base_currency,
+    expenses: expenses.map((expense) => {
+      const payer = getFinanceLedgerMemberById(expense.paid_by_member_id);
+      return {
+        expenseId: expense.id,
+        description: expense.description,
+        categoryLabel: expense.category_label,
+        amount: expense.amount,
+        currency: expense.currency,
+        amountBase: expense.amount_base,
+        baseCurrency: ledger.base_currency,
+        exchangeRate: expense.exchange_rate,
+        paidByName: payer?.display_name || `#${expense.paid_by_member_id}`,
+        placeName: expense.place_name,
+        expenseDate: expense.expense_date,
+        note: expense.note,
+        aiImagePath: expense.ai_image_path,
+      };
+    }),
+  });
+
+  const attachments: MailAttachment[] = [
+    {
+      filename: `finanzbrain-ausgaben-${ledgerId}.pdf`,
+      content: pdf.toString("base64"),
+    },
+  ];
+  for (const expense of expenses) {
+    if (expense.ai_image_path && fs.existsSync(expense.ai_image_path)) {
+      attachments.push({
+        filename: `expense-${expense.id}-ai.png`,
+        content: fs.readFileSync(expense.ai_image_path).toString("base64"),
+        content_id: `expense-ai-${expense.id}`,
+      });
+    }
+  }
+
+  const result = await sendMail({
+    to: recipients,
+    subject: mail.subject,
+    text: mail.text,
+    html: mail.html,
+    attachments,
+  });
+  if (!result.ok) {
+    return { ok: false, sent: 0, error: result.error };
+  }
   return { ok: true, sent: recipients.length };
 }
 

@@ -47,6 +47,7 @@ type ShareData = {
     place_name?: string | null;
     place_lat?: number | null;
     place_lon?: number | null;
+    note?: string | null;
     receipt_url?: string | null;
     has_receipt?: boolean;
     ai_image_url?: string | null;
@@ -93,6 +94,7 @@ export function FinanceShareClient({ token }: { token: string }) {
   const [expDesc, setExpDesc] = useState("");
   const [expDate, setExpDate] = useState(todayDateInputValue);
   const [expPlace, setExpPlace] = useState("");
+  const [expNote, setExpNote] = useState("");
   const [expPayer, setExpPayer] = useState<string>("");
 
   const [setAmount, setSetAmount] = useState("");
@@ -178,6 +180,7 @@ export function FinanceShareClient({ token }: { token: string }) {
             description: expDesc.trim() || null,
             expenseDate: expDate || null,
             place: expPlace.trim() || null,
+            note: expNote.trim() || null,
             paidByMemberId: expPayer ? Number(expPayer) : undefined,
           }),
         }
@@ -204,6 +207,7 @@ export function FinanceShareClient({ token }: { token: string }) {
       setExpDesc("");
       setExpDate(todayDateInputValue());
       setExpPlace("");
+      setExpNote("");
       setPendingReceipt(null);
       await load();
     } catch (err) {
@@ -287,6 +291,7 @@ export function FinanceShareClient({ token }: { token: string }) {
       expenseDate: string | null;
       paidByMemberId: number;
       place: string | null;
+      note: string | null;
     }
   ) {
     setEditBusyId(expenseId);
@@ -548,6 +553,15 @@ export function FinanceShareClient({ token }: { token: string }) {
               value={expPlace}
               onChange={(e) => setExpPlace(e.target.value)}
               placeholder="Stadt, Lokal…"
+            />
+          </div>
+          <div className="space-y-1 sm:col-span-2">
+            <Label>Notiz (optional)</Label>
+            <Textarea
+              rows={2}
+              value={expNote}
+              onChange={(e) => setExpNote(e.target.value)}
+              placeholder="Zusätzliche Infos"
             />
           </div>
           <div className="space-y-1">

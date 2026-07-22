@@ -54,6 +54,7 @@ export type FinanceExpenseRow = {
   place_lat: number | null;
   place_lon: number | null;
   notified_at: string | null;
+  note: string | null;
   split_mode: string;
   created_at: string;
   updated_at: string;
@@ -384,6 +385,7 @@ export function createFinanceExpense(
     placeName?: string | null;
     placeLat?: number | null;
     placeLon?: number | null;
+    note?: string | null;
     split: ExpenseSplitInput;
   }
 ): FinanceExpenseRow {
@@ -415,9 +417,9 @@ export function createFinanceExpense(
          ledger_id, paid_by_member_id, created_by_member_id,
          amount, currency, exchange_rate, amount_base,
          description, expense_date, document_id, trip_event_id,
-         place_name, place_lat, place_lon,
+         place_name, place_lat, place_lon, note,
          split_mode, created_at, updated_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       ledgerId,
@@ -434,6 +436,7 @@ export function createFinanceExpense(
       input.placeName?.trim() || null,
       input.placeLat ?? null,
       input.placeLon ?? null,
+      input.note?.trim() || null,
       input.split.mode,
       ts,
       ts
@@ -535,6 +538,7 @@ export function updateFinanceExpense(
     placeName?: string | null;
     placeLat?: number | null;
     placeLon?: number | null;
+    note?: string | null;
   }
 ): FinanceExpenseRow {
   const existing = getFinanceExpenseById(expenseId);
@@ -554,6 +558,8 @@ export function updateFinanceExpense(
     input.expenseDate !== undefined
       ? input.expenseDate || null
       : existing.expense_date;
+  const note =
+    input.note !== undefined ? input.note?.trim() || null : existing.note;
 
   let placeName = existing.place_name;
   let placeLat = existing.place_lat;
@@ -581,6 +587,7 @@ export function updateFinanceExpense(
        place_name = ?,
        place_lat = ?,
        place_lon = ?,
+       note = ?,
        updated_at = ?
      WHERE id = ?`
   ).run(
@@ -590,6 +597,7 @@ export function updateFinanceExpense(
     placeName,
     placeLat,
     placeLon,
+    note,
     nowIso(),
     expenseId
   );

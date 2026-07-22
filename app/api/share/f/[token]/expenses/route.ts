@@ -24,6 +24,7 @@ const CreateSchema = z.object({
   paidByMemberId: z.number().int().positive().optional(),
   memberIds: z.array(z.number().int().positive()).optional(),
   place: z.string().max(200).nullable().optional(),
+  note: z.string().max(1000).nullable().optional(),
 });
 
 export async function POST(request: Request, context: Ctx) {
@@ -67,6 +68,7 @@ export async function POST(request: Request, context: Ctx) {
       placeName,
       placeLat,
       placeLon,
+      note: parsed.data.note ?? null,
       split: {
         mode: "equal",
         memberIds: parsed.data.memberIds ?? [],
