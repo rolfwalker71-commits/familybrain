@@ -28,11 +28,23 @@ function memberEmails(ledgerId: number): string[] {
     .map((m) => m.email!.trim());
 }
 
+export type NotifyResult = {
+  ok: boolean;
+  sent: number;
+  skipped?: string;
+  error?: string;
+};
+
+/** True when mail was attempted and failed (not merely skipped / unconfigured). */
+export function notifyFailed(result: NotifyResult): boolean {
+  return !result.ok && Boolean(result.error);
+}
+
 export async function notifyLedgerExpense(
   expenseId: number
-): Promise<{ ok: boolean; sent: number; skipped?: string; error?: string }> {
+): Promise<NotifyResult> {
   if (!isEmailConfigured()) {
-    return { ok: false, sent: 0, skipped: "E-Mail nicht konfiguriert" };
+    return { ok: true, sent: 0, skipped: "E-Mail nicht konfiguriert" };
   }
   const expense = getFinanceExpenseById(expenseId);
   if (!expense) return { ok: false, sent: 0, error: "Ausgabe nicht gefunden" };
@@ -71,6 +83,7 @@ export async function notifyLedgerExpense(
     currency: expense.currency,
     amountBase: expense.amount_base,
     baseCurrency: ledger.base_currency,
+    exchangeRate: expense.exchange_rate,
     paidByName: payer?.display_name || `#${expense.paid_by_member_id}`,
     placeName: expense.place_name,
     expenseDate: expense.expense_date,
@@ -108,9 +121,9 @@ export async function notifyLedgerExpense(
 
 export async function notifyLedgerSettlement(
   settlementId: number
-): Promise<{ ok: boolean; sent: number; skipped?: string; error?: string }> {
+): Promise<NotifyResult> {
   if (!isEmailConfigured()) {
-    return { ok: false, sent: 0, skipped: "E-Mail nicht konfiguriert" };
+    return { ok: true, sent: 0, skipped: "E-Mail nicht konfiguriert" };
   }
   const settlement = getFinanceSettlementById(settlementId);
   if (!settlement) {

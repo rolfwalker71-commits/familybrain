@@ -45,17 +45,25 @@ export async function POST(request: Request, context: Ctx) {
       settledAt: parsed.data.settledAt ?? null,
       createdByMemberId: member.id,
     });
-    try {
-      const { notifyLedgerSettlement } = await import(
-        "@/lib/finance-brain/notify"
+    const { notifyFailed, notifyLedgerSettlement } = await import(
+      "@/lib/finance-brain/notify"
+    );
+    const notification = await notifyLedgerSettlement(settlement.id);
+    if (notifyFailed(notification)) {
+      console.error(
+        "[finance-brain] settlement mail failed:",
+        notification.error
       );
-      await notifyLedgerSettlement(settlement.id);
-    } catch (mailError) {
-      console.error("[finance-brain] settlement mail failed:", mailError);
     }
     return NextResponse.json({
       ok: true,
       settlement: serializeSettlement(settlement),
+      notification,
+      ...(notification.error
+        ? {
+            warning: `Rückzahlung gespeichert, Belegmail fehlgeschlagen: ${notification.error}`,
+          }
+        : {}),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

@@ -222,6 +222,9 @@ export function FinanceShareClient({ token }: { token: string }) {
       );
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "KI-Bild fehlgeschlagen");
+      if (typeof json.warning === "string" && json.warning) {
+        setError(json.warning);
+      }
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -302,6 +305,9 @@ export function FinanceShareClient({ token }: { token: string }) {
       if (!res.ok) throw new Error(json.error || "Fehler");
       setSetAmount("");
       setSetNote("");
+      if (typeof json.warning === "string" && json.warning) {
+        setError(json.warning);
+      }
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));

@@ -4,12 +4,47 @@ import {
   StandardFonts,
   rgb,
   type PDFFont,
+  type PDFPage,
+  type PDFImage,
 } from "pdf-lib";
 import { formatMoney } from "@/lib/finance-brain/format";
 
-const MARGIN = 48;
 const PAGE_W = 595.28;
 const PAGE_H = 841.89;
+const OUTER = 28;
+
+const MONTH_SHORT_DE = [
+  "JAN",
+  "FEB",
+  "MAR",
+  "APR",
+  "MAI",
+  "JUN",
+  "JUL",
+  "AUG",
+  "SEP",
+  "OKT",
+  "NOV",
+  "DEZ",
+] as const;
+
+const C = {
+  pageBg: rgb(0.973, 0.98, 0.988),
+  card: rgb(1, 1, 1),
+  border: rgb(0.886, 0.91, 0.941),
+  headerBg: rgb(1, 0.929, 0.835),
+  headerBorder: rgb(0.992, 0.729, 0.455),
+  headerLabel: rgb(0.604, 0.204, 0.071),
+  headerTitle: rgb(0.486, 0.176, 0.071),
+  ink: rgb(0.059, 0.09, 0.165),
+  muted: rgb(0.392, 0.455, 0.545),
+  soft: rgb(0.945, 0.961, 0.976),
+  badgeBg: rgb(1, 0.929, 0.835),
+  badgeFg: rgb(0.604, 0.204, 0.071),
+  redTop: rgb(0.937, 0.267, 0.267),
+  white: rgb(1, 1, 1),
+  foot: rgb(0.976, 0.98, 0.984),
+};
 
 function toPdfSafeText(raw: string): string {
   return raw
@@ -19,37 +54,212 @@ function toPdfSafeText(raw: string): string {
     .replace(/[\u201C\u201D]/g, '"')
     .replace(/\u2026/g, "...")
     .replace(/\u00B7/g, "-")
+    .replace(/\u2013|\u2014/g, "-")
     .replace(/\p{Extended_Pictographic}\s*/gu, "")
     .replace(/[\uFE0E\uFE0F\u200D]/g, "");
 }
 
-function drawLines(
-  page: ReturnType<PDFDocument["addPage"]>,
+function weekdayDe(isoDate: string): string {
+  const [y, m, d] = isoDate.split("-").map(Number);
+  const date = new Date(y, m - 1, d);
+  return new Intl.DateTimeFormat("de-CH", { weekday: "long" }).format(date);
+}
+
+function formatDateDe(isoDate: string | null | undefined): string {
+  if (!isoDate || !/^\d{4}-\d{2}-\d{2}/.test(isoDate)) return "-";
+  const iso = isoDate.slice(0, 10);
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Intl.DateTimeFormat("de-CH", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(new Date(y, m - 1, d));
+}
+
+function wrapText(
+  text: string,
   font: PDFFont,
-  lines: string[],
-  x: number,
-  startY: number,
   size: number,
-  gap = 4
-): number {
-  let y = startY;
-  for (const line of lines) {
-    page.drawText(toPdfSafeText(line), {
+  maxWidth: number
+): string[] {
+  const safe = toPdfSafeText(text);
+  const words = safe.split(/\s+/).filter(Boolean);
+  if (words.length === 0) return [""];
+  const lines: string[] = [];
+  let current = words[0];
+  for (let i = 1; i < words.length; i++) {
+    const next = `${current} ${words[i]}`;
+    if (font.widthOfTextAtSize(next, size) <= maxWidth) {
+      current = next;
+    } else {
+      lines.push(current);
+      current = words[i];
+    }
+  }
+  lines.push(current);
+  return lines;
+}
+
+function drawRoundedRect(
+  page: PDFPage,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number,
+  fill: ReturnType<typeof rgb>,
+  border?: ReturnType<typeof rgb>
+) {
+  // Approximate rounded corners with overlapping rects + corner circles.
+  const rr = Math.min(r, w / 2, h / 2);
+  page.drawRectangle({
+    x: x + rr,
+    y,
+    width: w - 2 * rr,
+    height: h,
+    color: fill,
+  });
+  page.drawRectangle({
+    x,
+    y: y + rr,
+    width: w,
+    height: h - 2 * rr,
+    color: fill,
+  });
+  for (const [cx, cy] of [
+    [x + rr, y + rr],
+    [x + w - rr, y + rr],
+    [x + rr, y + h - rr],
+    [x + w - rr, y + h - rr],
+  ] as const) {
+    page.drawCircle({ x: cx, y: cy, size: rr, color: fill });
+  }
+  if (border) {
+    page.drawRectangle({
       x,
       y,
-      size,
-      font,
-      color: rgb(0.08, 0.1, 0.15),
+      width: w,
+      height: h,
+      borderColor: border,
+      borderWidth: 1.25,
     });
-    y -= size + gap;
   }
-  return y;
+}
+
+function drawDateBadge(
+  page: PDFPage,
+  bold: PDFFont,
+  isoDate: string | null | undefined,
+  x: number,
+  topY: number,
+  w = 92,
+  h = 118
+) {
+  const bottom = topY - h;
+  page.drawRectangle({
+    x,
+    y: bottom,
+    width: w,
+    height: h,
+    color: C.white,
+    borderColor: rgb(0.85, 0.87, 0.9),
+    borderWidth: 1.25,
+  });
+
+  const headerH = 28;
+  page.drawRectangle({
+    x,
+    y: topY - headerH,
+    width: w,
+    height: headerH,
+    color: C.redTop,
+  });
+
+  const iso =
+    isoDate && /^\d{4}-\d{2}-\d{2}/.test(isoDate) ? isoDate.slice(0, 10) : null;
+  const month = iso ? MONTH_SHORT_DE[Number(iso.slice(5, 7)) - 1] : "---";
+  const day = iso ? String(Number(iso.slice(8, 10))) : "-";
+  const year = iso ? iso.slice(0, 4) : "----";
+  const weekday = iso ? toPdfSafeText(weekdayDe(iso)) : "Ohne Datum";
+
+  const monthSize = 12;
+  page.drawText(month, {
+    x: x + (w - bold.widthOfTextAtSize(month, monthSize)) / 2,
+    y: topY - headerH + 9,
+    size: monthSize,
+    font: bold,
+    color: C.white,
+  });
+
+  const bodyTop = topY - headerH - 10;
+  const wdSize = 11;
+  page.drawText(weekday, {
+    x: x + Math.max(4, (w - bold.widthOfTextAtSize(weekday, wdSize)) / 2),
+    y: bodyTop - wdSize,
+    size: wdSize,
+    font: bold,
+    color: C.ink,
+  });
+
+  const daySize = 34;
+  page.drawText(day, {
+    x: x + (w - bold.widthOfTextAtSize(day, daySize)) / 2,
+    y: bodyTop - wdSize - daySize - 6,
+    size: daySize,
+    font: bold,
+    color: C.ink,
+  });
+
+  const yearSize = 13;
+  page.drawText(year, {
+    x: x + (w - bold.widthOfTextAtSize(year, yearSize)) / 2,
+    y: bottom + 14,
+    size: yearSize,
+    font: bold,
+    color: C.ink,
+  });
+}
+
+function drawLabeledRow(
+  page: PDFPage,
+  font: PDFFont,
+  bold: PDFFont,
+  label: string,
+  value: string,
+  x: number,
+  y: number,
+  labelW: number,
+  valueMaxW: number,
+  labelSize = 12,
+  valueSize = 15
+): number {
+  const safeLabel = toPdfSafeText(label);
+  const lines = wrapText(value, bold, valueSize, valueMaxW);
+  page.drawText(safeLabel, {
+    x,
+    y,
+    size: labelSize,
+    font,
+    color: C.muted,
+  });
+  let yy = y;
+  for (const line of lines) {
+    page.drawText(line, {
+      x: x + labelW,
+      y: yy,
+      size: valueSize,
+      font: bold,
+      color: C.ink,
+    });
+    yy -= valueSize + 4;
+  }
+  return yy - 10;
 }
 
 async function embedOptionalPng(
   pdf: PDFDocument,
   filePath: string | null | undefined
-) {
+): Promise<PDFImage | null> {
   if (!filePath || !fs.existsSync(filePath)) return null;
   try {
     return await pdf.embedPng(fs.readFileSync(filePath));
@@ -70,6 +280,7 @@ export async function buildExpensePdfBuffer(input: {
   currency: string;
   amountBase: number;
   baseCurrency: string;
+  exchangeRate?: number;
   paidByName: string;
   placeName: string | null;
   expenseDate: string | null;
@@ -80,72 +291,227 @@ export async function buildExpensePdfBuffer(input: {
   const page = pdf.addPage([PAGE_W, PAGE_H]);
   const font = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
-  let y = PAGE_H - MARGIN;
 
-  page.drawText("FinanzBrain - Ausgabe", {
-    x: MARGIN,
-    y,
-    size: 18,
-    font: bold,
-    color: rgb(0.6, 0.25, 0.05),
+  // Page background
+  page.drawRectangle({
+    x: 0,
+    y: 0,
+    width: PAGE_W,
+    height: PAGE_H,
+    color: C.pageBg,
   });
-  y -= 28;
-  y = drawLines(page, font, [`Abrechnung: ${input.ledgerTitle}`], MARGIN, y, 11);
-  y -= 8;
 
-  const money = formatMoney(input.amount, input.currency);
-  const base =
-    input.currency !== input.baseCurrency
-      ? ` (${formatMoney(input.amountBase, input.baseCurrency)})`
-      : "";
+  const cardX = OUTER;
+  const cardW = PAGE_W - OUTER * 2;
+  const cardBottom = OUTER;
+  const cardTop = PAGE_H - OUTER;
+  const cardH = cardTop - cardBottom;
+  const pad = 28;
+  const contentX = cardX + pad;
+  const contentRight = cardX + cardW - pad;
+  const contentW = contentRight - contentX;
 
-  y = drawLines(
-    page,
-    bold,
-    [input.description?.trim() || "Ausgabe"],
-    MARGIN,
-    y,
-    16,
-    6
-  );
-  y = drawLines(
-    page,
-    font,
-    [
-      `Kategorie: ${input.categoryLabel || "Ausgabe"}`,
-      `Betrag: ${money}${base}`,
-      `Bezahlt von: ${input.paidByName}`,
-      input.expenseDate ? `Datum: ${input.expenseDate}` : "Datum: -",
-      input.placeName ? `Ort: ${input.placeName}` : "Ort: -",
-      `Beleg-ID: ${input.expenseId}`,
-    ],
-    MARGIN,
-    y,
-    11,
-    5
-  );
+  drawRoundedRect(page, cardX, cardBottom, cardW, cardH, 14, C.card, C.border);
+
+  // Header band
+  const headerH = 86;
+  const headerBottom = cardTop - headerH;
+  page.drawRectangle({
+    x: cardX,
+    y: headerBottom,
+    width: cardW,
+    height: headerH,
+    color: C.headerBg,
+  });
+  page.drawRectangle({
+    x: cardX,
+    y: headerBottom,
+    width: cardW,
+    height: 1.5,
+    color: C.headerBorder,
+  });
+
+  const eyebrow = "FINANZBRAIN  ·  NEUE AUSGABE";
+  page.drawText(eyebrow, {
+    x: contentX,
+    y: cardTop - 32,
+    size: 13,
+    font: bold,
+    color: C.headerLabel,
+  });
+
+  const ledgerLines = wrapText(input.ledgerTitle, bold, 22, contentW);
+  let ledgerY = cardTop - 58;
+  for (const line of ledgerLines.slice(0, 2)) {
+    page.drawText(line, {
+      x: contentX,
+      y: ledgerY,
+      size: 22,
+      font: bold,
+      color: C.headerTitle,
+    });
+    ledgerY -= 26;
+  }
+
+  // Body
+  let y = headerBottom - 36;
+  const badgeW = 100;
+  const badgeH = 128;
+  drawDateBadge(page, bold, input.expenseDate, contentX, y, badgeW, badgeH);
 
   const img = await embedOptionalPng(pdf, input.aiImagePath);
+  const imgMax = 220;
+  let imgW = 0;
+  let imgH = 0;
   if (img) {
-    const max = 180;
-    const scale = Math.min(max / img.width, max / img.height);
-    const w = img.width * scale;
-    const h = img.height * scale;
-    y -= 12;
+    const scale = Math.min(imgMax / img.width, imgMax / img.height, 1);
+    imgW = img.width * scale;
+    imgH = img.height * scale;
+    page.drawRectangle({
+      x: contentRight - imgW - 4,
+      y: y - imgH - 4,
+      width: imgW + 8,
+      height: imgH + 8,
+      color: C.soft,
+      borderColor: C.border,
+      borderWidth: 1,
+    });
     page.drawImage(img, {
-      x: MARGIN,
-      y: Math.max(MARGIN, y - h),
-      width: w,
-      height: h,
+      x: contentRight - imgW,
+      y: y - imgH,
+      width: imgW,
+      height: imgH,
     });
   }
 
-  page.drawText("FamilyBrain FinanzBrain Beleg", {
-    x: MARGIN,
-    y: MARGIN - 8,
-    size: 9,
+  const titleX = contentX + badgeW + 22;
+  const titleRight = img ? contentRight - imgW - 20 : contentRight;
+  const titleMaxW = Math.max(160, titleRight - titleX);
+  const title = input.description?.trim() || "Ausgabe";
+  const titleSize = 26;
+  const titleLines = wrapText(title, bold, titleSize, titleMaxW);
+  let titleY = y - 8;
+  for (const line of titleLines.slice(0, 3)) {
+    page.drawText(line, {
+      x: titleX,
+      y: titleY - titleSize,
+      size: titleSize,
+      font: bold,
+      color: C.ink,
+    });
+    titleY -= titleSize + 6;
+  }
+
+  // Category chip
+  const category = toPdfSafeText(input.categoryLabel || "Ausgabe");
+  const chipPadX = 10;
+  const chipSize = 11;
+  const chipW = bold.widthOfTextAtSize(category.toUpperCase(), chipSize) + chipPadX * 2;
+  const chipH = 22;
+  const chipY = titleY - chipH - 8;
+  page.drawRectangle({
+    x: titleX,
+    y: chipY,
+    width: chipW,
+    height: chipH,
+    color: C.badgeBg,
+  });
+  page.drawText(category.toUpperCase(), {
+    x: titleX + chipPadX,
+    y: chipY + 6,
+    size: chipSize,
+    font: bold,
+    color: C.badgeFg,
+  });
+
+  // Detail section below badge / image
+  const detailsTop = Math.min(y - badgeH, img ? y - imgH : y - badgeH) - 36;
+  y = detailsTop;
+
+  page.drawRectangle({
+    x: contentX,
+    y: y + 8,
+    width: contentW,
+    height: 1,
+    color: C.border,
+  });
+
+  const labelW = 168;
+  const valueMaxW = contentW - labelW;
+  const hasFx = input.currency.toUpperCase() !== input.baseCurrency.toUpperCase();
+  const rate =
+    typeof input.exchangeRate === "number" && input.exchangeRate > 0
+      ? input.exchangeRate
+      : hasFx && input.amount !== 0
+        ? input.amountBase / input.amount
+        : 1;
+
+  const rows: Array<[string, string]> = [
+    ["Wer hat bezahlt", input.paidByName],
+  ];
+  if (hasFx) {
+    rows.push([
+      `Betrag (${input.currency})`,
+      formatMoney(input.amount, input.currency),
+    ]);
+    rows.push([
+      `Betrag (${input.baseCurrency})`,
+      formatMoney(input.amountBase, input.baseCurrency),
+    ]);
+    rows.push([
+      "Wechselkurs",
+      `1 ${input.currency} = ${rate.toFixed(4)} ${input.baseCurrency}`,
+    ]);
+  } else {
+    rows.push(["Betrag", formatMoney(input.amount, input.currency)]);
+  }
+  rows.push(["Wann", formatDateDe(input.expenseDate)]);
+  rows.push(["Wo", input.placeName?.trim() || "-"]);
+  rows.push(["Kategorie", input.categoryLabel || "Ausgabe"]);
+  rows.push(["Beleg-ID", String(input.expenseId)]);
+
+  y -= 12;
+  for (const [label, value] of rows) {
+    y = drawLabeledRow(
+      page,
+      font,
+      bold,
+      label,
+      value,
+      contentX,
+      y,
+      labelW,
+      valueMaxW,
+      13,
+      16
+    );
+    if (y < cardBottom + 70) break;
+  }
+
+  // Footer
+  const footH = 52;
+  page.drawRectangle({
+    x: cardX,
+    y: cardBottom,
+    width: cardW,
+    height: footH,
+    color: C.foot,
+  });
+  page.drawRectangle({
+    x: cardX,
+    y: cardBottom + footH,
+    width: cardW,
+    height: 1,
+    color: C.border,
+  });
+  const foot =
+    "Beleg-PDF - geeignet fuer Paperless / FamilyBrain";
+  page.drawText(foot, {
+    x: contentX,
+    y: cardBottom + 22,
+    size: 11,
     font,
-    color: rgb(0.45, 0.5, 0.55),
+    color: C.muted,
   });
 
   return Buffer.from(await pdf.save());
@@ -167,55 +533,122 @@ export async function buildSettlementPdfBuffer(input: {
   const page = pdf.addPage([PAGE_W, PAGE_H]);
   const font = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
-  let y = PAGE_H - MARGIN;
 
-  page.drawText("FinanzBrain - Rueckzahlung", {
-    x: MARGIN,
-    y,
-    size: 18,
-    font: bold,
-    color: rgb(0.05, 0.4, 0.38),
+  page.drawRectangle({
+    x: 0,
+    y: 0,
+    width: PAGE_W,
+    height: PAGE_H,
+    color: C.pageBg,
   });
-  y -= 28;
-  y = drawLines(page, font, [`Abrechnung: ${input.ledgerTitle}`], MARGIN, y, 11);
-  y -= 8;
+
+  const cardX = OUTER;
+  const cardW = PAGE_W - OUTER * 2;
+  const cardBottom = OUTER;
+  const cardTop = PAGE_H - OUTER;
+  const cardH = cardTop - cardBottom;
+  const pad = 28;
+  const contentX = cardX + pad;
+
+  drawRoundedRect(page, cardX, cardBottom, cardW, cardH, 14, C.card, C.border);
+
+  const headerH = 86;
+  const headerBottom = cardTop - headerH;
+  page.drawRectangle({
+    x: cardX,
+    y: headerBottom,
+    width: cardW,
+    height: headerH,
+    color: rgb(0.8, 0.984, 0.945),
+  });
+  page.drawRectangle({
+    x: cardX,
+    y: headerBottom,
+    width: cardW,
+    height: 1.5,
+    color: rgb(0.369, 0.918, 0.831),
+  });
+
+  page.drawText("FINANZBRAIN  ·  RUECKZAHLUNG", {
+    x: contentX,
+    y: cardTop - 32,
+    size: 13,
+    font: bold,
+    color: rgb(0.067, 0.369, 0.349),
+  });
+  page.drawText(toPdfSafeText(input.ledgerTitle), {
+    x: contentX,
+    y: cardTop - 58,
+    size: 22,
+    font: bold,
+    color: rgb(0.075, 0.306, 0.29),
+  });
+
+  let y = headerBottom - 36;
+  drawDateBadge(page, bold, input.settledAt?.slice(0, 10) ?? null, contentX, y);
 
   const money = formatMoney(input.amount, input.currency);
-  const base =
-    input.currency !== input.baseCurrency
-      ? ` (${formatMoney(input.amountBase, input.baseCurrency)})`
-      : "";
-
-  y = drawLines(
-    page,
-    bold,
-    [`${input.fromName} -> ${input.toName}`],
-    MARGIN,
-    y,
-    16,
-    6
-  );
-  y = drawLines(
-    page,
-    font,
-    [
-      `Betrag: ${money}${base}`,
-      input.settledAt ? `Datum: ${input.settledAt}` : "Datum: -",
-      input.note ? `Notiz: ${input.note}` : "Notiz: -",
-      `Beleg-ID: ${input.settlementId}`,
-    ],
-    MARGIN,
-    y,
-    11,
-    5
+  const hasFx = input.currency.toUpperCase() !== input.baseCurrency.toUpperCase();
+  const titleX = contentX + 122;
+  page.drawText(
+    toPdfSafeText(`${input.fromName} -> ${input.toName}`),
+    {
+      x: titleX,
+      y: y - 30,
+      size: 24,
+      font: bold,
+      color: C.ink,
+    }
   );
 
-  page.drawText("FamilyBrain FinanzBrain Beleg", {
-    x: MARGIN,
-    y: MARGIN - 8,
-    size: 9,
+  y = y - 150;
+  const labelW = 168;
+  const valueMaxW = PAGE_W - OUTER * 2 - pad * 2 - labelW;
+  const rows: Array<[string, string]> = [
+    ["Von", input.fromName],
+    ["An", input.toName],
+    ["Betrag", money],
+  ];
+  if (hasFx) {
+    rows.push([
+      `Betrag (${input.baseCurrency})`,
+      formatMoney(input.amountBase, input.baseCurrency),
+    ]);
+  }
+  rows.push(["Wann", formatDateDe(input.settledAt?.slice(0, 10))]);
+  rows.push(["Notiz", input.note?.trim() || "-"]);
+  rows.push(["Beleg-ID", String(input.settlementId)]);
+
+  for (const [label, value] of rows) {
+    y = drawLabeledRow(
+      page,
+      font,
+      bold,
+      label,
+      value,
+      contentX,
+      y,
+      labelW,
+      valueMaxW,
+      13,
+      16
+    );
+  }
+
+  const footH = 52;
+  page.drawRectangle({
+    x: cardX,
+    y: cardBottom,
+    width: cardW,
+    height: footH,
+    color: C.foot,
+  });
+  page.drawText("Beleg-PDF - geeignet fuer Paperless / FamilyBrain", {
+    x: contentX,
+    y: cardBottom + 22,
+    size: 11,
     font,
-    color: rgb(0.45, 0.5, 0.55),
+    color: C.muted,
   });
 
   return Buffer.from(await pdf.save());

@@ -395,6 +395,9 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
       );
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "KI-Bild fehlgeschlagen");
+      if (typeof json.warning === "string" && json.warning) {
+        setError(json.warning);
+      }
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -477,7 +480,12 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
       if (!res.ok) throw new Error(json.error || "Fehler");
       setSetAmount("");
       setSetNote("");
-      setStatus("Rückzahlung erfasst – Saldo aktualisiert.");
+      if (typeof json.warning === "string" && json.warning) {
+        setError(json.warning);
+        setStatus("Rückzahlung erfasst – Belegmail fehlgeschlagen.");
+      } else {
+        setStatus("Rückzahlung erfasst – Saldo aktualisiert.");
+      }
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
