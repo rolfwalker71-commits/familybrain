@@ -44,6 +44,7 @@ import {
 import { PendingReceiptPicker } from "@/components/finance-brain/expense-receipt-controls";
 import { COMMON_CURRENCIES } from "@/lib/finance-brain/constants";
 import { cn } from "@/lib/utils";
+import { todayDateInputValue } from "@/lib/utils/dates";
 
 type Member = {
   id: number;
@@ -141,7 +142,7 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
   const [expCurrency, setExpCurrency] = useState("CHF");
   const [expRate, setExpRate] = useState("1");
   const [expDesc, setExpDesc] = useState("");
-  const [expDate, setExpDate] = useState("");
+  const [expDate, setExpDate] = useState(todayDateInputValue);
   const [expPlace, setExpPlace] = useState("");
   const [expPayer, setExpPayer] = useState<string>("");
   const [rateLoading, setRateLoading] = useState(false);
@@ -372,7 +373,7 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
       }
       setExpAmount("");
       setExpDesc("");
-      setExpDate("");
+      setExpDate(todayDateInputValue());
       setExpPlace("");
       setPendingReceipt(null);
       await load();

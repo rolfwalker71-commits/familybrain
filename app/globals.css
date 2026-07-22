@@ -109,7 +109,8 @@
   }
 }
 
-/* Safari paints "today" into empty date/time fields; fade that fake placeholder. */
+/* Safari paints "today" into empty date/time fields — hide that fake text so
+   empty fields look empty; real values stay bold foreground. */
 input[type="date"][data-empty="true"]::-webkit-datetime-edit-year-field,
 input[type="date"][data-empty="true"]::-webkit-datetime-edit-month-field,
 input[type="date"][data-empty="true"]::-webkit-datetime-edit-day-field,
@@ -119,4 +120,29 @@ input[type="time"][data-empty="true"]::-webkit-datetime-edit-minute-field,
 input[type="time"][data-empty="true"]::-webkit-datetime-edit-ampm-field,
 input[type="time"][data-empty="true"]::-webkit-datetime-edit-text {
   color: transparent;
+}
+
+input[type="date"]:not([data-empty="true"])::-webkit-datetime-edit-year-field,
+input[type="date"]:not([data-empty="true"])::-webkit-datetime-edit-month-field,
+input[type="date"]:not([data-empty="true"])::-webkit-datetime-edit-day-field,
+input[type="date"]:not([data-empty="true"])::-webkit-datetime-edit-text,
+input[type="time"]:not([data-empty="true"])::-webkit-datetime-edit-hour-field,
+input[type="time"]:not([data-empty="true"])::-webkit-datetime-edit-minute-field,
+input[type="time"]:not([data-empty="true"])::-webkit-datetime-edit-ampm-field,
+input[type="time"]:not([data-empty="true"])::-webkit-datetime-edit-text {
+  color: var(--foreground);
+  font-weight: 600;
+}
+
+/* Text/number inputs: values read as set; placeholders stay soft. */
+[data-slot="input"]:not([data-empty="true"]),
+[data-slot="textarea"] {
+  font-weight: 500;
+}
+
+[data-slot="input"]::placeholder,
+[data-slot="textarea"]::placeholder {
+  font-weight: 400;
+  color: var(--muted-foreground);
+  opacity: 1;
 }

@@ -196,6 +196,15 @@ export function toTimeInputValue(raw: string | null | undefined): string {
   return m ? `${m[1]}:${m[2]}` : "";
 }
 
+/** ISO date (yyyy-mm-dd) for today in local timezone (`<input type="date">`). */
+export function todayDateInputValue(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 export function daysFromNow(days: number): string {
   const d = new Date();
   d.setDate(d.getDate() + days);
