@@ -8,6 +8,8 @@ import {
   listTripDocumentsForImport,
 } from "@/lib/finance-brain/queries";
 import { serializeExpense } from "@/lib/finance-brain/serialize";
+import { fetchEcbExchangeRate } from "@/lib/finance-brain/exchange-rates";
+import { isForeignCurrency } from "@/lib/finance-brain/format";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -100,11 +102,33 @@ export async function POST(request: Request, context: Ctx) {
       );
     }
 
+    let exchangeRate = parsed.data.exchangeRate;
+    if (
+      exchangeRate == null &&
+      isForeignCurrency(currency, ledger.base_currency)
+    ) {
+      try {
+        const rate = await fetchEcbExchangeRate({
+          from: currency,
+          to: ledger.base_currency,
+          date: expenseDate,
+        });
+        exchangeRate = rate.rate;
+      } catch {
+        return NextResponse.json(
+          {
+            error: `Kein Wechselkurs für ${currency} → ${ledger.base_currency}. Bitte Kurs manuell setzen.`,
+          },
+          { status: 400 }
+        );
+      }
+    }
+
     const expense = createFinanceExpense(id, {
       paidByMemberId: parsed.data.paidByMemberId,
       amount,
       currency,
-      exchangeRate: parsed.data.exchangeRate,
+      exchangeRate,
       description,
       expenseDate,
       documentId: parsed.data.documentId,

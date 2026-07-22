@@ -1,4 +1,10 @@
-import { formatMoney } from "@/lib/finance-brain/format";
+import {
+  formatDateDe,
+  formatExchangeRateLine,
+  formatMoney,
+  isForeignCurrency,
+  resolveExchangeRate,
+} from "@/lib/finance-brain/format";
 
 const MONTH_SHORT_DE = [
   "JAN",
@@ -73,19 +79,15 @@ function moneyLines(input: {
   exchangeRate?: number;
 }): { money: string; fxHtml: string; fxText: string } {
   const money = formatMoney(input.amount, input.currency);
-  const hasFx =
-    input.currency.toUpperCase() !== input.baseCurrency.toUpperCase();
-  if (!hasFx) {
+  if (!isForeignCurrency(input.currency, input.baseCurrency)) {
     return { money, fxHtml: "", fxText: "" };
   }
-  const rate =
-    typeof input.exchangeRate === "number" && input.exchangeRate > 0
-      ? input.exchangeRate
-      : input.amount !== 0
-        ? input.amountBase / input.amount
-        : 1;
+  const rate = resolveExchangeRate(input);
   const baseMoney = formatMoney(input.amountBase, input.baseCurrency);
-  const rateLine = `1 ${input.currency} = ${rate.toFixed(4)} ${input.baseCurrency}`;
+  const rateLine = formatExchangeRateLine({
+    ...input,
+    exchangeRate: rate,
+  });
   return {
     money,
     fxHtml: `
@@ -173,7 +175,9 @@ export function buildExpenseMailHtml(
     fxText || null,
     input.placeName ? `Ort: ${input.placeName}` : null,
     input.note?.trim() ? `Notiz: ${input.note.trim()}` : null,
-    input.expenseDate ? `Datum: ${input.expenseDate}` : null,
+    input.expenseDate
+      ? `Datum: ${formatDateDe(input.expenseDate) || input.expenseDate}`
+      : null,
     "PDF im Anhang.",
   ]
     .filter(Boolean)
@@ -231,7 +235,7 @@ export function buildLedgerExpensesMailHtml(input: {
         fxText ? `  ${fxText}` : null,
         e.placeName ? `  Ort: ${e.placeName}` : null,
         e.note?.trim() ? `  Notiz: ${e.note.trim()}` : null,
-        e.expenseDate ? `  Datum: ${e.expenseDate}` : null,
+        e.expenseDate ? `  Datum: ${formatDateDe(e.expenseDate) || e.expenseDate}` : null,
         "",
       ].filter(Boolean) as string[];
     }),
@@ -249,15 +253,13 @@ export function buildSettlementMailHtml(input: {
   currency: string;
   amountBase: number;
   baseCurrency: string;
+  exchangeRate?: number;
   note: string | null;
   settledAt: string | null;
 }): { subject: string; html: string; text: string } {
-  const money = formatMoney(input.amount, input.currency);
-  const base =
-    input.currency !== input.baseCurrency
-      ? ` (${formatMoney(input.amountBase, input.baseCurrency)})`
-      : "";
+  const { money, fxHtml, fxText } = moneyLines(input);
   const subject = `FinanzBrain: Rückzahlung ${input.fromName} → ${input.toName} · ${money}`;
+  const settledLabel = formatDateDe(input.settledAt);
 
   const html = `<!DOCTYPE html>
 <html><body style="margin:0;padding:24px;background:#f8fafc;font-family:system-ui,-apple-system,sans-serif;color:#0f172a;">
@@ -272,7 +274,8 @@ export function buildSettlementMailHtml(input: {
         <div style="font-size:18px;font-weight:800;line-height:1.25;">
           ${escapeHtml(input.fromName)} → ${escapeHtml(input.toName)}
         </div>
-        <div style="margin-top:8px;font-size:15px;font-weight:700;">${escapeHtml(money)}${escapeHtml(base)}</div>
+        <div style="margin-top:8px;font-size:15px;font-weight:700;">${escapeHtml(money)}</div>
+        ${fxHtml}
         ${
           input.note
             ? `<div style="margin-top:8px;font-size:13px;color:#64748b;">${escapeHtml(input.note)}</div>`
@@ -288,9 +291,10 @@ export function buildSettlementMailHtml(input: {
 
   const text = [
     `FinanzBrain: Rückzahlung in «${input.ledgerTitle}»`,
-    `${input.fromName} → ${input.toName}: ${money}${base}`,
+    `${input.fromName} → ${input.toName}: ${money}`,
+    fxText || null,
     input.note ? `Notiz: ${input.note}` : null,
-    input.settledAt ? `Datum: ${input.settledAt}` : null,
+    settledLabel ? `Datum: ${settledLabel}` : null,
     "PDF im Anhang.",
   ]
     .filter(Boolean)

@@ -33,7 +33,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { formatMoney, formatSignedMoney } from "@/lib/finance-brain/format";
+import {
+  formatDateDe,
+  formatMoney,
+  formatMoneyFxSummary,
+  formatSignedMoney,
+} from "@/lib/finance-brain/format";
+import { COMMON_CURRENCIES } from "@/lib/finance-brain/constants";
 import {
   expenseVisualForExpense,
   settlementVisual,
@@ -73,6 +79,7 @@ export type ExpenseListItem = {
   description: string | null;
   amount: number;
   currency: string;
+  exchange_rate?: number;
   amount_base: number;
   expense_date: string | null;
   paid_by_member_id: number;
@@ -228,6 +235,13 @@ function ExpenseCard({
   const visual = expenseVisualForExpense(exp);
   const surface = toneSurface(visual.tone);
   const isoDate = toIsoDateOnly(exp.expense_date);
+  const fx = formatMoneyFxSummary({
+    amount: exp.amount,
+    currency: exp.currency,
+    amountBase: exp.amount_base,
+    baseCurrency,
+    exchangeRate: exp.exchange_rate,
+  });
 
   function startEdit() {
     setEditDesc(exp.description || "");
@@ -325,7 +339,7 @@ function ExpenseCard({
             <p className="line-clamp-1 text-base font-bold leading-snug text-foreground">
               {exp.description || "Ausgabe"}
             </p>
-            <p className="line-clamp-1 text-xs text-muted-foreground">
+            <p className="line-clamp-2 text-xs text-muted-foreground">
               <span
                 className={cn(
                   "mr-1.5 inline-flex rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
@@ -334,11 +348,15 @@ function ExpenseCard({
               >
                 {visual.label}
               </span>
-              Bezahlt von {memberName(exp.paid_by_member_id)} ·{" "}
-              {formatMoney(exp.amount, exp.currency)}
-              {exp.currency !== baseCurrency
-                ? ` (${formatMoney(exp.amount_base, baseCurrency)})`
-                : ""}
+              Bezahlt von {memberName(exp.paid_by_member_id)} · {fx.primary}
+              {fx.detail ? (
+                <>
+                  <br />
+                  <span className="text-[11px]">
+                    {exp.currency.toUpperCase()} → {baseCurrency}: {fx.detail}
+                  </span>
+                </>
+              ) : null}
             </p>
             <p className="flex min-h-[1rem] items-center gap-1 text-xs text-muted-foreground">
               {exp.place_name ? (
@@ -661,6 +679,8 @@ export type SettlementEditPayload = {
   fromMemberId: number;
   toMemberId: number;
   amount: number;
+  currency: string;
+  exchangeRate: number;
   note: string | null;
   settledAt: string | null;
 };
@@ -681,6 +701,7 @@ export function SettlementList({
     to_member_id: number;
     amount: number;
     currency: string;
+    exchange_rate?: number;
     amount_base: number;
     note: string | null;
     settled_at: string;
@@ -735,6 +756,7 @@ function SettlementCard({
     to_member_id: number;
     amount: number;
     currency: string;
+    exchange_rate?: number;
     amount_base: number;
     note: string | null;
     settled_at: string;
@@ -754,6 +776,8 @@ function SettlementCard({
   const [fromId, setFromId] = useState(String(s.from_member_id));
   const [toId, setToId] = useState(String(s.to_member_id));
   const [amount, setAmount] = useState(String(s.amount));
+  const [currency, setCurrency] = useState(s.currency);
+  const [rate, setRate] = useState(String(s.exchange_rate ?? 1));
   const [note, setNote] = useState(s.note || "");
   const [settledAt, setSettledAt] = useState(s.settled_at?.slice(0, 10) || "");
 
@@ -761,11 +785,21 @@ function SettlementCard({
     members.find((m) => m.id === id)?.display_name ?? `#${id}`;
   const visual = settlementVisual();
   const surface = toneSurface(visual.tone);
+  const fx = formatMoneyFxSummary({
+    amount: s.amount,
+    currency: s.currency,
+    amountBase: s.amount_base,
+    baseCurrency,
+    exchangeRate: s.exchange_rate,
+  });
+  const settledLabel = formatDateDe(s.settled_at);
 
   function startEdit() {
     setFromId(String(s.from_member_id));
     setToId(String(s.to_member_id));
     setAmount(String(s.amount));
+    setCurrency(s.currency);
+    setRate(String(s.exchange_rate ?? 1));
     setNote(s.note || "");
     setSettledAt(s.settled_at?.slice(0, 10) || "");
     setEditing(true);
@@ -774,11 +808,14 @@ function SettlementCard({
   async function saveEdit() {
     if (!onUpdate) return;
     const parsedAmount = Number(amount);
+    const parsedRate = Number(rate) || 1;
     if (!(parsedAmount > 0) || fromId === toId) return;
     await onUpdate(s.id, {
       fromMemberId: Number(fromId),
       toMemberId: Number(toId),
       amount: parsedAmount,
+      currency,
+      exchangeRate: currency === baseCurrency ? 1 : parsedRate,
       note: note.trim() || null,
       settledAt: settledAt || null,
     });
@@ -807,12 +844,14 @@ function SettlementCard({
               <span>{memberName(s.to_member_id)}</span>
             </p>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              {formatMoney(s.amount, s.currency)}
-              {s.currency !== baseCurrency
-                ? ` (${formatMoney(s.amount_base, baseCurrency)})`
-                : ""}
-              {s.settled_at ? ` · ${s.settled_at.slice(0, 10)}` : ""}
+              {fx.primary}
+              {settledLabel ? ` · ${settledLabel}` : ""}
             </p>
+            {fx.detail ? (
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                {s.currency.toUpperCase()} → {baseCurrency}: {fx.detail}
+              </p>
+            ) : null}
             {s.note ? (
               <p className="mt-1 text-xs text-muted-foreground">{s.note}</p>
             ) : null}
@@ -868,12 +907,47 @@ function SettlementCard({
                   </Select>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs">Betrag ({s.currency})</Label>
+                  <Label className="text-xs">Betrag</Label>
                   <Input
                     type="number"
                     step="0.01"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Währung</Label>
+                  <Select
+                    value={currency}
+                    onValueChange={(v) => {
+                      if (v == null) return;
+                      setCurrency(v);
+                      if (v === baseCurrency) setRate("1");
+                    }}
+                    items={Object.fromEntries(
+                      COMMON_CURRENCIES.map((c) => [c, c])
+                    )}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {COMMON_CURRENCIES.map((c) => (
+                        <SelectItem key={c} value={c}>
+                          {c}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Kurs → {baseCurrency}</Label>
+                  <Input
+                    type="number"
+                    step="0.0001"
+                    value={rate}
+                    disabled={currency === baseCurrency}
+                    onChange={(e) => setRate(e.target.value)}
                   />
                 </div>
                 <div className="space-y-1">

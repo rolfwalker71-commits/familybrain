@@ -39,6 +39,7 @@ type ShareData = {
     description: string | null;
     amount: number;
     currency: string;
+    exchange_rate?: number;
     amount_base: number;
     expense_date: string | null;
     paid_by_member_id: number;
@@ -60,6 +61,7 @@ type ShareData = {
     to_member_id: number;
     amount: number;
     currency: string;
+    exchange_rate?: number;
     amount_base: number;
     note: string | null;
     settled_at: string;
@@ -98,9 +100,12 @@ export function FinanceShareClient({ token }: { token: string }) {
   const [expPayer, setExpPayer] = useState<string>("");
 
   const [setAmount, setSetAmount] = useState("");
+  const [setCurrency, setSetCurrency] = useState("CHF");
+  const [setRate, setSetRate] = useState("1");
   const [setTo, setSetTo] = useState<string>("");
   const [setNote, setSetNote] = useState("");
   const [rateLoading, setRateLoading] = useState(false);
+  const [settlementRateLoading, setSettlementRateLoading] = useState(false);
   const [pendingReceipt, setPendingReceipt] = useState<File | null>(null);
   const [aiImageBusyId, setAiImageBusyId] = useState<number | null>(null);
   const [mailBusyId, setMailBusyId] = useState<number | null>(null);
@@ -115,6 +120,8 @@ export function FinanceShareClient({ token }: { token: string }) {
       if (!res.ok) throw new Error(json.error || "Laden fehlgeschlagen");
       setData(json);
       setExpCurrency(json.ledger.base_currency);
+      setSetCurrency(json.ledger.base_currency);
+      setSetRate("1");
       setExpPayer(String(json.member.id));
       setError(null);
     } catch (err) {
@@ -139,28 +146,41 @@ export function FinanceShareClient({ token }: { token: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, aiImageBusyId]);
 
-  async function fetchEcbRate() {
+  async function fetchEcbRate(opts?: {
+    from?: string;
+    date?: string;
+    target?: "expense" | "settlement";
+  }) {
     if (!data) return;
-    if (expCurrency === data.ledger.base_currency) {
-      setExpRate("1");
+    const target = opts?.target ?? "expense";
+    const from =
+      opts?.from ??
+      (target === "settlement" ? setCurrency : expCurrency);
+    const date = opts?.date ?? (target === "settlement" ? undefined : expDate);
+    const setRateFn = target === "settlement" ? setSetRate : setExpRate;
+    const setLoading =
+      target === "settlement" ? setSettlementRateLoading : setRateLoading;
+
+    if (from === data.ledger.base_currency) {
+      setRateFn("1");
       return;
     }
-    setRateLoading(true);
+    setLoading(true);
     try {
       const params = new URLSearchParams({
-        from: expCurrency,
+        from,
         to: data.ledger.base_currency,
       });
-      if (expDate) params.set("date", expDate);
+      if (date) params.set("date", date);
       const res = await fetch(`/api/finance-ledgers/exchange-rate?${params}`);
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Kurs laden fehlgeschlagen");
-      setExpRate(String(json.rate));
+      setRateFn(String(json.rate));
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
-      setRateLoading(false);
+      setLoading(false);
     }
   }
 
@@ -327,7 +347,8 @@ export function FinanceShareClient({ token }: { token: string }) {
           body: JSON.stringify({
             toMemberId: Number(setTo),
             amount,
-            currency: data?.ledger.base_currency ?? "CHF",
+            currency: setCurrency,
+            exchangeRate: Number(setRate) || 1,
             note: setNote.trim() || null,
           }),
         }
@@ -336,6 +357,8 @@ export function FinanceShareClient({ token }: { token: string }) {
       if (!res.ok) throw new Error(json.error || "Fehler");
       setSetAmount("");
       setSetNote("");
+      setSetCurrency(data?.ledger.base_currency ?? "CHF");
+      setSetRate("1");
       if (typeof json.warning === "string" && json.warning) {
         setError(json.warning);
       }
@@ -351,6 +374,8 @@ export function FinanceShareClient({ token }: { token: string }) {
       fromMemberId: number;
       toMemberId: number;
       amount: number;
+      currency: string;
+      exchangeRate: number;
       note: string | null;
       settledAt: string | null;
     }
@@ -362,10 +387,7 @@ export function FinanceShareClient({ token }: { token: string }) {
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            ...payload,
-            currency: data?.ledger.base_currency,
-          }),
+          body: JSON.stringify(payload),
         }
       );
       const json = await res.json();
@@ -475,6 +497,11 @@ export function FinanceShareClient({ token }: { token: string }) {
                 onValueChange={(v) => {
                   if (v == null) return;
                   setExpCurrency(v);
+                  if (v === ledger.base_currency) {
+                    setExpRate("1");
+                  } else {
+                    void fetchEcbRate({ from: v, target: "expense" });
+                  }
                 }}
                 items={currencySelectItems}
               >
@@ -615,13 +642,74 @@ export function FinanceShareClient({ token }: { token: string }) {
               </Select>
             </div>
             <div className="space-y-1">
-              <Label>Betrag ({ledger.base_currency})</Label>
+              <Label>Betrag</Label>
               <Input
                 type="number"
                 step="0.01"
                 value={setAmount}
                 onChange={(e) => setSetAmount(e.target.value)}
               />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <Label>Währung</Label>
+                <Select
+                  value={setCurrency}
+                  onValueChange={(v) => {
+                    if (v == null) return;
+                    setSetCurrency(v);
+                    if (v === ledger.base_currency) {
+                      setSetRate("1");
+                    } else {
+                      void fetchEcbRate({ from: v, target: "settlement" });
+                    }
+                  }}
+                  items={currencySelectItems}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {COMMON_CURRENCIES.map((c) => (
+                      <SelectItem key={c} value={c}>
+                        {c}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label>Kurs → {ledger.base_currency}</Label>
+                <div className="flex gap-1.5">
+                  <Input
+                    type="number"
+                    step="0.0001"
+                    value={setRate}
+                    disabled={setCurrency === ledger.base_currency}
+                    onChange={(e) => setSetRate(e.target.value)}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    title="EZB-Kurs laden"
+                    disabled={
+                      settlementRateLoading ||
+                      setCurrency === ledger.base_currency
+                    }
+                    onClick={() =>
+                      void fetchEcbRate({ target: "settlement" })
+                    }
+                  >
+                    <Download
+                      className={cn(
+                        "size-4",
+                        settlementRateLoading && "animate-pulse"
+                      )}
+                    />
+                  </Button>
+                </div>
+              </div>
             </div>
             <div className="space-y-1">
               <Label>Notiz</Label>

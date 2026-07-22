@@ -265,6 +265,7 @@ export async function notifyLedgerSettlement(
     currency: settlement.currency,
     amountBase: settlement.amount_base,
     baseCurrency: ledger.base_currency,
+    exchangeRate: settlement.exchange_rate,
     note: settlement.note,
     settledAt: settlement.settled_at,
   });
@@ -277,6 +278,7 @@ export async function notifyLedgerSettlement(
     currency: settlement.currency,
     amountBase: settlement.amount_base,
     baseCurrency: ledger.base_currency,
+    exchangeRate: settlement.exchange_rate,
     note: settlement.note,
     settledAt: settlement.settled_at,
     settlementId: settlement.id,

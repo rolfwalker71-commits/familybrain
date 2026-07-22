@@ -7,7 +7,13 @@ import {
   type PDFPage,
   type PDFImage,
 } from "pdf-lib";
-import { formatMoney } from "@/lib/finance-brain/format";
+import {
+  formatDateDe,
+  formatExchangeRateLine,
+  formatMoney,
+  isForeignCurrency,
+  resolveExchangeRate,
+} from "@/lib/finance-brain/format";
 
 const PAGE_W = 595.28;
 const PAGE_H = 841.89;
@@ -63,17 +69,6 @@ function weekdayDe(isoDate: string): string {
   const [y, m, d] = isoDate.split("-").map(Number);
   const date = new Date(y, m - 1, d);
   return new Intl.DateTimeFormat("de-CH", { weekday: "long" }).format(date);
-}
-
-function formatDateDe(isoDate: string | null | undefined): string {
-  if (!isoDate || !/^\d{4}-\d{2}-\d{2}/.test(isoDate)) return "-";
-  const iso = isoDate.slice(0, 10);
-  const [y, m, d] = iso.split("-").map(Number);
-  return new Intl.DateTimeFormat("de-CH", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).format(new Date(y, m - 1, d));
 }
 
 function wrapText(
@@ -468,14 +463,14 @@ export async function buildExpensePdfBuffer(input: {
     140,
     contentW - labelW - (img ? imgW + 24 : 0)
   );
-  const hasFx =
-    input.currency.toUpperCase() !== input.baseCurrency.toUpperCase();
-  const rate =
-    typeof input.exchangeRate === "number" && input.exchangeRate > 0
-      ? input.exchangeRate
-      : hasFx && input.amount !== 0
-        ? input.amountBase / input.amount
-        : 1;
+  const hasFx = isForeignCurrency(input.currency, input.baseCurrency);
+  const rate = resolveExchangeRate({
+    amount: input.amount,
+    amountBase: input.amountBase,
+    currency: input.currency,
+    baseCurrency: input.baseCurrency,
+    exchangeRate: input.exchangeRate,
+  });
 
   const rows: Array<[string, string]> = [
     ["Wer hat bezahlt", input.paidByName],
@@ -491,12 +486,16 @@ export async function buildExpensePdfBuffer(input: {
     ]);
     rows.push([
       "Wechselkurs",
-      `1 ${input.currency} = ${rate.toFixed(4)} ${input.baseCurrency}`,
+      formatExchangeRateLine({
+        currency: input.currency,
+        baseCurrency: input.baseCurrency,
+        exchangeRate: rate,
+      }),
     ]);
   } else {
     rows.push(["Betrag", formatMoney(input.amount, input.currency)]);
   }
-  rows.push(["Wann", formatDateDe(input.expenseDate)]);
+  rows.push(["Wann", formatDateDe(input.expenseDate) || "-"]);
   rows.push(["Wo", input.placeName?.trim() || "-"]);
   rows.push(["Kategorie", input.categoryLabel || "Ausgabe"]);
   if (input.note?.trim()) {
@@ -577,6 +576,7 @@ export async function buildSettlementPdfBuffer(input: {
   currency: string;
   amountBase: number;
   baseCurrency: string;
+  exchangeRate?: number;
   note: string | null;
   settledAt: string | null;
   settlementId: number;
@@ -640,7 +640,7 @@ export async function buildSettlementPdfBuffer(input: {
   drawDateBadge(page, bold, input.settledAt?.slice(0, 10) ?? null, contentX, y);
 
   const money = formatMoney(input.amount, input.currency);
-  const hasFx = input.currency.toUpperCase() !== input.baseCurrency.toUpperCase();
+  const hasFx = isForeignCurrency(input.currency, input.baseCurrency);
   const titleX = contentX + 122;
   page.drawText(
     toPdfSafeText(`${input.fromName} -> ${input.toName}`),
@@ -659,15 +659,27 @@ export async function buildSettlementPdfBuffer(input: {
   const rows: Array<[string, string]> = [
     ["Von", input.fromName],
     ["An", input.toName],
-    ["Betrag", money],
   ];
   if (hasFx) {
+    rows.push([`Betrag (${input.currency})`, money]);
     rows.push([
       `Betrag (${input.baseCurrency})`,
       formatMoney(input.amountBase, input.baseCurrency),
     ]);
+    rows.push([
+      "Wechselkurs",
+      formatExchangeRateLine({
+        currency: input.currency,
+        baseCurrency: input.baseCurrency,
+        exchangeRate: input.exchangeRate,
+        amount: input.amount,
+        amountBase: input.amountBase,
+      }),
+    ]);
+  } else {
+    rows.push(["Betrag", money]);
   }
-  rows.push(["Wann", formatDateDe(input.settledAt?.slice(0, 10))]);
+  rows.push(["Wann", formatDateDe(input.settledAt) || "-"]);
   rows.push(["Notiz", input.note?.trim() || "-"]);
   rows.push(["Beleg-ID", String(input.settlementId)]);
 
@@ -790,6 +802,8 @@ export async function buildLedgerExpensesPdfBuffer(input: {
   for (const exp of input.expenses) {
     const badgeW = 72;
     const badgeH = 96;
+    const padX = 12;
+    const padY = 12;
     const img = await embedOptionalPng(pdf, exp.aiImagePath);
     const imgSize = 88;
     let imgW = 0;
@@ -800,7 +814,53 @@ export async function buildLedgerExpensesPdfBuffer(input: {
       imgH = img.height * scale;
     }
 
-    const cardH = Math.max(badgeH + 28, 130) + (exp.note?.trim() ? 18 : 0);
+    const textX = margin + padX + badgeW + 14;
+    const textRight = margin + contentW - padX - (img ? imgW + 12 : 0);
+    const textW = Math.max(120, textRight - textX);
+    const title = exp.description?.trim() || "Ausgabe";
+    const titleLinesExp = wrapText(title, bold, 14, textW).slice(0, 2);
+
+    const hasFx = isForeignCurrency(exp.currency, exp.baseCurrency);
+    const rate = resolveExchangeRate({
+      amount: exp.amount,
+      amountBase: exp.amountBase,
+      currency: exp.currency,
+      baseCurrency: exp.baseCurrency,
+      exchangeRate: exp.exchangeRate,
+    });
+
+    const detailRaw = [
+      `Bezahlt von: ${exp.paidByName}`,
+      hasFx
+        ? `Betrag: ${formatMoney(exp.amount, exp.currency)} / ${formatMoney(exp.amountBase, exp.baseCurrency)}`
+        : `Betrag: ${formatMoney(exp.amount, exp.currency)}`,
+      hasFx
+        ? `Kurs: ${formatExchangeRateLine({
+            currency: exp.currency,
+            baseCurrency: exp.baseCurrency,
+            exchangeRate: rate,
+          })}`
+        : null,
+      exp.placeName?.trim() ? `Ort: ${exp.placeName.trim()}` : null,
+      exp.note?.trim() ? `Notiz: ${exp.note.trim()}` : null,
+      `Beleg-ID: ${exp.expenseId}`,
+    ].filter(Boolean) as string[];
+
+    const detailWrapped = detailRaw.flatMap((line) =>
+      wrapText(line, font, 10, textW).slice(0, 2)
+    );
+
+    // Measure text column: title (16/line) + category (20) + details (13/line)
+    const textColH =
+      4 + // top inset before title
+      titleLinesExp.length * 16 +
+      20 + // category
+      detailWrapped.length * 13 +
+      8; // bottom breathing room
+
+    const cardH =
+      Math.max(badgeH, imgH, textColH) + padY * 2;
+
     if (y - cardH < margin + 24) {
       page = newPage();
       y = PAGE_H - margin;
@@ -816,17 +876,12 @@ export async function buildLedgerExpensesPdfBuffer(input: {
       borderWidth: 1,
     });
 
-    const innerX = margin + 12;
-    const innerTop = y - 12;
+    const innerX = margin + padX;
+    const innerTop = y - padY;
     drawDateBadge(page, bold, exp.expenseDate, innerX, innerTop, badgeW, badgeH);
 
-    const textX = innerX + badgeW + 14;
-    const textRight = margin + contentW - 12 - (img ? imgW + 12 : 0);
-    const textW = Math.max(120, textRight - textX);
-    const title = exp.description?.trim() || "Ausgabe";
-    const titleLinesExp = wrapText(title, bold, 14, textW);
     let ty = innerTop - 4;
-    for (const line of titleLinesExp.slice(0, 2)) {
+    for (const line of titleLinesExp) {
       page.drawText(line, {
         x: textX,
         y: ty - 14,
@@ -846,44 +901,20 @@ export async function buildLedgerExpensesPdfBuffer(input: {
     });
     ty -= 20;
 
-    const hasFx =
-      exp.currency.toUpperCase() !== exp.baseCurrency.toUpperCase();
-    const rate =
-      typeof exp.exchangeRate === "number" && exp.exchangeRate > 0
-        ? exp.exchangeRate
-        : hasFx && exp.amount !== 0
-          ? exp.amountBase / exp.amount
-          : 1;
-
-    const detailLines = [
-      `Bezahlt von: ${exp.paidByName}`,
-      hasFx
-        ? `Betrag: ${formatMoney(exp.amount, exp.currency)} / ${formatMoney(exp.amountBase, exp.baseCurrency)}`
-        : `Betrag: ${formatMoney(exp.amount, exp.currency)}`,
-      hasFx
-        ? `Kurs: 1 ${exp.currency} = ${rate.toFixed(4)} ${exp.baseCurrency}`
-        : null,
-      exp.placeName?.trim() ? `Ort: ${exp.placeName.trim()}` : null,
-      exp.note?.trim() ? `Notiz: ${exp.note.trim()}` : null,
-      `Beleg-ID: ${exp.expenseId}`,
-    ].filter(Boolean) as string[];
-
-    for (const line of detailLines) {
-      for (const wline of wrapText(line, font, 10, textW).slice(0, 2)) {
-        page.drawText(wline, {
-          x: textX,
-          y: ty - 10,
-          size: 10,
-          font,
-          color: C.muted,
-        });
-        ty -= 13;
-      }
+    for (const wline of detailWrapped) {
+      page.drawText(wline, {
+        x: textX,
+        y: ty - 10,
+        size: 10,
+        font,
+        color: C.muted,
+      });
+      ty -= 13;
     }
 
     if (img && imgW > 0) {
       page.drawImage(img, {
-        x: margin + contentW - 12 - imgW,
+        x: margin + contentW - padX - imgW,
         y: innerTop - imgH,
         width: imgW,
         height: imgH,
