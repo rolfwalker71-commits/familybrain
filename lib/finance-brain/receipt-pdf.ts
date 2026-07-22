@@ -96,17 +96,15 @@ function wrapText(
   return lines;
 }
 
-function drawRoundedRect(
+function drawRoundedFill(
   page: PDFPage,
   x: number,
   y: number,
   w: number,
   h: number,
   r: number,
-  fill: ReturnType<typeof rgb>,
-  border?: ReturnType<typeof rgb>
+  fill: ReturnType<typeof rgb>
 ) {
-  // Approximate rounded corners with overlapping rects + corner circles.
   const rr = Math.min(r, w / 2, h / 2);
   page.drawRectangle({
     x: x + rr,
@@ -130,16 +128,89 @@ function drawRoundedRect(
   ] as const) {
     page.drawCircle({ x: cx, y: cy, size: rr, color: fill });
   }
+}
+
+function drawRoundedRect(
+  page: PDFPage,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number,
+  fill: ReturnType<typeof rgb>,
+  border?: ReturnType<typeof rgb>,
+  borderWidth = 1.25
+) {
+  const rr = Math.min(r, w / 2, h / 2);
   if (border) {
-    page.drawRectangle({
-      x,
-      y,
-      width: w,
-      height: h,
-      borderColor: border,
-      borderWidth: 1.25,
-    });
+    // Border via slightly larger rounded fill — avoid sharp border rect overlay
+    drawRoundedFill(
+      page,
+      x - borderWidth,
+      y - borderWidth,
+      w + borderWidth * 2,
+      h + borderWidth * 2,
+      rr + borderWidth,
+      border
+    );
   }
+  drawRoundedFill(page, x, y, w, h, rr, fill);
+}
+
+function drawRoundedTopBand(
+  page: PDFPage,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number,
+  fill: ReturnType<typeof rgb>
+) {
+  const rr = Math.min(r, w / 2, h / 2);
+  page.drawRectangle({
+    x: x + rr,
+    y,
+    width: w - 2 * rr,
+    height: h,
+    color: fill,
+  });
+  page.drawRectangle({
+    x,
+    y,
+    width: w,
+    height: Math.max(0, h - rr),
+    color: fill,
+  });
+  page.drawCircle({ x: x + rr, y: y + h - rr, size: rr, color: fill });
+  page.drawCircle({ x: x + w - rr, y: y + h - rr, size: rr, color: fill });
+}
+
+function drawRoundedBottomBand(
+  page: PDFPage,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number,
+  fill: ReturnType<typeof rgb>
+) {
+  const rr = Math.min(r, w / 2, h / 2);
+  page.drawRectangle({
+    x: x + rr,
+    y,
+    width: w - 2 * rr,
+    height: h,
+    color: fill,
+  });
+  page.drawRectangle({
+    x,
+    y: y + rr,
+    width: w,
+    height: Math.max(0, h - rr),
+    color: fill,
+  });
+  page.drawCircle({ x: x + rr, y: y + rr, size: rr, color: fill });
+  page.drawCircle({ x: x + w - rr, y: y + rr, size: rr, color: fill });
 }
 
 function drawDateBadge(
@@ -152,7 +223,7 @@ function drawDateBadge(
   h = 118
 ) {
   const bottom = topY - h;
-  const rr = Math.min(12, w / 4, h / 6);
+  const rr = Math.min(16, w / 4, h / 5);
   const border = rgb(0.85, 0.87, 0.9);
 
   drawRoundedRect(page, x, bottom, w, h, rr, C.white);
@@ -381,18 +452,22 @@ export async function buildExpensePdfBuffer(input: {
   const contentW = contentRight - contentX;
   const footH = 52;
 
-  drawRoundedRect(page, cardX, cardBottom, cardW, cardH, 14, C.card, C.border);
+  const CARD_RADIUS = 22;
+
+  drawRoundedRect(page, cardX, cardBottom, cardW, cardH, CARD_RADIUS, C.card, C.border);
 
   // Header band
   const headerH = 86;
   const headerBottom = cardTop - headerH;
-  page.drawRectangle({
-    x: cardX,
-    y: headerBottom,
-    width: cardW,
-    height: headerH,
-    color: C.headerBg,
-  });
+  drawRoundedTopBand(
+    page,
+    cardX,
+    headerBottom,
+    cardW,
+    headerH,
+    CARD_RADIUS,
+    C.headerBg
+  );
   page.drawRectangle({
     x: cardX,
     y: headerBottom,
@@ -553,15 +628,19 @@ export async function buildExpensePdfBuffer(input: {
   // AI image bottom-right, above footer
   if (img && imgW > 0 && imgH > 0) {
     const imgBottom = cardBottom + footH + 16;
-    page.drawRectangle({
-      x: contentRight - imgW - 4,
-      y: imgBottom - 4,
-      width: imgW + 8,
-      height: imgH + 8,
-      color: C.soft,
-      borderColor: C.border,
-      borderWidth: 1,
-    });
+    const framePad = 4;
+    const frameR = 14;
+    drawRoundedRect(
+      page,
+      contentRight - imgW - framePad,
+      imgBottom - framePad,
+      imgW + framePad * 2,
+      imgH + framePad * 2,
+      frameR,
+      C.soft,
+      C.border,
+      1
+    );
     page.drawImage(img, {
       x: contentRight - imgW,
       y: imgBottom,
@@ -571,13 +650,15 @@ export async function buildExpensePdfBuffer(input: {
   }
 
   // Footer
-  page.drawRectangle({
-    x: cardX,
-    y: cardBottom,
-    width: cardW,
-    height: footH,
-    color: C.foot,
-  });
+  drawRoundedBottomBand(
+    page,
+    cardX,
+    cardBottom,
+    cardW,
+    footH,
+    CARD_RADIUS,
+    C.foot
+  );
   page.drawRectangle({
     x: cardX,
     y: cardBottom + footH,
@@ -630,17 +711,21 @@ export async function buildSettlementPdfBuffer(input: {
   const pad = 28;
   const contentX = cardX + pad;
 
-  drawRoundedRect(page, cardX, cardBottom, cardW, cardH, 14, C.card, C.border);
+  const CARD_RADIUS = 22;
+
+  drawRoundedRect(page, cardX, cardBottom, cardW, cardH, CARD_RADIUS, C.card, C.border);
 
   const headerH = 86;
   const headerBottom = cardTop - headerH;
-  page.drawRectangle({
-    x: cardX,
-    y: headerBottom,
-    width: cardW,
-    height: headerH,
-    color: rgb(0.8, 0.984, 0.945),
-  });
+  drawRoundedTopBand(
+    page,
+    cardX,
+    headerBottom,
+    cardW,
+    headerH,
+    CARD_RADIUS,
+    rgb(0.8, 0.984, 0.945)
+  );
   page.drawRectangle({
     x: cardX,
     y: headerBottom,
@@ -731,13 +816,15 @@ export async function buildSettlementPdfBuffer(input: {
   }
 
   const footH = 52;
-  page.drawRectangle({
-    x: cardX,
-    y: cardBottom,
-    width: cardW,
-    height: footH,
-    color: C.foot,
-  });
+  drawRoundedBottomBand(
+    page,
+    cardX,
+    cardBottom,
+    cardW,
+    footH,
+    CARD_RADIUS,
+    C.foot
+  );
   page.drawText("Beleg-PDF - geeignet fuer Paperless / FamilyBrain", {
     x: contentX,
     y: cardBottom + 22,
@@ -917,15 +1004,17 @@ export async function buildLedgerExpensesPdfBuffer(input: {
       y = PAGE_H - margin;
     }
 
-    page.drawRectangle({
-      x: margin,
-      y: y - cardH,
-      width: contentW,
-      height: cardH,
-      color: C.card,
-      borderColor: C.border,
-      borderWidth: 1,
-    });
+    drawRoundedRect(
+      page,
+      margin,
+      y - cardH,
+      contentW,
+      cardH,
+      16,
+      C.card,
+      C.border,
+      1
+    );
 
     const innerX = margin + padX;
     const innerTop = y - padY;
