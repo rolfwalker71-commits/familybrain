@@ -37,7 +37,6 @@ import {
   settlementVisual,
 } from "@/lib/finance-brain/expense-category";
 import { ExpenseReceiptControls } from "@/components/finance-brain/expense-receipt-controls";
-import { TripMap } from "@/components/trips/trip-map";
 import {
   IconCircle,
   toneSurface,
@@ -215,11 +214,6 @@ function ExpenseCard({
 
   const visual = expenseVisualForExpense(exp);
   const surface = toneSurface(visual.tone);
-  const hasCoords =
-    exp.place_lat != null &&
-    exp.place_lon != null &&
-    Number.isFinite(exp.place_lat) &&
-    Number.isFinite(exp.place_lon);
 
   function startEdit() {
     setEditDesc(exp.description || "");
@@ -353,7 +347,7 @@ function ExpenseCard({
             ) : null}
           </div>
 
-          <div className="flex shrink-0 items-start gap-2">
+          <div className="ml-auto flex shrink-0 items-start">
             {exp.ai_image_url ? (
               <div className="relative">
                 <button
@@ -366,7 +360,7 @@ function ExpenseCard({
                   <img
                     src={exp.ai_image_url}
                     alt=""
-                    className="h-16 w-16 rounded-md border border-foreground/10 object-cover shadow-sm sm:h-[4.5rem] sm:w-[4.5rem]"
+                    className="h-20 w-20 rounded-md border border-foreground/10 object-cover shadow-sm sm:h-24 sm:w-24"
                   />
                 </button>
                 <Button
@@ -381,23 +375,9 @@ function ExpenseCard({
                 </Button>
               </div>
             ) : aiImageBusy ? (
-              <div className="flex h-16 w-16 items-center justify-center rounded-md border border-dashed border-foreground/20 bg-background/40 text-[10px] text-muted-foreground sm:h-[4.5rem] sm:w-[4.5rem]">
+              <div className="flex h-20 w-20 items-center justify-center rounded-md border border-dashed border-foreground/20 bg-background/40 text-[10px] text-muted-foreground sm:h-24 sm:w-24">
                 KI…
               </div>
-            ) : null}
-            {hasCoords ? (
-              <TripMap
-                points={[
-                  {
-                    lat: exp.place_lat!,
-                    lon: exp.place_lon!,
-                    label: exp.place_name || undefined,
-                  },
-                ]}
-                compact
-                className="w-16 shrink-0 sm:w-[4.5rem]"
-                heightClassName="h-16 sm:h-[4.5rem]"
-              />
             ) : null}
           </div>
         </div>
