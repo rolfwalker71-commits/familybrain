@@ -240,13 +240,20 @@ function ExpenseCard({
   }
 
   return (
-    <div className="relative pl-5 sm:pl-6">
-      <IconCircle
-        icon={visual.icon}
-        tone={visual.tone}
-        size="md"
-        className="absolute left-0 top-1 z-10 border-2 border-foreground/15 shadow-md"
-      />
+    <div className="relative pl-10 sm:pl-11">
+      {isoDate ? (
+        <CalendarDateBadge
+          isoDate={isoDate}
+          className="absolute left-0 top-2.5 z-10 h-20 w-[4.75rem] sm:h-24 sm:w-[5.1rem]"
+        />
+      ) : (
+        <IconCircle
+          icon={visual.icon}
+          tone={visual.tone}
+          size="md"
+          className="absolute left-0 top-1 z-10 border-2 border-foreground/15 shadow-md"
+        />
+      )}
       <div
         className={cn(
           "overflow-hidden rounded-md border-2 text-sm shadow-sm",
@@ -259,50 +266,38 @@ function ExpenseCard({
             surface.title
           )}
         >
-          <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
-            <div aria-hidden className="min-w-0" />
-            <div className="justify-self-center">
-              {isoDate ? (
-                <CalendarDateBadge isoDate={isoDate} />
-              ) : (
-                <span className="text-xs font-medium text-muted-foreground">
-                  Ohne Datum
-                </span>
-              )}
-            </div>
-            <div className="justify-self-end">
-              {exp.ai_image_url ? (
-                <div className="relative">
-                  <button
-                    type="button"
-                    title="Vergrössern"
-                    className="block"
-                    onClick={() => setZoomOpen(true)}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={exp.ai_image_url}
-                      alt=""
-                      className="h-20 w-20 rounded-md border border-foreground/10 object-cover shadow-sm sm:h-24 sm:w-24"
-                    />
-                  </button>
-                  <Button
-                    type="button"
-                    size="icon-xs"
-                    variant="secondary"
-                    className="absolute bottom-1 right-1 size-6 border border-border/70 bg-background/90 shadow-sm"
-                    title="Vergrössern"
-                    onClick={() => setZoomOpen(true)}
-                  >
-                    <Maximize2 className="size-3" />
-                  </Button>
-                </div>
-              ) : aiImageBusy ? (
-                <div className="flex h-20 w-20 items-center justify-center rounded-md border border-dashed border-foreground/20 bg-background/50 text-[10px] text-muted-foreground sm:h-24 sm:w-24">
-                  KI…
-                </div>
-              ) : null}
-            </div>
+          <div className="flex items-center justify-end gap-2">
+            {exp.ai_image_url ? (
+              <div className="relative">
+                <button
+                  type="button"
+                  title="Vergrössern"
+                  className="block"
+                  onClick={() => setZoomOpen(true)}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={exp.ai_image_url}
+                    alt=""
+                    className="h-20 w-20 rounded-md border border-foreground/10 object-cover shadow-sm sm:h-24 sm:w-24"
+                  />
+                </button>
+                <Button
+                  type="button"
+                  size="icon-xs"
+                  variant="secondary"
+                  className="absolute bottom-1 right-1 size-6 border border-border/70 bg-background/90 shadow-sm"
+                  title="Vergrössern"
+                  onClick={() => setZoomOpen(true)}
+                >
+                  <Maximize2 className="size-3" />
+                </Button>
+              </div>
+            ) : aiImageBusy ? (
+              <div className="flex h-20 w-20 items-center justify-center rounded-md border border-dashed border-foreground/20 bg-background/50 text-[10px] text-muted-foreground sm:h-24 sm:w-24">
+                KI…
+              </div>
+            ) : null}
           </div>
         </div>
 

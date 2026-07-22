@@ -51,7 +51,7 @@ export function CalendarDateBadge({
   return (
     <div
       className={cn(
-        "flex w-[4rem] shrink-0 flex-col overflow-hidden rounded-lg border border-black/10 bg-background sm:w-[4.35rem]",
+        "flex w-[4.5rem] shrink-0 flex-col overflow-hidden rounded-lg border border-black/10 bg-background sm:w-[4.85rem]",
         "shadow-[0_1px_0_rgba(255,255,255,0.85)_inset,0_1px_2px_rgba(15,23,42,0.08),0_3px_8px_rgba(15,23,42,0.12),0_8px_14px_-6px_rgba(15,23,42,0.18)]",
         "ring-1 ring-black/5",
         className
@@ -59,7 +59,7 @@ export function CalendarDateBadge({
     >
       <div
         className={cn(
-          "bg-gradient-to-b from-red-500 to-red-700 px-0.5 py-1 text-center text-[9px] font-extrabold uppercase leading-none tracking-wide text-white sm:text-[10px]",
+          "shrink-0 bg-gradient-to-b from-red-500 to-red-700 px-0.5 py-1 text-center text-[10px] font-black uppercase leading-none tracking-wide text-white sm:text-[11px]",
           "shadow-[0_1px_0_rgba(255,255,255,0.28)_inset,0_1px_2px_rgba(127,29,29,0.3)]"
         )}
       >
@@ -67,18 +67,18 @@ export function CalendarDateBadge({
       </div>
       <div
         className={cn(
-          "flex flex-col items-center bg-gradient-to-b from-white to-slate-100 px-0.5 pb-1 pt-1",
+          "flex min-h-0 flex-1 flex-col items-center justify-center bg-gradient-to-b from-white to-slate-100 px-0.5 py-1",
           "shadow-[0_1px_0_rgba(255,255,255,0.9)_inset]"
         )}
       >
-        <div className="text-[9px] font-extrabold leading-none text-foreground sm:text-[10px]">
+        <div className="text-[10px] font-extrabold leading-none text-foreground sm:text-[11px]">
           {weekdayDe(isoDate)}
         </div>
-        <div className="mt-0.5 text-xl font-extrabold leading-none tabular-nums text-foreground sm:text-2xl">
+        <div className="mt-0.5 text-[21px] font-black leading-none tabular-nums text-foreground sm:text-[25px]">
           {dayNumber(isoDate)}
         </div>
         {time ? (
-          <div className="mt-0.5 text-[9px] font-bold tabular-nums text-muted-foreground">
+          <div className="mt-0.5 text-[10px] font-bold tabular-nums text-muted-foreground">
             {time}
           </div>
         ) : null}
