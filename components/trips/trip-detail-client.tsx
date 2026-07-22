@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -264,7 +264,7 @@ function EventCalendarBadge({
     >
       <div
         className={cn(
-          "bg-gradient-to-b from-red-500 to-red-700 px-1 py-1 text-center text-[10px] font-black tracking-wide text-white sm:text-[11px]",
+          "flex min-h-[1.75rem] items-center justify-center bg-gradient-to-b from-red-500 to-red-700 px-1 py-1.5 text-center text-[10px] font-black tracking-wide text-white sm:min-h-8 sm:text-[11px]",
           "shadow-[0_1px_0_rgba(255,255,255,0.28)_inset,0_2px_3px_rgba(127,29,29,0.35)]"
         )}
       >
@@ -330,6 +330,54 @@ function formatEventMetaLine(event: TripEvent): string | null {
     transferRoute,
   ].filter(Boolean);
   return parts.length ? parts.join(" · ") : null;
+}
+
+function formatCompactDetailLine(event: TripEvent): string | null {
+  const type = coerceTripEventType(event.event_type);
+  const startT = toTimeInputValue(event.start_time);
+  const endT = toTimeInputValue(event.end_time);
+  const time =
+    startT || endT ? [startT, endT].filter(Boolean).join("–") : null;
+  const route =
+    event.origin_place || event.destination_place
+      ? [event.origin_place, event.destination_place].filter(Boolean).join(" → ")
+      : event.departure_airport || event.arrival_airport
+        ? [event.departure_airport, event.arrival_airport]
+            .filter(Boolean)
+            .join(" → ")
+        : null;
+  const place =
+    event.place_name ||
+    (route
+      ? null
+      : event.location && !textsOverlap(event.location, event.title)
+        ? event.location
+        : null);
+  const parts = [
+    type,
+    event.airline,
+    event.flight_number,
+    route || place,
+    event.provider,
+    event.booking_reference,
+    time,
+  ].filter((p): p is string => Boolean(p && String(p).trim()));
+  return parts.length ? parts.join(" | ") : null;
+}
+
+const VIEW_MODE_STORAGE_KEY = "travelbrain.tripViewMode";
+
+type TripViewMode = "cards" | "compact";
+
+function readViewMode(): TripViewMode {
+  if (typeof window === "undefined") return "cards";
+  try {
+    return window.localStorage.getItem(VIEW_MODE_STORAGE_KEY) === "compact"
+      ? "compact"
+      : "cards";
+  } catch {
+    return "cards";
+  }
 }
 
 function splitTransferPlaces(event: TripEvent): {
@@ -451,6 +499,12 @@ export function TripDetailClient({
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [editMode, setEditMode] = useState(false);
+  const [viewMode, setViewMode] = useState<TripViewMode>("cards");
+  const [aiBatch, setAiBatch] = useState<{
+    current: number;
+    total: number;
+  } | null>(null);
+  const aiBatchAbortRef = useRef(false);
   const [meta, setMeta] = useState({
     title: "",
     destination: "",
@@ -514,6 +568,19 @@ export function TripDetailClient({
   useEffect(() => {
     if (readOnly) setEditMode(false);
   }, [readOnly]);
+
+  useEffect(() => {
+    setViewMode(readViewMode());
+  }, []);
+
+  function changeViewMode(mode: TripViewMode) {
+    setViewMode(mode);
+    try {
+      window.localStorage.setItem(VIEW_MODE_STORAGE_KEY, mode);
+    } catch {
+      /* ignore */
+    }
+  }
 
   async function saveMeta() {
     setBusy(true);
@@ -1067,6 +1134,54 @@ export function TripDetailClient({
     }
   }
 
+  async function batchGenerateMissingAiImages() {
+    const missing = events.filter((e) => !e.ai_image_url);
+    if (missing.length === 0) {
+      setStatus("Alle Aktivitäten haben bereits ein KI-Bild.");
+      return;
+    }
+    if (aiBatch) return;
+    aiBatchAbortRef.current = false;
+    setError(null);
+    setAiBatch({ current: 0, total: missing.length });
+    let ok = 0;
+    let fail = 0;
+    for (let i = 0; i < missing.length; i++) {
+      if (aiBatchAbortRef.current) break;
+      const event = missing[i];
+      setAiBatch({ current: i + 1, total: missing.length });
+      try {
+        const res = await fetch(
+          `/api/trips/${tripId}/events/${event.id}/ai-image`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({}),
+          }
+        );
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Bildgenerierung fehlgeschlagen");
+        if (data.event) {
+          setEvents((prev) =>
+            prev.map((e) =>
+              e.id === data.event.id ? { ...e, ...data.event } : e
+            )
+          );
+        }
+        ok += 1;
+      } catch (err) {
+        fail += 1;
+        console.error(err);
+      }
+    }
+    setAiBatch(null);
+    setStatus(
+      aiBatchAbortRef.current
+        ? `KI-Bilder abgebrochen (${ok} erzeugt${fail ? `, ${fail} Fehler` : ""}).`
+        : `KI-Bilder: ${ok} erzeugt${fail ? `, ${fail} fehlgeschlagen` : ""}.`
+    );
+  }
+
   if (!trip) {
     return (
       <div className="space-y-4">
@@ -1174,6 +1289,29 @@ export function TripDetailClient({
             >
               Belege anreichern
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={busy || aiBatch != null || aiImageBusy}
+              onClick={() => void batchGenerateMissingAiImages()}
+              className="gap-1.5"
+            >
+              <ImagePlus className="size-4" />
+              {aiBatch
+                ? `KI-Bilder ${aiBatch.current}/${aiBatch.total}…`
+                : "KI-Bilder erzeugen"}
+            </Button>
+            {aiBatch ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  aiBatchAbortRef.current = true;
+                }}
+              >
+                Abbrechen
+              </Button>
+            ) : null}
             <Button variant="outline" size="sm" onClick={() => exitEditMode()}>
               Ansicht
             </Button>
@@ -1820,18 +1958,198 @@ export function TripDetailClient({
       </Sheet>
 
       <div className="space-y-5">
-        <h2 className="text-lg font-semibold">Timeline</h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-lg font-semibold">Timeline</h2>
+          <div className="flex items-center gap-1 rounded-lg border border-border/70 bg-muted/30 p-0.5">
+            <Button
+              type="button"
+              size="sm"
+              variant={viewMode === "cards" ? "default" : "ghost"}
+              className="h-7 px-2.5"
+              onClick={() => changeViewMode("cards")}
+            >
+              Karten
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={viewMode === "compact" ? "default" : "ghost"}
+              className="h-7 px-2.5"
+              onClick={() => changeViewMode("compact")}
+            >
+              Kompakt
+            </Button>
+          </div>
+        </div>
         {editMode ? (
           <p className="text-xs text-muted-foreground">
             Reihenfolge per ▲/▼ oder am Griff ziehen (Desktop).
           </p>
         ) : null}
+        {aiBatch ? (
+          <p className="text-xs text-muted-foreground">
+            KI-Bilder laufen im Hintergrund ({aiBatch.current}/{aiBatch.total}
+            )…
+          </p>
+        ) : null}
         {events.length === 0 ? (
           <p className="text-sm text-muted-foreground">Noch keine Ereignisse.</p>
         ) : (
-          <div className="flex flex-col gap-5">
+          <div
+            className={cn(
+              "flex flex-col",
+              viewMode === "compact" ? "gap-2.5" : "gap-5"
+            )}
+          >
           {events.map((event) => {
             const visual = eventVisual(event.event_type);
+            if (viewMode === "compact") {
+              const details = formatCompactDetailLine(event);
+              return (
+                <div
+                  key={event.id}
+                  className={cn(
+                    "relative pt-2 pl-3",
+                    editMode &&
+                      dragOverEventId === event.id &&
+                      "opacity-80"
+                  )}
+                  onDragOver={
+                    editMode
+                      ? (e) => {
+                          e.preventDefault();
+                          if (dragEventId != null && dragEventId !== event.id) {
+                            setDragOverEventId(event.id);
+                          }
+                        }
+                      : undefined
+                  }
+                  onDrop={
+                    editMode
+                      ? (e) => {
+                          e.preventDefault();
+                          if (dragEventId == null || dragEventId === event.id) {
+                            setDragEventId(null);
+                            setDragOverEventId(null);
+                            return;
+                          }
+                          const fromId = dragEventId;
+                          const toId = event.id;
+                          setDragEventId(null);
+                          setDragOverEventId(null);
+                          const fromIndex = events.findIndex(
+                            (x) => x.id === fromId
+                          );
+                          const toIndex = events.findIndex((x) => x.id === toId);
+                          if (fromIndex < 0 || toIndex < 0) return;
+                          const next = [...events];
+                          const [moved] = next.splice(fromIndex, 1);
+                          next.splice(toIndex, 0, moved);
+                          setEvents(next);
+                          void persistEventOrder(next);
+                        }
+                      : undefined
+                  }
+                >
+                  <IconCircle
+                    icon={visual.icon}
+                    tone={visual.tone}
+                    size="md"
+                    className="absolute left-0 top-1 z-10 border-2 border-foreground/20 shadow-md"
+                  />
+                  <Card
+                    className={cn(
+                      "relative gap-0 overflow-visible border-border/50 bg-card py-0",
+                      editMode &&
+                        dragOverEventId === event.id &&
+                        "ring-2 ring-teal-400/50"
+                    )}
+                  >
+                    <CardContent className="flex items-center gap-3 p-2.5 pl-7 sm:gap-4 sm:p-3 sm:pl-8">
+                      <div className="shrink-0 scale-90 sm:scale-100">
+                        <EventDateHeader event={event} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start gap-2">
+                          {editMode ? (
+                            <button
+                              type="button"
+                              draggable
+                              title="Ziehen zum Sortieren"
+                              className="mt-1 hidden cursor-grab touch-none rounded p-0.5 text-muted-foreground hover:bg-muted active:cursor-grabbing sm:inline-flex"
+                              onDragStart={(e) => {
+                                setDragEventId(event.id);
+                                e.dataTransfer.effectAllowed = "move";
+                                e.dataTransfer.setData(
+                                  "text/plain",
+                                  String(event.id)
+                                );
+                              }}
+                              onDragEnd={() => {
+                                setDragEventId(null);
+                                setDragOverEventId(null);
+                              }}
+                            >
+                              <GripVertical className="size-4" />
+                            </button>
+                          ) : null}
+                          <div className="min-w-0 flex-1">
+                            <div className="text-base font-black leading-tight tracking-tight sm:text-lg">
+                              {event.title}
+                            </div>
+                            {details ? (
+                              <div className="mt-0.5 truncate text-xs text-muted-foreground">
+                                {details}
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      </div>
+                      {event.ai_image_url ? (
+                        <button
+                          type="button"
+                          className="relative shrink-0"
+                          title="Vergrössern"
+                          onClick={() =>
+                            setAiZoom({
+                              url: event.ai_image_url!,
+                              title: event.title,
+                            })
+                          }
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={event.ai_image_url}
+                            alt=""
+                            className="h-14 w-14 rounded-md border border-border/60 object-cover shadow-sm"
+                          />
+                        </button>
+                      ) : null}
+                      {editMode ? (
+                        <div className="flex shrink-0 flex-col gap-0.5">
+                          <Button
+                            size="icon-xs"
+                            variant="ghost"
+                            title="KI-Bild"
+                            disabled={busy || aiImageBusy || aiBatch != null}
+                            onClick={() => openAiImageDialog(event)}
+                          >
+                            <ImagePlus className="size-3.5" />
+                          </Button>
+                          <Button
+                            size="icon-xs"
+                            variant="ghost"
+                            onClick={() => startEditEvent(event)}
+                          >
+                            <Pencil className="size-3.5" />
+                          </Button>
+                        </div>
+                      ) : null}
+                    </CardContent>
+                  </Card>
+                </div>
+              );
+            }
             return (
               <div
                 key={event.id}
