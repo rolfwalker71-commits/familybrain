@@ -2218,8 +2218,8 @@ export function TripDetailClient({
                         "ring-2 ring-teal-400/50"
                     )}
                   >
-                    <CardContent className="flex items-center gap-3 p-2.5 pl-7 sm:gap-4 sm:p-3 sm:pl-8">
-                      <div className="flex w-[9.75rem] shrink-0 items-center sm:w-[10.75rem]">
+                    <CardContent className="flex items-center gap-4 p-2.5 pl-9 sm:gap-5 sm:p-3 sm:pl-10">
+                      <div className="flex shrink-0 items-center">
                         <EventDateHeader event={event} />
                       </div>
                       <div className="min-w-0 flex-1">
