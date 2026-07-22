@@ -72,12 +72,6 @@ const navItems: NavItem[] = [
     countKey: "financialItemsTotal",
   },
   {
-    href: "/finance-brain",
-    label: "FinanzBrain",
-    icon: HandCoins,
-    tone: "green",
-  },
-  {
     href: "/travel",
     label: "Reisen",
     icon: Plane,
@@ -96,6 +90,12 @@ const navItems: NavItem[] = [
     label: "TravelBrain",
     icon: Luggage,
     tone: "indigo",
+  },
+  {
+    href: "/finance-brain",
+    label: "FinanzBrain",
+    icon: HandCoins,
+    tone: "green",
   },
   { href: "/guides", label: "Guides", icon: BookOpen, tone: "teal" },
   { href: "/chat", label: "Chat", icon: MessageSquare, tone: "indigo" },

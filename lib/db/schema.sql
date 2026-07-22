@@ -417,6 +417,7 @@ CREATE TABLE IF NOT EXISTS finance_expenses (
   expense_date TEXT,
   document_id INTEGER,
   trip_event_id INTEGER,
+  receipt_path TEXT,
   split_mode TEXT NOT NULL DEFAULT 'equal',
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,

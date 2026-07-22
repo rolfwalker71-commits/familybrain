@@ -9,6 +9,7 @@ const PUBLIC_PATHS = new Set([
   "/login",
   "/api/auth/login",
   "/api/auth/logout",
+  "/api/finance-ledgers/exchange-rate",
   "/manifest.webmanifest",
   "/favicon.ico",
   "/apple-touch-icon.png",

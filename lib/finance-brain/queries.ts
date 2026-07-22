@@ -1,4 +1,5 @@
 import { randomBytes } from "crypto";
+import fs from "fs";
 import { getDb } from "@/lib/db/client";
 import { getTripById } from "@/lib/trips/queries";
 import { nowIso } from "@/lib/utils/dates";
@@ -44,6 +45,7 @@ export type FinanceExpenseRow = {
   expense_date: string | null;
   document_id: number | null;
   trip_event_id: number | null;
+  receipt_path: string | null;
   split_mode: string;
   created_at: string;
   updated_at: string;
@@ -489,6 +491,20 @@ function insertSplits(
   }
 }
 
+export function setFinanceExpenseReceiptPath(
+  expenseId: number,
+  receiptPath: string | null
+): FinanceExpenseRow {
+  const existing = getFinanceExpenseById(expenseId);
+  if (!existing) throw new Error("Ausgabe nicht gefunden");
+  const db = getDb();
+  db.prepare(
+    `UPDATE finance_expenses SET receipt_path = ?, updated_at = ? WHERE id = ?`
+  ).run(receiptPath, nowIso(), expenseId);
+  touchLedger(existing.ledger_id);
+  return getFinanceExpenseById(expenseId)!;
+}
+
 export function deleteFinanceExpense(expenseId: number): void {
   const existing = getFinanceExpenseById(expenseId);
   if (!existing) throw new Error("Ausgabe nicht gefunden");
@@ -498,6 +514,13 @@ export function deleteFinanceExpense(expenseId: number): void {
   );
   db.prepare(`DELETE FROM finance_expenses WHERE id = ?`).run(expenseId);
   touchLedger(existing.ledger_id);
+  if (existing.receipt_path && fs.existsSync(existing.receipt_path)) {
+    try {
+      fs.unlinkSync(existing.receipt_path);
+    } catch {
+      /* ignore */
+    }
+  }
 }
 
 export function listFinanceSettlements(

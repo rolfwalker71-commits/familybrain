@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Plus, RefreshCw } from "lucide-react";
+import { Download, Plus, RefreshCw } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +21,7 @@ import {
   SectionCard,
   SettlementList,
 } from "@/components/finance-brain/balance-view";
+import { PendingReceiptPicker } from "@/components/finance-brain/expense-receipt-controls";
 import { COMMON_CURRENCIES } from "@/lib/finance-brain/constants";
 
 type ShareData = {
@@ -39,6 +41,8 @@ type ShareData = {
     amount_base: number;
     expense_date: string | null;
     paid_by_member_id: number;
+    receipt_url?: string | null;
+    has_receipt?: boolean;
     splits: Array<{ member_id: number; share_amount_base: number }>;
   }>;
   settlements: Array<{
@@ -84,6 +88,8 @@ export function FinanceShareClient({ token }: { token: string }) {
   const [setAmount, setSetAmount] = useState("");
   const [setTo, setSetTo] = useState<string>("");
   const [setNote, setSetNote] = useState("");
+  const [rateLoading, setRateLoading] = useState(false);
+  const [pendingReceipt, setPendingReceipt] = useState<File | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -106,6 +112,31 @@ export function FinanceShareClient({ token }: { token: string }) {
     void load();
   }, [load]);
 
+  async function fetchEcbRate() {
+    if (!data) return;
+    if (expCurrency === data.ledger.base_currency) {
+      setExpRate("1");
+      return;
+    }
+    setRateLoading(true);
+    try {
+      const params = new URLSearchParams({
+        from: expCurrency,
+        to: data.ledger.base_currency,
+      });
+      if (expDate) params.set("date", expDate);
+      const res = await fetch(`/api/finance-ledgers/exchange-rate?${params}`);
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Kurs laden fehlgeschlagen");
+      setExpRate(String(json.rate));
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRateLoading(false);
+    }
+  }
+
   async function addExpense() {
     const amount = Number(expAmount);
     if (!amount) return;
@@ -127,9 +158,22 @@ export function FinanceShareClient({ token }: { token: string }) {
       );
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Fehler");
+      if (pendingReceipt && json.expense?.id) {
+        const form = new FormData();
+        form.set("file", pendingReceipt);
+        const up = await fetch(
+          `/api/share/f/${encodeURIComponent(token)}/expenses/${json.expense.id}/receipt`,
+          { method: "POST", body: form }
+        );
+        const upJson = await up.json();
+        if (!up.ok) {
+          throw new Error(upJson.error || "Foto-Upload fehlgeschlagen");
+        }
+      }
       setExpAmount("");
       setExpDesc("");
       setExpDate("");
+      setPendingReceipt(null);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -246,13 +290,29 @@ export function FinanceShareClient({ token }: { token: string }) {
               </Select>
             </div>
             <div className="space-y-1">
-              <Label>Kurs</Label>
-              <Input
-                type="number"
-                step="0.0001"
-                value={expRate}
-                onChange={(e) => setExpRate(e.target.value)}
-              />
+              <Label>Kurs → {ledger.base_currency}</Label>
+              <div className="flex gap-1.5">
+                <Input
+                  type="number"
+                  step="0.0001"
+                  value={expRate}
+                  onChange={(e) => setExpRate(e.target.value)}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  title="EZB-Kurs laden"
+                  disabled={
+                    rateLoading || expCurrency === ledger.base_currency
+                  }
+                  onClick={() => void fetchEcbRate()}
+                >
+                  <Download
+                    className={cn("size-4", rateLoading && "animate-pulse")}
+                  />
+                </Button>
+              </div>
             </div>
           </div>
           <div className="space-y-1">
@@ -291,6 +351,13 @@ export function FinanceShareClient({ token }: { token: string }) {
               type="date"
               value={expDate}
               onChange={(e) => setExpDate(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label>Belegfoto (optional)</Label>
+            <PendingReceiptPicker
+              file={pendingReceipt}
+              onChange={setPendingReceipt}
             />
           </div>
           <Button className="w-full" onClick={() => void addExpense()} disabled={!expAmount}>
@@ -358,6 +425,10 @@ export function FinanceShareClient({ token }: { token: string }) {
           expenses={expenses}
           members={members}
           baseCurrency={ledger.base_currency}
+          receiptUploadUrl={(expenseId) =>
+            `/api/share/f/${encodeURIComponent(token)}/expenses/${expenseId}/receipt`
+          }
+          onReceiptChanged={() => void load()}
         />
       </SectionCard>
 

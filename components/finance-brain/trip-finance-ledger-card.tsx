@@ -69,7 +69,7 @@ export function TripFinanceLedgerCard({ tripId }: { tripId: number }) {
   if (loading) return null;
 
   return (
-    <Card className="border-border/80 shadow-sm">
+    <Card className="rounded-md border-border/80 shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <CardTitle className="flex items-center gap-2 text-base">
           <HandCoins className="size-4 text-emerald-600" />

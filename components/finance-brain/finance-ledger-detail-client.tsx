@@ -5,16 +5,21 @@ import Link from "next/link";
 import {
   ArrowLeft,
   Bell,
+  ChevronDown,
+  ChevronUp,
   Copy,
+  Download,
   Link2,
   Mail,
   Plus,
   RefreshCw,
   RotateCw,
+  Users,
+  FileDown,
+  Unlink,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -33,6 +38,7 @@ import {
   SectionCard,
   SettlementList,
 } from "@/components/finance-brain/balance-view";
+import { PendingReceiptPicker } from "@/components/finance-brain/expense-receipt-controls";
 import { COMMON_CURRENCIES } from "@/lib/finance-brain/constants";
 import { cn } from "@/lib/utils";
 
@@ -62,6 +68,8 @@ type LedgerDetail = {
     amount_base: number;
     expense_date: string | null;
     paid_by_member_id: number;
+    receipt_url?: string | null;
+    has_receipt?: boolean;
     splits: Array<{ member_id: number; share_amount_base: number }>;
   }>;
   settlements: Array<{
@@ -102,11 +110,19 @@ type ImportDoc = {
   trip_event_title?: string | null;
 };
 
+type TripOption = {
+  id: number;
+  title: string;
+};
+
+type Panel = "none" | "members" | "import";
+
 export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
   const [data, setData] = useState<LedgerDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const [panel, setPanel] = useState<Panel>("none");
 
   const [memberName, setMemberName] = useState("");
   const [memberEmail, setMemberEmail] = useState("");
@@ -117,6 +133,8 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
   const [expDesc, setExpDesc] = useState("");
   const [expDate, setExpDate] = useState("");
   const [expPayer, setExpPayer] = useState<string>("");
+  const [rateLoading, setRateLoading] = useState(false);
+  const [pendingReceipt, setPendingReceipt] = useState<File | null>(null);
 
   const [setAmount, setSetAmount] = useState("");
   const [setTo, setSetTo] = useState<string>("");
@@ -127,6 +145,9 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
     paperlessItems: ImportDoc[];
   }>({ tripDocuments: [], paperlessItems: [] });
   const [importPayer, setImportPayer] = useState<string>("");
+
+  const [trips, setTrips] = useState<TripOption[]>([]);
+  const [linkTripId, setLinkTripId] = useState<string>("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -140,6 +161,9 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
         setExpPayer(String(json.members[0].id));
         setImportPayer(String(json.members[0].id));
       }
+      setLinkTripId(
+        json.ledger.trip_id != null ? String(json.ledger.trip_id) : ""
+      );
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -163,10 +187,77 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
     }
   }, [ledgerId]);
 
+  const loadTrips = useCallback(async () => {
+    try {
+      const res = await fetch("/api/trips");
+      const json = await res.json();
+      if (res.ok) {
+        setTrips(
+          (json.trips || []).map((t: { id: number; title: string }) => ({
+            id: t.id,
+            title: t.title,
+          }))
+        );
+      }
+    } catch {
+      /* optional */
+    }
+  }, []);
+
   useEffect(() => {
     void load();
     void loadImport();
-  }, [load, loadImport]);
+    void loadTrips();
+  }, [load, loadImport, loadTrips]);
+
+  async function fetchEcbRate() {
+    if (!data) return;
+    if (expCurrency === data.ledger.base_currency) {
+      setExpRate("1");
+      setStatus("Basiswährung – Kurs = 1");
+      return;
+    }
+    setRateLoading(true);
+    try {
+      const params = new URLSearchParams({
+        from: expCurrency,
+        to: data.ledger.base_currency,
+      });
+      if (expDate) params.set("date", expDate);
+      const res = await fetch(`/api/finance-ledgers/exchange-rate?${params}`);
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Kurs laden fehlgeschlagen");
+      setExpRate(String(json.rate));
+      setStatus(
+        `EZB-Kurs ${expCurrency} → ${data.ledger.base_currency}: ${json.rate} (${json.date})`
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRateLoading(false);
+    }
+  }
+
+  async function linkTrip(tripId: number | null) {
+    try {
+      const res = await fetch(`/api/finance-ledgers/${ledgerId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tripId }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Verknüpfung fehlgeschlagen");
+      setStatus(
+        tripId
+          ? "Abrechnung mit Reise verknüpft."
+          : "Reise-Verknüpfung entfernt."
+      );
+      await load();
+      await loadImport();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
 
   async function addMember() {
     if (!memberName.trim()) return;
@@ -234,9 +325,22 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Fehler");
+      if (pendingReceipt && json.expense?.id) {
+        const form = new FormData();
+        form.set("file", pendingReceipt);
+        const up = await fetch(
+          `/api/finance-ledgers/${ledgerId}/expenses/${json.expense.id}/receipt`,
+          { method: "POST", body: form }
+        );
+        const upJson = await up.json();
+        if (!up.ok) {
+          throw new Error(upJson.error || "Foto-Upload fehlgeschlagen");
+        }
+      }
       setExpAmount("");
       setExpDesc("");
       setExpDate("");
+      setPendingReceipt(null);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -325,6 +429,10 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
     }
   }
 
+  function togglePanel(next: Panel) {
+    setPanel((prev) => (prev === next ? "none" : next));
+  }
+
   if (loading && !data) {
     return <p className="p-6 text-sm text-muted-foreground">Lade Abrechnung…</p>;
   }
@@ -338,6 +446,9 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
 
   const { ledger, members, expenses, settlements, balances, simplifiedDebts } =
     data;
+  const hasImport =
+    importDocs.tripDocuments.length > 0 ||
+    importDocs.paperlessItems.length > 0;
 
   return (
     <div className="space-y-6">
@@ -381,72 +492,228 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
       {status ? <p className="text-sm text-muted-foreground">{status}</p> : null}
 
+      <SectionCard title="Reise verknüpfen">
+        <p className="mb-3 text-sm text-muted-foreground">
+          Optional mit einer TravelBrain-Reise verbinden – dann erscheinen
+          Reise-Belege zum Import und die Abrechnung auf der Reise-Detailseite.
+        </p>
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="min-w-[200px] flex-1 space-y-1">
+            <Label>Reise</Label>
+            <Select
+              value={linkTripId || "__none__"}
+              onValueChange={(v) => {
+                if (v == null || v === "__none__") {
+                  setLinkTripId("");
+                  return;
+                }
+                setLinkTripId(v);
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Keine Reise" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">Keine Reise</SelectItem>
+                {trips.map((t) => (
+                  <SelectItem key={t.id} value={String(t.id)}>
+                    {t.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <Button
+            variant="outline"
+            onClick={() =>
+              void linkTrip(linkTripId ? Number(linkTripId) : null)
+            }
+          >
+            <Link2 className="mr-1 size-4" />
+            Speichern
+          </Button>
+          {ledger.trip_id ? (
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setLinkTripId("");
+                void linkTrip(null);
+              }}
+            >
+              <Unlink className="mr-1 size-4" />
+              Trennen
+            </Button>
+          ) : null}
+        </div>
+      </SectionCard>
+
       <BalanceView
         balances={balances}
         simplifiedDebts={simplifiedDebts}
         baseCurrency={ledger.base_currency}
       />
 
-      <SectionCard title="Teilnehmer & Einladungs-Links">
-        <div className="mb-4 grid gap-2 sm:grid-cols-3">
-          <Input
-            placeholder="Name"
-            value={memberName}
-            onChange={(e) => setMemberName(e.target.value)}
-          />
-          <Input
-            placeholder="E-Mail (optional)"
-            type="email"
-            value={memberEmail}
-            onChange={(e) => setMemberEmail(e.target.value)}
-          />
-          <Button onClick={() => void addMember()} disabled={!memberName.trim()}>
-            <Plus className="mr-1 size-4" />
-            Hinzufügen
-          </Button>
-        </div>
-        <div className="space-y-2">
-          {members.map((m) => (
-            <div
-              key={m.id}
-              className="flex flex-wrap items-center gap-2 rounded-lg border border-border/60 px-3 py-2 text-sm"
+      <div className="flex flex-wrap gap-2">
+        <Button
+          variant={panel === "members" ? "default" : "outline"}
+          size="sm"
+          onClick={() => togglePanel("members")}
+          className="gap-1.5"
+        >
+          <Users className="size-4" />
+          Teilnehmer
+          {panel === "members" ? (
+            <ChevronUp className="size-3.5 opacity-70" />
+          ) : (
+            <ChevronDown className="size-3.5 opacity-70" />
+          )}
+        </Button>
+        <Button
+          variant={panel === "import" ? "default" : "outline"}
+          size="sm"
+          onClick={() => togglePanel("import")}
+          className="gap-1.5"
+        >
+          <FileDown className="size-4" />
+          Belege importieren
+          {panel === "import" ? (
+            <ChevronUp className="size-3.5 opacity-70" />
+          ) : (
+            <ChevronDown className="size-3.5 opacity-70" />
+          )}
+        </Button>
+      </div>
+
+      {panel === "members" ? (
+        <SectionCard title="Teilnehmer & Einladungs-Links">
+          <div className="mb-4 grid gap-2 sm:grid-cols-3">
+            <Input
+              placeholder="Name"
+              value={memberName}
+              onChange={(e) => setMemberName(e.target.value)}
+            />
+            <Input
+              placeholder="E-Mail (optional)"
+              type="email"
+              value={memberEmail}
+              onChange={(e) => setMemberEmail(e.target.value)}
+            />
+            <Button
+              onClick={() => void addMember()}
+              disabled={!memberName.trim()}
             >
-              <span className="font-medium">{m.display_name}</span>
-              {m.email ? (
-                <Badge variant="secondary">{m.email}</Badge>
-              ) : null}
-              {m.invite_revoked_at ? (
-                <Badge variant="destructive">Widerrufen</Badge>
-              ) : null}
-              <div className="ml-auto flex flex-wrap gap-1">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => void copyShareUrl(m.share_url)}
-                >
-                  <Copy className="mr-1 size-3" />
-                  Link
-                </Button>
-                <a
-                  href={`mailto:?subject=${encodeURIComponent(`FinanzBrain: ${ledger.title}`)}&body=${encodeURIComponent(`Dein Link: ${window.location.origin}${m.share_url}`)}`}
-                  className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
-                >
-                  <Mail className="mr-1 size-3" />
-                  mailto
-                </a>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => void rotateToken(m.id)}
-                >
-                  <RotateCw className="mr-1 size-3" />
-                  Token
-                </Button>
+              <Plus className="mr-1 size-4" />
+              Hinzufügen
+            </Button>
+          </div>
+          <div className="space-y-2">
+            {members.map((m) => (
+              <div
+                key={m.id}
+                className="flex flex-wrap items-center gap-2 rounded-md border border-border/60 px-3 py-2 text-sm"
+              >
+                <span className="font-medium">{m.display_name}</span>
+                {m.email ? <Badge variant="secondary">{m.email}</Badge> : null}
+                {m.invite_revoked_at ? (
+                  <Badge variant="destructive">Widerrufen</Badge>
+                ) : null}
+                <div className="ml-auto flex flex-wrap gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => void copyShareUrl(m.share_url)}
+                  >
+                    <Copy className="mr-1 size-3" />
+                    Link
+                  </Button>
+                  <a
+                    href={`mailto:?subject=${encodeURIComponent(`FinanzBrain: ${ledger.title}`)}&body=${encodeURIComponent(`Dein Link: ${typeof window !== "undefined" ? window.location.origin : ""}${m.share_url}`)}`}
+                    className={cn(
+                      buttonVariants({ variant: "ghost", size: "sm" })
+                    )}
+                  >
+                    <Mail className="mr-1 size-3" />
+                    mailto
+                  </a>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => void rotateToken(m.id)}
+                  >
+                    <RotateCw className="mr-1 size-3" />
+                    Token
+                  </Button>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
-      </SectionCard>
+            ))}
+          </div>
+        </SectionCard>
+      ) : null}
+
+      {panel === "import" ? (
+        <SectionCard title="Belege importieren">
+          {!hasImport ? (
+            <p className="text-sm text-muted-foreground">
+              Keine Belege gefunden. Verknüpfe eine Reise (oben) für
+              Reise-Belege, oder warte auf Paperless-Finanzpositionen.
+            </p>
+          ) : (
+            <>
+              <div className="mb-3 space-y-1">
+                <Label>Bezahlt von</Label>
+                <Select
+                  value={importPayer}
+                  onValueChange={(v) => {
+                    if (v == null) return;
+                    setImportPayer(v);
+                  }}
+                >
+                  <SelectTrigger className="max-w-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {members.map((m) => (
+                      <SelectItem key={m.id} value={String(m.id)}>
+                        {m.display_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {importDocs.tripDocuments.length > 0 ? (
+                <div className="mb-4 space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Reise-Belege
+                  </p>
+                  {importDocs.tripDocuments.map((doc) => (
+                    <ImportRow
+                      key={`trip-${doc.document_id}`}
+                      doc={doc}
+                      baseCurrency={ledger.base_currency}
+                      onImport={() => void importDocument(doc)}
+                    />
+                  ))}
+                </div>
+              ) : null}
+              {importDocs.paperlessItems.length > 0 ? (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Paperless (Finanzblick)
+                  </p>
+                  {importDocs.paperlessItems.slice(0, 20).map((doc) => (
+                    <ImportRow
+                      key={`pl-${doc.document_id}`}
+                      doc={doc}
+                      baseCurrency={ledger.base_currency}
+                      onImport={() => void importDocument(doc)}
+                    />
+                  ))}
+                </div>
+              ) : null}
+            </>
+          )}
+        </SectionCard>
+      ) : null}
 
       <SectionCard title="Ausgabe erfassen">
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
@@ -466,6 +733,7 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
               onValueChange={(v) => {
                 if (v == null) return;
                 setExpCurrency(v);
+                if (v === ledger.base_currency) setExpRate("1");
               }}
             >
               <SelectTrigger>
@@ -482,12 +750,26 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
           </div>
           <div className="space-y-1">
             <Label>Kurs → {ledger.base_currency}</Label>
-            <Input
-              type="number"
-              step="0.0001"
-              value={expRate}
-              onChange={(e) => setExpRate(e.target.value)}
-            />
+            <div className="flex gap-1.5">
+              <Input
+                type="number"
+                step="0.0001"
+                value={expRate}
+                onChange={(e) => setExpRate(e.target.value)}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                title="EZB-Kurs laden (Frankfurter)"
+                disabled={rateLoading || expCurrency === ledger.base_currency}
+                onClick={() => void fetchEcbRate()}
+              >
+                <Download
+                  className={cn("size-4", rateLoading && "animate-pulse")}
+                />
+              </Button>
+            </div>
           </div>
           <div className="space-y-1">
             <Label>Bezahlt von</Label>
@@ -530,9 +812,17 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
               Speichern
             </Button>
           </div>
+          <div className="space-y-1 sm:col-span-2 lg:col-span-4">
+            <Label>Belegfoto (optional)</Label>
+            <PendingReceiptPicker
+              file={pendingReceipt}
+              onChange={setPendingReceipt}
+            />
+          </div>
         </div>
         <p className="mt-2 text-xs text-muted-foreground">
-          Aufteilung: gleichmässig auf alle Teilnehmer.
+          Aufteilung: gleichmässig auf alle Teilnehmer. Kurs-Button lädt den
+          EZB-Referenzkurs (optional zum Ausgabedatum).
         </p>
       </SectionCard>
 
@@ -605,63 +895,6 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
         </div>
       </SectionCard>
 
-      {(importDocs.tripDocuments.length > 0 ||
-        importDocs.paperlessItems.length > 0) && (
-        <SectionCard title="Belege importieren">
-          <div className="mb-3 space-y-1">
-            <Label>Bezahlt von</Label>
-            <Select
-              value={importPayer}
-              onValueChange={(v) => {
-                if (v == null) return;
-                setImportPayer(v);
-              }}
-            >
-              <SelectTrigger className="max-w-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {members.map((m) => (
-                  <SelectItem key={m.id} value={String(m.id)}>
-                    {m.display_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          {importDocs.tripDocuments.length > 0 ? (
-            <div className="mb-4 space-y-2">
-              <p className="text-xs font-medium text-muted-foreground">
-                Reise-Belege
-              </p>
-              {importDocs.tripDocuments.map((doc) => (
-                <ImportRow
-                  key={`trip-${doc.document_id}`}
-                  doc={doc}
-                  baseCurrency={ledger.base_currency}
-                  onImport={() => void importDocument(doc)}
-                />
-              ))}
-            </div>
-          ) : null}
-          {importDocs.paperlessItems.length > 0 ? (
-            <div className="space-y-2">
-              <p className="text-xs font-medium text-muted-foreground">
-                Paperless (Finanzblick)
-              </p>
-              {importDocs.paperlessItems.slice(0, 20).map((doc) => (
-                <ImportRow
-                  key={`pl-${doc.document_id}`}
-                  doc={doc}
-                  baseCurrency={ledger.base_currency}
-                  onImport={() => void importDocument(doc)}
-                />
-              ))}
-            </div>
-          ) : null}
-        </SectionCard>
-      )}
-
       <SectionCard title="Ausgaben">
         <ExpenseList
           expenses={expenses}
@@ -669,6 +902,10 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
           baseCurrency={ledger.base_currency}
           canDelete
           onDelete={(id) => void deleteExpense(id)}
+          receiptUploadUrl={(expenseId) =>
+            `/api/finance-ledgers/${ledgerId}/expenses/${expenseId}/receipt`
+          }
+          onReceiptChanged={() => void load()}
         />
       </SectionCard>
 
@@ -697,7 +934,7 @@ function ImportRow({
     doc.title ||
     `Beleg #${doc.document_id}`;
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border/60 px-3 py-2 text-sm">
+    <div className="flex flex-wrap items-center gap-2 rounded-md border border-border/60 px-3 py-2 text-sm">
       <Link2 className="size-4 shrink-0 text-muted-foreground" />
       <div className="min-w-0 flex-1">
         <p className="truncate font-medium">{label}</p>

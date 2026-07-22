@@ -38,7 +38,7 @@ export async function GET(_request: Request, context: Ctx) {
   const ledgerId = member.ledger_id;
   const members = listFinanceLedgerMembers(ledgerId).map(serializeMember);
   const expenses = listFinanceExpenses(ledgerId).map((e) =>
-    serializeExpense(e, listFinanceExpenseSplits(e.id))
+    serializeExpense(e, listFinanceExpenseSplits(e.id), { shareToken: token })
   );
   const settlements = listFinanceSettlements(ledgerId).map(serializeSettlement);
   const balances = buildBalancePayload(collectBalanceInputs(ledgerId));

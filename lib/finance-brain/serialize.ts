@@ -10,6 +10,10 @@ import type {
   FinanceLedgerRow,
   FinanceSettlementRow,
 } from "@/lib/finance-brain/queries";
+import {
+  receiptPublicUrl,
+  receiptSharePublicUrl,
+} from "@/lib/finance-brain/receipts";
 import { getTripById } from "@/lib/trips/queries";
 
 export function serializeLedger(ledger: FinanceLedgerRow) {
@@ -42,9 +46,19 @@ export function serializeMemberWithToken(member: FinanceLedgerMemberRow) {
 
 export function serializeExpense(
   expense: FinanceExpenseRow,
-  splits: FinanceExpenseSplitRow[]
+  splits: FinanceExpenseSplitRow[],
+  options?: { shareToken?: string }
 ) {
-  return { ...expense, splits };
+  const { receipt_path, ...rest } = expense;
+  const receipt_url = options?.shareToken
+    ? receiptSharePublicUrl(options.shareToken, receipt_path)
+    : receiptPublicUrl(receipt_path);
+  return {
+    ...rest,
+    has_receipt: Boolean(receipt_path),
+    receipt_url,
+    splits,
+  };
 }
 
 export function serializeSettlement(settlement: FinanceSettlementRow) {

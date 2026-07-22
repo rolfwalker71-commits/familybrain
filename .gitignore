@@ -48,6 +48,7 @@ next-env.d.ts
 /data/trip-covers/
 /data/trip-aircraft/
 /data/trip-maps/
+/data/finance-receipts/
 /familybrain.sqlite
 /familybrain.sqlite-*
 !.gitkeep

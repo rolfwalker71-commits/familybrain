@@ -53,7 +53,9 @@ export async function POST(request: Request, context: Ctx) {
     });
     return NextResponse.json({
       ok: true,
-      expense: serializeExpense(expense, listFinanceExpenseSplits(expense.id)),
+      expense: serializeExpense(expense, listFinanceExpenseSplits(expense.id), {
+        shareToken: token,
+      }),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

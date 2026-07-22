@@ -3,6 +3,8 @@
 import type { ReactNode } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatMoney, formatSignedMoney } from "@/lib/finance-brain/format";
+import { ExpenseReceiptControls } from "@/components/finance-brain/expense-receipt-controls";
+import { cn } from "@/lib/utils";
 
 type Balance = {
   memberId: number;
@@ -35,7 +37,7 @@ export function BalanceView({
 }) {
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      <Card className="border-border/80 shadow-sm">
+      <Card className="rounded-md border-border/80 shadow-sm">
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Saldo pro Person</CardTitle>
         </CardHeader>
@@ -46,11 +48,12 @@ export function BalanceView({
             balances.map((b) => (
               <div
                 key={b.memberId}
-                className={`flex items-center justify-between rounded-lg border px-3 py-2 text-sm ${
+                className={cn(
+                  "flex items-center justify-between rounded-md border px-3 py-2 text-sm",
                   highlightMemberId === b.memberId
                     ? "border-primary/40 bg-primary/5"
                     : "border-border/60"
-                }`}
+                )}
               >
                 <span className="font-medium">{b.displayName}</span>
                 <span
@@ -70,7 +73,7 @@ export function BalanceView({
         </CardContent>
       </Card>
 
-      <Card className="border-border/80 shadow-sm">
+      <Card className="rounded-md border-border/80 shadow-sm">
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Ausgleichsvorschläge</CardTitle>
         </CardHeader>
@@ -81,7 +84,7 @@ export function BalanceView({
             simplifiedDebts.map((d, i) => (
               <div
                 key={`${d.fromMemberId}-${d.toMemberId}-${i}`}
-                className="rounded-lg border border-border/60 px-3 py-2 text-sm"
+                className="rounded-md border border-border/60 px-3 py-2 text-sm"
               >
                 <span className="font-medium">{d.fromDisplayName}</span>
                 {" schuldet "}
@@ -105,6 +108,8 @@ export function ExpenseList({
   baseCurrency,
   onDelete,
   canDelete,
+  receiptUploadUrl,
+  onReceiptChanged,
 }: {
   expenses: Array<{
     id: number;
@@ -114,12 +119,16 @@ export function ExpenseList({
     amount_base: number;
     expense_date: string | null;
     paid_by_member_id: number;
+    receipt_url?: string | null;
+    has_receipt?: boolean;
     splits: Array<{ member_id: number; share_amount_base: number }>;
   }>;
   members: Array<{ id: number; display_name: string }>;
   baseCurrency: string;
   onDelete?: (id: number) => void;
   canDelete?: boolean;
+  receiptUploadUrl?: (expenseId: number) => string;
+  onReceiptChanged?: () => void;
 }) {
   const memberName = (id: number) =>
     members.find((m) => m.id === id)?.display_name ?? `#${id}`;
@@ -132,9 +141,9 @@ export function ExpenseList({
         expenses.map((exp) => (
           <div
             key={exp.id}
-            className="flex flex-wrap items-start justify-between gap-2 rounded-lg border border-border/60 px-3 py-2 text-sm"
+            className="flex flex-wrap items-start justify-between gap-2 rounded-md border border-border/60 px-3 py-2 text-sm"
           >
-            <div>
+            <div className="min-w-0 flex-1">
               <p className="font-medium">
                 {exp.description || "Ausgabe"}
                 {exp.expense_date ? (
@@ -150,6 +159,29 @@ export function ExpenseList({
                   ? ` (${formatMoney(exp.amount_base, baseCurrency)})`
                   : ""}
               </p>
+              {receiptUploadUrl ? (
+                <ExpenseReceiptControls
+                  expenseId={exp.id}
+                  receiptUrl={exp.receipt_url}
+                  uploadUrl={receiptUploadUrl(exp.id)}
+                  onChanged={onReceiptChanged}
+                  compact
+                />
+              ) : exp.receipt_url ? (
+                <a
+                  href={exp.receipt_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-1 inline-block"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={exp.receipt_url}
+                    alt="Beleg"
+                    className="h-10 w-10 rounded border border-border/60 object-cover"
+                  />
+                </a>
+              ) : null}
             </div>
             {canDelete && onDelete ? (
               <button
@@ -196,7 +228,7 @@ export function SettlementList({
         settlements.map((s) => (
           <div
             key={s.id}
-            className="rounded-lg border border-border/60 px-3 py-2 text-sm"
+            className="rounded-md border border-border/60 px-3 py-2 text-sm"
           >
             <p>
               <span className="font-medium">{memberName(s.from_member_id)}</span>
@@ -228,7 +260,7 @@ export function SectionCard({
   action?: ReactNode;
 }) {
   return (
-    <Card className="border-border/80 shadow-sm">
+    <Card className="rounded-md border-border/80 shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <CardTitle className="text-base">{title}</CardTitle>
         {action}

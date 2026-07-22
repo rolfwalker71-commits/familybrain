@@ -353,6 +353,7 @@ function ensureFinanceBrainTables(db: Database.Database): void {
       expense_date TEXT,
       document_id INTEGER,
       trip_event_id INTEGER,
+      receipt_path TEXT,
       split_mode TEXT NOT NULL DEFAULT 'equal',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
@@ -394,4 +395,11 @@ function ensureFinanceBrainTables(db: Database.Database): void {
     );
     CREATE INDEX IF NOT EXISTS idx_finance_settlements_ledger ON finance_settlements(ledger_id);
   `);
+
+  const expenseCols = db
+    .prepare(`PRAGMA table_info(finance_expenses)`)
+    .all() as Array<{ name: string }>;
+  if (!expenseCols.some((c) => c.name === "receipt_path")) {
+    db.exec(`ALTER TABLE finance_expenses ADD COLUMN receipt_path TEXT`);
+  }
 }
