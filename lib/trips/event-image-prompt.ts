@@ -49,10 +49,18 @@ function placeHint(event: {
   return null;
 }
 
-function sceneForType(eventType: string): string {
+function sceneForType(
+  eventType: string,
+  cabinClass?: string | null
+): string {
   switch (eventType) {
-    case "Flug":
+    case "Flug": {
+      const cabin = cabinClass?.trim();
+      if (cabin) {
+        return `${cabin} cabin atmosphere on board or at the gate, travel day mood`;
+      }
       return "airport terminal or aircraft cabin atmosphere, travel day mood";
+    }
     case "Hotel":
     case "Unterkunft":
       return "welcoming hotel exterior or lobby atmosphere";
@@ -84,6 +92,7 @@ export type EventImagePromptInput = {
   provider?: string | null;
   notes?: string | null;
   document_notes_md?: string | null;
+  cabin_class?: string | null;
 };
 
 function applyTemplate(
@@ -119,6 +128,6 @@ export function buildEventImagePrompt(
     provider: event.provider?.trim() || "",
     notes: notes || "",
     beleg: beleg || "",
-    scene: sceneForType(type),
+    scene: sceneForType(type, event.cabin_class),
   });
 }

@@ -31,6 +31,7 @@ const CreateSchema = z.object({
   noteId: z.string().nullable().optional(),
   sourceExcerpt: z.string().nullable().optional(),
   flightNumber: z.string().nullable().optional(),
+  cabinClass: z.string().nullable().optional(),
   address: z.string().nullable().optional(),
   departureAirport: z.string().nullable().optional(),
   arrivalAirport: z.string().nullable().optional(),

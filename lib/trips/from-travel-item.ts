@@ -125,6 +125,11 @@ export function travelItemToEventDrafts(item: TravelItemLike): TripEventDraft[] 
       asString(extracted?.notes)
     );
 
+  const cabinClass =
+    asString(extracted?.cabin_class) ||
+    asString(extracted?.cabinClass) ||
+    null;
+
   const hotelAddress = asString(extracted?.address);
 
   const route = [
@@ -176,6 +181,7 @@ export function travelItemToEventDrafts(item: TravelItemLike): TripEventDraft[] 
     provider: item.provider || asString(extracted?.provider),
     booking_reference: bookingReference,
     flight_number: type === "Flug" ? flightNumber : null,
+    cabin_class: type === "Flug" ? cabinClass : null,
     departure_airport: depIata,
     arrival_airport: arrIata,
     document_id: documentId,

@@ -46,6 +46,7 @@ export type TripEventRow = {
   note_id: string | null;
   source_excerpt: string | null;
   flight_number: string | null;
+  cabin_class: string | null;
   airline: string | null;
   aircraft_reg: string | null;
   aircraft_type: string | null;
@@ -334,6 +335,7 @@ export type TripEventInput = {
   noteId?: string | null;
   sourceExcerpt?: string | null;
   flightNumber?: string | null;
+  cabinClass?: string | null;
   airline?: string | null;
   aircraftReg?: string | null;
   aircraftType?: string | null;
@@ -403,7 +405,7 @@ export function createTripEvent(
          trip_id, event_type, title, start_date, end_date, start_time, end_time,
          location, provider, booking_reference, notes, sort_key,
          document_id, travel_item_id, guide_id, note_id, source_excerpt,
-         flight_number, airline, aircraft_reg, aircraft_type,
+         flight_number, cabin_class, airline, aircraft_reg, aircraft_type,
          departure_airport, arrival_airport, duration_minutes, aircraft_image_path,
          departure_terminal, arrival_terminal, departure_gate, arrival_gate,
          check_in_desk, baggage_belt,
@@ -417,7 +419,7 @@ export function createTripEvent(
          ?, ?, ?, ?, ?, ?, ?,
          ?, ?, ?, ?, ?,
          ?, ?, ?, ?, ?,
-         ?, ?, ?, ?,
+         ?, ?, ?, ?, ?,
          ?, ?, ?, ?,
          ?, ?, ?, ?,
          ?, ?,
@@ -448,6 +450,7 @@ export function createTripEvent(
       input.noteId ?? null,
       input.sourceExcerpt?.trim() || null,
       input.flightNumber?.trim() || null,
+      input.cabinClass?.trim() || null,
       input.airline?.trim() || null,
       input.aircraftReg?.trim() || null,
       input.aircraftType?.trim() || null,
@@ -540,6 +543,7 @@ export function updateTripEvent(
        note_id = ?,
        source_excerpt = ?,
        flight_number = ?,
+       cabin_class = ?,
        airline = ?,
        aircraft_reg = ?,
        aircraft_type = ?,
@@ -606,6 +610,9 @@ export function updateTripEvent(
     input.flightNumber !== undefined
       ? input.flightNumber?.trim() || null
       : existing.flight_number,
+    input.cabinClass !== undefined
+      ? input.cabinClass?.trim() || null
+      : existing.cabin_class,
     input.airline !== undefined
       ? input.airline?.trim() || null
       : existing.airline,

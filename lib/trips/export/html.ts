@@ -41,6 +41,7 @@ function eventDetailsHtml(event: TripExportEvent): string {
     ["Anbieter", event.provider],
     ["Buchung", event.booking_reference],
     ["Flugnr.", event.flight_number],
+    ["Klasse", event.cabin_class],
     ["Airline", event.airline],
     [
       "Flugzeug",

@@ -12,6 +12,7 @@ export function tripEventsToCalendarEvents(
         event.provider ? `Anbieter: ${event.provider}` : null,
         event.booking_reference ? `Buchung: ${event.booking_reference}` : null,
         event.flight_number ? `Flug: ${event.flight_number}` : null,
+        event.cabin_class ? `Klasse: ${event.cabin_class}` : null,
         event.airline ? `Airline: ${event.airline}` : null,
         event.departure_airport && event.arrival_airport
           ? `${event.departure_airport} → ${event.arrival_airport}`

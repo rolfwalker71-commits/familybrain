@@ -23,6 +23,7 @@ const PatchSchema = z.object({
   notes: z.string().nullable().optional(),
   sortKey: z.number().optional(),
   flightNumber: z.string().nullable().optional(),
+  cabinClass: z.string().nullable().optional(),
   address: z.string().nullable().optional(),
   departureAirport: z.string().nullable().optional(),
   arrivalAirport: z.string().nullable().optional(),

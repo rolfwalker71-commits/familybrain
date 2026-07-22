@@ -13,6 +13,15 @@ export const TRIP_EVENT_TYPES = [
 ] as const;
 export type TripEventType = (typeof TRIP_EVENT_TYPES)[number];
 
+/** Common airline cabin / booking classes for flight events. */
+export const CABIN_CLASSES = [
+  "Economy",
+  "Premium Economy",
+  "Business",
+  "First",
+] as const;
+export type CabinClass = (typeof CABIN_CLASSES)[number];
+
 const EVENT_TYPE_ALIASES: Record<string, TripEventType> = {
   Mietwagen: "Mietauto",
   Aktivität: "Ausflug",
@@ -47,6 +56,7 @@ export type TripEventDraft = {
   booking_reference?: string | null;
   notes?: string | null;
   flight_number?: string | null;
+  cabin_class?: string | null;
   departure_airport?: string | null;
   arrival_airport?: string | null;
   document_id?: number | null;

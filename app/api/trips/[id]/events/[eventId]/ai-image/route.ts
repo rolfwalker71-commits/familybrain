@@ -25,9 +25,10 @@ export async function GET(_request: Request, context: Ctx) {
     }
     return NextResponse.json({
       ok: true,
-      prompt:
-        existing.ai_image_prompt ||
-        buildEventImagePrompt(existing, getEventAiImagePromptTemplate()),
+      prompt: buildEventImagePrompt(
+        existing,
+        getEventAiImagePromptTemplate()
+      ),
       hasImage: Boolean(existing.ai_image_path),
     });
   } catch (error) {
@@ -49,6 +50,7 @@ export async function POST(request: Request, context: Ctx) {
     const body = (await request.json().catch(() => ({}))) as {
       prompt?: string;
       delete?: boolean;
+      useSettings?: boolean;
     };
 
     if (body.delete) {
@@ -56,7 +58,15 @@ export async function POST(request: Request, context: Ctx) {
       return NextResponse.json({ ok: true, event: serializeTripEvent(updated) });
     }
 
-    const updated = await generateEventAiImage(eventId, body.prompt);
+    // Empty / settings path: always rebuild from current settings + fresh event.
+    const useCustom =
+      body.useSettings !== true &&
+      typeof body.prompt === "string" &&
+      body.prompt.trim().length > 0;
+    const updated = await generateEventAiImage(
+      eventId,
+      useCustom ? body.prompt : undefined
+    );
     return NextResponse.json({ ok: true, event: serializeTripEvent(updated) });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

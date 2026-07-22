@@ -307,6 +307,7 @@ CREATE TABLE IF NOT EXISTS trip_events (
   note_id TEXT,
   source_excerpt TEXT,
   flight_number TEXT,
+  cabin_class TEXT,
   airline TEXT,
   aircraft_reg TEXT,
   aircraft_type TEXT,

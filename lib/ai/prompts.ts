@@ -105,6 +105,7 @@ Required JSON shape:
     "address": null,
     "booking_reference": null,
     "flight_number": null,
+    "cabin_class": null,
     "price": null,
     "currency": null,
     "itinerary": [{
@@ -124,7 +125,7 @@ Travel/cruise specifics:
 - Put cruising/sea days as location "Cruising" with note "Seetag".
 - Mirror each itinerary stop with a date into important_dates (label like "Anlaufhafen: Barcelona").
 - Also put payment due dates, cancellation deadlines, boarding/sailing times into important_dates.
-- For Flug items: set flight_number (IATA+digits) and booking_reference/PNR when visible; set start_time/end_time from scheduled departure/arrival when known.
+- For Flug items: set flight_number (IATA+digits), cabin_class when visible (Economy / Premium Economy / Business / First), and booking_reference/PNR when visible; set start_time/end_time from scheduled departure/arrival when known.
 - For Hotel items: set address to the full street address when present; destination can be the city.
 - Sections titled Flüge / Flugarrangements / Flight / E-Ticket are separate travel_items with travel_type "Flug", even when the same PDF also describes a cruise or hotel stay.`;
 }

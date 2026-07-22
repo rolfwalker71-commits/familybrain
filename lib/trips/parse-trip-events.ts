@@ -51,6 +51,7 @@ export function parseTripEventsMarker(rawAnswer: string): {
             booking_reference: asNullableString(row.booking_reference),
             notes: asNullableString(row.notes),
             flight_number: asNullableString(row.flight_number),
+            cabin_class: asNullableString(row.cabin_class),
             departure_airport: asNullableString(row.departure_airport),
             arrival_airport: asNullableString(row.arrival_airport),
             document_id: asNullableNumber(row.document_id),

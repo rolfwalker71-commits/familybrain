@@ -70,6 +70,7 @@ import {
   toTimeInputValue,
 } from "@/lib/utils/dates";
 import {
+  CABIN_CLASSES,
   TRIP_EVENT_TYPES,
   TRIP_STATUSES,
   coerceTripEventType,
@@ -102,6 +103,7 @@ type TripEvent = {
   booking_reference: string | null;
   notes: string | null;
   flight_number: string | null;
+  cabin_class: string | null;
   airline: string | null;
   aircraft_reg: string | null;
   aircraft_type: string | null;
@@ -444,6 +446,7 @@ function createEmptyEventForm() {
     bookingReference: "",
     notes: "",
     flightNumber: "",
+    cabinClass: "",
     departureAirport: "",
     arrivalAirport: "",
     departureTerminal: "",
@@ -484,6 +487,7 @@ function eventToForm(event: TripEvent) {
     bookingReference: event.booking_reference || "",
     notes: event.notes || "",
     flightNumber: event.flight_number || "",
+    cabinClass: event.cabin_class || "",
     departureAirport: event.departure_airport || "",
     arrivalAirport: event.arrival_airport || "",
     departureTerminal: event.departure_terminal || "",
@@ -543,6 +547,8 @@ export function TripDetailClient({
   const [dragOverEventId, setDragOverEventId] = useState<number | null>(null);
   const [aiImageEventId, setAiImageEventId] = useState<number | null>(null);
   const [aiImagePrompt, setAiImagePrompt] = useState("");
+  const [aiImagePromptDirty, setAiImagePromptDirty] = useState(false);
+  const [aiImagePromptLoading, setAiImagePromptLoading] = useState(false);
   const [aiImageBusy, setAiImageBusy] = useState(false);
   const [aiZoom, setAiZoom] = useState<{
     url: string;
@@ -657,6 +663,7 @@ export function TripDetailClient({
         notes: eventForm.notes || null,
         showDocumentNotes: eventForm.showDocumentNotes,
         flightNumber: eventForm.flightNumber || null,
+        cabinClass: eventForm.cabinClass || null,
         departureAirport: dep,
         arrivalAirport: arr,
         departureTerminal: eventForm.departureTerminal || null,
@@ -1078,22 +1085,26 @@ export function TripDetailClient({
 
   function openAiImageDialog(event: TripEvent) {
     setAiImageEventId(event.id);
+    setAiImagePromptDirty(false);
+    setAiImagePromptLoading(true);
     setAiImagePrompt(
-      event.ai_image_prompt?.trim() || buildEventImagePrompt(event)
+      buildEventImagePrompt(event) // temporary until settings template loads
     );
-    if (!event.ai_image_prompt?.trim()) {
-      void fetch(`/api/trips/${tripId}/events/${event.id}/ai-image`)
-        .then(async (res) => {
-          const data = await res.json();
-          if (!res.ok) return;
-          if (typeof data.prompt === "string" && data.prompt.trim()) {
-            setAiImagePrompt(data.prompt);
-          }
-        })
-        .catch(() => {
-          /* keep client fallback */
-        });
-    }
+    void fetch(`/api/trips/${tripId}/events/${event.id}/ai-image`)
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) return;
+        if (typeof data.prompt === "string" && data.prompt.trim()) {
+          setAiImagePrompt(data.prompt);
+          setAiImagePromptDirty(false);
+        }
+      })
+      .catch(() => {
+        /* keep client fallback */
+      })
+      .finally(() => {
+        setAiImagePromptLoading(false);
+      });
   }
 
   async function generateAiImage() {
@@ -1101,12 +1112,16 @@ export function TripDetailClient({
     setAiImageBusy(true);
     setError(null);
     try {
+      const body =
+        aiImagePromptDirty && aiImagePrompt.trim()
+          ? { prompt: aiImagePrompt.trim() }
+          : { useSettings: true };
       const res = await fetch(
         `/api/trips/${tripId}/events/${aiImageEventId}/ai-image`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt: aiImagePrompt }),
+          body: JSON.stringify(body),
         }
       );
       const data = await res.json();
@@ -1145,29 +1160,31 @@ export function TripDetailClient({
     }
   }
 
-  async function batchGenerateMissingAiImages() {
-    const missing = events.filter((e) => !e.ai_image_url);
-    if (missing.length === 0) {
-      setStatus("Alle Aktivitäten haben bereits ein KI-Bild.");
+  async function runAiImageBatch(
+    targets: TripEvent[],
+    emptyMessage: string
+  ) {
+    if (targets.length === 0) {
+      setStatus(emptyMessage);
       return;
     }
     if (aiBatch) return;
     aiBatchAbortRef.current = false;
     setError(null);
-    setAiBatch({ current: 0, total: missing.length });
+    setAiBatch({ current: 0, total: targets.length });
     let ok = 0;
     let fail = 0;
-    for (let i = 0; i < missing.length; i++) {
+    for (let i = 0; i < targets.length; i++) {
       if (aiBatchAbortRef.current) break;
-      const event = missing[i];
-      setAiBatch({ current: i + 1, total: missing.length });
+      const event = targets[i];
+      setAiBatch({ current: i + 1, total: targets.length });
       try {
         const res = await fetch(
           `/api/trips/${tripId}/events/${event.id}/ai-image`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({}),
+            body: JSON.stringify({ useSettings: true }),
           }
         );
         const data = await res.json();
@@ -1191,6 +1208,25 @@ export function TripDetailClient({
         ? `KI-Bilder abgebrochen (${ok} erzeugt${fail ? `, ${fail} Fehler` : ""}).`
         : `KI-Bilder: ${ok} erzeugt${fail ? `, ${fail} fehlgeschlagen` : ""}.`
     );
+  }
+
+  async function batchGenerateMissingAiImages() {
+    await runAiImageBatch(
+      events.filter((e) => !e.ai_image_url),
+      "Alle Aktivitäten haben bereits ein KI-Bild."
+    );
+  }
+
+  async function batchRegenerateAllAiImages() {
+    if (events.length === 0) {
+      setStatus("Keine Aktivitäten vorhanden.");
+      return;
+    }
+    const confirmed = window.confirm(
+      `Alle ${events.length} KI-Bilder neu erzeugen?\n\nBestehende Bilder werden überschrieben. Der aktuelle Prompt aus den Einstellungen wird verwendet.`
+    );
+    if (!confirmed) return;
+    await runAiImageBatch(events, "Keine Aktivitäten vorhanden.");
   }
 
   if (!trip) {
@@ -1311,6 +1347,19 @@ export function TripDetailClient({
               {aiBatch
                 ? `KI-Bilder ${aiBatch.current}/${aiBatch.total}…`
                 : "KI-Bilder erzeugen"}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={
+                busy ||
+                aiBatch != null ||
+                aiImageBusy ||
+                events.length === 0
+              }
+              onClick={() => void batchRegenerateAllAiImages()}
+            >
+              Alle KI-Bilder neu
             </Button>
             {aiBatch ? (
               <Button
@@ -1675,6 +1724,38 @@ export function TripDetailClient({
                     }
                     placeholder="z. B. LX80"
                   />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Klasse</Label>
+                  <Select
+                    value={eventForm.cabinClass || "__none__"}
+                    onValueChange={(v) =>
+                      setEventForm((f) => ({
+                        ...f,
+                        cabinClass: !v || v === "__none__" ? "" : String(v),
+                      }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Klasse wählen" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">—</SelectItem>
+                      {CABIN_CLASSES.map((c) => (
+                        <SelectItem key={c} value={c}>
+                          {c}
+                        </SelectItem>
+                      ))}
+                      {eventForm.cabinClass &&
+                      !(CABIN_CLASSES as readonly string[]).includes(
+                        eventForm.cabinClass
+                      ) ? (
+                        <SelectItem value={eventForm.cabinClass}>
+                          {eventForm.cabinClass}
+                        </SelectItem>
+                      ) : null}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-1.5">
                   <Label>Von (IATA)</Label>
@@ -2407,6 +2488,8 @@ export function TripDetailClient({
                               : null);
                       const hasFlightDetails = Boolean(
                         event.airline ||
+                          event.flight_number ||
+                          event.cabin_class ||
                           event.departure_airport ||
                           event.arrival_airport ||
                           event.duration_minutes ||
@@ -2560,6 +2643,10 @@ export function TripDetailClient({
                               <DetailRow
                                 label="Flugnr."
                                 value={event.flight_number}
+                              />
+                              <DetailRow
+                                label="Klasse"
+                                value={event.cabin_class}
                               />
                               <DetailRow
                                 label="Dauer"
@@ -2881,8 +2968,9 @@ export function TripDetailClient({
           <DialogHeader>
             <DialogTitle>KI-Bild für Aktivität</DialogTitle>
             <DialogDescription>
-              Thumbnail-Format (1024², low quality) — günstiger als das
-              Reise-Cover. Prompt ist vorbelegt und anpassbar.
+              Thumbnail-Format (1024², low quality). Prompt wird aus den
+              aktuellen Einstellungen und den Aktivitätsdaten neu aufgebaut —
+              anpassbar vor dem Erzeugen.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
@@ -2891,8 +2979,11 @@ export function TripDetailClient({
               id="aiImagePrompt"
               rows={8}
               value={aiImagePrompt}
-              onChange={(e) => setAiImagePrompt(e.target.value)}
-              disabled={aiImageBusy}
+              onChange={(e) => {
+                setAiImagePrompt(e.target.value);
+                setAiImagePromptDirty(true);
+              }}
+              disabled={aiImageBusy || aiImagePromptLoading}
             />
           </div>
           <DialogFooter className="gap-2 sm:gap-0">
@@ -2906,7 +2997,11 @@ export function TripDetailClient({
             </Button>
             <Button
               type="button"
-              disabled={aiImageBusy || !aiImagePrompt.trim()}
+              disabled={
+                aiImageBusy ||
+                aiImagePromptLoading ||
+                !aiImagePrompt.trim()
+              }
               onClick={() => void generateAiImage()}
               className="gap-1.5"
             >

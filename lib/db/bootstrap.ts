@@ -207,6 +207,7 @@ function ensureTripsTables(db: Database.Database): void {
     ["document_notes_enriched_at", "TEXT"],
     ["ai_image_path", "TEXT"],
     ["ai_image_prompt", "TEXT"],
+    ["cabin_class", "TEXT"],
   ];
   for (const [name, type] of flightExtraCols) {
     if (!tripEventColNames.has(name)) {

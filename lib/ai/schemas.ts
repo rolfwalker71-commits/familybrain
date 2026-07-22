@@ -82,6 +82,7 @@ export const TravelItemSchema = z.object({
   address: z.string().nullable().optional(),
   booking_reference: z.string().nullable(),
   flight_number: z.string().nullable().optional(),
+  cabin_class: z.string().nullable().optional(),
   price: z.number().nullable(),
   currency: z.string().nullable(),
   /** Ports of call / daily stops (cruise, multi-city trips, etc.) */

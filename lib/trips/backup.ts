@@ -52,6 +52,7 @@ type BackupEvent = {
   sort_key: number;
   source_excerpt: string | null;
   flight_number: string | null;
+  cabin_class: string | null;
   airline: string | null;
   aircraft_reg: string | null;
   aircraft_type: string | null;
@@ -150,6 +151,7 @@ function serializeEvent(event: TripEventRow): BackupEvent {
     sort_key: event.sort_key,
     source_excerpt: event.source_excerpt,
     flight_number: event.flight_number,
+    cabin_class: event.cabin_class,
     airline: event.airline,
     aircraft_reg: event.aircraft_reg,
     aircraft_type: event.aircraft_type,
@@ -321,6 +323,7 @@ export function importTravelBrainBackup(payload: TravelBrainBackup): {
         sortKey: ev.sort_key,
         sourceExcerpt: ev.source_excerpt,
         flightNumber: ev.flight_number,
+        cabinClass: ev.cabin_class,
         airline: ev.airline,
         aircraftReg: ev.aircraft_reg,
         aircraftType: ev.aircraft_type,
