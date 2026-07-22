@@ -359,6 +359,9 @@ function ExpenseCard({
                       if (v == null) return;
                       setEditPayer(v);
                     }}
+                    items={Object.fromEntries(
+                      members.map((m) => [String(m.id), m.display_name])
+                    )}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -769,6 +772,9 @@ function SettlementCard({
                       if (v == null) return;
                       setFromId(v);
                     }}
+                    items={Object.fromEntries(
+                      members.map((m) => [String(m.id), m.display_name])
+                    )}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -790,6 +796,9 @@ function SettlementCard({
                       if (v == null) return;
                       setToId(v);
                     }}
+                    items={Object.fromEntries(
+                      members.map((m) => [String(m.id), m.display_name])
+                    )}
                   >
                     <SelectTrigger>
                       <SelectValue />

@@ -30,6 +30,10 @@ function dayNumber(isoDate: string): string {
   return String(Number(isoDate.slice(8, 10)));
 }
 
+function yearNumber(isoDate: string): string {
+  return isoDate.slice(0, 4);
+}
+
 /** Normalize to YYYY-MM-DD when possible. */
 export function toIsoDateOnly(raw: string | null | undefined): string | null {
   if (!raw) return null;
@@ -76,6 +80,9 @@ export function CalendarDateBadge({
         </div>
         <div className="mt-0.5 text-[21px] font-black leading-none tabular-nums text-foreground sm:text-[25px]">
           {dayNumber(isoDate)}
+        </div>
+        <div className="mt-0.5 text-[12px] font-bold tabular-nums leading-none text-foreground sm:text-[13px]">
+          {yearNumber(isoDate)}
         </div>
         {time ? (
           <div className="mt-0.5 text-[10px] font-bold tabular-nums text-muted-foreground">

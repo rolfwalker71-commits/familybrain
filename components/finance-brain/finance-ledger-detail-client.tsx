@@ -613,6 +613,16 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
   const hasImport =
     importDocs.tripDocuments.length > 0 ||
     importDocs.paperlessItems.length > 0;
+  const memberSelectItems = Object.fromEntries(
+    members.map((m) => [String(m.id), m.display_name])
+  );
+  const tripSelectItems = {
+    __none__: "Keine Reise",
+    ...Object.fromEntries(trips.map((t) => [String(t.id), t.title])),
+  };
+  const currencySelectItems = Object.fromEntries(
+    COMMON_CURRENCIES.map((c) => [c, c])
+  );
 
   return (
     <div className="space-y-6">
@@ -673,6 +683,7 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
                 }
                 setLinkTripId(v);
               }}
+              items={tripSelectItems}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Keine Reise" />
@@ -831,6 +842,7 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
                     if (v == null) return;
                     setImportPayer(v);
                   }}
+                  items={memberSelectItems}
                 >
                   <SelectTrigger className="max-w-xs">
                     <SelectValue />
@@ -899,6 +911,7 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
                 setExpCurrency(v);
                 if (v === ledger.base_currency) setExpRate("1");
               }}
+              items={currencySelectItems}
             >
               <SelectTrigger>
                 <SelectValue />
@@ -943,6 +956,7 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
                 if (v == null) return;
                 setExpPayer(v);
               }}
+              items={memberSelectItems}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Person" />
@@ -1012,6 +1026,7 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
                 if (v == null) return;
                 setSetFrom(v);
               }}
+              items={memberSelectItems}
             >
               <SelectTrigger>
                 <SelectValue />
@@ -1033,6 +1048,7 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
                 if (v == null) return;
                 setSetTo(v);
               }}
+              items={memberSelectItems}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Empfänger" />

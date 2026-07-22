@@ -129,6 +129,7 @@ export function FinanceLedgersListClient() {
                 if (v == null) return;
                 setBaseCurrency(v);
               }}
+              items={Object.fromEntries(COMMON_CURRENCIES.map((c) => [c, c]))}
             >
               <SelectTrigger>
                 <SelectValue />

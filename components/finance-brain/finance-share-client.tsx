@@ -374,6 +374,18 @@ export function FinanceShareClient({ token }: { token: string }) {
   const { member, ledger, members, expenses, settlements, balances, simplifiedDebts } =
     data;
   const others = members.filter((m) => m.id !== member.id);
+  const memberSelectItems = Object.fromEntries(
+    members.map((m) => [
+      String(m.id),
+      m.id === member.id ? `${m.display_name} (ich)` : m.display_name,
+    ])
+  );
+  const otherSelectItems = Object.fromEntries(
+    others.map((m) => [String(m.id), m.display_name])
+  );
+  const currencySelectItems = Object.fromEntries(
+    COMMON_CURRENCIES.map((c) => [c, c])
+  );
 
   return (
     <div className="mx-auto max-w-lg space-y-4 px-4 py-6 pb-24">
@@ -425,6 +437,7 @@ export function FinanceShareClient({ token }: { token: string }) {
                   if (v == null) return;
                   setExpCurrency(v);
                 }}
+                items={currencySelectItems}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -472,6 +485,7 @@ export function FinanceShareClient({ token }: { token: string }) {
                 if (v == null) return;
                 setExpPayer(v);
               }}
+              items={memberSelectItems}
             >
               <SelectTrigger>
                 <SelectValue />
@@ -538,6 +552,7 @@ export function FinanceShareClient({ token }: { token: string }) {
                   if (v == null) return;
                   setSetTo(v);
                 }}
+                items={otherSelectItems}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Empfänger" />
