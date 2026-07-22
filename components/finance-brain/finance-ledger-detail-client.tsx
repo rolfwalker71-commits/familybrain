@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -73,6 +73,9 @@ type LedgerDetail = {
     paid_by_member_id: number;
     category_label?: string | null;
     category_tone?: string | null;
+    place_name?: string | null;
+    place_lat?: number | null;
+    place_lon?: number | null;
     receipt_url?: string | null;
     has_receipt?: boolean;
     ai_image_url?: string | null;
@@ -139,10 +142,13 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
   const [expRate, setExpRate] = useState("1");
   const [expDesc, setExpDesc] = useState("");
   const [expDate, setExpDate] = useState("");
+  const [expPlace, setExpPlace] = useState("");
   const [expPayer, setExpPayer] = useState<string>("");
   const [rateLoading, setRateLoading] = useState(false);
   const [pendingReceipt, setPendingReceipt] = useState<File | null>(null);
   const [aiImageBusyId, setAiImageBusyId] = useState<number | null>(null);
+  const [editBusyId, setEditBusyId] = useState<number | null>(null);
+  const aiAttemptedRef = useRef<Set<number>>(new Set());
 
   const [setAmount, setSetAmount] = useState("");
   const [setFrom, setSetFrom] = useState<string>("");
@@ -219,6 +225,18 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
     void loadImport();
     void loadTrips();
   }, [load, loadImport, loadTrips]);
+
+  useEffect(() => {
+    if (!data || aiImageBusyId != null) return;
+    const missing = data.expenses.find(
+      (e) => !e.ai_image_url && !aiAttemptedRef.current.has(e.id)
+    );
+    if (!missing) return;
+    aiAttemptedRef.current.add(missing.id);
+    void generateAiImage(missing.id, missing.place_name);
+    // Intentionally only depend on data/busy — generateAiImage closes over latest ledgerId.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, aiImageBusyId]);
 
   async function fetchEcbRate() {
     if (!data) return;
@@ -330,6 +348,7 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
           exchangeRate: Number(expRate) || 1,
           description: expDesc.trim() || null,
           expenseDate: expDate || null,
+          place: expPlace.trim() || null,
           split: { mode: "equal" },
         }),
       });
@@ -348,11 +367,13 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
         }
       }
       if (json.expense?.id) {
-        void generateAiImage(json.expense.id);
+        aiAttemptedRef.current.add(json.expense.id);
+        void generateAiImage(json.expense.id, expPlace.trim() || null);
       }
       setExpAmount("");
       setExpDesc("");
       setExpDate("");
+      setExpPlace("");
       setPendingReceipt(null);
       await load();
     } catch (err) {
@@ -360,7 +381,7 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
     }
   }
 
-  async function generateAiImage(expenseId: number) {
+  async function generateAiImage(expenseId: number, place?: string | null) {
     setAiImageBusyId(expenseId);
     try {
       const res = await fetch(
@@ -368,7 +389,7 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ useSettings: true }),
+          body: JSON.stringify({ useSettings: true, place: place ?? undefined }),
         }
       );
       const json = await res.json();
@@ -378,6 +399,57 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setAiImageBusyId(null);
+    }
+  }
+
+  async function deleteAiImage(expenseId: number) {
+    setAiImageBusyId(expenseId);
+    try {
+      const res = await fetch(
+        `/api/finance-ledgers/${ledgerId}/expenses/${expenseId}/ai-image`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ delete: true }),
+        }
+      );
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Löschen fehlgeschlagen");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setAiImageBusyId(null);
+    }
+  }
+
+  async function updateExpense(
+    expenseId: number,
+    payload: {
+      description: string | null;
+      expenseDate: string | null;
+      paidByMemberId: number;
+      place: string | null;
+    }
+  ) {
+    setEditBusyId(expenseId);
+    try {
+      const res = await fetch(
+        `/api/finance-ledgers/${ledgerId}/expenses/${expenseId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }
+      );
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Speichern fehlgeschlagen");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      throw err;
+    } finally {
+      setEditBusyId(null);
     }
   }
 
@@ -405,6 +477,55 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
       setSetAmount("");
       setSetNote("");
       setStatus("Rückzahlung erfasst – Saldo aktualisiert.");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function updateSettlement(
+    settlementId: number,
+    payload: {
+      fromMemberId: number;
+      toMemberId: number;
+      amount: number;
+      note: string | null;
+      settledAt: string | null;
+    }
+  ) {
+    setEditBusyId(settlementId);
+    try {
+      const res = await fetch(
+        `/api/finance-ledgers/${ledgerId}/settlements/${settlementId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...payload,
+            currency: data?.ledger.base_currency,
+          }),
+        }
+      );
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Speichern fehlgeschlagen");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      throw err;
+    } finally {
+      setEditBusyId(null);
+    }
+  }
+
+  async function deleteSettlement(settlementId: number) {
+    if (!window.confirm("Rückzahlung löschen?")) return;
+    try {
+      const res = await fetch(
+        `/api/finance-ledgers/${ledgerId}/settlements/${settlementId}`,
+        { method: "DELETE" }
+      );
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Fehler");
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -439,6 +560,10 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Import fehlgeschlagen");
+      if (json.expense?.id) {
+        aiAttemptedRef.current.add(json.expense.id);
+        void generateAiImage(json.expense.id);
+      }
       setStatus("Beleg importiert.");
       await load();
     } catch (err) {
@@ -838,6 +963,14 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
               onChange={(e) => setExpDesc(e.target.value)}
             />
           </div>
+          <div className="space-y-1 sm:col-span-2">
+            <Label>Ort (optional)</Label>
+            <Input
+              value={expPlace}
+              onChange={(e) => setExpPlace(e.target.value)}
+              placeholder="Restaurant, Stadt…"
+            />
+          </div>
           <div className="space-y-1">
             <Label>Datum</Label>
             <Input
@@ -947,13 +1080,17 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
           members={members}
           baseCurrency={ledger.base_currency}
           canDelete
+          canEdit
           onDelete={(id) => void deleteExpense(id)}
           receiptUploadUrl={(expenseId) =>
             `/api/finance-ledgers/${ledgerId}/expenses/${expenseId}/receipt`
           }
           onReceiptChanged={() => void load()}
           onGenerateAiImage={(id) => void generateAiImage(id)}
+          onDeleteAiImage={(id) => void deleteAiImage(id)}
+          onUpdateExpense={(id, payload) => updateExpense(id, payload)}
           aiImageBusyId={aiImageBusyId}
+          editBusyId={editBusyId}
         />
       </SectionCard>
 
@@ -962,6 +1099,11 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
           settlements={settlements}
           members={members}
           baseCurrency={ledger.base_currency}
+          canEdit
+          canDelete
+          onUpdate={(id, payload) => updateSettlement(id, payload)}
+          onDelete={(id) => void deleteSettlement(id)}
+          editBusyId={editBusyId}
         />
       </SectionCard>
     </div>

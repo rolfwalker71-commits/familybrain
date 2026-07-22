@@ -50,6 +50,9 @@ export type FinanceExpenseRow = {
   category_tone: string | null;
   ai_image_path: string | null;
   ai_image_prompt: string | null;
+  place_name: string | null;
+  place_lat: number | null;
+  place_lon: number | null;
   split_mode: string;
   created_at: string;
   updated_at: string;
@@ -376,6 +379,9 @@ export function createFinanceExpense(
     expenseDate?: string | null;
     documentId?: number | null;
     tripEventId?: number | null;
+    placeName?: string | null;
+    placeLat?: number | null;
+    placeLon?: number | null;
     split: ExpenseSplitInput;
   }
 ): FinanceExpenseRow {
@@ -407,8 +413,9 @@ export function createFinanceExpense(
          ledger_id, paid_by_member_id, created_by_member_id,
          amount, currency, exchange_rate, amount_base,
          description, expense_date, document_id, trip_event_id,
+         place_name, place_lat, place_lon,
          split_mode, created_at, updated_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       ledgerId,
@@ -422,6 +429,9 @@ export function createFinanceExpense(
       input.expenseDate || null,
       input.documentId ?? null,
       input.tripEventId ?? null,
+      input.placeName?.trim() || null,
+      input.placeLat ?? null,
+      input.placeLon ?? null,
       input.split.mode,
       ts,
       ts
@@ -509,6 +519,78 @@ export function setFinanceExpenseCategory(
        updated_at = ?
      WHERE id = ?`
   ).run(input.categoryLabel, input.categoryTone, nowIso(), expenseId);
+  touchLedger(existing.ledger_id);
+  return getFinanceExpenseById(expenseId)!;
+}
+
+/** Update metadata only — amount/currency/splits stay fixed. */
+export function updateFinanceExpense(
+  expenseId: number,
+  input: {
+    description?: string | null;
+    expenseDate?: string | null;
+    paidByMemberId?: number;
+    placeName?: string | null;
+    placeLat?: number | null;
+    placeLon?: number | null;
+  }
+): FinanceExpenseRow {
+  const existing = getFinanceExpenseById(expenseId);
+  if (!existing) throw new Error("Ausgabe nicht gefunden");
+
+  const paidByMemberId = input.paidByMemberId ?? existing.paid_by_member_id;
+  const payer = getFinanceLedgerMemberById(paidByMemberId);
+  if (!payer || payer.ledger_id !== existing.ledger_id) {
+    throw new Error("Zahler nicht in dieser Abrechnung");
+  }
+
+  const description =
+    input.description !== undefined
+      ? input.description?.trim() || null
+      : existing.description;
+  const expenseDate =
+    input.expenseDate !== undefined
+      ? input.expenseDate || null
+      : existing.expense_date;
+
+  let placeName = existing.place_name;
+  let placeLat = existing.place_lat;
+  let placeLon = existing.place_lon;
+  if (input.placeName !== undefined) {
+    placeName = input.placeName?.trim() || null;
+    if (input.placeLat !== undefined || input.placeLon !== undefined) {
+      placeLat = input.placeLat ?? null;
+      placeLon = input.placeLon ?? null;
+    } else if (!placeName) {
+      placeLat = null;
+      placeLon = null;
+    }
+  } else if (input.placeLat !== undefined || input.placeLon !== undefined) {
+    placeLat = input.placeLat ?? null;
+    placeLon = input.placeLon ?? null;
+  }
+
+  const db = getDb();
+  db.prepare(
+    `UPDATE finance_expenses SET
+       paid_by_member_id = ?,
+       description = ?,
+       expense_date = ?,
+       place_name = ?,
+       place_lat = ?,
+       place_lon = ?,
+       updated_at = ?
+     WHERE id = ?`
+  ).run(
+    paidByMemberId,
+    description,
+    expenseDate,
+    placeName,
+    placeLat,
+    placeLon,
+    nowIso(),
+    expenseId
+  );
   touchLedger(existing.ledger_id);
   return getFinanceExpenseById(expenseId)!;
 }
@@ -639,6 +721,96 @@ export function createFinanceSettlement(
   return db
     .prepare(`SELECT * FROM finance_settlements WHERE id = ?`)
     .get(Number(result.lastInsertRowid)) as FinanceSettlementRow;
+}
+
+export function getFinanceSettlementById(
+  settlementId: number
+): FinanceSettlementRow | null {
+  const db = getDb();
+  const row = db
+    .prepare(`SELECT * FROM finance_settlements WHERE id = ?`)
+    .get(settlementId) as FinanceSettlementRow | undefined;
+  return row ?? null;
+}
+
+export function updateFinanceSettlement(
+  settlementId: number,
+  input: {
+    fromMemberId?: number;
+    toMemberId?: number;
+    amount?: number;
+    currency?: string;
+    exchangeRate?: number;
+    note?: string | null;
+    settledAt?: string | null;
+  }
+): FinanceSettlementRow {
+  const existing = getFinanceSettlementById(settlementId);
+  if (!existing) throw new Error("Rückzahlung nicht gefunden");
+  const ledger = getFinanceLedgerById(existing.ledger_id);
+  if (!ledger) throw new Error("Abrechnung nicht gefunden");
+
+  const fromMemberId = input.fromMemberId ?? existing.from_member_id;
+  const toMemberId = input.toMemberId ?? existing.to_member_id;
+  if (fromMemberId === toMemberId) {
+    throw new Error("Absender und Empfänger müssen unterschiedlich sein");
+  }
+  const from = getFinanceLedgerMemberById(fromMemberId);
+  const to = getFinanceLedgerMemberById(toMemberId);
+  if (
+    !from ||
+    !to ||
+    from.ledger_id !== existing.ledger_id ||
+    to.ledger_id !== existing.ledger_id
+  ) {
+    throw new Error("Teilnehmer nicht in dieser Abrechnung");
+  }
+
+  const currency = (input.currency ?? existing.currency).trim().toUpperCase();
+  const exchangeRate =
+    currency === ledger.base_currency
+      ? 1
+      : (input.exchangeRate ?? existing.exchange_rate);
+  const amount = input.amount ?? existing.amount;
+  if (!(amount > 0)) throw new Error("Betrag muss positiv sein");
+  const amountBase = toBaseAmount(
+    amount,
+    currency,
+    ledger.base_currency,
+    exchangeRate
+  );
+  const note =
+    input.note !== undefined ? input.note?.trim() || null : existing.note;
+  const settledAt =
+    input.settledAt !== undefined
+      ? input.settledAt || existing.settled_at
+      : existing.settled_at;
+
+  const db = getDb();
+  db.prepare(
+    `UPDATE finance_settlements SET
+       from_member_id = ?,
+       to_member_id = ?,
+       amount = ?,
+       currency = ?,
+       exchange_rate = ?,
+       amount_base = ?,
+       note = ?,
+       settled_at = ?
+     WHERE id = ?`
+  ).run(
+    fromMemberId,
+    toMemberId,
+    amount,
+    currency,
+    exchangeRate,
+    amountBase,
+    note,
+    settledAt,
+    settlementId
+  );
+  touchLedger(existing.ledger_id);
+  return getFinanceSettlementById(settlementId)!;
 }
 
 export function deleteFinanceSettlement(settlementId: number): void {

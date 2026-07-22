@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { classifyAndStoreExpenseCategory } from "@/lib/finance-brain/expense-classify";
+import { geocodePlace } from "@/lib/finance-brain/geocode";
 import {
   createFinanceExpense,
   getFinanceLedgerMemberByToken,
@@ -41,6 +42,20 @@ export async function POST(request: Request, context: Ctx) {
       return NextResponse.json({ error: "Ungültige Eingabe" }, { status: 400 });
     }
     const paidByMemberId = parsed.data.paidByMemberId ?? member.id;
+
+    const placeRaw = parsed.data.place?.trim() || null;
+    let placeLat: number | null = null;
+    let placeLon: number | null = null;
+    let placeName = placeRaw;
+    if (placeRaw) {
+      const geo = await geocodePlace(placeRaw);
+      if (geo) {
+        placeLat = geo.lat;
+        placeLon = geo.lon;
+        placeName = placeRaw;
+      }
+    }
+
     let expense = createFinanceExpense(member.ledger_id, {
       paidByMemberId,
       createdByMemberId: member.id,
@@ -49,15 +64,15 @@ export async function POST(request: Request, context: Ctx) {
       exchangeRate: parsed.data.exchangeRate,
       description: parsed.data.description ?? null,
       expenseDate: parsed.data.expenseDate ?? null,
+      placeName,
+      placeLat,
+      placeLon,
       split: {
         mode: "equal",
         memberIds: parsed.data.memberIds ?? [],
       },
     });
-    expense = await classifyAndStoreExpenseCategory(
-      expense,
-      parsed.data.place
-    );
+    expense = await classifyAndStoreExpenseCategory(expense, placeName);
     return NextResponse.json({
       ok: true,
       expense: serializeExpense(expense, listFinanceExpenseSplits(expense.id), {

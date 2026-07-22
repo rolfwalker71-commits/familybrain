@@ -3,9 +3,8 @@ import { z } from "zod";
 import { classifyAndStoreExpenseCategory } from "@/lib/finance-brain/expense-classify";
 import { geocodePlace } from "@/lib/finance-brain/geocode";
 import {
-  deleteFinanceExpense,
   getFinanceExpenseById,
-  getFinanceLedgerById,
+  getFinanceLedgerMemberByToken,
   listFinanceExpenseSplits,
   updateFinanceExpense,
 } from "@/lib/finance-brain/queries";
@@ -15,7 +14,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-type Ctx = { params: Promise<{ id: string; expenseId: string }> };
+type Ctx = { params: Promise<{ token: string; expenseId: string }> };
 
 const PatchSchema = z.object({
   description: z.string().max(500).nullable().optional(),
@@ -26,14 +25,17 @@ const PatchSchema = z.object({
 
 export async function PATCH(request: Request, context: Ctx) {
   try {
-    const { id: idRaw, expenseId: expenseIdRaw } = await context.params;
-    const ledgerId = Number(idRaw);
-    const expenseId = Number(expenseIdRaw);
-    if (!getFinanceLedgerById(ledgerId)) {
-      return NextResponse.json({ error: "Abrechnung nicht gefunden" }, { status: 404 });
+    const { token, expenseId: expenseIdRaw } = await context.params;
+    const member = getFinanceLedgerMemberByToken(token);
+    if (!member) {
+      return NextResponse.json(
+        { error: "Einladungs-Link ungültig oder widerrufen." },
+        { status: 404 }
+      );
     }
+    const expenseId = Number(expenseIdRaw);
     const existing = getFinanceExpenseById(expenseId);
-    if (!existing || existing.ledger_id !== ledgerId) {
+    if (!existing || existing.ledger_id !== member.ledger_id) {
       return NextResponse.json({ error: "Ausgabe nicht gefunden" }, { status: 404 });
     }
 
@@ -74,28 +76,10 @@ export async function PATCH(request: Request, context: Ctx) {
     );
     return NextResponse.json({
       ok: true,
-      expense: serializeExpense(expense, listFinanceExpenseSplits(expenseId)),
+      expense: serializeExpense(expense, listFinanceExpenseSplits(expenseId), {
+        shareToken: token,
+      }),
     });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return NextResponse.json({ error: message }, { status: 500 });
-  }
-}
-
-export async function DELETE(_request: Request, context: Ctx) {
-  try {
-    const { id: idRaw, expenseId: expenseIdRaw } = await context.params;
-    const ledgerId = Number(idRaw);
-    const expenseId = Number(expenseIdRaw);
-    if (!getFinanceLedgerById(ledgerId)) {
-      return NextResponse.json({ error: "Abrechnung nicht gefunden" }, { status: 404 });
-    }
-    const expense = getFinanceExpenseById(expenseId);
-    if (!expense || expense.ledger_id !== ledgerId) {
-      return NextResponse.json({ error: "Ausgabe nicht gefunden" }, { status: 404 });
-    }
-    deleteFinanceExpense(expenseId);
-    return NextResponse.json({ ok: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return NextResponse.json({ error: message }, { status: 500 });

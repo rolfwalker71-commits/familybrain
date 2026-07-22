@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Download, Plus, Receipt, RefreshCw, ArrowLeftRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -43,6 +43,9 @@ type ShareData = {
     paid_by_member_id: number;
     category_label?: string | null;
     category_tone?: string | null;
+    place_name?: string | null;
+    place_lat?: number | null;
+    place_lon?: number | null;
     receipt_url?: string | null;
     has_receipt?: boolean;
     ai_image_url?: string | null;
@@ -87,6 +90,7 @@ export function FinanceShareClient({ token }: { token: string }) {
   const [expRate, setExpRate] = useState("1");
   const [expDesc, setExpDesc] = useState("");
   const [expDate, setExpDate] = useState("");
+  const [expPlace, setExpPlace] = useState("");
   const [expPayer, setExpPayer] = useState<string>("");
 
   const [setAmount, setSetAmount] = useState("");
@@ -95,6 +99,8 @@ export function FinanceShareClient({ token }: { token: string }) {
   const [rateLoading, setRateLoading] = useState(false);
   const [pendingReceipt, setPendingReceipt] = useState<File | null>(null);
   const [aiImageBusyId, setAiImageBusyId] = useState<number | null>(null);
+  const [editBusyId, setEditBusyId] = useState<number | null>(null);
+  const aiAttemptedRef = useRef<Set<number>>(new Set());
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -116,6 +122,17 @@ export function FinanceShareClient({ token }: { token: string }) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (!data || aiImageBusyId != null) return;
+    const missing = data.expenses.find(
+      (e) => !e.ai_image_url && !aiAttemptedRef.current.has(e.id)
+    );
+    if (!missing) return;
+    aiAttemptedRef.current.add(missing.id);
+    void generateAiImage(missing.id, missing.place_name);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, aiImageBusyId]);
 
   async function fetchEcbRate() {
     if (!data) return;
@@ -157,6 +174,7 @@ export function FinanceShareClient({ token }: { token: string }) {
             exchangeRate: Number(expRate) || 1,
             description: expDesc.trim() || null,
             expenseDate: expDate || null,
+            place: expPlace.trim() || null,
             paidByMemberId: expPayer ? Number(expPayer) : undefined,
           }),
         }
@@ -176,11 +194,13 @@ export function FinanceShareClient({ token }: { token: string }) {
         }
       }
       if (json.expense?.id) {
-        void generateAiImage(json.expense.id);
+        aiAttemptedRef.current.add(json.expense.id);
+        void generateAiImage(json.expense.id, expPlace.trim() || null);
       }
       setExpAmount("");
       setExpDesc("");
       setExpDate("");
+      setExpPlace("");
       setPendingReceipt(null);
       await load();
     } catch (err) {
@@ -188,7 +208,7 @@ export function FinanceShareClient({ token }: { token: string }) {
     }
   }
 
-  async function generateAiImage(expenseId: number) {
+  async function generateAiImage(expenseId: number, place?: string | null) {
     setAiImageBusyId(expenseId);
     try {
       const res = await fetch(
@@ -196,7 +216,7 @@ export function FinanceShareClient({ token }: { token: string }) {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({}),
+          body: JSON.stringify({ place: place ?? undefined }),
         }
       );
       const json = await res.json();
@@ -206,6 +226,57 @@ export function FinanceShareClient({ token }: { token: string }) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setAiImageBusyId(null);
+    }
+  }
+
+  async function deleteAiImage(expenseId: number) {
+    setAiImageBusyId(expenseId);
+    try {
+      const res = await fetch(
+        `/api/share/f/${encodeURIComponent(token)}/expenses/${expenseId}/ai-image`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ delete: true }),
+        }
+      );
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Löschen fehlgeschlagen");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setAiImageBusyId(null);
+    }
+  }
+
+  async function updateExpense(
+    expenseId: number,
+    payload: {
+      description: string | null;
+      expenseDate: string | null;
+      paidByMemberId: number;
+      place: string | null;
+    }
+  ) {
+    setEditBusyId(expenseId);
+    try {
+      const res = await fetch(
+        `/api/share/f/${encodeURIComponent(token)}/expenses/${expenseId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }
+      );
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Speichern fehlgeschlagen");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      throw err;
+    } finally {
+      setEditBusyId(null);
     }
   }
 
@@ -230,6 +301,55 @@ export function FinanceShareClient({ token }: { token: string }) {
       if (!res.ok) throw new Error(json.error || "Fehler");
       setSetAmount("");
       setSetNote("");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function updateSettlement(
+    settlementId: number,
+    payload: {
+      fromMemberId: number;
+      toMemberId: number;
+      amount: number;
+      note: string | null;
+      settledAt: string | null;
+    }
+  ) {
+    setEditBusyId(settlementId);
+    try {
+      const res = await fetch(
+        `/api/share/f/${encodeURIComponent(token)}/settlements/${settlementId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...payload,
+            currency: data?.ledger.base_currency,
+          }),
+        }
+      );
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Speichern fehlgeschlagen");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      throw err;
+    } finally {
+      setEditBusyId(null);
+    }
+  }
+
+  async function deleteSettlement(settlementId: number) {
+    if (!window.confirm("Rückzahlung löschen?")) return;
+    try {
+      const res = await fetch(
+        `/api/share/f/${encodeURIComponent(token)}/settlements/${settlementId}`,
+        { method: "DELETE" }
+      );
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Fehler");
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -375,6 +495,14 @@ export function FinanceShareClient({ token }: { token: string }) {
             />
           </div>
           <div className="space-y-1">
+            <Label>Ort (optional)</Label>
+            <Input
+              value={expPlace}
+              onChange={(e) => setExpPlace(e.target.value)}
+              placeholder="Stadt, Lokal…"
+            />
+          </div>
+          <div className="space-y-1">
             <Label>Datum</Label>
             <Input
               type="date"
@@ -457,12 +585,16 @@ export function FinanceShareClient({ token }: { token: string }) {
           expenses={expenses}
           members={members}
           baseCurrency={ledger.base_currency}
+          canEdit
           receiptUploadUrl={(expenseId) =>
             `/api/share/f/${encodeURIComponent(token)}/expenses/${expenseId}/receipt`
           }
           onReceiptChanged={() => void load()}
           onGenerateAiImage={(id) => void generateAiImage(id)}
+          onDeleteAiImage={(id) => void deleteAiImage(id)}
+          onUpdateExpense={(id, payload) => updateExpense(id, payload)}
           aiImageBusyId={aiImageBusyId}
+          editBusyId={editBusyId}
         />
       </SectionCard>
 
@@ -471,6 +603,11 @@ export function FinanceShareClient({ token }: { token: string }) {
           settlements={settlements}
           members={members}
           baseCurrency={ledger.base_currency}
+          canEdit
+          canDelete
+          onUpdate={(id, payload) => updateSettlement(id, payload)}
+          onDelete={(id) => void deleteSettlement(id)}
+          editBusyId={editBusyId}
         />
       </SectionCard>
     </div>

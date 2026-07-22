@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { SPLIT_MODES } from "@/lib/finance-brain/constants";
 import { classifyAndStoreExpenseCategory } from "@/lib/finance-brain/expense-classify";
+import { geocodePlace } from "@/lib/finance-brain/geocode";
 import {
   createFinanceExpense,
   getFinanceLedgerById,
@@ -69,6 +70,20 @@ export async function POST(request: Request, context: Ctx) {
     if (!SPLIT_MODES.includes(parsed.data.split.mode)) {
       return NextResponse.json({ error: "Ungültiger Split-Modus" }, { status: 400 });
     }
+
+    const placeRaw = parsed.data.place?.trim() || null;
+    let placeLat: number | null = null;
+    let placeLon: number | null = null;
+    let placeName = placeRaw;
+    if (placeRaw) {
+      const geo = await geocodePlace(placeRaw);
+      if (geo) {
+        placeLat = geo.lat;
+        placeLon = geo.lon;
+        placeName = placeRaw;
+      }
+    }
+
     let expense = createFinanceExpense(id, {
       paidByMemberId: parsed.data.paidByMemberId,
       createdByMemberId: parsed.data.createdByMemberId ?? null,
@@ -79,6 +94,9 @@ export async function POST(request: Request, context: Ctx) {
       expenseDate: parsed.data.expenseDate ?? null,
       documentId: parsed.data.documentId ?? null,
       tripEventId: parsed.data.tripEventId ?? null,
+      placeName,
+      placeLat,
+      placeLon,
       split: {
         ...parsed.data.split,
         memberIds:
@@ -87,10 +105,7 @@ export async function POST(request: Request, context: Ctx) {
             : undefined,
       } as import("@/lib/finance-brain/queries").ExpenseSplitInput,
     });
-    expense = await classifyAndStoreExpenseCategory(
-      expense,
-      parsed.data.place
-    );
+    expense = await classifyAndStoreExpenseCategory(expense, placeName);
     return NextResponse.json({
       ok: true,
       expense: serializeExpense(expense, listFinanceExpenseSplits(expense.id)),

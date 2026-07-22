@@ -78,7 +78,7 @@ export async function generateExpenseAiImage(
         amount: expense.amount,
         currency: expense.currency,
         expenseDate: expense.expense_date,
-        place: options?.place,
+        place: options?.place ?? expense.place_name,
         paidByName: payer?.display_name,
         scene: sceneForExpenseCategory(category),
       },

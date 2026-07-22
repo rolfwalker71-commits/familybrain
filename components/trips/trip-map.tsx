@@ -24,6 +24,8 @@ type Props = {
   heightClassName?: string;
   /** Override settings; otherwise loaded from /api/settings */
   mapStyle?: MapStyleId;
+  /** Hide attribution footer (e.g. mini thumbnails) */
+  compact?: boolean;
 };
 
 function toRad(d: number) {
@@ -161,6 +163,7 @@ export function TripMap({
   className,
   heightClassName = "h-40",
   mapStyle: mapStyleProp,
+  compact = false,
 }: Props) {
   const mapId = useId().replace(/:/g, "");
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -313,28 +316,30 @@ export function TripMap({
         id={`trip-map-${mapId}`}
         className={cn("w-full bg-muted/30", heightClassName)}
       />
-      <div className="flex items-center justify-between gap-2 px-2 py-1 text-[10px] text-muted-foreground">
-        <span>{attribution}</span>
-        {valid.length === 1 ? (
-          <a
-            href={`https://www.openstreetmap.org/?mlat=${valid[0].lat}&mlon=${valid[0].lon}#map=15/${valid[0].lat}/${valid[0].lon}`}
-            target="_blank"
-            rel="noreferrer"
-            className="hover:underline"
-          >
-            Grössere Karte
-          </a>
-        ) : valid.length >= 2 ? (
-          <a
-            href={`https://www.openstreetmap.org/?mlat=${valid[0].lat}&mlon=${valid[0].lon}#map=5/${valid[0].lat}/${valid[0].lon}`}
-            target="_blank"
-            rel="noreferrer"
-            className="hover:underline"
-          >
-            Grössere Karte
-          </a>
-        ) : null}
-      </div>
+      {!compact ? (
+        <div className="flex items-center justify-between gap-2 px-2 py-1 text-[10px] text-muted-foreground">
+          <span>{attribution}</span>
+          {valid.length === 1 ? (
+            <a
+              href={`https://www.openstreetmap.org/?mlat=${valid[0].lat}&mlon=${valid[0].lon}#map=15/${valid[0].lat}/${valid[0].lon}`}
+              target="_blank"
+              rel="noreferrer"
+              className="hover:underline"
+            >
+              Grössere Karte
+            </a>
+          ) : valid.length >= 2 ? (
+            <a
+              href={`https://www.openstreetmap.org/?mlat=${valid[0].lat}&mlon=${valid[0].lon}#map=5/${valid[0].lat}/${valid[0].lon}`}
+              target="_blank"
+              rel="noreferrer"
+              className="hover:underline"
+            >
+              Grössere Karte
+            </a>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }

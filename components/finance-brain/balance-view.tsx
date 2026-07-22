@@ -1,15 +1,43 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
-import { ArrowLeftRight, Scale, Users } from "lucide-react";
+import {
+  ArrowLeftRight,
+  MapPin,
+  Maximize2,
+  Pencil,
+  RefreshCw,
+  Scale,
+  Trash2,
+  Users,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { formatMoney, formatSignedMoney } from "@/lib/finance-brain/format";
 import {
   expenseVisualForExpense,
   settlementVisual,
 } from "@/lib/finance-brain/expense-category";
 import { ExpenseReceiptControls } from "@/components/finance-brain/expense-receipt-controls";
+import { TripMap } from "@/components/trips/trip-map";
 import {
   IconCircle,
   toneSurface,
@@ -33,6 +61,33 @@ type Debt = {
   toMemberId: number;
   toDisplayName: string;
   amount: number;
+};
+
+export type ExpenseListItem = {
+  id: number;
+  description: string | null;
+  amount: number;
+  currency: string;
+  amount_base: number;
+  expense_date: string | null;
+  paid_by_member_id: number;
+  category_label?: string | null;
+  category_tone?: string | null;
+  place_name?: string | null;
+  place_lat?: number | null;
+  place_lon?: number | null;
+  receipt_url?: string | null;
+  has_receipt?: boolean;
+  ai_image_url?: string | null;
+  has_ai_image?: boolean;
+  splits: Array<{ member_id: number; share_amount_base: number }>;
+};
+
+export type ExpenseEditPayload = {
+  description: string | null;
+  expenseDate: string | null;
+  paidByMemberId: number;
+  place: string | null;
 };
 
 export function BalanceView({
@@ -119,167 +174,445 @@ export function BalanceView({
   );
 }
 
+function ExpenseCard({
+  exp,
+  members,
+  baseCurrency,
+  onDelete,
+  canDelete,
+  canEdit,
+  receiptUploadUrl,
+  onReceiptChanged,
+  onGenerateAiImage,
+  onDeleteAiImage,
+  onUpdate,
+  aiImageBusy,
+  editBusy,
+}: {
+  exp: ExpenseListItem;
+  members: Array<{ id: number; display_name: string }>;
+  baseCurrency: string;
+  onDelete?: (id: number) => void;
+  canDelete?: boolean;
+  canEdit?: boolean;
+  receiptUploadUrl?: string;
+  onReceiptChanged?: () => void;
+  onGenerateAiImage?: (expenseId: number) => void;
+  onDeleteAiImage?: (expenseId: number) => void;
+  onUpdate?: (expenseId: number, payload: ExpenseEditPayload) => Promise<void>;
+  aiImageBusy?: boolean;
+  editBusy?: boolean;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [zoomOpen, setZoomOpen] = useState(false);
+  const [editDesc, setEditDesc] = useState(exp.description || "");
+  const [editDate, setEditDate] = useState(exp.expense_date || "");
+  const [editPayer, setEditPayer] = useState(String(exp.paid_by_member_id));
+  const [editPlace, setEditPlace] = useState(exp.place_name || "");
+
+  const memberName = (id: number) =>
+    members.find((m) => m.id === id)?.display_name ?? `#${id}`;
+
+  const visual = expenseVisualForExpense(exp);
+  const surface = toneSurface(visual.tone);
+  const hasCoords =
+    exp.place_lat != null &&
+    exp.place_lon != null &&
+    Number.isFinite(exp.place_lat) &&
+    Number.isFinite(exp.place_lon);
+
+  function startEdit() {
+    setEditDesc(exp.description || "");
+    setEditDate(exp.expense_date || "");
+    setEditPayer(String(exp.paid_by_member_id));
+    setEditPlace(exp.place_name || "");
+    setEditing(true);
+  }
+
+  async function saveEdit() {
+    if (!onUpdate) return;
+    await onUpdate(exp.id, {
+      description: editDesc.trim() || null,
+      expenseDate: editDate || null,
+      paidByMemberId: Number(editPayer),
+      place: editPlace.trim() || null,
+    });
+    setEditing(false);
+  }
+
+  return (
+    <div className="relative pl-5 sm:pl-6">
+      <IconCircle
+        icon={visual.icon}
+        tone={visual.tone}
+        size="md"
+        className="absolute left-0 top-1 z-10 border-2 border-foreground/15 shadow-md"
+      />
+      <div
+        className={cn(
+          "rounded-md border-2 py-2.5 pl-7 pr-3 text-sm shadow-sm sm:pl-8",
+          surface.body
+        )}
+      >
+        <div className="flex items-start gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-base font-bold leading-snug text-foreground">
+              {exp.description || "Ausgabe"}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              <span
+                className={cn(
+                  "mr-1.5 inline-flex rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+                  surface.soft
+                )}
+              >
+                {visual.label}
+              </span>
+              Bezahlt von {memberName(exp.paid_by_member_id)} ·{" "}
+              {formatMoney(exp.amount, exp.currency)}
+              {exp.currency !== baseCurrency
+                ? ` (${formatMoney(exp.amount_base, baseCurrency)})`
+                : ""}
+              {exp.expense_date ? ` · ${exp.expense_date}` : ""}
+            </p>
+            {exp.place_name ? (
+              <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                <MapPin className="size-3 shrink-0" />
+                <span className="truncate">{exp.place_name}</span>
+              </p>
+            ) : null}
+
+            {editing && canEdit && onUpdate ? (
+              <div className="mt-3 grid gap-2 rounded-md border border-border/50 bg-background/60 p-2.5 sm:grid-cols-2">
+                <div className="space-y-1 sm:col-span-2">
+                  <Label className="text-xs">Beschreibung</Label>
+                  <Input
+                    value={editDesc}
+                    onChange={(e) => setEditDesc(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Datum</Label>
+                  <Input
+                    type="date"
+                    value={editDate}
+                    onChange={(e) => setEditDate(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Bezahlt von</Label>
+                  <Select
+                    value={editPayer}
+                    onValueChange={(v) => {
+                      if (v == null) return;
+                      setEditPayer(v);
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {members.map((m) => (
+                        <SelectItem key={m.id} value={String(m.id)}>
+                          {m.display_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1 sm:col-span-2">
+                  <Label className="text-xs">Ort</Label>
+                  <Input
+                    value={editPlace}
+                    onChange={(e) => setEditPlace(e.target.value)}
+                    placeholder="z. B. Denny’s, Las Vegas"
+                  />
+                </div>
+                <p className="text-[11px] text-muted-foreground sm:col-span-2">
+                  Betrag kann nicht geändert werden — dazu Ausgabe löschen und
+                  neu erfassen.
+                </p>
+                <div className="flex flex-wrap gap-2 sm:col-span-2">
+                  <Button
+                    size="sm"
+                    disabled={editBusy}
+                    onClick={() => void saveEdit()}
+                  >
+                    Speichern
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={editBusy}
+                    onClick={() => setEditing(false)}
+                  >
+                    Abbrechen
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="flex shrink-0 items-start gap-2">
+            {exp.ai_image_url ? (
+              <div className="relative">
+                <button
+                  type="button"
+                  title="Vergrössern"
+                  className="block"
+                  onClick={() => setZoomOpen(true)}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={exp.ai_image_url}
+                    alt=""
+                    className="h-16 w-16 rounded-md border border-foreground/10 object-cover shadow-sm sm:h-[4.5rem] sm:w-[4.5rem]"
+                  />
+                </button>
+                <Button
+                  type="button"
+                  size="icon-xs"
+                  variant="secondary"
+                  className="absolute bottom-1 right-1 size-6 border border-border/70 bg-background/90 shadow-sm"
+                  title="Vergrössern"
+                  onClick={() => setZoomOpen(true)}
+                >
+                  <Maximize2 className="size-3" />
+                </Button>
+              </div>
+            ) : aiImageBusy ? (
+              <div className="flex h-16 w-16 items-center justify-center rounded-md border border-dashed border-foreground/20 bg-background/40 text-[10px] text-muted-foreground sm:h-[4.5rem] sm:w-[4.5rem]">
+                KI…
+              </div>
+            ) : null}
+            {hasCoords ? (
+              <TripMap
+                points={[
+                  {
+                    lat: exp.place_lat!,
+                    lon: exp.place_lon!,
+                    label: exp.place_name || undefined,
+                  },
+                ]}
+                compact
+                className="w-16 shrink-0 sm:w-[4.5rem]"
+                heightClassName="h-16 sm:h-[4.5rem]"
+              />
+            ) : null}
+          </div>
+        </div>
+
+        <div className="mt-2.5 flex flex-wrap items-center gap-2 border-t border-foreground/10 pt-2">
+          {receiptUploadUrl ? (
+            <ExpenseReceiptControls
+              expenseId={exp.id}
+              receiptUrl={exp.receipt_url}
+              uploadUrl={receiptUploadUrl}
+              onChanged={onReceiptChanged}
+              compact
+            />
+          ) : exp.receipt_url ? (
+            <a
+              href={exp.receipt_url}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-block"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={exp.receipt_url}
+                alt="Beleg"
+                className="h-10 w-10 rounded border border-border/60 object-cover"
+              />
+            </a>
+          ) : null}
+
+          {canEdit && onUpdate && !editing ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-7 px-2 text-xs"
+              onClick={startEdit}
+            >
+              <Pencil className="mr-1 size-3.5" />
+              Bearbeiten
+            </Button>
+          ) : null}
+
+          {onGenerateAiImage ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-7 px-2 text-xs"
+              disabled={aiImageBusy}
+              onClick={() => onGenerateAiImage(exp.id)}
+            >
+              <RefreshCw
+                className={cn("mr-1 size-3.5", aiImageBusy && "animate-spin")}
+              />
+              {exp.ai_image_url ? "KI-Bild neu" : "KI-Bild"}
+            </Button>
+          ) : null}
+
+          {exp.ai_image_url && onDeleteAiImage ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-7 px-2 text-xs text-destructive"
+              disabled={aiImageBusy}
+              onClick={() => onDeleteAiImage(exp.id)}
+              title="KI-Bild löschen"
+            >
+              <Trash2 className="mr-1 size-3.5" />
+              KI-Bild
+            </Button>
+          ) : null}
+
+          <div className="ml-auto flex items-center gap-1">
+            {canDelete && onDelete ? (
+              <Button
+                type="button"
+                size="icon-xs"
+                variant="ghost"
+                className="text-destructive hover:text-destructive"
+                title="Ausgabe löschen"
+                onClick={() => onDelete(exp.id)}
+              >
+                <Trash2 className="size-3.5" />
+              </Button>
+            ) : null}
+          </div>
+        </div>
+      </div>
+
+      <Dialog open={zoomOpen} onOpenChange={setZoomOpen}>
+        <DialogContent className="max-h-[90dvh] w-[min(96vw,40rem)] overflow-y-auto sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>{exp.description || "KI-Bild"}</DialogTitle>
+            <DialogDescription>Vergrösserte Ansicht</DialogDescription>
+          </DialogHeader>
+          {exp.ai_image_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={exp.ai_image_url}
+              alt={exp.description || "KI-Bild"}
+              className="mx-auto max-h-[70vh] w-full rounded-md object-contain"
+            />
+          ) : null}
+          {onDeleteAiImage || onGenerateAiImage ? (
+            <DialogFooter className="gap-2 sm:gap-0">
+              {onGenerateAiImage ? (
+                <Button
+                  variant="secondary"
+                  disabled={aiImageBusy}
+                  onClick={() => onGenerateAiImage(exp.id)}
+                >
+                  Neu generieren
+                </Button>
+              ) : null}
+              {onDeleteAiImage ? (
+                <Button
+                  variant="destructive"
+                  disabled={aiImageBusy}
+                  onClick={() => {
+                    onDeleteAiImage(exp.id);
+                    setZoomOpen(false);
+                  }}
+                >
+                  <Trash2 className="mr-1 size-3.5" />
+                  Bild löschen
+                </Button>
+              ) : null}
+            </DialogFooter>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 export function ExpenseList({
   expenses,
   members,
   baseCurrency,
   onDelete,
   canDelete,
+  canEdit,
   receiptUploadUrl,
   onReceiptChanged,
   onGenerateAiImage,
+  onDeleteAiImage,
+  onUpdateExpense,
   aiImageBusyId,
+  editBusyId,
 }: {
-  expenses: Array<{
-    id: number;
-    description: string | null;
-    amount: number;
-    currency: string;
-    amount_base: number;
-    expense_date: string | null;
-    paid_by_member_id: number;
-    category_label?: string | null;
-    category_tone?: string | null;
-    receipt_url?: string | null;
-    has_receipt?: boolean;
-    ai_image_url?: string | null;
-    has_ai_image?: boolean;
-    splits: Array<{ member_id: number; share_amount_base: number }>;
-  }>;
+  expenses: ExpenseListItem[];
   members: Array<{ id: number; display_name: string }>;
   baseCurrency: string;
   onDelete?: (id: number) => void;
   canDelete?: boolean;
+  canEdit?: boolean;
   receiptUploadUrl?: (expenseId: number) => string;
   onReceiptChanged?: () => void;
   onGenerateAiImage?: (expenseId: number) => void;
+  onDeleteAiImage?: (expenseId: number) => void;
+  onUpdateExpense?: (
+    expenseId: number,
+    payload: ExpenseEditPayload
+  ) => Promise<void>;
   aiImageBusyId?: number | null;
+  editBusyId?: number | null;
 }) {
-  const memberName = (id: number) =>
-    members.find((m) => m.id === id)?.display_name ?? `#${id}`;
-
   return (
     <div className="space-y-3">
       {expenses.length === 0 ? (
         <p className="text-sm text-muted-foreground">Noch keine Ausgaben.</p>
       ) : (
-        expenses.map((exp) => {
-          const visual = expenseVisualForExpense(exp);
-          const surface = toneSurface(visual.tone);
-          return (
-            <div key={exp.id} className="relative pl-5 sm:pl-6">
-              <IconCircle
-                icon={visual.icon}
-                tone={visual.tone}
-                size="md"
-                className="absolute left-0 top-1 z-10 border-2 border-foreground/15 shadow-md"
-              />
-              <div
-                className={cn(
-                  "rounded-md border-2 py-2.5 pl-7 pr-3 text-sm shadow-sm sm:pl-8",
-                  surface.body
-                )}
-              >
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-start gap-3">
-                      {exp.ai_image_url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={exp.ai_image_url}
-                          alt=""
-                          className="h-14 w-14 shrink-0 rounded-md border border-foreground/10 object-cover shadow-sm"
-                        />
-                      ) : null}
-                      <div className="min-w-0 flex-1">
-                        <p className="font-semibold">
-                          {exp.description || "Ausgabe"}
-                          {exp.expense_date ? (
-                            <span className="ml-2 text-xs font-normal text-muted-foreground">
-                              {exp.expense_date}
-                            </span>
-                          ) : null}
-                        </p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          <span
-                            className={cn(
-                              "mr-1.5 inline-flex rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
-                              surface.soft
-                            )}
-                          >
-                            {visual.label}
-                          </span>
-                          Bezahlt von {memberName(exp.paid_by_member_id)} ·{" "}
-                          {formatMoney(exp.amount, exp.currency)}
-                          {exp.currency !== baseCurrency
-                            ? ` (${formatMoney(exp.amount_base, baseCurrency)})`
-                            : ""}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="mt-1 flex flex-wrap items-center gap-2">
-                      {receiptUploadUrl ? (
-                        <ExpenseReceiptControls
-                          expenseId={exp.id}
-                          receiptUrl={exp.receipt_url}
-                          uploadUrl={receiptUploadUrl(exp.id)}
-                          onChanged={onReceiptChanged}
-                          compact
-                        />
-                      ) : exp.receipt_url ? (
-                        <a
-                          href={exp.receipt_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-block"
-                        >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={exp.receipt_url}
-                            alt="Beleg"
-                            className="h-10 w-10 rounded border border-border/60 object-cover"
-                          />
-                        </a>
-                      ) : null}
-                      {onGenerateAiImage ? (
-                        <button
-                          type="button"
-                          className="text-xs font-medium text-foreground/80 underline-offset-2 hover:underline"
-                          disabled={aiImageBusyId === exp.id}
-                          onClick={() => onGenerateAiImage(exp.id)}
-                        >
-                          {aiImageBusyId === exp.id
-                            ? "KI-Bild…"
-                            : exp.ai_image_url
-                              ? "KI-Bild neu"
-                              : "KI-Bild"}
-                        </button>
-                      ) : null}
-                    </div>
-                  </div>
-                  {canDelete && onDelete ? (
-                    <button
-                      type="button"
-                      className="text-xs text-destructive hover:underline"
-                      onClick={() => onDelete(exp.id)}
-                    >
-                      Löschen
-                    </button>
-                  ) : null}
-                </div>
-              </div>
-            </div>
-          );
-        })
+        expenses.map((exp) => (
+          <ExpenseCard
+            key={exp.id}
+            exp={exp}
+            members={members}
+            baseCurrency={baseCurrency}
+            canDelete={canDelete}
+            canEdit={canEdit}
+            onDelete={onDelete}
+            receiptUploadUrl={
+              receiptUploadUrl ? receiptUploadUrl(exp.id) : undefined
+            }
+            onReceiptChanged={onReceiptChanged}
+            onGenerateAiImage={onGenerateAiImage}
+            onDeleteAiImage={onDeleteAiImage}
+            onUpdate={onUpdateExpense}
+            aiImageBusy={aiImageBusyId === exp.id}
+            editBusy={editBusyId === exp.id}
+          />
+        ))
       )}
     </div>
   );
 }
 
+export type SettlementEditPayload = {
+  fromMemberId: number;
+  toMemberId: number;
+  amount: number;
+  note: string | null;
+  settledAt: string | null;
+};
+
 export function SettlementList({
   settlements,
   members,
   baseCurrency,
+  canEdit,
+  canDelete,
+  onUpdate,
+  onDelete,
+  editBusyId,
 }: {
   settlements: Array<{
     id: number;
@@ -293,50 +626,254 @@ export function SettlementList({
   }>;
   members: Array<{ id: number; display_name: string }>;
   baseCurrency: string;
+  canEdit?: boolean;
+  canDelete?: boolean;
+  onUpdate?: (
+    settlementId: number,
+    payload: SettlementEditPayload
+  ) => Promise<void>;
+  onDelete?: (settlementId: number) => void;
+  editBusyId?: number | null;
 }) {
-  const memberName = (id: number) =>
-    members.find((m) => m.id === id)?.display_name ?? `#${id}`;
-  const visual = settlementVisual();
-  const surface = toneSurface(visual.tone);
-
   return (
     <div className="space-y-3">
       {settlements.length === 0 ? (
         <p className="text-sm text-muted-foreground">Noch keine Rückzahlungen.</p>
       ) : (
         settlements.map((s) => (
-          <div key={s.id} className="relative pl-5 sm:pl-6">
-            <IconCircle
-              icon={visual.icon}
-              tone={visual.tone}
-              size="md"
-              className="absolute left-0 top-1 z-10 border-2 border-foreground/15 shadow-md"
-            />
-            <div
-              className={cn(
-                "rounded-md border-2 py-2.5 pl-7 pr-3 text-sm shadow-sm sm:pl-8",
-                surface.body
-              )}
-            >
-              <p>
-                <span className="font-medium">{memberName(s.from_member_id)}</span>
-                {" → "}
-                <span className="font-medium">{memberName(s.to_member_id)}</span>
-                {": "}
-                <span className="font-semibold">
-                  {formatMoney(s.amount, s.currency)}
-                </span>
-                {s.currency !== baseCurrency
-                  ? ` (${formatMoney(s.amount_base, baseCurrency)})`
-                  : ""}
-              </p>
-              {s.note ? (
-                <p className="text-xs text-muted-foreground">{s.note}</p>
-              ) : null}
-            </div>
-          </div>
+          <SettlementCard
+            key={s.id}
+            settlement={s}
+            members={members}
+            baseCurrency={baseCurrency}
+            canEdit={canEdit}
+            canDelete={canDelete}
+            onUpdate={onUpdate}
+            onDelete={onDelete}
+            editBusy={editBusyId === s.id}
+          />
         ))
       )}
+    </div>
+  );
+}
+
+function SettlementCard({
+  settlement: s,
+  members,
+  baseCurrency,
+  canEdit,
+  canDelete,
+  onUpdate,
+  onDelete,
+  editBusy,
+}: {
+  settlement: {
+    id: number;
+    from_member_id: number;
+    to_member_id: number;
+    amount: number;
+    currency: string;
+    amount_base: number;
+    note: string | null;
+    settled_at: string;
+  };
+  members: Array<{ id: number; display_name: string }>;
+  baseCurrency: string;
+  canEdit?: boolean;
+  canDelete?: boolean;
+  onUpdate?: (
+    settlementId: number,
+    payload: SettlementEditPayload
+  ) => Promise<void>;
+  onDelete?: (settlementId: number) => void;
+  editBusy?: boolean;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [fromId, setFromId] = useState(String(s.from_member_id));
+  const [toId, setToId] = useState(String(s.to_member_id));
+  const [amount, setAmount] = useState(String(s.amount));
+  const [note, setNote] = useState(s.note || "");
+  const [settledAt, setSettledAt] = useState(s.settled_at?.slice(0, 10) || "");
+
+  const memberName = (id: number) =>
+    members.find((m) => m.id === id)?.display_name ?? `#${id}`;
+  const visual = settlementVisual();
+  const surface = toneSurface(visual.tone);
+
+  function startEdit() {
+    setFromId(String(s.from_member_id));
+    setToId(String(s.to_member_id));
+    setAmount(String(s.amount));
+    setNote(s.note || "");
+    setSettledAt(s.settled_at?.slice(0, 10) || "");
+    setEditing(true);
+  }
+
+  async function saveEdit() {
+    if (!onUpdate) return;
+    const parsedAmount = Number(amount);
+    if (!(parsedAmount > 0) || fromId === toId) return;
+    await onUpdate(s.id, {
+      fromMemberId: Number(fromId),
+      toMemberId: Number(toId),
+      amount: parsedAmount,
+      note: note.trim() || null,
+      settledAt: settledAt || null,
+    });
+    setEditing(false);
+  }
+
+  return (
+    <div className="relative pl-5 sm:pl-6">
+      <IconCircle
+        icon={visual.icon}
+        tone={visual.tone}
+        size="md"
+        className="absolute left-0 top-1 z-10 border-2 border-foreground/15 shadow-md"
+      />
+      <div
+        className={cn(
+          "rounded-md border-2 py-2.5 pl-7 pr-3 text-sm shadow-sm sm:pl-8",
+          surface.body
+        )}
+      >
+        <div className="flex items-start gap-2">
+          <div className="min-w-0 flex-1">
+            <p className="text-base font-bold leading-snug">
+              <span>{memberName(s.from_member_id)}</span>
+              {" → "}
+              <span>{memberName(s.to_member_id)}</span>
+            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {formatMoney(s.amount, s.currency)}
+              {s.currency !== baseCurrency
+                ? ` (${formatMoney(s.amount_base, baseCurrency)})`
+                : ""}
+              {s.settled_at ? ` · ${s.settled_at.slice(0, 10)}` : ""}
+            </p>
+            {s.note ? (
+              <p className="mt-1 text-xs text-muted-foreground">{s.note}</p>
+            ) : null}
+
+            {editing && canEdit && onUpdate ? (
+              <div className="mt-3 grid gap-2 rounded-md border border-border/50 bg-background/60 p-2.5 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <Label className="text-xs">Von</Label>
+                  <Select
+                    value={fromId}
+                    onValueChange={(v) => {
+                      if (v == null) return;
+                      setFromId(v);
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {members.map((m) => (
+                        <SelectItem key={m.id} value={String(m.id)}>
+                          {m.display_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">An</Label>
+                  <Select
+                    value={toId}
+                    onValueChange={(v) => {
+                      if (v == null) return;
+                      setToId(v);
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {members.map((m) => (
+                        <SelectItem key={m.id} value={String(m.id)}>
+                          {m.display_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Betrag ({s.currency})</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Datum</Label>
+                  <Input
+                    type="date"
+                    value={settledAt}
+                    onChange={(e) => setSettledAt(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1 sm:col-span-2">
+                  <Label className="text-xs">Notiz</Label>
+                  <Input
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                  />
+                </div>
+                <div className="flex flex-wrap gap-2 sm:col-span-2">
+                  <Button
+                    size="sm"
+                    disabled={
+                      editBusy || !(Number(amount) > 0) || fromId === toId
+                    }
+                    onClick={() => void saveEdit()}
+                  >
+                    Speichern
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={editBusy}
+                    onClick={() => setEditing(false)}
+                  >
+                    Abbrechen
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="flex shrink-0 items-center gap-0.5">
+            {canEdit && onUpdate && !editing ? (
+              <Button
+                type="button"
+                size="icon-xs"
+                variant="ghost"
+                title="Bearbeiten"
+                onClick={startEdit}
+              >
+                <Pencil className="size-3.5" />
+              </Button>
+            ) : null}
+            {canDelete && onDelete ? (
+              <Button
+                type="button"
+                size="icon-xs"
+                variant="ghost"
+                className="text-destructive hover:text-destructive"
+                title="Rückzahlung löschen"
+                onClick={() => onDelete(s.id)}
+              >
+                <Trash2 className="size-3.5" />
+              </Button>
+            ) : null}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

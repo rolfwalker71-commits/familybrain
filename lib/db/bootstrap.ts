@@ -358,6 +358,9 @@ function ensureFinanceBrainTables(db: Database.Database): void {
       category_tone TEXT,
       ai_image_path TEXT,
       ai_image_prompt TEXT,
+      place_name TEXT,
+      place_lat REAL,
+      place_lon REAL,
       split_mode TEXT NOT NULL DEFAULT 'equal',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
@@ -418,5 +421,14 @@ function ensureFinanceBrainTables(db: Database.Database): void {
   }
   if (!expenseColNames.has("ai_image_prompt")) {
     db.exec(`ALTER TABLE finance_expenses ADD COLUMN ai_image_prompt TEXT`);
+  }
+  if (!expenseColNames.has("place_name")) {
+    db.exec(`ALTER TABLE finance_expenses ADD COLUMN place_name TEXT`);
+  }
+  if (!expenseColNames.has("place_lat")) {
+    db.exec(`ALTER TABLE finance_expenses ADD COLUMN place_lat REAL`);
+  }
+  if (!expenseColNames.has("place_lon")) {
+    db.exec(`ALTER TABLE finance_expenses ADD COLUMN place_lon REAL`);
   }
 }
