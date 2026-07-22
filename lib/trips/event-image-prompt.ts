@@ -3,6 +3,7 @@ export const DEFAULT_EVENT_AI_IMAGE_PROMPT = `Square travel illustration (not ph
 Title: {{title}}.
 Place/context: {{place}}.
 Provider: {{provider}}.
+Flight details: {{flight_info}}.
 Traveler notes: {{notes}}.
 Receipt context: {{beleg}}.
 Scene idea: {{scene}}.
@@ -16,6 +17,11 @@ export const EVENT_AI_IMAGE_PROMPT_PLACEHOLDERS = [
   "{{notes}}",
   "{{beleg}}",
   "{{scene}}",
+  "{{flight}}",
+  "{{airline}}",
+  "{{cabin}}",
+  "{{route}}",
+  "{{flight_info}}",
 ] as const;
 
 function clip(raw: string | null | undefined, max: number): string | null {
@@ -47,6 +53,29 @@ function placeHint(event: {
       .join(" → ");
   }
   return null;
+}
+
+function airportRoute(event: {
+  departure_airport?: string | null;
+  arrival_airport?: string | null;
+}): string {
+  const dep = event.departure_airport?.trim();
+  const arr = event.arrival_airport?.trim();
+  if (dep && arr) return `${dep} → ${arr}`;
+  return dep || arr || "";
+}
+
+function flightInfoLine(event: EventImagePromptInput): string {
+  const parts: string[] = [];
+  const flight = event.flight_number?.trim();
+  const airline = event.airline?.trim();
+  const cabin = event.cabin_class?.trim();
+  const route = airportRoute(event);
+  if (flight) parts.push(`flight ${flight}`);
+  if (airline) parts.push(`airline ${airline}`);
+  if (cabin) parts.push(`cabin ${cabin}`);
+  if (route) parts.push(`route ${route}`);
+  return parts.join(", ");
 }
 
 function sceneForType(
@@ -93,6 +122,8 @@ export type EventImagePromptInput = {
   notes?: string | null;
   document_notes_md?: string | null;
   cabin_class?: string | null;
+  flight_number?: string | null;
+  airline?: string | null;
 };
 
 function applyTemplate(
@@ -129,5 +160,10 @@ export function buildEventImagePrompt(
     notes: notes || "",
     beleg: beleg || "",
     scene: sceneForType(type, event.cabin_class),
+    flight: event.flight_number?.trim() || "",
+    airline: event.airline?.trim() || "",
+    cabin: event.cabin_class?.trim() || "",
+    route: airportRoute(event),
+    flight_info: flightInfoLine(event),
   });
 }

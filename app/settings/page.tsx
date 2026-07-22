@@ -82,6 +82,21 @@ export default function SettingsPage() {
     useState("");
   const [eventAiImagePromptCustomized, setEventAiImagePromptCustomized] =
     useState(false);
+  const [eventAiImagePromptPlaceholders, setEventAiImagePromptPlaceholders] =
+    useState<string[]>([
+      "{{type}}",
+      "{{title}}",
+      "{{place}}",
+      "{{provider}}",
+      "{{notes}}",
+      "{{beleg}}",
+      "{{scene}}",
+      "{{flight}}",
+      "{{airline}}",
+      "{{cabin}}",
+      "{{route}}",
+      "{{flight_info}}",
+    ]);
   const [flightTestNumber, setFlightTestNumber] = useState("LX1594");
   const [flightTestDate, setFlightTestDate] = useState("2026-10-23");
   const [flightTestBusy, setFlightTestBusy] = useState(false);
@@ -131,6 +146,13 @@ export default function SettingsPage() {
       setEventAiImagePromptCustomized(
         Boolean(data.eventAiImagePromptCustomized)
       );
+      if (Array.isArray(data.eventAiImagePromptPlaceholders)) {
+        setEventAiImagePromptPlaceholders(
+          data.eventAiImagePromptPlaceholders.filter(
+            (p: unknown): p is string => typeof p === "string"
+          )
+        );
+      }
     })();
   }, []);
 
@@ -337,6 +359,13 @@ export default function SettingsPage() {
       setEventAiImagePromptCustomized(
         Boolean(data.eventAiImagePromptCustomized)
       );
+      if (Array.isArray(data.eventAiImagePromptPlaceholders)) {
+        setEventAiImagePromptPlaceholders(
+          data.eventAiImagePromptPlaceholders.filter(
+            (p: unknown): p is string => typeof p === "string"
+          )
+        );
+      }
       setMessage("TravelBrain-Einstellungen gespeichert.");
       window.dispatchEvent(new Event("trip-map-style-changed"));
     } catch (err) {
@@ -774,12 +803,14 @@ export default function SettingsPage() {
             <p className="text-xs text-muted-foreground">
               Platzhalter:{" "}
               <code className="text-[11px]">
-                {"{{type}} {{title}} {{place}} {{provider}} {{notes}} {{beleg}} {{scene}}"}
+                {eventAiImagePromptPlaceholders.join(" ")}
               </code>
-              . Beim Erzeugen kannst du den Prompt pro Aktivität noch anpassen.
-              Stil steckt im Prompt; Modell:{" "}
-              <code className="text-[11px]">gpt-image-2</code> (besser lesbarer
-              Text).
+              . Flugfelder ({"{{flight}}"}, {"{{airline}}"}, {"{{cabin}}"},{" "}
+              {"{{route}}"} / zusammengefasst {"{{flight_info}}"}) werden bei
+              Flügen aus den Aktivitätsdaten gefüllt, sonst als —. Beim Erzeugen
+              kannst du den Prompt pro Aktivität noch anpassen. Stil steckt im
+              Prompt; Modell: <code className="text-[11px]">gpt-image-2</code>{" "}
+              (besser lesbarer Text).
             </p>
             <Button
               type="button"
