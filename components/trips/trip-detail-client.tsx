@@ -2005,6 +2005,7 @@ export function TripDetailClient({
             const visual = eventVisual(event.event_type);
             if (viewMode === "compact") {
               const details = formatCompactDetailLine(event);
+              const documents = event.documents || [];
               return (
                 <div
                   key={event.id}
@@ -2066,7 +2067,7 @@ export function TripDetailClient({
                     )}
                   >
                     <CardContent className="flex items-center gap-3 p-2.5 pl-7 sm:gap-4 sm:p-3 sm:pl-8">
-                      <div className="shrink-0 scale-90 sm:scale-100">
+                      <div className="flex w-[15.5rem] shrink-0 items-center sm:w-[17rem]">
                         <EventDateHeader event={event} />
                       </div>
                       <div className="min-w-0 flex-1">
@@ -2105,26 +2106,49 @@ export function TripDetailClient({
                           </div>
                         </div>
                       </div>
-                      {event.ai_image_url ? (
-                        <button
-                          type="button"
-                          className="relative shrink-0"
-                          title="Vergrössern"
-                          onClick={() =>
-                            setAiZoom({
-                              url: event.ai_image_url!,
-                              title: event.title,
-                            })
-                          }
-                        >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={event.ai_image_url}
-                            alt=""
-                            className="h-14 w-14 rounded-md border border-border/60 object-cover shadow-sm"
-                          />
-                        </button>
-                      ) : null}
+                      <div className="flex shrink-0 items-center gap-1.5">
+                        {!readOnly
+                          ? documents.map((doc) => (
+                              <DocumentPdfThumb
+                                key={doc.id}
+                                paperlessId={doc.paperless_id}
+                                title={doc.title}
+                                href={`/documents/${doc.id}`}
+                                size="square"
+                                removing={busy}
+                                onRemove={
+                                  editMode && doc.removable !== false
+                                    ? () =>
+                                        void unlinkEventDocument(
+                                          event.id,
+                                          doc.id
+                                        )
+                                    : undefined
+                                }
+                              />
+                            ))
+                          : null}
+                        {event.ai_image_url ? (
+                          <button
+                            type="button"
+                            className="relative shrink-0"
+                            title="Vergrössern"
+                            onClick={() =>
+                              setAiZoom({
+                                url: event.ai_image_url!,
+                                title: event.title,
+                              })
+                            }
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={event.ai_image_url}
+                              alt=""
+                              className="h-14 w-14 rounded-md border border-border/60 object-cover shadow-sm"
+                            />
+                          </button>
+                        ) : null}
+                      </div>
                       {editMode ? (
                         <div className="flex shrink-0 flex-col gap-0.5">
                           <Button

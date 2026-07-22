@@ -69,6 +69,7 @@ export function DocumentPdfThumb({
   className,
   onRemove,
   removing,
+  size = "default",
 }: {
   paperlessId: number;
   title?: string | null;
@@ -78,15 +79,22 @@ export function DocumentPdfThumb({
   /** Show remove control to unlink from event */
   onRemove?: () => void;
   removing?: boolean;
+  /** `square` matches compact AI thumbs (3.5rem). */
+  size?: "default" | "square";
 }) {
   const [open, setOpen] = useState(false);
   const [thumbError, setThumbError] = useState(false);
   const thumbUrl = `/api/paperless/documents/${paperlessId}/file?type=thumb`;
+  const square = size === "square";
 
   return (
     <div
-      className={cn("relative w-14 shrink-0", className)}
-      style={{ width: "3.5rem" }}
+      className={cn(
+        "relative shrink-0",
+        square ? "h-14 w-14" : "w-14",
+        className
+      )}
+      style={square ? undefined : { width: "3.5rem" }}
     >
       {onRemove ? (
         <button
@@ -108,18 +116,26 @@ export function DocumentPdfThumb({
         type="button"
         onClick={() => setOpen(true)}
         title={title || "PDF öffnen"}
-        className="group relative block w-full overflow-hidden rounded-md border border-border/70 bg-muted/40 text-left transition-colors hover:bg-muted"
+        className="group relative block h-full w-full overflow-hidden rounded-md border border-border/70 bg-muted/40 text-left transition-colors hover:bg-muted"
       >
         {!thumbError ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={thumbUrl}
             alt={title || "PDF Vorschau"}
-            className="h-20 w-full object-cover object-top"
+            className={cn(
+              "w-full object-cover object-top",
+              square ? "h-14" : "h-20"
+            )}
             onError={() => setThumbError(true)}
           />
         ) : (
-          <div className="flex h-20 w-full flex-col items-center justify-center gap-0.5 text-muted-foreground">
+          <div
+            className={cn(
+              "flex w-full flex-col items-center justify-center gap-0.5 text-muted-foreground",
+              square ? "h-14" : "h-20"
+            )}
+          >
             <FileText className="size-4" />
             <span className="px-0.5 text-center text-[9px] leading-tight">
               PDF
@@ -131,7 +147,7 @@ export function DocumentPdfThumb({
           Öffnen
         </div>
       </button>
-      {title || href ? (
+      {!square && (title || href) ? (
         <div className="mt-0.5 truncate text-[9px] leading-tight text-muted-foreground">
           {href ? (
             <a
