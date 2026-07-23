@@ -639,6 +639,7 @@ export function updateFinanceExpense(
     currency?: string;
     exchangeRate?: number;
     direction?: ExpenseDirection;
+    documentId?: number | null;
   }
 ): FinanceExpenseRow {
   const existing = getFinanceExpenseById(expenseId);
@@ -661,6 +662,19 @@ export function updateFinanceExpense(
     input.direction !== undefined
       ? coerceExpenseDirection(input.direction)
       : coerceExpenseDirection(existing.direction);
+
+  let documentId = existing.document_id;
+  if (input.documentId !== undefined) {
+    if (input.documentId == null) {
+      documentId = null;
+    } else {
+      const doc = getDb()
+        .prepare(`SELECT id FROM paperless_documents WHERE id = ?`)
+        .get(input.documentId) as { id: number } | undefined;
+      if (!doc) throw new Error("Paperless-Dokument nicht gefunden");
+      documentId = input.documentId;
+    }
+  }
 
   const description =
     input.description !== undefined
@@ -726,6 +740,7 @@ export function updateFinanceExpense(
        place_lon = ?,
        note = ?,
        direction = ?,
+       document_id = ?,
        updated_at = ?
      WHERE id = ?`
   ).run(
@@ -741,6 +756,7 @@ export function updateFinanceExpense(
     placeLon,
     note,
     direction,
+    documentId,
     nowIso(),
     expenseId
   );

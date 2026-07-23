@@ -86,6 +86,13 @@ type LedgerDetail = {
     has_receipt?: boolean;
     ai_image_url?: string | null;
     has_ai_image?: boolean;
+    document_id?: number | null;
+    document?: {
+      id: number;
+      paperless_id: number;
+      title: string | null;
+      original_file_name?: string | null;
+    } | null;
     splits: Array<{ member_id: number; share_amount_base: number }>;
   }>;
   settlements: Array<{
@@ -555,6 +562,36 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
       );
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Speichern fehlgeschlagen");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      throw err;
+    } finally {
+      setEditBusyId(null);
+    }
+  }
+
+  async function setExpenseDocument(
+    expenseId: number,
+    documentId: number | null
+  ) {
+    setEditBusyId(expenseId);
+    try {
+      const res = await fetch(
+        `/api/finance-ledgers/${ledgerId}/expenses/${expenseId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ documentId }),
+        }
+      );
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Verknüpfung fehlgeschlagen");
+      setStatus(
+        documentId == null
+          ? "Paperless-Verknüpfung entfernt."
+          : "Paperless-Beleg verknüpft."
+      );
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -1415,6 +1452,7 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
             isNormal ? undefined : (id) => void resendExpenseMail(id)
           }
           onUpdateExpense={(id, payload) => updateExpense(id, payload)}
+          onSetDocument={(id, documentId) => setExpenseDocument(id, documentId)}
           aiImageBusyId={aiImageBusyId}
           mailBusyId={mailBusyId}
           editBusyId={editBusyId}

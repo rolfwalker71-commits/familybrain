@@ -344,6 +344,36 @@ export function FinanceShareClient({ token }: { token: string }) {
     }
   }
 
+  async function setExpenseDocument(
+    expenseId: number,
+    documentId: number | null
+  ) {
+    setEditBusyId(expenseId);
+    try {
+      const res = await fetch(
+        `/api/share/f/${encodeURIComponent(token)}/expenses/${expenseId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ documentId }),
+        }
+      );
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Verknüpfung fehlgeschlagen");
+      setStatus(
+        documentId == null
+          ? "Paperless-Verknüpfung entfernt."
+          : "Paperless-Beleg verknüpft."
+      );
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      throw err;
+    } finally {
+      setEditBusyId(null);
+    }
+  }
+
   async function addSettlement() {
     const amount = Number(setAmount);
     if (!amount || !setTo) return;
@@ -754,6 +784,7 @@ export function FinanceShareClient({ token }: { token: string }) {
           onDeleteAiImage={(id) => void deleteAiImage(id)}
           onResendMail={(id) => void resendExpenseMail(id)}
           onUpdateExpense={(id, payload) => updateExpense(id, payload)}
+          onSetDocument={(id, documentId) => setExpenseDocument(id, documentId)}
           aiImageBusyId={aiImageBusyId}
           mailBusyId={mailBusyId}
           editBusyId={editBusyId}

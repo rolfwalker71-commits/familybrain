@@ -27,6 +27,7 @@ const PatchSchema = z.object({
   currency: z.string().min(3).max(3).optional(),
   exchangeRate: z.number().positive().optional(),
   direction: z.enum(["expense", "income"]).optional(),
+  documentId: z.number().int().positive().nullable().optional(),
 });
 
 export async function PATCH(request: Request, context: Ctx) {
@@ -72,6 +73,9 @@ export async function PATCH(request: Request, context: Ctx) {
     }
     if (parsed.data.direction !== undefined) {
       patch.direction = parsed.data.direction;
+    }
+    if (parsed.data.documentId !== undefined) {
+      patch.documentId = parsed.data.documentId;
     }
 
     if (parsed.data.place !== undefined) {

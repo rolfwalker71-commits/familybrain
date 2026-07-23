@@ -19,6 +19,7 @@ import {
   expenseAiImageSharePublicUrl,
 } from "@/lib/finance-brain/expense-image";
 import { getTripById } from "@/lib/trips/queries";
+import { getDocumentById } from "@/lib/db/queries";
 
 export function serializeLedger(ledger: FinanceLedgerRow) {
   const trip =
@@ -61,12 +62,24 @@ export function serializeExpense(
   const ai_image_url = options?.shareToken
     ? expenseAiImageSharePublicUrl(options.shareToken, ai_image_path)
     : expenseAiImagePublicUrl(ai_image_path);
+  const linkedDoc =
+    expense.document_id != null
+      ? getDocumentById(expense.document_id)?.document
+      : null;
   return {
     ...rest,
     has_receipt: Boolean(receipt_path),
     receipt_url,
     has_ai_image: Boolean(ai_image_path),
     ai_image_url,
+    document: linkedDoc
+      ? {
+          id: linkedDoc.id,
+          paperless_id: linkedDoc.paperless_id,
+          title: linkedDoc.title,
+          original_file_name: linkedDoc.original_file_name,
+        }
+      : null,
     splits,
   };
 }

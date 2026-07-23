@@ -2424,57 +2424,67 @@ export function TripDetailClient({
                           </button>
                         ) : null}
                       </div>
-                      {editMode ? (
+                      {!readOnly ? (
                         <div className="flex shrink-0 flex-col gap-0.5">
                           <Button
-                            size="icon-xs"
+                            size="sm"
                             variant="ghost"
-                            title="Belege verknüpfen"
-                            disabled={busy}
-                            onClick={() => setLinkDocsEventId(event.id)}
+                            className="h-7 px-2 text-xs"
+                            onClick={() => startEditEvent(event)}
                           >
-                            <FilePlus2 className="size-3.5" />
+                            <Pencil className="mr-1 size-3.5" />
+                            Ändern
                           </Button>
-                          <Button
-                            size="icon-xs"
-                            variant="ghost"
-                            title="KI-Bild"
-                            disabled={busy || aiImageBusy || aiBatch != null}
-                            onClick={() => openAiImageDialog(event)}
-                          >
-                            <ImagePlus className="size-3.5" />
-                          </Button>
-                          {event.ai_image_url ? (
+                          {editMode ? (
                             <>
                               <Button
                                 size="icon-xs"
                                 variant="ghost"
-                                title="Herunterladen"
-                                disabled={aiImageBusy}
-                                onClick={() =>
-                                  void downloadEventAiImage(event.id)
-                                }
+                                title="Belege verknüpfen"
+                                disabled={busy}
+                                onClick={() => setLinkDocsEventId(event.id)}
                               >
-                                <Download className="size-3.5" />
+                                <FilePlus2 className="size-3.5" />
                               </Button>
                               <Button
                                 size="icon-xs"
                                 variant="ghost"
-                                title="Ersetzen"
-                                disabled={aiImageBusy}
-                                onClick={() => pickReplaceAiImage(event.id)}
+                                title="KI-Bild"
+                                disabled={
+                                  busy || aiImageBusy || aiBatch != null
+                                }
+                                onClick={() => openAiImageDialog(event)}
                               >
-                                <Replace className="size-3.5" />
+                                <ImagePlus className="size-3.5" />
                               </Button>
+                              {event.ai_image_url ? (
+                                <>
+                                  <Button
+                                    size="icon-xs"
+                                    variant="ghost"
+                                    title="Herunterladen"
+                                    disabled={aiImageBusy}
+                                    onClick={() =>
+                                      void downloadEventAiImage(event.id)
+                                    }
+                                  >
+                                    <Download className="size-3.5" />
+                                  </Button>
+                                  <Button
+                                    size="icon-xs"
+                                    variant="ghost"
+                                    title="Ersetzen"
+                                    disabled={aiImageBusy}
+                                    onClick={() =>
+                                      pickReplaceAiImage(event.id)
+                                    }
+                                  >
+                                    <Replace className="size-3.5" />
+                                  </Button>
+                                </>
+                              ) : null}
                             </>
                           ) : null}
-                          <Button
-                            size="icon-xs"
-                            variant="ghost"
-                            onClick={() => startEditEvent(event)}
-                          >
-                            <Pencil className="size-3.5" />
-                          </Button>
                         </div>
                       ) : null}
                     </CardContent>
@@ -2651,6 +2661,17 @@ export function TripDetailClient({
                         <Badge variant="secondary" className="shrink-0">
                           {coerceTripEventType(event.event_type)}
                         </Badge>
+                        {!readOnly ? (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 px-2 text-xs"
+                            onClick={() => startEditEvent(event)}
+                          >
+                            <Pencil className="mr-1 size-3.5" />
+                            Ändern
+                          </Button>
+                        ) : null}
                         {editMode ? (
                           <>
                             <Button
@@ -2703,13 +2724,6 @@ export function TripDetailClient({
                               onClick={() => setLinkDocsEventId(event.id)}
                             >
                               <FilePlus2 className="size-3.5" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => startEditEvent(event)}
-                            >
-                              <Pencil className="size-3.5" />
                             </Button>
                             <Button
                               size="sm"

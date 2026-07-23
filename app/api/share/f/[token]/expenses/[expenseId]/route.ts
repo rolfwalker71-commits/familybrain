@@ -25,6 +25,7 @@ const PatchSchema = z.object({
   amount: z.number().positive().optional(),
   currency: z.string().min(3).max(3).optional(),
   exchangeRate: z.number().positive().optional(),
+  documentId: z.number().int().positive().nullable().optional(),
 });
 
 export async function PATCH(request: Request, context: Ctx) {
@@ -70,6 +71,9 @@ export async function PATCH(request: Request, context: Ctx) {
     }
     if (parsed.data.exchangeRate !== undefined) {
       patch.exchangeRate = parsed.data.exchangeRate;
+    }
+    if (parsed.data.documentId !== undefined) {
+      patch.documentId = parsed.data.documentId;
     }
 
     if (parsed.data.place !== undefined) {

@@ -5,6 +5,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   ArrowLeftRight,
   Download,
+  Link2,
   Mail,
   MapPin,
   Maximize2,
@@ -12,6 +13,7 @@ import {
   RefreshCw,
   Scale,
   Trash2,
+  Unlink,
   Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -56,6 +58,7 @@ import {
   CalendarDateBadge,
   toIsoDateOnly,
 } from "@/components/layout/calendar-date-badge";
+import { LinkPaperlessDocumentDialog } from "@/components/finance-brain/link-paperless-document-dialog";
 import { cn } from "@/lib/utils";
 
 type Balance = {
@@ -96,6 +99,13 @@ export type ExpenseListItem = {
   has_receipt?: boolean;
   ai_image_url?: string | null;
   has_ai_image?: boolean;
+  document_id?: number | null;
+  document?: {
+    id: number;
+    paperless_id: number;
+    title: string | null;
+    original_file_name?: string | null;
+  } | null;
   splits: Array<{ member_id: number; share_amount_base: number }>;
 };
 
@@ -209,6 +219,7 @@ function ExpenseCard({
   onDeleteAiImage,
   onResendMail,
   onUpdate,
+  onSetDocument,
   aiImageBusy,
   mailBusy,
   editBusy,
@@ -226,12 +237,18 @@ function ExpenseCard({
   onDeleteAiImage?: (expenseId: number) => void;
   onResendMail?: (expenseId: number) => void;
   onUpdate?: (expenseId: number, payload: ExpenseEditPayload) => Promise<void>;
+  onSetDocument?: (
+    expenseId: number,
+    documentId: number | null
+  ) => Promise<void>;
   aiImageBusy?: boolean;
   mailBusy?: boolean;
   editBusy?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [zoomOpen, setZoomOpen] = useState(false);
+  const [linkDocOpen, setLinkDocOpen] = useState(false);
+  const [docBusy, setDocBusy] = useState(false);
   const [editDesc, setEditDesc] = useState(exp.description || "");
   const [editDate, setEditDate] = useState(exp.expense_date || "");
   const [editPayer, setEditPayer] = useState(String(exp.paid_by_member_id));
@@ -447,6 +464,20 @@ function ExpenseCard({
             {exp.note?.trim() ? (
               <p className="break-words text-xs text-muted-foreground">
                 Notiz: {exp.note.trim()}
+              </p>
+            ) : null}
+            {exp.document ? (
+              <p className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                <Link2 className="size-3 shrink-0" />
+                <a
+                  href={`/documents/${exp.document.id}`}
+                  className="font-medium text-foreground underline-offset-2 hover:underline"
+                >
+                  {exp.document.title?.trim() ||
+                    exp.document.original_file_name?.trim() ||
+                    `Dokument #${exp.document.id}`}
+                </a>
+                <span className="text-muted-foreground">· Paperless</span>
               </p>
             ) : null}
           </div>
@@ -665,8 +696,49 @@ function ExpenseCard({
               onClick={startEdit}
             >
               <Pencil className="mr-1 size-3.5" />
-              Bearbeiten
+              Ändern
             </Button>
+          ) : null}
+
+          {canEdit && onSetDocument && !editing ? (
+            <>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-7 px-2 text-xs"
+                disabled={docBusy || editBusy}
+                onClick={() => setLinkDocOpen(true)}
+              >
+                <Link2 className="mr-1 size-3.5" />
+                {exp.document ? "Beleg ändern" : "Beleg verknüpfen"}
+              </Button>
+              {exp.document ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 px-2 text-xs text-destructive"
+                  disabled={docBusy || editBusy}
+                  onClick={() => {
+                    if (
+                      !window.confirm(
+                        "Paperless-Verknüpfung wirklich entfernen?"
+                      )
+                    ) {
+                      return;
+                    }
+                    setDocBusy(true);
+                    void onSetDocument(exp.id, null).finally(() =>
+                      setDocBusy(false)
+                    );
+                  }}
+                >
+                  <Unlink className="mr-1 size-3.5" />
+                  Beleg lösen
+                </Button>
+              ) : null}
+            </>
           ) : null}
 
           {onGenerateAiImage ? (
@@ -777,6 +849,27 @@ function ExpenseCard({
           ) : null}
         </DialogContent>
       </Dialog>
+
+      {onSetDocument ? (
+        <LinkPaperlessDocumentDialog
+          open={linkDocOpen}
+          onOpenChange={setLinkDocOpen}
+          currentDocumentId={exp.document?.id ?? exp.document_id ?? null}
+          title={
+            exp.document
+              ? "Paperless-Beleg ändern"
+              : "Paperless-Beleg verknüpfen"
+          }
+          onSelect={async (documentId) => {
+            setDocBusy(true);
+            try {
+              await onSetDocument(exp.id, documentId);
+            } finally {
+              setDocBusy(false);
+            }
+          }}
+        />
+      ) : null}
     </div>
   );
 }
@@ -795,6 +888,7 @@ export function ExpenseList({
   onDeleteAiImage,
   onResendMail,
   onUpdateExpense,
+  onSetDocument,
   aiImageBusyId,
   mailBusyId,
   editBusyId,
@@ -814,6 +908,10 @@ export function ExpenseList({
   onUpdateExpense?: (
     expenseId: number,
     payload: ExpenseEditPayload
+  ) => Promise<void>;
+  onSetDocument?: (
+    expenseId: number,
+    documentId: number | null
   ) => Promise<void>;
   aiImageBusyId?: number | null;
   mailBusyId?: number | null;
@@ -844,6 +942,7 @@ export function ExpenseList({
             onDeleteAiImage={onDeleteAiImage}
             onResendMail={onResendMail}
             onUpdate={onUpdateExpense}
+            onSetDocument={onSetDocument}
             aiImageBusy={aiImageBusyId === exp.id}
             mailBusy={mailBusyId === exp.id}
             editBusy={editBusyId === exp.id}
@@ -1186,12 +1285,13 @@ function SettlementCard({
             {canEdit && onUpdate && !editing ? (
               <Button
                 type="button"
-                size="icon-xs"
+                size="sm"
                 variant="ghost"
-                title="Bearbeiten"
+                className="h-7 px-2 text-xs"
                 onClick={startEdit}
               >
-                <Pencil className="size-3.5" />
+                <Pencil className="mr-1 size-3.5" />
+                Ändern
               </Button>
             ) : null}
             {canDelete && onDelete ? (
