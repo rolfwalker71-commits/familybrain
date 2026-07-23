@@ -8,7 +8,6 @@ import {
   Link2,
   Mail,
   MapPin,
-  Maximize2,
   Pencil,
   RefreshCw,
   Scale,
@@ -371,31 +370,19 @@ function ExpenseCard({
             </div>
             <div className="ml-auto flex shrink-0 items-center">
               {exp.ai_image_url ? (
-                <div className="relative">
-                  <button
-                    type="button"
-                    title="Vergrössern"
-                    className="block"
-                    onClick={() => setZoomOpen(true)}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={exp.ai_image_url}
-                      alt=""
-                      className="h-12 w-12 rounded-md border border-foreground/10 object-cover shadow-sm sm:h-20 sm:w-20"
-                    />
-                  </button>
-                  <Button
-                    type="button"
-                    size="icon-xs"
-                    variant="secondary"
-                    className="absolute bottom-0.5 right-0.5 size-5 border border-border/70 bg-background/90 shadow-sm sm:bottom-1 sm:right-1 sm:size-6"
-                    title="Vergrössern"
-                    onClick={() => setZoomOpen(true)}
-                  >
-                    <Maximize2 className="size-3" />
-                  </Button>
-                </div>
+                <button
+                  type="button"
+                  title="Tippen zum Vergrössern"
+                  className="shrink-0 overflow-hidden rounded-md border border-foreground/10 shadow-sm"
+                  onClick={() => setZoomOpen(true)}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={exp.ai_image_url}
+                    alt=""
+                    className="h-12 w-12 object-cover sm:h-20 sm:w-20"
+                  />
+                </button>
               ) : aiImageBusy ? (
                 <div className="flex h-12 w-12 items-center justify-center rounded-md border border-dashed border-foreground/20 bg-background/50 text-[10px] text-muted-foreground sm:h-20 sm:w-20">
                   KI…

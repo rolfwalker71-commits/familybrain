@@ -14,7 +14,6 @@ import {
   ImagePlus,
   Info,
   MapPin,
-  Maximize2,
   Pencil,
   Plane,
   Plus,
@@ -2350,18 +2349,16 @@ export function TripDetailClient({
                         "ring-2 ring-teal-400/50"
                     )}
                   >
-                    <CardContent className="flex items-center gap-4 p-2.5 pl-9 sm:gap-5 sm:p-3 sm:pl-10">
-                      <div className="flex shrink-0 items-center">
-                        <EventDateHeader event={event} reserveEndSlot />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-start gap-2">
+                    <CardContent className="space-y-2 p-2.5 pl-9 sm:p-3 sm:pl-10">
+                      <div className="flex items-start justify-between gap-2">
+                        <EventDateHeader event={event} size="sm" />
+                        <div className="flex shrink-0 items-center gap-1.5">
                           {editMode ? (
                             <button
                               type="button"
                               draggable
                               title="Ziehen zum Sortieren"
-                              className="mt-1 hidden cursor-grab touch-none rounded p-0.5 text-muted-foreground hover:bg-muted active:cursor-grabbing sm:inline-flex"
+                              className="hidden cursor-grab touch-none rounded p-0.5 text-muted-foreground hover:bg-muted active:cursor-grabbing sm:inline-flex"
                               onDragStart={(e) => {
                                 setDragEventId(event.id);
                                 e.dataTransfer.effectAllowed = "move";
@@ -2378,110 +2375,115 @@ export function TripDetailClient({
                               <GripVertical className="size-4" />
                             </button>
                           ) : null}
-                          <div className="min-w-0 flex-1">
-                            <div className="text-base font-black leading-tight tracking-tight sm:text-lg">
-                              {event.title}
-                            </div>
-                            {details ? (
-                              <div className="mt-0.5 truncate text-xs text-muted-foreground">
-                                {details}
-                              </div>
-                            ) : null}
-                          </div>
+                          {event.ai_image_url ? (
+                            <button
+                              type="button"
+                              title="Tippen zum Vergrössern"
+                              className="shrink-0 overflow-hidden rounded-md border border-border/60 shadow-sm"
+                              onClick={() =>
+                                setAiZoom({
+                                  url: event.ai_image_url!,
+                                  title: event.title,
+                                  eventId: event.id,
+                                })
+                              }
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={event.ai_image_url}
+                                alt=""
+                                className="h-11 w-11 object-cover sm:h-12 sm:w-12"
+                              />
+                            </button>
+                          ) : null}
                         </div>
                       </div>
-                      <div className="flex shrink-0 items-center gap-1.5">
-                        {!readOnly
-                          ? documents.map((doc) => (
-                              <DocumentPdfThumb
-                                key={doc.id}
-                                paperlessId={doc.paperless_id}
-                                title={doc.title}
-                                href={`/documents/${doc.id}`}
-                                size="square"
-                                removing={busy}
-                                onRemove={
-                                  editMode && doc.removable !== false
-                                    ? () =>
-                                        void unlinkEventDocument(
-                                          event.id,
-                                          doc.id
-                                        )
-                                    : undefined
-                                }
-                              />
-                            ))
-                          : null}
-                        {event.ai_image_url ? (
-                          <button
-                            type="button"
-                            className="relative shrink-0"
-                            title="Vergrössern"
-                            onClick={() =>
-                              setAiZoom({
-                                url: event.ai_image_url!,
-                                title: event.title,
-                                eventId: event.id,
-                              })
-                            }
-                          >
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={event.ai_image_url}
-                              alt=""
-                              className="h-14 w-14 rounded-md border border-border/60 object-cover shadow-sm"
-                            />
-                          </button>
+
+                      <div className="min-w-0">
+                        <div className="text-sm font-black leading-snug tracking-tight sm:text-base">
+                          {event.title}
+                        </div>
+                        {details ? (
+                          <div className="mt-0.5 line-clamp-2 text-xs text-muted-foreground sm:truncate sm:line-clamp-none">
+                            {details}
+                          </div>
                         ) : null}
                       </div>
-                      {!readOnly ? (
-                        <div className="flex shrink-0 flex-col gap-0.5">
-                          {!editMode ? (
+
+                      {!readOnly || documents.length > 0 ? (
+                        <div className="flex items-center gap-2">
+                          {documents.length > 0 ? (
+                            <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto">
+                              {documents.map((doc) => (
+                                <DocumentPdfThumb
+                                  key={doc.id}
+                                  paperlessId={doc.paperless_id}
+                                  title={doc.title}
+                                  href={`/documents/${doc.id}`}
+                                  size="square"
+                                  removing={busy}
+                                  onRemove={
+                                    editMode && doc.removable !== false
+                                      ? () =>
+                                          void unlinkEventDocument(
+                                            event.id,
+                                            doc.id
+                                          )
+                                      : undefined
+                                  }
+                                />
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="flex-1" />
+                          )}
+                          {!readOnly && !editMode ? (
                             <Button
                               size="sm"
                               variant="ghost"
-                              className="h-7 px-2 text-xs"
+                              className="h-7 shrink-0 px-2 text-xs"
                               onClick={() => startEditEvent(event)}
                             >
                               <Pencil className="mr-1 size-3.5" />
                               Ändern
                             </Button>
-                          ) : (
-                            <Button
-                              size="sm"
-                              variant={
-                                editFocusEventId === event.id
-                                  ? "secondary"
-                                  : "ghost"
-                              }
-                              className="h-7 px-2 text-xs md:hidden"
-                              onClick={() => setEditFocusEventId(event.id)}
-                            >
-                              {editFocusEventId === event.id
-                                ? "Aktiv"
-                                : "Wählen"}
-                            </Button>
-                          )}
-                          {editMode ? (
-                            <div className="hidden flex-col gap-0.5 md:flex">
+                          ) : null}
+                          {!readOnly && editMode ? (
+                            <>
                               <Button
-                                size="icon-xs"
-                                variant="ghost"
-                                title="Belege verknüpfen"
-                                disabled={busy}
-                                onClick={() => setLinkDocsEventId(event.id)}
+                                size="sm"
+                                variant={
+                                  editFocusEventId === event.id
+                                    ? "secondary"
+                                    : "ghost"
+                                }
+                                className="h-7 shrink-0 px-2 text-xs md:hidden"
+                                onClick={() => setEditFocusEventId(event.id)}
                               >
-                                <FilePlus2 className="size-3.5" />
+                                {editFocusEventId === event.id
+                                  ? "Aktiv"
+                                  : "Wählen"}
                               </Button>
-                              <Button
-                                size="icon-xs"
-                                variant="ghost"
-                                title="Ändern"
-                                onClick={() => startEditEvent(event)}
-                              >
-                                <Pencil className="size-3.5" />
-                              </Button>
-                            </div>
+                              <div className="hidden shrink-0 items-center gap-0.5 md:flex">
+                                <Button
+                                  size="icon-xs"
+                                  variant="ghost"
+                                  title="Belege verknüpfen"
+                                  disabled={busy}
+                                  onClick={() => setLinkDocsEventId(event.id)}
+                                >
+                                  <FilePlus2 className="size-3.5" />
+                                </Button>
+                                <Button
+                                  size="icon-xs"
+                                  variant="ghost"
+                                  title="Ändern"
+                                  onClick={() => startEditEvent(event)}
+                                >
+                                  <Pencil className="size-3.5" />
+                                </Button>
+                              </div>
+                            </>
                           ) : null}
                         </div>
                       ) : null}
@@ -2562,30 +2564,25 @@ export function TripDetailClient({
                         <EventDateHeader event={event} size="sm" />
                       </div>
                       {event.ai_image_url ? (
-                        <div className="relative shrink-0">
+                        <button
+                          type="button"
+                          title="Tippen zum Vergrössern"
+                          className="shrink-0 overflow-hidden rounded-md border border-border/60 shadow-sm"
+                          onClick={() =>
+                            setAiZoom({
+                              url: event.ai_image_url!,
+                              title: event.title,
+                              eventId: event.id,
+                            })
+                          }
+                        >
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={event.ai_image_url}
                             alt=""
-                            className="h-12 w-12 rounded-md border border-border/60 object-cover shadow-sm sm:h-16 sm:w-16"
+                            className="h-12 w-12 object-cover sm:h-16 sm:w-16"
                           />
-                          <Button
-                            type="button"
-                            size="icon-xs"
-                            variant="secondary"
-                            className="absolute bottom-0.5 right-0.5 size-5 border border-border/70 bg-background/90 shadow-sm sm:size-6"
-                            title="Vergrössern"
-                            onClick={() =>
-                              setAiZoom({
-                                url: event.ai_image_url!,
-                                title: event.title,
-                                eventId: event.id,
-                              })
-                            }
-                          >
-                            <Maximize2 className="size-3" />
-                          </Button>
-                        </div>
+                        </button>
                       ) : null}
                     </div>
                   </div>
