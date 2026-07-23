@@ -48,7 +48,9 @@ function sceneForType(
     case "Mietwagen":
       return "scenic road trip / rental car travel atmosphere";
     case "Transfer":
-      return "transfer journey atmosphere (train station, shuttle, or city transit)";
+      return "transfer journey atmosphere (shuttle, taxi, or city transit)";
+    case "Zugreisen":
+      return "train journey atmosphere at a railway station or scenic rail travel";
     case "Ausflug":
     case "Aktivität":
       return "memorable sightseeing or outdoor activity atmosphere";

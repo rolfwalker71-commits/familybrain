@@ -22,8 +22,10 @@ import {
   Ship,
   Sparkles,
   Ticket,
+  TrainFront,
   Trash2,
   X,
+  FilePlus2,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -69,6 +71,7 @@ import { TripMap } from "@/components/trips/trip-map";
 import { TripExportMenu } from "@/components/trips/trip-export-menu";
 import { TripFinanceLedgerCard } from "@/components/finance-brain/trip-finance-ledger-card";
 import { BelegNotesBlock } from "@/components/trips/beleg-notes-block";
+import { LinkDocumentsToEventDialog } from "@/components/trips/link-documents-to-event-dialog";
 import {
   toDateInputValue,
   toSwissDate,
@@ -171,6 +174,8 @@ const STATUS_LABEL: Record<string, string> = {
 
 const EVENT_VISUALS: Record<string, { icon: LucideIcon; tone: IconTone }> = {
   Flug: { icon: Plane, tone: "sky" },
+  Zugreisen: { icon: TrainFront, tone: "slate" },
+  Bahn: { icon: TrainFront, tone: "slate" },
   Mietauto: { icon: Car, tone: "teal" },
   Mietwagen: { icon: Car, tone: "teal" },
   Transfer: { icon: Bus, tone: "slate" },
@@ -201,7 +206,12 @@ function textsOverlap(
 }
 
 function isDualPlaceType(type: string): boolean {
-  return type === "Transfer" || type === "Mietauto" || type === "Mietwagen";
+  return (
+    type === "Transfer" ||
+    type === "Zugreisen" ||
+    type === "Mietauto" ||
+    type === "Mietwagen"
+  );
 }
 
 function dualPlaceLabels(type: string): { origin: string; destination: string } {
@@ -285,18 +295,19 @@ function EventDateHeader({
 
 function formatEventMetaLine(event: TripEvent): string | null {
   const type = coerceTripEventType(event.event_type);
-  const transferRoute =
-    type === "Transfer" || isDualPlaceType(type)
-      ? event.origin_place && event.destination_place
-        ? `${event.origin_place} → ${event.destination_place}`
-        : event.origin_place ||
-          event.destination_place ||
-          (event.location && !textsOverlap(event.location, event.title)
-            ? event.location
-            : null)
-      : null;
+  const transferRoute = isDualPlaceType(type)
+    ? event.origin_place && event.destination_place
+      ? `${event.origin_place} → ${event.destination_place}`
+      : event.origin_place ||
+        event.destination_place ||
+        (event.location && !textsOverlap(event.location, event.title)
+          ? event.location
+          : null)
+    : null;
   const parts = [
-    event.flight_number && type === "Flug" ? event.flight_number : null,
+    event.flight_number && (type === "Flug" || type === "Zugreisen")
+      ? event.flight_number
+      : null,
     transferRoute,
   ].filter(Boolean);
   return parts.length ? parts.join(" · ") : null;
@@ -489,6 +500,7 @@ export function TripDetailClient({
   const [eventForm, setEventForm] = useState(createEmptyEventForm);
   const [editingEventId, setEditingEventId] = useState<number | null>(null);
   const [eventSheetOpen, setEventSheetOpen] = useState(false);
+  const [linkDocsEventId, setLinkDocsEventId] = useState<number | null>(null);
   const [coverPrompt, setCoverPrompt] = useState("");
   const [busy, setBusy] = useState(false);
   const [placeCandidates, setPlaceCandidates] = useState<
@@ -606,6 +618,8 @@ export function TripDetailClient({
         origin && destination
           ? `${origin} → ${destination}`
           : origin || destination || null;
+      const isFlight = eventForm.eventType === "Flug";
+      const isTrain = eventForm.eventType === "Zugreisen";
       const payload = {
         eventType: eventForm.eventType,
         title: eventForm.title.trim(),
@@ -616,22 +630,29 @@ export function TripDetailClient({
         location: isDual
           ? transferLocation
           : eventForm.location ||
-            (dep && arr ? `${dep} → ${arr}` : dep || arr || null),
+            (isFlight && dep && arr
+              ? `${dep} → ${arr}`
+              : isFlight
+                ? dep || arr || null
+                : null),
         address: eventForm.address || null,
         provider: eventForm.provider || null,
         bookingReference: eventForm.bookingReference || null,
         notes: eventForm.notes || null,
         showDocumentNotes: eventForm.showDocumentNotes,
-        flightNumber: eventForm.flightNumber || null,
-        cabinClass: eventForm.cabinClass || null,
-        departureAirport: dep,
-        arrivalAirport: arr,
-        departureTerminal: eventForm.departureTerminal || null,
-        arrivalTerminal: eventForm.arrivalTerminal || null,
-        departureGate: eventForm.departureGate || null,
-        arrivalGate: eventForm.arrivalGate || null,
-        checkInDesk: eventForm.checkInDesk || null,
-        baggageBelt: eventForm.baggageBelt || null,
+        flightNumber:
+          isFlight || isTrain ? eventForm.flightNumber || null : null,
+        cabinClass: isFlight ? eventForm.cabinClass || null : null,
+        departureAirport: isFlight ? dep : null,
+        arrivalAirport: isFlight ? arr : null,
+        departureTerminal: isFlight
+          ? eventForm.departureTerminal || null
+          : null,
+        arrivalTerminal: isFlight ? eventForm.arrivalTerminal || null : null,
+        departureGate: isFlight ? eventForm.departureGate || null : null,
+        arrivalGate: isFlight ? eventForm.arrivalGate || null : null,
+        checkInDesk: isFlight ? eventForm.checkInDesk || null : null,
+        baggageBelt: isFlight ? eventForm.baggageBelt || null : null,
         originPlace: isDual ? origin : null,
         destinationPlace: isDual ? destination : null,
         ...(isDual
@@ -1406,7 +1427,7 @@ export function TripDetailClient({
               className="gap-1.5"
             >
               <Plus className="size-4" />
-              Aktivität hinzufügen
+              Neuen Eintrag erstellen
             </Button>
             <Button
               variant="outline"
@@ -1624,11 +1645,12 @@ export function TripDetailClient({
           <SheetHeader className="shrink-0 border-b border-border/70 px-4 pt-4">
             <SheetTitle>
               {editingEventId != null
-                ? "Aktivität bearbeiten"
-                : "Aktivität hinzufügen"}
+                ? "Eintrag bearbeiten"
+                : "Neuen Eintrag erstellen"}
             </SheetTitle>
             <SheetDescription>
-              Typ, Zeiten und Details der Aktivität anpassen.
+              Typ, Zeiten und Details festlegen — Belege sind optional und können
+              später verknüpft werden.
             </SheetDescription>
           </SheetHeader>
           <div className="grid min-h-0 flex-1 gap-3 overflow-y-auto p-4 sm:grid-cols-2">
@@ -1956,6 +1978,20 @@ export function TripDetailClient({
                   />
                 </div>
               </>
+            ) : eventForm.eventType === "Zugreisen" ? (
+              <div className="space-y-1.5">
+                <Label>Zugnummer (optional)</Label>
+                <Input
+                  value={eventForm.flightNumber}
+                  onChange={(e) =>
+                    setEventForm((f) => ({
+                      ...f,
+                      flightNumber: e.target.value,
+                    }))
+                  }
+                  placeholder="z. B. IC 732"
+                />
+              </div>
             ) : null}
             <div className="space-y-1.5 sm:col-span-2">
               <Label>Notizen (manuell)</Label>
@@ -2120,6 +2156,28 @@ export function TripDetailClient({
                 ) : null}
               </div>
             ) : null}
+
+            {editingEventId != null ? (
+              <div className="space-y-2 rounded-lg border border-border/70 bg-muted/20 p-3 sm:col-span-2">
+                <div className="text-xs font-medium text-muted-foreground">
+                  Belege
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Mehrere Paperless-PDFs können verknüpft werden. Neue PDFs zuerst
+                  in Paperless importieren.
+                </p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5"
+                  disabled={busy}
+                  onClick={() => setLinkDocsEventId(editingEventId)}
+                >
+                  <FilePlus2 className="size-3.5" />
+                  Belege verknüpfen
+                </Button>
+              </div>
+            ) : null}
           </div>
           <SheetFooter className="mt-auto shrink-0 flex-row gap-2 border-t border-border/70 bg-background p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
             <Button
@@ -2134,6 +2192,27 @@ export function TripDetailClient({
           </SheetFooter>
         </SheetContent>
       </Sheet>
+
+      {linkDocsEventId != null ? (
+        <LinkDocumentsToEventDialog
+          tripId={tripId}
+          eventId={linkDocsEventId}
+          open
+          onOpenChange={(open) => {
+            if (!open) setLinkDocsEventId(null);
+          }}
+          excludeDocumentIds={
+            events
+              .find((e) => e.id === linkDocsEventId)
+              ?.documents?.map((d) => d.id) || []
+          }
+          onLinked={(message) => {
+            setStatus(message);
+            void load();
+          }}
+          onError={setError}
+        />
+      ) : null}
 
       <div className="space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -2171,7 +2250,23 @@ export function TripDetailClient({
           </p>
         ) : null}
         {events.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Noch keine Ereignisse.</p>
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">
+              Noch keine Einträge. Du kannst Aktivitäten ohne Beleg anlegen und
+              später Dokumente verknüpfen.
+            </p>
+            {editMode ? (
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5"
+                onClick={() => openNewEvent()}
+              >
+                <Plus className="size-4" />
+                Neuen Eintrag erstellen
+              </Button>
+            ) : null}
+          </div>
         ) : (
           <div
             className={cn(
@@ -2331,6 +2426,15 @@ export function TripDetailClient({
                       </div>
                       {editMode ? (
                         <div className="flex shrink-0 flex-col gap-0.5">
+                          <Button
+                            size="icon-xs"
+                            variant="ghost"
+                            title="Belege verknüpfen"
+                            disabled={busy}
+                            onClick={() => setLinkDocsEventId(event.id)}
+                          >
+                            <FilePlus2 className="size-3.5" />
+                          </Button>
                           <Button
                             size="icon-xs"
                             variant="ghost"
@@ -2594,6 +2698,15 @@ export function TripDetailClient({
                             <Button
                               size="sm"
                               variant="ghost"
+                              title="Belege verknüpfen"
+                              disabled={busy}
+                              onClick={() => setLinkDocsEventId(event.id)}
+                            >
+                              <FilePlus2 className="size-3.5" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
                               onClick={() => startEditEvent(event)}
                             >
                               <Pencil className="size-3.5" />
@@ -2627,24 +2740,29 @@ export function TripDetailClient({
                             !textsOverlap(event.location, event.place_name)
                               ? event.location
                               : null);
-                      const hasFlightDetails = Boolean(
-                        event.airline ||
-                          event.flight_number ||
-                          event.cabin_class ||
-                          event.departure_airport ||
-                          event.arrival_airport ||
-                          event.duration_minutes ||
-                          event.aircraft_reg ||
-                          event.aircraft_type ||
-                          event.departure_terminal ||
-                          event.arrival_terminal ||
-                          event.departure_gate ||
-                          event.arrival_gate ||
-                          event.check_in_desk ||
-                          event.baggage_belt
-                      );
+                      const hasFlightDetails =
+                        type === "Flug" &&
+                        Boolean(
+                          event.airline ||
+                            event.flight_number ||
+                            event.cabin_class ||
+                            event.departure_airport ||
+                            event.arrival_airport ||
+                            event.duration_minutes ||
+                            event.aircraft_reg ||
+                            event.aircraft_type ||
+                            event.departure_terminal ||
+                            event.arrival_terminal ||
+                            event.departure_gate ||
+                            event.arrival_gate ||
+                            event.check_in_desk ||
+                            event.baggage_belt
+                        );
                       const hasDualPlaceDetails = Boolean(
-                        dual && (routePlaces.origin || routePlaces.destination)
+                        dual &&
+                          (routePlaces.origin ||
+                            routePlaces.destination ||
+                            (type === "Zugreisen" && event.flight_number))
                       );
                       const hasPlaceDetails = Boolean(
                         showPlaceName ||
@@ -2867,6 +2985,12 @@ export function TripDetailClient({
                                 label={dualLabels.destination}
                                 value={routePlaces.destination || null}
                               />
+                              {type === "Zugreisen" ? (
+                                <DetailRow
+                                  label="Zugnr."
+                                  value={event.flight_number}
+                                />
+                              ) : null}
                               <DetailRow
                                 label="Anbieter"
                                 value={event.provider}

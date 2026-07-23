@@ -41,6 +41,8 @@ function draftToPayload(draft: TripEventDraft) {
     cabinClass: draft.cabin_class ?? null,
     departureAirport: draft.departure_airport ?? null,
     arrivalAirport: draft.arrival_airport ?? null,
+    originPlace: draft.origin_place ?? null,
+    destinationPlace: draft.destination_place ?? null,
     documentId: draft.document_id ?? null,
     travelItemId: draft.travel_item_id ?? null,
     guideId: draft.guide_id ?? null,

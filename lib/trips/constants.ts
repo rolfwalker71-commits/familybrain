@@ -4,6 +4,7 @@ export type TripStatus = (typeof TRIP_STATUSES)[number];
 /** Selectable TravelBrain event types (edit UI). */
 export const TRIP_EVENT_TYPES = [
   "Flug",
+  "Zugreisen",
   "Mietauto",
   "Transfer",
   "Hotel",
@@ -27,7 +28,9 @@ const EVENT_TYPE_ALIASES: Record<string, TripEventType> = {
   Aktivität: "Ausflug",
   Notiz: "Ausflug",
   Sonstiges: "Ausflug",
-  Bahn: "Transfer",
+  Bahn: "Zugreisen",
+  Zug: "Zugreisen",
+  Train: "Zugreisen",
   Parking: "Transfer",
   "Visa / Einreise": "Ausflug",
   "Pauschalreise / Urlaub": "Ausflug",
@@ -59,6 +62,8 @@ export type TripEventDraft = {
   cabin_class?: string | null;
   departure_airport?: string | null;
   arrival_airport?: string | null;
+  origin_place?: string | null;
+  destination_place?: string | null;
   document_id?: number | null;
   travel_item_id?: number | null;
   guide_id?: number | null;

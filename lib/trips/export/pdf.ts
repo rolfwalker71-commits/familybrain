@@ -159,7 +159,10 @@ function detailLines(event: TripExportEvent): string[] {
     ["Adresse", event.address],
     ["Anbieter", event.provider],
     ["Buchung", event.booking_reference],
-    ["Flugnr.", event.flight_number],
+    [
+      event.event_type === "Zugreisen" ? "Zugnr." : "Flugnr.",
+      event.flight_number,
+    ],
     ["Klasse", event.cabin_class],
     ["Airline", event.airline],
     [

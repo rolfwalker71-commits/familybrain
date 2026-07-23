@@ -4,7 +4,10 @@ import {
   resolveItinerary,
   type ItineraryStop,
 } from "@/lib/extraction/itinerary";
-import type { TripEventDraft } from "@/lib/trips/constants";
+import {
+  coerceTripEventType,
+  type TripEventDraft,
+} from "@/lib/trips/constants";
 import { formatAirportRoute, normalizeIataCode } from "@/lib/trips/iata";
 
 export type TravelItemLike = {
@@ -97,16 +100,15 @@ function portNote(stop: ItineraryStop): string | null {
  */
 export function travelItemToEventDrafts(item: TravelItemLike): TripEventDraft[] {
   const extracted = parseExtracted(item.extracted_data);
-  const type = travelTypeOf(item, extracted);
+  const type = coerceTripEventType(travelTypeOf(item, extracted));
+  const originRaw =
+    item.origin || asString(extracted?.origin) || null;
+  const destinationRaw =
+    item.destination || asString(extracted?.destination) || null;
   const title =
     item.title ||
     asString(extracted?.title) ||
-    [
-      item.origin || asString(extracted?.origin),
-      item.destination || asString(extracted?.destination),
-    ]
-      .filter(Boolean)
-      .join(" → ") ||
+    [originRaw, destinationRaw].filter(Boolean).join(" → ") ||
     type;
 
   const bookingReference =
@@ -125,6 +127,12 @@ export function travelItemToEventDrafts(item: TravelItemLike): TripEventDraft[] 
       asString(extracted?.notes)
     );
 
+  const trainNumber =
+    asString(extracted?.train_number) ||
+    asString(extracted?.trainNumber) ||
+    asString(extracted?.zugnummer) ||
+    null;
+
   const cabinClass =
     asString(extracted?.cabin_class) ||
     asString(extracted?.cabinClass) ||
@@ -132,35 +140,22 @@ export function travelItemToEventDrafts(item: TravelItemLike): TripEventDraft[] 
 
   const hotelAddress = asString(extracted?.address);
 
-  const route = [
-    item.origin || asString(extracted?.origin),
-    item.destination || asString(extracted?.destination),
-  ]
-    .filter(Boolean)
-    .join(" → ");
+  const route = [originRaw, destinationRaw].filter(Boolean).join(" → ");
 
   const location =
     type === "Hotel"
-      ? hotelAddress ||
-        item.destination ||
-        asString(extracted?.destination) ||
-        route ||
-        null
+      ? hotelAddress || destinationRaw || route || null
       : route || hotelAddress || null;
 
   const documentId = item.document_id ?? item.document_local_id ?? null;
   const travelItemId = item.id ?? null;
 
   const depIata =
-    type === "Flug"
-      ? normalizeIataCode(item.origin || asString(extracted?.origin))
-      : null;
+    type === "Flug" ? normalizeIataCode(originRaw) : null;
   const arrIata =
-    type === "Flug"
-      ? normalizeIataCode(
-          item.destination || asString(extracted?.destination)
-        )
-      : null;
+    type === "Flug" ? normalizeIataCode(destinationRaw) : null;
+
+  const isTrain = type === "Zugreisen";
 
   const main: TripEventDraft = {
     type,
@@ -180,10 +175,13 @@ export function travelItemToEventDrafts(item: TravelItemLike): TripEventDraft[] 
     address: hotelAddress,
     provider: item.provider || asString(extracted?.provider),
     booking_reference: bookingReference,
-    flight_number: type === "Flug" ? flightNumber : null,
+    flight_number:
+      type === "Flug" ? flightNumber : isTrain ? trainNumber || flightNumber : null,
     cabin_class: type === "Flug" ? cabinClass : null,
     departure_airport: depIata,
     arrival_airport: arrIata,
+    origin_place: isTrain || type === "Transfer" ? originRaw : null,
+    destination_place: isTrain || type === "Transfer" ? destinationRaw : null,
     document_id: documentId,
     travel_item_id: travelItemId,
     source_excerpt: title,
