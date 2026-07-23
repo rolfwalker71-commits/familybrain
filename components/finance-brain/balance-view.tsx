@@ -220,6 +220,8 @@ function ExpenseCard({
   onResendMail,
   onUpdate,
   onSetDocument,
+  mobileFocused,
+  onMobileFocus,
   aiImageBusy,
   mailBusy,
   editBusy,
@@ -241,6 +243,8 @@ function ExpenseCard({
     expenseId: number,
     documentId: number | null
   ) => Promise<void>;
+  mobileFocused?: boolean;
+  onMobileFocus?: (expenseId: number) => void;
   aiImageBusy?: boolean;
   mailBusy?: boolean;
   editBusy?: boolean;
@@ -330,7 +334,13 @@ function ExpenseCard({
   }
 
   return (
-    <div className="relative pl-5 sm:pl-6">
+    <div
+      id={`expense-card-${exp.id}`}
+      className={cn(
+        "relative pl-5 sm:pl-6",
+        mobileFocused && "rounded-md ring-2 ring-teal-400/40"
+      )}
+    >
       <IconCircle
         icon={visual.icon}
         tone={visual.tone}
@@ -349,13 +359,10 @@ function ExpenseCard({
             surface.title
           )}
         >
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center justify-between gap-2">
             <div className="min-w-0 shrink-0">
               {isoDate ? (
-                <CalendarDateBadge
-                  isoDate={isoDate}
-                  className="h-20 w-[4.75rem] sm:h-24 sm:w-[5.1rem]"
-                />
+                <CalendarDateBadge isoDate={isoDate} size="sm" />
               ) : (
                 <span className="text-xs font-medium text-muted-foreground">
                   Ohne Datum
@@ -375,14 +382,14 @@ function ExpenseCard({
                     <img
                       src={exp.ai_image_url}
                       alt=""
-                      className="h-20 w-20 rounded-md border border-foreground/10 object-cover shadow-sm sm:h-24 sm:w-24"
+                      className="h-12 w-12 rounded-md border border-foreground/10 object-cover shadow-sm sm:h-20 sm:w-20"
                     />
                   </button>
                   <Button
                     type="button"
                     size="icon-xs"
                     variant="secondary"
-                    className="absolute bottom-1 right-1 size-6 border border-border/70 bg-background/90 shadow-sm"
+                    className="absolute bottom-0.5 right-0.5 size-5 border border-border/70 bg-background/90 shadow-sm sm:bottom-1 sm:right-1 sm:size-6"
                     title="Vergrössern"
                     onClick={() => setZoomOpen(true)}
                   >
@@ -390,7 +397,7 @@ function ExpenseCard({
                   </Button>
                 </div>
               ) : aiImageBusy ? (
-                <div className="flex h-20 w-20 items-center justify-center rounded-md border border-dashed border-foreground/20 bg-background/50 text-[10px] text-muted-foreground sm:h-24 sm:w-24">
+                <div className="flex h-12 w-12 items-center justify-center rounded-md border border-dashed border-foreground/20 bg-background/50 text-[10px] text-muted-foreground sm:h-20 sm:w-20">
                   KI…
                 </div>
               ) : null}
@@ -690,16 +697,33 @@ function ExpenseCard({
           {canEdit && onUpdate && !editing ? (
             <Button
               type="button"
+              id={`expense-edit-${exp.id}`}
               size="sm"
               variant="ghost"
               className="h-7 px-2 text-xs"
-              onClick={startEdit}
+              onClick={() => {
+                onMobileFocus?.(exp.id);
+                startEdit();
+              }}
             >
               <Pencil className="mr-1 size-3.5" />
               Ändern
             </Button>
           ) : null}
 
+          {onMobileFocus && !editing ? (
+            <Button
+              type="button"
+              size="sm"
+              variant={mobileFocused ? "secondary" : "ghost"}
+              className="h-7 px-2 text-xs md:hidden"
+              onClick={() => onMobileFocus(exp.id)}
+            >
+              {mobileFocused ? "Aktiv" : "Aktionen"}
+            </Button>
+          ) : null}
+
+          <div className="hidden flex-wrap items-center gap-1 md:flex">
           {canEdit && onSetDocument && !editing ? (
             <>
               <Button
@@ -708,6 +732,7 @@ function ExpenseCard({
                 variant="ghost"
                 className="h-7 px-2 text-xs"
                 disabled={docBusy || editBusy}
+                id={`expense-link-doc-${exp.id}`}
                 onClick={() => setLinkDocOpen(true)}
               >
                 <Link2 className="mr-1 size-3.5" />
@@ -788,6 +813,7 @@ function ExpenseCard({
               KI-Bild
             </Button>
           ) : null}
+          </div>
 
           <div className="ml-auto flex items-center gap-1">
             {canDelete && onDelete ? (
@@ -795,7 +821,7 @@ function ExpenseCard({
                 type="button"
                 size="icon-xs"
                 variant="ghost"
-                className="text-destructive hover:text-destructive"
+                className="hidden text-destructive hover:text-destructive md:inline-flex"
                 title="Ausgabe löschen"
                 onClick={() => onDelete(exp.id)}
               >
@@ -917,8 +943,13 @@ export function ExpenseList({
   mailBusyId?: number | null;
   editBusyId?: number | null;
 }) {
+  const [mobileFocusId, setMobileFocusId] = useState<number | null>(null);
+  const focus =
+    expenses.find((e) => e.id === mobileFocusId) ||
+    (mobileFocusId != null ? expenses[0] : null);
+
   return (
-    <div className="space-y-3">
+    <div className={cn("space-y-3", mobileFocusId != null && "pb-24 md:pb-0")}>
       {expenses.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           {cashbookMode ? "Noch keine Buchungen." : "Noch keine Ausgaben."}
@@ -943,12 +974,123 @@ export function ExpenseList({
             onResendMail={onResendMail}
             onUpdate={onUpdateExpense}
             onSetDocument={onSetDocument}
+            mobileFocused={mobileFocusId === exp.id}
+            onMobileFocus={setMobileFocusId}
             aiImageBusy={aiImageBusyId === exp.id}
             mailBusy={mailBusyId === exp.id}
             editBusy={editBusyId === exp.id}
           />
         ))
       )}
+
+      {focus && (canEdit || canDelete) ? (
+        <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 md:hidden">
+          <div className="pointer-events-auto border-t border-border/80 bg-background/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(15,23,42,0.12)] backdrop-blur">
+            <p className="truncate px-1 text-[11px] text-muted-foreground">
+              {focus.description ||
+                (focus.direction === "income" ? "Einnahme" : "Ausgabe")}
+            </p>
+            <div className="mt-1 flex items-center gap-1 overflow-x-auto pb-0.5">
+              {canEdit && onUpdateExpense ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="shrink-0"
+                  onClick={() => {
+                    document.getElementById(`expense-edit-${focus.id}`)?.click();
+                  }}
+                >
+                  <Pencil className="mr-1 size-3.5" />
+                  Ändern
+                </Button>
+              ) : null}
+              {canEdit && onSetDocument ? (
+                <>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="shrink-0"
+                    disabled={editBusyId === focus.id}
+                    onClick={() => {
+                      const el = document.getElementById(
+                        `expense-link-doc-${focus.id}`
+                      );
+                      el?.click();
+                    }}
+                  >
+                    <Link2 className="mr-1 size-3.5" />
+                    Beleg
+                  </Button>
+                  {focus.document ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="shrink-0 text-destructive"
+                      disabled={editBusyId === focus.id}
+                      onClick={() => {
+                        if (
+                          !window.confirm(
+                            "Paperless-Verknüpfung wirklich entfernen?"
+                          )
+                        ) {
+                          return;
+                        }
+                        void onSetDocument(focus.id, null);
+                      }}
+                    >
+                      <Unlink className="mr-1 size-3.5" />
+                      Lösen
+                    </Button>
+                  ) : null}
+                </>
+              ) : null}
+              {onGenerateAiImage ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="shrink-0"
+                  disabled={aiImageBusyId === focus.id}
+                  onClick={() => onGenerateAiImage(focus.id)}
+                >
+                  <RefreshCw className="mr-1 size-3.5" />
+                  KI
+                </Button>
+              ) : null}
+              {onResendMail ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="shrink-0"
+                  disabled={mailBusyId === focus.id}
+                  onClick={() => onResendMail(focus.id)}
+                >
+                  <Mail className="mr-1 size-3.5" />
+                  Mail
+                </Button>
+              ) : null}
+              {canDelete && onDelete ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="shrink-0 text-destructive"
+                  onClick={() => onDelete(focus.id)}
+                >
+                  <Trash2 className="mr-1 size-3.5" />
+                  Löschen
+                </Button>
+              ) : null}
+              <Button
+                size="sm"
+                variant="ghost"
+                className="ml-auto shrink-0"
+                onClick={() => setMobileFocusId(null)}
+              >
+                Fertig
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

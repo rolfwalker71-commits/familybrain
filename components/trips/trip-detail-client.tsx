@@ -248,10 +248,12 @@ function parseEventIsoDate(raw: string | null | undefined): string | null {
 function EventDateHeader({
   event,
   reserveEndSlot = false,
+  size = "sm",
 }: {
   event: TripEvent;
   /** Keep title columns aligned when some events only have a start date. */
   reserveEndSlot?: boolean;
+  size?: "sm" | "md";
 }) {
   const startIso = parseEventIsoDate(event.start_date);
   if (!startIso) return null;
@@ -259,34 +261,34 @@ function EventDateHeader({
   const showEnd = Boolean(endIso && endIso !== startIso && endIso >= startIso);
   const startTime = toTimeInputValue(event.start_time) || null;
   const endTime = toTimeInputValue(event.end_time) || null;
+  const badgeW = size === "sm" ? "w-[3.15rem]" : "w-[4.5rem] sm:w-[4.85rem]";
+  const reserveW =
+    size === "sm" ? "w-[7.6rem]" : "w-[11.25rem] sm:w-[12.25rem]";
 
   return (
     <div
       className={cn(
-        "flex shrink-0 items-center gap-2",
-        reserveEndSlot && "w-[11.25rem] sm:w-[12.25rem]"
+        "flex shrink-0 items-center gap-1.5",
+        reserveEndSlot && reserveW
       )}
     >
-      <CalendarDateBadge isoDate={startIso} time={startTime} />
+      <CalendarDateBadge isoDate={startIso} time={startTime} size={size} />
       {showEnd && endIso ? (
         <>
-          <span className="w-5 shrink-0 text-center text-xs font-bold text-muted-foreground">
+          <span className="w-4 shrink-0 text-center text-[10px] font-bold text-muted-foreground sm:w-5 sm:text-xs">
             bis
           </span>
-          <CalendarDateBadge isoDate={endIso} time={endTime} />
+          <CalendarDateBadge isoDate={endIso} time={endTime} size={size} />
         </>
       ) : reserveEndSlot ? (
         <>
           <span
-            className="invisible w-5 shrink-0 text-center text-xs font-bold"
+            className="invisible w-4 shrink-0 text-center text-[10px] font-bold sm:w-5 sm:text-xs"
             aria-hidden
           >
             bis
           </span>
-          <div
-            className="invisible h-0 w-[4.5rem] shrink-0 sm:w-[4.85rem]"
-            aria-hidden
-          />
+          <div className={cn("invisible h-0 shrink-0", badgeW)} aria-hidden />
         </>
       ) : null}
     </div>
@@ -482,6 +484,8 @@ export function TripDetailClient({
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [editMode, setEditMode] = useState(false);
+  /** Mobile edit toolbar focuses actions on one event. */
+  const [editFocusEventId, setEditFocusEventId] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<TripViewMode>("cards");
   const [aiBatch, setAiBatch] = useState<{
     current: number;
@@ -1035,9 +1039,15 @@ export function TripDetailClient({
 
   function exitEditMode() {
     setEditMode(false);
+    setEditFocusEventId(null);
     closeEventSheet();
     setDragEventId(null);
     setDragOverEventId(null);
+  }
+
+  function enterEditMode() {
+    setEditMode(true);
+    setEditFocusEventId((prev) => prev ?? events[0]?.id ?? null);
   }
 
   async function persistEventOrder(nextEvents: TripEvent[]) {
@@ -1333,7 +1343,7 @@ export function TripDetailClient({
   }
 
   return (
-    <div className="space-y-6">
+    <div className={cn("space-y-6", editMode && !readOnly && "pb-28 md:pb-0")}>
       {!readOnly ? (
         <div className="flex flex-wrap items-center gap-2">
           <Link
@@ -1485,7 +1495,7 @@ export function TripDetailClient({
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setEditMode(true)}
+            onClick={() => enterEditMode()}
           >
             <Pencil className="mr-1.5 size-4" />
             Reise bearbeiten
@@ -2426,17 +2436,34 @@ export function TripDetailClient({
                       </div>
                       {!readOnly ? (
                         <div className="flex shrink-0 flex-col gap-0.5">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-7 px-2 text-xs"
-                            onClick={() => startEditEvent(event)}
-                          >
-                            <Pencil className="mr-1 size-3.5" />
-                            Ändern
-                          </Button>
+                          {!editMode ? (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 px-2 text-xs"
+                              onClick={() => startEditEvent(event)}
+                            >
+                              <Pencil className="mr-1 size-3.5" />
+                              Ändern
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant={
+                                editFocusEventId === event.id
+                                  ? "secondary"
+                                  : "ghost"
+                              }
+                              className="h-7 px-2 text-xs md:hidden"
+                              onClick={() => setEditFocusEventId(event.id)}
+                            >
+                              {editFocusEventId === event.id
+                                ? "Aktiv"
+                                : "Wählen"}
+                            </Button>
+                          )}
                           {editMode ? (
-                            <>
+                            <div className="hidden flex-col gap-0.5 md:flex">
                               <Button
                                 size="icon-xs"
                                 variant="ghost"
@@ -2449,41 +2476,12 @@ export function TripDetailClient({
                               <Button
                                 size="icon-xs"
                                 variant="ghost"
-                                title="KI-Bild"
-                                disabled={
-                                  busy || aiImageBusy || aiBatch != null
-                                }
-                                onClick={() => openAiImageDialog(event)}
+                                title="Ändern"
+                                onClick={() => startEditEvent(event)}
                               >
-                                <ImagePlus className="size-3.5" />
+                                <Pencil className="size-3.5" />
                               </Button>
-                              {event.ai_image_url ? (
-                                <>
-                                  <Button
-                                    size="icon-xs"
-                                    variant="ghost"
-                                    title="Herunterladen"
-                                    disabled={aiImageBusy}
-                                    onClick={() =>
-                                      void downloadEventAiImage(event.id)
-                                    }
-                                  >
-                                    <Download className="size-3.5" />
-                                  </Button>
-                                  <Button
-                                    size="icon-xs"
-                                    variant="ghost"
-                                    title="Ersetzen"
-                                    disabled={aiImageBusy}
-                                    onClick={() =>
-                                      pickReplaceAiImage(event.id)
-                                    }
-                                  >
-                                    <Replace className="size-3.5" />
-                                  </Button>
-                                </>
-                              ) : null}
-                            </>
+                            </div>
                           ) : null}
                         </div>
                       ) : null}
@@ -2546,196 +2544,160 @@ export function TripDetailClient({
                     "relative gap-0 overflow-visible py-0",
                     editingEventId === event.id && "ring-2 ring-foreground/15",
                     editMode &&
+                      editFocusEventId === event.id &&
+                      "ring-2 ring-teal-400/40",
+                    editMode &&
                       dragOverEventId === event.id &&
                       "ring-2 ring-teal-400/50"
                   )}
                 >
                   <div
                     className={cn(
-                      "rounded-t-[0.7rem] px-4 py-3 pl-8",
+                      "rounded-t-[0.7rem] px-3 py-2.5 pl-7 sm:px-4 sm:py-3 sm:pl-8",
                       toneSurface(visual.tone).title
                     )}
                   >
-                    <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
-                      <div aria-hidden className="min-w-0" />
-                      <div className="justify-self-center">
-                        <EventDateHeader event={event} />
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <EventDateHeader event={event} size="sm" />
                       </div>
-                      <div className="justify-self-end">
-                        {event.ai_image_url ? (
-                          <div className="relative">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={event.ai_image_url}
-                              alt=""
-                              className="h-16 w-16 rounded-md border border-border/60 object-cover shadow-sm sm:h-[4.5rem] sm:w-[4.5rem]"
-                            />
-                            <Button
-                              type="button"
-                              size="icon-xs"
-                              variant="secondary"
-                              className="absolute bottom-1 right-1 size-6 border border-border/70 bg-background/90 shadow-sm"
-                              title="Vergrössern"
-                              onClick={() =>
-                                setAiZoom({
-                                  url: event.ai_image_url!,
-                                  title: event.title,
-                                  eventId: event.id,
-                                })
-                              }
-                            >
-                              <Maximize2 className="size-3" />
-                            </Button>
-                          </div>
-                        ) : null}
-                      </div>
+                      {event.ai_image_url ? (
+                        <div className="relative shrink-0">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={event.ai_image_url}
+                            alt=""
+                            className="h-12 w-12 rounded-md border border-border/60 object-cover shadow-sm sm:h-16 sm:w-16"
+                          />
+                          <Button
+                            type="button"
+                            size="icon-xs"
+                            variant="secondary"
+                            className="absolute bottom-0.5 right-0.5 size-5 border border-border/70 bg-background/90 shadow-sm sm:size-6"
+                            title="Vergrössern"
+                            onClick={() =>
+                              setAiZoom({
+                                url: event.ai_image_url!,
+                                title: event.title,
+                                eventId: event.id,
+                              })
+                            }
+                          >
+                            <Maximize2 className="size-3" />
+                          </Button>
+                        </div>
+                      ) : null}
                     </div>
                   </div>
-                  <CardContent className="space-y-3 p-4 pl-8">
+                  <CardContent className="space-y-3 p-3 pl-7 sm:p-4 sm:pl-8">
                     <div className="flex items-start gap-2">
-                      <div className="flex min-w-0 flex-1 items-start gap-2 pr-2">
-                        {editMode ? (
-                          <div className="mt-0.5 flex shrink-0 flex-col items-center gap-0.5">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <Badge variant="secondary" className="shrink-0">
+                            {coerceTripEventType(event.event_type)}
+                          </Badge>
+                          {!readOnly && !editMode ? (
                             <Button
-                              type="button"
-                              size="icon-xs"
+                              size="sm"
                               variant="ghost"
-                              className="sm:hidden"
-                              disabled={busy || events[0]?.id === event.id}
-                              onClick={() => moveEvent(event.id, -1)}
-                              title="Nach oben"
+                              className="h-7 px-2 text-xs"
+                              onClick={() => startEditEvent(event)}
                             >
-                              <ChevronUp className="size-3.5" />
+                              <Pencil className="mr-1 size-3.5" />
+                              Ändern
                             </Button>
-                            <button
-                              type="button"
-                              draggable
-                              title="Ziehen zum Sortieren"
-                              className="hidden cursor-grab touch-none rounded p-1 text-muted-foreground hover:bg-background/70 active:cursor-grabbing sm:inline-flex"
-                              onDragStart={(e) => {
-                                setDragEventId(event.id);
-                                e.dataTransfer.effectAllowed = "move";
-                                e.dataTransfer.setData(
-                                  "text/plain",
-                                  String(event.id)
-                                );
-                              }}
-                              onDragEnd={() => {
-                                setDragEventId(null);
-                                setDragOverEventId(null);
-                              }}
-                            >
-                              <GripVertical className="size-4" />
-                            </button>
-                            <Button
-                              type="button"
-                              size="icon-xs"
-                              variant="ghost"
-                              className="sm:hidden"
-                              disabled={
-                                busy ||
-                                events[events.length - 1]?.id === event.id
-                              }
-                              onClick={() => moveEvent(event.id, 1)}
-                              title="Nach unten"
-                            >
-                              <ChevronDown className="size-3.5" />
-                            </Button>
-                          </div>
-                        ) : null}
-                        <div className="min-w-0 flex-1">
-                          <div className="text-xl font-black leading-tight tracking-tight sm:text-2xl">
-                            {event.title}
-                          </div>
-                          {(() => {
-                            const meta = formatEventMetaLine(event);
-                            return meta ? (
-                              <div className="mt-1 text-xs text-muted-foreground">
-                                {meta}
-                              </div>
-                            ) : null;
-                          })()}
+                          ) : null}
                         </div>
+                        <div className="mt-1 text-lg font-black leading-snug tracking-tight sm:text-2xl">
+                          {event.title}
+                        </div>
+                        {(() => {
+                          const meta = formatEventMetaLine(event);
+                          return meta ? (
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              {meta}
+                            </div>
+                          ) : null;
+                        })()}
                       </div>
-                      <div className="flex shrink-0 flex-wrap items-start justify-end gap-1">
-                        <Badge variant="secondary" className="shrink-0">
-                          {coerceTripEventType(event.event_type)}
-                        </Badge>
-                        {!readOnly ? (
+                      {/* Desktop edit actions — mobile uses bottom bar */}
+                      {editMode ? (
+                        <div className="hidden shrink-0 flex-col items-center gap-0.5 md:flex">
+                          <button
+                            type="button"
+                            draggable
+                            title="Ziehen zum Sortieren"
+                            className="cursor-grab touch-none rounded p-1 text-muted-foreground hover:bg-background/70 active:cursor-grabbing"
+                            onDragStart={(e) => {
+                              setDragEventId(event.id);
+                              e.dataTransfer.effectAllowed = "move";
+                              e.dataTransfer.setData(
+                                "text/plain",
+                                String(event.id)
+                              );
+                            }}
+                            onDragEnd={() => {
+                              setDragEventId(null);
+                              setDragOverEventId(null);
+                            }}
+                          >
+                            <GripVertical className="size-4" />
+                          </button>
                           <Button
                             size="sm"
-                            variant="ghost"
+                            variant={
+                              editFocusEventId === event.id
+                                ? "secondary"
+                                : "ghost"
+                            }
                             className="h-7 px-2 text-xs"
-                            onClick={() => startEditEvent(event)}
+                            onClick={() => {
+                              setEditFocusEventId(event.id);
+                              startEditEvent(event);
+                            }}
                           >
                             <Pencil className="mr-1 size-3.5" />
                             Ändern
                           </Button>
-                        ) : null}
-                        {editMode ? (
-                          <>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              title="KI-Bild"
-                              disabled={busy || aiImageBusy}
-                              onClick={() => openAiImageDialog(event)}
-                            >
-                              <ImagePlus className="size-3.5" />
-                            </Button>
-                            {event.ai_image_url ? (
-                              <>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  title="KI-Bild herunterladen"
-                                  disabled={aiImageBusy}
-                                  onClick={() =>
-                                    void downloadEventAiImage(event.id)
-                                  }
-                                >
-                                  <Download className="size-3.5" />
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  title="KI-Bild ersetzen"
-                                  disabled={aiImageBusy}
-                                  onClick={() => pickReplaceAiImage(event.id)}
-                                >
-                                  <Replace className="size-3.5" />
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  title="KI-Bild entfernen"
-                                  disabled={aiImageBusy}
-                                  onClick={() => void deleteAiImage(event.id)}
-                                >
-                                  <X className="size-3.5 text-muted-foreground" />
-                                </Button>
-                              </>
-                            ) : null}
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              title="Belege verknüpfen"
-                              disabled={busy}
-                              onClick={() => setLinkDocsEventId(event.id)}
-                            >
-                              <FilePlus2 className="size-3.5" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => void removeEvent(event.id)}
-                            >
-                              <Trash2 className="size-3.5" />
-                            </Button>
-                          </>
-                        ) : null}
-                      </div>
+                          <Button
+                            size="icon-xs"
+                            variant="ghost"
+                            title="Belege verknüpfen"
+                            disabled={busy}
+                            onClick={() => {
+                              setEditFocusEventId(event.id);
+                              setLinkDocsEventId(event.id);
+                            }}
+                          >
+                            <FilePlus2 className="size-3.5" />
+                          </Button>
+                          <Button
+                            size="icon-xs"
+                            variant="ghost"
+                            title="Löschen"
+                            onClick={() => void removeEvent(event.id)}
+                          >
+                            <Trash2 className="size-3.5" />
+                          </Button>
+                        </div>
+                      ) : null}
                     </div>
+                    {editMode ? (
+                      <button
+                        type="button"
+                        className={cn(
+                          "w-full rounded-md border border-dashed px-2 py-1.5 text-left text-xs md:hidden",
+                          editFocusEventId === event.id
+                            ? "border-foreground/40 bg-background/80 font-medium"
+                            : "border-border/60 text-muted-foreground"
+                        )}
+                        onClick={() => setEditFocusEventId(event.id)}
+                      >
+                        {editFocusEventId === event.id
+                          ? "Für Aktionen unten ausgewählt"
+                          : "Tippen zum Auswählen"}
+                      </button>
+                    ) : null}
 
                     {(() => {
                       const type = coerceTripEventType(event.event_type);
@@ -3376,6 +3338,123 @@ export function TripDetailClient({
           }
         }}
       />
+
+      {editMode && !readOnly ? (
+        <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 md:hidden">
+          <div className="pointer-events-auto border-t border-border/80 bg-background/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(15,23,42,0.12)] backdrop-blur">
+            {(() => {
+              const focus =
+                events.find((e) => e.id === editFocusEventId) || events[0];
+              if (!focus) {
+                return (
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => openNewEvent()}
+                    >
+                      <Plus className="mr-1 size-4" />
+                      Neuer Eintrag
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => exitEditMode()}
+                    >
+                      Ansicht
+                    </Button>
+                  </div>
+                );
+              }
+              const focusIdx = events.findIndex((e) => e.id === focus.id);
+              return (
+                <div className="space-y-1.5">
+                  <p className="truncate px-1 text-[11px] text-muted-foreground">
+                    {focus.title}
+                  </p>
+                  <div className="flex items-center gap-1 overflow-x-auto pb-0.5">
+                    <Button
+                      size="icon-sm"
+                      variant="outline"
+                      disabled={busy || focusIdx <= 0}
+                      title="Nach oben"
+                      onClick={() => moveEvent(focus.id, -1)}
+                    >
+                      <ChevronUp className="size-4" />
+                    </Button>
+                    <Button
+                      size="icon-sm"
+                      variant="outline"
+                      disabled={
+                        busy || focusIdx < 0 || focusIdx >= events.length - 1
+                      }
+                      title="Nach unten"
+                      onClick={() => moveEvent(focus.id, 1)}
+                    >
+                      <ChevronDown className="size-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="shrink-0"
+                      onClick={() => startEditEvent(focus)}
+                    >
+                      <Pencil className="mr-1 size-3.5" />
+                      Ändern
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="shrink-0"
+                      disabled={busy}
+                      onClick={() => setLinkDocsEventId(focus.id)}
+                    >
+                      <FilePlus2 className="mr-1 size-3.5" />
+                      Beleg
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="shrink-0"
+                      disabled={busy || aiImageBusy}
+                      onClick={() => openAiImageDialog(focus)}
+                    >
+                      <ImagePlus className="mr-1 size-3.5" />
+                      KI
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="shrink-0 text-destructive"
+                      onClick={() => void removeEvent(focus.id)}
+                    >
+                      <Trash2 className="mr-1 size-3.5" />
+                      Löschen
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="ml-auto shrink-0"
+                      onClick={() => openNewEvent()}
+                    >
+                      <Plus className="mr-1 size-3.5" />
+                      Neu
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="shrink-0"
+                      onClick={() => exitEditMode()}
+                    >
+                      Fertig
+                    </Button>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
