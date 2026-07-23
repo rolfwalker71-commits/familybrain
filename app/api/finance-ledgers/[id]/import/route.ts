@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   createFinanceExpense,
   getFinanceLedgerById,
+  isNormalLedger,
   listFinanceExpenseSplits,
   listPaperlessFinancialItemsForImport,
   listTripDocumentsForImport,
@@ -18,7 +19,7 @@ type Ctx = { params: Promise<{ id: string }> };
 
 const ImportSchema = z.object({
   documentId: z.number().int().positive(),
-  paidByMemberId: z.number().int().positive(),
+  paidByMemberId: z.number().int().positive().optional(),
   amount: z.number().positive().optional(),
   currency: z.string().min(3).max(3).optional(),
   exchangeRate: z.number().positive().optional(),
@@ -26,6 +27,7 @@ const ImportSchema = z.object({
   expenseDate: z.string().nullable().optional(),
   tripEventId: z.number().int().positive().nullable().optional(),
   memberIds: z.array(z.number().int().positive()).optional(),
+  direction: z.enum(["expense", "income"]).optional(),
 });
 
 export async function GET(_request: Request, context: Ctx) {
@@ -124,8 +126,16 @@ export async function POST(request: Request, context: Ctx) {
       }
     }
 
+    const normal = isNormalLedger(ledger);
+    if (!normal && parsed.data.paidByMemberId == null) {
+      return NextResponse.json(
+        { error: "Zahler ist erforderlich" },
+        { status: 400 }
+      );
+    }
+
     const expense = createFinanceExpense(id, {
-      paidByMemberId: parsed.data.paidByMemberId,
+      paidByMemberId: parsed.data.paidByMemberId ?? null,
       amount,
       currency,
       exchangeRate,
@@ -133,10 +143,13 @@ export async function POST(request: Request, context: Ctx) {
       expenseDate,
       documentId: parsed.data.documentId,
       tripEventId,
-      split: {
-        mode: "equal",
-        memberIds: parsed.data.memberIds ?? [],
-      },
+      direction: parsed.data.direction ?? "expense",
+      split: normal
+        ? undefined
+        : {
+            mode: "equal",
+            memberIds: parsed.data.memberIds ?? [],
+          },
     });
     return NextResponse.json({
       ok: true,

@@ -42,7 +42,8 @@ import {
   SettlementList,
 } from "@/components/finance-brain/balance-view";
 import { PendingReceiptPicker } from "@/components/finance-brain/expense-receipt-controls";
-import { COMMON_CURRENCIES } from "@/lib/finance-brain/constants";
+import { COMMON_CURRENCIES, LEDGER_KIND_LABELS } from "@/lib/finance-brain/constants";
+import { formatMoney, formatSignedMoney } from "@/lib/finance-brain/format";
 import { cn } from "@/lib/utils";
 import { todayDateInputValue } from "@/lib/utils/dates";
 
@@ -60,6 +61,7 @@ type LedgerDetail = {
     id: number;
     title: string;
     base_currency: string;
+    ledger_kind?: "split" | "normal";
     trip_id: number | null;
     trip_title: string | null;
   };
@@ -73,6 +75,7 @@ type LedgerDetail = {
     amount_base: number;
     expense_date: string | null;
     paid_by_member_id: number;
+    direction?: "expense" | "income";
     category_label?: string | null;
     category_tone?: string | null;
     place_name?: string | null;
@@ -112,6 +115,11 @@ type LedgerDetail = {
     toDisplayName: string;
     amount: number;
   }>;
+  cashbook?: {
+    expenseTotalBase: number;
+    incomeTotalBase: number;
+    netBase: number;
+  };
 };
 
 type ImportDoc = {
@@ -149,6 +157,9 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
   const [expPlace, setExpPlace] = useState("");
   const [expNote, setExpNote] = useState("");
   const [expPayer, setExpPayer] = useState<string>("");
+  const [expDirection, setExpDirection] = useState<"expense" | "income">(
+    "expense"
+  );
   const [rateLoading, setRateLoading] = useState(false);
   const [pendingReceipt, setPendingReceipt] = useState<File | null>(null);
   const [aiImageBusyId, setAiImageBusyId] = useState<number | null>(null);
@@ -368,13 +379,21 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
 
   async function addExpense() {
     const amount = Number(expAmount);
-    if (!amount || !expPayer) return;
+    const isNormal = data?.ledger.ledger_kind === "normal";
+    if (!amount) return;
+    if (!isNormal && !expPayer) return;
     try {
       const res = await fetch(`/api/finance-ledgers/${ledgerId}/expenses`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          paidByMemberId: Number(expPayer),
+          ...(isNormal
+            ? { direction: expDirection }
+            : {
+                paidByMemberId: Number(expPayer),
+                split: { mode: "equal" },
+                direction: "expense",
+              }),
           amount,
           currency: expCurrency,
           exchangeRate: Number(expRate) || 1,
@@ -382,7 +401,6 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
           expenseDate: expDate || null,
           place: expPlace.trim() || null,
           note: expNote.trim() || null,
-          split: { mode: "equal" },
         }),
       });
       const json = await res.json();
@@ -410,6 +428,7 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
       setExpNote("");
       setExpCurrency(data?.ledger.base_currency ?? "CHF");
       setExpRate("1");
+      setExpDirection("expense");
       setPendingReceipt(null);
       await load();
     } catch (err) {
@@ -521,6 +540,7 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
       amount: number;
       currency: string;
       exchangeRate: number;
+      direction?: "expense" | "income";
     }
   ) {
     setEditBusyId(expenseId);
@@ -646,14 +666,17 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
   }
 
   async function importDocument(doc: ImportDoc) {
-    if (!importPayer) return;
+    const isNormal = data?.ledger.ledger_kind === "normal";
+    if (!isNormal && !importPayer) return;
     try {
       const res = await fetch(`/api/finance-ledgers/${ledgerId}/import`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           documentId: doc.document_id,
-          paidByMemberId: Number(importPayer),
+          ...(isNormal
+            ? { direction: "expense" }
+            : { paidByMemberId: Number(importPayer) }),
         }),
       });
       const json = await res.json();
@@ -706,8 +729,16 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
     );
   }
 
-  const { ledger, members, expenses, settlements, balances, simplifiedDebts } =
-    data;
+  const {
+    ledger,
+    members,
+    expenses,
+    settlements,
+    balances,
+    simplifiedDebts,
+    cashbook,
+  } = data;
+  const isNormal = ledger.ledger_kind === "normal";
   const hasImport =
     importDocs.tripDocuments.length > 0 ||
     importDocs.paperlessItems.length > 0;
@@ -721,6 +752,8 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
   const currencySelectItems = Object.fromEntries(
     COMMON_CURRENCIES.map((c) => [c, c])
   );
+  const kindLabel =
+    LEDGER_KIND_LABELS[isNormal ? "normal" : "split"];
 
   return (
     <div className="space-y-6">
@@ -744,18 +777,24 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
           <RefreshCw className="mr-1 size-4" />
           Aktualisieren
         </Button>
-        <Button variant="outline" size="sm" onClick={() => void sendReminders()}>
-          <Bell className="mr-1 size-4" />
-          Saldo-Erinnerungen
-        </Button>
+        {!isNormal ? (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void sendReminders()}
+          >
+            <Bell className="mr-1 size-4" />
+            Saldo-Erinnerungen
+          </Button>
+        ) : null}
       </div>
 
       <PageHeader
         title={ledger.title}
         description={
           ledger.trip_title
-            ? `Basiswährung ${ledger.base_currency} · Reise: ${ledger.trip_title}`
-            : `Basiswährung ${ledger.base_currency}`
+            ? `${kindLabel} · Basiswährung ${ledger.base_currency} · Reise: ${ledger.trip_title}`
+            : `${kindLabel} · Basiswährung ${ledger.base_currency}`
         }
         icon={pageVisuals.financeBrain.icon}
         tone={pageVisuals.financeBrain.tone}
@@ -820,27 +859,63 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
         </div>
       </SectionCard>
 
-      <BalanceView
-        balances={balances}
-        simplifiedDebts={simplifiedDebts}
-        baseCurrency={ledger.base_currency}
-      />
+      {!isNormal ? (
+        <BalanceView
+          balances={balances}
+          simplifiedDebts={simplifiedDebts}
+          baseCurrency={ledger.base_currency}
+        />
+      ) : (
+        <SectionCard title="Übersicht" tone="green" icon={Receipt}>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-md border border-border/60 px-3 py-2">
+              <p className="text-xs text-muted-foreground">Ausgaben</p>
+              <p className="text-lg font-semibold">
+                {formatMoney(
+                  cashbook?.expenseTotalBase ?? 0,
+                  ledger.base_currency
+                )}
+              </p>
+            </div>
+            <div className="rounded-md border border-border/60 px-3 py-2">
+              <p className="text-xs text-muted-foreground">Einnahmen</p>
+              <p className="text-lg font-semibold text-emerald-700">
+                {formatMoney(
+                  cashbook?.incomeTotalBase ?? 0,
+                  ledger.base_currency
+                )}
+              </p>
+            </div>
+            <div className="rounded-md border border-border/60 px-3 py-2">
+              <p className="text-xs text-muted-foreground">Saldo</p>
+              <p className="text-lg font-semibold">
+                {formatSignedMoney(
+                  cashbook?.netBase ?? 0,
+                  ledger.base_currency
+                )}
+              </p>
+            </div>
+          </div>
+        </SectionCard>
+      )}
 
       <div className="flex flex-wrap gap-2">
-        <Button
-          variant={panel === "members" ? "default" : "outline"}
-          size="sm"
-          onClick={() => togglePanel("members")}
-          className="gap-1.5"
-        >
-          <Users className="size-4" />
-          Teilnehmer
-          {panel === "members" ? (
-            <ChevronUp className="size-3.5 opacity-70" />
-          ) : (
-            <ChevronDown className="size-3.5 opacity-70" />
-          )}
-        </Button>
+        {!isNormal ? (
+          <Button
+            variant={panel === "members" ? "default" : "outline"}
+            size="sm"
+            onClick={() => togglePanel("members")}
+            className="gap-1.5"
+          >
+            <Users className="size-4" />
+            Teilnehmer
+            {panel === "members" ? (
+              <ChevronUp className="size-3.5 opacity-70" />
+            ) : (
+              <ChevronDown className="size-3.5 opacity-70" />
+            )}
+          </Button>
+        ) : null}
         <Button
           variant={panel === "import" ? "default" : "outline"}
           size="sm"
@@ -855,20 +930,24 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
             <ChevronDown className="size-3.5 opacity-70" />
           )}
         </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          className="gap-1.5"
-          disabled={summaryMailBusy || expenses.length === 0}
-          onClick={() => void sendExpensesSummaryMail()}
-          title="Alle Ausgaben per Mail inkl. PDF an die Gruppe senden"
-        >
-          <Mail className={cn("size-4", summaryMailBusy && "animate-pulse")} />
-          {summaryMailBusy ? "Sendet…" : "Ausgaben-Mail"}
-        </Button>
+        {!isNormal ? (
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            disabled={summaryMailBusy || expenses.length === 0}
+            onClick={() => void sendExpensesSummaryMail()}
+            title="Alle Ausgaben per Mail inkl. PDF an die Gruppe senden"
+          >
+            <Mail
+              className={cn("size-4", summaryMailBusy && "animate-pulse")}
+            />
+            {summaryMailBusy ? "Sendet…" : "Ausgaben-Mail"}
+          </Button>
+        ) : null}
       </div>
 
-      {panel === "members" ? (
+      {panel === "members" && !isNormal ? (
         <SectionCard title="Teilnehmer & Einladungs-Links" tone="sky" icon={Users}>
           <p className="mb-3 text-sm text-muted-foreground">
             E-Mail-Adresse eintragen, damit Beleg-Mails (Ausgabe / Rückzahlung)
@@ -947,28 +1026,30 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
             </p>
           ) : (
             <>
-              <div className="mb-3 space-y-1">
-                <Label>Bezahlt von</Label>
-                <Select
-                  value={importPayer}
-                  onValueChange={(v) => {
-                    if (v == null) return;
-                    setImportPayer(v);
-                  }}
-                  items={memberSelectItems}
-                >
-                  <SelectTrigger className="max-w-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {members.map((m) => (
-                      <SelectItem key={m.id} value={String(m.id)}>
-                        {m.display_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {!isNormal ? (
+                <div className="mb-3 space-y-1">
+                  <Label>Bezahlt von</Label>
+                  <Select
+                    value={importPayer}
+                    onValueChange={(v) => {
+                      if (v == null) return;
+                      setImportPayer(v);
+                    }}
+                    items={memberSelectItems}
+                  >
+                    <SelectTrigger className="max-w-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {members.map((m) => (
+                        <SelectItem key={m.id} value={String(m.id)}>
+                          {m.display_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : null}
               {importDocs.tripDocuments.length > 0 ? (
                 <div className="mb-4 space-y-2">
                   <p className="text-xs font-medium text-muted-foreground">
@@ -1004,8 +1085,33 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
         </SectionCard>
       ) : null}
 
-      <SectionCard title="Ausgabe erfassen" tone="orange" icon={Receipt}>
+      <SectionCard
+        title={isNormal ? "Buchung erfassen" : "Ausgabe erfassen"}
+        tone="orange"
+        icon={Receipt}
+      >
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          {isNormal ? (
+            <div className="space-y-1">
+              <Label>Typ</Label>
+              <Select
+                value={expDirection}
+                onValueChange={(v) => {
+                  if (v == null) return;
+                  setExpDirection(v as "expense" | "income");
+                }}
+                items={{ expense: "Ausgabe", income: "Einnahme" }}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="expense">Ausgabe</SelectItem>
+                  <SelectItem value="income">Einnahme</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
           <div className="space-y-1">
             <Label>Betrag</Label>
             <Input
@@ -1065,28 +1171,30 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
               </Button>
             </div>
           </div>
-          <div className="space-y-1">
-            <Label>Bezahlt von</Label>
-            <Select
-              value={expPayer}
-              onValueChange={(v) => {
-                if (v == null) return;
-                setExpPayer(v);
-              }}
-              items={memberSelectItems}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Person" />
-              </SelectTrigger>
-              <SelectContent>
-                {members.map((m) => (
-                  <SelectItem key={m.id} value={String(m.id)}>
-                    {m.display_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {!isNormal ? (
+            <div className="space-y-1">
+              <Label>Bezahlt von</Label>
+              <Select
+                value={expPayer}
+                onValueChange={(v) => {
+                  if (v == null) return;
+                  setExpPayer(v);
+                }}
+                items={memberSelectItems}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Person" />
+                </SelectTrigger>
+                <SelectContent>
+                  {members.map((m) => (
+                    <SelectItem key={m.id} value={String(m.id)}>
+                      {m.display_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
           <div className="space-y-1 sm:col-span-2">
             <Label>Beschreibung</Label>
             <Input
@@ -1108,7 +1216,7 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
               rows={2}
               value={expNote}
               onChange={(e) => setExpNote(e.target.value)}
-              placeholder="Zusätzliche Infos zur Ausgabe"
+              placeholder="Zusätzliche Infos"
             />
           </div>
           <div className="space-y-1">
@@ -1140,11 +1248,13 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
           </div>
         </div>
         <p className="mt-2 text-xs text-muted-foreground">
-          Aufteilung: gleichmässig auf alle Teilnehmer. Kurs-Button lädt den
-          EZB-Referenzkurs (optional zum Ausgabedatum).
+          {isNormal
+            ? "Einfache Ein- und Ausgaben ohne Split oder Ausgleich."
+            : "Aufteilung: gleichmässig auf alle Teilnehmer. Kurs-Button lädt den EZB-Referenzkurs (optional zum Ausgabedatum)."}
         </p>
       </SectionCard>
 
+      {!isNormal ? (
       <SectionCard title="Rückzahlung" tone="teal" icon={ArrowLeftRight}>
         <p className="mb-3 text-sm text-muted-foreground">
           Wer hat wem Geld zurückbezahlt? («Von» = Person, die zahlt und damit
@@ -1280,12 +1390,18 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
           </div>
         </div>
       </SectionCard>
+      ) : null}
 
-      <SectionCard title="Ausgaben" tone="green" icon={Receipt}>
+      <SectionCard
+        title={isNormal ? "Buchungen" : "Ausgaben"}
+        tone="green"
+        icon={Receipt}
+      >
         <ExpenseList
           expenses={expenses}
           members={members}
           baseCurrency={ledger.base_currency}
+          cashbookMode={isNormal}
           canDelete
           canEdit
           onDelete={(id) => void deleteExpense(id)}
@@ -1295,7 +1411,9 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
           onReceiptChanged={() => void load()}
           onGenerateAiImage={(id) => void generateAiImage(id)}
           onDeleteAiImage={(id) => void deleteAiImage(id)}
-          onResendMail={(id) => void resendExpenseMail(id)}
+          onResendMail={
+            isNormal ? undefined : (id) => void resendExpenseMail(id)
+          }
           onUpdateExpense={(id, payload) => updateExpense(id, payload)}
           aiImageBusyId={aiImageBusyId}
           mailBusyId={mailBusyId}
@@ -1303,6 +1421,7 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
         />
       </SectionCard>
 
+      {!isNormal ? (
       <SectionCard title="Rückzahlungen" tone="teal" icon={ArrowLeftRight}>
         <SettlementList
           settlements={settlements}
@@ -1315,6 +1434,7 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
           editBusyId={editBusyId}
         />
       </SectionCard>
+      ) : null}
     </div>
   );
 }

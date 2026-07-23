@@ -5,7 +5,7 @@ import {
   listFinanceLedgers,
 } from "@/lib/finance-brain/queries";
 import { serializeLedger } from "@/lib/finance-brain/serialize";
-import { COMMON_CURRENCIES } from "@/lib/finance-brain/constants";
+import { COMMON_CURRENCIES, LEDGER_KINDS } from "@/lib/finance-brain/constants";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,6 +15,7 @@ const CreateSchema = z.object({
   baseCurrency: z.string().min(3).max(3).optional(),
   tripId: z.number().int().positive().nullable().optional(),
   memberNames: z.array(z.string().min(1).max(80)).optional(),
+  ledgerKind: z.enum(LEDGER_KINDS).optional(),
 });
 
 export async function GET() {
@@ -40,7 +41,11 @@ export async function POST(request: Request) {
       title: parsed.data.title,
       baseCurrency: currency,
       tripId: parsed.data.tripId ?? null,
-      memberNames: parsed.data.memberNames,
+      memberNames:
+        parsed.data.ledgerKind === "normal"
+          ? undefined
+          : parsed.data.memberNames,
+      ledgerKind: parsed.data.ledgerKind ?? "split",
     });
     return NextResponse.json({
       ok: true,

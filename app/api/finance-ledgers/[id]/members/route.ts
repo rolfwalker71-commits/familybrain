@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   addFinanceLedgerMember,
   getFinanceLedgerById,
+  isNormalLedger,
   listFinanceLedgerMembers,
   rotateFinanceLedgerMemberToken,
   revokeFinanceLedgerMember,
@@ -28,8 +29,12 @@ const CreateSchema = z.object({
 export async function GET(_request: Request, context: Ctx) {
   const { id: idRaw } = await context.params;
   const id = Number(idRaw);
-  if (!getFinanceLedgerById(id)) {
+  const ledger = getFinanceLedgerById(id);
+  if (!ledger) {
     return NextResponse.json({ error: "Abrechnung nicht gefunden" }, { status: 404 });
+  }
+  if (isNormalLedger(ledger)) {
+    return NextResponse.json({ members: [] });
   }
   return NextResponse.json({
     members: listFinanceLedgerMembers(id).map(serializeMemberWithToken),
@@ -43,6 +48,12 @@ export async function POST(request: Request, context: Ctx) {
     const ledger = getFinanceLedgerById(id);
     if (!ledger) {
       return NextResponse.json({ error: "Abrechnung nicht gefunden" }, { status: 404 });
+    }
+    if (isNormalLedger(ledger)) {
+      return NextResponse.json(
+        { error: "Teilnehmer sind nur bei Split-Abrechnungen möglich" },
+        { status: 400 }
+      );
     }
     const body = await request.json();
     const parsed = CreateSchema.safeParse(body);

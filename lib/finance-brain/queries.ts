@@ -3,7 +3,7 @@ import fs from "fs";
 import { getDb } from "@/lib/db/client";
 import { getTripById } from "@/lib/trips/queries";
 import { nowIso } from "@/lib/utils/dates";
-import { DEFAULT_BASE_CURRENCY, type SplitMode } from "@/lib/finance-brain/constants";
+import { DEFAULT_BASE_CURRENCY, NORMAL_SOLO_MEMBER_NAME, type ExpenseDirection, type LedgerKind, type SplitMode } from "@/lib/finance-brain/constants";
 import {
   computeEqualSplits,
   computeShareSplits,
@@ -16,6 +16,7 @@ export type FinanceLedgerRow = {
   id: number;
   title: string;
   base_currency: string;
+  ledger_kind: LedgerKind;
   trip_id: number | null;
   created_at: string;
   updated_at: string;
@@ -55,6 +56,7 @@ export type FinanceExpenseRow = {
   place_lon: number | null;
   notified_at: string | null;
   note: string | null;
+  direction: ExpenseDirection;
   split_mode: string;
   created_at: string;
   updated_at: string;
@@ -87,15 +89,59 @@ function newToken(): string {
   return randomBytes(24).toString("base64url");
 }
 
+export function coerceLedgerKind(
+  raw: string | null | undefined
+): LedgerKind {
+  return raw === "normal" ? "normal" : "split";
+}
+
+export function coerceExpenseDirection(
+  raw: string | null | undefined
+): ExpenseDirection {
+  return raw === "income" ? "income" : "expense";
+}
+
+export function isNormalLedger(ledger: FinanceLedgerRow): boolean {
+  return coerceLedgerKind(ledger.ledger_kind) === "normal";
+}
+
+export function assertSplitLedgerFeatures(
+  ledger: FinanceLedgerRow,
+  feature: string
+): void {
+  if (isNormalLedger(ledger)) {
+    throw new Error(`${feature} ist nur bei Split-Abrechnungen möglich`);
+  }
+}
+
+/** Hidden solo member used for Normal cashbook FK/split integrity. */
+export function ensureNormalSoloMember(
+  ledgerId: number
+): FinanceLedgerMemberRow {
+  const members = listFinanceLedgerMembers(ledgerId);
+  const existing = members.find(
+    (m) => m.display_name === NORMAL_SOLO_MEMBER_NAME
+  );
+  if (existing) return existing;
+  return addFinanceLedgerMember(ledgerId, {
+    displayName: NORMAL_SOLO_MEMBER_NAME,
+  });
+}
+
 export function listFinanceLedgers(): FinanceLedgerRow[] {
   const db = getDb();
-  return db
-    .prepare(
-      `SELECT * FROM finance_ledgers
-       WHERE archived_at IS NULL
-       ORDER BY updated_at DESC, id DESC`
-    )
-    .all() as FinanceLedgerRow[];
+  return (
+    db
+      .prepare(
+        `SELECT * FROM finance_ledgers
+         WHERE archived_at IS NULL
+         ORDER BY updated_at DESC, id DESC`
+      )
+      .all() as FinanceLedgerRow[]
+  ).map((row) => ({
+    ...row,
+    ledger_kind: coerceLedgerKind(row.ledger_kind),
+  }));
 }
 
 export function getFinanceLedgerById(id: number): FinanceLedgerRow | null {
@@ -103,7 +149,8 @@ export function getFinanceLedgerById(id: number): FinanceLedgerRow | null {
   const row = db
     .prepare(`SELECT * FROM finance_ledgers WHERE id = ?`)
     .get(id) as FinanceLedgerRow | undefined;
-  return row ?? null;
+  if (!row) return null;
+  return { ...row, ledger_kind: coerceLedgerKind(row.ledger_kind) };
 }
 
 export function getFinanceLedgerByTripId(
@@ -117,7 +164,8 @@ export function getFinanceLedgerByTripId(
        ORDER BY id DESC LIMIT 1`
     )
     .get(tripId) as FinanceLedgerRow | undefined;
-  return row ?? null;
+  if (!row) return null;
+  return { ...row, ledger_kind: coerceLedgerKind(row.ledger_kind) };
 }
 
 export function createFinanceLedger(input: {
@@ -125,31 +173,41 @@ export function createFinanceLedger(input: {
   baseCurrency?: string;
   tripId?: number | null;
   memberNames?: string[];
+  ledgerKind?: LedgerKind;
 }): FinanceLedgerRow {
   const db = getDb();
   const ts = nowIso();
   const baseCurrency = (input.baseCurrency || DEFAULT_BASE_CURRENCY)
     .trim()
     .toUpperCase();
+  const ledgerKind = coerceLedgerKind(input.ledgerKind);
   if (input.tripId != null && !getTripById(input.tripId)) {
     throw new Error("Reise nicht gefunden");
   }
+  // Trip-linked ledgers are always Split Abrechnung.
+  const kind: LedgerKind =
+    input.tripId != null ? "split" : ledgerKind;
   const result = db
     .prepare(
-      `INSERT INTO finance_ledgers (title, base_currency, trip_id, created_at, updated_at, archived_at)
-       VALUES (?, ?, ?, ?, ?, NULL)`
+      `INSERT INTO finance_ledgers (title, base_currency, ledger_kind, trip_id, created_at, updated_at, archived_at)
+       VALUES (?, ?, ?, ?, ?, ?, NULL)`
     )
     .run(
       input.title.trim(),
       baseCurrency,
+      kind,
       input.tripId ?? null,
       ts,
       ts
     );
   const ledgerId = Number(result.lastInsertRowid);
-  const names = input.memberNames?.filter((n) => n.trim()) ?? [];
-  for (const name of names) {
-    addFinanceLedgerMember(ledgerId, { displayName: name });
+  if (kind === "normal") {
+    ensureNormalSoloMember(ledgerId);
+  } else {
+    const names = input.memberNames?.filter((n) => n.trim()) ?? [];
+    for (const name of names) {
+      addFinanceLedgerMember(ledgerId, { displayName: name });
+    }
   }
   const ledger = getFinanceLedgerById(ledgerId);
   if (!ledger) throw new Error("Abrechnung konnte nicht angelegt werden");
@@ -248,8 +306,20 @@ export function addFinanceLedgerMember(
   ledgerId: number,
   input: { displayName: string; email?: string | null }
 ): FinanceLedgerMemberRow {
-  if (!getFinanceLedgerById(ledgerId)) {
+  const ledger = getFinanceLedgerById(ledgerId);
+  if (!ledger) {
     throw new Error("Abrechnung nicht gefunden");
+  }
+  const displayName = input.displayName.trim();
+  if (isNormalLedger(ledger)) {
+    // Only the hidden solo member may exist on Normal ledgers.
+    if (displayName !== NORMAL_SOLO_MEMBER_NAME) {
+      throw new Error("Teilnehmer sind nur bei Split-Abrechnungen möglich");
+    }
+    const existing = listFinanceLedgerMembers(ledgerId);
+    if (existing.length > 0) {
+      throw new Error("Teilnehmer sind nur bei Split-Abrechnungen möglich");
+    }
   }
   const db = getDb();
   const token = newToken();
@@ -262,7 +332,7 @@ export function addFinanceLedgerMember(
     )
     .run(
       ledgerId,
-      input.displayName.trim(),
+      displayName,
       input.email?.trim() || null,
       token,
       ts
@@ -334,13 +404,18 @@ function touchLedger(ledgerId: number) {
 
 export function listFinanceExpenses(ledgerId: number): FinanceExpenseRow[] {
   const db = getDb();
-  return db
-    .prepare(
-      `SELECT * FROM finance_expenses
-       WHERE ledger_id = ?
-       ORDER BY COALESCE(expense_date, created_at) DESC, id DESC`
-    )
-    .all(ledgerId) as FinanceExpenseRow[];
+  return (
+    db
+      .prepare(
+        `SELECT * FROM finance_expenses
+         WHERE ledger_id = ?
+         ORDER BY COALESCE(expense_date, created_at) DESC, id DESC`
+      )
+      .all(ledgerId) as FinanceExpenseRow[]
+  ).map((row) => ({
+    ...row,
+    direction: coerceExpenseDirection(row.direction),
+  }));
 }
 
 export function getFinanceExpenseById(
@@ -350,7 +425,8 @@ export function getFinanceExpenseById(
   const row = db
     .prepare(`SELECT * FROM finance_expenses WHERE id = ?`)
     .get(expenseId) as FinanceExpenseRow | undefined;
-  return row ?? null;
+  if (!row) return null;
+  return { ...row, direction: coerceExpenseDirection(row.direction) };
 }
 
 export function listFinanceExpenseSplits(
@@ -373,7 +449,7 @@ export type ExpenseSplitInput =
 export function createFinanceExpense(
   ledgerId: number,
   input: {
-    paidByMemberId: number;
+    paidByMemberId?: number | null;
     createdByMemberId?: number | null;
     amount: number;
     currency: string;
@@ -386,14 +462,33 @@ export function createFinanceExpense(
     placeLat?: number | null;
     placeLon?: number | null;
     note?: string | null;
-    split: ExpenseSplitInput;
+    direction?: ExpenseDirection;
+    split?: ExpenseSplitInput;
   }
 ): FinanceExpenseRow {
   const ledger = getFinanceLedgerById(ledgerId);
   if (!ledger) throw new Error("Abrechnung nicht gefunden");
-  const payer = getFinanceLedgerMemberById(input.paidByMemberId);
-  if (!payer || payer.ledger_id !== ledgerId) {
-    throw new Error("Zahler nicht in dieser Abrechnung");
+  const direction = coerceExpenseDirection(input.direction);
+  const normal = isNormalLedger(ledger);
+
+  let paidByMemberId = input.paidByMemberId ?? null;
+  let split: ExpenseSplitInput;
+  if (normal) {
+    const solo = ensureNormalSoloMember(ledgerId);
+    paidByMemberId = solo.id;
+    split = { mode: "equal", memberIds: [solo.id] };
+  } else {
+    if (paidByMemberId == null) {
+      throw new Error("Zahler ist erforderlich");
+    }
+    if (!input.split) {
+      throw new Error("Aufteilung ist erforderlich");
+    }
+    split = input.split;
+    const payer = getFinanceLedgerMemberById(paidByMemberId);
+    if (!payer || payer.ledger_id !== ledgerId) {
+      throw new Error("Zahler nicht in dieser Abrechnung");
+    }
   }
 
   const currency = input.currency.trim().toUpperCase();
@@ -406,7 +501,7 @@ export function createFinanceExpense(
     exchangeRate
   );
 
-  const splitMap = buildSplitMap(amountBase, input.split, ledgerId);
+  const splitMap = buildSplitMap(amountBase, split, ledgerId);
   validateSplitTotal(amountBase, splitMap);
 
   const db = getDb();
@@ -417,13 +512,13 @@ export function createFinanceExpense(
          ledger_id, paid_by_member_id, created_by_member_id,
          amount, currency, exchange_rate, amount_base,
          description, expense_date, document_id, trip_event_id,
-         place_name, place_lat, place_lon, note,
+         place_name, place_lat, place_lon, note, direction,
          split_mode, created_at, updated_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       ledgerId,
-      input.paidByMemberId,
+      paidByMemberId,
       input.createdByMemberId ?? null,
       input.amount,
       currency,
@@ -437,12 +532,13 @@ export function createFinanceExpense(
       input.placeLat ?? null,
       input.placeLon ?? null,
       input.note?.trim() || null,
-      input.split.mode,
+      direction,
+      split.mode,
       ts,
       ts
     );
   const expenseId = Number(result.lastInsertRowid);
-  insertSplits(expenseId, input.split, splitMap);
+  insertSplits(expenseId, split, splitMap);
   touchLedger(ledgerId);
   return getFinanceExpenseById(expenseId)!;
 }
@@ -542,18 +638,29 @@ export function updateFinanceExpense(
     amount?: number;
     currency?: string;
     exchangeRate?: number;
+    direction?: ExpenseDirection;
   }
 ): FinanceExpenseRow {
   const existing = getFinanceExpenseById(expenseId);
   if (!existing) throw new Error("Ausgabe nicht gefunden");
   const ledger = getFinanceLedgerById(existing.ledger_id);
   if (!ledger) throw new Error("Abrechnung nicht gefunden");
+  const normal = isNormalLedger(ledger);
 
-  const paidByMemberId = input.paidByMemberId ?? existing.paid_by_member_id;
-  const payer = getFinanceLedgerMemberById(paidByMemberId);
-  if (!payer || payer.ledger_id !== existing.ledger_id) {
-    throw new Error("Zahler nicht in dieser Abrechnung");
+  let paidByMemberId = input.paidByMemberId ?? existing.paid_by_member_id;
+  if (normal) {
+    paidByMemberId = ensureNormalSoloMember(existing.ledger_id).id;
+  } else {
+    const payer = getFinanceLedgerMemberById(paidByMemberId);
+    if (!payer || payer.ledger_id !== existing.ledger_id) {
+      throw new Error("Zahler nicht in dieser Abrechnung");
+    }
   }
+
+  const direction =
+    input.direction !== undefined
+      ? coerceExpenseDirection(input.direction)
+      : coerceExpenseDirection(existing.direction);
 
   const description =
     input.description !== undefined
@@ -618,6 +725,7 @@ export function updateFinanceExpense(
        place_lat = ?,
        place_lon = ?,
        note = ?,
+       direction = ?,
        updated_at = ?
      WHERE id = ?`
   ).run(
@@ -632,6 +740,7 @@ export function updateFinanceExpense(
     placeLat,
     placeLon,
     note,
+    direction,
     nowIso(),
     expenseId
   );
@@ -768,6 +877,7 @@ export function createFinanceSettlement(
 ): FinanceSettlementRow {
   const ledger = getFinanceLedgerById(ledgerId);
   if (!ledger) throw new Error("Abrechnung nicht gefunden");
+  assertSplitLedgerFeatures(ledger, "Rückzahlungen");
   if (input.fromMemberId === input.toMemberId) {
     throw new Error("Absender und Empfänger müssen unterschiedlich sein");
   }
@@ -863,6 +973,7 @@ export function updateFinanceSettlement(
   if (!existing) throw new Error("Rückzahlung nicht gefunden");
   const ledger = getFinanceLedgerById(existing.ledger_id);
   if (!ledger) throw new Error("Abrechnung nicht gefunden");
+  assertSplitLedgerFeatures(ledger, "Rückzahlungen");
 
   const fromMemberId = input.fromMemberId ?? existing.from_member_id;
   const toMemberId = input.toMemberId ?? existing.to_member_id;
@@ -952,6 +1063,7 @@ export function collectBalanceInputs(ledgerId: number): BalanceInput[] {
   }
 
   for (const exp of listFinanceExpenses(ledgerId)) {
+    if (coerceExpenseDirection(exp.direction) !== "expense") continue;
     paid.set(
       exp.paid_by_member_id,
       (paid.get(exp.paid_by_member_id) ?? 0) + exp.amount_base
@@ -980,6 +1092,28 @@ export function collectBalanceInputs(ledgerId: number): BalanceInput[] {
     settlementsReceivedBase: roundMoney(received.get(m.id) ?? 0),
     settlementsPaidBase: roundMoney(paidOut.get(m.id) ?? 0),
   }));
+}
+
+/** Cashbook totals for Normal ledgers (income − expense in base currency). */
+export function collectCashbookTotals(ledgerId: number): {
+  expenseTotalBase: number;
+  incomeTotalBase: number;
+  netBase: number;
+} {
+  let expenseTotalBase = 0;
+  let incomeTotalBase = 0;
+  for (const exp of listFinanceExpenses(ledgerId)) {
+    if (coerceExpenseDirection(exp.direction) === "income") {
+      incomeTotalBase += exp.amount_base;
+    } else {
+      expenseTotalBase += exp.amount_base;
+    }
+  }
+  return {
+    expenseTotalBase: roundMoney(expenseTotalBase),
+    incomeTotalBase: roundMoney(incomeTotalBase),
+    netBase: roundMoney(incomeTotalBase - expenseTotalBase),
+  };
 }
 
 export type TripDocumentImportRow = {

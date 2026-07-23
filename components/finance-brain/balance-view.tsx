@@ -85,6 +85,7 @@ export type ExpenseListItem = {
   amount_base: number;
   expense_date: string | null;
   paid_by_member_id: number;
+  direction?: "expense" | "income";
   category_label?: string | null;
   category_tone?: string | null;
   place_name?: string | null;
@@ -107,6 +108,7 @@ export type ExpenseEditPayload = {
   amount: number;
   currency: string;
   exchangeRate: number;
+  direction?: "expense" | "income";
 };
 
 export function BalanceView({
@@ -197,6 +199,7 @@ function ExpenseCard({
   exp,
   members,
   baseCurrency,
+  cashbookMode,
   onDelete,
   canDelete,
   canEdit,
@@ -213,6 +216,7 @@ function ExpenseCard({
   exp: ExpenseListItem;
   members: Array<{ id: number; display_name: string }>;
   baseCurrency: string;
+  cashbookMode?: boolean;
   onDelete?: (id: number) => void;
   canDelete?: boolean;
   canEdit?: boolean;
@@ -237,7 +241,11 @@ function ExpenseCard({
   const [editCurrency, setEditCurrency] = useState(exp.currency);
   const [editRate, setEditRate] = useState(String(exp.exchange_rate ?? 1));
   const [editRateLoading, setEditRateLoading] = useState(false);
+  const [editDirection, setEditDirection] = useState<"expense" | "income">(
+    exp.direction === "income" ? "income" : "expense"
+  );
 
+  const isIncome = (exp.direction || "expense") === "income";
   const memberName = (id: number) =>
     members.find((m) => m.id === id)?.display_name ?? `#${id}`;
 
@@ -261,6 +269,7 @@ function ExpenseCard({
     setEditAmount(String(exp.amount));
     setEditCurrency(exp.currency);
     setEditRate(String(exp.exchange_rate ?? 1));
+    setEditDirection(exp.direction === "income" ? "income" : "expense");
     setEditing(true);
   }
 
@@ -292,12 +301,13 @@ function ExpenseCard({
     await onUpdate(exp.id, {
       description: editDesc.trim() || null,
       expenseDate: editDate || null,
-      paidByMemberId: Number(editPayer),
+      paidByMemberId: Number(editPayer) || exp.paid_by_member_id,
       place: editPlace.trim() || null,
       note: editNote.trim() || null,
       amount: parsedAmount,
       currency: editCurrency,
       exchangeRate: editCurrency === baseCurrency ? 1 : parsedRate,
+      direction: cashbookMode ? editDirection : undefined,
     });
     setEditing(false);
   }
@@ -375,7 +385,7 @@ function ExpenseCard({
           {/* Fixed block for title / meta / place so cards align without shifting the header */}
           <div className="flex min-h-[4.5rem] flex-col justify-center gap-1">
             <p className="text-base font-bold leading-snug text-foreground">
-              {exp.description || "Ausgabe"}
+              {exp.description || (isIncome ? "Einnahme" : "Ausgabe")}
             </p>
             <p className="text-xs text-muted-foreground">
               <span
@@ -384,9 +394,25 @@ function ExpenseCard({
                   surface.soft
                 )}
               >
-                {visual.label}
+                {isIncome ? "Einnahme" : visual.label}
               </span>
-              Bezahlt von {memberName(exp.paid_by_member_id)} · {fx.primary}
+              {cashbookMode ? (
+                <>
+                  <span
+                    className={cn(
+                      "font-semibold",
+                      isIncome ? "text-emerald-700" : "text-foreground"
+                    )}
+                  >
+                    {isIncome ? "+" : "−"}
+                    {fx.primary}
+                  </span>
+                </>
+              ) : (
+                <>
+                  Bezahlt von {memberName(exp.paid_by_member_id)} · {fx.primary}
+                </>
+              )}
             </p>
             {fx.detail ? (
               <div className="space-y-0.5 text-[11px] leading-snug text-muted-foreground">
@@ -509,30 +535,55 @@ function ExpenseCard({
                     onChange={(e) => setEditDate(e.target.value)}
                   />
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Bezahlt von</Label>
-                  <Select
-                    value={editPayer}
-                    onValueChange={(v) => {
-                      if (v == null) return;
-                      setEditPayer(v);
-                    }}
-                    items={Object.fromEntries(
-                      members.map((m) => [String(m.id), m.display_name])
-                    )}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {members.map((m) => (
-                        <SelectItem key={m.id} value={String(m.id)}>
-                          {m.display_name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                {cashbookMode ? (
+                  <div className="space-y-1">
+                    <Label className="text-xs">Typ</Label>
+                    <Select
+                      value={editDirection}
+                      onValueChange={(v) => {
+                        if (v == null) return;
+                        setEditDirection(v as "expense" | "income");
+                      }}
+                      items={{
+                        expense: "Ausgabe",
+                        income: "Einnahme",
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="expense">Ausgabe</SelectItem>
+                        <SelectItem value="income">Einnahme</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    <Label className="text-xs">Bezahlt von</Label>
+                    <Select
+                      value={editPayer}
+                      onValueChange={(v) => {
+                        if (v == null) return;
+                        setEditPayer(v);
+                      }}
+                      items={Object.fromEntries(
+                        members.map((m) => [String(m.id), m.display_name])
+                      )}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {members.map((m) => (
+                          <SelectItem key={m.id} value={String(m.id)}>
+                            {m.display_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
                 <div className="space-y-1 sm:col-span-2">
                   <Label className="text-xs">Ort</Label>
                   <Input
@@ -734,6 +785,7 @@ export function ExpenseList({
   expenses,
   members,
   baseCurrency,
+  cashbookMode,
   onDelete,
   canDelete,
   canEdit,
@@ -750,6 +802,7 @@ export function ExpenseList({
   expenses: ExpenseListItem[];
   members: Array<{ id: number; display_name: string }>;
   baseCurrency: string;
+  cashbookMode?: boolean;
   onDelete?: (id: number) => void;
   canDelete?: boolean;
   canEdit?: boolean;
@@ -769,7 +822,9 @@ export function ExpenseList({
   return (
     <div className="space-y-3">
       {expenses.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Noch keine Ausgaben.</p>
+        <p className="text-sm text-muted-foreground">
+          {cashbookMode ? "Noch keine Buchungen." : "Noch keine Ausgaben."}
+        </p>
       ) : (
         expenses.map((exp) => (
           <ExpenseCard
@@ -777,6 +832,7 @@ export function ExpenseList({
             exp={exp}
             members={members}
             baseCurrency={baseCurrency}
+            cashbookMode={cashbookMode}
             canDelete={canDelete}
             canEdit={canEdit}
             onDelete={onDelete}

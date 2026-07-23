@@ -1,12 +1,17 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { SPLIT_MODES } from "@/lib/finance-brain/constants";
+import {
+  EXPENSE_DIRECTIONS,
+  SPLIT_MODES,
+} from "@/lib/finance-brain/constants";
 import { classifyAndStoreExpenseCategory } from "@/lib/finance-brain/expense-classify";
 import { geocodePlace } from "@/lib/finance-brain/geocode";
 import {
   createFinanceExpense,
   getFinanceLedgerById,
+  isNormalLedger,
   listFinanceExpenseSplits,
+  type ExpenseSplitInput,
 } from "@/lib/finance-brain/queries";
 import { serializeExpense } from "@/lib/finance-brain/serialize";
 
@@ -42,7 +47,7 @@ const SplitSchema = z.discriminatedUnion("mode", [
 ]);
 
 const CreateSchema = z.object({
-  paidByMemberId: z.number().int().positive(),
+  paidByMemberId: z.number().int().positive().optional(),
   createdByMemberId: z.number().int().positive().nullable().optional(),
   amount: z.number().positive(),
   currency: z.string().min(3).max(3),
@@ -53,23 +58,47 @@ const CreateSchema = z.object({
   tripEventId: z.number().int().positive().nullable().optional(),
   place: z.string().max(200).nullable().optional(),
   note: z.string().max(1000).nullable().optional(),
-  split: SplitSchema,
+  direction: z.enum(EXPENSE_DIRECTIONS).optional(),
+  split: SplitSchema.optional(),
 });
 
 export async function POST(request: Request, context: Ctx) {
   try {
     const { id: idRaw } = await context.params;
     const id = Number(idRaw);
-    if (!getFinanceLedgerById(id)) {
-      return NextResponse.json({ error: "Abrechnung nicht gefunden" }, { status: 404 });
+    const ledger = getFinanceLedgerById(id);
+    if (!ledger) {
+      return NextResponse.json(
+        { error: "Abrechnung nicht gefunden" },
+        { status: 404 }
+      );
     }
     const body = await request.json();
     const parsed = CreateSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: "Ungültige Eingabe" }, { status: 400 });
     }
-    if (!SPLIT_MODES.includes(parsed.data.split.mode)) {
-      return NextResponse.json({ error: "Ungültiger Split-Modus" }, { status: 400 });
+
+    const normal = isNormalLedger(ledger);
+    if (!normal) {
+      if (parsed.data.paidByMemberId == null) {
+        return NextResponse.json(
+          { error: "Zahler ist erforderlich" },
+          { status: 400 }
+        );
+      }
+      if (!parsed.data.split) {
+        return NextResponse.json(
+          { error: "Aufteilung ist erforderlich" },
+          { status: 400 }
+        );
+      }
+      if (!SPLIT_MODES.includes(parsed.data.split.mode)) {
+        return NextResponse.json(
+          { error: "Ungültiger Split-Modus" },
+          { status: 400 }
+        );
+      }
     }
 
     const placeRaw = parsed.data.place?.trim() || null;
@@ -85,8 +114,18 @@ export async function POST(request: Request, context: Ctx) {
       }
     }
 
+    const split = parsed.data.split
+      ? ({
+          ...parsed.data.split,
+          memberIds:
+            parsed.data.split.mode === "equal"
+              ? (parsed.data.split.memberIds ?? [])
+              : undefined,
+        } as ExpenseSplitInput)
+      : undefined;
+
     let expense = createFinanceExpense(id, {
-      paidByMemberId: parsed.data.paidByMemberId,
+      paidByMemberId: parsed.data.paidByMemberId ?? null,
       createdByMemberId: parsed.data.createdByMemberId ?? null,
       amount: parsed.data.amount,
       currency: parsed.data.currency.toUpperCase(),
@@ -99,13 +138,8 @@ export async function POST(request: Request, context: Ctx) {
       placeLat,
       placeLon,
       note: parsed.data.note ?? null,
-      split: {
-        ...parsed.data.split,
-        memberIds:
-          parsed.data.split.mode === "equal"
-            ? (parsed.data.split.memberIds ?? [])
-            : undefined,
-      } as import("@/lib/finance-brain/queries").ExpenseSplitInput,
+      direction: parsed.data.direction ?? "expense",
+      split,
     });
     expense = await classifyAndStoreExpenseCategory(expense, placeName);
     return NextResponse.json({

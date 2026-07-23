@@ -376,11 +376,12 @@ CREATE TABLE IF NOT EXISTS trip_share_links (
 CREATE INDEX IF NOT EXISTS idx_trip_share_links_trip ON trip_share_links(trip_id);
 CREATE INDEX IF NOT EXISTS idx_trip_share_links_token ON trip_share_links(token);
 
--- FinanzBrain: group expense ledgers (Settle-Up style)
+-- FinanzBrain: group expense ledgers (Settle-Up style) + Normal cashbooks
 CREATE TABLE IF NOT EXISTS finance_ledgers (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   title TEXT NOT NULL,
   base_currency TEXT NOT NULL DEFAULT 'CHF',
+  ledger_kind TEXT NOT NULL DEFAULT 'split',
   trip_id INTEGER,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
@@ -427,6 +428,7 @@ CREATE TABLE IF NOT EXISTS finance_expenses (
   place_lon REAL,
   notified_at TEXT,
   note TEXT,
+  direction TEXT NOT NULL DEFAULT 'expense',
   split_mode TEXT NOT NULL DEFAULT 'equal',
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,

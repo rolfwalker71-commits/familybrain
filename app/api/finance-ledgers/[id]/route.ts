@@ -2,8 +2,10 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import {
   collectBalanceInputs,
+  collectCashbookTotals,
   deleteFinanceLedger,
   getFinanceLedgerById,
+  isNormalLedger,
   listFinanceExpenses,
   listFinanceExpenseSplits,
   listFinanceLedgerMembers,
@@ -40,11 +42,27 @@ export async function GET(_request: Request, context: Ctx) {
   if (!ledger) {
     return NextResponse.json({ error: "Abrechnung nicht gefunden" }, { status: 404 });
   }
-  const members = listFinanceLedgerMembers(id).map(serializeMemberWithToken);
+  const normal = isNormalLedger(ledger);
+  const members = normal
+    ? []
+    : listFinanceLedgerMembers(id).map(serializeMemberWithToken);
   const expenses = listFinanceExpenses(id).map((e) =>
     serializeExpense(e, listFinanceExpenseSplits(e.id))
   );
-  const settlements = listFinanceSettlements(id).map(serializeSettlement);
+  const settlements = normal
+    ? []
+    : listFinanceSettlements(id).map(serializeSettlement);
+  if (normal) {
+    return NextResponse.json({
+      ledger: serializeLedger(ledger),
+      members,
+      expenses,
+      settlements,
+      balances: [],
+      simplifiedDebts: [],
+      cashbook: collectCashbookTotals(id),
+    });
+  }
   const balances = buildBalancePayload(collectBalanceInputs(id));
   return NextResponse.json({
     ledger: serializeLedger(ledger),

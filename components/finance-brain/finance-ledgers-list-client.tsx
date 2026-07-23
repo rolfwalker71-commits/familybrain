@@ -17,13 +17,18 @@ import {
 } from "@/components/ui/select";
 import { PageHeader } from "@/components/layout/page-primitives";
 import { IconCircle, pageVisuals } from "@/components/layout/icon-circle";
-import { COMMON_CURRENCIES } from "@/lib/finance-brain/constants";
+import {
+  COMMON_CURRENCIES,
+  LEDGER_KIND_LABELS,
+  type LedgerKind,
+} from "@/lib/finance-brain/constants";
 import { cn } from "@/lib/utils";
 
 type Ledger = {
   id: number;
   title: string;
   base_currency: string;
+  ledger_kind?: LedgerKind;
   trip_id: number | null;
   trip_title: string | null;
   updated_at: string;
@@ -35,6 +40,7 @@ export function FinanceLedgersListClient() {
   const [error, setError] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [baseCurrency, setBaseCurrency] = useState("CHF");
+  const [ledgerKind, setLedgerKind] = useState<LedgerKind>("split");
   const [memberNames, setMemberNames] = useState("");
   const [creating, setCreating] = useState(false);
 
@@ -71,13 +77,16 @@ export function FinanceLedgersListClient() {
         body: JSON.stringify({
           title: title.trim(),
           baseCurrency,
-          memberNames: names.length ? names : undefined,
+          ledgerKind,
+          memberNames:
+            ledgerKind === "split" && names.length ? names : undefined,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Anlegen fehlgeschlagen");
       setTitle("");
       setMemberNames("");
+      setLedgerKind("split");
       await load();
       if (data.ledger?.id) {
         window.location.assign(`/finance-brain/${data.ledger.id}`);
@@ -105,7 +114,7 @@ export function FinanceLedgersListClient() {
     <div className="space-y-6">
       <PageHeader
         title="FinanzBrain"
-        description="Geteilte Abrechnungen – Ausgaben splitten und Schulden ausgleichen"
+        description="Split-Abrechnungen oder normales Haushaltsbuch für Ein- und Ausgaben"
         icon={pageVisuals.financeBrain.icon}
         tone={pageVisuals.financeBrain.tone}
       />
@@ -120,6 +129,34 @@ export function FinanceLedgersListClient() {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
             />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Typ</Label>
+            <Select
+              value={ledgerKind}
+              onValueChange={(v) => {
+                if (v == null) return;
+                setLedgerKind(v as LedgerKind);
+              }}
+              items={LEDGER_KIND_LABELS}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="split">
+                  {LEDGER_KIND_LABELS.split}
+                </SelectItem>
+                <SelectItem value="normal">
+                  {LEDGER_KIND_LABELS.normal}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {ledgerKind === "split"
+                ? "Gemeinsame Ausgaben splitten und ausgleichen"
+                : "Nur Ein- und Ausgaben verbuchen – ohne Settle-up"}
+            </p>
           </div>
           <div className="space-y-1.5">
             <Label>Basiswährung</Label>
@@ -143,17 +180,22 @@ export function FinanceLedgersListClient() {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="memberNames">Teilnehmer (optional)</Label>
-            <Input
-              id="memberNames"
-              placeholder="Anna, Ben, Chris"
-              value={memberNames}
-              onChange={(e) => setMemberNames(e.target.value)}
-            />
-          </div>
+          {ledgerKind === "split" ? (
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label htmlFor="memberNames">Teilnehmer (optional)</Label>
+              <Input
+                id="memberNames"
+                placeholder="Anna, Ben, Chris"
+                value={memberNames}
+                onChange={(e) => setMemberNames(e.target.value)}
+              />
+            </div>
+          ) : null}
           <div className="sm:col-span-2">
-            <Button onClick={() => void createLedger()} disabled={creating || !title.trim()}>
+            <Button
+              onClick={() => void createLedger()}
+              disabled={creating || !title.trim()}
+            >
               <Plus className="mr-2 size-4" />
               Abrechnung anlegen
             </Button>
@@ -171,44 +213,54 @@ export function FinanceLedgersListClient() {
         </p>
       ) : (
         <div className="grid gap-3">
-          {ledgers.map((ledger) => (
-            <Card key={ledger.id} tone="green" className="rounded-md shadow-sm">
-              <CardContent className="flex flex-wrap items-center gap-3 p-4">
-                <IconCircle
-                  icon={pageVisuals.financeBrain.icon}
-                  tone="green"
-                  size="sm"
-                />
-                <div className="min-w-0 flex-1">
+          {ledgers.map((ledger) => {
+            const kind = ledger.ledger_kind === "normal" ? "normal" : "split";
+            return (
+              <Card key={ledger.id} tone="green" className="rounded-md shadow-sm">
+                <CardContent className="flex flex-wrap items-center gap-3 p-4">
+                  <IconCircle
+                    icon={pageVisuals.financeBrain.icon}
+                    tone="green"
+                    size="sm"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <Link
+                      href={`/finance-brain/${ledger.id}`}
+                      className="font-medium hover:underline"
+                    >
+                      {ledger.title}
+                    </Link>
+                    <p className="text-xs text-muted-foreground">
+                      {LEDGER_KIND_LABELS[kind]} · {ledger.base_currency}
+                      {ledger.trip_title
+                        ? ` · Reise: ${ledger.trip_title}`
+                        : ""}
+                    </p>
+                  </div>
+                  <Badge variant="secondary">
+                    {LEDGER_KIND_LABELS[kind]}
+                  </Badge>
+                  <Badge variant="outline">{ledger.base_currency}</Badge>
                   <Link
                     href={`/finance-brain/${ledger.id}`}
-                    className="font-medium hover:underline"
+                    className={cn(
+                      buttonVariants({ variant: "outline", size: "sm" })
+                    )}
                   >
-                    {ledger.title}
+                    Öffnen
                   </Link>
-                  <p className="text-xs text-muted-foreground">
-                    {ledger.base_currency}
-                    {ledger.trip_title ? ` · Reise: ${ledger.trip_title}` : ""}
-                  </p>
-                </div>
-                <Badge variant="secondary">{ledger.base_currency}</Badge>
-                <Link
-                  href={`/finance-brain/${ledger.id}`}
-                  className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-                >
-                  Öffnen
-                </Link>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={() => void removeLedger(ledger.id, ledger.title)}
-                  aria-label="Löschen"
-                >
-                  <Trash2 className="size-4 text-destructive" />
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => void removeLedger(ledger.id, ledger.title)}
+                    aria-label="Löschen"
+                  >
+                    <Trash2 className="size-4 text-destructive" />
+                  </Button>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>

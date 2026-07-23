@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   collectBalanceInputs,
   getFinanceLedgerById,
+  isNormalLedger,
   listFinanceLedgerMembers,
 } from "@/lib/finance-brain/queries";
 import { serializeMemberWithToken } from "@/lib/finance-brain/serialize";
@@ -29,6 +30,12 @@ export async function POST(request: Request, context: Ctx) {
     const ledger = getFinanceLedgerById(ledgerId);
     if (!ledger) {
       return NextResponse.json({ error: "Abrechnung nicht gefunden" }, { status: 404 });
+    }
+    if (isNormalLedger(ledger)) {
+      return NextResponse.json(
+        { error: "Erinnerungen sind nur bei Split-Abrechnungen möglich" },
+        { status: 400 }
+      );
     }
 
     const body = await request.json().catch(() => ({}));

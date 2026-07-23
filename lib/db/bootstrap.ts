@@ -317,6 +317,7 @@ function ensureFinanceBrainTables(db: Database.Database): void {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       title TEXT NOT NULL,
       base_currency TEXT NOT NULL DEFAULT 'CHF',
+      ledger_kind TEXT NOT NULL DEFAULT 'split',
       trip_id INTEGER,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
@@ -363,6 +364,7 @@ function ensureFinanceBrainTables(db: Database.Database): void {
       place_lon REAL,
       notified_at TEXT,
       note TEXT,
+      direction TEXT NOT NULL DEFAULT 'expense',
       split_mode TEXT NOT NULL DEFAULT 'equal',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
@@ -439,6 +441,21 @@ function ensureFinanceBrainTables(db: Database.Database): void {
   }
   if (!expenseColNames.has("note")) {
     db.exec(`ALTER TABLE finance_expenses ADD COLUMN note TEXT`);
+  }
+  if (!expenseColNames.has("direction")) {
+    db.exec(
+      `ALTER TABLE finance_expenses ADD COLUMN direction TEXT NOT NULL DEFAULT 'expense'`
+    );
+  }
+
+  const ledgerCols = db
+    .prepare(`PRAGMA table_info(finance_ledgers)`)
+    .all() as Array<{ name: string }>;
+  const ledgerColNames = new Set(ledgerCols.map((c) => c.name));
+  if (!ledgerColNames.has("ledger_kind")) {
+    db.exec(
+      `ALTER TABLE finance_ledgers ADD COLUMN ledger_kind TEXT NOT NULL DEFAULT 'split'`
+    );
   }
 
   const settlementCols = db

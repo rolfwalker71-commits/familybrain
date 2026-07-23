@@ -51,6 +51,7 @@ export async function POST(_request: Request, context: Ctx) {
     const ledger = createFinanceLedger({
       title: trip.title,
       tripId,
+      ledgerKind: "split",
     });
     return NextResponse.json({
       ok: true,
