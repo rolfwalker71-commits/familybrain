@@ -710,6 +710,23 @@ function ExpenseCard({
             </Button>
           ) : null}
 
+          {onGenerateAiImage ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-7 px-2 text-xs"
+              disabled={aiImageBusy}
+              onClick={() => onGenerateAiImage(exp.id)}
+              title={exp.ai_image_url ? "KI-Bild neu erzeugen" : "KI-Bild erzeugen"}
+            >
+              <RefreshCw
+                className={cn("mr-1 size-3.5", aiImageBusy && "animate-spin")}
+              />
+              {exp.ai_image_url ? "KI-Bild neu" : "KI-Bild"}
+            </Button>
+          ) : null}
+
           <div className="hidden flex-wrap items-center gap-1 md:flex">
           {canEdit && onSetDocument && !editing ? (
             <>
@@ -751,22 +768,6 @@ function ExpenseCard({
                 </Button>
               ) : null}
             </>
-          ) : null}
-
-          {onGenerateAiImage ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              className="h-7 px-2 text-xs"
-              disabled={aiImageBusy}
-              onClick={() => onGenerateAiImage(exp.id)}
-            >
-              <RefreshCw
-                className={cn("mr-1 size-3.5", aiImageBusy && "animate-spin")}
-              />
-              {exp.ai_image_url ? "KI-Bild neu" : "KI-Bild"}
-            </Button>
           ) : null}
 
           {onResendMail ? (

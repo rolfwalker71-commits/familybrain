@@ -2477,6 +2477,17 @@ export function TripDetailClient({
                                 <Button
                                   size="icon-xs"
                                   variant="ghost"
+                                  title="KI-Bild"
+                                  disabled={
+                                    busy || aiImageBusy || aiBatch != null
+                                  }
+                                  onClick={() => openAiImageDialog(event)}
+                                >
+                                  <ImagePlus className="size-3.5" />
+                                </Button>
+                                <Button
+                                  size="icon-xs"
+                                  variant="ghost"
                                   title="Ändern"
                                   onClick={() => startEditEvent(event)}
                                 >
@@ -2667,6 +2678,18 @@ export function TripDetailClient({
                             }}
                           >
                             <FilePlus2 className="size-3.5" />
+                          </Button>
+                          <Button
+                            size="icon-xs"
+                            variant="ghost"
+                            title="KI-Bild"
+                            disabled={busy || aiImageBusy || aiBatch != null}
+                            onClick={() => {
+                              setEditFocusEventId(event.id);
+                              openAiImageDialog(event);
+                            }}
+                          >
+                            <ImagePlus className="size-3.5" />
                           </Button>
                           <Button
                             size="icon-xs"
