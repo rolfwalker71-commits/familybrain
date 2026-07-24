@@ -107,7 +107,7 @@ export function DataListRow({
   return (
     <div
       className={cn(
-        "rounded-2xl border border-border/60 bg-card p-3.5 shadow-[0_4px_16px_rgba(20,32,28,0.05)] transition-colors hover:bg-muted/30 md:rounded-none md:border-0 md:bg-transparent md:px-4 md:py-3 md:shadow-none",
+        "rounded-xl border border-border/60 bg-card p-3.5 shadow-[0_4px_16px_rgba(20,32,28,0.05)] transition-colors hover:bg-muted/30 md:rounded-none md:border-0 md:bg-transparent md:px-4 md:py-3 md:shadow-none",
         onClick && "cursor-pointer",
         className
       )}

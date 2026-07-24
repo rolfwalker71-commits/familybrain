@@ -46,7 +46,7 @@ export function PageHeader({
     <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
       <div className="flex min-w-0 items-start gap-3">
         {icon ? (
-          <IconCircle icon={icon} tone={tone} size="lg" className="rounded-2xl" />
+          <IconCircle icon={icon} tone={tone} size="lg" className="rounded-xl" />
         ) : null}
         <div className="min-w-0">
           <h1 className="break-words text-2xl font-semibold tracking-tight sm:text-3xl">
@@ -170,7 +170,7 @@ export function MetricTile({
   return (
     <div
       className={cn(
-        "min-w-0 overflow-hidden rounded-2xl border border-border/60 shadow-[0_4px_16px_rgba(20,32,28,0.05)]",
+        "min-w-0 overflow-hidden rounded-xl border border-border/60 shadow-[0_4px_16px_rgba(20,32,28,0.05)]",
         surface.body,
         className
       )}
@@ -206,7 +206,7 @@ export function TableShell({
   return (
     <div
       className={cn(
-        "w-full min-w-0 overflow-hidden rounded-2xl border border-border/60 shadow-[0_4px_16px_rgba(20,32,28,0.05)]",
+        "w-full min-w-0 overflow-hidden rounded-xl border border-border/60 shadow-[0_4px_16px_rgba(20,32,28,0.05)]",
         surface.body
       )}
     >

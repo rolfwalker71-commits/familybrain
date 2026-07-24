@@ -173,7 +173,7 @@ export function AutomationPanel() {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-5">
-        <div className="rounded-2xl border border-border/60 bg-[var(--brand-sync-soft)]/50 p-4 text-sm">
+        <div className="rounded-xl border border-border/60 bg-[var(--brand-sync-soft)]/50 p-4 text-sm">
           {initialComplete ? (
             <>
               Initialisierung abgeschlossen. Nächster Lauf:{" "}
@@ -269,7 +269,7 @@ export function AutomationPanel() {
                   <button
                     key={run.id}
                     type="button"
-                    className="w-full rounded-2xl border border-border/60 p-3 text-left text-sm hover:bg-[var(--brand-sync-soft)]/40"
+                    className="w-full rounded-xl border border-border/60 p-3 text-left text-sm hover:bg-[var(--brand-sync-soft)]/40"
                     onClick={() => {
                       if (selectedRun === run.id) {
                         setSelectedRun(null);
@@ -330,7 +330,7 @@ export function AutomationPanel() {
         </div>
 
         {selectedRun ? (
-          <div className="space-y-2 rounded-2xl border border-border/60 bg-[var(--brand-sync-soft)]/30 p-3">
+          <div className="space-y-2 rounded-xl border border-border/60 bg-[var(--brand-sync-soft)]/30 p-3">
             <h3 className="font-medium">Details zu Lauf #{selectedRun}</h3>
             <div className="max-h-80 space-y-1 overflow-y-auto text-xs">
               {items.map((item) => (

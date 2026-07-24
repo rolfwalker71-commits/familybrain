@@ -446,7 +446,7 @@ function SyncClientInner() {
           </p>
 
           {syncProgress ? (
-            <div className="w-full space-y-3 rounded-2xl border border-border/60 bg-[var(--brand-sync-soft)]/50 p-4 text-left">
+            <div className="w-full space-y-3 rounded-xl border border-border/60 bg-[var(--brand-sync-soft)]/50 p-4 text-left">
               <ProgressBar
                 value={syncProgress.percent}
                 label={syncLabel}
@@ -551,7 +551,7 @@ function SyncClientInner() {
             SQLite-Datenbank. Der Chat nutzt danach den lokalen Index (schneller,
             auch bei Trilium-Ausfall).
           </p>
-          <div className="rounded-2xl border border-border/60 bg-[var(--brand-sync-soft)]/50 p-4 text-sm">
+          <div className="rounded-xl border border-border/60 bg-[var(--brand-sync-soft)]/50 p-4 text-sm">
             {triliumConfigured ? (
               <>
                 Trilium konfiguriert · lokal indexiert:{" "}
@@ -581,7 +581,7 @@ function SyncClientInner() {
           </Button>
 
           {triliumSyncProgress ? (
-            <div className="space-y-3 rounded-2xl border border-border/60 bg-[var(--brand-sync-soft)]/50 p-4">
+            <div className="space-y-3 rounded-xl border border-border/60 bg-[var(--brand-sync-soft)]/50 p-4">
               <ProgressBar
                 value={triliumSyncProgress.percent}
                 label={
@@ -646,7 +646,7 @@ function SyncClientInner() {
             ausstehenden Dokumente fertig sind (Tab muss offen bleiben). Status
             und Fortschritt siehst du oben auf jeder Seite.
           </p>
-          <div className="rounded-2xl border border-border/60 bg-[var(--brand-sync-soft)]/50 p-4 text-sm">
+          <div className="rounded-xl border border-border/60 bg-[var(--brand-sync-soft)]/50 p-4 text-sm">
             Ausstehend: <strong>{pendingCount}</strong>
             {!hasOpenAIKey ? (
               <span className="ml-2 text-destructive">

@@ -482,7 +482,7 @@ function TravelOverviewClientInner({ items }: Props) {
               type="button"
               onClick={() => openDimension(key)}
               className={cn(
-                "min-w-0 overflow-hidden rounded-2xl border text-left shadow-[0_4px_16px_rgba(20,32,28,0.05)] transition-all",
+                "min-w-0 overflow-hidden rounded-xl border text-left shadow-[0_4px_16px_rgba(20,32,28,0.05)] transition-all",
                 surface.body,
                 active
                   ? "border-[var(--brand-docs)] ring-2 ring-[var(--brand-docs)]/20"
@@ -584,7 +584,7 @@ function TravelOverviewClientInner({ items }: Props) {
                         setDetailId(null);
                       }}
                       className={cn(
-                        "min-w-0 overflow-hidden rounded-2xl border text-left shadow-[0_4px_16px_rgba(20,32,28,0.05)] transition-colors",
+                        "min-w-0 overflow-hidden rounded-xl border text-left shadow-[0_4px_16px_rgba(20,32,28,0.05)] transition-colors",
                         itemSurface.body,
                         isSelected
                           ? "border-[var(--brand-docs)] ring-2 ring-[var(--brand-docs)]/20"
@@ -619,7 +619,7 @@ function TravelOverviewClientInner({ items }: Props) {
             {selectedRow ? (
               <div
                 className={cn(
-                  "overflow-hidden rounded-2xl border border-border/60",
+                  "overflow-hidden rounded-xl border border-border/60",
                   toneSurface(dimensionMeta[dimension].tone).body
                 )}
               >

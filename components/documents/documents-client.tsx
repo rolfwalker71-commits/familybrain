@@ -322,7 +322,7 @@ export function DocumentsClient() {
           <div className="flex gap-2">
             <Input
               ref={searchInputRef}
-              className="min-w-0 flex-1 rounded-2xl border-border/70 bg-card"
+              className="min-w-0 flex-1 rounded-xl border-border/70 bg-card"
               placeholder="Suche…"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
@@ -342,7 +342,7 @@ export function DocumentsClient() {
               type="button"
               variant={hasActiveFilters ? "default" : "outline"}
               size="icon"
-              className="rounded-2xl"
+              className="rounded-xl"
               aria-label="Filter"
               onClick={() => setFilterOpen(true)}
             >
@@ -664,13 +664,13 @@ export function DocumentsClient() {
                 <Link
                   key={doc.id}
                   href={`/documents/${doc.id}`}
-                  className="flex items-center gap-3 rounded-2xl border border-border/60 bg-card p-3.5 shadow-[0_4px_16px_rgba(20,32,28,0.05)] transition-colors active:bg-muted/40"
+                  className="flex items-center gap-3 rounded-xl border border-border/60 bg-card p-3.5 shadow-[0_4px_16px_rgba(20,32,28,0.05)] transition-colors active:bg-muted/40"
                 >
                   <IconCircle
                     icon={visual.icon}
                     tone="teal"
                     size="lg"
-                    className="rounded-2xl"
+                    className="rounded-xl"
                   />
                   <div className="min-w-0 flex-1">
                     <div className="truncate font-semibold text-foreground">

@@ -134,7 +134,7 @@ export function Sidebar({
     >
       <div className="px-5 py-6">
         <Link href="/dashboard" className="flex items-center gap-3">
-          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-sidebar-primary text-sidebar-primary-foreground shadow-sm">
+          <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground shadow-sm">
             <Brain className="h-6 w-6" />
           </span>
           <span className="text-3xl font-extrabold leading-none tracking-tight text-white">

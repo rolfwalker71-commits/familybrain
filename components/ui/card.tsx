@@ -19,7 +19,7 @@ function Card({
       data-size={size}
       data-tone={tone}
       className={cn(
-        "group/card flex flex-col gap-(--card-spacing) overflow-hidden rounded-2xl border border-border/70 py-(--card-spacing) text-sm text-card-foreground shadow-[0_1px_2px_rgba(20,32,28,0.04),0_8px_24px_rgba(20,32,28,0.06)] [--card-spacing:--spacing(4)] has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:--spacing(3)] data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-2xl *:[img:last-child]:rounded-b-2xl",
+        "group/card flex flex-col gap-(--card-spacing) overflow-hidden rounded-xl border border-border/70 py-(--card-spacing) text-sm text-card-foreground shadow-[0_1px_2px_rgba(20,32,28,0.04),0_8px_24px_rgba(20,32,28,0.06)] [--card-spacing:--spacing(4)] has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:--spacing(3)] data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl",
         surface ? surface.body : "border-border/70 bg-card",
         className
       )}
@@ -103,7 +103,7 @@ function CardFooter({
     <div
       data-slot="card-footer"
       className={cn(
-        "flex items-center rounded-b-2xl border-t p-(--card-spacing)",
+        "flex items-center rounded-b-xl border-t p-(--card-spacing)",
         soft,
         className
       )}

@@ -81,7 +81,7 @@ export function AppTabNav<T extends string>({
         className={cn(
           alwaysBottom
             ? "hidden"
-            : "hidden flex-wrap gap-1 rounded-2xl border border-border/60 bg-muted/50 p-1 md:flex",
+            : "hidden flex-wrap gap-1 rounded-xl border border-border/60 bg-muted/50 p-1 md:flex",
           className
         )}
       >
@@ -115,7 +115,7 @@ export function AppTabNav<T extends string>({
         )}
         aria-label="Bereiche"
       >
-        <div className="pointer-events-auto mx-3 mb-[max(0.5rem,env(safe-area-inset-bottom))] rounded-[1.35rem] border border-border/50 bg-card/95 px-1.5 pt-1.5 pb-1.5 shadow-[0_8px_32px_rgba(20,32,28,0.12)] backdrop-blur-md">
+        <div className="pointer-events-auto mx-3 mb-[max(0.5rem,env(safe-area-inset-bottom))] rounded-xl border border-border/50 bg-card/95 px-1.5 pt-1.5 pb-1.5 shadow-[0_8px_32px_rgba(20,32,28,0.12)] backdrop-blur-md">
           <div className="mx-auto flex max-w-lg items-stretch justify-between gap-0.5">
             {items.map((item) => {
               const Icon = item.icon;
@@ -128,7 +128,7 @@ export function AppTabNav<T extends string>({
                   type="button"
                   onClick={() => onChange(item.id)}
                   className={cn(
-                    "flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-2xl px-1 py-1 text-[10px] font-medium transition-colors",
+                    "flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-xl px-1 py-1 text-[10px] font-medium transition-colors",
                     isActive ? activeText : "text-muted-foreground"
                   )}
                 >

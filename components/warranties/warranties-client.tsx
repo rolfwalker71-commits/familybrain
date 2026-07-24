@@ -111,7 +111,7 @@ export function WarrantiesClient({ rows }: { rows: WarrantyRow[] }) {
       <Card className="min-w-0 gap-0 overflow-visible border-0 bg-transparent p-0 shadow-none md:overflow-hidden md:border md:border-border/60 md:bg-card md:shadow-[0_4px_16px_rgba(20,32,28,0.05)]">
         <CardContent className="p-0">
           {rows.length === 0 ? (
-            <div className="rounded-2xl border border-border/60 bg-card p-8 text-sm text-muted-foreground shadow-[0_4px_16px_rgba(20,32,28,0.05)] md:rounded-none md:border-0 md:bg-transparent md:shadow-none">
+            <div className="rounded-xl border border-border/60 bg-card p-8 text-sm text-muted-foreground shadow-[0_4px_16px_rgba(20,32,28,0.05)] md:rounded-none md:border-0 md:bg-transparent md:shadow-none">
               Noch keine Garantien erkannt. Analysiere Kaufbelege und
               Gerätedokumente.
             </div>

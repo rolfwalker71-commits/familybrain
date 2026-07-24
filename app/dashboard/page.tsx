@@ -162,7 +162,7 @@ export default function DashboardPage() {
                   return (
                     <div
                       key={row.id}
-                      className="flex min-w-0 items-start gap-2 rounded-2xl border border-border/60 bg-card p-3.5 shadow-[0_4px_16px_rgba(20,32,28,0.05)] transition-colors hover:bg-muted/40"
+                      className="flex min-w-0 items-start gap-2 rounded-xl border border-border/60 bg-card p-3.5 shadow-[0_4px_16px_rgba(20,32,28,0.05)] transition-colors hover:bg-muted/40"
                     >
                       <Link
                         href={`/documents/${row.id}`}
@@ -230,7 +230,7 @@ export default function DashboardPage() {
                 {upcoming.map((row) => (
                   <div
                     key={row.id}
-                    className="flex min-w-0 items-center gap-2 rounded-2xl border border-border/60 bg-card p-3.5 shadow-[0_4px_16px_rgba(20,32,28,0.05)] transition-colors hover:bg-muted/40"
+                    className="flex min-w-0 items-center gap-2 rounded-xl border border-border/60 bg-card p-3.5 shadow-[0_4px_16px_rgba(20,32,28,0.05)] transition-colors hover:bg-muted/40"
                   >
                     <Link
                       href={`/documents/${row.document_local_id}`}

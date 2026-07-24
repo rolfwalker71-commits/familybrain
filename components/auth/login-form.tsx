@@ -42,7 +42,7 @@ export function LoginForm({ nextPath }: { nextPath: string }) {
     <Card className="mx-auto w-full max-w-md border-white/50 bg-white/95 shadow-2xl shadow-slate-950/20 backdrop-blur">
       <CardHeader className="space-y-5 px-6 pb-2 pt-7 sm:px-8">
         <div className="flex items-center gap-4">
-          <span className="flex size-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/25">
+          <span className="flex size-14 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/25">
             <Brain className="size-7" />
           </span>
           <div>

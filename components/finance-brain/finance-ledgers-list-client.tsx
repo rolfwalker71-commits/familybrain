@@ -258,7 +258,7 @@ export function FinanceLedgersListClient() {
               return (
                 <div
                   key={ledger.id}
-                  className="relative rounded-2xl border border-border/60 bg-card p-4 shadow-[0_4px_16px_rgba(20,32,28,0.05)]"
+                  className="relative rounded-xl border border-border/60 bg-card p-4 shadow-[0_4px_16px_rgba(20,32,28,0.05)]"
                 >
                   <Button
                     variant="ghost"
@@ -275,7 +275,7 @@ export function FinanceLedgersListClient() {
                       icon={pageVisuals.financeBrain.icon}
                       tone="green"
                       size="lg"
-                      className="rounded-2xl"
+                      className="rounded-xl"
                     />
                     <div className="min-w-0 flex-1">
                       <p className="font-semibold text-foreground">

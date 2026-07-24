@@ -336,12 +336,12 @@ function ExpenseCard({
       id={`expense-card-${exp.id}`}
       className={cn(
         "relative",
-        mobileFocused && "rounded-2xl ring-2 ring-[var(--brand-finance)]/30"
+        mobileFocused && "rounded-xl ring-2 ring-[var(--brand-finance)]/30"
       )}
     >
       <div
         className={cn(
-          "overflow-hidden rounded-2xl border border-border/60 bg-card text-sm shadow-[0_4px_16px_rgba(20,32,28,0.05)]",
+          "overflow-hidden rounded-xl border border-border/60 bg-card text-sm shadow-[0_4px_16px_rgba(20,32,28,0.05)]",
           onMobileFocus && !editing && "cursor-pointer md:cursor-default"
         )}
         onClick={
@@ -350,13 +350,13 @@ function ExpenseCard({
             : undefined
         }
       >
-        {/* Soft row: date · title/meta · amount */}
+        {/* Soft row: date · title/meta · amount + AI thumb */}
         <div className="flex items-center gap-3 px-3 py-3">
           <div className="shrink-0">
             {isoDate ? (
               <CalendarDateBadge isoDate={isoDate} size="sm" />
             ) : (
-              <span className="flex size-12 items-center justify-center rounded-md bg-muted text-[10px] font-medium text-muted-foreground">
+              <span className="flex size-12 items-center justify-center rounded-lg bg-muted text-[10px] font-medium text-muted-foreground">
                 —
               </span>
             )}
@@ -375,29 +375,14 @@ function ExpenseCard({
                 </>
               ) : null}
             </p>
-            {exp.ai_image_url || aiImageBusy ? (
-              <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-[var(--brand-finance-soft)] px-2 py-0.5 text-[10px] font-medium text-[var(--brand-finance)]">
-                <Sparkles className="size-3" />
-                {aiImageBusy && !exp.ai_image_url ? "KI…" : "KI"}
-              </span>
-            ) : null}
           </div>
 
           <div className="flex shrink-0 flex-col items-end gap-1.5">
-            <p
-              className={cn(
-                "text-right text-sm font-bold tabular-nums",
-                isIncome ? "text-[var(--brand-finance)]" : "text-foreground"
-              )}
-            >
-              {isIncome ? "+" : ""}
-              {formatMoney(exp.amount_base, baseCurrency)}
-            </p>
             {exp.ai_image_url ? (
               <button
                 type="button"
                 title="Tippen zum Vergrössern"
-                className="hidden shrink-0 overflow-hidden rounded-lg border border-border/50 shadow-sm sm:block"
+                className="relative shrink-0 overflow-hidden rounded-lg border border-border/50 shadow-sm"
                 onClick={(e) => {
                   e.stopPropagation();
                   setZoomOpen(true);
@@ -407,10 +392,27 @@ function ExpenseCard({
                 <img
                   src={exp.ai_image_url}
                   alt=""
-                  className="h-12 w-12 object-cover"
+                  className="h-12 w-12 object-cover sm:h-14 sm:w-14"
                 />
+                <span className="absolute right-0.5 top-0.5 inline-flex items-center gap-0.5 rounded bg-[var(--brand-finance)]/90 px-1 py-px text-[8px] font-bold uppercase tracking-wide text-white">
+                  <Sparkles className="size-2.5" />
+                  AI
+                </span>
               </button>
+            ) : aiImageBusy ? (
+              <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-dashed border-[var(--brand-finance)]/35 bg-[var(--brand-finance-soft)] text-[10px] font-medium text-[var(--brand-finance)] sm:h-14 sm:w-14">
+                KI…
+              </div>
             ) : null}
+            <p
+              className={cn(
+                "text-right text-sm font-bold tabular-nums",
+                isIncome ? "text-[var(--brand-finance)]" : "text-foreground"
+              )}
+            >
+              {isIncome ? "+" : ""}
+              {formatMoney(exp.amount_base, baseCurrency)}
+            </p>
           </div>
         </div>
 
@@ -1226,7 +1228,7 @@ function SettlementCard({
     <div className="relative">
       <div
         className={cn(
-          "rounded-2xl border border-border/60 bg-card py-2.5 pl-3 pr-3 text-sm shadow-[0_4px_16px_rgba(20,32,28,0.05)]"
+          "rounded-xl border border-border/60 bg-card py-2.5 pl-3 pr-3 text-sm shadow-[0_4px_16px_rgba(20,32,28,0.05)]"
         )}
       >
         <div className="flex items-start gap-2">
