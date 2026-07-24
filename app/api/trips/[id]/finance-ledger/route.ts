@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import {
   collectBalanceInputs,
+  collectCashbookTotals,
   createFinanceLedger,
   getFinanceLedgerByTripId,
+  isNormalLedger,
 } from "@/lib/finance-brain/queries";
 import { buildBalancePayload, serializeLedger } from "@/lib/finance-brain/serialize";
 import { getTripById } from "@/lib/trips/queries";
@@ -25,9 +27,18 @@ export async function GET(_request: Request, context: Ctx) {
   if (!ledger) {
     return NextResponse.json({ ledger: null });
   }
+  if (isNormalLedger(ledger)) {
+    return NextResponse.json({
+      ledger: serializeLedger(ledger),
+      balances: [],
+      simplifiedDebts: [],
+      cashbook: collectCashbookTotals(ledger.id),
+    });
+  }
   const balances = buildBalancePayload(collectBalanceInputs(ledger.id));
   return NextResponse.json({
     ledger: serializeLedger(ledger),
+    cashbook: null,
     ...balances,
   });
 }

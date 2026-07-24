@@ -335,7 +335,7 @@ function ExpenseCard({
     <div
       id={`expense-card-${exp.id}`}
       className={cn(
-        "relative",
+        "relative ml-3 mt-3",
         mobileFocused && "rounded-xl ring-2 ring-[var(--brand-finance)]/30"
       )}
     >
@@ -343,7 +343,7 @@ function ExpenseCard({
         icon={visual.icon}
         tone={visual.tone}
         size="md"
-        className="absolute left-0 top-1 z-10 border-2 border-foreground/20 shadow-md"
+        className="absolute -left-[1.65rem] -top-[1.65rem] z-10 border-2 border-foreground/20 shadow-md"
       />
       <div
         className={cn(
@@ -357,7 +357,7 @@ function ExpenseCard({
         }
       >
         {/* Soft row: type icon · date · title/meta · amount + AI thumb */}
-        <div className="flex items-center gap-3 py-3 pr-3 pl-9 sm:pl-10">
+        <div className="flex items-center gap-3 px-3 py-3">
           <div className="shrink-0">
             {isoDate ? (
               <CalendarDateBadge isoDate={isoDate} size="sm" accent="green" />

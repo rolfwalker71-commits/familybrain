@@ -2461,7 +2461,7 @@ function TripDetailInner({
                     icon={visual.icon}
                     tone={visual.tone}
                     size="md"
-                    className="absolute left-0 top-1 z-10 border-2 border-foreground/20 shadow-md"
+                    className="absolute -left-[1.65rem] -top-[1.65rem] z-10 border-2 border-foreground/20 shadow-md"
                   />
                   <Card
                     tone={visual.tone}

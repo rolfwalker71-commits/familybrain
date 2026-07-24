@@ -6,13 +6,14 @@ import { HandCoins, Plus } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { IconCircle } from "@/components/layout/icon-circle";
-import { formatSignedMoney } from "@/lib/finance-brain/format";
+import { formatMoney, formatSignedMoney } from "@/lib/finance-brain/format";
 import { cn } from "@/lib/utils";
 
 type LedgerSummary = {
   id: number;
   title: string;
   base_currency: string;
+  ledger_kind?: string | null;
 };
 
 type Balance = {
@@ -21,9 +22,16 @@ type Balance = {
   netBalance: number;
 };
 
+type Cashbook = {
+  expenseTotalBase: number;
+  incomeTotalBase: number;
+  netBase: number;
+};
+
 export function TripFinanceLedgerCard({ tripId }: { tripId: number }) {
   const [ledger, setLedger] = useState<LedgerSummary | null>(null);
   const [balances, setBalances] = useState<Balance[]>([]);
+  const [cashbook, setCashbook] = useState<Cashbook | null>(null);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
 
@@ -35,9 +43,11 @@ export function TripFinanceLedgerCard({ tripId }: { tripId: number }) {
       if (res.ok && data.ledger) {
         setLedger(data.ledger);
         setBalances(data.balances || []);
+        setCashbook(data.cashbook ?? null);
       } else {
         setLedger(null);
         setBalances([]);
+        setCashbook(null);
       }
     } finally {
       setLoading(false);
@@ -68,6 +78,8 @@ export function TripFinanceLedgerCard({ tripId }: { tripId: number }) {
   }
 
   if (loading) return null;
+
+  const isNormal = ledger?.ledger_kind === "normal";
 
   return (
     <Card tone="green" className="rounded-md shadow-sm">
@@ -101,7 +113,37 @@ export function TripFinanceLedgerCard({ tripId }: { tripId: number }) {
       {ledger ? (
         <CardContent className="space-y-2 pt-0">
           <p className="text-sm text-muted-foreground">{ledger.title}</p>
-          {balances.length > 0 ? (
+          {isNormal && cashbook ? (
+            <div className="space-y-1">
+              <div className="flex justify-between rounded-md border border-emerald-200/70 bg-white/70 px-2 py-1 text-sm">
+                <span>Ausgaben</span>
+                <span className="font-semibold tabular-nums text-foreground">
+                  {formatMoney(cashbook.expenseTotalBase, ledger.base_currency)}
+                </span>
+              </div>
+              <div className="flex justify-between rounded-md border border-emerald-200/70 bg-white/70 px-2 py-1 text-sm">
+                <span>Einnahmen</span>
+                <span className="font-semibold tabular-nums text-emerald-700">
+                  {formatMoney(cashbook.incomeTotalBase, ledger.base_currency)}
+                </span>
+              </div>
+              <div className="flex justify-between rounded-md border border-border/60 bg-muted/40 px-2 py-1 text-sm">
+                <span className="text-muted-foreground">Saldo</span>
+                <span
+                  className={cn(
+                    "font-semibold tabular-nums",
+                    cashbook.netBase > 0
+                      ? "text-emerald-700"
+                      : cashbook.netBase < 0
+                        ? "text-rose-600"
+                        : "text-muted-foreground"
+                  )}
+                >
+                  {formatSignedMoney(cashbook.netBase, ledger.base_currency)}
+                </span>
+              </div>
+            </div>
+          ) : balances.length > 0 ? (
             <div className="space-y-1">
               {balances.slice(0, 4).map((b) => (
                 <div
@@ -125,7 +167,9 @@ export function TripFinanceLedgerCard({ tripId }: { tripId: number }) {
             </div>
           ) : (
             <p className="text-xs text-muted-foreground">
-              Noch keine Teilnehmer oder Ausgaben.
+              {isNormal
+                ? "Noch keine Buchungen."
+                : "Noch keine Teilnehmer oder Ausgaben."}
             </p>
           )}
         </CardContent>
