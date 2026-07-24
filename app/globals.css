@@ -35,6 +35,14 @@
   --color-secondary: var(--secondary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary: var(--primary);
+  --color-brand-docs: var(--brand-docs);
+  --color-brand-docs-soft: var(--brand-docs-soft);
+  --color-brand-finance: var(--brand-finance);
+  --color-brand-finance-soft: var(--brand-finance-soft);
+  --color-brand-settings: var(--brand-settings);
+  --color-brand-settings-soft: var(--brand-settings-soft);
+  --color-brand-sync: var(--brand-sync);
+  --color-brand-sync-soft: var(--brand-sync-soft);
   --color-popover-foreground: var(--popover-foreground);
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
@@ -47,39 +55,50 @@
 }
 
 :root {
-  --background: #f3f4f6;
-  --foreground: #111827;
+  /* Soft-UI canvas */
+  --background: #f5f7f6;
+  --foreground: #14201c;
   --card: #ffffff;
-  --card-foreground: #111827;
+  --card-foreground: #14201c;
   --popover: #ffffff;
-  --popover-foreground: #111827;
-  --primary: #2563eb;
+  --popover-foreground: #14201c;
+  /* FamilyBrain default = teal (Dokumente) */
+  --primary: #0f766e;
   --primary-foreground: #ffffff;
-  --secondary: #e5e7eb;
-  --secondary-foreground: #111827;
-  /* Distinct from page background so tile/card title bars stand out */
-  --muted: #e5e7eb;
-  --muted-foreground: #4b5563;
-  --accent: #dbeafe;
-  --accent-foreground: #1e40af;
+  --secondary: #e8eeec;
+  --secondary-foreground: #14201c;
+  --muted: #eef2f0;
+  --muted-foreground: #5b6b66;
+  --accent: #ccfbf1;
+  --accent-foreground: #115e59;
   --destructive: #dc2626;
-  --border: #94a3b8;
-  --input: #94a3b8;
-  --ring: #2563eb;
-  --chart-1: #3b82f6;
+  --border: #d7e0dc;
+  --input: #d7e0dc;
+  --ring: #0f766e;
+  --chart-1: #0f766e;
   --chart-2: #f59e0b;
   --chart-3: #ec4899;
-  --chart-4: #22c55e;
+  --chart-4: #3f6b52;
   --chart-5: #14b8a6;
-  --radius: 0.75rem;
-  --sidebar: #111827;
+  --radius: 1rem;
+  /* Domain accents (Soft-UI mockups) */
+  --brand-docs: #0f766e;
+  --brand-docs-soft: #ccfbf1;
+  --brand-finance: #3f6b52;
+  --brand-finance-soft: #d9e4d1;
+  --brand-settings: #1e3a5f;
+  --brand-settings-soft: #e2e8f0;
+  --brand-sync: #4a6b55;
+  --brand-sync-soft: #dde8df;
+  /* Desktop sidebar stays dark; mobile header uses light tokens */
+  --sidebar: #14201c;
   --sidebar-foreground: #d1d5db;
-  --sidebar-primary: #2563eb;
+  --sidebar-primary: #0f766e;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #1f2937;
+  --sidebar-accent: #1f2e29;
   --sidebar-accent-foreground: #f9fafb;
-  --sidebar-border: #1f2937;
-  --sidebar-ring: #2563eb;
+  --sidebar-border: #1f2e29;
+  --sidebar-ring: #0f766e;
 }
 
 @layer base {

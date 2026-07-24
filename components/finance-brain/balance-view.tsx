@@ -11,6 +11,7 @@ import {
   Pencil,
   RefreshCw,
   Scale,
+  Sparkles,
   Trash2,
   Unlink,
   Users,
@@ -50,7 +51,6 @@ import {
 import { ExpenseReceiptControls } from "@/components/finance-brain/expense-receipt-controls";
 import {
   IconCircle,
-  toneSurface,
   type IconTone,
 } from "@/components/layout/icon-circle";
 import {
@@ -133,9 +133,9 @@ export function BalanceView({
 }) {
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      <Card tone="green" className="rounded-md shadow-sm">
+      <Card tone="green" className="overflow-hidden border-border/60 shadow-[0_4px_16px_rgba(20,32,28,0.05)]">
         <CardHeader tone="green" className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-base">
+          <CardTitle className="flex items-center gap-2 text-base text-[var(--brand-finance)]">
             <IconCircle icon={Scale} tone="green" size="sm" />
             Saldo pro Person
           </CardTitle>
@@ -148,17 +148,17 @@ export function BalanceView({
               <div
                 key={b.memberId}
                 className={cn(
-                  "flex items-center justify-between rounded-md border px-3 py-2 text-sm",
+                  "flex items-center justify-between rounded-xl border px-3 py-2.5 text-sm",
                   highlightMemberId === b.memberId
-                    ? "border-emerald-400/60 bg-emerald-100/50"
-                    : "border-emerald-200/70 bg-white/70"
+                    ? "border-[var(--brand-finance)]/35 bg-[var(--brand-finance-soft)]/60"
+                    : "border-border/50 bg-white"
                 )}
               >
                 <span className="font-medium">{b.displayName}</span>
                 <span
                   className={
                     b.netBalance > 0
-                      ? "font-semibold text-emerald-700"
+                      ? "font-semibold text-[var(--brand-finance)]"
                       : b.netBalance < 0
                         ? "font-semibold text-rose-600"
                         : "text-muted-foreground"
@@ -172,9 +172,9 @@ export function BalanceView({
         </CardContent>
       </Card>
 
-      <Card tone="amber" className="rounded-md shadow-sm">
+      <Card tone="amber" className="overflow-hidden border-border/60 shadow-[0_4px_16px_rgba(20,32,28,0.05)]">
         <CardHeader tone="amber" className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-base">
+          <CardTitle className="flex items-center gap-2 text-base text-amber-900">
             <IconCircle icon={ArrowLeftRight} tone="amber" size="sm" />
             Ausgleichsvorschläge
           </CardTitle>
@@ -186,7 +186,7 @@ export function BalanceView({
             simplifiedDebts.map((d, i) => (
               <div
                 key={`${d.fromMemberId}-${d.toMemberId}-${i}`}
-                className="rounded-md border border-amber-200/70 bg-white/70 px-3 py-2 text-sm"
+                className="rounded-xl border border-amber-200/60 bg-white px-3 py-2.5 text-sm"
               >
                 <span className="font-medium">{d.fromDisplayName}</span>
                 {" schuldet "}
@@ -270,7 +270,6 @@ function ExpenseCard({
     members.find((m) => m.id === id)?.display_name ?? `#${id}`;
 
   const visual = expenseVisualForExpense(exp);
-  const surface = toneSurface(visual.tone);
   const isoDate = toIsoDateOnly(exp.expense_date);
   const fx = formatMoneyFxSummary({
     amount: exp.amount,
@@ -336,20 +335,13 @@ function ExpenseCard({
     <div
       id={`expense-card-${exp.id}`}
       className={cn(
-        "relative pl-5 sm:pl-6",
-        mobileFocused && "rounded-md ring-2 ring-teal-400/40"
+        "relative",
+        mobileFocused && "rounded-2xl ring-2 ring-[var(--brand-finance)]/30"
       )}
     >
-      <IconCircle
-        icon={visual.icon}
-        tone={visual.tone}
-        size="md"
-        className="absolute left-0 top-1 z-10 border-2 border-foreground/15 shadow-md"
-      />
       <div
         className={cn(
-          "overflow-hidden rounded-md border-2 text-sm shadow-sm",
-          surface.body,
+          "overflow-hidden rounded-2xl border border-border/60 bg-card text-sm shadow-[0_4px_16px_rgba(20,32,28,0.05)]",
           onMobileFocus && !editing && "cursor-pointer md:cursor-default"
         )}
         onClick={
@@ -358,99 +350,75 @@ function ExpenseCard({
             : undefined
         }
       >
-        <div
-          className={cn(
-            "border-b px-3 py-2 pl-7 sm:py-2.5 sm:pl-8",
-            surface.title
-          )}
-        >
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0 shrink-0">
-              {isoDate ? (
-                <CalendarDateBadge isoDate={isoDate} size="sm" />
-              ) : (
-                <span className="text-xs font-medium text-muted-foreground">
-                  Ohne Datum
-                </span>
-              )}
-            </div>
-            <div className="ml-auto flex shrink-0 items-center gap-2">
-              <p
-                className={cn(
-                  "text-right text-sm font-bold tabular-nums sm:hidden",
-                  isIncome ? "text-emerald-700" : "text-foreground"
-                )}
-              >
-                {isIncome ? "+" : ""}
-                {formatMoney(exp.amount_base, baseCurrency)}
-              </p>
-              {exp.ai_image_url ? (
-                <button
-                  type="button"
-                  title="Tippen zum Vergrössern"
-                  className="shrink-0 overflow-hidden rounded-md border border-foreground/10 shadow-sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setZoomOpen(true);
-                  }}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={exp.ai_image_url}
-                    alt=""
-                    className="h-10 w-10 object-cover sm:h-20 sm:w-20"
-                  />
-                </button>
-              ) : aiImageBusy ? (
-                <div className="flex h-10 w-10 items-center justify-center rounded-md border border-dashed border-foreground/20 bg-background/50 text-[10px] text-muted-foreground sm:h-20 sm:w-20">
-                  KI…
-                </div>
+        {/* Soft row: date · title/meta · amount */}
+        <div className="flex items-center gap-3 px-3 py-3">
+          <div className="shrink-0">
+            {isoDate ? (
+              <CalendarDateBadge isoDate={isoDate} size="sm" />
+            ) : (
+              <span className="flex size-12 items-center justify-center rounded-md bg-muted text-[10px] font-medium text-muted-foreground">
+                —
+              </span>
+            )}
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <p className="truncate font-semibold text-foreground">
+              {exp.description || (isIncome ? "Einnahme" : "Ausgabe")}
+            </p>
+            <p className="mt-0.5 truncate text-xs text-muted-foreground">
+              {isIncome ? "Einnahme" : visual.label}
+              {!cashbookMode ? (
+                <>
+                  {" · "}
+                  {memberName(exp.paid_by_member_id)}
+                </>
               ) : null}
-            </div>
+            </p>
+            {exp.ai_image_url || aiImageBusy ? (
+              <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-[var(--brand-finance-soft)] px-2 py-0.5 text-[10px] font-medium text-[var(--brand-finance)]">
+                <Sparkles className="size-3" />
+                {aiImageBusy && !exp.ai_image_url ? "KI…" : "KI"}
+              </span>
+            ) : null}
+          </div>
+
+          <div className="flex shrink-0 flex-col items-end gap-1.5">
+            <p
+              className={cn(
+                "text-right text-sm font-bold tabular-nums",
+                isIncome ? "text-[var(--brand-finance)]" : "text-foreground"
+              )}
+            >
+              {isIncome ? "+" : ""}
+              {formatMoney(exp.amount_base, baseCurrency)}
+            </p>
+            {exp.ai_image_url ? (
+              <button
+                type="button"
+                title="Tippen zum Vergrössern"
+                className="hidden shrink-0 overflow-hidden rounded-lg border border-border/50 shadow-sm sm:block"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setZoomOpen(true);
+                }}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={exp.ai_image_url}
+                  alt=""
+                  className="h-12 w-12 object-cover"
+                />
+              </button>
+            ) : null}
           </div>
         </div>
 
-        <div className="px-3 py-2 pl-7 sm:py-2.5 sm:pl-8">
-          <div className="flex min-h-0 flex-col justify-center gap-1 sm:min-h-[4.5rem]">
-            <div className="flex items-start justify-between gap-2">
-              <p className="min-w-0 text-sm font-bold leading-snug text-foreground sm:text-base">
-                {exp.description || (isIncome ? "Einnahme" : "Ausgabe")}
-              </p>
-              <p
-                className={cn(
-                  "hidden shrink-0 text-right text-base font-bold tabular-nums sm:block",
-                  isIncome ? "text-emerald-700" : "text-foreground"
-                )}
-              >
-                {isIncome ? "+" : ""}
-                {formatMoney(exp.amount_base, baseCurrency)}
-              </p>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              <span
-                className={cn(
-                  "mr-1.5 inline-flex rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
-                  surface.soft
-                )}
-              >
-                {isIncome ? "Einnahme" : visual.label}
-              </span>
-              {cashbookMode ? (
-                <span
-                  className={cn(
-                    "font-semibold",
-                    isIncome ? "text-emerald-700" : "text-foreground"
-                  )}
-                >
-                  {isIncome ? "+" : "−"}
-                  {fx.primary}
-                </span>
-              ) : (
-                <>Bezahlt von {memberName(exp.paid_by_member_id)}</>
-              )}
-            </p>
+        {/* Desktop detail + place/note */}
+        <div className="hidden border-t border-border/40 px-3 py-2 md:block">
+          <div className="flex min-h-0 flex-col gap-1">
             {fx.detail ? (
-              <div className="hidden space-y-0.5 text-[11px] leading-snug text-muted-foreground md:block">
+              <div className="space-y-0.5 text-[11px] leading-snug text-muted-foreground">
                 <p>Währung: {exp.currency.toUpperCase()}</p>
                 <p>FW Betrag: {fx.primary}</p>
                 <p className="text-[12px] font-bold text-foreground">
@@ -469,18 +437,14 @@ function ExpenseCard({
                 </p>
               </div>
             ) : null}
-            <p className="flex min-h-[1rem] items-center gap-1 text-xs text-muted-foreground">
-              {exp.place_name ? (
-                <>
-                  <MapPin className="size-3 shrink-0" />
-                  <span className="break-words">{exp.place_name}</span>
-                </>
-              ) : (
-                <span className="invisible select-none">—</span>
-              )}
-            </p>
+            {exp.place_name ? (
+              <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                <MapPin className="size-3 shrink-0" />
+                <span className="break-words">{exp.place_name}</span>
+              </p>
+            ) : null}
             {exp.note?.trim() ? (
-              <p className="hidden break-words text-xs text-muted-foreground md:block">
+              <p className="break-words text-xs text-muted-foreground">
                 Notiz: {exp.note.trim()}
               </p>
             ) : null}
@@ -499,15 +463,17 @@ function ExpenseCard({
                 <span className="text-muted-foreground">· Paperless</span>
               </p>
             ) : null}
-            {onMobileFocus && !editing ? (
-              <p className="text-[11px] text-muted-foreground md:hidden">
-                Tippen für Aktionen
-              </p>
-            ) : null}
           </div>
+        </div>
+
+        {onMobileFocus && !editing ? (
+          <p className="border-t border-border/40 px-3 py-1.5 text-[11px] text-muted-foreground md:hidden">
+            Tippen für Aktionen
+          </p>
+        ) : null}
 
             {editing && canEdit && onUpdate ? (
-              <div className="mt-3 grid gap-2 rounded-md border border-border/50 bg-background/60 p-2.5 sm:grid-cols-2">
+              <div className="mx-3 mb-3 grid gap-2 rounded-xl border border-border/50 bg-background/60 p-2.5 sm:grid-cols-2">
                 <div className="space-y-1 sm:col-span-2">
                   <Label className="text-xs">Beschreibung</Label>
                   <Input
@@ -687,7 +653,7 @@ function ExpenseCard({
             ) : null}
 
         <div
-          className="mt-2.5 flex flex-wrap items-center gap-2 border-t border-foreground/10 pt-2"
+          className="flex flex-wrap items-center gap-2 border-t border-border/40 px-3 py-2"
           onClick={(e) => e.stopPropagation()}
         >
           {receiptUploadUrl ? (
@@ -840,7 +806,6 @@ function ExpenseCard({
               </Button>
             ) : null}
           </div>
-        </div>
         </div>
       </div>
 
@@ -1220,7 +1185,6 @@ function SettlementCard({
   const memberName = (id: number) =>
     members.find((m) => m.id === id)?.display_name ?? `#${id}`;
   const visual = settlementVisual();
-  const surface = toneSurface(visual.tone);
   const fx = formatMoneyFxSummary({
     amount: s.amount,
     currency: s.currency,
@@ -1259,20 +1223,16 @@ function SettlementCard({
   }
 
   return (
-    <div className="relative pl-5 sm:pl-6">
-      <IconCircle
-        icon={visual.icon}
-        tone={visual.tone}
-        size="md"
-        className="absolute left-0 top-1 z-10 border-2 border-foreground/15 shadow-md"
-      />
+    <div className="relative">
       <div
         className={cn(
-          "rounded-md border-2 py-2.5 pl-7 pr-3 text-sm shadow-sm sm:pl-8",
-          surface.body
+          "rounded-2xl border border-border/60 bg-card py-2.5 pl-3 pr-3 text-sm shadow-[0_4px_16px_rgba(20,32,28,0.05)]"
         )}
       >
         <div className="flex items-start gap-2">
+          <div className="mt-0.5 shrink-0">
+            <IconCircle icon={visual.icon} tone={visual.tone} size="sm" />
+          </div>
           <div className="min-w-0 flex-1">
             <p className="text-base font-bold leading-snug">
               <span>{memberName(s.from_member_id)}</span>
@@ -1308,7 +1268,7 @@ function SettlementCard({
             ) : null}
 
             {editing && canEdit && onUpdate ? (
-              <div className="mt-3 grid gap-2 rounded-md border border-border/50 bg-background/60 p-2.5 sm:grid-cols-2">
+              <div className="mt-3 grid gap-2 rounded-xl border border-border/50 bg-background/60 p-2.5 sm:grid-cols-2">
                 <div className="space-y-1">
                   <Label className="text-xs">Von</Label>
                   <Select
@@ -1486,7 +1446,10 @@ export function SectionCard({
 }) {
   const Icon = icon ?? Users;
   return (
-    <Card tone={tone} className="rounded-md shadow-sm">
+    <Card
+      tone={tone}
+      className="overflow-hidden border-border/60 shadow-[0_4px_16px_rgba(20,32,28,0.05)]"
+    >
       <CardHeader
         tone={tone}
         className="flex flex-row items-center justify-between pb-2"

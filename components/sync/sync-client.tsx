@@ -11,6 +11,8 @@ import {
   Activity,
   Bot,
   Sparkles,
+  CloudCheck,
+  Info,
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -101,6 +103,7 @@ function SyncClientInner() {
   const [busy, setBusy] = useState<
     "save" | "test" | "sync" | "trilium-sync" | null
   >(null);
+  const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -114,6 +117,35 @@ function SyncClientInner() {
       await refreshStats();
     })();
   }, [refreshStats]);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const [statusRes, runsRes] = await Promise.all([
+          fetch("/api/jobs/status", { cache: "no-store" }),
+          fetch("/api/jobs/runs?limit=1", { cache: "no-store" }),
+        ]);
+        const statusData = await statusRes.json().catch(() => null);
+        const runsData = await runsRes.json().catch(() => null);
+        const fromScheduler =
+          typeof statusData?.scheduler?.lastTickAt === "string"
+            ? statusData.scheduler.lastTickAt
+            : null;
+        const latestRun = Array.isArray(runsData?.runs)
+          ? runsData.runs[0]
+          : null;
+        const fromRun =
+          typeof latestRun?.finished_at === "string"
+            ? latestRun.finished_at
+            : typeof latestRun?.started_at === "string"
+              ? latestRun.started_at
+              : null;
+        setLastSyncAt(fromScheduler || fromRun || null);
+      } catch {
+        /* ignore status lookup errors */
+      }
+    })();
+  }, []);
 
   async function saveSettings() {
     setBusy("save");
@@ -255,6 +287,7 @@ function SyncClientInner() {
             }
       );
       setMessage("Sync abgeschlossen. Du kannst jetzt die Analyse starten.");
+      setLastSyncAt(new Date().toISOString());
       await refreshStats();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -339,6 +372,16 @@ function SyncClientInner() {
         ? "Sync abgeschlossen"
         : "Synchronisiere Dokumente…";
 
+  const lastSyncLabel = lastSyncAt
+    ? new Intl.DateTimeFormat("de-CH", {
+        dateStyle: "short",
+        timeStyle: "short",
+      }).format(new Date(lastSyncAt))
+    : "Noch nie";
+
+  const syncPrimaryBtn =
+    "w-full bg-[var(--brand-sync)] text-white hover:bg-[var(--brand-sync)]/90";
+
   const activeTab = parseSyncTab(searchParams.get("tab"));
   const tabItems: SyncTabItem[] = [
     { id: "status", label: "Status", icon: Activity },
@@ -355,10 +398,10 @@ function SyncClientInner() {
   }
 
   return (
-    <div className="space-y-4 pb-24 md:space-y-6 md:pb-0">
+    <div className="space-y-6 pb-28 md:space-y-8 md:pb-0">
       <PageHeader
         title="Sync"
-        description="Paperless und Trilium synchronisieren, dann AI-Analyse starten"
+        description="Paperless und Trilium aktuell halten — dann AI-Analyse starten."
         icon={pageVisuals.sync.icon}
         tone={pageVisuals.sync.tone}
       />
@@ -367,72 +410,43 @@ function SyncClientInner() {
 
       {activeTab === "status" ? (
         <div className="space-y-4">
-      <Card className="border-border/80 shadow-sm">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-3 text-base">
-            <IconCircle icon={Link2} tone="blue" size="sm" />
-            1. Paperless-Verbindung
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="baseUrl">Paperless Basis-URL</Label>
-            <Input
-              id="baseUrl"
-              placeholder="https://paperless.example.com"
-              value={baseUrl}
-              onChange={(e) => setBaseUrl(e.target.value)}
-            />
+      <Card className="border-[color-mix(in_oklab,var(--brand-sync),white_70%)] bg-white">
+        <CardContent className="flex flex-col items-center gap-4 py-8 text-center">
+          <IconCircle
+            icon={CloudCheck}
+            tone="green"
+            size="lg"
+            className="size-16 bg-[var(--brand-sync-soft)] text-[var(--brand-sync)] [&_svg]:size-8"
+          />
+          <div className="space-y-1">
+            <p className="text-base text-muted-foreground">
+              Letzte Sync:{" "}
+              <span className="font-semibold text-[var(--brand-sync)]">
+                {lastSyncLabel}
+              </span>
+            </p>
+            <p className="mx-auto max-w-sm text-sm text-muted-foreground">
+              Lädt Metadaten und OCR-Text aus Paperless in die lokale
+              SQLite-Datenbank.
+            </p>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="token">API-Token</Label>
-            <Input
-              id="token"
-              type="password"
-              placeholder={
-                hasToken
-                  ? `Gespeichert: ${tokenMasked || "••••"}`
-                  : "Token eingeben"
-              }
-              value={apiToken}
-              onChange={(e) => setApiToken(e.target.value)}
-            />
-          </div>
-          <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
-            <Button onClick={() => void saveSettings()} disabled={busy !== null}>
-              {busy === "save" ? "Speichert…" : "Speichern"}
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() => void testConnection()}
-              disabled={busy !== null}
-            >
-              {busy === "test" ? "Testet…" : "Verbindung testen"}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="border-border/80 shadow-sm">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-3 text-base">
-            <IconCircle icon={RefreshCw} tone="amber" size="sm" />
-            2. Dokumente synchronisieren
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Lädt Metadaten und OCR-Text aus Paperless in die lokale SQLite-Datenbank.
-          </p>
           <Button
             onClick={() => void startSync()}
             disabled={busy !== null || !hasToken || analysisRunning}
+            className={syncPrimaryBtn}
           >
-            {busy === "sync" ? "Synchronisiert…" : "Sync starten"}
+            <RefreshCw
+              className={busy === "sync" ? "animate-spin" : undefined}
+            />
+            {busy === "sync" ? "Synchronisiert…" : "Jetzt synchronisieren"}
           </Button>
+          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Info className="size-3.5 shrink-0" />
+            Automatik und Analyse findest du in den anderen Tabs.
+          </p>
 
           {syncProgress ? (
-            <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4">
+            <div className="w-full space-y-3 rounded-2xl border border-border/60 bg-[var(--brand-sync-soft)]/50 p-4 text-left">
               <ProgressBar
                 value={syncProgress.percent}
                 label={syncLabel}
@@ -453,7 +467,7 @@ function SyncClientInner() {
           ) : null}
 
           {syncResult ? (
-            <div className="space-y-1 text-sm">
+            <div className="w-full space-y-1 text-left text-sm">
               <div>Remote gesamt: {syncResult.totalRemote}</div>
               <div>Verarbeitet: {syncResult.processed}</div>
               {syncResult.errors.length > 0 ? (
@@ -471,11 +485,64 @@ function SyncClientInner() {
         </CardContent>
       </Card>
 
-      <Card className="border-border/80 shadow-sm">
+      <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-3 text-base">
-            <IconCircle icon={BookOpen} tone="teal" size="sm" />
-            3. Trilium-Notizen synchronisieren
+          <CardTitle className="flex items-center gap-3">
+            <IconCircle icon={Link2} tone="green" size="sm" />
+            Paperless-Verbindung
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="baseUrl">Paperless Basis-URL</Label>
+            <Input
+              id="baseUrl"
+              className="rounded-xl"
+              placeholder="https://paperless.example.com"
+              value={baseUrl}
+              onChange={(e) => setBaseUrl(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="token">API-Token</Label>
+            <Input
+              id="token"
+              type="password"
+              className="rounded-xl"
+              placeholder={
+                hasToken
+                  ? `Gespeichert: ${tokenMasked || "••••"}`
+                  : "Token eingeben"
+              }
+              value={apiToken}
+              onChange={(e) => setApiToken(e.target.value)}
+            />
+          </div>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <Button
+              onClick={() => void saveSettings()}
+              disabled={busy !== null}
+              className={syncPrimaryBtn}
+            >
+              {busy === "save" ? "Speichert…" : "Speichern"}
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => void testConnection()}
+              disabled={busy !== null}
+            >
+              {busy === "test" ? "Testet…" : "Verbindung testen"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-3">
+            <IconCircle icon={BookOpen} tone="green" size="sm" />
+            Trilium-Notizen
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -484,7 +551,7 @@ function SyncClientInner() {
             SQLite-Datenbank. Der Chat nutzt danach den lokalen Index (schneller,
             auch bei Trilium-Ausfall).
           </p>
-          <div className="rounded-lg border border-border bg-muted/30 p-4 text-sm">
+          <div className="rounded-2xl border border-border/60 bg-[var(--brand-sync-soft)]/50 p-4 text-sm">
             {triliumConfigured ? (
               <>
                 Trilium konfiguriert · lokal indexiert:{" "}
@@ -503,12 +570,18 @@ function SyncClientInner() {
           <Button
             onClick={() => void startTriliumSync()}
             disabled={busy !== null || !triliumConfigured || analysisRunning}
+            className={syncPrimaryBtn}
           >
+            <RefreshCw
+              className={
+                busy === "trilium-sync" ? "animate-spin" : undefined
+              }
+            />
             {busy === "trilium-sync" ? "Synchronisiert…" : "Trilium-Sync starten"}
           </Button>
 
           {triliumSyncProgress ? (
-            <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4">
+            <div className="space-y-3 rounded-2xl border border-border/60 bg-[var(--brand-sync-soft)]/50 p-4">
               <ProgressBar
                 value={triliumSyncProgress.percent}
                 label={
@@ -559,11 +632,11 @@ function SyncClientInner() {
       {activeTab === "automation" ? <AutomationPanel /> : null}
 
       {activeTab === "analyse" ? (
-      <Card className="border-border/80 shadow-sm">
+      <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-3 text-base">
-            <IconCircle icon={BrainCircuit} tone="violet" size="sm" />
-            4. AI-Analyse
+          <CardTitle className="flex items-center gap-3">
+            <IconCircle icon={BrainCircuit} tone="green" size="sm" />
+            AI-Analyse
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -573,7 +646,7 @@ function SyncClientInner() {
             ausstehenden Dokumente fertig sind (Tab muss offen bleiben). Status
             und Fortschritt siehst du oben auf jeder Seite.
           </p>
-          <div className="rounded-lg border border-border bg-muted/30 p-4 text-sm">
+          <div className="rounded-2xl border border-border/60 bg-[var(--brand-sync-soft)]/50 p-4 text-sm">
             Ausstehend: <strong>{pendingCount}</strong>
             {!hasOpenAIKey ? (
               <span className="ml-2 text-destructive">
@@ -585,29 +658,31 @@ function SyncClientInner() {
               </span>
             ) : null}
           </div>
-          <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
+          <div className="grid grid-cols-1 gap-2">
             {analysisRunning ? (
-              <Button variant="outline" onClick={stopAnalysis}>
+              <Button variant="outline" className="w-full" onClick={stopAnalysis}>
                 Analyse stoppen
               </Button>
             ) : (
               <>
                 <Button
-                  variant="outline"
-                  disabled={pendingCount === 0 || !hasOpenAIKey || busy !== null}
-                  onClick={() =>
-                    void startAnalysis({ mode: "batch", batchSize: 10 })
-                  }
-                >
-                  10 analysieren
-                </Button>
-                <Button
+                  className={syncPrimaryBtn}
                   disabled={pendingCount === 0 || !hasOpenAIKey || busy !== null}
                   onClick={() =>
                     void startAnalysis({ mode: "all", batchSize: 10 })
                   }
                 >
                   Alle im Hintergrund analysieren
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  disabled={pendingCount === 0 || !hasOpenAIKey || busy !== null}
+                  onClick={() =>
+                    void startAnalysis({ mode: "batch", batchSize: 10 })
+                  }
+                >
+                  10 analysieren
                 </Button>
               </>
             )}

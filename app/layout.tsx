@@ -23,7 +23,7 @@ export const metadata: Metadata = {
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "black-translucent",
+    statusBarStyle: "default",
     title: "FamilyBrain",
   },
   formatDetection: {
@@ -49,7 +49,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 5,
   viewportFit: "cover",
-  themeColor: "#111827",
+  themeColor: "#0f766e",
   colorScheme: "light",
 };
 

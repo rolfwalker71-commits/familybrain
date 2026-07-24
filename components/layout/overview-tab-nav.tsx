@@ -20,11 +20,13 @@ export function OverviewTabNav({
   active,
   onChange,
   className,
+  accent = "primary",
 }: {
   items: OverviewTabItem[];
   active: OverviewTab;
   onChange: (tab: OverviewTab) => void;
   className?: string;
+  accent?: "primary" | "teal" | "green" | "slate";
 }) {
   return (
     <AppTabNav
@@ -32,6 +34,7 @@ export function OverviewTabNav({
       active={active}
       onChange={onChange}
       className={className}
+      accent={accent}
     />
   );
 }

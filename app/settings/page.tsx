@@ -753,11 +753,14 @@ function SettingsPageInner() {
     router.replace(q ? `?${q}` : "?", { scroll: false });
   }
 
+  const settingsPrimaryBtn =
+    "w-full bg-[var(--brand-settings)] text-white hover:bg-[var(--brand-settings)]/90";
+
   return (
-    <div className="space-y-4 pb-24 md:space-y-6 md:pb-0">
+    <div className="space-y-6 pb-28 md:space-y-8 md:pb-0">
       <PageHeader
         title="Einstellungen"
-        description="Paperless, Trilium, OpenAI und Chat-Regeln konfigurieren"
+        description="Verbindungen, KI und Chat-Verhalten für FamilyBrain."
         icon={pageVisuals.settings.icon}
         tone={pageVisuals.settings.tone}
       />
@@ -765,10 +768,10 @@ function SettingsPageInner() {
       <SettingsTabNav items={tabItems} active={activeTab} onChange={setTab} />
 
       {activeTab === "chat" ? (
-      <Card className="border-border/80 shadow-sm">
+      <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-3">
-          <CardTitle className="flex items-center gap-3 text-base">
-            <IconCircle icon={MessageSquareText} tone="indigo" size="sm" />
+          <CardTitle className="flex items-center gap-3">
+            <IconCircle icon={MessageSquareText} tone="slate" size="sm" />
             Chat-Regeln
           </CardTitle>
           {chatInstructionsCustomized ? (
@@ -791,50 +794,55 @@ function SettingsPageInner() {
               id="chatInstructions"
               value={chatInstructions}
               onChange={(e) => setChatInstructions(e.target.value)}
-              className="min-h-[220px] font-mono text-xs leading-relaxed"
+              className="min-h-[220px] rounded-xl font-mono text-xs leading-relaxed"
               placeholder="z. B. Pfade immer vollständig ausgeben…"
             />
             <p className="text-xs text-muted-foreground">
               {chatInstructions.length} Zeichen · max. 8000
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-col gap-2">
             <Button
               onClick={() => void saveChatInstructions()}
               disabled={saving !== null}
+              className={settingsPrimaryBtn}
             >
               {saving === "chat" ? "Speichert…" : "Chat-Regeln speichern"}
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                if (chatInstructionsDefault) {
-                  setChatInstructions(chatInstructionsDefault);
-                }
-              }}
-              disabled={saving !== null || !chatInstructionsDefault}
-            >
-              Vorlage in Editor laden
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => void restoreDefaultChatInstructions()}
-              disabled={saving !== null}
-            >
-              Auf Ausgangsvorlage zurücksetzen
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1 sm:flex-none"
+                onClick={() => {
+                  if (chatInstructionsDefault) {
+                    setChatInstructions(chatInstructionsDefault);
+                  }
+                }}
+                disabled={saving !== null || !chatInstructionsDefault}
+              >
+                Vorlage in Editor laden
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                className="flex-1 sm:flex-none"
+                onClick={() => void restoreDefaultChatInstructions()}
+                disabled={saving !== null}
+              >
+                Auf Ausgangsvorlage zurücksetzen
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
       ) : null}
 
       {activeTab === "paperless" ? (
-      <Card className="border-border/80 shadow-sm">
+      <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-3 text-base">
-            <IconCircle icon={Server} tone="blue" size="sm" />
+          <CardTitle className="flex items-center gap-3">
+            <IconCircle icon={Server} tone="slate" size="sm" />
             Paperless-ngx
           </CardTitle>
         </CardHeader>
@@ -843,6 +851,7 @@ function SettingsPageInner() {
             <Label htmlFor="url">Basis-URL</Label>
             <Input
               id="url"
+              className="rounded-xl"
               value={baseUrl}
               onChange={(e) => setBaseUrl(e.target.value)}
               placeholder="https://paperless.example.com"
@@ -853,6 +862,7 @@ function SettingsPageInner() {
             <Input
               id="token"
               type="password"
+              className="rounded-xl"
               value={apiToken}
               onChange={(e) => setApiToken(e.target.value)}
               placeholder={
@@ -865,7 +875,7 @@ function SettingsPageInner() {
           <Button
             onClick={() => void savePaperless()}
             disabled={saving !== null}
-            className="w-full sm:w-auto"
+            className={settingsPrimaryBtn}
           >
             {saving === "paperless" ? "Speichert…" : "Paperless speichern"}
           </Button>
@@ -875,10 +885,10 @@ function SettingsPageInner() {
 
       {activeTab === "more" ? (
         <div className="space-y-4">
-      <Card className="border-border/80 shadow-sm">
+      <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="flex items-center gap-3 text-base">
-            <IconCircle icon={BookOpen} tone="teal" size="sm" />
+          <CardTitle className="flex items-center gap-3">
+            <IconCircle icon={BookOpen} tone="slate" size="sm" />
             Trilium
           </CardTitle>
           {triliumConfigured ? (
@@ -899,6 +909,7 @@ function SettingsPageInner() {
             <Label htmlFor="triliumUrl">Basis-URL</Label>
             <Input
               id="triliumUrl"
+              className="rounded-xl"
               value={triliumBaseUrl}
               onChange={(e) => setTriliumBaseUrl(e.target.value)}
               placeholder="https://trilium.example.com"
@@ -909,6 +920,7 @@ function SettingsPageInner() {
             <Input
               id="triliumToken"
               type="password"
+              className="rounded-xl"
               value={triliumToken}
               onChange={(e) => setTriliumToken(e.target.value)}
               placeholder={
@@ -919,35 +931,40 @@ function SettingsPageInner() {
             />
           </div>
           {triliumPrivatNoteId || triliumGeschaeftlichNoteId ? (
-            <div className="rounded-lg border border-border/70 bg-muted/30 p-3 text-xs text-muted-foreground">
+            <div className="rounded-xl border border-border/60 bg-[var(--brand-settings-soft)]/60 p-3 text-xs text-muted-foreground">
               <div>Master: {triliumMasterNoteId || "–"}</div>
               <div>Privat: {triliumPrivatNoteId || "–"}</div>
               <div>Geschäftlich ANG: {triliumGeschaeftlichNoteId || "–"}</div>
             </div>
           ) : null}
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-col gap-2">
             <Button
               onClick={() => void saveTrilium()}
               disabled={saving !== null || resolvingScopes}
+              className={settingsPrimaryBtn}
             >
               {saving === "trilium" ? "Speichert…" : "Trilium speichern"}
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => void testTriliumConnection()}
-              disabled={saving !== null || resolvingScopes}
-            >
-              Verbindung testen
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => void resolveTriliumScopes()}
-              disabled={saving !== null || resolvingScopes}
-            >
-              {resolvingScopes ? "Erkenne Bereiche…" : "Bereiche erkennen"}
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1"
+                onClick={() => void testTriliumConnection()}
+                disabled={saving !== null || resolvingScopes}
+              >
+                Verbindung testen
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1"
+                onClick={() => void resolveTriliumScopes()}
+                disabled={saving !== null || resolvingScopes}
+              >
+                {resolvingScopes ? "Erkenne Bereiche…" : "Bereiche erkennen"}
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -955,10 +972,10 @@ function SettingsPageInner() {
       ) : null}
 
       {activeTab === "travel" ? (
-      <Card className="border-border/80 shadow-sm">
+      <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-3">
-          <CardTitle className="flex items-center gap-3 text-base">
-            <IconCircle icon={Luggage} tone="indigo" size="sm" />
+          <CardTitle className="flex items-center gap-3">
+            <IconCircle icon={Luggage} tone="slate" size="sm" />
             TravelBrain
           </CardTitle>
           {hasAerodataboxKey ? (
@@ -1097,10 +1114,11 @@ function SettingsPageInner() {
               Prompt zurücksetzen
             </Button>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-col gap-2">
             <Button
               onClick={() => void saveTravelBrainSettings()}
               disabled={saving !== null}
+              className={settingsPrimaryBtn}
             >
               {saving === "travelbrain" ? "Speichert…" : "TravelBrain speichern"}
             </Button>
@@ -1108,6 +1126,7 @@ function SettingsPageInner() {
               <Button
                 type="button"
                 variant="outline"
+                className="w-full"
                 disabled={saving !== null}
                 onClick={() => void clearAerodataboxKey()}
               >
@@ -1116,7 +1135,7 @@ function SettingsPageInner() {
             ) : null}
           </div>
 
-          <div className="space-y-3 rounded-lg border border-border/70 bg-muted/20 p-3">
+          <div className="space-y-3 rounded-xl border border-border/60 bg-[var(--brand-settings-soft)]/40 p-3">
             <div className="text-sm font-medium">Flug-API testen</div>
             <p className="text-xs text-muted-foreground">
               Sendet dieselbe Lookup-Anfrage wie die Anreicherung und zeigt die
@@ -1167,10 +1186,10 @@ function SettingsPageInner() {
       ) : null}
 
       {activeTab === "mail" ? (
-      <Card className="border-border/80 shadow-sm">
+      <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-3">
-          <CardTitle className="flex items-center gap-3 text-base">
-            <IconCircle icon={Mail} tone="sky" size="sm" />
+          <CardTitle className="flex items-center gap-3">
+            <IconCircle icon={Mail} tone="slate" size="sm" />
             E-Mail (SMTP)
           </CardTitle>
           {emailConfigured ? (
@@ -1298,16 +1317,17 @@ function SettingsPageInner() {
           <Button
             onClick={() => void saveEmailSettings()}
             disabled={saving !== null}
+            className={settingsPrimaryBtn}
           >
             {saving === "email" ? "Speichert…" : "SMTP speichern"}
           </Button>
           <div className="space-y-2 border-t border-border/60 pt-4">
             <Label htmlFor="testMailTo">Testmail senden</Label>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row">
               <Input
                 id="testMailTo"
                 type="email"
-                className="min-w-[14rem] flex-1"
+                className="min-w-0 flex-1 rounded-xl"
                 value={testMailTo}
                 onChange={(e) => setTestMailTo(e.target.value)}
                 placeholder="du@example.com"
@@ -1315,6 +1335,7 @@ function SettingsPageInner() {
               <Button
                 type="button"
                 variant="outline"
+                className="w-full sm:w-auto"
                 disabled={testMailBusy || saving !== null || !emailConfigured}
                 onClick={() => void sendSettingsTestMail()}
               >
@@ -1328,10 +1349,10 @@ function SettingsPageInner() {
 
       {activeTab === "more" ? (
         <div className="space-y-4">
-      <Card className="border-border/80 shadow-sm">
+      <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-3">
-          <CardTitle className="flex items-center gap-3 text-base">
-            <IconCircle icon={HandCoins} tone="green" size="sm" />
+          <CardTitle className="flex items-center gap-3">
+            <IconCircle icon={HandCoins} tone="slate" size="sm" />
             FinanzBrain
           </CardTitle>
           {financeExpenseAiImagePromptCustomized ? (
@@ -1381,6 +1402,7 @@ function SettingsPageInner() {
           <Button
             onClick={() => void saveFinanzBrainSettings()}
             disabled={saving !== null}
+            className={settingsPrimaryBtn}
           >
             {saving === "finanzbrain"
               ? "Speichert…"
@@ -1389,10 +1411,10 @@ function SettingsPageInner() {
         </CardContent>
       </Card>
 
-      <Card className="border-border/80 shadow-sm">
+      <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="flex items-center gap-3 text-base">
-            <IconCircle icon={KeyRound} tone="violet" size="sm" />
+          <CardTitle className="flex items-center gap-3">
+            <IconCircle icon={KeyRound} tone="slate" size="sm" />
             OpenAI
           </CardTitle>
           {hasOpenAIKey ? (
@@ -1457,7 +1479,7 @@ function SettingsPageInner() {
           <Button
             onClick={() => void saveOpenAI()}
             disabled={saving !== null}
-            className="w-full sm:w-auto"
+            className={settingsPrimaryBtn}
           >
             {saving === "openai" ? "Speichert…" : "OpenAI speichern"}
           </Button>

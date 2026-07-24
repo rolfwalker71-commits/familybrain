@@ -3,8 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Plus, Trash2 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,6 +23,7 @@ import {
 } from "@/components/ui/sheet";
 import { PageHeader } from "@/components/layout/page-primitives";
 import { IconCircle, pageVisuals } from "@/components/layout/icon-circle";
+import { SoftFab } from "@/components/layout/soft-ui";
 import {
   COMMON_CURRENCIES,
   LEDGER_KIND_LABELS,
@@ -196,7 +196,7 @@ export function FinanceLedgersListClient() {
         ) : null}
         <div className={cn(!compact && "sm:col-span-2")}>
           <Button
-            className="w-full sm:w-auto"
+            className="w-full bg-[var(--brand-finance)] text-white hover:bg-[var(--brand-finance)]/90 sm:w-auto"
             onClick={() => void createLedger()}
             disabled={creating || !title.trim()}
           >
@@ -209,18 +209,20 @@ export function FinanceLedgersListClient() {
   }
 
   return (
-    <div className="relative space-y-6 pb-20 md:pb-0">
+    <div className="relative space-y-6 pb-28 md:pb-0">
       <PageHeader
         title="FinanzBrain"
-        description="Split-Abrechnungen oder normales Haushaltsbuch für Ein- und Ausgaben"
+        description="Abrechnungen einfach im Griff."
         icon={pageVisuals.financeBrain.icon}
         tone={pageVisuals.financeBrain.tone}
       />
 
       {/* Desktop create form */}
-      <Card tone="green" className="hidden rounded-md shadow-sm md:block">
+      <Card tone="green" className="hidden md:block">
         <CardContent className="p-4">
-          <p className="mb-3 text-sm font-medium">Neue Abrechnung</p>
+          <p className="mb-3 text-sm font-medium text-[var(--brand-finance)]">
+            Neue Abrechnung
+          </p>
           <CreateForm />
         </CardContent>
       </Card>
@@ -228,31 +230,20 @@ export function FinanceLedgersListClient() {
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
       <div className="space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold tracking-tight text-foreground">
-            Meine Abrechnungen
-          </h2>
-          <Button
-            size="sm"
-            variant="outline"
-            className="md:hidden"
-            onClick={() => setCreateOpen(true)}
-          >
-            <Plus className="mr-1 size-4" />
-            Neu
-          </Button>
-        </div>
+        <h2 className="text-sm font-semibold tracking-tight text-foreground">
+          Meine Abrechnungen
+        </h2>
 
         {loading ? (
           <p className="text-sm text-muted-foreground">Lade Abrechnungen…</p>
         ) : ledgers.length === 0 ? (
-          <Card tone="green" className="rounded-md shadow-sm">
+          <Card className="border-border/60 bg-card shadow-[0_4px_16px_rgba(20,32,28,0.05)]">
             <CardContent className="space-y-3 p-4">
               <p className="text-sm text-muted-foreground">
                 Noch keine Abrechnungen.
               </p>
               <Button
-                className="w-full md:hidden"
+                className="w-full bg-[var(--brand-finance)] text-white hover:bg-[var(--brand-finance)]/90 md:hidden"
                 onClick={() => setCreateOpen(true)}
               >
                 <Plus className="mr-2 size-4" />
@@ -265,89 +256,68 @@ export function FinanceLedgersListClient() {
             {ledgers.map((ledger) => {
               const kind = ledger.ledger_kind === "normal" ? "normal" : "split";
               return (
-                <Card
+                <div
                   key={ledger.id}
-                  tone="green"
-                  className="rounded-md shadow-sm"
+                  className="relative rounded-2xl border border-border/60 bg-card p-4 shadow-[0_4px_16px_rgba(20,32,28,0.05)]"
                 >
-                  <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:flex-wrap sm:items-center">
-                    <div className="flex min-w-0 flex-1 items-start gap-3">
-                      <IconCircle
-                        icon={pageVisuals.financeBrain.icon}
-                        tone="green"
-                        size="sm"
-                      />
-                      <div className="min-w-0 flex-1">
-                        <Link
-                          href={`/finance-brain/${ledger.id}`}
-                          className="font-medium hover:underline"
-                        >
-                          {ledger.title}
-                        </Link>
-                        <p className="text-xs text-muted-foreground">
-                          {LEDGER_KIND_LABELS[kind]} · {ledger.base_currency}
-                          {ledger.trip_title
-                            ? ` · Reise: ${ledger.trip_title}`
-                            : ""}
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="absolute top-3 right-3 z-10"
+                    onClick={() => void removeLedger(ledger.id, ledger.title)}
+                    aria-label="Löschen"
+                  >
+                    <Trash2 className="size-4 text-destructive" />
+                  </Button>
+
+                  <div className="flex items-start gap-3 pr-10">
+                    <IconCircle
+                      icon={pageVisuals.financeBrain.icon}
+                      tone="green"
+                      size="lg"
+                      className="rounded-2xl"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-foreground">
+                        {ledger.title}
+                      </p>
+                      {ledger.trip_title ? (
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          Reise: {ledger.trip_title}
                         </p>
-                        <div className="mt-1.5 flex flex-wrap gap-1.5">
-                          <Badge variant="secondary">
-                            {LEDGER_KIND_LABELS[kind]}
-                          </Badge>
-                          <Badge variant="outline">{ledger.base_currency}</Badge>
-                        </div>
+                      ) : null}
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        <span className="inline-flex rounded-full bg-muted px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+                          {LEDGER_KIND_LABELS[kind]}
+                        </span>
+                        <span className="inline-flex rounded-full bg-muted px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+                          {ledger.base_currency}
+                        </span>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        className="shrink-0 sm:hidden"
-                        onClick={() =>
-                          void removeLedger(ledger.id, ledger.title)
-                        }
-                        aria-label="Löschen"
-                      >
-                        <Trash2 className="size-4 text-destructive" />
-                      </Button>
                     </div>
-                    <div className="flex items-center gap-2 sm:ml-auto">
-                      <Link
-                        href={`/finance-brain/${ledger.id}`}
-                        className={cn(
-                          buttonVariants({ variant: "outline", size: "sm" }),
-                          "flex-1 sm:flex-none"
-                        )}
-                      >
-                        Öffnen
-                      </Link>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        className="hidden sm:inline-flex"
-                        onClick={() =>
-                          void removeLedger(ledger.id, ledger.title)
-                        }
-                        aria-label="Löschen"
-                      >
-                        <Trash2 className="size-4 text-destructive" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+                  </div>
+
+                  <Link
+                    href={`/finance-brain/${ledger.id}`}
+                    className="mt-4 flex w-full items-center justify-center rounded-xl bg-[var(--brand-finance-soft)] px-4 py-2.5 text-sm font-semibold text-[var(--brand-finance)] transition-colors hover:opacity-90"
+                  >
+                    Öffnen
+                  </Link>
+                </div>
               );
             })}
           </div>
         )}
       </div>
 
-      {/* Mobile FAB */}
-      <button
-        type="button"
-        className="fixed right-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-30 flex size-14 items-center justify-center rounded-full bg-foreground text-background shadow-lg md:hidden"
+      <SoftFab
+        accent="green"
+        label="Neue Abrechnung"
         aria-label="Neue Abrechnung"
         onClick={() => setCreateOpen(true)}
       >
         <Plus className="size-6" />
-      </button>
+      </SoftFab>
 
       <Sheet open={createOpen} onOpenChange={setCreateOpen}>
         <SheetContent side="bottom" className="max-h-[90dvh] overflow-y-auto">

@@ -8,6 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toSwissDate } from "@/lib/utils/dates";
 import { formatCHF } from "@/lib/utils/format";
 import {
+  ChevronLeft,
+  CheckCircle2,
   ExternalLink,
   FileText,
   Info,
@@ -23,7 +25,14 @@ import {
   Layers,
   MoreHorizontal,
   RefreshCw,
+  Sparkles,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { DocumentPdfPreview } from "@/components/documents/document-pdf-preview";
 import {
   DocumentTabNav,
@@ -222,8 +231,63 @@ function DocumentDetailInner({ detail }: DetailProps) {
   }
 
   return (
-    <div className="space-y-4 pb-24 md:space-y-6 md:pb-0">
-      <div className="flex flex-wrap items-start justify-between gap-4">
+    <div className="space-y-4 pb-28 md:space-y-6 md:pb-0">
+      {/* Mobile soft header */}
+      <div className="flex items-center gap-2 md:hidden">
+        <button
+          type="button"
+          onClick={() => router.back()}
+          className="flex size-10 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted"
+          aria-label="Zurück"
+        >
+          <ChevronLeft className="size-5" />
+        </button>
+        <div className="flex min-w-0 flex-1 items-center gap-2.5">
+          <IconCircle
+            icon={categoryVisual.icon}
+            tone="teal"
+            size="sm"
+            className="rounded-xl"
+          />
+          <h1 className="truncate text-base font-semibold tracking-tight">
+            {document.title || `Dokument #${document.id}`}
+          </h1>
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-10 shrink-0"
+                aria-label="Mehr"
+              />
+            }
+          >
+            <MoreHorizontal className="size-5" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {document.paperless_url ? (
+              <DropdownMenuItem
+                onClick={() =>
+                  window.open(document.paperless_url!, "_blank", "noreferrer")
+                }
+              >
+                In Paperless öffnen
+              </DropdownMenuItem>
+            ) : null}
+            <DropdownMenuItem
+              onClick={() => void analyze()}
+              disabled={analyzing}
+            >
+              {analyzing ? "Analysiert…" : "Neu analysieren"}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      {/* Desktop header */}
+      <div className="hidden flex-wrap items-start justify-between gap-4 md:flex">
         <div className="min-w-0">
           <button
             type="button"
@@ -256,7 +320,7 @@ function DocumentDetailInner({ detail }: DetailProps) {
               href={document.paperless_url}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border bg-background px-3 text-sm font-medium hover:bg-muted"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border bg-background px-3 text-sm font-medium hover:bg-muted"
             >
               <ExternalLink className="h-4 w-4" />
               In Paperless öffnen
@@ -276,7 +340,7 @@ function DocumentDetailInner({ detail }: DetailProps) {
         </Card>
       ) : null}
 
-      <div className="flex flex-wrap gap-2">
+      <div className="hidden flex-wrap gap-2 md:flex">
         {tags.map((tag, idx) => (
           <Badge key={`${tag.tag_id}-${idx}`} variant="secondary">
             {tag.tag_name}
@@ -292,7 +356,71 @@ function DocumentDetailInner({ detail }: DetailProps) {
 
       {activeTab === "overview" ? (
         <div className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
+          {/* Soft UI hero card (mobile-first, also on desktop) */}
+          <Card className="overflow-hidden border-border/50 shadow-[0_8px_28px_rgba(20,32,28,0.07)]">
+            <CardContent className="space-y-5 p-5">
+              <div className="flex gap-3">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--brand-docs-soft)] text-[var(--brand-docs)]">
+                  <Sparkles className="size-5" />
+                </span>
+                <div className="min-w-0">
+                  <h2 className="font-semibold text-[var(--brand-docs)]">
+                    KI-Zusammenfassung
+                  </h2>
+                  <p className="mt-1.5 text-sm leading-relaxed text-foreground/85">
+                    {String(
+                      summary?.detailed_summary ||
+                        summary?.short_summary ||
+                        "Noch nicht analysiert."
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              {importantPoints.length > 0 ? (
+                <>
+                  <div className="border-t border-border/60" />
+                  <div className="flex gap-3">
+                    <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--brand-docs-soft)] text-[var(--brand-docs)]">
+                      <CheckCircle2 className="size-5" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <h2 className="font-semibold text-[var(--brand-docs)]">
+                        {importantPoints.length} zentrale Punkte
+                      </h2>
+                      <ul className="mt-2 space-y-2.5">
+                        {importantPoints.slice(0, 5).map((p, i) => {
+                          const colon = p.indexOf(":");
+                          const hasLabel = colon > 0 && colon < 40;
+                          const label = hasLabel ? p.slice(0, colon) : null;
+                          const body = hasLabel ? p.slice(colon + 1).trim() : p;
+                          return (
+                            <li key={i} className="text-sm leading-snug">
+                              {label ? (
+                                <>
+                                  <span className="font-semibold text-[var(--brand-docs)]">
+                                    {label}
+                                  </span>
+                                  <span className="text-foreground/80">
+                                    {" "}
+                                    {body}
+                                  </span>
+                                </>
+                              ) : (
+                                <span className="text-foreground/85">{body}</span>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  </div>
+                </>
+              ) : null}
+            </CardContent>
+          </Card>
+
+          <div className="hidden gap-4 sm:grid sm:grid-cols-2 md:grid">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-3 text-base">
@@ -319,38 +447,6 @@ function DocumentDetailInner({ detail }: DetailProps) {
               </CardContent>
             </Card>
           </div>
-
-          {summary?.detailed_summary ? (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-3 text-base">
-                  <IconCircle icon={ScrollText} tone="blue" size="sm" />
-                  Detaillierte Zusammenfassung
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="whitespace-pre-wrap text-sm text-muted-foreground">
-                {String(summary.detailed_summary)}
-              </CardContent>
-            </Card>
-          ) : null}
-
-          {importantPoints.length > 0 ? (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-3 text-base">
-                  <IconCircle icon={ListChecks} tone="green" size="sm" />
-                  Wichtige Punkte
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ul className="list-disc space-y-1 pl-5 text-sm">
-                  {importantPoints.map((p, i) => (
-                    <li key={i}>{p}</li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-          ) : null}
         </div>
       ) : null}
 

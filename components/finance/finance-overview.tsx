@@ -424,7 +424,7 @@ function FinanceOverviewClientInner({
   }
 
   return (
-    <div className="min-w-0 space-y-4 pb-24 md:space-y-6 md:pb-0">
+    <div className="min-w-0 space-y-4 pb-28 md:space-y-6 md:pb-0">
       <PageHeader
         title="Finanzblick"
         description={
@@ -453,14 +453,19 @@ function FinanceOverviewClientInner({
         }
       />
 
-      <OverviewTabNav items={tabItems} active={activeTab} onChange={setTab} />
+      <OverviewTabNav
+        items={tabItems}
+        active={activeTab}
+        onChange={setTab}
+        accent="green"
+      />
 
       {activeTab === "overview" ? (
         <>
       {recentDueInvoices.length > 0 || olderDueInvoices.length > 0 ? (
         <Card
           tone="amber"
-          className="min-w-0 overflow-hidden border-amber-300 p-0 shadow-[0_1px_2px_rgba(15,23,42,0.06),0_4px_14px_rgba(15,23,42,0.08)] [--card-spacing:0px]"
+          className="min-w-0 overflow-hidden border-amber-300/80 p-0 shadow-[0_4px_16px_rgba(20,32,28,0.05)] [--card-spacing:0px]"
         >
           <div
             className={cn(
@@ -612,11 +617,11 @@ function FinanceOverviewClientInner({
               type="button"
               onClick={() => openDimension(key)}
               className={cn(
-                "min-w-0 overflow-hidden rounded-xl border-2 text-left shadow-[0_1px_2px_rgba(15,23,42,0.06),0_4px_14px_rgba(15,23,42,0.08)] transition-all",
+                "min-w-0 overflow-hidden rounded-2xl border text-left shadow-[0_4px_16px_rgba(20,32,28,0.05)] transition-all",
                 surface.body,
                 active
-                  ? "border-primary ring-2 ring-primary/20"
-                  : "hover:border-primary/40"
+                  ? "border-[var(--brand-finance)] ring-2 ring-[var(--brand-finance)]/20"
+                  : "border-border/60 hover:border-[var(--brand-finance)]/40"
               )}
             >
               <TileTitleBar
@@ -627,7 +632,7 @@ function FinanceOverviewClientInner({
                     <ChevronRight
                       className={cn(
                         "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
-                        active && "rotate-90 text-primary"
+                        active && "rotate-90 text-[var(--brand-finance)]"
                       )}
                     />
                   </div>
@@ -714,11 +719,11 @@ function FinanceOverviewClientInner({
                         setSelected(isSelected ? null : item.label)
                       }
                       className={cn(
-                        "min-w-0 overflow-hidden rounded-xl border-2 text-left shadow-[0_1px_2px_rgba(15,23,42,0.06),0_4px_14px_rgba(15,23,42,0.08)] transition-colors",
+                        "min-w-0 overflow-hidden rounded-2xl border text-left shadow-[0_4px_16px_rgba(20,32,28,0.05)] transition-colors",
                         itemSurface.body,
                         isSelected
-                          ? "border-primary ring-2 ring-primary/20"
-                          : "hover:border-primary/40"
+                          ? "border-[var(--brand-finance)] ring-2 ring-[var(--brand-finance)]/20"
+                          : "border-border/60 hover:border-[var(--brand-finance)]/40"
                       )}
                     >
                       <TileTitleBar
@@ -749,7 +754,7 @@ function FinanceOverviewClientInner({
             {selectedRow ? (
               <div
                 className={cn(
-                  "overflow-hidden rounded-xl border-2",
+                  "overflow-hidden rounded-2xl border border-border/60",
                   toneSurface(dimensionMeta[dimension].tone).body
                 )}
               >
@@ -776,7 +781,7 @@ function FinanceOverviewClientInner({
                       <div
                         key={group.key}
                         className={cn(
-                          "overflow-hidden rounded-lg border-2",
+                          "overflow-hidden rounded-2xl border border-border/60",
                           toneSurface(dimensionMeta[dimension].tone).body
                         )}
                       >

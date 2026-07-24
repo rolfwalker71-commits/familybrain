@@ -37,6 +37,7 @@ export function DocumentTabNav({
       active={active}
       onChange={onChange}
       className={className}
+      accent="teal"
     />
   );
 }

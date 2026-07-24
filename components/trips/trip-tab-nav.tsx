@@ -32,6 +32,7 @@ export function TripTabNav({
       active={active}
       onChange={onChange}
       className={className}
+      accent="green"
     />
   );
 }

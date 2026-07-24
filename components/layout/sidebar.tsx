@@ -134,7 +134,7 @@ export function Sidebar({
     >
       <div className="px-5 py-6">
         <Link href="/dashboard" className="flex items-center gap-3">
-          <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground">
+          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-sidebar-primary text-sidebar-primary-foreground shadow-sm">
             <Brain className="h-6 w-6" />
           </span>
           <span className="text-3xl font-extrabold leading-none tracking-tight text-white">
@@ -157,9 +157,9 @@ export function Sidebar({
               href={item.href}
               onClick={onNavigate}
               className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
                 active
-                  ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
+                  ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-[0_4px_12px_rgba(15,118,110,0.28)]"
                   : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
               )}
             >
@@ -199,7 +199,7 @@ export function Sidebar({
       <div className="mt-auto space-y-3 border-t border-sidebar-border/60 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4">
         <button
           type="button"
-          className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
           onClick={async () => {
             await fetch("/api/auth/logout", { method: "POST" }).catch(
               () => undefined

@@ -12,7 +12,6 @@ import {
   ArrowLeftRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -536,19 +535,23 @@ function FinanceShareInner({ token }: { token: string }) {
   });
   const tabItems: FinanceTabItem[] = [
     { id: "overview", label: "Übersicht", icon: LayoutDashboard },
-    { id: "new", label: "Neu", icon: Plus },
+    { id: "new", label: "Neu", icon: Plus, emphasize: true },
     { id: "expenses", label: "Ausgaben", icon: List },
     { id: "settle", label: "Ausgleich", icon: ArrowLeftRight },
   ];
 
   return (
     <div className="mx-auto max-w-lg space-y-4 px-4 py-6 pb-28">
-      <div className="space-y-1 text-center">
-        <Badge variant="secondary">FinanzBrain</Badge>
-        <h1 className="text-xl font-semibold">{ledger.title}</h1>
+      <div className="space-y-3 text-center">
+        <div className="flex justify-center">
+          <span className="inline-flex rounded-full bg-[var(--brand-finance-soft)] px-3 py-1 text-xs font-semibold text-[var(--brand-finance)]">
+            FinanzBrain
+          </span>
+        </div>
+        <h1 className="text-xl font-semibold tracking-tight">{ledger.title}</h1>
         <p className="text-sm text-muted-foreground">
           Angemeldet als{" "}
-          <span className="font-medium">{member.display_name}</span>
+          <span className="font-medium text-foreground">{member.display_name}</span>
         </p>
       </div>
 

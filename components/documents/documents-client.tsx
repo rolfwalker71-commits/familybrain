@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Filter } from "lucide-react";
+import { CalendarDays, ChevronRight, Filter, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -29,12 +29,18 @@ import {
 } from "@/components/layout/data-list";
 import { useAnalysis } from "@/components/analysis/analysis-provider";
 import { FilterGrid, PageHeader } from "@/components/layout/page-primitives";
-import { pageVisuals } from "@/components/layout/icon-circle";
+import {
+  IconCircle,
+  knowledgeVisual,
+  pageVisuals,
+} from "@/components/layout/icon-circle";
+import { FilterChip, SoftFab } from "@/components/layout/soft-ui";
 import { toSwissDate } from "@/lib/utils/dates";
 import {
   DocumentInfoButton,
   DocumentTitleLink,
 } from "@/components/documents/document-link";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 type DocRow = {
@@ -111,7 +117,9 @@ export function DocumentsClient() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [analyzingId, setAnalyzingId] = useState<number | null>(null);
+  const [searchFocus, setSearchFocus] = useState(false);
   const requestIdRef = useRef(0);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Keep filters in sync when navigating from Wissensbereiche (/documents?category=…)
   useEffect(() => {
@@ -310,65 +318,67 @@ export function DocumentsClient() {
 
       {/* Mobile: search + filter trigger + category chips */}
       <div className="space-y-3 md:hidden">
-        <div className="flex gap-2">
-          <Input
-            className="min-w-0 flex-1"
-            placeholder="Suche…"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                const next = searchInput.trim();
-                setSearch(next);
-                updateUrl({ search: next });
-              }
-            }}
-          />
-          <Button
-            type="button"
-            variant={hasActiveFilters ? "default" : "outline"}
-            size="icon"
-            aria-label="Filter"
-            onClick={() => setFilterOpen(true)}
-          >
-            <Filter className="size-4" />
-          </Button>
-        </div>
-        <div className="flex gap-1.5 overflow-x-auto pb-0.5">
-          <button
-            type="button"
-            className={cn(
-              "shrink-0 rounded-full border px-3 py-1 text-xs font-medium",
-              category === "all"
-                ? "border-foreground/30 bg-foreground/10"
-                : "border-border/70 text-muted-foreground"
-            )}
+        {(searchFocus || searchInput) && (
+          <div className="flex gap-2">
+            <Input
+              ref={searchInputRef}
+              className="min-w-0 flex-1 rounded-2xl border-border/70 bg-card"
+              placeholder="Suche…"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onBlur={() => {
+                if (!searchInput.trim()) setSearchFocus(false);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  const next = searchInput.trim();
+                  setSearch(next);
+                  updateUrl({ search: next });
+                }
+              }}
+            />
+            <Button
+              type="button"
+              variant={hasActiveFilters ? "default" : "outline"}
+              size="icon"
+              className="rounded-2xl"
+              aria-label="Filter"
+              onClick={() => setFilterOpen(true)}
+            >
+              <Filter className="size-4" />
+            </Button>
+          </div>
+        )}
+        <div className="flex gap-2 overflow-x-auto pb-0.5">
+          <FilterChip
+            accent="teal"
+            active={category === "all"}
             onClick={() => {
               setCategory("all");
               updateUrl({ category: "all" });
             }}
           >
             Alle
-          </button>
-          {filters.categories.slice(0, 8).map((c) => (
-            <button
-              key={c}
-              type="button"
-              className={cn(
-                "shrink-0 rounded-full border px-3 py-1 text-xs font-medium",
-                category === c
-                  ? "border-foreground/30 bg-foreground/10"
-                  : "border-border/70 text-muted-foreground"
-              )}
-              onClick={() => {
-                setCategory(c);
-                updateUrl({ category: c });
-              }}
-            >
-              {c}
-            </button>
-          ))}
+          </FilterChip>
+          {filters.categories.slice(0, 8).map((c) => {
+            const visual = knowledgeVisual(c);
+            const Icon = visual.icon;
+            return (
+              <FilterChip
+                key={c}
+                accent="teal"
+                active={category === c}
+                onClick={() => {
+                  setCategory(c);
+                  updateUrl({ category: c });
+                }}
+              >
+                <Icon className="size-3.5" />
+                {c}
+              </FilterChip>
+            );
+          })}
         </div>
       </div>
 
@@ -632,64 +642,118 @@ export function DocumentsClient() {
         </Card>
       ) : null}
 
-      <Card className="min-w-0 overflow-hidden border-border/80 shadow-sm">
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="p-8 text-sm text-muted-foreground">
-              Lade Dokumente…
-            </div>
-          ) : docs.length === 0 ? (
-            <div className="p-8 text-sm text-muted-foreground">
-              {hasActiveFilters
-                ? "Keine Treffer für diese Suche/Filter. Filter zurücksetzen oder anderen Begriff versuchen."
-                : "Keine Dokumente gefunden. Starte zuerst den Paperless-Sync."}
-            </div>
-          ) : (
-            <DataList>
-              {docs.map((doc) => (
-                <DataListRow key={doc.id}>
-                  <DataListMain
-                    title={
-                      <DocumentTitleLink
-                        documentId={doc.id}
-                        title={doc.title}
-                      />
-                    }
-                    meta={
-                      <MetaLine>
-                        <span className="tabular-nums">
-                          {toSwissDate(doc.created_date)}
-                        </span>
-                        {doc.correspondent_name ? (
-                          <span>{doc.correspondent_name}</span>
-                        ) : null}
-                        {doc.document_type_name ? (
-                          <span>{doc.document_type_name}</span>
-                        ) : null}
-                        {doc.category ? <span>{doc.category}</span> : null}
-                        {statusBadge(doc.analysis_status)}
-                      </MetaLine>
-                    }
-                    actions={
-                      <>
-                        <DocumentInfoButton documentId={doc.id} />
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={analyzingId === doc.id || isRunning}
-                          onClick={() => void analyzeOne(doc.id)}
-                        >
-                          {analyzingId === doc.id ? "…" : "Analysieren"}
-                        </Button>
-                      </>
-                    }
+      {loading ? (
+        <div className="p-8 text-sm text-muted-foreground">
+          Lade Dokumente…
+        </div>
+      ) : docs.length === 0 ? (
+        <Card>
+          <CardContent className="py-8 text-sm text-muted-foreground">
+            {hasActiveFilters
+              ? "Keine Treffer für diese Suche/Filter. Filter zurücksetzen oder anderen Begriff versuchen."
+              : "Keine Dokumente gefunden. Starte zuerst den Paperless-Sync."}
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          {/* Mobile soft cards */}
+          <div className="space-y-3 md:hidden">
+            {docs.map((doc) => {
+              const visual = knowledgeVisual(doc.category || "Sonstiges");
+              return (
+                <Link
+                  key={doc.id}
+                  href={`/documents/${doc.id}`}
+                  className="flex items-center gap-3 rounded-2xl border border-border/60 bg-card p-3.5 shadow-[0_4px_16px_rgba(20,32,28,0.05)] transition-colors active:bg-muted/40"
+                >
+                  <IconCircle
+                    icon={visual.icon}
+                    tone="teal"
+                    size="lg"
+                    className="rounded-2xl"
                   />
-                </DataListRow>
-              ))}
-            </DataList>
-          )}
-        </CardContent>
-      </Card>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate font-semibold text-foreground">
+                      {doc.title || `Dokument #${doc.id}`}
+                    </div>
+                    {doc.category ? (
+                      <span className="mt-1 inline-flex rounded-full bg-[var(--brand-docs-soft)] px-2 py-0.5 text-[11px] font-medium text-[var(--brand-docs)]">
+                        {doc.category}
+                      </span>
+                    ) : null}
+                    <div className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <CalendarDays className="size-3.5 shrink-0" />
+                      <span className="tabular-nums">
+                        {toSwissDate(doc.created_date)}
+                      </span>
+                    </div>
+                  </div>
+                  <ChevronRight className="size-5 shrink-0 text-[var(--brand-docs)]" />
+                </Link>
+              );
+            })}
+          </div>
+
+          {/* Desktop list */}
+          <Card className="hidden min-w-0 overflow-hidden md:block">
+            <CardContent className="p-0">
+              <DataList>
+                {docs.map((doc) => (
+                  <DataListRow key={doc.id}>
+                    <DataListMain
+                      title={
+                        <DocumentTitleLink
+                          documentId={doc.id}
+                          title={doc.title}
+                        />
+                      }
+                      meta={
+                        <MetaLine>
+                          <span className="tabular-nums">
+                            {toSwissDate(doc.created_date)}
+                          </span>
+                          {doc.correspondent_name ? (
+                            <span>{doc.correspondent_name}</span>
+                          ) : null}
+                          {doc.document_type_name ? (
+                            <span>{doc.document_type_name}</span>
+                          ) : null}
+                          {doc.category ? <span>{doc.category}</span> : null}
+                          {statusBadge(doc.analysis_status)}
+                        </MetaLine>
+                      }
+                      actions={
+                        <>
+                          <DocumentInfoButton documentId={doc.id} />
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={analyzingId === doc.id || isRunning}
+                            onClick={() => void analyzeOne(doc.id)}
+                          >
+                            {analyzingId === doc.id ? "…" : "Analysieren"}
+                          </Button>
+                        </>
+                      }
+                    />
+                  </DataListRow>
+                ))}
+              </DataList>
+            </CardContent>
+          </Card>
+        </>
+      )}
+
+      <SoftFab
+        accent="teal"
+        aria-label="Suche"
+        onClick={() => {
+          setSearchFocus(true);
+          window.setTimeout(() => searchInputRef.current?.focus(), 50);
+        }}
+      >
+        <Search className="size-5" />
+      </SoftFab>
     </div>
   );
 }

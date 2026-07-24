@@ -415,7 +415,7 @@ function TravelOverviewClientInner({ items }: Props) {
   }
 
   return (
-    <div className="min-w-0 space-y-4 pb-24 md:space-y-6 md:pb-0">
+    <div className="min-w-0 space-y-4 pb-28 md:space-y-6 md:pb-0">
       <PageHeader
         title="Reise-Gedächtnis"
         description="KPIs zuerst – Details per Drilldown, Termine in den Kalender"
@@ -432,7 +432,12 @@ function TravelOverviewClientInner({ items }: Props) {
         }
       />
 
-      <OverviewTabNav items={tabItems} active={activeTab} onChange={setTab} />
+      <OverviewTabNav
+        items={tabItems}
+        active={activeTab}
+        onChange={setTab}
+        accent="teal"
+      />
 
       {activeTab === "overview" ? (
         <>
@@ -477,11 +482,11 @@ function TravelOverviewClientInner({ items }: Props) {
               type="button"
               onClick={() => openDimension(key)}
               className={cn(
-                "min-w-0 overflow-hidden rounded-xl border-2 text-left shadow-[0_1px_2px_rgba(15,23,42,0.06),0_4px_14px_rgba(15,23,42,0.08)] transition-all",
+                "min-w-0 overflow-hidden rounded-2xl border text-left shadow-[0_4px_16px_rgba(20,32,28,0.05)] transition-all",
                 surface.body,
                 active
-                  ? "border-primary ring-2 ring-primary/20"
-                  : "hover:border-primary/40"
+                  ? "border-[var(--brand-docs)] ring-2 ring-[var(--brand-docs)]/20"
+                  : "border-border/60 hover:border-[var(--brand-docs)]/40"
               )}
             >
               <TileTitleBar
@@ -492,7 +497,7 @@ function TravelOverviewClientInner({ items }: Props) {
                     <ChevronRight
                       className={cn(
                         "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
-                        active && "rotate-90 text-primary"
+                        active && "rotate-90 text-[var(--brand-docs)]"
                       )}
                     />
                   </div>
@@ -579,11 +584,11 @@ function TravelOverviewClientInner({ items }: Props) {
                         setDetailId(null);
                       }}
                       className={cn(
-                        "min-w-0 overflow-hidden rounded-xl border-2 text-left shadow-[0_1px_2px_rgba(15,23,42,0.06),0_4px_14px_rgba(15,23,42,0.08)] transition-colors",
+                        "min-w-0 overflow-hidden rounded-2xl border text-left shadow-[0_4px_16px_rgba(20,32,28,0.05)] transition-colors",
                         itemSurface.body,
                         isSelected
-                          ? "border-primary ring-2 ring-primary/20"
-                          : "hover:border-primary/40"
+                          ? "border-[var(--brand-docs)] ring-2 ring-[var(--brand-docs)]/20"
+                          : "border-border/60 hover:border-[var(--brand-docs)]/40"
                       )}
                     >
                       <TileTitleBar
@@ -614,7 +619,7 @@ function TravelOverviewClientInner({ items }: Props) {
             {selectedRow ? (
               <div
                 className={cn(
-                  "overflow-hidden rounded-xl border-2",
+                  "overflow-hidden rounded-2xl border border-border/60",
                   toneSurface(dimensionMeta[dimension].tone).body
                 )}
               >

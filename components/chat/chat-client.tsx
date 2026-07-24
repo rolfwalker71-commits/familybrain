@@ -314,7 +314,7 @@ export function ChatClient() {
           tone={pageVisuals.chat.tone}
         />
       </div>
-      <Card className="flex min-h-0 flex-1 flex-col gap-0 overflow-hidden border-border/80 py-0 shadow-sm">
+      <Card className="flex min-h-0 flex-1 flex-col gap-0 overflow-hidden border-border/60 py-0 shadow-[0_4px_16px_rgba(20,32,28,0.05)]">
         <CardContent className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-3 sm:gap-4 sm:p-4">
           <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap items-center gap-1.5">
@@ -330,7 +330,7 @@ export function ChatClient() {
                     className={
                       active
                         ? "rounded-full border border-primary/40 bg-primary/10 px-2.5 py-1 text-xs font-medium text-foreground"
-                        : "rounded-full border border-border bg-background px-2.5 py-1 text-xs text-muted-foreground hover:bg-muted"
+                        : "rounded-full border border-border/60 bg-background px-2.5 py-1 text-xs text-muted-foreground hover:bg-muted"
                     }
                   >
                     {option.label}
@@ -353,7 +353,7 @@ export function ChatClient() {
           </p>
 
           {showCorrections ? (
-            <div className="space-y-3 rounded-lg border border-border/70 bg-muted/20 p-3">
+            <div className="space-y-3 rounded-2xl border border-border/60 bg-muted/20 p-3">
               <div className="space-y-2">
                 <Label htmlFor="correctionTopic">Thema (optional)</Label>
                 <Input
@@ -407,7 +407,7 @@ export function ChatClient() {
                   {corrections.map((correction) => (
                     <div
                       key={correction.id}
-                      className="flex items-start justify-between gap-2 rounded-md border border-border/60 bg-background px-2.5 py-2"
+                      className="flex items-start justify-between gap-2 rounded-2xl border border-border/60 bg-background px-2.5 py-2"
                     >
                       <div className="min-w-0 text-xs">
                         {correction.topic ? (
@@ -453,7 +453,7 @@ export function ChatClient() {
                       key={s}
                       type="button"
                       onClick={() => void send(s)}
-                      className="min-h-11 rounded-full border border-border bg-background px-3 py-2 text-left text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                      className="min-h-11 rounded-full border border-border/60 bg-background px-3 py-2 text-left text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                     >
                       {s}
                     </button>
@@ -472,7 +472,7 @@ export function ChatClient() {
                     className={
                       message.role === "user"
                         ? "max-w-[92%] rounded-2xl bg-primary px-4 py-3 text-sm text-primary-foreground sm:max-w-[85%]"
-                        : "max-w-[min(100%,42rem)] rounded-2xl border border-border bg-muted/40 px-4 py-3 text-sm"
+                        : "max-w-[min(100%,42rem)] rounded-2xl border border-border/60 bg-muted/40 px-4 py-3 text-sm"
                     }
                   >
                     {message.role === "assistant" ? (
@@ -681,19 +681,19 @@ export function ChatClient() {
           </div>
 
           {status ? (
-            <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+            <div className="rounded-2xl border border-border/60 bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
               {status}
             </div>
           ) : null}
 
           {error ? (
-            <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+            <div className="rounded-2xl border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
               {error}
             </div>
           ) : null}
 
           <form
-            className="flex shrink-0 items-end gap-2 pb-[env(safe-area-inset-bottom)]"
+            className="flex shrink-0 items-end gap-2 rounded-2xl border border-border/60 bg-muted/20 p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]"
             onSubmit={(e) => {
               e.preventDefault();
               void send(input);
@@ -703,7 +703,7 @@ export function ChatClient() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="z. B. Wann endet die Garantie der Waschmaschine?"
-              className="min-h-[48px] max-h-40 flex-1 resize-none"
+              className="min-h-[48px] max-h-40 flex-1 resize-none rounded-xl border-0 bg-transparent shadow-none focus-visible:ring-0"
               onKeyDown={(e) => {
                 if (
                   e.key === "Enter" &&
@@ -719,7 +719,7 @@ export function ChatClient() {
               type="submit"
               disabled={loading || !input.trim()}
               size="icon"
-              className="size-11"
+              className="size-11 rounded-xl"
               aria-label="Nachricht senden"
             >
               <Send className="h-4 w-4" />

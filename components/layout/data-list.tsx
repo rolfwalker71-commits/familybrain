@@ -84,7 +84,14 @@ export function DataList({
   className?: string;
 }) {
   return (
-    <div className={cn("divide-y divide-border/70", className)}>{children}</div>
+    <div
+      className={cn(
+        "flex flex-col gap-3 p-3 md:gap-0 md:divide-y md:divide-border/70 md:p-0",
+        className
+      )}
+    >
+      {children}
+    </div>
   );
 }
 
@@ -100,7 +107,7 @@ export function DataListRow({
   return (
     <div
       className={cn(
-        "px-4 py-3 transition-colors hover:bg-muted/30",
+        "rounded-2xl border border-border/60 bg-card p-3.5 shadow-[0_4px_16px_rgba(20,32,28,0.05)] transition-colors hover:bg-muted/30 md:rounded-none md:border-0 md:bg-transparent md:px-4 md:py-3 md:shadow-none",
         onClick && "cursor-pointer",
         className
       )}

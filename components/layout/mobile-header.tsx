@@ -18,27 +18,14 @@ export function MobileHeader() {
   const [open, setOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-40 flex min-h-16 items-center justify-between border-b border-slate-700/70 bg-sidebar px-4 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] text-white shadow-sm lg:hidden">
-      <Link
-        href="/dashboard"
-        className="flex min-h-11 items-center gap-3 rounded-lg"
-        aria-label="MyBrain Dashboard"
-      >
-        <span className="flex size-10 items-center justify-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground">
-          <Brain className="size-5" />
-        </span>
-        <span className="text-2xl font-extrabold tracking-tight">
-          MyBrain
-        </span>
-      </Link>
-
+    <header className="sticky top-0 z-40 flex min-h-14 items-center justify-between border-b border-border/60 bg-card/90 px-4 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] shadow-[0_1px_0_rgba(20,32,28,0.04)] backdrop-blur-md lg:hidden">
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger
           render={
             <Button
               variant="ghost"
               size="icon"
-              className="size-11 text-white hover:bg-sidebar-accent hover:text-white"
+              className="size-11 text-foreground hover:bg-muted"
               aria-label="Navigation öffnen"
             />
           }
@@ -51,11 +38,26 @@ export function MobileHeader() {
         >
           <SheetHeader className="sr-only">
             <SheetTitle>Navigation</SheetTitle>
-            <SheetDescription>MyBrain Hauptnavigation</SheetDescription>
+            <SheetDescription>FamilyBrain Hauptnavigation</SheetDescription>
           </SheetHeader>
           <Sidebar className="w-full" onNavigate={() => setOpen(false)} />
         </SheetContent>
       </Sheet>
+
+      <Link
+        href="/dashboard"
+        className="absolute left-1/2 flex min-h-11 -translate-x-1/2 items-center gap-2 rounded-lg"
+        aria-label="FamilyBrain Dashboard"
+      >
+        <span className="flex size-9 items-center justify-center rounded-full bg-[var(--brand-docs-soft)] text-[var(--brand-docs)]">
+          <Brain className="size-5" />
+        </span>
+        <span className="text-lg font-bold tracking-tight text-[var(--brand-docs)]">
+          FamilyBrain
+        </span>
+      </Link>
+
+      <div className="size-11" aria-hidden />
     </header>
   );
 }

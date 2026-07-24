@@ -47,6 +47,7 @@ export function FinanceTabNav({
       onChange={onChange}
       className={className}
       alwaysBottom={alwaysBottom}
+      accent="green"
     />
   );
 }

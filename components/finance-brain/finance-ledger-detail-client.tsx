@@ -806,14 +806,14 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
   const tabItems: FinanceTabItem[] = isSplit
     ? [
         { id: "overview", label: "Übersicht", icon: LayoutDashboard },
-        { id: "new", label: "Neu", icon: Plus },
+        { id: "new", label: "Neu", icon: Plus, emphasize: true },
         { id: "expenses", label: "Ausgaben", icon: List },
         { id: "settle", label: "Ausgleich", icon: ArrowLeftRight },
         { id: "more", label: "Mehr", icon: MoreHorizontal },
       ]
     : [
         { id: "overview", label: "Übersicht", icon: LayoutDashboard },
-        { id: "new", label: "Neu", icon: Plus },
+        { id: "new", label: "Neu", icon: Plus, emphasize: true },
         { id: "expenses", label: "Buchungen", icon: List },
         { id: "more", label: "Mehr", icon: MoreHorizontal },
       ];
@@ -833,7 +833,7 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
   const kindLabel = LEDGER_KIND_LABELS[isNormal ? "normal" : "split"];
 
   return (
-    <div className="space-y-4 pb-24 md:space-y-6 md:pb-0">
+    <div className="space-y-4 pb-28 md:space-y-6 md:pb-0">
       <div className="flex flex-wrap items-center gap-2">
         <Link
           href="/finance-brain"
@@ -845,12 +845,20 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
         {ledger.trip_id ? (
           <Link
             href={`/trips/${ledger.trip_id}`}
-            className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+            className={cn(
+              buttonVariants({ variant: "outline", size: "sm" }),
+              "hidden sm:inline-flex"
+            )}
           >
             Reise öffnen
           </Link>
         ) : null}
-        <Button variant="outline" size="sm" onClick={() => void load()}>
+        <Button
+          variant="outline"
+          size="sm"
+          className="hidden sm:inline-flex"
+          onClick={() => void load()}
+        >
           <RefreshCw className="mr-1 size-4" />
           Aktualisieren
         </Button>
@@ -871,8 +879,8 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
         title={ledger.title}
         description={
           ledger.trip_title
-            ? `${kindLabel} · Basiswährung ${ledger.base_currency} · Reise: ${ledger.trip_title}`
-            : `${kindLabel} · Basiswährung ${ledger.base_currency}`
+            ? `${kindLabel} · ${ledger.base_currency} · ${ledger.trip_title}`
+            : `${kindLabel} · ${ledger.base_currency}`
         }
         icon={pageVisuals.financeBrain.icon}
         tone={pageVisuals.financeBrain.tone}
@@ -893,7 +901,7 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
         ) : (
           <SectionCard title="Übersicht" tone="green" icon={Receipt}>
             <div className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-md border border-border/60 px-3 py-2">
+              <div className="rounded-xl border border-border/50 bg-white px-3 py-2.5">
                 <p className="text-xs text-muted-foreground">Ausgaben</p>
                 <p className="text-lg font-semibold">
                   {formatMoney(
@@ -902,16 +910,16 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
                   )}
                 </p>
               </div>
-              <div className="rounded-md border border-border/60 px-3 py-2">
+              <div className="rounded-xl border border-border/50 bg-white px-3 py-2.5">
                 <p className="text-xs text-muted-foreground">Einnahmen</p>
-                <p className="text-lg font-semibold text-emerald-700">
+                <p className="text-lg font-semibold text-[var(--brand-finance)]">
                   {formatMoney(
                     cashbook?.incomeTotalBase ?? 0,
                     ledger.base_currency
                   )}
                 </p>
               </div>
-              <div className="rounded-md border border-border/60 px-3 py-2">
+              <div className="rounded-xl border border-border/50 bg-white px-3 py-2.5">
                 <p className="text-xs text-muted-foreground">Saldo</p>
                 <p className="text-lg font-semibold">
                   {formatSignedMoney(

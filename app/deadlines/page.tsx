@@ -156,19 +156,21 @@ export default function DeadlinesPage() {
         }
       />
 
-      <Card className="min-w-0 overflow-hidden border-border shadow-[0_1px_2px_rgba(15,23,42,0.06),0_4px_14px_rgba(15,23,42,0.08)]">
+      <Card className="min-w-0 gap-0 overflow-visible border-0 bg-transparent p-0 shadow-none md:overflow-hidden md:border md:border-border/60 md:bg-card md:shadow-[0_4px_16px_rgba(20,32,28,0.05)]">
         <CardContent className="p-0">
           {loading ? (
-            <div className="p-8 text-sm text-muted-foreground">Lade Fristen…</div>
+            <div className="rounded-2xl border border-border/60 bg-card p-8 text-sm text-muted-foreground shadow-[0_4px_16px_rgba(20,32,28,0.05)] md:rounded-none md:border-0 md:bg-transparent md:shadow-none">
+              Lade Fristen…
+            </div>
           ) : error ? (
-            <div className="space-y-3 p-8 text-sm">
+            <div className="space-y-3 rounded-2xl border border-border/60 bg-card p-8 text-sm shadow-[0_4px_16px_rgba(20,32,28,0.05)] md:rounded-none md:border-0 md:bg-transparent md:shadow-none">
               <p className="text-destructive">{error}</p>
               <Button type="button" variant="outline" size="sm" onClick={() => void load()}>
                 Erneut laden
               </Button>
             </div>
           ) : rows.length === 0 ? (
-            <div className="p-8 text-sm text-muted-foreground">
+            <div className="rounded-2xl border border-border/60 bg-card p-8 text-sm text-muted-foreground shadow-[0_4px_16px_rgba(20,32,28,0.05)] md:rounded-none md:border-0 md:bg-transparent md:shadow-none">
               Keine Fristen gefunden.
             </div>
           ) : (

@@ -33,12 +33,15 @@ export const iconToneClasses = {
   amber: "bg-amber-50 text-amber-600",
   rose: "bg-rose-50 text-rose-500",
   orange: "bg-orange-50 text-orange-600",
-  green: "bg-emerald-50 text-emerald-600",
-  teal: "bg-teal-50 text-teal-600",
+  /** Sage / FinanzBrain */
+  green: "bg-[var(--brand-finance-soft)] text-[var(--brand-finance)]",
+  /** Dokumente / FamilyBrain default */
+  teal: "bg-[var(--brand-docs-soft)] text-[var(--brand-docs)]",
   sky: "bg-sky-50 text-sky-600",
   indigo: "bg-indigo-50 text-indigo-600",
   violet: "bg-violet-50 text-violet-600",
-  slate: "bg-slate-100 text-slate-600",
+  /** Settings navy-ish */
+  slate: "bg-[var(--brand-settings-soft)] text-[var(--brand-settings)]",
 } as const;
 
 /**
@@ -67,14 +70,16 @@ export const toneSurfaceClasses = {
     soft: "bg-orange-100/60",
   },
   green: {
-    title: "border-emerald-300/70 bg-emerald-200/90 text-emerald-950",
-    body: "border-emerald-200/80 bg-emerald-50/90",
-    soft: "bg-emerald-100/60",
+    title:
+      "border-[color-mix(in_oklab,var(--brand-finance),white_55%)] bg-[var(--brand-finance-soft)] text-[var(--brand-finance)]",
+    body: "border-[color-mix(in_oklab,var(--brand-finance),white_70%)] bg-white",
+    soft: "bg-[var(--brand-finance-soft)]",
   },
   teal: {
-    title: "border-teal-300/70 bg-teal-200/90 text-teal-950",
-    body: "border-teal-200/80 bg-teal-50/90",
-    soft: "bg-teal-100/60",
+    title:
+      "border-[color-mix(in_oklab,var(--brand-docs),white_55%)] bg-[var(--brand-docs-soft)] text-[var(--brand-docs)]",
+    body: "border-[color-mix(in_oklab,var(--brand-docs),white_70%)] bg-white",
+    soft: "bg-[var(--brand-docs-soft)]",
   },
   sky: {
     title: "border-sky-300/70 bg-sky-200/90 text-sky-950",
@@ -92,9 +97,10 @@ export const toneSurfaceClasses = {
     soft: "bg-violet-100/60",
   },
   slate: {
-    title: "border-slate-300/80 bg-slate-200/90 text-slate-900",
-    body: "border-slate-200/80 bg-slate-50/90",
-    soft: "bg-slate-100/70",
+    title:
+      "border-[color-mix(in_oklab,var(--brand-settings),white_60%)] bg-[var(--brand-settings-soft)] text-[var(--brand-settings)]",
+    body: "border-[color-mix(in_oklab,var(--brand-settings),white_75%)] bg-white",
+    soft: "bg-[var(--brand-settings-soft)]",
   },
 } as const;
 
@@ -159,19 +165,19 @@ export const knowledgeAreaVisuals: Record<
 };
 
 export const pageVisuals = {
-  dashboard: { icon: LayoutDashboard, tone: "blue" as const },
-  documents: { icon: Files, tone: "blue" as const },
+  dashboard: { icon: LayoutDashboard, tone: "teal" as const },
+  documents: { icon: Files, tone: "teal" as const },
   chat: { icon: MessageSquare, tone: "indigo" as const },
-  sync: { icon: RefreshCw, tone: "amber" as const },
+  sync: { icon: RefreshCw, tone: "green" as const },
   knowledge: { icon: Brain, tone: "violet" as const },
   warranties: { icon: Shield, tone: "orange" as const },
   deadlines: { icon: CalendarClock, tone: "rose" as const },
   finance: { icon: Wallet, tone: "green" as const },
   financeBrain: { icon: HandCoins, tone: "green" as const },
   travel: { icon: Plane, tone: "teal" as const },
-  trips: { icon: Luggage, tone: "indigo" as const },
+  trips: { icon: Luggage, tone: "green" as const },
   settings: { icon: Settings, tone: "slate" as const },
-  summaries: { icon: Sparkles, tone: "indigo" as const },
+  summaries: { icon: Sparkles, tone: "teal" as const },
   guides: { icon: BookOpen, tone: "teal" as const },
 } as const;
 

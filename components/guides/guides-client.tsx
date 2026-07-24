@@ -270,7 +270,7 @@ export function GuidesClient() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 pb-6 md:space-y-6">
       <PageHeader
         title="Guides"
         description="PDF-Guides importieren und semantisch für den Chat indexieren"
@@ -278,7 +278,7 @@ export function GuidesClient() {
         tone={pageVisuals.guides.tone}
       />
 
-      <Card className="border-border/80 shadow-sm">
+      <Card className="border-border/60 shadow-[0_4px_16px_rgba(20,32,28,0.05)]">
         <CardHeader>
           <CardTitle className="flex items-center gap-3 text-base">
             <IconCircle icon={Upload} tone="blue" size="sm" />
@@ -292,7 +292,7 @@ export function GuidesClient() {
             semantisch.
           </p>
 
-          <div className="rounded-lg border border-border bg-muted/30 p-4 text-sm">
+          <div className="rounded-2xl border border-border/60 bg-muted/30 p-4 text-sm">
             <div>
               Qdrant:{" "}
               <strong>{qdrantOk ? "verbunden" : "nicht erreichbar"}</strong>
@@ -355,7 +355,7 @@ export function GuidesClient() {
         </CardContent>
       </Card>
 
-      <Card className="border-border/80 shadow-sm">
+      <Card className="border-border/60 shadow-[0_4px_16px_rgba(20,32,28,0.05)]">
         <CardHeader>
           <CardTitle className="flex items-center gap-3 text-base">
             <IconCircle icon={BookOpen} tone="teal" size="sm" />
@@ -372,7 +372,7 @@ export function GuidesClient() {
               <div
                 key={guide.id}
                 id={`guide-${guide.id}`}
-                className="rounded-lg border border-border/70 p-4"
+                className="rounded-2xl border border-border/60 bg-card p-4 shadow-[0_4px_16px_rgba(20,32,28,0.05)]"
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
