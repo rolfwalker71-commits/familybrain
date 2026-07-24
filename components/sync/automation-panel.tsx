@@ -168,16 +168,16 @@ export function AutomationPanel() {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-3">
-          <IconCircle icon={Clock3} tone="green" size="sm" />
+          <IconCircle icon={Clock3} tone="teal" size="sm" />
           Automatischer Sync und Analyse
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-5">
-        <div className="rounded-xl border border-border/60 bg-[var(--brand-sync-soft)]/50 p-4 text-sm">
+        <div className="rounded-xl border border-border/60 bg-[var(--brand-docs-soft)]/50 p-4 text-sm">
           {initialComplete ? (
             <>
               Initialisierung abgeschlossen. Nächster Lauf:{" "}
-              <strong className="text-[var(--brand-sync)]">
+              <strong className="text-[var(--brand-docs)]">
                 {formatDate(status?.scheduler.nextTickAt ?? null)}
               </strong>
             </>
@@ -236,7 +236,7 @@ export function AutomationPanel() {
 
         <Button
           onClick={() => void runNow()}
-          className="w-full bg-[var(--brand-sync)] text-white hover:bg-[var(--brand-sync)]/90"
+          className="w-full bg-[var(--brand-docs)] text-white hover:bg-[var(--brand-docs)]/90"
           disabled={busy !== null || Boolean(active)}
         >
           {active ? (
@@ -269,7 +269,7 @@ export function AutomationPanel() {
                   <button
                     key={run.id}
                     type="button"
-                    className="w-full rounded-xl border border-border/60 p-3 text-left text-sm hover:bg-[var(--brand-sync-soft)]/40"
+                    className="w-full rounded-xl border border-border/60 p-3 text-left text-sm hover:bg-[var(--brand-docs-soft)]/40"
                     onClick={() => {
                       if (selectedRun === run.id) {
                         setSelectedRun(null);
@@ -330,7 +330,7 @@ export function AutomationPanel() {
         </div>
 
         {selectedRun ? (
-          <div className="space-y-2 rounded-xl border border-border/60 bg-[var(--brand-sync-soft)]/30 p-3">
+          <div className="space-y-2 rounded-xl border border-border/60 bg-[var(--brand-docs-soft)]/30 p-3">
             <h3 className="font-medium">Details zu Lauf #{selectedRun}</h3>
             <div className="max-h-80 space-y-1 overflow-y-auto text-xs">
               {items.map((item) => (

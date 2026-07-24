@@ -337,7 +337,7 @@ function TravelOverviewClientInner({ items }: Props) {
     year: {
       title: "Nach Jahr",
       icon: CalendarDays,
-      tone: "blue" as IconTone,
+      tone: "teal" as IconTone,
       items: byYear,
       empty: "Keine Jahresdaten",
       hint: "Reisen mit Startdatum",
@@ -353,7 +353,7 @@ function TravelOverviewClientInner({ items }: Props) {
     provider: {
       title: "Nach Anbieter",
       icon: Building2,
-      tone: "amber" as IconTone,
+      tone: "teal" as IconTone,
       items: byProvider,
       empty: "Keine Anbieter",
       hint: "Airlines, Hotels, Buchungsportale",
@@ -452,19 +452,19 @@ function TravelOverviewClientInner({ items }: Props) {
           title="Mit Termin"
           value={totals.withDates}
           icon={CalendarDays}
-          tone="sky"
+          tone="teal"
         />
         <MetricTile
           title="Kommend"
           value={upcoming.length}
           icon={Plane}
-          tone="blue"
+          tone="teal"
         />
         <MetricTile
           title="Erkannte Kosten"
           value={formatCHF(totals.total)}
           icon={MapPin}
-          tone="amber"
+          tone="teal"
         />
       </div>
 

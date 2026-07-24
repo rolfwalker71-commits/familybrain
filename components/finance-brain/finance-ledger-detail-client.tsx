@@ -936,7 +936,7 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
       {activeTab === "new" ? (
         <SectionCard
           title={isNormal ? "Buchung erfassen" : "Ausgabe erfassen"}
-          tone="orange"
+          tone="green"
           icon={Receipt}
         >
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
@@ -1144,7 +1144,7 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
 
       {activeTab === "settle" && !isNormal ? (
         <div className="space-y-4">
-          <SectionCard title="Rückzahlung" tone="teal" icon={ArrowLeftRight}>
+          <SectionCard title="Rückzahlung" tone="green" icon={ArrowLeftRight}>
             <p className="mb-3 text-sm text-muted-foreground">
               Wer hat wem Geld zurückbezahlt? («Von» = Person, die zahlt und
               damit ihre Schuld reduziert.)
@@ -1280,7 +1280,7 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
             </div>
           </SectionCard>
 
-          <SectionCard title="Rückzahlungen" tone="teal" icon={ArrowLeftRight}>
+          <SectionCard title="Rückzahlungen" tone="green" icon={ArrowLeftRight}>
             <SettlementList
               settlements={settlements}
               members={members}
@@ -1297,7 +1297,7 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
 
       {activeTab === "more" ? (
         <div className="space-y-4">
-          <SectionCard title="Reise verknüpfen" tone="indigo" icon={Luggage}>
+          <SectionCard title="Reise verknüpfen" tone="green" icon={Luggage}>
             <p className="mb-3 text-sm text-muted-foreground">
               Optional mit einer TravelBrain-Reise verbinden – dann erscheinen
               Reise-Belege zum Import und die Abrechnung auf der
@@ -1357,7 +1357,7 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
           {!isNormal ? (
             <SectionCard
               title="Teilnehmer & Einladungs-Links"
-              tone="sky"
+              tone="green"
               icon={Users}
             >
               <p className="mb-3 text-sm text-muted-foreground">
@@ -1440,7 +1440,7 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
             </SectionCard>
           ) : null}
 
-          <SectionCard title="Belege importieren" tone="violet" icon={FileDown}>
+          <SectionCard title="Belege importieren" tone="green" icon={FileDown}>
             {!hasImport ? (
               <p className="text-sm text-muted-foreground">
                 Keine Belege gefunden. Verknüpfe eine Reise (oben) für
@@ -1507,7 +1507,7 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
           </SectionCard>
 
           {!isNormal ? (
-            <SectionCard title="Ausgaben-Mail" tone="sky" icon={Mail}>
+            <SectionCard title="Ausgaben-Mail" tone="green" icon={Mail}>
               <p className="mb-3 text-sm text-muted-foreground">
                 Alle Ausgaben per Mail inkl. PDF an die Gruppe senden.
               </p>

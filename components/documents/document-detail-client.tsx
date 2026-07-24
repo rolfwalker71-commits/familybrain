@@ -424,7 +424,7 @@ function DocumentDetailInner({ detail }: DetailProps) {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-3 text-base">
-                  <IconCircle icon={Info} tone="slate" size="sm" />
+                  <IconCircle icon={Info} tone="teal" size="sm" />
                   Metadaten
                 </CardTitle>
               </CardHeader>
@@ -438,7 +438,7 @@ function DocumentDetailInner({ detail }: DetailProps) {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-3 text-base">
-                  <IconCircle icon={FileSearch} tone="indigo" size="sm" />
+                  <IconCircle icon={FileSearch} tone="teal" size="sm" />
                   Kurzfassung
                 </CardTitle>
               </CardHeader>
@@ -520,7 +520,7 @@ function DocumentDetailInner({ detail }: DetailProps) {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-3 text-base">
-                  <IconCircle icon={CalendarDays} tone="amber" size="sm" />
+                  <IconCircle icon={CalendarDays} tone="teal" size="sm" />
                   Wichtige Daten
                 </CardTitle>
               </CardHeader>
@@ -541,7 +541,7 @@ function DocumentDetailInner({ detail }: DetailProps) {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-3 text-base">
-                  <IconCircle icon={CalendarDays} tone="rose" size="sm" />
+                  <IconCircle icon={CalendarDays} tone="teal" size="sm" />
                   Fristen
                 </CardTitle>
               </CardHeader>
@@ -567,7 +567,7 @@ function DocumentDetailInner({ detail }: DetailProps) {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-3 text-base">
-                  <IconCircle icon={Users} tone="slate" size="sm" />
+                  <IconCircle icon={Users} tone="teal" size="sm" />
                   Vertragsparteien
                 </CardTitle>
               </CardHeader>
@@ -588,7 +588,7 @@ function DocumentDetailInner({ detail }: DetailProps) {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-3 text-base">
-                  <IconCircle icon={Shield} tone="orange" size="sm" />
+                  <IconCircle icon={Shield} tone="teal" size="sm" />
                   Garantieinfos
                 </CardTitle>
               </CardHeader>
@@ -620,7 +620,7 @@ function DocumentDetailInner({ detail }: DetailProps) {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-3 text-base">
-                  <IconCircle icon={ListChecks} tone="violet" size="sm" />
+                  <IconCircle icon={ListChecks} tone="teal" size="sm" />
                   Kündigung / To-dos
                 </CardTitle>
               </CardHeader>
@@ -662,7 +662,7 @@ function DocumentDetailInner({ detail }: DetailProps) {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between gap-3">
               <CardTitle className="flex items-center gap-3 text-base">
-                <IconCircle icon={FileText} tone="slate" size="sm" />
+                <IconCircle icon={FileText} tone="teal" size="sm" />
                 OCR-Text
               </CardTitle>
               <Button
@@ -689,7 +689,7 @@ function DocumentDetailInner({ detail }: DetailProps) {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-3 text-base">
-                <IconCircle icon={RefreshCw} tone="slate" size="sm" />
+                <IconCircle icon={RefreshCw} tone="teal" size="sm" />
                 Aktionen
               </CardTitle>
             </CardHeader>

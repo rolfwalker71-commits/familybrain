@@ -82,42 +82,42 @@ export default function DashboardPage() {
           title="Dokumente synchronisiert"
           value={stats.totalDocuments}
           icon={FileText}
-          tone="blue"
+          tone="teal"
           href="/documents"
         />
         <StatCard
           title="Analyse ausstehend"
           value={stats.pendingAnalysis}
           icon={Clock3}
-          tone="amber"
+          tone="teal"
           href="/documents?analysisStatus=pending"
         />
         <StatCard
           title="Anstehende Fristen"
           value={stats.upcomingDeadlines}
           icon={CalendarDays}
-          tone="rose"
+          tone="teal"
           href="/deadlines"
         />
         <StatCard
           title="Garantien bald abgelaufen"
           value={stats.warrantiesExpiringSoon}
           icon={Shield}
-          tone="orange"
+          tone="teal"
           href="/warranties"
         />
         <StatCard
           title="Analysiert"
           value={stats.analyzed}
           icon={TrendingUp}
-          tone="green"
+          tone="teal"
           href="/summaries"
         />
         <StatCard
           title="Ausgaben dieses Jahr (ohne Unbekannt)"
           value={formatCHF(stats.financialTotalThisYear)}
           icon={Wallet}
-          tone="green"
+          tone="teal"
           href="/finance"
         />
         <StatCard
@@ -130,15 +130,15 @@ export default function DashboardPage() {
       </MetricGrid>
 
       <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card tone="indigo" className="min-w-0 overflow-hidden shadow-sm">
+        <Card tone="teal" className="min-w-0 overflow-hidden shadow-sm">
           <CardHeader
-            tone="indigo"
+            tone="teal"
             className="flex flex-row items-center justify-between gap-3"
           >
             <CardTitle className="text-base font-semibold">
               Zuletzt analysiert
             </CardTitle>
-            <IconCircle icon={Sparkles} tone="indigo" size="sm" />
+            <IconCircle icon={Sparkles} tone="teal" size="sm" />
           </CardHeader>
           <CardContent className="min-w-0">
             {stats.recentAnalyses.length === 0 ? (
@@ -207,15 +207,15 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card tone="rose" className="min-w-0 overflow-hidden shadow-sm">
+        <Card tone="teal" className="min-w-0 overflow-hidden shadow-sm">
           <CardHeader
-            tone="rose"
+            tone="teal"
             className="flex flex-row items-center justify-between gap-3"
           >
             <CardTitle className="text-base font-semibold">
               Nächste Fristen
             </CardTitle>
-            <IconCircle icon={Calendar} tone="rose" size="sm" />
+            <IconCircle icon={Calendar} tone="teal" size="sm" />
           </CardHeader>
           <CardContent className="min-w-0">
             {upcoming.length === 0 ? (

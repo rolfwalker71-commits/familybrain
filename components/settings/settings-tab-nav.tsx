@@ -43,7 +43,7 @@ export function SettingsTabNav({
       active={active}
       onChange={onChange}
       className={className}
-      accent="slate"
+      accent="teal"
     />
   );
 }

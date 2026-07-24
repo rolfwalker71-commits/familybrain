@@ -380,7 +380,7 @@ function SyncClientInner() {
     : "Noch nie";
 
   const syncPrimaryBtn =
-    "w-full bg-[var(--brand-sync)] text-white hover:bg-[var(--brand-sync)]/90";
+    "w-full bg-[var(--brand-docs)] text-white hover:bg-[var(--brand-docs)]/90";
 
   const activeTab = parseSyncTab(searchParams.get("tab"));
   const tabItems: SyncTabItem[] = [
@@ -410,18 +410,18 @@ function SyncClientInner() {
 
       {activeTab === "status" ? (
         <div className="space-y-4">
-      <Card className="border-[color-mix(in_oklab,var(--brand-sync),white_70%)] bg-white">
+      <Card className="border-[color-mix(in_oklab,var(--brand-docs),white_70%)] bg-white">
         <CardContent className="flex flex-col items-center gap-4 py-8 text-center">
           <IconCircle
             icon={CloudCheck}
-            tone="green"
+            tone="teal"
             size="lg"
-            className="size-16 bg-[var(--brand-sync-soft)] text-[var(--brand-sync)] [&_svg]:size-8"
+            className="size-16 bg-[var(--brand-docs-soft)] text-[var(--brand-docs)] [&_svg]:size-8"
           />
           <div className="space-y-1">
             <p className="text-base text-muted-foreground">
               Letzte Sync:{" "}
-              <span className="font-semibold text-[var(--brand-sync)]">
+              <span className="font-semibold text-[var(--brand-docs)]">
                 {lastSyncLabel}
               </span>
             </p>
@@ -446,7 +446,7 @@ function SyncClientInner() {
           </p>
 
           {syncProgress ? (
-            <div className="w-full space-y-3 rounded-xl border border-border/60 bg-[var(--brand-sync-soft)]/50 p-4 text-left">
+            <div className="w-full space-y-3 rounded-xl border border-border/60 bg-[var(--brand-docs-soft)]/50 p-4 text-left">
               <ProgressBar
                 value={syncProgress.percent}
                 label={syncLabel}
@@ -488,7 +488,7 @@ function SyncClientInner() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-3">
-            <IconCircle icon={Link2} tone="green" size="sm" />
+            <IconCircle icon={Link2} tone="teal" size="sm" />
             Paperless-Verbindung
           </CardTitle>
         </CardHeader>
@@ -541,7 +541,7 @@ function SyncClientInner() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-3">
-            <IconCircle icon={BookOpen} tone="green" size="sm" />
+            <IconCircle icon={BookOpen} tone="teal" size="sm" />
             Trilium-Notizen
           </CardTitle>
         </CardHeader>
@@ -551,7 +551,7 @@ function SyncClientInner() {
             SQLite-Datenbank. Der Chat nutzt danach den lokalen Index (schneller,
             auch bei Trilium-Ausfall).
           </p>
-          <div className="rounded-xl border border-border/60 bg-[var(--brand-sync-soft)]/50 p-4 text-sm">
+          <div className="rounded-xl border border-border/60 bg-[var(--brand-docs-soft)]/50 p-4 text-sm">
             {triliumConfigured ? (
               <>
                 Trilium konfiguriert · lokal indexiert:{" "}
@@ -581,7 +581,7 @@ function SyncClientInner() {
           </Button>
 
           {triliumSyncProgress ? (
-            <div className="space-y-3 rounded-xl border border-border/60 bg-[var(--brand-sync-soft)]/50 p-4">
+            <div className="space-y-3 rounded-xl border border-border/60 bg-[var(--brand-docs-soft)]/50 p-4">
               <ProgressBar
                 value={triliumSyncProgress.percent}
                 label={
@@ -635,7 +635,7 @@ function SyncClientInner() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-3">
-            <IconCircle icon={BrainCircuit} tone="green" size="sm" />
+            <IconCircle icon={BrainCircuit} tone="teal" size="sm" />
             AI-Analyse
           </CardTitle>
         </CardHeader>
@@ -646,7 +646,7 @@ function SyncClientInner() {
             ausstehenden Dokumente fertig sind (Tab muss offen bleiben). Status
             und Fortschritt siehst du oben auf jeder Seite.
           </p>
-          <div className="rounded-xl border border-border/60 bg-[var(--brand-sync-soft)]/50 p-4 text-sm">
+          <div className="rounded-xl border border-border/60 bg-[var(--brand-docs-soft)]/50 p-4 text-sm">
             Ausstehend: <strong>{pendingCount}</strong>
             {!hasOpenAIKey ? (
               <span className="ml-2 text-destructive">

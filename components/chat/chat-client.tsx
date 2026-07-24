@@ -439,7 +439,7 @@ export function ChatClient() {
           >
             {messages.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-center gap-4 py-12 text-center">
-                <IconCircle icon={Sparkles} tone="indigo" size="lg" />
+                <IconCircle icon={Sparkles} tone="teal" size="lg" />
                 <div>
                   <p className="font-medium">Frage deine Dokumentenbasis</p>
                   <p className="mt-1 text-sm text-muted-foreground">

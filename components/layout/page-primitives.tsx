@@ -34,7 +34,7 @@ export function PageHeader({
   description,
   actions,
   icon,
-  tone = "blue",
+  tone = "teal",
 }: {
   title: string;
   description?: string;
@@ -156,7 +156,7 @@ export function MetricTile({
   value,
   subtitle,
   icon,
-  tone = "blue",
+  tone = "teal",
   className,
 }: {
   title: ReactNode;

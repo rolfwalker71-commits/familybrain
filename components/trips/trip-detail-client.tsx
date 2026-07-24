@@ -3175,7 +3175,7 @@ function TripDetailInner({
                                     event.website ? (
                                       <a
                                         href={event.website}
-                                        className="break-all text-blue-700 underline"
+                                        className="break-all text-primary underline"
                                         target="_blank"
                                         rel="noreferrer"
                                       >

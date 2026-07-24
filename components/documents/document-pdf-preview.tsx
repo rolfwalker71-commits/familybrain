@@ -190,7 +190,7 @@ export function DocumentPdfPreview({
       <Card className="border-border/80 shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="flex items-center gap-3 text-base">
-            <IconCircle icon={FileText} tone="blue" size="sm" />
+            <IconCircle icon={FileText} tone="teal" size="sm" />
             PDF-Vorschau
           </CardTitle>
           <div className="flex items-center gap-2">

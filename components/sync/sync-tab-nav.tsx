@@ -30,7 +30,7 @@ export function SyncTabNav({
       active={active}
       onChange={onChange}
       className={className}
-      accent="green"
+      accent="teal"
     />
   );
 }

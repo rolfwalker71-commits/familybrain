@@ -172,10 +172,10 @@ export function BalanceView({
         </CardContent>
       </Card>
 
-      <Card tone="amber" className="overflow-hidden border-border/60 shadow-[0_4px_16px_rgba(20,32,28,0.05)]">
-        <CardHeader tone="amber" className="pb-2">
+      <Card tone="green" className="overflow-hidden border-border/60 shadow-[0_4px_16px_rgba(20,32,28,0.05)]">
+        <CardHeader tone="green" className="pb-2">
           <CardTitle className="flex items-center gap-2 text-base text-amber-900">
-            <IconCircle icon={ArrowLeftRight} tone="amber" size="sm" />
+            <IconCircle icon={ArrowLeftRight} tone="green" size="sm" />
             Ausgleichsvorschläge
           </CardTitle>
         </CardHeader>
@@ -354,7 +354,7 @@ function ExpenseCard({
         <div className="flex items-center gap-3 px-3 py-3">
           <div className="shrink-0">
             {isoDate ? (
-              <CalendarDateBadge isoDate={isoDate} size="sm" />
+              <CalendarDateBadge isoDate={isoDate} size="sm" accent="green" />
             ) : (
               <span className="flex size-12 items-center justify-center rounded-lg bg-muted text-[10px] font-medium text-muted-foreground">
                 —

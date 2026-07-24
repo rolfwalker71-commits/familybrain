@@ -115,7 +115,7 @@ export function AppTabNav<T extends string>({
         )}
         aria-label="Bereiche"
       >
-        <div className="pointer-events-auto mx-3 mb-[max(0.5rem,env(safe-area-inset-bottom))] rounded-xl border border-border/50 bg-card/95 px-1.5 pt-1.5 pb-1.5 shadow-[0_8px_32px_rgba(20,32,28,0.12)] backdrop-blur-md">
+        <div className="pointer-events-auto mx-3 mb-[max(0.5rem,env(safe-area-inset-bottom))] rounded-xl border border-border/60 bg-card px-1.5 pt-1.5 pb-1.5 shadow-[0_8px_32px_rgba(20,32,28,0.14)]">
           <div className="mx-auto flex max-w-lg items-stretch justify-between gap-0.5">
             {items.map((item) => {
               const Icon = item.icon;
@@ -128,24 +128,30 @@ export function AppTabNav<T extends string>({
                   type="button"
                   onClick={() => onChange(item.id)}
                   className={cn(
-                    "flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-xl px-1 py-1 text-[10px] font-medium transition-colors",
-                    isActive ? activeText : "text-muted-foreground"
+                    "flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-xl px-1 py-1 text-[10px] font-bold tracking-tight transition-colors",
+                    isEmphasize
+                      ? "text-foreground"
+                      : isActive
+                        ? "text-foreground"
+                        : "text-foreground/55"
                   )}
                 >
                   <span
                     className={cn(
-                      "flex size-8 items-center justify-center rounded-xl transition-colors",
-                      isEmphasize && !isActive && solid,
-                      isEmphasize && isActive && solid,
-                      !isEmphasize && isActive && activePill,
+                      "flex size-9 items-center justify-center rounded-lg transition-colors",
+                      isEmphasize && solid,
+                      !isEmphasize && isActive && "bg-foreground/8",
                       !isEmphasize && !isActive && "bg-transparent"
                     )}
                   >
                     <Icon
                       className={cn(
-                        "size-4",
-                        isEmphasize && "text-inherit"
+                        "size-5 stroke-[2.75]",
+                        isEmphasize
+                          ? "text-inherit"
+                          : "text-foreground"
                       )}
+                      absoluteStrokeWidth
                     />
                   </span>
                   <span className="truncate">{item.label}</span>

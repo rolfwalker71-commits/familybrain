@@ -165,35 +165,35 @@ export const knowledgeAreaVisuals: Record<
   string,
   { icon: LucideIcon; tone: IconTone }
 > = {
-  Gesundheit: { icon: HeartPulse, tone: "rose" },
-  Versicherungen: { icon: Shield, tone: "blue" },
-  Wohnen: { icon: Home, tone: "amber" },
-  Steuern: { icon: Landmark, tone: "indigo" },
-  Finanzen: { icon: Wallet, tone: "green" },
+  Gesundheit: { icon: HeartPulse, tone: "teal" },
+  Versicherungen: { icon: Shield, tone: "teal" },
+  Wohnen: { icon: Home, tone: "teal" },
+  Steuern: { icon: Landmark, tone: "teal" },
+  Finanzen: { icon: Wallet, tone: "teal" },
   Reisen: { icon: Plane, tone: "teal" },
-  Fahrzeuge: { icon: Car, tone: "sky" },
-  Arbeit: { icon: Briefcase, tone: "slate" },
-  "Geräte & Garantien": { icon: Cpu, tone: "orange" },
-  Verträge: { icon: FileSignature, tone: "violet" },
-  "Kinder / Familie": { icon: Users, tone: "rose" },
-  Behörden: { icon: Building2, tone: "slate" },
-  Ausbildung: { icon: GraduationCap, tone: "indigo" },
-  Sonstiges: { icon: FolderOpen, tone: "slate" },
+  Fahrzeuge: { icon: Car, tone: "teal" },
+  Arbeit: { icon: Briefcase, tone: "teal" },
+  "Geräte & Garantien": { icon: Cpu, tone: "teal" },
+  Verträge: { icon: FileSignature, tone: "teal" },
+  "Kinder / Familie": { icon: Users, tone: "teal" },
+  Behörden: { icon: Building2, tone: "teal" },
+  Ausbildung: { icon: GraduationCap, tone: "teal" },
+  Sonstiges: { icon: FolderOpen, tone: "teal" },
 };
 
 export const pageVisuals = {
   dashboard: { icon: LayoutDashboard, tone: "teal" as const },
   documents: { icon: Files, tone: "teal" as const },
-  chat: { icon: MessageSquare, tone: "indigo" as const },
-  sync: { icon: RefreshCw, tone: "green" as const },
-  knowledge: { icon: Brain, tone: "violet" as const },
-  warranties: { icon: Shield, tone: "orange" as const },
-  deadlines: { icon: CalendarClock, tone: "rose" as const },
+  chat: { icon: MessageSquare, tone: "teal" as const },
+  sync: { icon: RefreshCw, tone: "teal" as const },
+  knowledge: { icon: Brain, tone: "teal" as const },
+  warranties: { icon: Shield, tone: "teal" as const },
+  deadlines: { icon: CalendarClock, tone: "teal" as const },
   finance: { icon: Wallet, tone: "green" as const },
   financeBrain: { icon: HandCoins, tone: "green" as const },
   travel: { icon: Plane, tone: "teal" as const },
-  trips: { icon: Luggage, tone: "green" as const },
-  settings: { icon: Settings, tone: "slate" as const },
+  trips: { icon: Luggage, tone: "teal" as const },
+  settings: { icon: Settings, tone: "teal" as const },
   summaries: { icon: Sparkles, tone: "teal" as const },
   guides: { icon: BookOpen, tone: "teal" as const },
 } as const;
@@ -202,5 +202,5 @@ export function knowledgeVisual(name: string): {
   icon: LucideIcon;
   tone: IconTone;
 } {
-  return knowledgeAreaVisuals[name] || { icon: FolderOpen, tone: "slate" };
+  return knowledgeAreaVisuals[name] || { icon: FolderOpen, tone: "teal" };
 }

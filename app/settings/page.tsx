@@ -754,7 +754,7 @@ function SettingsPageInner() {
   }
 
   const settingsPrimaryBtn =
-    "w-full bg-[var(--brand-settings)] text-white hover:bg-[var(--brand-settings)]/90";
+    "w-full bg-primary text-primary-foreground hover:bg-primary/90";
 
   return (
     <div className="space-y-6 pb-28 md:space-y-8 md:pb-0">
@@ -771,7 +771,7 @@ function SettingsPageInner() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-3">
           <CardTitle className="flex items-center gap-3">
-            <IconCircle icon={MessageSquareText} tone="slate" size="sm" />
+            <IconCircle icon={MessageSquareText} tone="teal" size="sm" />
             Chat-Regeln
           </CardTitle>
           {chatInstructionsCustomized ? (
@@ -842,7 +842,7 @@ function SettingsPageInner() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-3">
-            <IconCircle icon={Server} tone="slate" size="sm" />
+            <IconCircle icon={Server} tone="teal" size="sm" />
             Paperless-ngx
           </CardTitle>
         </CardHeader>
@@ -888,7 +888,7 @@ function SettingsPageInner() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="flex items-center gap-3">
-            <IconCircle icon={BookOpen} tone="slate" size="sm" />
+            <IconCircle icon={BookOpen} tone="teal" size="sm" />
             Trilium
           </CardTitle>
           {triliumConfigured ? (
@@ -931,7 +931,7 @@ function SettingsPageInner() {
             />
           </div>
           {triliumPrivatNoteId || triliumGeschaeftlichNoteId ? (
-            <div className="rounded-xl border border-border/60 bg-[var(--brand-settings-soft)]/60 p-3 text-xs text-muted-foreground">
+            <div className="rounded-xl border border-border/60 bg-[var(--brand-docs-soft)]/60 p-3 text-xs text-muted-foreground">
               <div>Master: {triliumMasterNoteId || "–"}</div>
               <div>Privat: {triliumPrivatNoteId || "–"}</div>
               <div>Geschäftlich ANG: {triliumGeschaeftlichNoteId || "–"}</div>
@@ -975,7 +975,7 @@ function SettingsPageInner() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-3">
           <CardTitle className="flex items-center gap-3">
-            <IconCircle icon={Luggage} tone="slate" size="sm" />
+            <IconCircle icon={Luggage} tone="teal" size="sm" />
             TravelBrain
           </CardTitle>
           {hasAerodataboxKey ? (
@@ -1135,7 +1135,7 @@ function SettingsPageInner() {
             ) : null}
           </div>
 
-          <div className="space-y-3 rounded-xl border border-border/60 bg-[var(--brand-settings-soft)]/40 p-3">
+          <div className="space-y-3 rounded-xl border border-border/60 bg-[var(--brand-docs-soft)]/40 p-3">
             <div className="text-sm font-medium">Flug-API testen</div>
             <p className="text-xs text-muted-foreground">
               Sendet dieselbe Lookup-Anfrage wie die Anreicherung und zeigt die
@@ -1189,7 +1189,7 @@ function SettingsPageInner() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-3">
           <CardTitle className="flex items-center gap-3">
-            <IconCircle icon={Mail} tone="slate" size="sm" />
+            <IconCircle icon={Mail} tone="teal" size="sm" />
             E-Mail (SMTP)
           </CardTitle>
           {emailConfigured ? (
@@ -1352,7 +1352,7 @@ function SettingsPageInner() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-3">
           <CardTitle className="flex items-center gap-3">
-            <IconCircle icon={HandCoins} tone="slate" size="sm" />
+            <IconCircle icon={HandCoins} tone="teal" size="sm" />
             FinanzBrain
           </CardTitle>
           {financeExpenseAiImagePromptCustomized ? (
@@ -1414,7 +1414,7 @@ function SettingsPageInner() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="flex items-center gap-3">
-            <IconCircle icon={KeyRound} tone="slate" size="sm" />
+            <IconCircle icon={KeyRound} tone="teal" size="sm" />
             OpenAI
           </CardTitle>
           {hasOpenAIKey ? (

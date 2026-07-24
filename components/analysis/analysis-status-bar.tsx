@@ -45,9 +45,9 @@ export function AnalysisStatusBar() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 items-start gap-3">
             {isRunning ? (
-              <IconCircle icon={Loader2} tone="blue" size="sm" className="mt-0.5 [&_svg]:animate-spin" />
+              <IconCircle icon={Loader2} tone="teal" size="sm" className="mt-0.5 [&_svg]:animate-spin" />
             ) : (
-              <IconCircle icon={BrainCircuit} tone="violet" size="sm" className="mt-0.5" />
+              <IconCircle icon={BrainCircuit} tone="teal" size="sm" className="mt-0.5" />
             )}
             <div className="min-w-0">
               <div className="text-sm font-medium text-foreground">

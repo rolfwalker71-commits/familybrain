@@ -309,7 +309,7 @@ function FinanceOverviewClientInner({
     year: {
       title: "Nach Jahr",
       icon: CalendarDays,
-      tone: "blue" as IconTone,
+      tone: "green" as IconTone,
       items: byYear,
       empty: "Keine Jahresdaten",
       hint: "Jahre mit erkannten Beträgen",
@@ -317,7 +317,7 @@ function FinanceOverviewClientInner({
     vendor: {
       title: "Nach Lieferant",
       icon: Building2,
-      tone: "amber" as IconTone,
+      tone: "green" as IconTone,
       items: byVendor,
       empty: "Keine Lieferanten",
       hint: "Höchste Ausgaben zuerst",
@@ -325,7 +325,7 @@ function FinanceOverviewClientInner({
     category: {
       title: "Nach Kategorie",
       icon: Tags,
-      tone: "violet" as IconTone,
+      tone: "green" as IconTone,
       items: byCategory,
       empty: "Keine Kategorien",
       hint: "Semantisch gruppiert",
@@ -584,20 +584,20 @@ function FinanceOverviewClientInner({
           }
           value={totals.count}
           icon={FileText}
-          tone="sky"
+          tone="green"
         />
         <MetricTile
           title="Top-Lieferant"
           value={topVendor?.label || "–"}
           subtitle={topVendor ? formatCHF(topVendor.total) : undefined}
           icon={Building2}
-          tone="amber"
+          tone="green"
         />
         <MetricTile
           title="Wiederkehrend"
           value={recurring.length}
           icon={Repeat}
-          tone="teal"
+          tone="green"
         />
       </div>
 

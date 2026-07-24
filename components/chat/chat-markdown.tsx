@@ -39,7 +39,7 @@ export function ChatMarkdown({ content, className }: ChatMarkdownProps) {
           a: ({ href, children }) => (
             <a
               href={href}
-              className="font-medium text-blue-700 underline underline-offset-2 hover:text-blue-900"
+              className="font-medium text-[var(--brand-docs)] underline underline-offset-2 hover:text-primary"
               target="_blank"
               rel="noreferrer"
             >

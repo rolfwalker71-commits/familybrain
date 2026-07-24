@@ -585,7 +585,7 @@ function FinanceShareInner({ token }: { token: string }) {
       ) : null}
 
       {activeTab === "new" ? (
-        <SectionCard title="Ausgabe erfassen" tone="orange" icon={Receipt}>
+        <SectionCard title="Ausgabe erfassen" tone="green" icon={Receipt}>
           <div className="space-y-3">
             <div className="space-y-1">
               <Label>Betrag</Label>
@@ -754,7 +754,7 @@ function FinanceShareInner({ token }: { token: string }) {
       {activeTab === "settle" ? (
         <div className="space-y-4">
           {others.length > 0 ? (
-            <SectionCard title="Rückzahlung" tone="teal" icon={ArrowLeftRight}>
+            <SectionCard title="Rückzahlung" tone="green" icon={ArrowLeftRight}>
               <p className="mb-2 text-sm text-muted-foreground">
                 Du zahlst jemandem Geld zurück (reduziert deine Schuld).
               </p>
@@ -875,7 +875,7 @@ function FinanceShareInner({ token }: { token: string }) {
             </p>
           )}
 
-          <SectionCard title="Rückzahlungen" tone="teal" icon={ArrowLeftRight}>
+          <SectionCard title="Rückzahlungen" tone="green" icon={ArrowLeftRight}>
             <SettlementList
               settlements={settlements}
               members={members}

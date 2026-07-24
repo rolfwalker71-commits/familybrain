@@ -65,20 +65,27 @@ export type CalendarDateBadgeSize = keyof typeof SIZE_STYLES;
 
 /**
  * Soft-UI calendar date badge (TravelBrain / FinanzBrain).
- * Month strip on top, large day, short weekday — sage accent.
+ * Month strip on top, large day, short weekday.
  */
 export function CalendarDateBadge({
   isoDate,
   time,
   size = "sm",
+  accent = "teal",
   className,
 }: {
   isoDate: string;
   time?: string | null;
   size?: CalendarDateBadgeSize;
+  /** teal = MyBrain/TravelBrain; green = FinanzBrain */
+  accent?: "teal" | "green";
   className?: string;
 }) {
   const s = SIZE_STYLES[size];
+  const monthTone =
+    accent === "green"
+      ? "bg-[var(--brand-finance-soft)] text-[var(--brand-finance)]"
+      : "bg-[var(--brand-docs-soft)] text-[var(--brand-docs)]";
   return (
     <div
       className={cn(
@@ -90,7 +97,8 @@ export function CalendarDateBadge({
     >
       <div
         className={cn(
-          "shrink-0 bg-[var(--brand-finance-soft)] text-center font-bold uppercase leading-none tracking-wide text-[var(--brand-finance)]",
+          "shrink-0 text-center font-bold uppercase leading-none tracking-wide",
+          monthTone,
           s.month
         )}
       >

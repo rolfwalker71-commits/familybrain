@@ -42,26 +42,26 @@ type NavItem = {
 };
 
 const navItems: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, tone: "blue" },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, tone: "teal" },
   {
     href: "/documents",
     label: "Dokumente",
     icon: Files,
-    tone: "blue",
+    tone: "teal",
     countKey: "totalDocuments",
   },
   {
     href: "/warranties",
     label: "Garantien",
     icon: Shield,
-    tone: "orange",
+    tone: "teal",
     countKey: "warrantiesTotal",
   },
   {
     href: "/deadlines",
     label: "Fristen",
     icon: CalendarClock,
-    tone: "rose",
+    tone: "teal",
     countKey: "deadlinesOpen",
   },
   {
@@ -82,14 +82,14 @@ const navItems: NavItem[] = [
     href: "/knowledge",
     label: "Wissen",
     icon: Brain,
-    tone: "violet",
+    tone: "teal",
     countKey: "knowledgeDocuments",
   },
   {
     href: "/trips",
     label: "TravelBrain",
     icon: Luggage,
-    tone: "indigo",
+    tone: "teal",
   },
   {
     href: "/finance-brain",
@@ -98,13 +98,13 @@ const navItems: NavItem[] = [
     tone: "green",
   },
   { href: "/guides", label: "Guides", icon: BookOpen, tone: "teal" },
-  { href: "/chat", label: "Chat", icon: MessageSquare, tone: "indigo" },
-  { href: "/settings", label: "Einstellungen", icon: Settings, tone: "slate" },
+  { href: "/chat", label: "Chat", icon: MessageSquare, tone: "teal" },
+  { href: "/settings", label: "Einstellungen", icon: Settings, tone: "teal" },
   {
     href: "/sync",
     label: "Sync",
     icon: RefreshCw,
-    tone: "amber",
+    tone: "teal",
     countKey: "pendingCount",
     pendingStyle: true,
   },

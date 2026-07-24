@@ -38,7 +38,7 @@ type CategoryDef = {
 export const EXPENSE_CATEGORIES: CategoryDef[] = [
   {
     label: "Essen",
-    tone: "orange",
+    tone: "green",
     icon: UtensilsCrossed,
     scene: "cozy meal or breakfast table atmosphere",
     keywords: [
@@ -76,21 +76,21 @@ export const EXPENSE_CATEGORIES: CategoryDef[] = [
   },
   {
     label: "Café",
-    tone: "amber",
+    tone: "green",
     icon: Coffee,
     scene: "warm café counter with coffee cup atmosphere",
     keywords: ["café", "cafe", "kaffee", "coffee", "bäckerei", "bakery"],
   },
   {
     label: "Bar",
-    tone: "rose",
+    tone: "green",
     icon: Wine,
     scene: "friendly evening bar or aperitif atmosphere",
     keywords: ["bar", "drink", "getränk", "wein", "bier", "cocktail", "pub"],
   },
   {
     label: "Hotel",
-    tone: "indigo",
+    tone: "green",
     icon: BedDouble,
     scene: "welcoming hotel exterior or lobby atmosphere",
     keywords: [
@@ -108,35 +108,35 @@ export const EXPENSE_CATEGORIES: CategoryDef[] = [
   },
   {
     label: "Flug",
-    tone: "sky",
+    tone: "green",
     icon: Plane,
     scene: "airport terminal or aircraft cabin travel atmosphere",
     keywords: ["flug", "flight", "airline", "airport", "boarding", "swiss", "lufthansa"],
   },
   {
     label: "Bahn",
-    tone: "teal",
+    tone: "green",
     icon: TrainFront,
     scene: "train station or scenic train journey atmosphere",
     keywords: ["bahn", "zug", "train", "sbb", "öbb", "rail"],
   },
   {
     label: "Bus",
-    tone: "teal",
+    tone: "green",
     icon: Bus,
     scene: "city bus or transit atmosphere",
     keywords: ["bus", "tram", "metro", "u-bahn", "subway", "öpnv"],
   },
   {
     label: "Taxi / Transfer",
-    tone: "teal",
+    tone: "green",
     icon: Car,
     scene: "city transfer or taxi ride atmosphere",
     keywords: ["taxi", "uber", "lyft", "transfer", "shuttle", "bolt"],
   },
   {
     label: "Mietwagen",
-    tone: "teal",
+    tone: "green",
     icon: Car,
     scene: "scenic road trip rental car atmosphere",
     keywords: [
@@ -152,21 +152,21 @@ export const EXPENSE_CATEGORIES: CategoryDef[] = [
   },
   {
     label: "Tanken",
-    tone: "amber",
+    tone: "green",
     icon: Fuel,
     scene: "roadside fuel stop travel atmosphere",
     keywords: ["tank", "benzin", "diesel", "fuel", "gas station", "shell", "esso"],
   },
   {
     label: "Parken",
-    tone: "slate",
+    tone: "green",
     icon: ParkingCircle,
     scene: "parking garage or city parking atmosphere",
     keywords: ["park", "parking", "parkhaus"],
   },
   {
     label: "Einkauf",
-    tone: "violet",
+    tone: "green",
     icon: ShoppingBag,
     scene: "market or grocery shopping atmosphere",
     keywords: [
@@ -184,7 +184,7 @@ export const EXPENSE_CATEGORIES: CategoryDef[] = [
   },
   {
     label: "Ticket / Kultur",
-    tone: "rose",
+    tone: "green",
     icon: Ticket,
     scene: "museum ticket desk or cultural venue atmosphere",
     keywords: [
@@ -218,21 +218,21 @@ export const EXPENSE_CATEGORIES: CategoryDef[] = [
   },
   {
     label: "Schiff",
-    tone: "sky",
+    tone: "green",
     icon: Ship,
     scene: "ferry deck or harbor atmosphere",
     keywords: ["schiff", "ferry", "fähre", "boot", "boat", "cruise"],
   },
   {
     label: "Versicherung",
-    tone: "slate",
+    tone: "green",
     icon: Shield,
     scene: "calm administrative paperwork atmosphere, no logos",
     keywords: ["versicherung", "prämie", "insurance", "concordia", "css", "helvetia"],
   },
   {
     label: "Bank / Gebühr",
-    tone: "slate",
+    tone: "green",
     icon: Landmark,
     scene: "subtle banking / currency exchange atmosphere, no logos",
     keywords: ["gebühr", "fee", "bank", "wechsel", "atm", "bancomat"],
@@ -347,7 +347,7 @@ export function expenseVisualForExpense(expense: {
 export function settlementVisual(): ExpenseVisual {
   return {
     icon: ArrowLeftRight,
-    tone: "teal",
+    tone: "green",
     label: "Rückzahlung",
   };
 }
