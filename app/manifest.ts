@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "FamilyBrain",
-    short_name: "FamilyBrain",
+    name: "MyBrain",
+    short_name: "MyBrain",
     description:
       "Private Wissensschicht für Paperless-Dokumente, Fristen, Finanzen und Reisen.",
     start_url: "/dashboard",

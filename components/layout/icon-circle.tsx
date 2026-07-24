@@ -35,13 +35,27 @@ export const iconToneClasses = {
   orange: "bg-orange-50 text-orange-600",
   /** Sage / FinanzBrain */
   green: "bg-[var(--brand-finance-soft)] text-[var(--brand-finance)]",
-  /** Dokumente / FamilyBrain default */
+  /** Dokumente / MyBrain default */
   teal: "bg-[var(--brand-docs-soft)] text-[var(--brand-docs)]",
   sky: "bg-sky-50 text-sky-600",
   indigo: "bg-indigo-50 text-indigo-600",
   violet: "bg-violet-50 text-violet-600",
   /** Settings navy-ish */
   slate: "bg-[var(--brand-settings-soft)] text-[var(--brand-settings)]",
+} as const;
+
+/** High-contrast icon wells for dark sidebar / overlay nav */
+export const iconToneSolidClasses = {
+  blue: "bg-blue-500 text-white",
+  amber: "bg-amber-500 text-white",
+  rose: "bg-rose-500 text-white",
+  orange: "bg-orange-500 text-white",
+  green: "bg-[var(--brand-finance)] text-white",
+  teal: "bg-[var(--brand-docs)] text-white",
+  sky: "bg-sky-500 text-white",
+  indigo: "bg-indigo-500 text-white",
+  violet: "bg-violet-500 text-white",
+  slate: "bg-[var(--brand-settings)] text-white",
 } as const;
 
 /**
@@ -114,6 +128,8 @@ type IconCircleProps = {
   icon: LucideIcon;
   tone?: IconTone;
   size?: "sm" | "md" | "lg";
+  /** soft = pastel (default); solid = saturated fill for dark nav */
+  variant?: "soft" | "solid";
   className?: string;
 };
 
@@ -127,6 +143,7 @@ export function IconCircle({
   icon: Icon,
   tone = "blue",
   size = "md",
+  variant = "soft",
   className,
 }: IconCircleProps) {
   const s = sizeClasses[size];
@@ -135,11 +152,11 @@ export function IconCircle({
       className={cn(
         "flex shrink-0 items-center justify-center rounded-full",
         s.wrap,
-        iconToneClasses[tone],
+        variant === "solid" ? iconToneSolidClasses[tone] : iconToneClasses[tone],
         className
       )}
     >
-      <Icon className={s.icon} />
+      <Icon className={cn(s.icon, variant === "solid" && "stroke-[2.25]")} />
     </div>
   );
 }

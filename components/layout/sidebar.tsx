@@ -157,28 +157,31 @@ export function Sidebar({
               href={item.href}
               onClick={onNavigate}
               className={cn(
-                "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
+                "flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition-colors",
                 active
-                  ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-[0_4px_12px_rgba(15,118,110,0.28)]"
-                  : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  ? "bg-white/12 text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.12)]"
+                  : "text-sidebar-foreground/90 hover:bg-sidebar-accent hover:text-white"
               )}
             >
               <IconCircle
                 icon={item.icon}
                 tone={item.tone}
                 size="sm"
-                className="shadow-sm"
+                variant="solid"
+                className="rounded-lg shadow-md ring-1 ring-white/25"
               />
-              <span className="flex-1">{item.label}</span>
+              <span className="flex-1 text-[15px] font-semibold tracking-tight">
+                {item.label}
+              </span>
               {showCount ? (
                 <span
                   className={cn(
                     "min-w-[1.5rem] rounded-full px-1.5 py-0.5 text-center text-[10px] font-semibold tabular-nums",
                     active
-                      ? "bg-white/20 text-white"
+                      ? "bg-white/25 text-white"
                       : item.pendingStyle && isRunning
-                        ? "bg-amber-500/20 text-amber-300"
-                        : "bg-sidebar-primary/30 text-blue-200"
+                        ? "bg-amber-500 text-white"
+                        : "bg-white/15 text-white"
                   )}
                   title={
                     item.countKey === "pendingCount"
