@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Filter } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,6 +14,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import {
   DataList,
   DataListRow,
@@ -27,6 +35,7 @@ import {
   DocumentInfoButton,
   DocumentTitleLink,
 } from "@/components/documents/document-link";
+import { cn } from "@/lib/utils";
 
 type DocRow = {
   id: number;
@@ -98,6 +107,7 @@ export function DocumentsClient() {
   const [analysisStatus, setAnalysisStatus] = useState(
     searchParams.get("analysisStatus") || "all"
   );
+  const [filterOpen, setFilterOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [analyzingId, setAnalyzingId] = useState<number | null>(null);
@@ -286,7 +296,7 @@ export function DocumentsClient() {
   );
 
   return (
-    <div className="min-w-0 space-y-6">
+    <div className="min-w-0 space-y-4 pb-6 md:space-y-6">
       <PageHeader
         title="Dokumente"
         description={
@@ -298,7 +308,71 @@ export function DocumentsClient() {
         tone={pageVisuals.documents.tone}
       />
 
-      <Card className="min-w-0 overflow-hidden border-border/80 shadow-sm">
+      {/* Mobile: search + filter trigger + category chips */}
+      <div className="space-y-3 md:hidden">
+        <div className="flex gap-2">
+          <Input
+            className="min-w-0 flex-1"
+            placeholder="Suche…"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                const next = searchInput.trim();
+                setSearch(next);
+                updateUrl({ search: next });
+              }
+            }}
+          />
+          <Button
+            type="button"
+            variant={hasActiveFilters ? "default" : "outline"}
+            size="icon"
+            aria-label="Filter"
+            onClick={() => setFilterOpen(true)}
+          >
+            <Filter className="size-4" />
+          </Button>
+        </div>
+        <div className="flex gap-1.5 overflow-x-auto pb-0.5">
+          <button
+            type="button"
+            className={cn(
+              "shrink-0 rounded-full border px-3 py-1 text-xs font-medium",
+              category === "all"
+                ? "border-foreground/30 bg-foreground/10"
+                : "border-border/70 text-muted-foreground"
+            )}
+            onClick={() => {
+              setCategory("all");
+              updateUrl({ category: "all" });
+            }}
+          >
+            Alle
+          </button>
+          {filters.categories.slice(0, 8).map((c) => (
+            <button
+              key={c}
+              type="button"
+              className={cn(
+                "shrink-0 rounded-full border px-3 py-1 text-xs font-medium",
+                category === c
+                  ? "border-foreground/30 bg-foreground/10"
+                  : "border-border/70 text-muted-foreground"
+              )}
+              onClick={() => {
+                setCategory(c);
+                updateUrl({ category: c });
+              }}
+            >
+              {c}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <Card className="hidden min-w-0 overflow-hidden border-border/80 shadow-sm md:block">
         <CardContent className="space-y-3 py-4">
           <FilterGrid>
             <div className="min-w-0 xl:col-span-2">
@@ -434,6 +508,121 @@ export function DocumentsClient() {
           ) : null}
         </CardContent>
       </Card>
+
+      <Sheet open={filterOpen} onOpenChange={setFilterOpen}>
+        <SheetContent side="bottom" className="max-h-[90dvh] overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Filter</SheetTitle>
+            <SheetDescription>
+              Dokumente nach Kategorie, Typ und Status eingrenzen.
+            </SheetDescription>
+          </SheetHeader>
+          <div className="space-y-3 px-4 pb-6">
+            <Select
+              value={category}
+              onValueChange={(value) => {
+                if (value == null) return;
+                setCategory(value);
+                updateUrl({ category: value });
+              }}
+              items={categoryItems}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Kategorie" />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(categoryItems).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select
+              value={correspondent}
+              onValueChange={(value) => {
+                if (value == null) return;
+                setCorrespondent(value);
+                updateUrl({ correspondent: value });
+              }}
+              items={correspondentItems}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Korrespondent" />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(correspondentItems).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select
+              value={documentType}
+              onValueChange={(value) => {
+                if (value == null) return;
+                setDocumentType(value);
+                updateUrl({ documentType: value });
+              }}
+              items={documentTypeItems}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Typ" />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(documentTypeItems).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select
+              value={analysisStatus}
+              onValueChange={(value) => {
+                if (value == null) return;
+                setAnalysisStatus(value);
+                updateUrl({ analysisStatus: value });
+              }}
+              items={statusItems}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(statusItems).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="flex gap-2">
+              <Button
+                className="flex-1"
+                onClick={() => {
+                  setSearch(searchInput.trim());
+                  setFilterOpen(false);
+                }}
+              >
+                Anwenden
+              </Button>
+              {hasActiveFilters ? (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    resetFilters();
+                    setFilterOpen(false);
+                  }}
+                >
+                  Reset
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {error ? (
         <Card className="border-destructive/30">

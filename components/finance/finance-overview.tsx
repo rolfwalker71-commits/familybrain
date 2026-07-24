@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   CalendarDays,
   Building2,
@@ -11,6 +12,9 @@ import {
   ChevronRight,
   CircleAlert,
   ChevronDown,
+  LayoutDashboard,
+  List,
+  PieChart,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -33,6 +37,13 @@ import { FinanceStatsToggle } from "@/components/finance/finance-stats-toggle";
 import { formatCHF } from "@/lib/utils/format";
 import { daysAgo, toSwissDate } from "@/lib/utils/dates";
 import { cn } from "@/lib/utils";
+import {
+  OverviewTabNav,
+  parseOverviewTab,
+  type OverviewTab,
+  type OverviewTabItem,
+} from "@/components/layout/overview-tab-nav";
+
 import type { CalendarEvent } from "@/lib/utils/ics";
 import { financeBucket } from "@/lib/extraction/normalize-categories";
 
@@ -211,7 +222,19 @@ function InvoiceListRow({
   );
 }
 
-export function FinanceOverviewClient({
+export function FinanceOverviewClient(props: Parameters<typeof FinanceOverviewClientInner>[0]) {
+  return (
+    <Suspense
+      fallback={
+        <p className="p-6 text-sm text-muted-foreground">Lädt…</p>
+      }
+    >
+      <FinanceOverviewClientInner {...props} />
+    </Suspense>
+  );
+}
+
+function FinanceOverviewClientInner({
   byYear,
   byVendor,
   byCategory,
@@ -223,6 +246,9 @@ export function FinanceOverviewClient({
   excludedCount,
   unknownVendor,
 }: Props) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [dimension, setDimension] = useState<Dimension | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [dueOpen, setDueOpen] = useState(true);
@@ -373,13 +399,32 @@ export function FinanceOverviewClient({
     return groups;
   }, [selectedInvoices, detailGroupBy]);
 
+  const activeTab = parseOverviewTab(searchParams.get("tab"));
+  const tabItems: OverviewTabItem[] = [
+    { id: "overview", label: "Übersicht", icon: LayoutDashboard },
+    { id: "list", label: "Liste", icon: List },
+    { id: "breakdown", label: "Details", icon: PieChart },
+  ];
+
+  function setTab(tab: OverviewTab) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (tab === "overview") params.delete("tab");
+    else params.set("tab", tab);
+    const q = params.toString();
+    router.replace(q ? `?${q}` : "?", { scroll: false });
+  }
+
   function openDimension(next: Dimension) {
-    setDimension((prev) => (prev === next ? null : next));
+    setDimension((prev) => {
+      const nextDim = prev === next ? null : next;
+      if (nextDim) setTab("breakdown");
+      return nextDim;
+    });
     setSelected(null);
   }
 
   return (
-    <div className="min-w-0 space-y-6">
+    <div className="min-w-0 space-y-4 pb-24 md:space-y-6 md:pb-0">
       <PageHeader
         title="Finanzblick"
         description={
@@ -408,6 +453,10 @@ export function FinanceOverviewClient({
         }
       />
 
+      <OverviewTabNav items={tabItems} active={activeTab} onChange={setTab} />
+
+      {activeTab === "overview" ? (
+        <>
       {recentDueInvoices.length > 0 || olderDueInvoices.length > 0 ? (
         <Card
           tone="amber"
@@ -613,8 +662,11 @@ export function FinanceOverviewClient({
           );
         })}
       </div>
+        </>
+      ) : null}
 
-      {dimension ? (
+      {activeTab === "breakdown" ? (
+        dimension ? (
         <Card
           tone={dimensionMeta[dimension].tone}
           className="min-w-0 overflow-hidden shadow-sm"
@@ -767,8 +819,17 @@ export function FinanceOverviewClient({
             ) : null}
           </CardContent>
         </Card>
+      ) : (
+          <Card className="border-border/80 shadow-sm">
+            <CardContent className="py-6 text-sm text-muted-foreground">
+              Wähle in der Übersicht eine Dimension (Lieferant, Kategorie, …), um
+              die Aufschlüsselung zu sehen.
+            </CardContent>
+          </Card>
+        )
       ) : null}
 
+      {activeTab === "list" ? (
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <Card tone="green" className="min-w-0 overflow-hidden shadow-sm">
           <CardHeader tone="green">
@@ -814,6 +875,7 @@ export function FinanceOverviewClient({
           </CardContent>
         </Card>
       </div>
+      ) : null}
     </div>
   );
 }

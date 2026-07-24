@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { KeyRound, Server, BookOpen, MessageSquareText, Luggage, HandCoins, Mail } from "lucide-react";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { KeyRound, Server, BookOpen, MessageSquareText, Luggage, HandCoins, Mail, MoreHorizontal } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,6 +19,13 @@ import {
 } from "@/components/ui/select";
 import { PageHeader } from "@/components/layout/page-primitives";
 import { IconCircle, pageVisuals } from "@/components/layout/icon-circle";
+import {
+  SettingsTabNav,
+  parseSettingsTab,
+  type SettingsTab,
+  type SettingsTabItem,
+} from "@/components/settings/settings-tab-nav";
+
 
 const ICLOUD_SMTP = {
   host: "smtp.mail.me.com",
@@ -34,6 +42,20 @@ const OPENAI_MODELS = [
 ];
 
 export default function SettingsPage() {
+  return (
+    <Suspense
+      fallback={
+        <p className="p-6 text-sm text-muted-foreground">Lade Einstellungen…</p>
+      }
+    >
+      <SettingsPageInner />
+    </Suspense>
+  );
+}
+
+function SettingsPageInner() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [baseUrl, setBaseUrl] = useState("");
   const [apiToken, setApiToken] = useState("");
   const [tokenMasked, setTokenMasked] = useState<string | null>(null);
@@ -714,8 +736,25 @@ export default function SettingsPage() {
     }
   }
 
+  const activeTab = parseSettingsTab(searchParams.get("tab"));
+  const tabItems: SettingsTabItem[] = [
+    { id: "chat", label: "Chat", icon: MessageSquareText },
+    { id: "paperless", label: "Paperless", icon: Server },
+    { id: "travel", label: "Travel", icon: Luggage },
+    { id: "mail", label: "Mail", icon: Mail },
+    { id: "more", label: "Mehr", icon: MoreHorizontal },
+  ];
+
+  function setTab(tab: SettingsTab) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (tab === "chat") params.delete("tab");
+    else params.set("tab", tab);
+    const q = params.toString();
+    router.replace(q ? `?${q}` : "?", { scroll: false });
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 pb-24 md:space-y-6 md:pb-0">
       <PageHeader
         title="Einstellungen"
         description="Paperless, Trilium, OpenAI und Chat-Regeln konfigurieren"
@@ -723,6 +762,9 @@ export default function SettingsPage() {
         tone={pageVisuals.settings.tone}
       />
 
+      <SettingsTabNav items={tabItems} active={activeTab} onChange={setTab} />
+
+      {activeTab === "chat" ? (
       <Card className="border-border/80 shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between gap-3">
           <CardTitle className="flex items-center gap-3 text-base">
@@ -786,7 +828,9 @@ export default function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+      ) : null}
 
+      {activeTab === "paperless" ? (
       <Card className="border-border/80 shadow-sm">
         <CardHeader>
           <CardTitle className="flex items-center gap-3 text-base">
@@ -827,7 +871,10 @@ export default function SettingsPage() {
           </Button>
         </CardContent>
       </Card>
+      ) : null}
 
+      {activeTab === "more" ? (
+        <div className="space-y-4">
       <Card className="border-border/80 shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="flex items-center gap-3 text-base">
@@ -904,7 +951,10 @@ export default function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+        </div>
+      ) : null}
 
+      {activeTab === "travel" ? (
       <Card className="border-border/80 shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between gap-3">
           <CardTitle className="flex items-center gap-3 text-base">
@@ -1114,7 +1164,9 @@ export default function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+      ) : null}
 
+      {activeTab === "mail" ? (
       <Card className="border-border/80 shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between gap-3">
           <CardTitle className="flex items-center gap-3 text-base">
@@ -1272,7 +1324,10 @@ export default function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+      ) : null}
 
+      {activeTab === "more" ? (
+        <div className="space-y-4">
       <Card className="border-border/80 shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between gap-3">
           <CardTitle className="flex items-center gap-3 text-base">
@@ -1408,6 +1463,8 @@ export default function SettingsPage() {
           </Button>
         </CardContent>
       </Card>
+        </div>
+      ) : null}
 
       {message ? (
         <Alert>

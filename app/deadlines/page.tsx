@@ -119,7 +119,7 @@ export default function DeadlinesPage() {
     .filter((e): e is CalendarEvent => Boolean(e));
 
   return (
-    <div className="min-w-0 space-y-6">
+    <div className="min-w-0 space-y-4 pb-6 md:space-y-6">
       <PageHeader
         title="Fristenradar"
         description="Kündigungen, Garantieenden und Zahlungstermine"

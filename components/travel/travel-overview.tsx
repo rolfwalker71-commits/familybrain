@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { Suspense, useMemo, useState, type ReactNode } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   CalendarDays,
   Plane,
@@ -8,6 +9,9 @@ import {
   MapPin,
   ChevronRight,
   Ticket,
+  LayoutDashboard,
+  List,
+  PieChart,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -36,6 +40,13 @@ import { TravelTypeReclassify } from "@/components/travel/travel-type-reclassify
 import { formatCHF } from "@/lib/utils/format";
 import { toSwissDate } from "@/lib/utils/dates";
 import { cn } from "@/lib/utils";
+import {
+  OverviewTabNav,
+  parseOverviewTab,
+  type OverviewTab,
+  type OverviewTabItem,
+} from "@/components/layout/overview-tab-nav";
+
 import type { CalendarEvent } from "@/lib/utils/ics";
 
 export type TravelRow = {
@@ -258,7 +269,22 @@ type Props = {
   items: TravelRow[];
 };
 
-export function TravelOverviewClient({ items }: Props) {
+export function TravelOverviewClient(props: Parameters<typeof TravelOverviewClientInner>[0]) {
+  return (
+    <Suspense
+      fallback={
+        <p className="p-6 text-sm text-muted-foreground">Lädt…</p>
+      }
+    >
+      <TravelOverviewClientInner {...props} />
+    </Suspense>
+  );
+}
+
+function TravelOverviewClientInner({ items }: Props) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [dimension, setDimension] = useState<Dimension | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<number | null>(null);
@@ -359,18 +385,37 @@ export function TravelOverviewClient({ items }: Props) {
     [items, detailId]
   );
 
-  function openDimension(next: Dimension) {
-    setDimension((prev) => (prev === next ? null : next));
-    setSelected(null);
-    setDetailId(null);
-  }
-
   const upcomingEvents = upcoming
     .map(travelToCalendarEvent)
     .filter((e): e is CalendarEvent => Boolean(e));
 
+  const activeTab = parseOverviewTab(searchParams.get("tab"));
+  const tabItems: OverviewTabItem[] = [
+    { id: "overview", label: "Übersicht", icon: LayoutDashboard },
+    { id: "list", label: "Liste", icon: List },
+    { id: "breakdown", label: "Details", icon: PieChart },
+  ];
+
+  function setTab(tab: OverviewTab) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (tab === "overview") params.delete("tab");
+    else params.set("tab", tab);
+    const q = params.toString();
+    router.replace(q ? `?${q}` : "?", { scroll: false });
+  }
+
+  function openDimension(next: Dimension) {
+    setDimension((prev) => {
+      const nextDim = prev === next ? null : next;
+      if (nextDim) setTab("breakdown");
+      return nextDim;
+    });
+    setSelected(null);
+    setDetailId(null);
+  }
+
   return (
-    <div className="min-w-0 space-y-6">
+    <div className="min-w-0 space-y-4 pb-24 md:space-y-6 md:pb-0">
       <PageHeader
         title="Reise-Gedächtnis"
         description="KPIs zuerst – Details per Drilldown, Termine in den Kalender"
@@ -387,6 +432,10 @@ export function TravelOverviewClient({ items }: Props) {
         }
       />
 
+      <OverviewTabNav items={tabItems} active={activeTab} onChange={setTab} />
+
+      {activeTab === "overview" ? (
+        <>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricTile
           title="Reiseeinträge"
@@ -476,8 +525,11 @@ export function TravelOverviewClient({ items }: Props) {
           );
         })}
       </div>
+        </>
+      ) : null}
 
-      {dimension ? (
+      {activeTab === "breakdown" ? (
+        dimension ? (
         <Card
           tone={dimensionMeta[dimension].tone}
           className="min-w-0 overflow-hidden shadow-sm"
@@ -691,8 +743,17 @@ export function TravelOverviewClient({ items }: Props) {
             ) : null}
           </CardContent>
         </Card>
+      ) : (
+          <Card className="border-border/80 shadow-sm">
+            <CardContent className="py-6 text-sm text-muted-foreground">
+              Wähle in der Übersicht eine Dimension, um die Aufschlüsselung zu
+              sehen.
+            </CardContent>
+          </Card>
+        )
       ) : null}
 
+      {activeTab === "list" ? (
       <Card tone="teal" className="min-w-0 overflow-hidden shadow-sm">
         <CardHeader
           tone="teal"
@@ -812,6 +873,7 @@ export function TravelOverviewClient({ items }: Props) {
           ) : null}
         </CardContent>
       </Card>
+      ) : null}
     </div>
   );
 }

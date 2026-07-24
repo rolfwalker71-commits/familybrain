@@ -1,8 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Link2, RefreshCw, BrainCircuit, BookOpen } from "lucide-react";
+import {
+  Link2,
+  RefreshCw,
+  BrainCircuit,
+  BookOpen,
+  Activity,
+  Bot,
+  Sparkles,
+} from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,6 +23,13 @@ import { readNdjsonStream } from "@/lib/utils/stream";
 import { PageHeader } from "@/components/layout/page-primitives";
 import { IconCircle, pageVisuals } from "@/components/layout/icon-circle";
 import { AutomationPanel } from "@/components/sync/automation-panel";
+import {
+  SyncTabNav,
+  parseSyncTab,
+  type SyncTab,
+  type SyncTabItem,
+} from "@/components/sync/sync-tab-nav";
+
 
 type SyncResult = {
   totalRemote: number;
@@ -47,6 +63,18 @@ type TriliumSyncResult = {
 };
 
 export function SyncClient() {
+  return (
+    <Suspense
+      fallback={<p className="p-6 text-sm text-muted-foreground">Lade Sync…</p>}
+    >
+      <SyncClientInner />
+    </Suspense>
+  );
+}
+
+function SyncClientInner() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const {
     pendingCount,
     hasOpenAIKey,
@@ -311,8 +339,23 @@ export function SyncClient() {
         ? "Sync abgeschlossen"
         : "Synchronisiere Dokumente…";
 
+  const activeTab = parseSyncTab(searchParams.get("tab"));
+  const tabItems: SyncTabItem[] = [
+    { id: "status", label: "Status", icon: Activity },
+    { id: "automation", label: "Automation", icon: Bot },
+    { id: "analyse", label: "Analyse", icon: Sparkles },
+  ];
+
+  function setTab(tab: SyncTab) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (tab === "status") params.delete("tab");
+    else params.set("tab", tab);
+    const q = params.toString();
+    router.replace(q ? `?${q}` : "?", { scroll: false });
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 pb-24 md:space-y-6 md:pb-0">
       <PageHeader
         title="Sync"
         description="Paperless und Trilium synchronisieren, dann AI-Analyse starten"
@@ -320,6 +363,10 @@ export function SyncClient() {
         tone={pageVisuals.sync.tone}
       />
 
+      <SyncTabNav items={tabItems} active={activeTab} onChange={setTab} />
+
+      {activeTab === "status" ? (
+        <div className="space-y-4">
       <Card className="border-border/80 shadow-sm">
         <CardHeader>
           <CardTitle className="flex items-center gap-3 text-base">
@@ -365,8 +412,6 @@ export function SyncClient() {
           </div>
         </CardContent>
       </Card>
-
-      <AutomationPanel />
 
       <Card className="border-border/80 shadow-sm">
         <CardHeader>
@@ -508,7 +553,12 @@ export function SyncClient() {
           ) : null}
         </CardContent>
       </Card>
+        </div>
+      ) : null}
 
+      {activeTab === "automation" ? <AutomationPanel /> : null}
+
+      {activeTab === "analyse" ? (
       <Card className="border-border/80 shadow-sm">
         <CardHeader>
           <CardTitle className="flex items-center gap-3 text-base">
@@ -564,6 +614,9 @@ export function SyncClient() {
           </div>
         </CardContent>
       </Card>
+      ) : null}
+
+
 
       {message ? (
         <Alert>
