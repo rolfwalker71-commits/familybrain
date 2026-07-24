@@ -1,7 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Download, Plus, Receipt, RefreshCw, ArrowLeftRight } from "lucide-react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import {
+  Download,
+  LayoutDashboard,
+  List,
+  Plus,
+  Receipt,
+  RefreshCw,
+  ArrowLeftRight,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,6 +31,12 @@ import {
   SettlementList,
 } from "@/components/finance-brain/balance-view";
 import { PendingReceiptPicker } from "@/components/finance-brain/expense-receipt-controls";
+import {
+  FinanceTabNav,
+  parseFinanceLedgerTab,
+  type FinanceLedgerTab,
+  type FinanceTabItem,
+} from "@/components/finance-brain/finance-tab-nav";
 import { COMMON_CURRENCIES } from "@/lib/finance-brain/constants";
 import { todayDateInputValue } from "@/lib/utils/dates";
 
@@ -85,6 +100,22 @@ type ShareData = {
 };
 
 export function FinanceShareClient({ token }: { token: string }) {
+  return (
+    <Suspense
+      fallback={
+        <p className="p-6 text-center text-sm text-muted-foreground">
+          Lade Abrechnung…
+        </p>
+      }
+    >
+      <FinanceShareInner token={token} />
+    </Suspense>
+  );
+}
+
+function FinanceShareInner({ token }: { token: string }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [data, setData] = useState<ShareData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -455,6 +486,14 @@ export function FinanceShareClient({ token }: { token: string }) {
     }
   }
 
+  function setTab(tab: FinanceLedgerTab) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (tab === "overview") params.delete("tab");
+    else params.set("tab", tab);
+    const q = params.toString();
+    router.replace(q ? `?${q}` : "?", { scroll: false });
+  }
+
   if (loading && !data) {
     return (
       <p className="p-6 text-center text-sm text-muted-foreground">
@@ -470,8 +509,15 @@ export function FinanceShareClient({ token }: { token: string }) {
     );
   }
 
-  const { member, ledger, members, expenses, settlements, balances, simplifiedDebts } =
-    data;
+  const {
+    member,
+    ledger,
+    members,
+    expenses,
+    settlements,
+    balances,
+    simplifiedDebts,
+  } = data;
   const others = members.filter((m) => m.id !== member.id);
   const memberSelectItems = Object.fromEntries(
     members.map((m) => [
@@ -485,16 +531,33 @@ export function FinanceShareClient({ token }: { token: string }) {
   const currencySelectItems = Object.fromEntries(
     COMMON_CURRENCIES.map((c) => [c, c])
   );
+  const activeTab = parseFinanceLedgerTab(searchParams.get("tab"), {
+    isSplit: true,
+  });
+  const tabItems: FinanceTabItem[] = [
+    { id: "overview", label: "Übersicht", icon: LayoutDashboard },
+    { id: "new", label: "Neu", icon: Plus },
+    { id: "expenses", label: "Ausgaben", icon: List },
+    { id: "settle", label: "Ausgleich", icon: ArrowLeftRight },
+  ];
 
   return (
-    <div className="mx-auto max-w-lg space-y-4 px-4 py-6 pb-24">
+    <div className="mx-auto max-w-lg space-y-4 px-4 py-6 pb-28">
       <div className="space-y-1 text-center">
         <Badge variant="secondary">FinanzBrain</Badge>
         <h1 className="text-xl font-semibold">{ledger.title}</h1>
         <p className="text-sm text-muted-foreground">
-          Angemeldet als <span className="font-medium">{member.display_name}</span>
+          Angemeldet als{" "}
+          <span className="font-medium">{member.display_name}</span>
         </p>
       </div>
+
+      <FinanceTabNav
+        items={tabItems}
+        active={activeTab}
+        onChange={setTab}
+        alwaysBottom
+      />
 
       <Button
         variant="outline"
@@ -509,198 +572,40 @@ export function FinanceShareClient({ token }: { token: string }) {
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
       {status ? <p className="text-sm text-muted-foreground">{status}</p> : null}
 
-      <BalanceView
-        balances={balances}
-        simplifiedDebts={simplifiedDebts}
-        baseCurrency={ledger.base_currency}
-        highlightMemberId={member.id}
-      />
+      {activeTab === "overview" ? (
+        <BalanceView
+          balances={balances}
+          simplifiedDebts={simplifiedDebts}
+          baseCurrency={ledger.base_currency}
+          highlightMemberId={member.id}
+        />
+      ) : null}
 
-      <SectionCard title="Ausgabe erfassen" tone="orange" icon={Receipt}>
-        <div className="space-y-3">
-          <div className="space-y-1">
-            <Label>Betrag</Label>
-            <Input
-              type="number"
-              inputMode="decimal"
-              step="0.01"
-              value={expAmount}
-              onChange={(e) => setExpAmount(e.target.value)}
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div className="space-y-1">
-              <Label>Währung</Label>
-              <Select
-                value={expCurrency}
-                onValueChange={(v) => {
-                  if (v == null) return;
-                  setExpCurrency(v);
-                  if (v === ledger.base_currency) {
-                    setExpRate("1");
-                  } else {
-                    void fetchEcbRate({ from: v, target: "expense" });
-                  }
-                }}
-                items={currencySelectItems}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {COMMON_CURRENCIES.map((c) => (
-                    <SelectItem key={c} value={c}>
-                      {c}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label>Kurs → {ledger.base_currency}</Label>
-              <div className="flex gap-1.5">
-                <Input
-                  type="number"
-                  step="0.0001"
-                  value={expRate}
-                  onChange={(e) => setExpRate(e.target.value)}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  title="EZB-Kurs laden"
-                  disabled={
-                    rateLoading || expCurrency === ledger.base_currency
-                  }
-                  onClick={() => void fetchEcbRate()}
-                >
-                  <Download
-                    className={cn("size-4", rateLoading && "animate-pulse")}
-                  />
-                </Button>
-              </div>
-            </div>
-          </div>
-          <div className="space-y-1">
-            <Label>Bezahlt von</Label>
-            <Select
-              value={expPayer}
-              onValueChange={(v) => {
-                if (v == null) return;
-                setExpPayer(v);
-              }}
-              items={memberSelectItems}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {members.map((m) => (
-                  <SelectItem key={m.id} value={String(m.id)}>
-                    {m.display_name}
-                    {m.id === member.id ? " (ich)" : ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <Label>Beschreibung</Label>
-            <Input
-              value={expDesc}
-              onChange={(e) => setExpDesc(e.target.value)}
-              placeholder="Restaurant, Taxi…"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label>Ort (optional)</Label>
-            <Input
-              value={expPlace}
-              onChange={(e) => setExpPlace(e.target.value)}
-              placeholder="Stadt, Lokal…"
-            />
-          </div>
-          <div className="space-y-1 sm:col-span-2">
-            <Label>Notiz (optional)</Label>
-            <Textarea
-              rows={2}
-              value={expNote}
-              onChange={(e) => setExpNote(e.target.value)}
-              placeholder="Zusätzliche Infos"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label>Datum</Label>
-            <Input
-              type="date"
-              value={expDate}
-              onChange={(e) => setExpDate(e.target.value)}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label>Belegfoto (optional)</Label>
-            <PendingReceiptPicker
-              file={pendingReceipt}
-              onChange={setPendingReceipt}
-            />
-          </div>
-          <Button className="w-full" onClick={() => void addExpense()} disabled={!expAmount}>
-            <Plus className="mr-2 size-4" />
-            Ausgabe speichern
-          </Button>
-        </div>
-      </SectionCard>
-
-      {others.length > 0 ? (
-        <SectionCard title="Rückzahlung" tone="teal" icon={ArrowLeftRight}>
-          <p className="mb-2 text-sm text-muted-foreground">
-            Du zahlst jemandem Geld zurück (reduziert deine Schuld).
-          </p>
+      {activeTab === "new" ? (
+        <SectionCard title="Ausgabe erfassen" tone="orange" icon={Receipt}>
           <div className="space-y-3">
-            <div className="space-y-1">
-              <Label>An</Label>
-              <Select
-                value={setTo}
-                onValueChange={(v) => {
-                  if (v == null) return;
-                  setSetTo(v);
-                }}
-                items={otherSelectItems}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Empfänger" />
-                </SelectTrigger>
-                <SelectContent>
-                  {others.map((m) => (
-                    <SelectItem key={m.id} value={String(m.id)}>
-                      {m.display_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
             <div className="space-y-1">
               <Label>Betrag</Label>
               <Input
                 type="number"
+                inputMode="decimal"
                 step="0.01"
-                value={setAmount}
-                onChange={(e) => setSetAmount(e.target.value)}
+                value={expAmount}
+                onChange={(e) => setExpAmount(e.target.value)}
               />
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
                 <Label>Währung</Label>
                 <Select
-                  value={setCurrency}
+                  value={expCurrency}
                   onValueChange={(v) => {
                     if (v == null) return;
-                    setSetCurrency(v);
+                    setExpCurrency(v);
                     if (v === ledger.base_currency) {
-                      setSetRate("1");
+                      setExpRate("1");
                     } else {
-                      void fetchEcbRate({ from: v, target: "settlement" });
+                      void fetchEcbRate({ from: v, target: "expense" });
                     }
                   }}
                   items={currencySelectItems}
@@ -723,9 +628,8 @@ export function FinanceShareClient({ token }: { token: string }) {
                   <Input
                     type="number"
                     step="0.0001"
-                    value={setRate}
-                    disabled={setCurrency === ledger.base_currency}
-                    onChange={(e) => setSetRate(e.target.value)}
+                    value={expRate}
+                    onChange={(e) => setExpRate(e.target.value)}
                   />
                   <Button
                     type="button"
@@ -733,76 +637,255 @@ export function FinanceShareClient({ token }: { token: string }) {
                     size="icon"
                     title="EZB-Kurs laden"
                     disabled={
-                      settlementRateLoading ||
-                      setCurrency === ledger.base_currency
+                      rateLoading || expCurrency === ledger.base_currency
                     }
-                    onClick={() =>
-                      void fetchEcbRate({ target: "settlement" })
-                    }
+                    onClick={() => void fetchEcbRate()}
                   >
                     <Download
-                      className={cn(
-                        "size-4",
-                        settlementRateLoading && "animate-pulse"
-                      )}
+                      className={cn("size-4", rateLoading && "animate-pulse")}
                     />
                   </Button>
                 </div>
               </div>
             </div>
             <div className="space-y-1">
-              <Label>Notiz</Label>
+              <Label>Bezahlt von</Label>
+              <Select
+                value={expPayer}
+                onValueChange={(v) => {
+                  if (v == null) return;
+                  setExpPayer(v);
+                }}
+                items={memberSelectItems}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {members.map((m) => (
+                    <SelectItem key={m.id} value={String(m.id)}>
+                      {m.display_name}
+                      {m.id === member.id ? " (ich)" : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>Beschreibung</Label>
+              <Input
+                value={expDesc}
+                onChange={(e) => setExpDesc(e.target.value)}
+                placeholder="Restaurant, Taxi…"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Ort (optional)</Label>
+              <Input
+                value={expPlace}
+                onChange={(e) => setExpPlace(e.target.value)}
+                placeholder="Stadt, Lokal…"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Notiz (optional)</Label>
               <Textarea
                 rows={2}
-                value={setNote}
-                onChange={(e) => setSetNote(e.target.value)}
+                value={expNote}
+                onChange={(e) => setExpNote(e.target.value)}
+                placeholder="Zusätzliche Infos"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Datum</Label>
+              <Input
+                type="date"
+                value={expDate}
+                onChange={(e) => setExpDate(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Belegfoto (optional)</Label>
+              <PendingReceiptPicker
+                file={pendingReceipt}
+                onChange={setPendingReceipt}
               />
             </div>
             <Button
               className="w-full"
-              variant="secondary"
-              onClick={() => void addSettlement()}
-              disabled={!setAmount || !setTo}
+              onClick={() => void addExpense()}
+              disabled={!expAmount}
             >
-              Rückzahlung erfassen
+              <Plus className="mr-2 size-4" />
+              Ausgabe speichern
             </Button>
           </div>
         </SectionCard>
       ) : null}
 
-      <SectionCard title="Ausgaben" tone="green" icon={Receipt}>
-        <ExpenseList
-          expenses={expenses}
-          members={members}
-          baseCurrency={ledger.base_currency}
-          canEdit
-          receiptUploadUrl={(expenseId) =>
-            `/api/share/f/${encodeURIComponent(token)}/expenses/${expenseId}/receipt`
-          }
-          onReceiptChanged={() => void load()}
-          onGenerateAiImage={(id) => void generateAiImage(id)}
-          onDeleteAiImage={(id) => void deleteAiImage(id)}
-          onResendMail={(id) => void resendExpenseMail(id)}
-          onUpdateExpense={(id, payload) => updateExpense(id, payload)}
-          onSetDocument={(id, documentId) => setExpenseDocument(id, documentId)}
-          aiImageBusyId={aiImageBusyId}
-          mailBusyId={mailBusyId}
-          editBusyId={editBusyId}
-        />
-      </SectionCard>
+      {activeTab === "expenses" ? (
+        <SectionCard title="Ausgaben" tone="green" icon={Receipt}>
+          <ExpenseList
+            expenses={expenses}
+            members={members}
+            baseCurrency={ledger.base_currency}
+            canEdit
+            receiptUploadUrl={(expenseId) =>
+              `/api/share/f/${encodeURIComponent(token)}/expenses/${expenseId}/receipt`
+            }
+            onReceiptChanged={() => void load()}
+            onGenerateAiImage={(id) => void generateAiImage(id)}
+            onDeleteAiImage={(id) => void deleteAiImage(id)}
+            onResendMail={(id) => void resendExpenseMail(id)}
+            onUpdateExpense={(id, payload) => updateExpense(id, payload)}
+            onSetDocument={(id, documentId) =>
+              setExpenseDocument(id, documentId)
+            }
+            aiImageBusyId={aiImageBusyId}
+            mailBusyId={mailBusyId}
+            editBusyId={editBusyId}
+          />
+        </SectionCard>
+      ) : null}
 
-      <SectionCard title="Rückzahlungen" tone="teal" icon={ArrowLeftRight}>
-        <SettlementList
-          settlements={settlements}
-          members={members}
-          baseCurrency={ledger.base_currency}
-          canEdit
-          canDelete
-          onUpdate={(id, payload) => updateSettlement(id, payload)}
-          onDelete={(id) => void deleteSettlement(id)}
-          editBusyId={editBusyId}
-        />
-      </SectionCard>
+      {activeTab === "settle" ? (
+        <div className="space-y-4">
+          {others.length > 0 ? (
+            <SectionCard title="Rückzahlung" tone="teal" icon={ArrowLeftRight}>
+              <p className="mb-2 text-sm text-muted-foreground">
+                Du zahlst jemandem Geld zurück (reduziert deine Schuld).
+              </p>
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <Label>An</Label>
+                  <Select
+                    value={setTo}
+                    onValueChange={(v) => {
+                      if (v == null) return;
+                      setSetTo(v);
+                    }}
+                    items={otherSelectItems}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Empfänger" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {others.map((m) => (
+                        <SelectItem key={m.id} value={String(m.id)}>
+                          {m.display_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label>Betrag</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={setAmount}
+                    onChange={(e) => setSetAmount(e.target.value)}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label>Währung</Label>
+                    <Select
+                      value={setCurrency}
+                      onValueChange={(v) => {
+                        if (v == null) return;
+                        setSetCurrency(v);
+                        if (v === ledger.base_currency) {
+                          setSetRate("1");
+                        } else {
+                          void fetchEcbRate({ from: v, target: "settlement" });
+                        }
+                      }}
+                      items={currencySelectItems}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {COMMON_CURRENCIES.map((c) => (
+                          <SelectItem key={c} value={c}>
+                            {c}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Kurs → {ledger.base_currency}</Label>
+                    <div className="flex gap-1.5">
+                      <Input
+                        type="number"
+                        step="0.0001"
+                        value={setRate}
+                        disabled={setCurrency === ledger.base_currency}
+                        onChange={(e) => setSetRate(e.target.value)}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        title="EZB-Kurs laden"
+                        disabled={
+                          settlementRateLoading ||
+                          setCurrency === ledger.base_currency
+                        }
+                        onClick={() =>
+                          void fetchEcbRate({ target: "settlement" })
+                        }
+                      >
+                        <Download
+                          className={cn(
+                            "size-4",
+                            settlementRateLoading && "animate-pulse"
+                          )}
+                        />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label>Notiz</Label>
+                  <Textarea
+                    rows={2}
+                    value={setNote}
+                    onChange={(e) => setSetNote(e.target.value)}
+                  />
+                </div>
+                <Button
+                  className="w-full"
+                  variant="secondary"
+                  onClick={() => void addSettlement()}
+                  disabled={!setAmount || !setTo}
+                >
+                  Rückzahlung erfassen
+                </Button>
+              </div>
+            </SectionCard>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Keine weiteren Teilnehmer für Rückzahlungen.
+            </p>
+          )}
+
+          <SectionCard title="Rückzahlungen" tone="teal" icon={ArrowLeftRight}>
+            <SettlementList
+              settlements={settlements}
+              members={members}
+              baseCurrency={ledger.base_currency}
+              canEdit
+              canDelete
+              onUpdate={(id, payload) => updateSettlement(id, payload)}
+              onDelete={(id) => void deleteSettlement(id)}
+              editBusyId={editBusyId}
+            />
+          </SectionCard>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -349,16 +349,22 @@ function ExpenseCard({
       <div
         className={cn(
           "overflow-hidden rounded-md border-2 text-sm shadow-sm",
-          surface.body
+          surface.body,
+          onMobileFocus && !editing && "cursor-pointer md:cursor-default"
         )}
+        onClick={
+          onMobileFocus && !editing
+            ? () => onMobileFocus(exp.id)
+            : undefined
+        }
       >
         <div
           className={cn(
-            "border-b px-3 py-2.5 pl-7 sm:pl-8",
+            "border-b px-3 py-2 pl-7 sm:py-2.5 sm:pl-8",
             surface.title
           )}
         >
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex items-start justify-between gap-2">
             <div className="min-w-0 shrink-0">
               {isoDate ? (
                 <CalendarDateBadge isoDate={isoDate} size="sm" />
@@ -368,23 +374,35 @@ function ExpenseCard({
                 </span>
               )}
             </div>
-            <div className="ml-auto flex shrink-0 items-center">
+            <div className="ml-auto flex shrink-0 items-center gap-2">
+              <p
+                className={cn(
+                  "text-right text-sm font-bold tabular-nums sm:hidden",
+                  isIncome ? "text-emerald-700" : "text-foreground"
+                )}
+              >
+                {isIncome ? "+" : ""}
+                {formatMoney(exp.amount_base, baseCurrency)}
+              </p>
               {exp.ai_image_url ? (
                 <button
                   type="button"
                   title="Tippen zum Vergrössern"
                   className="shrink-0 overflow-hidden rounded-md border border-foreground/10 shadow-sm"
-                  onClick={() => setZoomOpen(true)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setZoomOpen(true);
+                  }}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={exp.ai_image_url}
                     alt=""
-                    className="h-12 w-12 object-cover sm:h-20 sm:w-20"
+                    className="h-10 w-10 object-cover sm:h-20 sm:w-20"
                   />
                 </button>
               ) : aiImageBusy ? (
-                <div className="flex h-12 w-12 items-center justify-center rounded-md border border-dashed border-foreground/20 bg-background/50 text-[10px] text-muted-foreground sm:h-20 sm:w-20">
+                <div className="flex h-10 w-10 items-center justify-center rounded-md border border-dashed border-foreground/20 bg-background/50 text-[10px] text-muted-foreground sm:h-20 sm:w-20">
                   KI…
                 </div>
               ) : null}
@@ -392,12 +410,22 @@ function ExpenseCard({
           </div>
         </div>
 
-        <div className="px-3 py-2.5 pl-7 sm:pl-8">
-          {/* Fixed block for title / meta / place so cards align without shifting the header */}
-          <div className="flex min-h-[4.5rem] flex-col justify-center gap-1">
-            <p className="text-base font-bold leading-snug text-foreground">
-              {exp.description || (isIncome ? "Einnahme" : "Ausgabe")}
-            </p>
+        <div className="px-3 py-2 pl-7 sm:py-2.5 sm:pl-8">
+          <div className="flex min-h-0 flex-col justify-center gap-1 sm:min-h-[4.5rem]">
+            <div className="flex items-start justify-between gap-2">
+              <p className="min-w-0 text-sm font-bold leading-snug text-foreground sm:text-base">
+                {exp.description || (isIncome ? "Einnahme" : "Ausgabe")}
+              </p>
+              <p
+                className={cn(
+                  "hidden shrink-0 text-right text-base font-bold tabular-nums sm:block",
+                  isIncome ? "text-emerald-700" : "text-foreground"
+                )}
+              >
+                {isIncome ? "+" : ""}
+                {formatMoney(exp.amount_base, baseCurrency)}
+              </p>
+            </div>
             <p className="text-xs text-muted-foreground">
               <span
                 className={cn(
@@ -408,25 +436,21 @@ function ExpenseCard({
                 {isIncome ? "Einnahme" : visual.label}
               </span>
               {cashbookMode ? (
-                <>
-                  <span
-                    className={cn(
-                      "font-semibold",
-                      isIncome ? "text-emerald-700" : "text-foreground"
-                    )}
-                  >
-                    {isIncome ? "+" : "−"}
-                    {fx.primary}
-                  </span>
-                </>
+                <span
+                  className={cn(
+                    "font-semibold",
+                    isIncome ? "text-emerald-700" : "text-foreground"
+                  )}
+                >
+                  {isIncome ? "+" : "−"}
+                  {fx.primary}
+                </span>
               ) : (
-                <>
-                  Bezahlt von {memberName(exp.paid_by_member_id)} · {fx.primary}
-                </>
+                <>Bezahlt von {memberName(exp.paid_by_member_id)}</>
               )}
             </p>
             {fx.detail ? (
-              <div className="space-y-0.5 text-[11px] leading-snug text-muted-foreground">
+              <div className="hidden space-y-0.5 text-[11px] leading-snug text-muted-foreground md:block">
                 <p>Währung: {exp.currency.toUpperCase()}</p>
                 <p>FW Betrag: {fx.primary}</p>
                 <p className="text-[12px] font-bold text-foreground">
@@ -456,7 +480,7 @@ function ExpenseCard({
               )}
             </p>
             {exp.note?.trim() ? (
-              <p className="break-words text-xs text-muted-foreground">
+              <p className="hidden break-words text-xs text-muted-foreground md:block">
                 Notiz: {exp.note.trim()}
               </p>
             ) : null}
@@ -466,12 +490,18 @@ function ExpenseCard({
                 <a
                   href={`/documents/${exp.document.id}`}
                   className="font-medium text-foreground underline-offset-2 hover:underline"
+                  onClick={(e) => e.stopPropagation()}
                 >
                   {exp.document.title?.trim() ||
                     exp.document.original_file_name?.trim() ||
                     `Dokument #${exp.document.id}`}
                 </a>
                 <span className="text-muted-foreground">· Paperless</span>
+              </p>
+            ) : null}
+            {onMobileFocus && !editing ? (
+              <p className="text-[11px] text-muted-foreground md:hidden">
+                Tippen für Aktionen
               </p>
             ) : null}
           </div>
@@ -656,7 +686,10 @@ function ExpenseCard({
               </div>
             ) : null}
 
-        <div className="mt-2.5 flex flex-wrap items-center gap-2 border-t border-foreground/10 pt-2">
+        <div
+          className="mt-2.5 flex flex-wrap items-center gap-2 border-t border-foreground/10 pt-2"
+          onClick={(e) => e.stopPropagation()}
+        >
           {receiptUploadUrl ? (
             <ExpenseReceiptControls
               expenseId={exp.id}
@@ -687,7 +720,7 @@ function ExpenseCard({
               id={`expense-edit-${exp.id}`}
               size="sm"
               variant="ghost"
-              className="h-7 px-2 text-xs"
+              className="hidden h-7 px-2 text-xs md:inline-flex"
               onClick={() => {
                 onMobileFocus?.(exp.id);
                 startEdit();
@@ -698,18 +731,7 @@ function ExpenseCard({
             </Button>
           ) : null}
 
-          {onMobileFocus && !editing ? (
-            <Button
-              type="button"
-              size="sm"
-              variant={mobileFocused ? "secondary" : "ghost"}
-              className="h-7 px-2 text-xs md:hidden"
-              onClick={() => onMobileFocus(exp.id)}
-            >
-              {mobileFocused ? "Aktiv" : "Aktionen"}
-            </Button>
-          ) : null}
-
+          <div className="hidden flex-wrap items-center gap-1 md:flex">
           {onGenerateAiImage ? (
             <Button
               type="button"
@@ -718,7 +740,9 @@ function ExpenseCard({
               className="h-7 px-2 text-xs"
               disabled={aiImageBusy}
               onClick={() => onGenerateAiImage(exp.id)}
-              title={exp.ai_image_url ? "KI-Bild neu erzeugen" : "KI-Bild erzeugen"}
+              title={
+                exp.ai_image_url ? "KI-Bild neu erzeugen" : "KI-Bild erzeugen"
+              }
             >
               <RefreshCw
                 className={cn("mr-1 size-3.5", aiImageBusy && "animate-spin")}
@@ -727,7 +751,6 @@ function ExpenseCard({
             </Button>
           ) : null}
 
-          <div className="hidden flex-wrap items-center gap-1 md:flex">
           {canEdit && onSetDocument && !editing ? (
             <>
               <Button
@@ -937,7 +960,12 @@ export function ExpenseList({
     (mobileFocusId != null ? expenses[0] : null);
 
   return (
-    <div className={cn("space-y-3", mobileFocusId != null && "pb-24 md:pb-0")}>
+    <div
+      className={cn(
+        "space-y-3",
+        mobileFocusId != null && "pb-36 md:pb-0"
+      )}
+    >
       {expenses.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           {cashbookMode ? "Noch keine Buchungen." : "Noch keine Ausgaben."}
@@ -972,8 +1000,8 @@ export function ExpenseList({
       )}
 
       {focus && (canEdit || canDelete) ? (
-        <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 md:hidden">
-          <div className="pointer-events-auto border-t border-border/80 bg-background/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(15,23,42,0.12)] backdrop-blur">
+        <div className="pointer-events-none fixed inset-x-0 bottom-[4.25rem] z-40 md:hidden">
+          <div className="pointer-events-auto border-t border-border/80 bg-background/95 px-2 py-2 shadow-[0_-8px_24px_rgba(15,23,42,0.12)] backdrop-blur">
             <p className="truncate px-1 text-[11px] text-muted-foreground">
               {focus.description ||
                 (focus.direction === "income" ? "Einnahme" : "Ausgabe")}

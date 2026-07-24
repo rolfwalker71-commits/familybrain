@@ -1,18 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
   Bell,
-  ChevronDown,
-  ChevronUp,
   Copy,
   Download,
   FileDown,
+  LayoutDashboard,
   Link2,
+  List,
   Luggage,
   Mail,
+  MoreHorizontal,
   Plus,
   Receipt,
   RefreshCw,
@@ -42,6 +44,12 @@ import {
   SettlementList,
 } from "@/components/finance-brain/balance-view";
 import { PendingReceiptPicker } from "@/components/finance-brain/expense-receipt-controls";
+import {
+  FinanceTabNav,
+  parseFinanceLedgerTab,
+  type FinanceLedgerTab,
+  type FinanceTabItem,
+} from "@/components/finance-brain/finance-tab-nav";
 import { COMMON_CURRENCIES, LEDGER_KIND_LABELS } from "@/lib/finance-brain/constants";
 import { formatMoney, formatSignedMoney } from "@/lib/finance-brain/format";
 import { cn } from "@/lib/utils";
@@ -144,14 +152,25 @@ type TripOption = {
   title: string;
 };
 
-type Panel = "none" | "members" | "import";
-
 export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
+  return (
+    <Suspense
+      fallback={
+        <p className="p-6 text-sm text-muted-foreground">Lade Abrechnung…</p>
+      }
+    >
+      <FinanceLedgerDetailInner ledgerId={ledgerId} />
+    </Suspense>
+  );
+}
+
+function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [data, setData] = useState<LedgerDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
-  const [panel, setPanel] = useState<Panel>("none");
 
   const [memberName, setMemberName] = useState("");
   const [memberEmail, setMemberEmail] = useState("");
@@ -751,8 +770,12 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
     }
   }
 
-  function togglePanel(next: Panel) {
-    setPanel((prev) => (prev === next ? "none" : next));
+  function setTab(tab: FinanceLedgerTab) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (tab === "overview") params.delete("tab");
+    else params.set("tab", tab);
+    const q = params.toString();
+    router.replace(q ? `?${q}` : "?", { scroll: false });
   }
 
   if (loading && !data) {
@@ -776,6 +799,24 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
     cashbook,
   } = data;
   const isNormal = ledger.ledger_kind === "normal";
+  const isSplit = !isNormal;
+  const activeTab = parseFinanceLedgerTab(searchParams.get("tab"), {
+    isSplit,
+  });
+  const tabItems: FinanceTabItem[] = isSplit
+    ? [
+        { id: "overview", label: "Übersicht", icon: LayoutDashboard },
+        { id: "new", label: "Neu", icon: Plus },
+        { id: "expenses", label: "Ausgaben", icon: List },
+        { id: "settle", label: "Ausgleich", icon: ArrowLeftRight },
+        { id: "more", label: "Mehr", icon: MoreHorizontal },
+      ]
+    : [
+        { id: "overview", label: "Übersicht", icon: LayoutDashboard },
+        { id: "new", label: "Neu", icon: Plus },
+        { id: "expenses", label: "Buchungen", icon: List },
+        { id: "more", label: "Mehr", icon: MoreHorizontal },
+      ];
   const hasImport =
     importDocs.tripDocuments.length > 0 ||
     importDocs.paperlessItems.length > 0;
@@ -789,11 +830,10 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
   const currencySelectItems = Object.fromEntries(
     COMMON_CURRENCIES.map((c) => [c, c])
   );
-  const kindLabel =
-    LEDGER_KIND_LABELS[isNormal ? "normal" : "split"];
+  const kindLabel = LEDGER_KIND_LABELS[isNormal ? "normal" : "split"];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 pb-24 md:space-y-6 md:pb-0">
       <div className="flex flex-wrap items-center gap-2">
         <Link
           href="/finance-brain"
@@ -818,6 +858,7 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
           <Button
             variant="outline"
             size="sm"
+            className="hidden md:inline-flex"
             onClick={() => void sendReminders()}
           >
             <Bell className="mr-1 size-4" />
@@ -837,641 +878,646 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
         tone={pageVisuals.financeBrain.tone}
       />
 
+      <FinanceTabNav items={tabItems} active={activeTab} onChange={setTab} />
+
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
       {status ? <p className="text-sm text-muted-foreground">{status}</p> : null}
 
-      <SectionCard title="Reise verknüpfen" tone="indigo" icon={Luggage}>
-        <p className="mb-3 text-sm text-muted-foreground">
-          Optional mit einer TravelBrain-Reise verbinden – dann erscheinen
-          Reise-Belege zum Import und die Abrechnung auf der Reise-Detailseite.
-        </p>
-        <div className="flex flex-wrap items-end gap-2">
-          <div className="min-w-[200px] flex-1 space-y-1">
-            <Label>Reise</Label>
-            <Select
-              value={linkTripId || "__none__"}
-              onValueChange={(v) => {
-                if (v == null || v === "__none__") {
-                  setLinkTripId("");
-                  return;
-                }
-                setLinkTripId(v);
-              }}
-              items={tripSelectItems}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Keine Reise" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">Keine Reise</SelectItem>
-                {trips.map((t) => (
-                  <SelectItem key={t.id} value={String(t.id)}>
-                    {t.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <Button
-            variant="outline"
-            onClick={() =>
-              void linkTrip(linkTripId ? Number(linkTripId) : null)
-            }
-          >
-            <Link2 className="mr-1 size-4" />
-            Speichern
-          </Button>
-          {ledger.trip_id ? (
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setLinkTripId("");
-                void linkTrip(null);
-              }}
-            >
-              <Unlink className="mr-1 size-4" />
-              Trennen
-            </Button>
-          ) : null}
-        </div>
-      </SectionCard>
-
-      {!isNormal ? (
-        <BalanceView
-          balances={balances}
-          simplifiedDebts={simplifiedDebts}
-          baseCurrency={ledger.base_currency}
-        />
-      ) : (
-        <SectionCard title="Übersicht" tone="green" icon={Receipt}>
-          <div className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-md border border-border/60 px-3 py-2">
-              <p className="text-xs text-muted-foreground">Ausgaben</p>
-              <p className="text-lg font-semibold">
-                {formatMoney(
-                  cashbook?.expenseTotalBase ?? 0,
-                  ledger.base_currency
-                )}
-              </p>
-            </div>
-            <div className="rounded-md border border-border/60 px-3 py-2">
-              <p className="text-xs text-muted-foreground">Einnahmen</p>
-              <p className="text-lg font-semibold text-emerald-700">
-                {formatMoney(
-                  cashbook?.incomeTotalBase ?? 0,
-                  ledger.base_currency
-                )}
-              </p>
-            </div>
-            <div className="rounded-md border border-border/60 px-3 py-2">
-              <p className="text-xs text-muted-foreground">Saldo</p>
-              <p className="text-lg font-semibold">
-                {formatSignedMoney(
-                  cashbook?.netBase ?? 0,
-                  ledger.base_currency
-                )}
-              </p>
-            </div>
-          </div>
-        </SectionCard>
-      )}
-
-      <div className="flex flex-wrap gap-2">
-        {!isNormal ? (
-          <Button
-            variant={panel === "members" ? "default" : "outline"}
-            size="sm"
-            onClick={() => togglePanel("members")}
-            className="gap-1.5"
-          >
-            <Users className="size-4" />
-            Teilnehmer
-            {panel === "members" ? (
-              <ChevronUp className="size-3.5 opacity-70" />
-            ) : (
-              <ChevronDown className="size-3.5 opacity-70" />
-            )}
-          </Button>
-        ) : null}
-        <Button
-          variant={panel === "import" ? "default" : "outline"}
-          size="sm"
-          onClick={() => togglePanel("import")}
-          className="gap-1.5"
-        >
-          <FileDown className="size-4" />
-          Belege importieren
-          {panel === "import" ? (
-            <ChevronUp className="size-3.5 opacity-70" />
-          ) : (
-            <ChevronDown className="size-3.5 opacity-70" />
-          )}
-        </Button>
-        {!isNormal ? (
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5"
-            disabled={summaryMailBusy || expenses.length === 0}
-            onClick={() => void sendExpensesSummaryMail()}
-            title="Alle Ausgaben per Mail inkl. PDF an die Gruppe senden"
-          >
-            <Mail
-              className={cn("size-4", summaryMailBusy && "animate-pulse")}
-            />
-            {summaryMailBusy ? "Sendet…" : "Ausgaben-Mail"}
-          </Button>
-        ) : null}
-      </div>
-
-      {panel === "members" && !isNormal ? (
-        <SectionCard title="Teilnehmer & Einladungs-Links" tone="sky" icon={Users}>
-          <p className="mb-3 text-sm text-muted-foreground">
-            E-Mail-Adresse eintragen, damit Beleg-Mails (Ausgabe / Rückzahlung)
-            an die ganze Gruppe gehen können.
-          </p>
-          <div className="mb-4 grid gap-2 sm:grid-cols-3">
-            <Input
-              placeholder="Name"
-              value={memberName}
-              onChange={(e) => setMemberName(e.target.value)}
-            />
-            <Input
-              placeholder="E-Mail (für Beleg-Mails)"
-              type="email"
-              value={memberEmail}
-              onChange={(e) => setMemberEmail(e.target.value)}
-            />
-            <Button
-              onClick={() => void addMember()}
-              disabled={!memberName.trim()}
-            >
-              <Plus className="mr-1 size-4" />
-              Hinzufügen
-            </Button>
-          </div>
-          <div className="space-y-2">
-            {members.map((m) => (
-              <div
-                key={m.id}
-                className="flex flex-wrap items-center gap-2 rounded-md border border-border/60 px-3 py-2 text-sm"
-              >
-                <span className="font-medium">{m.display_name}</span>
-                {m.email ? <Badge variant="secondary">{m.email}</Badge> : null}
-                {m.invite_revoked_at ? (
-                  <Badge variant="destructive">Widerrufen</Badge>
-                ) : null}
-                <div className="ml-auto flex flex-wrap gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => void copyShareUrl(m.share_url)}
-                  >
-                    <Copy className="mr-1 size-3" />
-                    Link
-                  </Button>
-                  <a
-                    href={`mailto:?subject=${encodeURIComponent(`FinanzBrain: ${ledger.title}`)}&body=${encodeURIComponent(`Dein Link: ${typeof window !== "undefined" ? window.location.origin : ""}${m.share_url}`)}`}
-                    className={cn(
-                      buttonVariants({ variant: "ghost", size: "sm" })
-                    )}
-                  >
-                    <Mail className="mr-1 size-3" />
-                    mailto
-                  </a>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => void rotateToken(m.id)}
-                  >
-                    <RotateCw className="mr-1 size-3" />
-                    Token
-                  </Button>
-                </div>
+      {activeTab === "overview" ? (
+        !isNormal ? (
+          <BalanceView
+            balances={balances}
+            simplifiedDebts={simplifiedDebts}
+            baseCurrency={ledger.base_currency}
+          />
+        ) : (
+          <SectionCard title="Übersicht" tone="green" icon={Receipt}>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-md border border-border/60 px-3 py-2">
+                <p className="text-xs text-muted-foreground">Ausgaben</p>
+                <p className="text-lg font-semibold">
+                  {formatMoney(
+                    cashbook?.expenseTotalBase ?? 0,
+                    ledger.base_currency
+                  )}
+                </p>
               </div>
-            ))}
-          </div>
-        </SectionCard>
+              <div className="rounded-md border border-border/60 px-3 py-2">
+                <p className="text-xs text-muted-foreground">Einnahmen</p>
+                <p className="text-lg font-semibold text-emerald-700">
+                  {formatMoney(
+                    cashbook?.incomeTotalBase ?? 0,
+                    ledger.base_currency
+                  )}
+                </p>
+              </div>
+              <div className="rounded-md border border-border/60 px-3 py-2">
+                <p className="text-xs text-muted-foreground">Saldo</p>
+                <p className="text-lg font-semibold">
+                  {formatSignedMoney(
+                    cashbook?.netBase ?? 0,
+                    ledger.base_currency
+                  )}
+                </p>
+              </div>
+            </div>
+          </SectionCard>
+        )
       ) : null}
 
-      {panel === "import" ? (
-        <SectionCard title="Belege importieren" tone="violet" icon={FileDown}>
-          {!hasImport ? (
-            <p className="text-sm text-muted-foreground">
-              Keine Belege gefunden. Verknüpfe eine Reise (oben) für
-              Reise-Belege, oder warte auf Paperless-Finanzpositionen.
-            </p>
-          ) : (
-            <>
-              {!isNormal ? (
-                <div className="mb-3 space-y-1">
-                  <Label>Bezahlt von</Label>
-                  <Select
-                    value={importPayer}
-                    onValueChange={(v) => {
-                      if (v == null) return;
-                      setImportPayer(v);
-                    }}
-                    items={memberSelectItems}
-                  >
-                    <SelectTrigger className="max-w-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {members.map((m) => (
-                        <SelectItem key={m.id} value={String(m.id)}>
-                          {m.display_name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              ) : null}
-              {importDocs.tripDocuments.length > 0 ? (
-                <div className="mb-4 space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground">
-                    Reise-Belege
-                  </p>
-                  {importDocs.tripDocuments.map((doc) => (
-                    <ImportRow
-                      key={`trip-${doc.document_id}`}
-                      doc={doc}
-                      baseCurrency={ledger.base_currency}
-                      onImport={() => void importDocument(doc)}
-                    />
-                  ))}
-                </div>
-              ) : null}
-              {importDocs.paperlessItems.length > 0 ? (
-                <div className="space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground">
-                    Paperless (Finanzblick)
-                  </p>
-                  {importDocs.paperlessItems.slice(0, 20).map((doc) => (
-                    <ImportRow
-                      key={`pl-${doc.document_id}`}
-                      doc={doc}
-                      baseCurrency={ledger.base_currency}
-                      onImport={() => void importDocument(doc)}
-                    />
-                  ))}
-                </div>
-              ) : null}
-            </>
-          )}
-        </SectionCard>
-      ) : null}
-
-      <SectionCard
-        title={isNormal ? "Buchung erfassen" : "Ausgabe erfassen"}
-        tone="orange"
-        icon={Receipt}
-      >
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-          {isNormal ? (
+      {activeTab === "new" ? (
+        <SectionCard
+          title={isNormal ? "Buchung erfassen" : "Ausgabe erfassen"}
+          tone="orange"
+          icon={Receipt}
+        >
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            {isNormal ? (
+              <div className="space-y-1">
+                <Label>Typ</Label>
+                <Select
+                  value={expDirection}
+                  onValueChange={(v) => {
+                    if (v == null) return;
+                    setExpDirection(v as "expense" | "income");
+                  }}
+                  items={{ expense: "Ausgabe", income: "Einnahme" }}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="expense">Ausgabe</SelectItem>
+                    <SelectItem value="income">Einnahme</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : null}
             <div className="space-y-1">
-              <Label>Typ</Label>
+              <Label>Betrag</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={expAmount}
+                onChange={(e) => setExpAmount(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Währung</Label>
               <Select
-                value={expDirection}
+                value={expCurrency}
                 onValueChange={(v) => {
                   if (v == null) return;
-                  setExpDirection(v as "expense" | "income");
+                  setExpCurrency(v);
+                  if (v === ledger.base_currency) {
+                    setExpRate("1");
+                  } else {
+                    void fetchEcbRate({ from: v, target: "expense" });
+                  }
                 }}
-                items={{ expense: "Ausgabe", income: "Einnahme" }}
+                items={currencySelectItems}
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="expense">Ausgabe</SelectItem>
-                  <SelectItem value="income">Einnahme</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          ) : null}
-          <div className="space-y-1">
-            <Label>Betrag</Label>
-            <Input
-              type="number"
-              step="0.01"
-              value={expAmount}
-              onChange={(e) => setExpAmount(e.target.value)}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label>Währung</Label>
-            <Select
-              value={expCurrency}
-              onValueChange={(v) => {
-                if (v == null) return;
-                setExpCurrency(v);
-                if (v === ledger.base_currency) {
-                  setExpRate("1");
-                } else {
-                  void fetchEcbRate({ from: v, target: "expense" });
-                }
-              }}
-              items={currencySelectItems}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {COMMON_CURRENCIES.map((c) => (
-                  <SelectItem key={c} value={c}>
-                    {c}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <Label>Kurs → {ledger.base_currency}</Label>
-            <div className="flex gap-1.5">
-              <Input
-                type="number"
-                step="0.0001"
-                value={expRate}
-                onChange={(e) => setExpRate(e.target.value)}
-              />
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                title="EZB-Kurs laden (Frankfurter)"
-                disabled={rateLoading || expCurrency === ledger.base_currency}
-                onClick={() => void fetchEcbRate()}
-              >
-                <Download
-                  className={cn("size-4", rateLoading && "animate-pulse")}
-                />
-              </Button>
-            </div>
-          </div>
-          {!isNormal ? (
-            <div className="space-y-1">
-              <Label>Bezahlt von</Label>
-              <Select
-                value={expPayer}
-                onValueChange={(v) => {
-                  if (v == null) return;
-                  setExpPayer(v);
-                }}
-                items={memberSelectItems}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Person" />
-                </SelectTrigger>
-                <SelectContent>
-                  {members.map((m) => (
-                    <SelectItem key={m.id} value={String(m.id)}>
-                      {m.display_name}
+                  {COMMON_CURRENCIES.map((c) => (
+                    <SelectItem key={c} value={c}>
+                      {c}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-          ) : null}
-          <div className="space-y-1 sm:col-span-2">
-            <Label>Beschreibung</Label>
-            <Input
-              value={expDesc}
-              onChange={(e) => setExpDesc(e.target.value)}
-            />
-          </div>
-          <div className="space-y-1 sm:col-span-2">
-            <Label>Ort (optional)</Label>
-            <Input
-              value={expPlace}
-              onChange={(e) => setExpPlace(e.target.value)}
-              placeholder="Restaurant, Stadt…"
-            />
-          </div>
-          <div className="space-y-1 sm:col-span-2 lg:col-span-4">
-            <Label>Notiz (optional)</Label>
-            <Textarea
-              rows={2}
-              value={expNote}
-              onChange={(e) => setExpNote(e.target.value)}
-              placeholder="Zusätzliche Infos"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label>Datum</Label>
-            <Input
-              type="date"
-              value={expDate}
-              onChange={(e) => setExpDate(e.target.value)}
-            />
-          </div>
-          {expCurrency !== ledger.base_currency && Number(expAmount) > 0 ? (
-            <p className="text-xs text-muted-foreground sm:col-span-2 lg:col-span-4">
-              Fremdwährung {expCurrency}: {expAmount} → ≈{" "}
-              {(Number(expAmount) * (Number(expRate) || 1)).toFixed(2)}{" "}
-              {ledger.base_currency} (Kurs {expRate || "—"})
-            </p>
-          ) : null}
-          <div className="flex items-end">
-            <Button onClick={() => void addExpense()} disabled={!expAmount}>
-              Speichern
-            </Button>
-          </div>
-          <div className="space-y-1 sm:col-span-2 lg:col-span-4">
-            <Label>Belegfoto (optional)</Label>
-            <PendingReceiptPicker
-              file={pendingReceipt}
-              onChange={setPendingReceipt}
-            />
-          </div>
-        </div>
-        <p className="mt-2 text-xs text-muted-foreground">
-          {isNormal
-            ? "Einfache Ein- und Ausgaben ohne Split oder Ausgleich."
-            : "Aufteilung: gleichmässig auf alle Teilnehmer. Kurs-Button lädt den EZB-Referenzkurs (optional zum Ausgabedatum)."}
-        </p>
-      </SectionCard>
-
-      {!isNormal ? (
-      <SectionCard title="Rückzahlung" tone="teal" icon={ArrowLeftRight}>
-        <p className="mb-3 text-sm text-muted-foreground">
-          Wer hat wem Geld zurückbezahlt? («Von» = Person, die zahlt und damit
-          ihre Schuld reduziert.)
-        </p>
-        <div className="grid gap-2 sm:grid-cols-4">
-          <div className="space-y-1">
-            <Label>Von (zahlt)</Label>
-            <Select
-              value={setFrom}
-              onValueChange={(v) => {
-                if (v == null) return;
-                setSetFrom(v);
-              }}
-              items={memberSelectItems}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {members.map((m) => (
-                  <SelectItem key={m.id} value={String(m.id)}>
-                    {m.display_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <Label>An (empfängt)</Label>
-            <Select
-              value={setTo}
-              onValueChange={(v) => {
-                if (v == null) return;
-                setSetTo(v);
-              }}
-              items={memberSelectItems}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Empfänger" />
-              </SelectTrigger>
-              <SelectContent>
-                {members.map((m) => (
-                  <SelectItem key={m.id} value={String(m.id)}>
-                    {m.display_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <Label>Betrag</Label>
-            <Input
-              type="number"
-              step="0.01"
-              value={setAmount}
-              onChange={(e) => setSetAmount(e.target.value)}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label>Währung</Label>
-            <Select
-              value={setCurrency}
-              onValueChange={(v) => {
-                if (v == null) return;
-                setSetCurrency(v);
-                if (v === ledger.base_currency) {
-                  setSetRate("1");
-                } else {
-                  void fetchEcbRate({ from: v, target: "settlement" });
-                }
-              }}
-              items={currencySelectItems}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {COMMON_CURRENCIES.map((c) => (
-                  <SelectItem key={c} value={c}>
-                    {c}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <Label>Kurs → {ledger.base_currency}</Label>
-            <div className="flex gap-1.5">
-              <Input
-                type="number"
-                step="0.0001"
-                value={setRate}
-                onChange={(e) => setSetRate(e.target.value)}
-                disabled={setCurrency === ledger.base_currency}
-              />
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                title="EZB-Kurs laden"
-                disabled={
-                  settlementRateLoading || setCurrency === ledger.base_currency
-                }
-                onClick={() =>
-                  void fetchEcbRate({ target: "settlement" })
-                }
-              >
-                <Download
-                  className={cn(
-                    "size-4",
-                    settlementRateLoading && "animate-pulse"
-                  )}
+            <div className="space-y-1">
+              <Label>Kurs → {ledger.base_currency}</Label>
+              <div className="flex gap-1.5">
+                <Input
+                  type="number"
+                  step="0.0001"
+                  value={expRate}
+                  onChange={(e) => setExpRate(e.target.value)}
                 />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  title="EZB-Kurs laden (Frankfurter)"
+                  disabled={rateLoading || expCurrency === ledger.base_currency}
+                  onClick={() => void fetchEcbRate()}
+                >
+                  <Download
+                    className={cn("size-4", rateLoading && "animate-pulse")}
+                  />
+                </Button>
+              </div>
+            </div>
+            {!isNormal ? (
+              <div className="space-y-1">
+                <Label>Bezahlt von</Label>
+                <Select
+                  value={expPayer}
+                  onValueChange={(v) => {
+                    if (v == null) return;
+                    setExpPayer(v);
+                  }}
+                  items={memberSelectItems}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Person" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {members.map((m) => (
+                      <SelectItem key={m.id} value={String(m.id)}>
+                        {m.display_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : null}
+            <div className="space-y-1 sm:col-span-2">
+              <Label>Beschreibung</Label>
+              <Input
+                value={expDesc}
+                onChange={(e) => setExpDesc(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1 sm:col-span-2">
+              <Label>Ort (optional)</Label>
+              <Input
+                value={expPlace}
+                onChange={(e) => setExpPlace(e.target.value)}
+                placeholder="Restaurant, Stadt…"
+              />
+            </div>
+            <div className="space-y-1 sm:col-span-2 lg:col-span-4">
+              <Label>Notiz (optional)</Label>
+              <Textarea
+                rows={2}
+                value={expNote}
+                onChange={(e) => setExpNote(e.target.value)}
+                placeholder="Zusätzliche Infos"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Datum</Label>
+              <Input
+                type="date"
+                value={expDate}
+                onChange={(e) => setExpDate(e.target.value)}
+              />
+            </div>
+            {expCurrency !== ledger.base_currency && Number(expAmount) > 0 ? (
+              <p className="text-xs text-muted-foreground sm:col-span-2 lg:col-span-4">
+                Fremdwährung {expCurrency}: {expAmount} → ≈{" "}
+                {(Number(expAmount) * (Number(expRate) || 1)).toFixed(2)}{" "}
+                {ledger.base_currency} (Kurs {expRate || "—"})
+              </p>
+            ) : null}
+            <div className="flex items-end">
+              <Button
+                className="w-full sm:w-auto"
+                onClick={() => void addExpense()}
+                disabled={!expAmount}
+              >
+                Speichern
               </Button>
             </div>
+            <div className="space-y-1 sm:col-span-2 lg:col-span-4">
+              <Label>Belegfoto (optional)</Label>
+              <PendingReceiptPicker
+                file={pendingReceipt}
+                onChange={setPendingReceipt}
+              />
+            </div>
           </div>
-          <div className="flex items-end">
-            <Button
-              onClick={() => void addSettlement()}
-              disabled={!setAmount || !setFrom || !setTo}
-            >
-              Erfassen
-            </Button>
-          </div>
-          <div className="space-y-1 sm:col-span-4">
-            <Label>Notiz</Label>
-            <Textarea
-              rows={2}
-              value={setNote}
-              onChange={(e) => setSetNote(e.target.value)}
-            />
-          </div>
-        </div>
-      </SectionCard>
+          <p className="mt-2 text-xs text-muted-foreground">
+            {isNormal
+              ? "Einfache Ein- und Ausgaben ohne Split oder Ausgleich."
+              : "Aufteilung: gleichmässig auf alle Teilnehmer. Kurs-Button lädt den EZB-Referenzkurs (optional zum Ausgabedatum)."}
+          </p>
+        </SectionCard>
       ) : null}
 
-      <SectionCard
-        title={isNormal ? "Buchungen" : "Ausgaben"}
-        tone="green"
-        icon={Receipt}
-      >
-        <ExpenseList
-          expenses={expenses}
-          members={members}
-          baseCurrency={ledger.base_currency}
-          cashbookMode={isNormal}
-          canDelete
-          canEdit
-          onDelete={(id) => void deleteExpense(id)}
-          receiptUploadUrl={(expenseId) =>
-            `/api/finance-ledgers/${ledgerId}/expenses/${expenseId}/receipt`
-          }
-          onReceiptChanged={() => void load()}
-          onGenerateAiImage={(id) => void generateAiImage(id)}
-          onDeleteAiImage={(id) => void deleteAiImage(id)}
-          onResendMail={
-            isNormal ? undefined : (id) => void resendExpenseMail(id)
-          }
-          onUpdateExpense={(id, payload) => updateExpense(id, payload)}
-          onSetDocument={(id, documentId) => setExpenseDocument(id, documentId)}
-          aiImageBusyId={aiImageBusyId}
-          mailBusyId={mailBusyId}
-          editBusyId={editBusyId}
-        />
-      </SectionCard>
+      {activeTab === "expenses" ? (
+        <SectionCard
+          title={isNormal ? "Buchungen" : "Ausgaben"}
+          tone="green"
+          icon={Receipt}
+        >
+          <ExpenseList
+            expenses={expenses}
+            members={members}
+            baseCurrency={ledger.base_currency}
+            cashbookMode={isNormal}
+            canDelete
+            canEdit
+            onDelete={(id) => void deleteExpense(id)}
+            receiptUploadUrl={(expenseId) =>
+              `/api/finance-ledgers/${ledgerId}/expenses/${expenseId}/receipt`
+            }
+            onReceiptChanged={() => void load()}
+            onGenerateAiImage={(id) => void generateAiImage(id)}
+            onDeleteAiImage={(id) => void deleteAiImage(id)}
+            onResendMail={
+              isNormal ? undefined : (id) => void resendExpenseMail(id)
+            }
+            onUpdateExpense={(id, payload) => updateExpense(id, payload)}
+            onSetDocument={(id, documentId) =>
+              setExpenseDocument(id, documentId)
+            }
+            aiImageBusyId={aiImageBusyId}
+            mailBusyId={mailBusyId}
+            editBusyId={editBusyId}
+          />
+        </SectionCard>
+      ) : null}
 
-      {!isNormal ? (
-      <SectionCard title="Rückzahlungen" tone="teal" icon={ArrowLeftRight}>
-        <SettlementList
-          settlements={settlements}
-          members={members}
-          baseCurrency={ledger.base_currency}
-          canEdit
-          canDelete
-          onUpdate={(id, payload) => updateSettlement(id, payload)}
-          onDelete={(id) => void deleteSettlement(id)}
-          editBusyId={editBusyId}
-        />
-      </SectionCard>
+      {activeTab === "settle" && !isNormal ? (
+        <div className="space-y-4">
+          <SectionCard title="Rückzahlung" tone="teal" icon={ArrowLeftRight}>
+            <p className="mb-3 text-sm text-muted-foreground">
+              Wer hat wem Geld zurückbezahlt? («Von» = Person, die zahlt und
+              damit ihre Schuld reduziert.)
+            </p>
+            <div className="grid gap-2 sm:grid-cols-4">
+              <div className="space-y-1">
+                <Label>Von (zahlt)</Label>
+                <Select
+                  value={setFrom}
+                  onValueChange={(v) => {
+                    if (v == null) return;
+                    setSetFrom(v);
+                  }}
+                  items={memberSelectItems}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {members.map((m) => (
+                      <SelectItem key={m.id} value={String(m.id)}>
+                        {m.display_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label>An (empfängt)</Label>
+                <Select
+                  value={setTo}
+                  onValueChange={(v) => {
+                    if (v == null) return;
+                    setSetTo(v);
+                  }}
+                  items={memberSelectItems}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Empfänger" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {members.map((m) => (
+                      <SelectItem key={m.id} value={String(m.id)}>
+                        {m.display_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label>Betrag</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={setAmount}
+                  onChange={(e) => setSetAmount(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Währung</Label>
+                <Select
+                  value={setCurrency}
+                  onValueChange={(v) => {
+                    if (v == null) return;
+                    setSetCurrency(v);
+                    if (v === ledger.base_currency) {
+                      setSetRate("1");
+                    } else {
+                      void fetchEcbRate({ from: v, target: "settlement" });
+                    }
+                  }}
+                  items={currencySelectItems}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {COMMON_CURRENCIES.map((c) => (
+                      <SelectItem key={c} value={c}>
+                        {c}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label>Kurs → {ledger.base_currency}</Label>
+                <div className="flex gap-1.5">
+                  <Input
+                    type="number"
+                    step="0.0001"
+                    value={setRate}
+                    onChange={(e) => setSetRate(e.target.value)}
+                    disabled={setCurrency === ledger.base_currency}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    title="EZB-Kurs laden"
+                    disabled={
+                      settlementRateLoading ||
+                      setCurrency === ledger.base_currency
+                    }
+                    onClick={() => void fetchEcbRate({ target: "settlement" })}
+                  >
+                    <Download
+                      className={cn(
+                        "size-4",
+                        settlementRateLoading && "animate-pulse"
+                      )}
+                    />
+                  </Button>
+                </div>
+              </div>
+              <div className="flex items-end">
+                <Button
+                  className="w-full sm:w-auto"
+                  onClick={() => void addSettlement()}
+                  disabled={!setAmount || !setFrom || !setTo}
+                >
+                  Erfassen
+                </Button>
+              </div>
+              <div className="space-y-1 sm:col-span-4">
+                <Label>Notiz</Label>
+                <Textarea
+                  rows={2}
+                  value={setNote}
+                  onChange={(e) => setSetNote(e.target.value)}
+                />
+              </div>
+            </div>
+          </SectionCard>
+
+          <SectionCard title="Rückzahlungen" tone="teal" icon={ArrowLeftRight}>
+            <SettlementList
+              settlements={settlements}
+              members={members}
+              baseCurrency={ledger.base_currency}
+              canEdit
+              canDelete
+              onUpdate={(id, payload) => updateSettlement(id, payload)}
+              onDelete={(id) => void deleteSettlement(id)}
+              editBusyId={editBusyId}
+            />
+          </SectionCard>
+        </div>
+      ) : null}
+
+      {activeTab === "more" ? (
+        <div className="space-y-4">
+          <SectionCard title="Reise verknüpfen" tone="indigo" icon={Luggage}>
+            <p className="mb-3 text-sm text-muted-foreground">
+              Optional mit einer TravelBrain-Reise verbinden – dann erscheinen
+              Reise-Belege zum Import und die Abrechnung auf der
+              Reise-Detailseite.
+            </p>
+            <div className="flex flex-wrap items-end gap-2">
+              <div className="min-w-[200px] flex-1 space-y-1">
+                <Label>Reise</Label>
+                <Select
+                  value={linkTripId || "__none__"}
+                  onValueChange={(v) => {
+                    if (v == null || v === "__none__") {
+                      setLinkTripId("");
+                      return;
+                    }
+                    setLinkTripId(v);
+                  }}
+                  items={tripSelectItems}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Keine Reise" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Keine Reise</SelectItem>
+                    {trips.map((t) => (
+                      <SelectItem key={t.id} value={String(t.id)}>
+                        {t.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                variant="outline"
+                onClick={() =>
+                  void linkTrip(linkTripId ? Number(linkTripId) : null)
+                }
+              >
+                <Link2 className="mr-1 size-4" />
+                Speichern
+              </Button>
+              {ledger.trip_id ? (
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setLinkTripId("");
+                    void linkTrip(null);
+                  }}
+                >
+                  <Unlink className="mr-1 size-4" />
+                  Trennen
+                </Button>
+              ) : null}
+            </div>
+          </SectionCard>
+
+          {!isNormal ? (
+            <SectionCard
+              title="Teilnehmer & Einladungs-Links"
+              tone="sky"
+              icon={Users}
+            >
+              <p className="mb-3 text-sm text-muted-foreground">
+                E-Mail-Adresse eintragen, damit Beleg-Mails (Ausgabe /
+                Rückzahlung) an die ganze Gruppe gehen können.
+              </p>
+              <div className="mb-4 grid gap-2 sm:grid-cols-3">
+                <Input
+                  placeholder="Name"
+                  value={memberName}
+                  onChange={(e) => setMemberName(e.target.value)}
+                />
+                <Input
+                  placeholder="E-Mail (für Beleg-Mails)"
+                  type="email"
+                  value={memberEmail}
+                  onChange={(e) => setMemberEmail(e.target.value)}
+                />
+                <Button
+                  onClick={() => void addMember()}
+                  disabled={!memberName.trim()}
+                >
+                  <Plus className="mr-1 size-4" />
+                  Hinzufügen
+                </Button>
+              </div>
+              <div className="space-y-2">
+                {members.map((m) => (
+                  <div
+                    key={m.id}
+                    className="flex flex-wrap items-center gap-2 rounded-md border border-border/60 px-3 py-2 text-sm"
+                  >
+                    <span className="font-medium">{m.display_name}</span>
+                    {m.email ? (
+                      <Badge variant="secondary">{m.email}</Badge>
+                    ) : null}
+                    {m.invite_revoked_at ? (
+                      <Badge variant="destructive">Widerrufen</Badge>
+                    ) : null}
+                    <div className="ml-auto flex flex-wrap gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => void copyShareUrl(m.share_url)}
+                      >
+                        <Copy className="mr-1 size-3" />
+                        Link
+                      </Button>
+                      <a
+                        href={`mailto:?subject=${encodeURIComponent(`FinanzBrain: ${ledger.title}`)}&body=${encodeURIComponent(`Dein Link: ${typeof window !== "undefined" ? window.location.origin : ""}${m.share_url}`)}`}
+                        className={cn(
+                          buttonVariants({ variant: "ghost", size: "sm" })
+                        )}
+                      >
+                        <Mail className="mr-1 size-3" />
+                        mailto
+                      </a>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => void rotateToken(m.id)}
+                      >
+                        <RotateCw className="mr-1 size-3" />
+                        Token
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void sendReminders()}
+                >
+                  <Bell className="mr-1 size-4" />
+                  Saldo-Erinnerungen
+                </Button>
+              </div>
+            </SectionCard>
+          ) : null}
+
+          <SectionCard title="Belege importieren" tone="violet" icon={FileDown}>
+            {!hasImport ? (
+              <p className="text-sm text-muted-foreground">
+                Keine Belege gefunden. Verknüpfe eine Reise (oben) für
+                Reise-Belege, oder warte auf Paperless-Finanzpositionen.
+              </p>
+            ) : (
+              <>
+                {!isNormal ? (
+                  <div className="mb-3 space-y-1">
+                    <Label>Bezahlt von</Label>
+                    <Select
+                      value={importPayer}
+                      onValueChange={(v) => {
+                        if (v == null) return;
+                        setImportPayer(v);
+                      }}
+                      items={memberSelectItems}
+                    >
+                      <SelectTrigger className="max-w-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {members.map((m) => (
+                          <SelectItem key={m.id} value={String(m.id)}>
+                            {m.display_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : null}
+                {importDocs.tripDocuments.length > 0 ? (
+                  <div className="mb-4 space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground">
+                      Reise-Belege
+                    </p>
+                    {importDocs.tripDocuments.map((doc) => (
+                      <ImportRow
+                        key={`trip-${doc.document_id}`}
+                        doc={doc}
+                        baseCurrency={ledger.base_currency}
+                        onImport={() => void importDocument(doc)}
+                      />
+                    ))}
+                  </div>
+                ) : null}
+                {importDocs.paperlessItems.length > 0 ? (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground">
+                      Paperless (Finanzblick)
+                    </p>
+                    {importDocs.paperlessItems.slice(0, 20).map((doc) => (
+                      <ImportRow
+                        key={`pl-${doc.document_id}`}
+                        doc={doc}
+                        baseCurrency={ledger.base_currency}
+                        onImport={() => void importDocument(doc)}
+                      />
+                    ))}
+                  </div>
+                ) : null}
+              </>
+            )}
+          </SectionCard>
+
+          {!isNormal ? (
+            <SectionCard title="Ausgaben-Mail" tone="sky" icon={Mail}>
+              <p className="mb-3 text-sm text-muted-foreground">
+                Alle Ausgaben per Mail inkl. PDF an die Gruppe senden.
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                disabled={summaryMailBusy || expenses.length === 0}
+                onClick={() => void sendExpensesSummaryMail()}
+              >
+                <Mail
+                  className={cn("size-4", summaryMailBusy && "animate-pulse")}
+                />
+                {summaryMailBusy ? "Sendet…" : "Ausgaben-Mail senden"}
+              </Button>
+            </SectionCard>
+          ) : null}
+        </div>
       ) : null}
     </div>
   );

@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
   BedDouble,
@@ -25,6 +26,9 @@ import {
   Trash2,
   X,
   FilePlus2,
+  FileText,
+  LayoutList,
+  MoreHorizontal,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -71,6 +75,13 @@ import { TripExportMenu } from "@/components/trips/trip-export-menu";
 import { TripFinanceLedgerCard } from "@/components/finance-brain/trip-finance-ledger-card";
 import { BelegNotesBlock } from "@/components/trips/beleg-notes-block";
 import { LinkDocumentsToEventDialog } from "@/components/trips/link-documents-to-event-dialog";
+import {
+  TripTabNav,
+  parseTripDetailTab,
+  type TripDetailTab,
+  type TripTabItem,
+} from "@/components/trips/trip-tab-nav";
+
 import {
   toDateInputValue,
   toSwissDate,
@@ -477,6 +488,26 @@ export function TripDetailClient({
   /** Public share view: read-only timeline matching Ansicht mode. */
   shareToken?: string;
 }) {
+  return (
+    <Suspense
+      fallback={
+        <p className="p-6 text-sm text-muted-foreground">Lädt Reise…</p>
+      }
+    >
+      <TripDetailInner tripId={tripId} shareToken={shareToken} />
+    </Suspense>
+  );
+}
+
+function TripDetailInner({
+  tripId,
+  shareToken,
+}: {
+  tripId: number;
+  shareToken?: string;
+}) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const readOnly = Boolean(shareToken);
   const [trip, setTrip] = useState<Trip | null>(null);
   const [events, setEvents] = useState<TripEvent[]>([]);
@@ -1341,8 +1372,32 @@ export function TripDetailClient({
     );
   }
 
+  const activeTab = parseTripDetailTab(searchParams.get("tab"));
+  const tabItems: TripTabItem[] = [
+    { id: "ablauf", label: "Ablauf", icon: LayoutList },
+    { id: "neu", label: "Neu", icon: Plus },
+    { id: "belege", label: "Belege", icon: FileText },
+    { id: "mehr", label: "Mehr", icon: MoreHorizontal },
+  ];
+
+  function setTab(tab: TripDetailTab) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (tab === "ablauf") params.delete("tab");
+    else params.set("tab", tab);
+    const q = params.toString();
+    router.replace(q ? `?${q}` : "?", { scroll: false });
+  }
+
+  const allDocuments = events.flatMap((event) =>
+    (event.documents || []).map((doc) => ({
+      ...doc,
+      eventId: event.id,
+      eventTitle: event.title,
+    }))
+  );
+
   return (
-    <div className={cn("space-y-6", editMode && !readOnly && "pb-28 md:pb-0")}>
+    <div className={cn("space-y-6 pb-24 md:pb-0", editMode && !readOnly && "pb-36 md:pb-0")}>
       {!readOnly ? (
         <div className="flex flex-wrap items-center gap-2">
           <Link
@@ -1389,6 +1444,10 @@ export function TripDetailClient({
         </div>
       </div>
 
+      {!readOnly ? (
+        <TripTabNav items={tabItems} active={activeTab} onChange={setTab} />
+      ) : null}
+
       {error ? (
         <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
           {error}
@@ -1400,6 +1459,8 @@ export function TripDetailClient({
         </div>
       ) : null}
 
+      {activeTab === "mehr" ? (
+        <div className="space-y-6">
       {!readOnly ? <TripFinanceLedgerCard tripId={tripId} /> : null}
 
       {!readOnly ? (
@@ -1638,6 +1699,67 @@ export function TripDetailClient({
       </Card>
 
       </>
+      ) : null}
+
+        </div>
+      ) : null}
+
+      {activeTab === "neu" && !readOnly ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Neuen Eintrag</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Aktivität ohne Beleg anlegen oder später Dokumente verknüpfen.
+            </p>
+            <Button className="w-full sm:w-auto" onClick={() => openNewEvent()}>
+              <Plus className="mr-2 size-4" />
+              Eintrag erstellen
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {activeTab === "belege" && !readOnly ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Belege</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {allDocuments.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Noch keine Belege verknüpft. Im Ablauf einen Eintrag wählen und
+                Belege verknüpfen.
+              </p>
+            ) : (
+              allDocuments.map((doc) => (
+                <div
+                  key={`${doc.eventId}-${doc.id}`}
+                  className="flex items-center gap-3 rounded-md border border-border/60 px-3 py-2"
+                >
+                  <DocumentPdfThumb
+                    paperlessId={doc.paperless_id}
+                    title={doc.title}
+                    href={`/documents/${doc.id}`}
+                    size="square"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <Link
+                      href={`/documents/${doc.id}`}
+                      className="text-sm font-medium hover:underline"
+                    >
+                      {doc.title || `Dokument #${doc.id}`}
+                    </Link>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {doc.eventTitle}
+                    </p>
+                  </div>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
       ) : null}
 
       <Sheet
@@ -2223,6 +2345,7 @@ export function TripDetailClient({
         />
       ) : null}
 
+{activeTab === "ablauf" || readOnly ? (
       <div className="space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-semibold">Timeline</h2>
@@ -3211,6 +3334,7 @@ export function TripDetailClient({
           </div>
         )}
       </div>
+      ) : null}
 
       <Dialog
         open={aiZoom != null}
@@ -3359,9 +3483,9 @@ export function TripDetailClient({
         }}
       />
 
-      {editMode && !readOnly ? (
-        <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 md:hidden">
-          <div className="pointer-events-auto border-t border-border/80 bg-background/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(15,23,42,0.12)] backdrop-blur">
+      {editMode && !readOnly && activeTab === "ablauf" ? (
+        <div className="pointer-events-none fixed inset-x-0 bottom-[4.25rem] z-40 md:hidden">
+          <div className="pointer-events-auto border-t border-border/80 bg-background/95 px-2 py-2 shadow-[0_-8px_24px_rgba(15,23,42,0.12)] backdrop-blur">
             {(() => {
               const focus =
                 events.find((e) => e.id === editFocusEventId) || events[0];
