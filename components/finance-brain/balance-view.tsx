@@ -339,6 +339,12 @@ function ExpenseCard({
         mobileFocused && "rounded-xl ring-2 ring-[var(--brand-finance)]/30"
       )}
     >
+      <IconCircle
+        icon={visual.icon}
+        tone={visual.tone}
+        size="md"
+        className="absolute left-0 top-1 z-10 border-2 border-foreground/20 shadow-md"
+      />
       <div
         className={cn(
           "overflow-hidden rounded-xl border border-border/60 bg-card text-sm shadow-[0_4px_16px_rgba(20,32,28,0.05)]",
@@ -350,8 +356,8 @@ function ExpenseCard({
             : undefined
         }
       >
-        {/* Soft row: date · title/meta · amount + AI thumb */}
-        <div className="flex items-center gap-3 px-3 py-3">
+        {/* Soft row: type icon · date · title/meta · amount + AI thumb */}
+        <div className="flex items-center gap-3 py-3 pr-3 pl-9 sm:pl-10">
           <div className="shrink-0">
             {isoDate ? (
               <CalendarDateBadge isoDate={isoDate} size="sm" accent="green" />

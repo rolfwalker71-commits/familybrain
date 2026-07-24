@@ -15,6 +15,7 @@ import {
   Luggage,
   Mail,
   MoreHorizontal,
+  Pencil,
   Plus,
   Receipt,
   RefreshCw,
@@ -211,6 +212,10 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
 
   const [trips, setTrips] = useState<TripOption[]>([]);
   const [linkTripId, setLinkTripId] = useState<string>("");
+  const [tripRenameTitle, setTripRenameTitle] = useState("");
+  const [tripRenameBusy, setTripRenameBusy] = useState(false);
+  const [ledgerRenameTitle, setLedgerRenameTitle] = useState("");
+  const [ledgerRenameBusy, setLedgerRenameBusy] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -233,6 +238,10 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
       setLinkTripId(
         json.ledger.trip_id != null ? String(json.ledger.trip_id) : ""
       );
+      setLedgerRenameTitle(json.ledger.title || "");
+      if (json.ledger.trip_title) {
+        setTripRenameTitle(json.ledger.trip_title);
+      }
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -353,6 +362,50 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
       await loadImport();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function renameLinkedTrip() {
+    const tripId = Number(linkTripId || data?.ledger.trip_id);
+    const next = tripRenameTitle.trim();
+    if (!Number.isInteger(tripId) || tripId <= 0 || !next) return;
+    setTripRenameBusy(true);
+    try {
+      const res = await fetch(`/api/trips/${tripId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: next }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Umbenennen fehlgeschlagen");
+      setStatus(`Reise umbenannt in «${next}».`);
+      await loadTrips();
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setTripRenameBusy(false);
+    }
+  }
+
+  async function renameLedger() {
+    const next = ledgerRenameTitle.trim();
+    if (!next || next === data?.ledger.title) return;
+    setLedgerRenameBusy(true);
+    try {
+      const res = await fetch(`/api/finance-ledgers/${ledgerId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: next }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Umbenennen fehlgeschlagen");
+      setStatus(`Abrechnung umbenannt in «${next}».`);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLedgerRenameBusy(false);
     }
   }
 
@@ -1297,6 +1350,37 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
 
       {activeTab === "more" ? (
         <div className="space-y-4">
+          <SectionCard title="Abrechnung umbenennen" tone="green" icon={Pencil}>
+            <div className="flex flex-wrap items-end gap-2">
+              <div className="min-w-[200px] flex-1 space-y-1">
+                <Label htmlFor="ledger-rename">Name der Abrechnung</Label>
+                <Input
+                  id="ledger-rename"
+                  value={ledgerRenameTitle}
+                  onChange={(e) => setLedgerRenameTitle(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      void renameLedger();
+                    }
+                  }}
+                />
+              </div>
+              <Button
+                variant="outline"
+                disabled={
+                  ledgerRenameBusy ||
+                  !ledgerRenameTitle.trim() ||
+                  ledgerRenameTitle.trim() === ledger.title
+                }
+                onClick={() => void renameLedger()}
+              >
+                <Pencil className="mr-1 size-4" />
+                Speichern
+              </Button>
+            </div>
+          </SectionCard>
+
           <SectionCard title="Reise verknüpfen" tone="green" icon={Luggage}>
             <p className="mb-3 text-sm text-muted-foreground">
               Optional mit einer TravelBrain-Reise verbinden – dann erscheinen
@@ -1311,9 +1395,12 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
                   onValueChange={(v) => {
                     if (v == null || v === "__none__") {
                       setLinkTripId("");
+                      setTripRenameTitle("");
                       return;
                     }
                     setLinkTripId(v);
+                    const match = trips.find((t) => String(t.id) === v);
+                    setTripRenameTitle(match?.title || "");
                   }}
                   items={tripSelectItems}
                 >
@@ -1344,6 +1431,7 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
                   variant="ghost"
                   onClick={() => {
                     setLinkTripId("");
+                    setTripRenameTitle("");
                     void linkTrip(null);
                   }}
                 >
@@ -1352,6 +1440,41 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
                 </Button>
               ) : null}
             </div>
+
+            {linkTripId ? (
+              <div className="mt-4 flex flex-wrap items-end gap-2 border-t border-border/50 pt-4">
+                <div className="min-w-[200px] flex-1 space-y-1">
+                  <Label htmlFor="trip-rename">Reise umbenennen</Label>
+                  <Input
+                    id="trip-rename"
+                    value={tripRenameTitle}
+                    onChange={(e) => setTripRenameTitle(e.target.value)}
+                    placeholder="Neuer Name der TravelBrain-Reise"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        void renameLinkedTrip();
+                      }
+                    }}
+                  />
+                </div>
+                <Button
+                  variant="outline"
+                  disabled={
+                    tripRenameBusy ||
+                    !tripRenameTitle.trim() ||
+                    tripRenameTitle.trim() ===
+                      (trips.find((t) => String(t.id) === linkTripId)?.title ||
+                        ledger.trip_title ||
+                        "")
+                  }
+                  onClick={() => void renameLinkedTrip()}
+                >
+                  <Pencil className="mr-1 size-4" />
+                  Umbenennen
+                </Button>
+              </div>
+            ) : null}
           </SectionCard>
 
           {!isNormal ? (
