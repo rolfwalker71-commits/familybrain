@@ -383,6 +383,8 @@ CREATE TABLE IF NOT EXISTS finance_ledgers (
   base_currency TEXT NOT NULL DEFAULT 'CHF',
   ledger_kind TEXT NOT NULL DEFAULT 'split',
   trip_id INTEGER,
+  cover_path TEXT,
+  cover_prompt TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   archived_at TEXT,

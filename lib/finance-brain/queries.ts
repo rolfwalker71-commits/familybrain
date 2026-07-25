@@ -18,6 +18,8 @@ export type FinanceLedgerRow = {
   base_currency: string;
   ledger_kind: LedgerKind;
   trip_id: number | null;
+  cover_path: string | null;
+  cover_prompt: string | null;
   created_at: string;
   updated_at: string;
   archived_at: string | null;
@@ -252,6 +254,28 @@ export function updateFinanceLedger(
     id
   );
   return getFinanceLedgerById(id)!;
+}
+
+export function setFinanceLedgerCover(
+  id: number,
+  input: {
+    coverPath: string | null;
+    coverPrompt: string | null;
+  }
+): FinanceLedgerRow {
+  const existing = getFinanceLedgerById(id);
+  if (!existing) throw new Error("Abrechnung nicht gefunden");
+  const db = getDb();
+  db.prepare(
+    `UPDATE finance_ledgers SET
+       cover_path = ?,
+       cover_prompt = ?,
+       updated_at = ?
+     WHERE id = ?`
+  ).run(input.coverPath, input.coverPrompt, nowIso(), id);
+  const ledger = getFinanceLedgerById(id);
+  if (!ledger) throw new Error("Abrechnung nicht gefunden");
+  return ledger;
 }
 
 export function deleteFinanceLedger(id: number): void {

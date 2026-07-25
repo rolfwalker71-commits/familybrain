@@ -38,6 +38,7 @@ type Ledger = {
   ledger_kind?: LedgerKind;
   trip_id: number | null;
   trip_title: string | null;
+  cover_url?: string | null;
   updated_at: string;
 };
 
@@ -258,8 +259,17 @@ export function FinanceLedgersListClient() {
               return (
                 <div
                   key={ledger.id}
-                  className="relative flex flex-col rounded-xl border border-border bg-card p-4 shadow-[0_2px_4px_rgba(20,32,28,0.06),0_10px_28px_rgba(20,32,28,0.1)]"
+                  className="relative flex flex-col overflow-hidden rounded-xl border border-border bg-card shadow-[0_2px_4px_rgba(20,32,28,0.06),0_10px_28px_rgba(20,32,28,0.1)]"
                 >
+                  <div
+                    className="h-36 bg-gradient-to-br from-[var(--brand-finance-soft)] to-emerald-100 bg-cover bg-center"
+                    style={
+                      ledger.cover_url
+                        ? { backgroundImage: `url(${ledger.cover_url})` }
+                        : undefined
+                    }
+                  />
+                  <div className="relative flex flex-1 flex-col p-4">
                   <Button
                     variant="ghost"
                     size="icon-sm"
@@ -303,6 +313,7 @@ export function FinanceLedgersListClient() {
                   >
                     Öffnen
                   </Link>
+                  </div>
                 </div>
               );
             })}

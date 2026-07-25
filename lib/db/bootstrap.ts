@@ -319,6 +319,8 @@ function ensureFinanceBrainTables(db: Database.Database): void {
       base_currency TEXT NOT NULL DEFAULT 'CHF',
       ledger_kind TEXT NOT NULL DEFAULT 'split',
       trip_id INTEGER,
+      cover_path TEXT,
+      cover_prompt TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       archived_at TEXT,
@@ -456,6 +458,12 @@ function ensureFinanceBrainTables(db: Database.Database): void {
     db.exec(
       `ALTER TABLE finance_ledgers ADD COLUMN ledger_kind TEXT NOT NULL DEFAULT 'split'`
     );
+  }
+  if (!ledgerColNames.has("cover_path")) {
+    db.exec(`ALTER TABLE finance_ledgers ADD COLUMN cover_path TEXT`);
+  }
+  if (!ledgerColNames.has("cover_prompt")) {
+    db.exec(`ALTER TABLE finance_ledgers ADD COLUMN cover_prompt TEXT`);
   }
 
   const settlementCols = db

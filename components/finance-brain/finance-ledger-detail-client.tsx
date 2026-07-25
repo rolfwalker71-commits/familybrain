@@ -9,6 +9,7 @@ import {
   Copy,
   Download,
   FileDown,
+  ImagePlus,
   LayoutDashboard,
   Link2,
   List,
@@ -21,6 +22,7 @@ import {
   RefreshCw,
   RotateCw,
   ArrowLeftRight,
+  Sparkles,
   Unlink,
   Users,
 } from "lucide-react";
@@ -73,6 +75,8 @@ type LedgerDetail = {
     ledger_kind?: "split" | "normal";
     trip_id: number | null;
     trip_title: string | null;
+    cover_url?: string | null;
+    cover_prompt?: string | null;
   };
   members: Member[];
   expenses: Array<{
@@ -216,6 +220,8 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
   const [tripRenameBusy, setTripRenameBusy] = useState(false);
   const [ledgerRenameTitle, setLedgerRenameTitle] = useState("");
   const [ledgerRenameBusy, setLedgerRenameBusy] = useState(false);
+  const [coverPrompt, setCoverPrompt] = useState("");
+  const [coverBusy, setCoverBusy] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -239,6 +245,9 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
         json.ledger.trip_id != null ? String(json.ledger.trip_id) : ""
       );
       setLedgerRenameTitle(json.ledger.title || "");
+      if (json.ledger.cover_prompt) {
+        setCoverPrompt(json.ledger.cover_prompt);
+      }
       if (json.ledger.trip_title) {
         setTripRenameTitle(json.ledger.trip_title);
       }
@@ -406,6 +415,75 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setLedgerRenameBusy(false);
+    }
+  }
+
+  async function uploadCover(file: File) {
+    setCoverBusy(true);
+    setError(null);
+    try {
+      const form = new FormData();
+      form.set("file", file);
+      const res = await fetch(`/api/finance-ledgers/${ledgerId}/cover`, {
+        method: "POST",
+        body: form,
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Upload fehlgeschlagen");
+      await load();
+      setStatus("Titelbild hochgeladen.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setCoverBusy(false);
+    }
+  }
+
+  async function generateCover() {
+    setCoverBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/finance-ledgers/${ledgerId}/cover`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          generate: true,
+          prompt: coverPrompt || undefined,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Generierung fehlgeschlagen");
+      await load();
+      setStatus("Titelbild erzeugt.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setCoverBusy(false);
+    }
+  }
+
+  async function downloadCover() {
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/finance-ledgers/${ledgerId}/cover?download=1`
+      );
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        throw new Error(json.error || "Download fehlgeschlagen");
+      }
+      const blob = await res.blob();
+      const cd = res.headers.get("Content-Disposition") || "";
+      const match = /filename="([^"]+)"/.exec(cd);
+      const filename = match?.[1] || "titelbild.png";
+      const href = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = href;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(href);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
     }
   }
 
@@ -939,6 +1017,15 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
         tone={pageVisuals.financeBrain.tone}
       />
 
+      <div
+        className="relative h-40 overflow-hidden rounded-xl bg-gradient-to-br from-[var(--brand-finance-soft)] to-emerald-100 bg-cover bg-center sm:h-52"
+        style={
+          ledger.cover_url
+            ? { backgroundImage: `url(${ledger.cover_url})` }
+            : undefined
+        }
+      />
+
       <FinanceTabNav items={tabItems} active={activeTab} onChange={setTab} />
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
@@ -1377,6 +1464,52 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
               >
                 <Pencil className="mr-1 size-4" />
                 Speichern
+              </Button>
+            </div>
+          </SectionCard>
+
+          <SectionCard title="Titelbild" tone="green" icon={ImagePlus}>
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="ledger-cover-file">Hochladen</Label>
+                <Input
+                  id="ledger-cover-file"
+                  type="file"
+                  accept="image/*"
+                  disabled={coverBusy}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) void uploadCover(file);
+                  }}
+                />
+              </div>
+              <div className="min-w-0 w-full flex-1 space-y-1.5 sm:min-w-[16rem]">
+                <Label htmlFor="ledger-cover-prompt">AI-Prompt (optional)</Label>
+                <Input
+                  id="ledger-cover-prompt"
+                  value={coverPrompt}
+                  onChange={(e) => setCoverPrompt(e.target.value)}
+                  placeholder="z. B. Freunde teilen Rechnung im Café, flache Illustration"
+                  disabled={coverBusy}
+                />
+              </div>
+              <Button
+                variant="outline"
+                disabled={coverBusy}
+                onClick={() => void generateCover()}
+                className="gap-1.5"
+              >
+                <Sparkles className="size-4" />
+                Mit AI erzeugen
+              </Button>
+              <Button
+                variant="outline"
+                disabled={coverBusy || !ledger.cover_url}
+                onClick={() => void downloadCover()}
+                className="gap-1.5"
+              >
+                <Download className="size-4" />
+                Herunterladen
               </Button>
             </div>
           </SectionCard>

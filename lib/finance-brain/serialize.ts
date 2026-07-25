@@ -18,6 +18,7 @@ import {
   expenseAiImagePublicUrl,
   expenseAiImageSharePublicUrl,
 } from "@/lib/finance-brain/expense-image";
+import { ledgerCoverPublicUrl } from "@/lib/finance-brain/cover";
 import { getTripById } from "@/lib/trips/queries";
 import { getDocumentById } from "@/lib/db/queries";
 
@@ -27,6 +28,7 @@ export function serializeLedger(ledger: FinanceLedgerRow) {
   return {
     ...ledger,
     trip_title: trip?.title ?? null,
+    cover_url: ledgerCoverPublicUrl(ledger.cover_path),
   };
 }
 
