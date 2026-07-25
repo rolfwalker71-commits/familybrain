@@ -33,6 +33,12 @@ const PatchSchema = z.object({
   direction: z.enum(["expense", "income"]).optional(),
   documentId: z.number().int().positive().nullable().optional(),
   tripEventId: z.number().int().positive().nullable().optional(),
+  split: z
+    .object({
+      mode: z.literal("equal"),
+      memberIds: z.array(z.number().int().positive()).min(1),
+    })
+    .optional(),
 });
 
 export async function PATCH(request: Request, context: Ctx) {
@@ -86,6 +92,9 @@ export async function PATCH(request: Request, context: Ctx) {
     }
     if (parsed.data.tripEventId !== undefined) {
       patch.tripEventId = parsed.data.tripEventId;
+    }
+    if (parsed.data.split !== undefined) {
+      patch.split = parsed.data.split;
     }
 
     if (parsed.data.place !== undefined) {

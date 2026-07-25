@@ -56,6 +56,7 @@ import {
 } from "@/components/finance-brain/balance-view";
 import { PendingReceiptPicker } from "@/components/finance-brain/expense-receipt-controls";
 import { ExpenseTripEventPicker } from "@/components/finance-brain/expense-trip-event-picker";
+import { ExpenseSplitParticipants } from "@/components/finance-brain/expense-split-participants";
 import {
   FinanceTabNav,
   parseFinanceLedgerTab,
@@ -144,6 +145,13 @@ type LedgerDetail = {
     toDisplayName: string;
     amount: number;
   }>;
+  minimalDebts?: Array<{
+    fromMemberId: number;
+    fromDisplayName: string;
+    toMemberId: number;
+    toDisplayName: string;
+    amount: number;
+  }>;
   cashbook?: {
     expenseTotalBase: number;
     incomeTotalBase: number;
@@ -197,6 +205,7 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
   const [expPlace, setExpPlace] = useState("");
   const [expNote, setExpNote] = useState("");
   const [expPayer, setExpPayer] = useState<string>("");
+  const [expSplitMemberIds, setExpSplitMemberIds] = useState<number[]>([]);
   const [expTripEventId, setExpTripEventId] = useState<number | null>(null);
   const [expDirection, setExpDirection] = useState<"expense" | "income">(
     "expense"
@@ -256,6 +265,11 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
         setExpPayer(String(json.members[0].id));
         setImportPayer(String(json.members[0].id));
         setSetFrom(String(json.members[0].id));
+      }
+      if (json.members?.length) {
+        setExpSplitMemberIds((prev) =>
+          prev.length > 0 ? prev : json.members.map((m: { id: number }) => m.id)
+        );
       }
       setLinkTripId(
         json.ledger.trip_id != null ? String(json.ledger.trip_id) : ""
@@ -555,6 +569,10 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
     const isNormal = data?.ledger.ledger_kind === "normal";
     if (!amount) return;
     if (!isNormal && !expPayer) return;
+    if (!isNormal && expSplitMemberIds.length === 0) {
+      setError("Mindestens eine beteiligte Person wählen");
+      return;
+    }
     try {
       const res = await fetch(`/api/finance-ledgers/${ledgerId}/expenses`, {
         method: "POST",
@@ -564,7 +582,7 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
             ? { direction: expDirection }
             : {
                 paidByMemberId: Number(expPayer),
-                split: { mode: "equal" },
+                split: { mode: "equal", memberIds: expSplitMemberIds },
                 direction: "expense",
               }),
           amount,
@@ -605,6 +623,9 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
       setExpRate("1");
       setExpDirection("expense");
       setPendingReceipt(null);
+      if (data?.members?.length) {
+        setExpSplitMemberIds(data.members.map((m) => m.id));
+      }
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -774,6 +795,7 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
       exchangeRate: number;
       direction?: "expense" | "income";
       tripEventId?: number | null;
+      splitMemberIds?: number[];
     }
   ) {
     setEditBusyId(expenseId);
@@ -783,7 +805,26 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
+          body: JSON.stringify({
+            description: payload.description,
+            expenseDate: payload.expenseDate,
+            paidByMemberId: payload.paidByMemberId,
+            place: payload.place,
+            note: payload.note,
+            amount: payload.amount,
+            currency: payload.currency,
+            exchangeRate: payload.exchangeRate,
+            direction: payload.direction,
+            tripEventId: payload.tripEventId,
+            ...(payload.splitMemberIds
+              ? {
+                  split: {
+                    mode: "equal" as const,
+                    memberIds: payload.splitMemberIds,
+                  },
+                }
+              : {}),
+          }),
         }
       );
       const json = await res.json();
@@ -1003,6 +1044,7 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
     settlements,
     balances,
     simplifiedDebts,
+    minimalDebts = [],
     cashbook,
   } = data;
   const isNormal = ledger.ledger_kind === "normal";
@@ -1112,6 +1154,7 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
           <BalanceView
             balances={balances}
             simplifiedDebts={simplifiedDebts}
+            minimalDebts={minimalDebts}
             baseCurrency={ledger.base_currency}
           />
         ) : (
@@ -1260,6 +1303,15 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
                 </Select>
               </div>
             ) : null}
+            {!isNormal ? (
+              <div className="sm:col-span-2 lg:col-span-4">
+                <ExpenseSplitParticipants
+                  members={members}
+                  selectedIds={expSplitMemberIds}
+                  onChange={setExpSplitMemberIds}
+                />
+              </div>
+            ) : null}
             <div className="space-y-1 sm:col-span-2">
               <Label>Beschreibung</Label>
               <Input
@@ -1311,7 +1363,10 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
               <Button
                 className="w-full sm:w-auto"
                 onClick={() => void addExpense()}
-                disabled={!expAmount}
+                disabled={
+                  !expAmount ||
+                  (!isNormal && expSplitMemberIds.length === 0)
+                }
               >
                 Speichern
               </Button>
@@ -1327,7 +1382,7 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
           <p className="mt-2 text-xs text-muted-foreground">
             {isNormal
               ? "Einfache Ein- und Ausgaben ohne Split oder Ausgleich."
-              : "Aufteilung: gleichmässig auf alle Teilnehmer. Kurs-Button lädt den EZB-Referenzkurs (optional zum Ausgabedatum)."}
+              : "Aufteilung gleichmässig unter den ausgewählten Beteiligten. Kurs-Button lädt den EZB-Referenzkurs (optional zum Ausgabedatum)."}
           </p>
         </SectionCard>
       ) : null}

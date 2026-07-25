@@ -63,6 +63,7 @@ import {
   ExpenseTripEventPicker,
   type TripPickerOption,
 } from "@/components/finance-brain/expense-trip-event-picker";
+import { ExpenseSplitParticipants } from "@/components/finance-brain/expense-split-participants";
 import { cn } from "@/lib/utils";
 
 type Balance = {
@@ -133,21 +134,26 @@ export type ExpenseEditPayload = {
   exchangeRate: number;
   direction?: "expense" | "income";
   tripEventId?: number | null;
+  splitMemberIds?: number[];
 };
 
 export function BalanceView({
   balances,
   simplifiedDebts,
+  minimalDebts = [],
   baseCurrency,
   highlightMemberId,
 }: {
   balances: Balance[];
+  /** Nach Zahler / Person (Anteil an dessen Ausgaben). */
   simplifiedDebts: Debt[];
+  /** Wenigste Überweisungen bis alle Saldi null sind. */
+  minimalDebts?: Debt[];
   baseCurrency: string;
   highlightMemberId?: number;
 }) {
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
+    <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
       <Card tone="green" className="overflow-hidden border-border/60 shadow-[0_4px_16px_rgba(20,32,28,0.05)]">
         <CardHeader tone="green" className="pb-2">
           <CardTitle className="flex items-center gap-2 text-base text-[var(--brand-finance)]">
@@ -205,7 +211,7 @@ export function BalanceView({
         <CardHeader tone="green" className="pb-2">
           <CardTitle className="flex items-center gap-2 text-base text-amber-900">
             <IconCircle icon={ArrowLeftRight} tone="green" size="sm" />
-            Ausgleichsvorschläge
+            Nach Zahler
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
@@ -214,13 +220,48 @@ export function BalanceView({
           ) : (
             <>
               <p className="text-xs text-muted-foreground">
-                Wer wem noch Geld schuldet — Anteil an Ausgaben des Zahlers,
-                abzüglich erfasster Rückzahlungen. Gegenforderungen zwischen
-                denselben Personen werden verrechnet.
+                Wer wem noch den Anteil an dessen Ausgaben schuldet
+                (Rückzahlungen abgezogen; Gegenforderungen zwischen denselben
+                Personen verrechnet).
               </p>
               {simplifiedDebts.map((d, i) => (
                 <div
-                  key={`${d.fromMemberId}-${d.toMemberId}-${i}`}
+                  key={`payer-${d.fromMemberId}-${d.toMemberId}-${i}`}
+                  className="rounded-xl border border-amber-200/60 bg-white px-3 py-2.5 text-sm"
+                >
+                  <span className="font-medium">{d.fromDisplayName}</span>
+                  {" schuldet "}
+                  <span className="font-medium">{d.toDisplayName}</span>
+                  {" "}
+                  <span className="font-semibold text-amber-900">
+                    {formatMoney(d.amount, baseCurrency)}
+                  </span>
+                </div>
+              ))}
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card tone="green" className="overflow-hidden border-border/60 shadow-[0_4px_16px_rgba(20,32,28,0.05)] lg:col-span-2 xl:col-span-1">
+        <CardHeader tone="green" className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-base text-amber-900">
+            <IconCircle icon={ArrowLeftRight} tone="green" size="sm" />
+            Wenigste Überweisungen
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {minimalDebts.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Alles ausgeglichen.</p>
+          ) : (
+            <>
+              <p className="text-xs text-muted-foreground">
+                Minimale Anzahl Transfers, bis alle Saldi auf null sind — nicht
+                zwingend an den ursprünglichen Zahler.
+              </p>
+              {minimalDebts.map((d, i) => (
+                <div
+                  key={`min-${d.fromMemberId}-${d.toMemberId}-${i}`}
                   className="rounded-xl border border-amber-200/60 bg-white px-3 py-2.5 text-sm"
                 >
                   <span className="font-medium">{d.fromDisplayName}</span>
@@ -303,6 +344,9 @@ function ExpenseCard({
   const [editTripEventId, setEditTripEventId] = useState<number | null>(
     exp.trip_event?.id ?? exp.trip_event_id ?? null
   );
+  const [editSplitMemberIds, setEditSplitMemberIds] = useState<number[]>(() =>
+    exp.splits.map((s) => s.member_id)
+  );
   const [editRateLoading, setEditRateLoading] = useState(false);
   const [editDirection, setEditDirection] = useState<"expense" | "income">(
     exp.direction === "income" ? "income" : "expense"
@@ -332,6 +376,7 @@ function ExpenseCard({
     setEditCurrency(exp.currency);
     setEditRate(String(exp.exchange_rate ?? 1));
     setEditTripEventId(exp.trip_event?.id ?? exp.trip_event_id ?? null);
+    setEditSplitMemberIds(exp.splits.map((s) => s.member_id));
     setEditDirection(exp.direction === "income" ? "income" : "expense");
     setEditing(true);
   }
@@ -361,6 +406,7 @@ function ExpenseCard({
     const parsedAmount = Number(editAmount);
     const parsedRate = Number(editRate) || 1;
     if (!(parsedAmount > 0)) return;
+    if (!cashbookMode && !isIncome && editSplitMemberIds.length === 0) return;
     await onUpdate(exp.id, {
       description: editDesc.trim() || null,
       expenseDate: editDate || null,
@@ -372,6 +418,9 @@ function ExpenseCard({
       exchangeRate: editCurrency === baseCurrency ? 1 : parsedRate,
       direction: cashbookMode ? editDirection : undefined,
       tripEventId: editTripEventId,
+      ...(!cashbookMode && !isIncome
+        ? { splitMemberIds: editSplitMemberIds }
+        : {}),
     });
     setEditing(false);
   }
@@ -721,6 +770,16 @@ function ExpenseCard({
                     </Select>
                   </div>
                 )}
+                {!cashbookMode && !isIncome ? (
+                  <div className="sm:col-span-2">
+                    <ExpenseSplitParticipants
+                      compact
+                      members={members}
+                      selectedIds={editSplitMemberIds}
+                      onChange={setEditSplitMemberIds}
+                    />
+                  </div>
+                ) : null}
                 <div className="space-y-1 sm:col-span-2">
                   <Label className="text-xs">Ort</Label>
                   <Input
@@ -763,7 +822,13 @@ function ExpenseCard({
                 <div className="flex flex-wrap gap-2 sm:col-span-2">
                   <Button
                     size="sm"
-                    disabled={editBusy || !(Number(editAmount) > 0)}
+                    disabled={
+                      editBusy ||
+                      !(Number(editAmount) > 0) ||
+                      (!cashbookMode &&
+                        !isIncome &&
+                        editSplitMemberIds.length === 0)
+                    }
                     onClick={() => void saveEdit()}
                   >
                     Speichern

@@ -40,6 +40,7 @@ export async function GET(_request: Request, context: Ctx) {
       ledger: serializeLedger(ledger),
       balances: [],
       simplifiedDebts: [],
+      minimalDebts: [],
       cashbook: collectCashbookTotals(ledger.id),
     });
   }

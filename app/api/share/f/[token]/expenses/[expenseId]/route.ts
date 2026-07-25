@@ -26,6 +26,12 @@ const PatchSchema = z.object({
   currency: z.string().min(3).max(3).optional(),
   exchangeRate: z.number().positive().optional(),
   documentId: z.number().int().positive().nullable().optional(),
+  split: z
+    .object({
+      mode: z.literal("equal"),
+      memberIds: z.array(z.number().int().positive()).min(1),
+    })
+    .optional(),
 });
 
 export async function PATCH(request: Request, context: Ctx) {
@@ -74,6 +80,9 @@ export async function PATCH(request: Request, context: Ctx) {
     }
     if (parsed.data.documentId !== undefined) {
       patch.documentId = parsed.data.documentId;
+    }
+    if (parsed.data.split !== undefined) {
+      patch.split = parsed.data.split;
     }
 
     if (parsed.data.place !== undefined) {

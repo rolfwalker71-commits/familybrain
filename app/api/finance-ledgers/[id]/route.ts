@@ -66,6 +66,7 @@ export async function GET(_request: Request, context: Ctx) {
       settlements,
       balances: [],
       simplifiedDebts: [],
+      minimalDebts: [],
       cashbook: collectCashbookTotals(id),
     });
   }

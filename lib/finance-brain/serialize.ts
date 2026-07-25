@@ -1,5 +1,8 @@
 import type { BalanceInput, SimplifiedDebt } from "@/lib/finance-brain/settlement";
-import { computeMemberBalances } from "@/lib/finance-brain/settlement";
+import {
+  computeMemberBalances,
+  simplifyDebts,
+} from "@/lib/finance-brain/settlement";
 import type {
   FinanceExpenseRow,
   FinanceExpenseSplitRow,
@@ -22,6 +25,16 @@ import {
 import { ledgerCoverPublicUrl } from "@/lib/finance-brain/cover";
 import { getTripById, getTripEventById } from "@/lib/trips/queries";
 import { getDocumentById } from "@/lib/db/queries";
+
+function mapDebt(d: SimplifiedDebt) {
+  return {
+    fromMemberId: d.fromMemberId,
+    fromDisplayName: d.fromName,
+    toMemberId: d.toMemberId,
+    toDisplayName: d.toName,
+    amount: d.amount,
+  };
+}
 
 export function serializeLedger(ledger: FinanceLedgerRow) {
   const trip =
@@ -121,17 +134,14 @@ export function buildBalancePayload(
     settlementsPaidBase: b.settlementsPaidBase,
     netBalance: b.net,
   }));
-  const simplifiedDebts = (openDebts || []).map((d) => ({
-    fromMemberId: d.fromMemberId,
-    fromDisplayName: d.fromName,
-    toMemberId: d.toMemberId,
-    toDisplayName: d.toName,
-    amount: d.amount,
-  }));
-  return { balances, simplifiedDebts };
+  /** Payer-oriented: share of each expense owed to who paid. */
+  const simplifiedDebts = (openDebts || []).map(mapDebt);
+  /** Min cash-flow: fewest transfers to zero all nets. */
+  const minimalDebts = simplifyDebts(raw).map(mapDebt);
+  return { balances, simplifiedDebts, minimalDebts };
 }
 
-/** Saldo + offene Schulden (pro Zahler) für eine Abrechnung. */
+/** Saldo + beide Ausgleichsansichten für eine Abrechnung. */
 export function buildLedgerBalancePayload(ledgerId: number) {
   return buildBalancePayload(
     collectBalanceInputs(ledgerId),

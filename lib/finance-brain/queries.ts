@@ -721,6 +721,9 @@ function buildSplitMap(
     const ids = split.memberIds.length
       ? split.memberIds
       : members.map((m) => m.id);
+    if (ids.length === 0) {
+      throw new Error("Mindestens eine beteiligte Person wählen");
+    }
     for (const id of ids) {
       if (!memberSet.has(id)) throw new Error("Ungültiger Teilnehmer");
     }
@@ -790,7 +793,7 @@ export function setFinanceExpenseCategory(
   return getFinanceExpenseById(expenseId)!;
 }
 
-/** Update expense metadata and optionally amount/currency (recalculates equal splits). */
+/** Update expense metadata and optionally amount/currency/split participants. */
 export function updateFinanceExpense(
   expenseId: number,
   input: {
@@ -807,6 +810,8 @@ export function updateFinanceExpense(
     direction?: ExpenseDirection;
     documentId?: number | null;
     tripEventId?: number | null;
+    /** When set, rebuilds splits (equal among these members, or full split input). */
+    split?: ExpenseSplitInput;
   }
 ): FinanceExpenseRow {
   const existing = getFinanceExpenseById(expenseId);
@@ -897,53 +902,20 @@ export function updateFinanceExpense(
     exchangeRate !== existing.exchange_rate ||
     amountBase !== existing.amount_base;
 
-  const db = getDb();
-  db.prepare(
-    `UPDATE finance_expenses SET
-       paid_by_member_id = ?,
-       amount = ?,
-       currency = ?,
-       exchange_rate = ?,
-       amount_base = ?,
-       description = ?,
-       expense_date = ?,
-       place_name = ?,
-       place_lat = ?,
-       place_lon = ?,
-       note = ?,
-       direction = ?,
-       document_id = ?,
-       trip_event_id = ?,
-       updated_at = ?
-     WHERE id = ?`
-  ).run(
-    paidByMemberId,
-    amount,
-    currency,
-    exchangeRate,
-    amountBase,
-    description,
-    expenseDate,
-    placeName,
-    placeLat,
-    placeLon,
-    note,
-    direction,
-    documentId,
-    tripEventId,
-    nowIso(),
-    expenseId
-  );
+  const splitChanged = input.split !== undefined;
+  const rebuildSplits = moneyChanged || splitChanged;
 
-  if (moneyChanged) {
+  let nextSplitMode = existing.split_mode;
+  if (rebuildSplits) {
     const existingSplits = listFinanceExpenseSplits(expenseId);
     const memberIds =
       existingSplits.length > 0
         ? existingSplits.map((s) => s.member_id)
         : listFinanceLedgerMembers(existing.ledger_id).map((m) => m.id);
-    const splitInput: ExpenseSplitInput =
-      existing.split_mode === "shares" &&
-      existingSplits.some((s) => s.share_units != null && s.share_units > 0)
+    const splitInput: ExpenseSplitInput = input.split
+      ? input.split
+      : existing.split_mode === "shares" &&
+          existingSplits.some((s) => s.share_units != null && s.share_units > 0)
         ? {
             mode: "shares",
             shares: existingSplits.map((s) => ({
@@ -966,6 +938,13 @@ export function updateFinanceExpense(
             }
           : { mode: "equal", memberIds };
 
+    if (
+      splitInput.mode === "equal" &&
+      (!splitInput.memberIds || splitInput.memberIds.length === 0)
+    ) {
+      throw new Error("Mindestens eine beteiligte Person wählen");
+    }
+
     const splitMap = buildSplitMap(amountBase, splitInput, existing.ledger_id);
     // Fix rounding drift for exact proportional rescale
     if (splitInput.mode === "exact" && splitMap.size > 0) {
@@ -977,10 +956,89 @@ export function updateFinanceExpense(
       }
     }
     validateSplitTotal(amountBase, splitMap);
+    nextSplitMode = splitInput.mode;
+
+    const db = getDb();
+    db.prepare(
+      `UPDATE finance_expenses SET
+         paid_by_member_id = ?,
+         amount = ?,
+         currency = ?,
+         exchange_rate = ?,
+         amount_base = ?,
+         description = ?,
+         expense_date = ?,
+         place_name = ?,
+         place_lat = ?,
+         place_lon = ?,
+         note = ?,
+         direction = ?,
+         document_id = ?,
+         trip_event_id = ?,
+         split_mode = ?,
+         updated_at = ?
+       WHERE id = ?`
+    ).run(
+      paidByMemberId,
+      amount,
+      currency,
+      exchangeRate,
+      amountBase,
+      description,
+      expenseDate,
+      placeName,
+      placeLat,
+      placeLon,
+      note,
+      direction,
+      documentId,
+      tripEventId,
+      nextSplitMode,
+      nowIso(),
+      expenseId
+    );
     db.prepare(`DELETE FROM finance_expense_splits WHERE expense_id = ?`).run(
       expenseId
     );
     insertSplits(expenseId, splitInput, splitMap);
+  } else {
+    const db = getDb();
+    db.prepare(
+      `UPDATE finance_expenses SET
+         paid_by_member_id = ?,
+         amount = ?,
+         currency = ?,
+         exchange_rate = ?,
+         amount_base = ?,
+         description = ?,
+         expense_date = ?,
+         place_name = ?,
+         place_lat = ?,
+         place_lon = ?,
+         note = ?,
+         direction = ?,
+         document_id = ?,
+         trip_event_id = ?,
+         updated_at = ?
+       WHERE id = ?`
+    ).run(
+      paidByMemberId,
+      amount,
+      currency,
+      exchangeRate,
+      amountBase,
+      description,
+      expenseDate,
+      placeName,
+      placeLat,
+      placeLon,
+      note,
+      direction,
+      documentId,
+      tripEventId,
+      nowIso(),
+      expenseId
+    );
   }
 
   touchLedger(existing.ledger_id);

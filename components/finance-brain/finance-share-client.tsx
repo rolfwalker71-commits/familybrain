@@ -30,6 +30,7 @@ import {
   SettlementList,
 } from "@/components/finance-brain/balance-view";
 import { PendingReceiptPicker } from "@/components/finance-brain/expense-receipt-controls";
+import { ExpenseSplitParticipants } from "@/components/finance-brain/expense-split-participants";
 import {
   FinanceTabNav,
   parseFinanceLedgerTab,
@@ -96,6 +97,13 @@ type ShareData = {
     toDisplayName: string;
     amount: number;
   }>;
+  minimalDebts?: Array<{
+    fromMemberId: number;
+    fromDisplayName: string;
+    toMemberId: number;
+    toDisplayName: string;
+    amount: number;
+  }>;
 };
 
 export function FinanceShareClient({ token }: { token: string }) {
@@ -128,6 +136,7 @@ function FinanceShareInner({ token }: { token: string }) {
   const [expPlace, setExpPlace] = useState("");
   const [expNote, setExpNote] = useState("");
   const [expPayer, setExpPayer] = useState<string>("");
+  const [expSplitMemberIds, setExpSplitMemberIds] = useState<number[]>([]);
 
   const [setAmount, setSetAmount] = useState("");
   const [setCurrency, setSetCurrency] = useState("CHF");
@@ -157,6 +166,11 @@ function FinanceShareInner({ token }: { token: string }) {
         formDefaultsSeededRef.current = true;
       }
       setExpPayer(String(json.member.id));
+      if (json.members?.length) {
+        setExpSplitMemberIds((prev) =>
+          prev.length > 0 ? prev : json.members.map((m: { id: number }) => m.id)
+        );
+      }
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -221,6 +235,10 @@ function FinanceShareInner({ token }: { token: string }) {
   async function addExpense() {
     const amount = Number(expAmount);
     if (!amount) return;
+    if (expSplitMemberIds.length === 0) {
+      setError("Mindestens eine beteiligte Person wählen");
+      return;
+    }
     try {
       const res = await fetch(
         `/api/share/f/${encodeURIComponent(token)}/expenses`,
@@ -236,6 +254,7 @@ function FinanceShareInner({ token }: { token: string }) {
             place: expPlace.trim() || null,
             note: expNote.trim() || null,
             paidByMemberId: expPayer ? Number(expPayer) : undefined,
+            memberIds: expSplitMemberIds,
           }),
         }
       );
@@ -265,6 +284,9 @@ function FinanceShareInner({ token }: { token: string }) {
       setExpCurrency(data?.ledger.base_currency ?? "CHF");
       setExpRate("1");
       setPendingReceipt(null);
+      if (data?.members?.length) {
+        setExpSplitMemberIds(data.members.map((m) => m.id));
+      }
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -351,6 +373,7 @@ function FinanceShareInner({ token }: { token: string }) {
       amount: number;
       currency: string;
       exchangeRate: number;
+      splitMemberIds?: number[];
     }
   ) {
     setEditBusyId(expenseId);
@@ -360,7 +383,24 @@ function FinanceShareInner({ token }: { token: string }) {
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
+          body: JSON.stringify({
+            description: payload.description,
+            expenseDate: payload.expenseDate,
+            paidByMemberId: payload.paidByMemberId,
+            place: payload.place,
+            note: payload.note,
+            amount: payload.amount,
+            currency: payload.currency,
+            exchangeRate: payload.exchangeRate,
+            ...(payload.splitMemberIds
+              ? {
+                  split: {
+                    mode: "equal" as const,
+                    memberIds: payload.splitMemberIds,
+                  },
+                }
+              : {}),
+          }),
         }
       );
       const json = await res.json();
@@ -516,6 +556,7 @@ function FinanceShareInner({ token }: { token: string }) {
     settlements,
     balances,
     simplifiedDebts,
+    minimalDebts = [],
   } = data;
   const others = members.filter((m) => m.id !== member.id);
   const memberSelectItems = Object.fromEntries(
@@ -579,6 +620,7 @@ function FinanceShareInner({ token }: { token: string }) {
         <BalanceView
           balances={balances}
           simplifiedDebts={simplifiedDebts}
+          minimalDebts={minimalDebts}
           baseCurrency={ledger.base_currency}
           highlightMemberId={member.id}
         />
@@ -674,6 +716,13 @@ function FinanceShareInner({ token }: { token: string }) {
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-1 sm:col-span-2">
+              <ExpenseSplitParticipants
+                members={members}
+                selectedIds={expSplitMemberIds}
+                onChange={setExpSplitMemberIds}
+              />
+            </div>
             <div className="space-y-1">
               <Label>Beschreibung</Label>
               <Input
@@ -717,7 +766,7 @@ function FinanceShareInner({ token }: { token: string }) {
             <Button
               className="w-full"
               onClick={() => void addExpense()}
-              disabled={!expAmount}
+              disabled={!expAmount || expSplitMemberIds.length === 0}
             >
               <Plus className="mr-2 size-4" />
               Ausgabe speichern
