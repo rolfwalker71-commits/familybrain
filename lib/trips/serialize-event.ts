@@ -1,15 +1,18 @@
-import { getDb } from "@/lib/db/client";
 import {
   listLinkedExpensesForTripEvents,
   type TripEventLinkedExpense,
 } from "@/lib/finance-brain/queries";
+import { getDb } from "@/lib/db/client";
+import { tripEventAttachmentPublicUrl } from "@/lib/trips/attachments";
 import {
   aircraftPublicUrl,
   eventAiImagePublicUrl,
   mapPublicUrl,
 } from "@/lib/trips/cover";
 import {
+  listAttachmentsForEvents,
   listLinkedDocumentIdsForEvents,
+  type TripEventAttachmentRow,
   type TripEventRow,
 } from "@/lib/trips/queries";
 
@@ -21,11 +24,20 @@ export type TripEventDocumentRef = {
   removable: boolean;
 };
 
+export type TripEventAttachmentRef = {
+  id: number;
+  title: string | null;
+  original_filename: string | null;
+  url: string;
+  removable: boolean;
+};
+
 export type SerializedTripEvent = TripEventRow & {
   aircraft_image_url: string | null;
   map_image_url: string | null;
   ai_image_url: string | null;
   documents: TripEventDocumentRef[];
+  attachments: TripEventAttachmentRef[];
   linked_expenses: TripEventLinkedExpense[];
 };
 
@@ -89,17 +101,37 @@ function loadDocumentRefs(
     }));
 }
 
+function serializeAttachment(
+  row: TripEventAttachmentRow
+): TripEventAttachmentRef | null {
+  const url = tripEventAttachmentPublicUrl(row.file_path);
+  if (!url) return null;
+  return {
+    id: row.id,
+    title: row.title || row.original_filename,
+    original_filename: row.original_filename,
+    url,
+    removable: true,
+  };
+}
+
 export function serializeTripEvent(event: TripEventRow): SerializedTripEvent {
   const linked = listLinkedDocumentIdsForEvents([event.id]).get(event.id) || [];
   const { ids, removable } = collectDocumentIds(event, linked);
   const expenses =
     listLinkedExpensesForTripEvents([event.id]).get(event.id) || [];
+  const attachments = (
+    listAttachmentsForEvents([event.id]).get(event.id) || []
+  )
+    .map(serializeAttachment)
+    .filter((a): a is TripEventAttachmentRef => Boolean(a));
   return {
     ...event,
     aircraft_image_url: aircraftPublicUrl(event.aircraft_image_path),
     map_image_url: mapPublicUrl(event.map_image_path),
     ai_image_url: eventAiImagePublicUrl(event.ai_image_path),
     documents: loadDocumentRefs(ids, removable),
+    attachments,
     linked_expenses: expenses,
   };
 }
@@ -113,6 +145,7 @@ export function serializeTripEvents(
   const expensesByEvent = listLinkedExpensesForTripEvents(
     events.map((e) => e.id)
   );
+  const attachmentsByEvent = listAttachmentsForEvents(events.map((e) => e.id));
   const allIds = new Set<number>();
   const perEvent = events.map((event) => {
     const linked = linkedByEvent.get(event.id) || [];
@@ -123,12 +156,14 @@ export function serializeTripEvents(
 
   const unionRemovable = new Set<number>();
   perEvent.forEach((p) => p.removable.forEach((id) => unionRemovable.add(id)));
-  // load with per-event removable below
   const refsAll = loadDocumentRefs([...allIds], unionRemovable);
   const byId = new Map(refsAll.map((r) => [r.id, r]));
 
   return events.map((event, i) => {
     const { ids, removable } = perEvent[i];
+    const attachments = (attachmentsByEvent.get(event.id) || [])
+      .map(serializeAttachment)
+      .filter((a): a is TripEventAttachmentRef => Boolean(a));
     return {
       ...event,
       aircraft_image_url: aircraftPublicUrl(event.aircraft_image_path),
@@ -141,6 +176,7 @@ export function serializeTripEvents(
           return { ...ref, removable: removable.has(id) };
         })
         .filter((r): r is TripEventDocumentRef => Boolean(r)),
+      attachments,
       linked_expenses: expensesByEvent.get(event.id) || [],
     };
   });

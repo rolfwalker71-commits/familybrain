@@ -174,6 +174,19 @@ function ensureTripsTables(db: Database.Database): void {
       ON trip_event_documents(trip_event_id);
     CREATE INDEX IF NOT EXISTS idx_trip_event_documents_doc
       ON trip_event_documents(document_id);
+    CREATE TABLE IF NOT EXISTS trip_event_attachments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      trip_event_id INTEGER NOT NULL,
+      title TEXT,
+      original_filename TEXT,
+      file_path TEXT NOT NULL,
+      mime_type TEXT NOT NULL DEFAULT 'application/pdf',
+      byte_size INTEGER,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY(trip_event_id) REFERENCES trip_events(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_trip_event_attachments_event
+      ON trip_event_attachments(trip_event_id);
     CREATE TABLE IF NOT EXISTS trip_share_links (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       trip_id INTEGER NOT NULL,

@@ -144,14 +144,15 @@ export function LinkDocumentsToEventDialog({
       const form = new FormData();
       form.set("file", file);
       form.set("title", file.name.replace(/\.pdf$/i, ""));
+      // Local TravelBuddy storage — no Paperless required.
       const res = await fetch(
-        `/api/trips/${tripId}/events/${eventId}/documents/upload`,
+        `/api/trips/${tripId}/events/${eventId}/attachments`,
         { method: "POST", body: form }
       );
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Upload fehlgeschlagen");
       onOpenChange(false);
-      onLinked?.("PDF hochgeladen und verknüpft.");
+      onLinked?.("PDF hochgeladen.");
     } catch (err) {
       onError?.(err instanceof Error ? err.message : String(err));
     } finally {
@@ -166,10 +167,10 @@ export function LinkDocumentsToEventDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Belege verknüpfen</DialogTitle>
+          <DialogTitle>Belege & PDFs</DialogTitle>
           <DialogDescription>
-            PDF direkt hochladen oder ein bestehendes Dokument mit dieser
-            Aktivität verknüpfen.
+            Eigenes PDF direkt zur Aktivität hochladen (ohne Paperless) oder ein
+            bestehendes Paperless-Dokument verknüpfen.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
@@ -192,16 +193,16 @@ export function LinkDocumentsToEventDialog({
               onClick={() => fileRef.current?.click()}
             >
               <Upload className="size-4" />
-              {uploading ? "Wird hochgeladen…" : "PDF hochladen"}
+              {uploading ? "Wird hochgeladen…" : "Eigenes PDF hochladen"}
             </Button>
             <p className="mt-1.5 text-[11px] text-muted-foreground">
-              Wird in Paperless importiert und mit der Aktivität verknüpft
-              (max. 40 MB).
+              Wird lokal bei der Aktivität gespeichert (max. 40 MB) — kein
+              Paperless nötig.
             </p>
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="doc-search">Bestehende Dokumente</Label>
+            <Label htmlFor="doc-search">Paperless-Dokumente verknüpfen</Label>
             <div className="relative">
               <Search className="pointer-events-none absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
               <Input
@@ -218,7 +219,8 @@ export function LinkDocumentsToEventDialog({
               <p className="p-3 text-sm text-muted-foreground">Lädt…</p>
             ) : docs.length === 0 ? (
               <p className="p-3 text-sm text-muted-foreground">
-                Keine Dokumente gefunden. Lade ein PDF hoch oder suche anders.
+                Keine Paperless-Dokumente gefunden. Lade oben ein eigenes PDF
+                hoch.
               </p>
             ) : (
               docs.map((doc) => {

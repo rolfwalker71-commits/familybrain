@@ -165,6 +165,13 @@ type TripEvent = {
     title: string | null;
     removable?: boolean;
   }>;
+  attachments?: Array<{
+    id: number;
+    title: string | null;
+    original_filename: string | null;
+    url: string;
+    removable?: boolean;
+  }>;
   linked_expenses?: Array<{
     id: number;
     ledger_id: number;
@@ -1194,6 +1201,26 @@ function TripDetailInner({
     }
   }
 
+  async function deleteEventAttachment(eventId: number, attachmentId: number) {
+    if (!window.confirm("PDF-Anhang löschen?")) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/trips/${tripId}/events/${eventId}/attachments?attachmentId=${attachmentId}`,
+        { method: "DELETE" }
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Löschen fehlgeschlagen");
+      await load();
+      setStatus("PDF-Anhang gelöscht.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function enrichEventNotes(eventId: number) {
     setBusy(true);
     setError(null);
@@ -1445,13 +1472,26 @@ function TripDetailInner({
     router.replace(q ? `?${q}` : "?", { scroll: false });
   }
 
-  const allDocuments = events.flatMap((event) =>
-    (event.documents || []).map((doc) => ({
-      ...doc,
+  const allDocuments = events.flatMap((event) => [
+    ...(event.documents || []).map((doc) => ({
+      kind: "paperless" as const,
+      id: doc.id,
+      paperless_id: doc.paperless_id,
+      title: doc.title,
+      url: null as string | null,
       eventId: event.id,
       eventTitle: event.title,
-    }))
-  );
+    })),
+    ...(event.attachments || []).map((att) => ({
+      kind: "local" as const,
+      id: att.id,
+      paperless_id: null as number | null,
+      title: att.title || att.original_filename,
+      url: att.url,
+      eventId: event.id,
+      eventTitle: event.title,
+    })),
+  ]);
 
   return (
     <div className={cn("space-y-6 pb-24 md:pb-0", editMode && !readOnly && "pb-36 md:pb-0")}>
@@ -1797,17 +1837,19 @@ function TripDetailInner({
           <CardContent className="space-y-2">
             {allDocuments.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                Noch keine Belege verknüpft. Im Ablauf einen Eintrag wählen und
-                Belege verknüpfen.
+                Noch keine Belege. Im Ablauf einen Eintrag wählen und PDF
+                hochladen oder Paperless-Belege verknüpfen.
               </p>
             ) : (
               allDocuments.map((doc) => (
                 <div
-                  key={`${doc.eventId}-${doc.id}`}
+                  key={`${doc.kind}-${doc.eventId}-${doc.id}`}
                   className="flex items-center gap-3 rounded-md border border-border/60 px-3 py-2"
                 >
                   <DocumentPdfThumb
-                    paperlessId={doc.paperless_id}
+                    paperlessId={doc.paperless_id ?? undefined}
+                    pdfUrl={doc.url ?? undefined}
+                    thumbUrl={doc.kind === "local" ? null : undefined}
                     title={doc.title}
                     size="square"
                   />
@@ -1817,6 +1859,7 @@ function TripDetailInner({
                     </p>
                     <p className="truncate text-xs text-muted-foreground">
                       {doc.eventTitle}
+                      {doc.kind === "local" ? " · lokal" : ""}
                     </p>
                   </div>
                 </div>
@@ -2474,6 +2517,7 @@ function TripDetailInner({
             if (viewMode === "compact") {
               const details = formatCompactDetailLine(event);
               const documents = event.documents || [];
+              const attachments = event.attachments || [];
               return (
                 <div
                   key={event.id}
@@ -2600,13 +2644,13 @@ function TripDetailInner({
                         />
                       </div>
 
-                      {!readOnly || documents.length > 0 ? (
+                      {!readOnly || documents.length > 0 || attachments.length > 0 ? (
                         <div className="flex items-center gap-2">
-                          {documents.length > 0 ? (
+                          {documents.length > 0 || attachments.length > 0 ? (
                             <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto">
                               {documents.map((doc) => (
                                 <DocumentPdfThumb
-                                  key={doc.id}
+                                  key={`p-${doc.id}`}
                                   paperlessId={doc.paperless_id}
                                   title={doc.title}
                                   size="square"
@@ -2617,6 +2661,25 @@ function TripDetailInner({
                                           void unlinkEventDocument(
                                             event.id,
                                             doc.id
+                                          )
+                                      : undefined
+                                  }
+                                />
+                              ))}
+                              {attachments.map((att) => (
+                                <DocumentPdfThumb
+                                  key={`a-${att.id}`}
+                                  pdfUrl={att.url}
+                                  thumbUrl={null}
+                                  title={att.title || att.original_filename}
+                                  size="square"
+                                  removing={busy}
+                                  onRemove={
+                                    editMode && att.removable !== false
+                                      ? () =>
+                                          void deleteEventAttachment(
+                                            event.id,
+                                            att.id
                                           )
                                       : undefined
                                   }
@@ -3019,7 +3082,9 @@ function TripDetailInner({
                           (type !== "Flug" && event.flight_number)
                       );
                       const documents = event.documents || [];
-                      const hasDocuments = documents.length > 0;
+                      const attachments = event.attachments || [];
+                      const hasDocuments =
+                        documents.length > 0 || attachments.length > 0;
                       const flightEnrichmentNotice =
                         type === "Flug"
                           ? parseFlightEnrichmentNotice(event.enrichment_json)
@@ -3054,7 +3119,7 @@ function TripDetailInner({
                           >
                           {documents.map((doc) => (
                             <DocumentPdfThumb
-                              key={doc.id}
+                              key={`p-${doc.id}`}
                               paperlessId={doc.paperless_id}
                               title={doc.title}
                               removing={busy}
@@ -3062,6 +3127,24 @@ function TripDetailInner({
                                 doc.removable !== false
                                   ? () =>
                                       void unlinkEventDocument(event.id, doc.id)
+                                  : undefined
+                              }
+                            />
+                          ))}
+                          {attachments.map((att) => (
+                            <DocumentPdfThumb
+                              key={`a-${att.id}`}
+                              pdfUrl={att.url}
+                              thumbUrl={null}
+                              title={att.title || att.original_filename}
+                              removing={busy}
+                              onRemove={
+                                att.removable !== false
+                                  ? () =>
+                                      void deleteEventAttachment(
+                                        event.id,
+                                        att.id
+                                      )
                                   : undefined
                               }
                             />

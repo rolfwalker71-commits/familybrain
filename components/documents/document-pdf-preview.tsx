@@ -16,15 +16,14 @@ import { cn } from "@/lib/utils";
 function PdfPreviewDialog({
   open,
   onOpenChange,
-  paperlessId,
+  pdfUrl,
   title,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  paperlessId: number;
+  pdfUrl: string;
   title?: string | null;
 }) {
-  const pdfUrl = `/api/paperless/documents/${paperlessId}/file?type=pdf`;
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -33,7 +32,7 @@ function PdfPreviewDialog({
       >
         <DialogHeader>
           <DialogTitle className="truncate pr-8">
-            {title || `Dokument ${paperlessId}`}
+            {title || "PDF"}
           </DialogTitle>
         </DialogHeader>
         <div className="min-h-0 flex-1 overflow-hidden rounded-lg border border-border bg-muted/30">
@@ -64,6 +63,8 @@ function PdfPreviewDialog({
 /** Compact PDF thumbnail for cards — click opens enlarge dialog. */
 export function DocumentPdfThumb({
   paperlessId,
+  pdfUrl,
+  thumbUrl,
   title,
   href,
   className,
@@ -71,7 +72,12 @@ export function DocumentPdfThumb({
   removing,
   size = "default",
 }: {
-  paperlessId: number;
+  /** Paperless document id (legacy). Prefer pdfUrl for local files. */
+  paperlessId?: number;
+  /** Direct PDF URL (local attachment or paperless proxy). */
+  pdfUrl?: string;
+  /** Optional thumbnail URL; without it a PDF icon is shown. */
+  thumbUrl?: string | null;
   title?: string | null;
   /** Optional link under the thumb (e.g. document detail page) */
   href?: string;
@@ -84,8 +90,20 @@ export function DocumentPdfThumb({
 }) {
   const [open, setOpen] = useState(false);
   const [thumbError, setThumbError] = useState(false);
-  const thumbUrl = `/api/paperless/documents/${paperlessId}/file?type=thumb`;
+  const resolvedPdf =
+    pdfUrl ||
+    (paperlessId != null
+      ? `/api/paperless/documents/${paperlessId}/file?type=pdf`
+      : null);
+  const resolvedThumb =
+    thumbUrl !== undefined
+      ? thumbUrl
+      : paperlessId != null
+        ? `/api/paperless/documents/${paperlessId}/file?type=thumb`
+        : null;
   const square = size === "square";
+
+  if (!resolvedPdf) return null;
 
   return (
     <div
@@ -105,11 +123,11 @@ export function DocumentPdfThumb({
             onRemove();
           }}
           disabled={removing}
-          title="Verknüpfung entfernen"
+          title="Entfernen"
           className="absolute -right-1.5 -top-1.5 z-10 flex size-5 items-center justify-center rounded-full border border-border bg-background text-muted-foreground shadow-sm hover:bg-destructive hover:text-destructive-foreground disabled:opacity-50"
         >
           <XIcon className="size-3" />
-          <span className="sr-only">Verknüpfung entfernen</span>
+          <span className="sr-only">Entfernen</span>
         </button>
       ) : null}
       <button
@@ -118,10 +136,10 @@ export function DocumentPdfThumb({
         title={title || "PDF öffnen"}
         className="group relative block h-full w-full overflow-hidden rounded-md border border-border/70 bg-muted/40 text-left transition-colors hover:bg-muted"
       >
-        {!thumbError ? (
+        {resolvedThumb && !thumbError ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={thumbUrl}
+            src={resolvedThumb}
             alt={title || "PDF Vorschau"}
             className={cn(
               "w-full object-cover object-top",
@@ -165,7 +183,7 @@ export function DocumentPdfThumb({
       <PdfPreviewDialog
         open={open}
         onOpenChange={setOpen}
-        paperlessId={paperlessId}
+        pdfUrl={resolvedPdf}
         title={title}
       />
     </div>
@@ -244,7 +262,7 @@ export function DocumentPdfPreview({
       <PdfPreviewDialog
         open={open}
         onOpenChange={setOpen}
-        paperlessId={paperlessId}
+        pdfUrl={pdfUrl}
         title={title}
       />
     </>

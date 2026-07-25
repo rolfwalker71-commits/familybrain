@@ -9,6 +9,7 @@ import {
   type TripStatus,
 } from "@/lib/trips/constants";
 import { formatAirportRoute, normalizeIataCode } from "@/lib/trips/iata";
+import { unlinkTripEventAttachmentFile } from "@/lib/trips/attachments";
 
 export type TripRow = {
   id: number;
@@ -712,9 +713,14 @@ export function updateTripEvent(
 export function deleteTripEvent(eventId: number): void {
   const existing = getTripEventById(eventId);
   if (!existing) throw new Error("Ereignis nicht gefunden");
+  const attachments =
+    listAttachmentsForEvents([eventId]).get(eventId) || [];
   const db = getDb();
   db.prepare(`DELETE FROM trip_events WHERE id = ?`).run(eventId);
   syncTripDatesFromEvents(existing.trip_id);
+  for (const att of attachments) {
+    unlinkTripEventAttachmentFile(att.file_path);
+  }
 }
 
 export function listLinkedDocumentIdsForEvents(
@@ -849,6 +855,97 @@ export function unlinkTripEventDocument(
   const updated = getTripEventById(eventId);
   if (!updated) throw new Error("Ereignis nicht gefunden");
   return updated;
+}
+
+export type TripEventAttachmentRow = {
+  id: number;
+  trip_event_id: number;
+  title: string | null;
+  original_filename: string | null;
+  file_path: string;
+  mime_type: string;
+  byte_size: number | null;
+  created_at: string;
+};
+
+export function listAttachmentsForEvents(
+  eventIds: number[]
+): Map<number, TripEventAttachmentRow[]> {
+  const map = new Map<number, TripEventAttachmentRow[]>();
+  if (eventIds.length === 0) return map;
+  const db = getDb();
+  const placeholders = eventIds.map(() => "?").join(",");
+  const rows = db
+    .prepare(
+      `SELECT * FROM trip_event_attachments
+       WHERE trip_event_id IN (${placeholders})
+       ORDER BY created_at ASC, id ASC`
+    )
+    .all(...eventIds) as TripEventAttachmentRow[];
+  for (const row of rows) {
+    const list = map.get(row.trip_event_id) || [];
+    list.push(row);
+    map.set(row.trip_event_id, list);
+  }
+  return map;
+}
+
+export function getTripEventAttachmentById(
+  attachmentId: number
+): TripEventAttachmentRow | null {
+  const db = getDb();
+  return (
+    (db
+      .prepare(`SELECT * FROM trip_event_attachments WHERE id = ?`)
+      .get(attachmentId) as TripEventAttachmentRow | undefined) ?? null
+  );
+}
+
+export function createTripEventAttachment(
+  eventId: number,
+  input: {
+    title?: string | null;
+    originalFilename?: string | null;
+    filePath: string;
+    mimeType?: string | null;
+    byteSize?: number | null;
+  }
+): TripEventAttachmentRow {
+  const event = getTripEventById(eventId);
+  if (!event) throw new Error("Ereignis nicht gefunden");
+  const db = getDb();
+  const result = db
+    .prepare(
+      `INSERT INTO trip_event_attachments (
+         trip_event_id, title, original_filename, file_path, mime_type, byte_size, created_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?)`
+    )
+    .run(
+      eventId,
+      input.title?.trim() || null,
+      input.originalFilename?.trim() || null,
+      input.filePath,
+      input.mimeType?.trim() || "application/pdf",
+      input.byteSize ?? null,
+      nowIso()
+    );
+  const row = getTripEventAttachmentById(Number(result.lastInsertRowid));
+  if (!row) throw new Error("Anhang konnte nicht gespeichert werden");
+  return row;
+}
+
+export function deleteTripEventAttachment(attachmentId: number): {
+  event: TripEventRow;
+  filePath: string;
+} {
+  const attachment = getTripEventAttachmentById(attachmentId);
+  if (!attachment) throw new Error("Anhang nicht gefunden");
+  const event = getTripEventById(attachment.trip_event_id);
+  if (!event) throw new Error("Ereignis nicht gefunden");
+  getDb()
+    .prepare(`DELETE FROM trip_event_attachments WHERE id = ?`)
+    .run(attachmentId);
+  return { event, filePath: attachment.file_path };
 }
 
 function syncTripDatesFromEvents(tripId: number): void {
