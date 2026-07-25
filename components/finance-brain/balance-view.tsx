@@ -186,6 +186,12 @@ export function BalanceView({
                       bezahlt {formatMoney(b.paidBase, baseCurrency)}
                       {" · "}
                       Anteil {formatMoney(b.owedBase, baseCurrency)}
+                      {b.settlementsPaidBase > 0
+                        ? ` · Rückz. gezahlt ${formatMoney(b.settlementsPaidBase, baseCurrency)}`
+                        : ""}
+                      {b.settlementsReceivedBase > 0
+                        ? ` · Rückz. erhalten ${formatMoney(b.settlementsReceivedBase, baseCurrency)}`
+                        : ""}
                     </div>
                   </div>
                   <span
@@ -256,8 +262,9 @@ export function BalanceView({
           ) : (
             <>
               <p className="text-xs text-muted-foreground">
-                Minimale Anzahl Transfers, bis alle Saldi auf null sind — nicht
-                zwingend an den ursprünglichen Zahler.
+                Aus dem Netto-Saldo (inkl. erfasster Rückzahlungen). Wenigste
+                Transfers bis alle bei null sind — nicht zwingend an den
+                ursprünglichen Zahler.
               </p>
               {minimalDebts.map((d, i) => (
                 <div

@@ -24,11 +24,12 @@ export function computeMemberBalances(rows: BalanceInput[]): MemberBalance[] {
     ...row,
     // Settle-Up: paying someone back reduces your debt (improves net);
     // receiving a repayment reduces what others owe you.
-    net:
+    net: roundMoney(
       row.paidBase -
-      row.owedBase +
-      row.settlementsPaidBase -
-      row.settlementsReceivedBase,
+        row.owedBase +
+        row.settlementsPaidBase -
+        row.settlementsReceivedBase
+    ),
   }));
 }
 
@@ -42,19 +43,20 @@ export function simplifyDebts(
   const debtors: Node[] = [];
 
   for (const b of balances) {
-    if (b.net > epsilon) {
-      creditors.push({ id: b.memberId, name: b.displayName, amount: b.net });
-    } else if (b.net < -epsilon) {
+    const net = roundMoney(b.net);
+    if (net > epsilon) {
+      creditors.push({ id: b.memberId, name: b.displayName, amount: net });
+    } else if (net < -epsilon) {
       debtors.push({
         id: b.memberId,
         name: b.displayName,
-        amount: -b.net,
+        amount: roundMoney(-net),
       });
     }
   }
 
-  creditors.sort((a, b) => b.amount - a.amount);
-  debtors.sort((a, b) => b.amount - a.amount);
+  creditors.sort((a, b) => b.amount - a.amount || a.name.localeCompare(b.name, "de"));
+  debtors.sort((a, b) => b.amount - a.amount || a.name.localeCompare(b.name, "de"));
 
   const debts: SimplifiedDebt[] = [];
   let i = 0;
@@ -63,18 +65,22 @@ export function simplifyDebts(
   while (i < debtors.length && j < creditors.length) {
     const debtor = debtors[i];
     const creditor = creditors[j];
-    const pay = Math.min(debtor.amount, creditor.amount);
+    const pay = roundMoney(Math.min(debtor.amount, creditor.amount));
     if (pay > epsilon) {
       debts.push({
         fromMemberId: debtor.id,
         fromName: debtor.name,
         toMemberId: creditor.id,
         toName: creditor.name,
-        amount: roundMoney(pay),
+        amount: pay,
       });
+      debtor.amount = roundMoney(debtor.amount - pay);
+      creditor.amount = roundMoney(creditor.amount - pay);
+    } else {
+      // Dust only — advance the smaller side so we never loop forever.
+      if (debtor.amount <= creditor.amount) debtor.amount = 0;
+      else creditor.amount = 0;
     }
-    debtor.amount -= pay;
-    creditor.amount -= pay;
     if (debtor.amount <= epsilon) i += 1;
     if (creditor.amount <= epsilon) j += 1;
   }

@@ -162,6 +162,68 @@ describe("settlement", () => {
     assert.equal(set.has("Valentyna->Rolf:48"), true);
     assert.equal(set.has("Rolf->Harald:48.5"), true);
     assert.equal(debts.length, 5);
+
+    const minDebts = simplifyDebts(rows);
+    const minLabel = (d: { fromName: string; toName: string; amount: number }) =>
+      `${d.fromName}->${d.toName}:${d.amount}`;
+    const minSet = new Set(minDebts.map(minLabel));
+    assert.equal(minSet.has("Eliane->Harald:144.5"), true);
+    assert.equal(minSet.has("Valentyna->Harald:97"), true);
+    assert.equal(minSet.has("Valentyna->Rolf:47.5"), true);
+    assert.equal(minDebts.length, 3);
+  });
+
+  it("boat-share settlement of 48 overpays Rolf net by 0.50", () => {
+    // After Valentyna→Rolf 48 (gross boat share), Rolf's net credit 47.50
+    // flips to −0.50 and Valentyna still owes 96.50.
+    const rows = computeMemberBalances([
+      {
+        memberId: 1,
+        displayName: "Harald",
+        paidBase: 386,
+        owedBase: 144.5,
+        settlementsReceivedBase: 0,
+        settlementsPaidBase: 0,
+      },
+      {
+        memberId: 2,
+        displayName: "Rolf",
+        paidBase: 192,
+        owedBase: 144.5,
+        settlementsReceivedBase: 48,
+        settlementsPaidBase: 0,
+      },
+      {
+        memberId: 3,
+        displayName: "Eliane",
+        paidBase: 0,
+        owedBase: 144.5,
+        settlementsReceivedBase: 0,
+        settlementsPaidBase: 0,
+      },
+      {
+        memberId: 4,
+        displayName: "Valentyna",
+        paidBase: 0,
+        owedBase: 144.5,
+        settlementsReceivedBase: 0,
+        settlementsPaidBase: 48,
+      },
+    ]);
+    const byName = Object.fromEntries(rows.map((r) => [r.displayName, r.net]));
+    assert.equal(byName.Harald, 241.5);
+    assert.equal(byName.Rolf, -0.5);
+    assert.equal(byName.Eliane, -144.5);
+    assert.equal(byName.Valentyna, -96.5);
+
+    const minDebts = simplifyDebts(rows);
+    const minLabel = (d: { fromName: string; toName: string; amount: number }) =>
+      `${d.fromName}->${d.toName}:${d.amount}`;
+    const minSet = new Set(minDebts.map(minLabel));
+    assert.equal(minSet.has("Eliane->Harald:144.5"), true);
+    assert.equal(minSet.has("Valentyna->Harald:96.5"), true);
+    assert.equal(minSet.has("Rolf->Harald:0.5"), true);
+    assert.equal(minDebts.length, 3);
   });
 
   it("splits equally with remainder on last member", () => {
