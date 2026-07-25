@@ -35,22 +35,24 @@ const MONTH_SHORT_DE = [
   "DEZ",
 ] as const;
 
+/** Soft-UI sage palette — matches --brand-finance / globals.css */
 const C = {
-  pageBg: rgb(0.973, 0.98, 0.988),
+  pageBg: rgb(0.933, 0.949, 0.941), // #eef2f0
   card: rgb(1, 1, 1),
-  border: rgb(0.886, 0.91, 0.941),
-  headerBg: rgb(1, 0.929, 0.835),
-  headerBorder: rgb(0.992, 0.729, 0.455),
-  headerLabel: rgb(0.604, 0.204, 0.071),
-  headerTitle: rgb(0.486, 0.176, 0.071),
-  ink: rgb(0.059, 0.09, 0.165),
-  muted: rgb(0.392, 0.455, 0.545),
-  soft: rgb(0.945, 0.961, 0.976),
-  badgeBg: rgb(1, 0.929, 0.835),
-  badgeFg: rgb(0.604, 0.204, 0.071),
-  redTop: rgb(0.937, 0.267, 0.267),
+  border: rgb(0.843, 0.878, 0.863), // #d7e0dc
+  headerBg: rgb(0.851, 0.894, 0.82), // #d9e4d1
+  headerBorder: rgb(0.843, 0.878, 0.863),
+  headerLabel: rgb(0.247, 0.42, 0.322), // #3f6b52
+  headerTitle: rgb(0.247, 0.42, 0.322),
+  ink: rgb(0.078, 0.125, 0.11), // #14201c
+  muted: rgb(0.357, 0.42, 0.4), // #5b6b66
+  soft: rgb(0.933, 0.949, 0.941),
+  badgeBg: rgb(0.851, 0.894, 0.82),
+  badgeFg: rgb(0.247, 0.42, 0.322),
+  monthBg: rgb(0.851, 0.894, 0.82),
+  monthFg: rgb(0.247, 0.42, 0.322),
   white: rgb(1, 1, 1),
-  foot: rgb(0.976, 0.98, 0.984),
+  foot: rgb(0.933, 0.949, 0.941),
 };
 
 function toPdfSafeText(raw: string): string {
@@ -66,10 +68,12 @@ function toPdfSafeText(raw: string): string {
     .replace(/[\uFE0E\uFE0F\u200D]/g, "");
 }
 
-function weekdayDe(isoDate: string): string {
+function weekdayShortDe(isoDate: string): string {
   const [y, m, d] = isoDate.split("-").map(Number);
   const date = new Date(y, m - 1, d);
-  return new Intl.DateTimeFormat("de-CH", { weekday: "long" }).format(date);
+  return new Intl.DateTimeFormat("de-CH", { weekday: "short" })
+    .format(date)
+    .replace(/\.$/, "");
 }
 
 function wrapText(
@@ -219,66 +223,37 @@ function drawDateBadge(
   isoDate: string | null | undefined,
   x: number,
   topY: number,
-  w = 92,
-  h = 118
+  w = 78,
+  h = 82
 ) {
   const bottom = topY - h;
-  const rr = Math.min(16, w / 4, h / 5);
-  const border = rgb(0.85, 0.87, 0.9);
+  const rr = Math.min(8, w / 4, h / 5);
 
-  drawRoundedRect(page, x, bottom, w, h, rr, C.white);
+  // Compact Soft-UI badge: month + day + weekday + year, tightly packed
+  drawRoundedRect(page, x, bottom, w, h, rr, C.card, C.border, 1);
 
-  page.drawRectangle({
-    x: x + rr,
-    y: bottom,
-    width: w - 2 * rr,
-    height: 1,
-    color: border,
-  });
-  page.drawRectangle({
-    x: x + rr,
-    y: topY - 1,
-    width: w - 2 * rr,
-    height: 1,
-    color: border,
-  });
-  page.drawRectangle({
-    x,
-    y: bottom + rr,
-    width: 1,
-    height: h - 2 * rr,
-    color: border,
-  });
-  page.drawRectangle({
-    x: x + w - 1,
-    y: bottom + rr,
-    width: 1,
-    height: h - 2 * rr,
-    color: border,
-  });
-
-  const headerH = Math.max(18, Math.min(28, Math.round(h * 0.27)));
+  const headerH = 16;
   const headerBottom = topY - headerH;
   page.drawRectangle({
     x: x + rr,
     y: headerBottom,
     width: w - 2 * rr,
     height: headerH,
-    color: C.redTop,
+    color: C.monthBg,
   });
   page.drawRectangle({
     x,
     y: headerBottom,
     width: w,
     height: Math.max(0, headerH - rr),
-    color: C.redTop,
+    color: C.monthBg,
   });
-  page.drawCircle({ x: x + rr, y: topY - rr, size: rr, color: C.redTop });
+  page.drawCircle({ x: x + rr, y: topY - rr, size: rr, color: C.monthBg });
   page.drawCircle({
     x: x + w - rr,
     y: topY - rr,
     size: rr,
-    color: C.redTop,
+    color: C.monthBg,
   });
 
   const iso =
@@ -286,58 +261,48 @@ function drawDateBadge(
   const month = iso ? MONTH_SHORT_DE[Number(iso.slice(5, 7)) - 1] : "---";
   const day = iso ? String(Number(iso.slice(8, 10))) : "-";
   const year = iso ? iso.slice(0, 4) : "----";
-  const weekday = iso ? toPdfSafeText(weekdayDe(iso)) : "Ohne Datum";
+  const weekday = iso ? toPdfSafeText(weekdayShortDe(iso)) : "-";
 
-  const bodyH = h - headerH;
-  const monthSize = headerH >= 24 ? 11 : 9;
-  const wdSize = bodyH >= 80 ? 10 : 8;
-  const daySize = bodyH >= 80 ? 28 : bodyH >= 65 ? 20 : 16;
-  const yearSize = bodyH >= 80 ? 11 : 9;
-  const pad = 3;
+  const monthSize = 11;
+  const daySize = h >= 78 ? 20 : 17;
+  const metaSize = 8;
+  const gap = 2;
+  const topPad = 3;
+  const bottomPad = 3;
 
   page.drawText(month, {
     x: x + (w - bold.widthOfTextAtSize(month, monthSize)) / 2,
-    y: topY - headerH + Math.max(4, (headerH - monthSize) / 2),
+    y: topY - headerH + Math.max(2, (headerH - monthSize) / 2),
     size: monthSize,
     font: bold,
-    color: C.white,
+    color: C.monthFg,
   });
 
-  // Stack weekday → day → year inside the body without overlap
-  const weekdayY = topY - headerH - pad - wdSize;
-  const yearY = bottom + pad + 2;
-  const minDayY = yearY + yearSize + 3;
-  const maxDayY = weekdayY - daySize - 2;
-  let fittedDaySize = daySize;
-  let dayY = minDayY;
-  if (maxDayY >= minDayY) {
-    dayY = (minDayY + maxDayY) / 2;
-  } else {
-    // Shrink day numeral until it fits between weekday and year
-    fittedDaySize = Math.max(12, weekdayY - 2 - minDayY);
-    dayY = minDayY;
-  }
-
-  page.drawText(weekday, {
-    x: x + Math.max(2, (w - bold.widthOfTextAtSize(weekday, wdSize)) / 2),
-    y: weekdayY,
-    size: wdSize,
-    font: bold,
-    color: C.ink,
-  });
+  // Pack from top of body: day → weekday → year (no vertical centering)
+  let cursor = topY - headerH - topPad - daySize;
   page.drawText(day, {
-    x: x + (w - bold.widthOfTextAtSize(day, fittedDaySize)) / 2,
-    y: dayY,
-    size: fittedDaySize,
+    x: x + (w - bold.widthOfTextAtSize(day, daySize)) / 2,
+    y: cursor,
+    size: daySize,
     font: bold,
     color: C.ink,
   });
-  page.drawText(year, {
-    x: x + (w - bold.widthOfTextAtSize(year, yearSize)) / 2,
-    y: yearY,
-    size: yearSize,
+  cursor -= gap + metaSize;
+  const weekdayY = Math.max(bottom + bottomPad + metaSize + gap, cursor);
+  page.drawText(weekday, {
+    x: x + Math.max(2, (w - bold.widthOfTextAtSize(weekday, metaSize)) / 2),
+    y: weekdayY,
+    size: metaSize,
     font: bold,
-    color: C.ink,
+    color: C.muted,
+  });
+  const yearY = Math.max(bottom + bottomPad, weekdayY - gap - metaSize);
+  page.drawText(year, {
+    x: x + (w - bold.widthOfTextAtSize(year, metaSize)) / 2,
+    y: yearY,
+    size: metaSize,
+    font: bold,
+    color: C.muted,
   });
 }
 
@@ -476,7 +441,7 @@ export async function buildExpensePdfBuffer(input: {
     color: C.headerBorder,
   });
 
-  const eyebrow = "FINANZBRAIN  ·  NEUE AUSGABE";
+  const eyebrow = "FINANZBUDDY  ·  NEUE AUSGABE";
   page.drawText(eyebrow, {
     x: contentX,
     y: cardTop - 32,
@@ -500,8 +465,8 @@ export async function buildExpensePdfBuffer(input: {
 
   // Top body: date badge + title (no AI image here)
   let y = headerBottom - 36;
-  const badgeW = 100;
-  const badgeH = 128;
+  const badgeW = 78;
+  const badgeH = 82;
   drawDateBadge(page, bold, input.expenseDate, contentX, y, badgeW, badgeH);
 
   const titleX = contentX + badgeW + 22;
@@ -724,37 +689,47 @@ export async function buildSettlementPdfBuffer(input: {
     cardW,
     headerH,
     CARD_RADIUS,
-    rgb(0.8, 0.984, 0.945)
+    C.headerBg
   );
   page.drawRectangle({
     x: cardX,
     y: headerBottom,
     width: cardW,
     height: 1.5,
-    color: rgb(0.369, 0.918, 0.831),
+    color: C.headerBorder,
   });
 
-  page.drawText("FINANZBRAIN  ·  RUECKZAHLUNG", {
+  page.drawText("FINANZBUDDY  ·  RUECKZAHLUNG", {
     x: contentX,
     y: cardTop - 32,
     size: 13,
     font: bold,
-    color: rgb(0.067, 0.369, 0.349),
+    color: C.headerLabel,
   });
   page.drawText(toPdfSafeText(input.ledgerTitle), {
     x: contentX,
     y: cardTop - 58,
     size: 22,
     font: bold,
-    color: rgb(0.075, 0.306, 0.29),
+    color: C.headerTitle,
   });
 
   let y = headerBottom - 36;
-  drawDateBadge(page, bold, input.settledAt?.slice(0, 10) ?? null, contentX, y);
+  const badgeW = 78;
+  const badgeH = 82;
+  drawDateBadge(
+    page,
+    bold,
+    input.settledAt?.slice(0, 10) ?? null,
+    contentX,
+    y,
+    badgeW,
+    badgeH
+  );
 
   const money = formatMoney(input.amount, input.currency);
   const hasFx = isForeignCurrency(input.currency, input.baseCurrency);
-  const titleX = contentX + 122;
+  const titleX = contentX + badgeW + 22;
   page.drawText(
     toPdfSafeText(`${input.fromName} -> ${input.toName}`),
     {
@@ -766,7 +741,7 @@ export async function buildSettlementPdfBuffer(input: {
     }
   );
 
-  y = y - 150;
+  y = y - badgeH - 28;
   const labelW = 168;
   const valueMaxW = PAGE_W - OUTER * 2 - pad * 2 - labelW;
   const rows: Array<[string, string, boolean?]> = [
@@ -888,7 +863,7 @@ export async function buildLedgerExpensesPdfBuffer(input: {
     borderColor: C.headerBorder,
     borderWidth: 1,
   });
-  page.drawText("FINANZBRAIN  ·  ALLE AUSGABEN", {
+  page.drawText("FINANZBUDDY  ·  ALLE AUSGABEN", {
     x: margin + 16,
     y: y - 28,
     size: 12,
@@ -918,8 +893,8 @@ export async function buildLedgerExpensesPdfBuffer(input: {
   y -= 98;
 
   for (const exp of input.expenses) {
-    const badgeW = 72;
-    const badgeH = 96;
+    const badgeW = 62;
+    const badgeH = 74;
     const padX = 12;
     const padY = 12;
     const img = await embedOptionalScaledJpeg(

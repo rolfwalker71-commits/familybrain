@@ -32,6 +32,10 @@ function dayNumber(isoDate: string): string {
   return String(Number(isoDate.slice(8, 10)));
 }
 
+function yearNumber(isoDate: string): string {
+  return isoDate.slice(0, 4);
+}
+
 /** Normalize to YYYY-MM-DD when possible. */
 export function toIsoDateOnly(raw: string | null | undefined): string | null {
   if (!raw) return null;
@@ -41,23 +45,25 @@ export function toIsoDateOnly(raw: string | null | undefined): string | null {
 }
 
 const SIZE_STYLES = {
-  /** Compact — mobile travel/finance cards (wider, shorter) */
+  /** Compact — mobile travel/finance cards */
   sm: {
-    root: "w-[3.35rem] rounded-md",
-    month: "px-1 py-0.5 text-[10px] font-extrabold",
-    body: "px-1 py-1",
-    day: "text-[18px] font-extrabold",
-    weekday: "mt-px text-[10px]",
-    time: "mt-px text-[8px]",
+    root: "w-[3.85rem] rounded-md",
+    month: "px-1 py-px text-[11px] font-black leading-none",
+    body: "gap-px px-1 py-0.5",
+    day: "text-[19px] font-black leading-none",
+    weekday: "text-[9px] font-semibold leading-none",
+    year: "text-[9px] font-bold leading-none",
+    time: "text-[8px] leading-none",
   },
   /** Default desktop / roomier cards */
   md: {
-    root: "w-16 rounded-lg sm:w-[4.25rem]",
-    month: "px-1 py-1 text-[11px] font-extrabold sm:text-[12px]",
-    body: "px-1 py-1.5",
-    day: "text-[23px] font-extrabold sm:text-[25px]",
-    weekday: "mt-0.5 text-[11px] sm:text-[12px]",
-    time: "mt-0.5 text-[10px]",
+    root: "w-[4.5rem] rounded-lg sm:w-[4.75rem]",
+    month: "px-1 py-0.5 text-[12px] font-black leading-none sm:text-[13px]",
+    body: "gap-0.5 px-1 py-1",
+    day: "text-[24px] font-black leading-none sm:text-[26px]",
+    weekday: "text-[10px] font-semibold leading-none sm:text-[11px]",
+    year: "text-[10px] font-bold leading-none sm:text-[11px]",
+    time: "text-[9px] leading-none",
   },
 } as const;
 
@@ -65,7 +71,7 @@ export type CalendarDateBadgeSize = keyof typeof SIZE_STYLES;
 
 /**
  * Soft-UI calendar date badge (TravelBuddy / FinanzBuddy).
- * Month strip on top, large day, short weekday.
+ * Month strip, large day, weekday, year — compact stack.
  */
 export function CalendarDateBadge({
   isoDate,
@@ -97,7 +103,7 @@ export function CalendarDateBadge({
     >
       <div
         className={cn(
-          "shrink-0 text-center uppercase leading-none tracking-wide",
+          "shrink-0 text-center uppercase tracking-wide",
           monthTone,
           s.month
         )}
@@ -106,33 +112,21 @@ export function CalendarDateBadge({
       </div>
       <div
         className={cn(
-          "flex min-h-0 flex-1 flex-col items-center justify-center bg-card",
+          "flex flex-col items-center justify-center bg-card",
           s.body
         )}
       >
-        <div
-          className={cn(
-            "leading-none tabular-nums text-foreground",
-            s.day
-          )}
-        >
+        <div className={cn("tabular-nums text-foreground", s.day)}>
           {dayNumber(isoDate)}
         </div>
-        <div
-          className={cn(
-            "font-medium leading-none text-muted-foreground",
-            s.weekday
-          )}
-        >
+        <div className={cn("text-muted-foreground", s.weekday)}>
           {weekdayShortDe(isoDate)}
         </div>
+        <div className={cn("tabular-nums text-muted-foreground", s.year)}>
+          {yearNumber(isoDate)}
+        </div>
         {time ? (
-          <div
-            className={cn(
-              "font-medium tabular-nums text-muted-foreground",
-              s.time
-            )}
-          >
+          <div className={cn("tabular-nums text-muted-foreground", s.time)}>
             {time}
           </div>
         ) : null}

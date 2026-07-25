@@ -21,11 +21,25 @@ const MONTH_SHORT_DE = [
   "DEZ",
 ] as const;
 
-function weekdayDe(isoDate: string): string {
+/** Matches Soft-UI CalendarDateBadge (short weekday). */
+function weekdayShortDe(isoDate: string): string {
   const [y, m, d] = isoDate.split("-").map(Number);
   const date = new Date(y, m - 1, d);
-  return new Intl.DateTimeFormat("de-CH", { weekday: "long" }).format(date);
+  return new Intl.DateTimeFormat("de-CH", { weekday: "short" })
+    .format(date)
+    .replace(/\.$/, "");
 }
+
+/** Soft-UI sage palette (matches --brand-finance / globals.css). */
+const BRAND = {
+  finance: "#3f6b52",
+  financeSoft: "#d9e4d1",
+  ink: "#14201c",
+  muted: "#5b6b66",
+  border: "#d7e0dc",
+  page: "#eef2f0",
+  card: "#ffffff",
+} as const;
 
 export function escapeHtml(raw: string): string {
   return raw
@@ -37,19 +51,20 @@ export function escapeHtml(raw: string): string {
 
 export function dateBadgeHtml(isoDate: string | null | undefined): string {
   if (!isoDate || !/^\d{4}-\d{2}-\d{2}/.test(isoDate)) {
-    return `<div style="font-size:12px;color:#64748b;">Ohne Datum</div>`;
+    return `<div style="font-size:12px;color:${BRAND.muted};">Ohne Datum</div>`;
   }
   const iso = isoDate.slice(0, 10);
   const month = MONTH_SHORT_DE[Number(iso.slice(5, 7)) - 1] ?? "";
   const day = String(Number(iso.slice(8, 10)));
   const year = iso.slice(0, 4);
+  const weekday = weekdayShortDe(iso);
   return `
-    <div style="width:72px;border-radius:10px;overflow:hidden;border:1px solid rgba(0,0,0,.08);box-shadow:0 2px 8px rgba(15,23,42,.12);font-family:system-ui,sans-serif;flex-shrink:0;">
-      <div style="background:linear-gradient(#ef4444,#b91c1c);color:#fff;text-align:center;font-size:11px;font-weight:900;padding:6px 4px;letter-spacing:.04em;">${month}</div>
-      <div style="background:linear-gradient(#fff,#f1f5f9);text-align:center;padding:8px 4px;">
-        <div style="font-size:11px;font-weight:800;color:#0f172a;">${escapeHtml(weekdayDe(iso))}</div>
-        <div style="font-size:24px;font-weight:900;color:#0f172a;line-height:1.1;margin-top:2px;">${day}</div>
-        <div style="font-size:12px;font-weight:700;color:#0f172a;margin-top:2px;">${year}</div>
+    <div style="width:62px;border-radius:8px;overflow:hidden;border:1px solid ${BRAND.border};box-shadow:0 1px 2px rgba(20,32,28,.08),0 4px 10px rgba(20,32,28,.06);font-family:system-ui,sans-serif;flex-shrink:0;background:${BRAND.card};">
+      <div style="background:${BRAND.financeSoft};color:${BRAND.finance};text-align:center;font-size:11px;font-weight:900;padding:3px 2px 2px;letter-spacing:.04em;text-transform:uppercase;line-height:1;">${month}</div>
+      <div style="background:${BRAND.card};text-align:center;padding:3px 2px 4px;">
+        <div style="font-size:19px;font-weight:900;color:${BRAND.ink};line-height:1;font-variant-numeric:tabular-nums;">${day}</div>
+        <div style="font-size:9px;font-weight:600;color:${BRAND.muted};margin-top:2px;line-height:1;">${escapeHtml(weekday)}</div>
+        <div style="font-size:9px;font-weight:700;color:${BRAND.muted};margin-top:1px;line-height:1;font-variant-numeric:tabular-nums;">${year}</div>
       </div>
     </div>`;
 }
@@ -93,11 +108,11 @@ function moneyLines(input: {
   return {
     money,
     fxHtml: `
-      <div style="margin-top:8px;font-size:13px;color:#64748b;line-height:1.55;">
-        <div>Währung: <strong style="color:#0f172a;">${escapeHtml(cur)}</strong></div>
-        <div>FW Betrag: <strong style="color:#0f172a;">${escapeHtml(money)}</strong></div>
-        <div style="font-size:14px;font-weight:700;color:#0f172a;">Betrag ${escapeHtml(base)}: ${escapeHtml(baseMoney)}</div>
-        <div>Kurs: <strong style="color:#0f172a;">${escapeHtml(rateLine)}</strong></div>
+      <div style="margin-top:8px;font-size:13px;color:${BRAND.muted};line-height:1.55;">
+        <div>Währung: <strong style="color:${BRAND.ink};">${escapeHtml(cur)}</strong></div>
+        <div>FW Betrag: <strong style="color:${BRAND.ink};">${escapeHtml(money)}</strong></div>
+        <div style="font-size:14px;font-weight:700;color:${BRAND.ink};">Betrag ${escapeHtml(base)}: ${escapeHtml(baseMoney)}</div>
+        <div>Kurs: <strong style="color:${BRAND.ink};">${escapeHtml(rateLine)}</strong></div>
       </div>`,
     fxText: [
       `Währung: ${cur}`,
@@ -115,30 +130,30 @@ function expenseCardHtml(input: ExpenseMailFields): string {
   const cid = input.aiCid || `expense-ai-${input.expenseId}`;
   const hasFx = Boolean(fxHtml);
   return `
-    <div style="background:#fff;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;margin-bottom:16px;">
+    <div style="background:${BRAND.card};border-radius:12px;overflow:hidden;border:1px solid ${BRAND.border};margin-bottom:16px;">
       <div style="padding:14px 16px;display:flex;gap:14px;align-items:flex-start;">
         ${dateBadgeHtml(input.expenseDate)}
         <div style="flex:1;min-width:0;">
-          <div style="font-size:17px;font-weight:800;line-height:1.25;color:#0f172a;">${escapeHtml(title)}</div>
-          <div style="margin-top:8px;font-size:13px;color:#475569;">
-            <span style="display:inline-block;background:#ffedd5;color:#9a3412;border-radius:4px;padding:2px 6px;font-size:10px;font-weight:700;text-transform:uppercase;margin-right:6px;">${escapeHtml(category)}</span>
-            Bezahlt von ${escapeHtml(input.paidByName)}${hasFx ? "" : ` · <strong>${escapeHtml(money)}</strong>`}
+          <div style="font-size:17px;font-weight:800;line-height:1.25;color:${BRAND.ink};">${escapeHtml(title)}</div>
+          <div style="margin-top:8px;font-size:13px;color:${BRAND.muted};">
+            <span style="display:inline-block;background:${BRAND.financeSoft};color:${BRAND.finance};border-radius:4px;padding:2px 6px;font-size:10px;font-weight:700;text-transform:uppercase;margin-right:6px;">${escapeHtml(category)}</span>
+            Bezahlt von ${escapeHtml(input.paidByName)}${hasFx ? "" : ` · <strong style="color:${BRAND.ink};">${escapeHtml(money)}</strong>`}
           </div>
           ${fxHtml}
           ${
             input.placeName
-              ? `<div style="margin-top:6px;font-size:13px;color:#64748b;">Ort: ${escapeHtml(input.placeName)}</div>`
+              ? `<div style="margin-top:6px;font-size:13px;color:${BRAND.muted};">Ort: ${escapeHtml(input.placeName)}</div>`
               : ""
           }
           ${
             input.note?.trim()
-              ? `<div style="margin-top:6px;font-size:13px;color:#64748b;">Notiz: ${escapeHtml(input.note.trim())}</div>`
+              ? `<div style="margin-top:6px;font-size:13px;color:${BRAND.muted};">Notiz: ${escapeHtml(input.note.trim())}</div>`
               : ""
           }
         </div>
         ${
           input.hasAiImage
-            ? `<img src="cid:${escapeHtml(cid)}" alt="" width="72" height="72" style="width:72px;height:72px;border-radius:8px;object-fit:cover;border:1px solid #e2e8f0;flex-shrink:0;" />`
+            ? `<img src="cid:${escapeHtml(cid)}" alt="" width="72" height="72" style="width:72px;height:72px;border-radius:8px;object-fit:cover;border:1px solid ${BRAND.border};flex-shrink:0;" />`
             : ""
         }
       </div>
@@ -162,15 +177,15 @@ export function buildExpenseMailHtml(
   });
 
   const html = `<!DOCTYPE html>
-<html><body style="margin:0;padding:24px;background:#f8fafc;font-family:system-ui,-apple-system,sans-serif;color:#0f172a;">
+<html><body style="margin:0;padding:24px;background:${BRAND.page};font-family:system-ui,-apple-system,sans-serif;color:${BRAND.ink};">
   <div style="max-width:640px;margin:0 auto;">
-    <div style="padding:14px 18px;background:#ffedd5;border:1px solid #fdba74;border-radius:12px 12px 0 0;">
-      <div style="font-size:12px;font-weight:700;color:#9a3412;letter-spacing:.04em;text-transform:uppercase;">FinanzBuddy · Neue Ausgabe</div>
-      <div style="font-size:14px;color:#7c2d12;margin-top:2px;">${escapeHtml(input.ledgerTitle)}</div>
+    <div style="padding:14px 18px;background:${BRAND.financeSoft};border:1px solid ${BRAND.border};border-radius:12px 12px 0 0;">
+      <div style="font-size:12px;font-weight:700;color:${BRAND.finance};letter-spacing:.04em;text-transform:uppercase;">FinanzBuddy · Neue Ausgabe</div>
+      <div style="font-size:14px;color:${BRAND.finance};margin-top:2px;font-weight:600;">${escapeHtml(input.ledgerTitle)}</div>
     </div>
-    <div style="border:1px solid #e2e8f0;border-top:0;border-radius:0 0 12px 12px;overflow:hidden;background:#fff;">
+    <div style="border:1px solid ${BRAND.border};border-top:0;border-radius:0 0 12px 12px;overflow:hidden;background:${BRAND.card};">
       <div style="padding:16px 16px 4px;">${card}</div>
-      <div style="padding:12px 18px 18px;font-size:12px;color:#64748b;border-top:1px solid #f1f5f9;">
+      <div style="padding:12px 18px 18px;font-size:12px;color:${BRAND.muted};border-top:1px solid ${BRAND.page};">
         Beleg-PDF im Anhang — geeignet für Paperless / FamilyBrain.
       </div>
     </div>
@@ -215,18 +230,18 @@ export function buildLedgerExpensesMailHtml(input: {
     .join("");
 
   const html = `<!DOCTYPE html>
-<html><body style="margin:0;padding:24px;background:#f8fafc;font-family:system-ui,-apple-system,sans-serif;color:#0f172a;">
+<html><body style="margin:0;padding:24px;background:${BRAND.page};font-family:system-ui,-apple-system,sans-serif;color:${BRAND.ink};">
   <div style="max-width:600px;margin:0 auto;">
-    <div style="padding:16px 18px;background:#ffedd5;border:1px solid #fdba74;border-radius:12px;margin-bottom:16px;">
-      <div style="font-size:12px;font-weight:700;color:#9a3412;letter-spacing:.04em;text-transform:uppercase;">FinanzBuddy · Alle Ausgaben</div>
-      <div style="font-size:20px;font-weight:800;color:#7c2d12;margin-top:4px;">${escapeHtml(input.ledgerTitle)}</div>
-      <div style="font-size:13px;color:#9a3412;margin-top:6px;">${count} Ausgaben · Summe ${escapeHtml(totalLabel)}</div>
+    <div style="padding:16px 18px;background:${BRAND.financeSoft};border:1px solid ${BRAND.border};border-radius:12px;margin-bottom:16px;">
+      <div style="font-size:12px;font-weight:700;color:${BRAND.finance};letter-spacing:.04em;text-transform:uppercase;">FinanzBuddy · Alle Ausgaben</div>
+      <div style="font-size:20px;font-weight:800;color:${BRAND.finance};margin-top:4px;">${escapeHtml(input.ledgerTitle)}</div>
+      <div style="font-size:13px;color:${BRAND.finance};margin-top:6px;">${count} Ausgaben · Summe ${escapeHtml(totalLabel)}</div>
     </div>
     ${
       cards ||
-      `<div style="padding:18px;color:#64748b;background:#fff;border-radius:12px;border:1px solid #e2e8f0;">Noch keine Ausgaben.</div>`
+      `<div style="padding:18px;color:${BRAND.muted};background:${BRAND.card};border-radius:12px;border:1px solid ${BRAND.border};">Noch keine Ausgaben.</div>`
     }
-    <div style="padding:12px 4px;font-size:12px;color:#64748b;">
+    <div style="padding:12px 4px;font-size:12px;color:${BRAND.muted};">
       Übersicht-PDF im Anhang — geeignet für Paperless / FamilyBrain.
     </div>
   </div>
@@ -271,28 +286,28 @@ export function buildSettlementMailHtml(input: {
   const settledLabel = formatDateDe(input.settledAt);
 
   const html = `<!DOCTYPE html>
-<html><body style="margin:0;padding:24px;background:#f8fafc;font-family:system-ui,-apple-system,sans-serif;color:#0f172a;">
-  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;">
-    <div style="padding:14px 18px;background:#ccfbf1;border-bottom:1px solid #5eead4;">
-      <div style="font-size:12px;font-weight:700;color:#115e59;letter-spacing:.04em;text-transform:uppercase;">FinanzBuddy · Rückzahlung</div>
-      <div style="font-size:14px;color:#134e4a;margin-top:2px;">${escapeHtml(input.ledgerTitle)}</div>
+<html><body style="margin:0;padding:24px;background:${BRAND.page};font-family:system-ui,-apple-system,sans-serif;color:${BRAND.ink};">
+  <div style="max-width:560px;margin:0 auto;background:${BRAND.card};border-radius:12px;overflow:hidden;border:1px solid ${BRAND.border};">
+    <div style="padding:14px 18px;background:${BRAND.financeSoft};border-bottom:1px solid ${BRAND.border};">
+      <div style="font-size:12px;font-weight:700;color:${BRAND.finance};letter-spacing:.04em;text-transform:uppercase;">FinanzBuddy · Rückzahlung</div>
+      <div style="font-size:14px;color:${BRAND.finance};margin-top:2px;font-weight:600;">${escapeHtml(input.ledgerTitle)}</div>
     </div>
     <div style="padding:18px;display:flex;gap:16px;align-items:flex-start;">
       ${dateBadgeHtml(input.settledAt?.slice(0, 10))}
       <div style="flex:1;min-width:0;">
-        <div style="font-size:18px;font-weight:800;line-height:1.25;">
+        <div style="font-size:18px;font-weight:800;line-height:1.25;color:${BRAND.ink};">
           ${escapeHtml(input.fromName)} → ${escapeHtml(input.toName)}
         </div>
-        <div style="margin-top:8px;font-size:15px;font-weight:700;">${escapeHtml(money)}</div>
+        <div style="margin-top:8px;font-size:15px;font-weight:700;color:${BRAND.ink};">${escapeHtml(money)}</div>
         ${fxHtml}
         ${
           input.note
-            ? `<div style="margin-top:8px;font-size:13px;color:#64748b;">${escapeHtml(input.note)}</div>`
+            ? `<div style="margin-top:8px;font-size:13px;color:${BRAND.muted};">${escapeHtml(input.note)}</div>`
             : ""
         }
       </div>
     </div>
-    <div style="padding:12px 18px 18px;font-size:12px;color:#64748b;border-top:1px solid #f1f5f9;">
+    <div style="padding:12px 18px 18px;font-size:12px;color:${BRAND.muted};border-top:1px solid ${BRAND.page};">
       Beleg-PDF im Anhang — geeignet für Paperless / FamilyBrain.
     </div>
   </div>
