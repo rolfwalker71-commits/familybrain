@@ -357,8 +357,6 @@ function ensureFinanceBrainTables(db: Database.Database): void {
       ON finance_ledger_members(ledger_id);
     CREATE INDEX IF NOT EXISTS idx_finance_ledger_members_token
       ON finance_ledger_members(invite_token);
-    CREATE INDEX IF NOT EXISTS idx_finance_ledger_members_couple
-      ON finance_ledger_members(couple_id);
 
     CREATE TABLE IF NOT EXISTS finance_ledger_couple_groups (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -438,7 +436,6 @@ function ensureFinanceBrainTables(db: Database.Database): void {
       FOREIGN KEY(related_expense_id) REFERENCES finance_expenses(id) ON DELETE CASCADE
     );
     CREATE INDEX IF NOT EXISTS idx_finance_settlements_ledger ON finance_settlements(ledger_id);
-    CREATE INDEX IF NOT EXISTS idx_finance_settlements_expense ON finance_settlements(related_expense_id);
   `);
 
   const expenseCols = db
@@ -513,10 +510,10 @@ function ensureFinanceBrainTables(db: Database.Database): void {
     db.exec(
       `ALTER TABLE finance_settlements ADD COLUMN related_expense_id INTEGER`
     );
-    db.exec(
-      `CREATE INDEX IF NOT EXISTS idx_finance_settlements_expense ON finance_settlements(related_expense_id)`
-    );
   }
+  db.exec(
+    `CREATE INDEX IF NOT EXISTS idx_finance_settlements_expense ON finance_settlements(related_expense_id)`
+  );
 
   const memberCols = db
     .prepare(`PRAGMA table_info(finance_ledger_members)`)

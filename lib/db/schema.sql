@@ -436,9 +436,7 @@ CREATE INDEX IF NOT EXISTS idx_finance_ledger_members_ledger
   ON finance_ledger_members(ledger_id);
 CREATE INDEX IF NOT EXISTS idx_finance_ledger_members_token
   ON finance_ledger_members(invite_token);
-CREATE INDEX IF NOT EXISTS idx_finance_ledger_members_couple
-  ON finance_ledger_members(couple_id);
--- idx on user_id is created in bootstrap after ALTER adds the column on existing DBs
+-- idx on user_id / couple_id is created in bootstrap after ALTER on existing DBs
 
 CREATE TABLE IF NOT EXISTS finance_ledger_couple_groups (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -518,7 +516,7 @@ CREATE TABLE IF NOT EXISTS finance_settlements (
   FOREIGN KEY(related_expense_id) REFERENCES finance_expenses(id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_finance_settlements_ledger ON finance_settlements(ledger_id);
-CREATE INDEX IF NOT EXISTS idx_finance_settlements_expense ON finance_settlements(related_expense_id);
+-- idx_finance_settlements_expense is created in bootstrap after column migration
 
 CREATE TABLE IF NOT EXISTS user_trip_access (
   user_id INTEGER NOT NULL,
