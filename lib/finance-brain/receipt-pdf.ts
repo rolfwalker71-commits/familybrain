@@ -68,12 +68,10 @@ function toPdfSafeText(raw: string): string {
     .replace(/[\uFE0E\uFE0F\u200D]/g, "");
 }
 
-function weekdayShortDe(isoDate: string): string {
+function weekdayLongDe(isoDate: string): string {
   const [y, m, d] = isoDate.split("-").map(Number);
   const date = new Date(y, m - 1, d);
-  return new Intl.DateTimeFormat("de-CH", { weekday: "short" })
-    .format(date)
-    .replace(/\.$/, "");
+  return new Intl.DateTimeFormat("de-CH", { weekday: "long" }).format(date);
 }
 
 function wrapText(
@@ -223,13 +221,13 @@ function drawDateBadge(
   isoDate: string | null | undefined,
   x: number,
   topY: number,
-  w = 78,
-  h = 82
+  w = 92,
+  h = 86
 ) {
   const bottom = topY - h;
   const rr = Math.min(8, w / 4, h / 5);
 
-  // Compact Soft-UI badge: month + day + weekday + year, tightly packed
+  // Order: month → weekday (full) → day → year
   drawRoundedRect(page, x, bottom, w, h, rr, C.card, C.border, 1);
 
   const headerH = 16;
@@ -261,14 +259,15 @@ function drawDateBadge(
   const month = iso ? MONTH_SHORT_DE[Number(iso.slice(5, 7)) - 1] : "---";
   const day = iso ? String(Number(iso.slice(8, 10))) : "-";
   const year = iso ? iso.slice(0, 4) : "----";
-  const weekday = iso ? toPdfSafeText(weekdayShortDe(iso)) : "-";
+  const weekday = iso ? toPdfSafeText(weekdayLongDe(iso)) : "-";
 
   const monthSize = 11;
-  const daySize = h >= 78 ? 20 : 17;
-  const metaSize = 8;
+  const daySize = h >= 80 ? 19 : 16;
+  const metaSize = 7;
   const gap = 2;
   const topPad = 3;
   const bottomPad = 3;
+  const sidePad = 3;
 
   page.drawText(month, {
     x: x + (w - bold.widthOfTextAtSize(month, monthSize)) / 2,
@@ -278,8 +277,23 @@ function drawDateBadge(
     color: C.monthFg,
   });
 
-  // Pack from top of body: day → weekday → year (no vertical centering)
-  let cursor = topY - headerH - topPad - daySize;
+  // Pack from top: weekday → day → year
+  let cursor = topY - headerH - topPad - metaSize;
+  let weekdaySize = metaSize;
+  while (
+    weekdaySize > 5 &&
+    bold.widthOfTextAtSize(weekday, weekdaySize) > w - sidePad * 2
+  ) {
+    weekdaySize -= 0.5;
+  }
+  page.drawText(weekday, {
+    x: x + Math.max(sidePad, (w - bold.widthOfTextAtSize(weekday, weekdaySize)) / 2),
+    y: cursor,
+    size: weekdaySize,
+    font: bold,
+    color: C.muted,
+  });
+  cursor -= gap + daySize;
   page.drawText(day, {
     x: x + (w - bold.widthOfTextAtSize(day, daySize)) / 2,
     y: cursor,
@@ -287,19 +301,10 @@ function drawDateBadge(
     font: bold,
     color: C.ink,
   });
-  cursor -= gap + metaSize;
-  const weekdayY = Math.max(bottom + bottomPad + metaSize + gap, cursor);
-  page.drawText(weekday, {
-    x: x + Math.max(2, (w - bold.widthOfTextAtSize(weekday, metaSize)) / 2),
-    y: weekdayY,
-    size: metaSize,
-    font: bold,
-    color: C.muted,
-  });
-  const yearY = Math.max(bottom + bottomPad, weekdayY - gap - metaSize);
+  cursor = Math.max(bottom + bottomPad, cursor - gap - metaSize);
   page.drawText(year, {
     x: x + (w - bold.widthOfTextAtSize(year, metaSize)) / 2,
-    y: yearY,
+    y: cursor,
     size: metaSize,
     font: bold,
     color: C.muted,
@@ -465,8 +470,8 @@ export async function buildExpensePdfBuffer(input: {
 
   // Top body: date badge + title (no AI image here)
   let y = headerBottom - 36;
-  const badgeW = 78;
-  const badgeH = 82;
+  const badgeW = 92;
+  const badgeH = 86;
   drawDateBadge(page, bold, input.expenseDate, contentX, y, badgeW, badgeH);
 
   const titleX = contentX + badgeW + 22;
@@ -715,8 +720,8 @@ export async function buildSettlementPdfBuffer(input: {
   });
 
   let y = headerBottom - 36;
-  const badgeW = 78;
-  const badgeH = 82;
+  const badgeW = 92;
+  const badgeH = 86;
   drawDateBadge(
     page,
     bold,
@@ -893,8 +898,8 @@ export async function buildLedgerExpensesPdfBuffer(input: {
   y -= 98;
 
   for (const exp of input.expenses) {
-    const badgeW = 62;
-    const badgeH = 74;
+    const badgeW = 78;
+    const badgeH = 78;
     const padX = 12;
     const padY = 12;
     const img = await embedOptionalScaledJpeg(

@@ -15,12 +15,11 @@ const MONTH_SHORT_DE = [
   "DEZ",
 ] as const;
 
-function weekdayShortDe(isoDate: string): string {
+/** Full German weekday, e.g. Freitag. */
+function weekdayLongDe(isoDate: string): string {
   const [y, m, d] = isoDate.split("-").map(Number);
   const date = new Date(y, m - 1, d);
-  return new Intl.DateTimeFormat("de-CH", { weekday: "short" })
-    .format(date)
-    .replace(/\.$/, "");
+  return new Intl.DateTimeFormat("de-CH", { weekday: "long" }).format(date);
 }
 
 function monthShortDe(isoDate: string): string {
@@ -45,25 +44,25 @@ export function toIsoDateOnly(raw: string | null | undefined): string | null {
 }
 
 const SIZE_STYLES = {
-  /** Compact — mobile travel/finance cards */
+  /** Compact — mobile travel/finance cards (wide enough for «Donnerstag») */
   sm: {
-    root: "w-[3.85rem] rounded-md",
+    root: "w-[5.25rem] rounded-md",
     month: "px-1 py-px text-[11px] font-black leading-none",
     body: "gap-px px-1 py-0.5",
-    day: "text-[19px] font-black leading-none",
     weekday: "text-[9px] font-semibold leading-none",
+    day: "text-[19px] font-black leading-none",
     year: "text-[9px] font-bold leading-none",
-    time: "text-[8px] leading-none",
+    time: "text-[8px] font-semibold leading-none",
   },
   /** Default desktop / roomier cards */
   md: {
-    root: "w-[4.5rem] rounded-lg sm:w-[4.75rem]",
+    root: "w-[5.75rem] rounded-lg sm:w-24",
     month: "px-1 py-0.5 text-[12px] font-black leading-none sm:text-[13px]",
     body: "gap-0.5 px-1 py-1",
-    day: "text-[24px] font-black leading-none sm:text-[26px]",
     weekday: "text-[10px] font-semibold leading-none sm:text-[11px]",
+    day: "text-[24px] font-black leading-none sm:text-[26px]",
     year: "text-[10px] font-bold leading-none sm:text-[11px]",
-    time: "text-[9px] leading-none",
+    time: "text-[9px] font-semibold leading-none",
   },
 } as const;
 
@@ -71,7 +70,7 @@ export type CalendarDateBadgeSize = keyof typeof SIZE_STYLES;
 
 /**
  * Soft-UI calendar date badge (TravelBuddy / FinanzBuddy).
- * Month strip, large day, weekday, year — compact stack.
+ * Order: month → weekday (full) → day → year → time.
  */
 export function CalendarDateBadge({
   isoDate,
@@ -116,11 +115,11 @@ export function CalendarDateBadge({
           s.body
         )}
       >
+        <div className={cn("max-w-full truncate text-center text-muted-foreground", s.weekday)}>
+          {weekdayLongDe(isoDate)}
+        </div>
         <div className={cn("tabular-nums text-foreground", s.day)}>
           {dayNumber(isoDate)}
-        </div>
-        <div className={cn("text-muted-foreground", s.weekday)}>
-          {weekdayShortDe(isoDate)}
         </div>
         <div className={cn("tabular-nums text-muted-foreground", s.year)}>
           {yearNumber(isoDate)}

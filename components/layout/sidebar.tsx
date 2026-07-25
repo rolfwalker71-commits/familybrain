@@ -150,6 +150,19 @@ export function Sidebar({
             MyBrain
           </span>
         </Link>
+        {me ? (
+          <div className="mt-4 rounded-xl bg-white/10 px-3 py-2.5 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1)]">
+            <p className="text-[11px] font-medium leading-none text-sidebar-foreground/65">
+              Angemeldet als:
+            </p>
+            <p
+              className="mt-1.5 truncate text-sm font-semibold tracking-tight text-white"
+              title={me.displayName}
+            >
+              {me.displayName}
+            </p>
+          </div>
+        ) : null}
       </div>
 
       <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto px-3 pb-4">
