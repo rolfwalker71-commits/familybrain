@@ -24,8 +24,8 @@ import {
   getFinanceLedgerMemberById,
   getFinanceSettlementById,
   listExpenseShareDisplays,
+  listFinanceExpenseSplits,
   listFinanceExpenses,
-  listFinanceLedgerMembers,
   markFinanceExpenseNotified,
   markFinanceSettlementNotified,
 } from "@/lib/finance-brain/queries";
@@ -34,10 +34,40 @@ import {
   listTripSummaryRecipients,
 } from "@/lib/finance-brain/trip-summary";
 
-function memberEmails(ledgerId: number): string[] {
-  return listFinanceLedgerMembers(ledgerId)
-    .filter((m) => !m.invite_revoked_at && m.email?.trim())
-    .map((m) => m.email!.trim());
+/** Unique emails for active ledger members (non-revoked, with address). */
+function emailsForMemberIds(memberIds: Iterable<number>): string[] {
+  const byLower = new Map<string, string>();
+  for (const id of memberIds) {
+    const member = getFinanceLedgerMemberById(id);
+    const email = member?.email?.trim();
+    if (!email || member?.invite_revoked_at) continue;
+    const key = email.toLowerCase();
+    if (!byLower.has(key)) byLower.set(key, email);
+  }
+  return [...byLower.values()];
+}
+
+/** Payer + split participants for a single expense. */
+function expenseParticipantMemberIds(expenseId: number): number[] {
+  const expense = getFinanceExpenseById(expenseId);
+  if (!expense) return [];
+  const ids = new Set<number>([expense.paid_by_member_id]);
+  for (const split of listFinanceExpenseSplits(expenseId)) {
+    ids.add(split.member_id);
+  }
+  return [...ids];
+}
+
+/** Union of participants across all expenses in a ledger. */
+function ledgerExpenseParticipantMemberIds(ledgerId: number): number[] {
+  const ids = new Set<number>();
+  for (const expense of listFinanceExpenses(ledgerId)) {
+    ids.add(expense.paid_by_member_id);
+    for (const split of listFinanceExpenseSplits(expense.id)) {
+      ids.add(split.member_id);
+    }
+  }
+  return [...ids];
 }
 
 export type NotifyResult = {
@@ -102,7 +132,7 @@ export async function notifyLedgerExpense(
   const ledger = getFinanceLedgerById(expense.ledger_id);
   if (!ledger) return { ok: false, sent: 0, error: "Abrechnung nicht gefunden" };
 
-  const recipients = memberEmails(expense.ledger_id);
+  const recipients = emailsForMemberIds(expenseParticipantMemberIds(expenseId));
   if (recipients.length === 0) {
     markFinanceExpenseNotified(expenseId);
     if (options?.force) {
@@ -174,7 +204,9 @@ export async function notifyLedgerExpensesSummary(
   const ledger = getFinanceLedgerById(ledgerId);
   if (!ledger) return { ok: false, sent: 0, error: "Abrechnung nicht gefunden" };
 
-  const recipients = memberEmails(ledgerId);
+  const recipients = emailsForMemberIds(
+    ledgerExpenseParticipantMemberIds(ledgerId)
+  );
   if (recipients.length === 0) {
     return { ok: false, sent: 0, error: "Keine Empfänger mit E-Mail-Adresse" };
   }
@@ -266,14 +298,17 @@ export async function notifyLedgerSettlement(
   const ledger = getFinanceLedgerById(settlement.ledger_id);
   if (!ledger) return { ok: false, sent: 0, error: "Abrechnung nicht gefunden" };
 
-  const recipients = memberEmails(settlement.ledger_id);
+  const from = getFinanceLedgerMemberById(settlement.from_member_id);
+  const to = getFinanceLedgerMemberById(settlement.to_member_id);
+  const recipients = emailsForMemberIds([
+    settlement.from_member_id,
+    settlement.to_member_id,
+  ]);
   if (recipients.length === 0) {
     markFinanceSettlementNotified(settlementId);
     return { ok: true, sent: 0, skipped: "keine Empfänger mit E-Mail" };
   }
 
-  const from = getFinanceLedgerMemberById(settlement.from_member_id);
-  const to = getFinanceLedgerMemberById(settlement.to_member_id);
   const mail = buildSettlementMailHtml({
     ledgerTitle: ledger.title,
     fromName: from?.display_name || `#${settlement.from_member_id}`,
