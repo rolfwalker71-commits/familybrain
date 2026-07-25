@@ -57,10 +57,10 @@ export function dateBadgeHtml(isoDate: string | null | undefined): string {
   const year = iso.slice(0, 4);
   const weekday = weekdayLongDe(iso);
   return `
-    <div style="width:84px;border-radius:8px;overflow:hidden;border:1px solid ${BRAND.border};box-shadow:0 1px 2px rgba(20,32,28,.08),0 4px 10px rgba(20,32,28,.06);font-family:system-ui,sans-serif;flex-shrink:0;background:${BRAND.card};">
-      <div style="background:${BRAND.financeSoft};color:${BRAND.finance};text-align:center;font-size:11px;font-weight:900;padding:3px 2px 2px;letter-spacing:.04em;text-transform:uppercase;line-height:1;">${month}</div>
-      <div style="background:${BRAND.card};text-align:center;padding:3px 2px 4px;">
-        <div style="font-size:9px;font-weight:600;color:${BRAND.muted};line-height:1.1;">${escapeHtml(weekday)}</div>
+    <div style="width:72px;border-radius:8px;overflow:hidden;border:1px solid ${BRAND.border};box-shadow:0 1px 2px rgba(20,32,28,.08),0 4px 10px rgba(20,32,28,.06);font-family:system-ui,sans-serif;flex-shrink:0;background:${BRAND.card};">
+      <div style="background:${BRAND.financeSoft};color:${BRAND.finance};text-align:center;font-size:11px;font-weight:900;padding:3px 1px 2px;letter-spacing:.04em;text-transform:uppercase;line-height:1;">${month}</div>
+      <div style="background:${BRAND.card};text-align:center;padding:3px 1px 4px;">
+        <div style="font-size:8.5px;font-weight:600;color:${BRAND.muted};line-height:1.1;letter-spacing:-0.02em;">${escapeHtml(weekday)}</div>
         <div style="font-size:19px;font-weight:900;color:${BRAND.ink};line-height:1;margin-top:2px;font-variant-numeric:tabular-nums;">${day}</div>
         <div style="font-size:9px;font-weight:700;color:${BRAND.muted};margin-top:2px;line-height:1;font-variant-numeric:tabular-nums;">${year}</div>
       </div>

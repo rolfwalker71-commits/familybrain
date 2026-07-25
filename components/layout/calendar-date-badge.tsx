@@ -44,22 +44,22 @@ export function toIsoDateOnly(raw: string | null | undefined): string | null {
 }
 
 const SIZE_STYLES = {
-  /** Compact — mobile travel/finance cards (wide enough for «Donnerstag») */
+  /** Narrow but fits «Donnerstag» without clipping */
   sm: {
-    root: "w-[5.25rem] rounded-md",
-    month: "px-1 py-px text-[11px] font-black leading-none",
-    body: "gap-px px-1 py-0.5",
-    weekday: "text-[9px] font-semibold leading-none",
+    root: "w-[4.55rem] rounded-md",
+    month: "px-0.5 py-px text-[11px] font-black leading-none",
+    body: "gap-px px-0.5 py-0.5",
+    weekday: "text-[8.5px] font-semibold leading-none tracking-tight",
     day: "text-[19px] font-black leading-none",
     year: "text-[9px] font-bold leading-none",
     time: "text-[8px] font-semibold leading-none",
   },
-  /** Default desktop / roomier cards */
+  /** Desktop — still compact */
   md: {
-    root: "w-[5.75rem] rounded-lg sm:w-24",
-    month: "px-1 py-0.5 text-[12px] font-black leading-none sm:text-[13px]",
-    body: "gap-0.5 px-1 py-1",
-    weekday: "text-[10px] font-semibold leading-none sm:text-[11px]",
+    root: "w-[5rem] rounded-lg sm:w-[5.25rem]",
+    month: "px-0.5 py-0.5 text-[12px] font-black leading-none sm:text-[13px]",
+    body: "gap-0.5 px-0.5 py-1",
+    weekday: "text-[9px] font-semibold leading-none tracking-tight sm:text-[10px]",
     day: "text-[24px] font-black leading-none sm:text-[26px]",
     year: "text-[10px] font-bold leading-none sm:text-[11px]",
     time: "text-[9px] font-semibold leading-none",
@@ -115,7 +115,12 @@ export function CalendarDateBadge({
           s.body
         )}
       >
-        <div className={cn("max-w-full truncate text-center text-muted-foreground", s.weekday)}>
+        <div
+          className={cn(
+            "w-full text-center text-muted-foreground",
+            s.weekday
+          )}
+        >
           {weekdayLongDe(isoDate)}
         </div>
         <div className={cn("tabular-nums text-foreground", s.day)}>

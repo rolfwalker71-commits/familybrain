@@ -221,7 +221,7 @@ function drawDateBadge(
   isoDate: string | null | undefined,
   x: number,
   topY: number,
-  w = 92,
+  w = 78,
   h = 86
 ) {
   const bottom = topY - h;
@@ -470,7 +470,7 @@ export async function buildExpensePdfBuffer(input: {
 
   // Top body: date badge + title (no AI image here)
   let y = headerBottom - 36;
-  const badgeW = 92;
+  const badgeW = 78;
   const badgeH = 86;
   drawDateBadge(page, bold, input.expenseDate, contentX, y, badgeW, badgeH);
 
@@ -720,7 +720,7 @@ export async function buildSettlementPdfBuffer(input: {
   });
 
   let y = headerBottom - 36;
-  const badgeW = 92;
+  const badgeW = 78;
   const badgeH = 86;
   drawDateBadge(
     page,
@@ -898,7 +898,7 @@ export async function buildLedgerExpensesPdfBuffer(input: {
   y -= 98;
 
   for (const exp of input.expenses) {
-    const badgeW = 78;
+    const badgeW = 70;
     const badgeH = 78;
     const padX = 12;
     const padY = 12;
