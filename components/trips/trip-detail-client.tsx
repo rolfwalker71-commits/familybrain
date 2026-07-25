@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
   BedDouble,
+  BookOpen,
   Bus,
   Car,
   ChevronDown,
@@ -606,6 +607,12 @@ function TripDetailInner({
   const [linkDocsEventId, setLinkDocsEventId] = useState<number | null>(null);
   const [coverPrompt, setCoverPrompt] = useState("");
   const [busy, setBusy] = useState(false);
+  const [diaryOpen, setDiaryOpen] = useState(false);
+  const [diaryBusy, setDiaryBusy] = useState(false);
+  const [diaryRecipients, setDiaryRecipients] = useState<
+    Array<{ recipientKey: string; displayName: string; email: string }>
+  >([]);
+  const [diarySelected, setDiarySelected] = useState<string[]>([]);
   const [placeCandidates, setPlaceCandidates] = useState<
     Record<number, PlaceCandidate[]>
   >({});
@@ -852,6 +859,58 @@ function TripDetailInner({
       return;
     }
     window.location.href = "/trips";
+  }
+
+  async function openDiaryDialog() {
+    setError(null);
+    setStatus(null);
+    try {
+      const res = await fetch(`/api/trips/${tripId}/travel-diary-mail`);
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error || "Empfänger laden fehlgeschlagen");
+      }
+      const list = (json.recipients || []) as Array<{
+        recipientKey: string;
+        displayName: string;
+        email: string;
+      }>;
+      if (list.length === 0) {
+        throw new Error("Keine Teilnehmer mit E-Mail-Adresse");
+      }
+      setDiaryRecipients(list);
+      setDiarySelected(list.map((r) => r.recipientKey));
+      setDiaryOpen(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function sendDiaryMail() {
+    if (diarySelected.length === 0) return;
+    setDiaryBusy(true);
+    setError(null);
+    setStatus(null);
+    try {
+      const res = await fetch(`/api/trips/${tripId}/travel-diary-mail`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recipientKeys: diarySelected }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Mailversand fehlgeschlagen");
+      const sent = typeof json.sent === "number" ? json.sent : 0;
+      setDiaryOpen(false);
+      setStatus(
+        sent > 0
+          ? `Reisetagebuch gesendet (${sent} Empfänger).`
+          : "Reisetagebuch gesendet."
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDiaryBusy(false);
+    }
   }
 
   async function uploadCover(file: File) {
@@ -1587,6 +1646,16 @@ function TripDetailInner({
           onStatus={setStatus}
           onError={setError}
         />
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={diaryBusy || events.length === 0}
+          onClick={() => void openDiaryDialog()}
+          className="gap-1.5"
+        >
+          <BookOpen className="size-4" />
+          {diaryBusy ? "Sendet…" : "Reisetagebuch senden"}
+        </Button>
         <Button
           variant="outline"
           size="sm"
@@ -3549,6 +3618,66 @@ function TripDetailInner({
         )}
       </div>
       ) : null}
+
+      <Dialog open={diaryOpen} onOpenChange={setDiaryOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Reisetagebuch per Mail</DialogTitle>
+            <DialogDescription>
+              {trip.title} — Aktivitäten, Kommentare und Ausgaben als HTML und
+              PDF.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <p className="text-sm font-medium">Wer soll die Mail bekommen?</p>
+            {diaryRecipients.map((r) => {
+              const checked = diarySelected.includes(r.recipientKey);
+              return (
+                <label
+                  key={r.recipientKey}
+                  className="flex cursor-pointer items-center gap-3 rounded-lg border border-border/60 px-3 py-2.5 text-sm hover:bg-muted/40"
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => {
+                      setDiarySelected((prev) =>
+                        checked
+                          ? prev.filter((id) => id !== r.recipientKey)
+                          : [...prev, r.recipientKey]
+                      );
+                    }}
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-medium">{r.displayName}</span>
+                    <span className="block truncate text-xs text-muted-foreground">
+                      {r.email}
+                    </span>
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              disabled={diaryBusy}
+              onClick={() => setDiaryOpen(false)}
+            >
+              Abbrechen
+            </Button>
+            <Button
+              disabled={diaryBusy || diarySelected.length === 0}
+              onClick={() => void sendDiaryMail()}
+              className="bg-[var(--brand-finance)] text-white hover:bg-[var(--brand-finance)]/90"
+            >
+              {diaryBusy
+                ? "Sendet…"
+                : `Senden (${diarySelected.length})`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={aiZoom != null}

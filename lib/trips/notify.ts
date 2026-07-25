@@ -6,13 +6,21 @@ import {
   type MailAttachment,
 } from "@/lib/finance-brain/email";
 import { loadScaledJpeg } from "@/lib/finance-brain/image-scale";
-import { buildTripEventCommentMailHtml } from "@/lib/trips/mail-templates";
+import { buildTravelDiaryPdfBuffer } from "@/lib/finance-brain/receipt-pdf";
+import {
+  buildTravelDiaryMailHtml,
+  buildTripEventCommentMailHtml,
+} from "@/lib/trips/mail-templates";
 import {
   getTripById,
   getTripEventById,
   getTripEventCommentById,
   listTripTravelers,
 } from "@/lib/trips/queries";
+import {
+  buildTravelDiaryModel,
+  listTravelDiaryRecipients,
+} from "@/lib/trips/travel-diary";
 import { getAppUserById } from "@/lib/users/queries";
 
 export type NotifyResult = {
@@ -173,6 +181,113 @@ export async function notifyTripEventComment(
     text: mail.text,
     html: mail.html,
     attachments: attachments.length ? attachments : undefined,
+  });
+  if (!result.ok) {
+    return { ok: false, sent: 0, error: result.error };
+  }
+  return { ok: true, sent: recipients.length };
+}
+
+/** Selective travel diary mail (timeline + comments + expenses + PDF). */
+export async function notifyTravelDiary(
+  tripId: number,
+  recipientKeys: string[]
+): Promise<NotifyResult> {
+  if (!isEmailConfigured()) {
+    return { ok: false, sent: 0, error: "E-Mail nicht konfiguriert" };
+  }
+  if (!getTripById(tripId)) {
+    return { ok: false, sent: 0, error: "Reise nicht gefunden" };
+  }
+
+  const allowed = listTravelDiaryRecipients(tripId);
+  if (allowed.length === 0) {
+    return { ok: false, sent: 0, error: "Keine Empfänger mit E-Mail-Adresse" };
+  }
+
+  const keySet = new Set(recipientKeys);
+  const recipients = allowed.filter((r) => keySet.has(r.recipientKey));
+  if (recipients.length === 0) {
+    return { ok: false, sent: 0, error: "Keine gültigen Empfänger ausgewählt" };
+  }
+
+  let model;
+  try {
+    model = buildTravelDiaryModel(tripId);
+  } catch (err) {
+    return {
+      ok: false,
+      sent: 0,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+
+  if (model.events.length === 0 && model.orphanExpenses.length === 0) {
+    return { ok: false, sent: 0, error: "Keine Einträge fürs Reisetagebuch" };
+  }
+
+  const mail = buildTravelDiaryMailHtml(model);
+  const pdf = await buildTravelDiaryPdfBuffer(model);
+
+  const attachments: MailAttachment[] = [
+    {
+      filename: `travelbuddy-reisetagebuch-${tripId}.pdf`,
+      content: pdf.toString("base64"),
+    },
+  ];
+
+  for (const event of model.events) {
+    if (event.aiImagePath) {
+      const scaled = await loadScaledJpeg(event.aiImagePath, 144);
+      if (scaled) {
+        attachments.push({
+          filename: `event-${event.eventId}-ai.jpg`,
+          content: scaled.toString("base64"),
+          content_id: event.aiCid,
+        });
+      }
+    }
+    for (const comment of event.comments) {
+      if (!comment.imagePath) continue;
+      const scaled = await loadScaledJpeg(comment.imagePath, 480);
+      if (scaled) {
+        attachments.push({
+          filename: `comment-${comment.commentId}.jpg`,
+          content: scaled.toString("base64"),
+          content_id: comment.imageCid,
+        });
+      }
+    }
+    for (const expense of event.expenses) {
+      if (!expense.aiImagePath) continue;
+      const scaled = await loadScaledJpeg(expense.aiImagePath);
+      if (scaled) {
+        attachments.push({
+          filename: `expense-${expense.expenseId}-ai.jpg`,
+          content: scaled.toString("base64"),
+          content_id: expense.aiCid || `expense-ai-${expense.expenseId}`,
+        });
+      }
+    }
+  }
+  for (const expense of model.orphanExpenses) {
+    if (!expense.aiImagePath) continue;
+    const scaled = await loadScaledJpeg(expense.aiImagePath);
+    if (scaled) {
+      attachments.push({
+        filename: `expense-${expense.expenseId}-ai.jpg`,
+        content: scaled.toString("base64"),
+        content_id: expense.aiCid || `expense-ai-${expense.expenseId}`,
+      });
+    }
+  }
+
+  const result = await sendMail({
+    to: recipients.map((r) => r.email),
+    subject: mail.subject,
+    text: mail.text,
+    html: mail.html,
+    attachments,
   });
   if (!result.ok) {
     return { ok: false, sent: 0, error: result.error };

@@ -953,7 +953,11 @@ export async function buildLedgerExpensesPdfBuffer(input: {
       exchangeRate: exp.exchangeRate,
     });
 
-    const detailLines: Array<{ text: string; emphasize?: boolean }> = [
+    const detailLines: Array<{
+      text: string;
+      emphasize?: boolean;
+      share?: boolean;
+    }> = [
       { text: `Bezahlt von: ${exp.paidByName}` },
       ...(hasFx
         ? [
@@ -993,24 +997,34 @@ export async function buildLedgerExpensesPdfBuffer(input: {
                   return `${s.displayName}${s.isPayer ? " (gezahlt)" : ""} ${money}`;
                 })
                 .join(" · ")}`,
+              share: true as const,
             },
           ]
         : []),
       { text: `Beleg-ID: ${exp.expenseId}` },
     ];
 
-    const detailWrapped = detailLines.flatMap((line) =>
-      wrapText(line.text, line.emphasize ? bold : font, line.emphasize ? 11 : 10, textW).map(
-        (wline) => ({ text: wline, emphasize: Boolean(line.emphasize) })
-      )
-    );
+    const detailWrapped = detailLines.flatMap((line) => {
+      const size = "share" in line && line.share ? 8 : line.emphasize ? 11 : 10;
+      const useBold = Boolean(line.emphasize);
+      return wrapText(line.text, useBold ? bold : font, size, textW).map(
+        (wline) => ({
+          text: wline,
+          emphasize: Boolean(line.emphasize),
+          share: Boolean("share" in line && line.share),
+        })
+      );
+    });
 
     // Measure text column: title (16/line) + category (20) + details
     const textColH =
       4 +
       titleLinesExp.length * 16 +
       20 +
-      detailWrapped.reduce((h, line) => h + (line.emphasize ? 14 : 13), 0) +
+      detailWrapped.reduce(
+        (h, line) => h + (line.share ? 10 : line.emphasize ? 14 : 13),
+        0
+      ) +
       8;
 
     const cardH =
@@ -1059,14 +1073,15 @@ export async function buildLedgerExpensesPdfBuffer(input: {
     ty -= 20;
 
     for (const wline of detailWrapped) {
+      const size = wline.share ? 8 : wline.emphasize ? 11 : 10;
       page.drawText(wline.text, {
         x: textX,
-        y: ty - (wline.emphasize ? 11 : 10),
-        size: wline.emphasize ? 11 : 10,
+        y: ty - size,
+        size,
         font: wline.emphasize ? bold : font,
-        color: C.ink,
+        color: wline.share ? C.muted : C.ink,
       });
-      ty -= wline.emphasize ? 14 : 13;
+      ty -= wline.share ? 10 : wline.emphasize ? 14 : 13;
     }
 
     if (img && imgW > 0) {
@@ -1246,22 +1261,32 @@ export async function buildTripLedgerSummaryPdfBuffer(model: {
     if (exp.placeName) detailLines.push(`Ort: ${exp.placeName}`);
     if (exp.note?.trim()) detailLines.push(`Notiz: ${exp.note.trim()}`);
     if (exp.activityLabel) detailLines.push(`Aktivitaet: ${exp.activityLabel}`);
-    if (exp.shares?.length) {
-      detailLines.push(
-        `Anteile (${exp.shares.length}): ${exp.shares
+
+    const shareHeader = exp.shares?.length
+      ? `Anteile (${exp.shares.length}):`
+      : null;
+    const shareBody = exp.shares?.length
+      ? exp.shares
           .map((s) => {
             const money = formatMoney(s.shareAmountBase, model.baseCurrency);
             return `${s.displayName}${s.isPayer ? " (gezahlt)" : ""} ${money}`;
           })
-          .join(" · ")}`
-      );
-    }
+          .join(" · ")
+      : null;
 
     const detailWrapped = detailLines.flatMap((line) =>
       wrapText(line, font, 10, textW).map((t) => t)
     );
+    const shareWrapped = shareBody
+      ? wrapText(shareBody, font, 8, textW)
+      : [];
     const textColH =
-      titleLinesExp.length * 15 + 16 + detailWrapped.length * 12 + 8;
+      titleLinesExp.length * 15 +
+      16 +
+      detailWrapped.length * 12 +
+      (shareHeader ? 10 : 0) +
+      shareWrapped.length * 10 +
+      8;
     const cardH =
       Math.max(badgeH, imgH, textColH) + padY * 2;
 
@@ -1311,6 +1336,26 @@ export async function buildTripLedgerSummaryPdfBuffer(model: {
         color: C.ink,
       });
       ty -= 12;
+    }
+    if (shareHeader) {
+      page.drawText(toPdfSafeText(shareHeader), {
+        x: textX,
+        y: ty - 8,
+        size: 8,
+        font: bold,
+        color: C.badgeFg,
+      });
+      ty -= 10;
+      for (const line of shareWrapped) {
+        page.drawText(toPdfSafeText(line), {
+          x: textX,
+          y: ty - 8,
+          size: 8,
+          font,
+          color: C.ink,
+        });
+        ty -= 10;
+      }
     }
     if (img && imgW > 0) {
       page.drawImage(img, {
@@ -1464,6 +1509,455 @@ export async function buildTripLedgerSummaryPdfBuffer(model: {
       color: C.muted,
     });
     y -= 15;
+  }
+
+  return Buffer.from(await pdf.save());
+}
+
+export async function buildTravelDiaryPdfBuffer(model: {
+  tripTitle: string;
+  destination: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  exportedAt: string;
+  events: Array<{
+    title: string;
+    eventType: string;
+    startDate: string | null;
+    endDate: string | null;
+    startTime: string | null;
+    endTime: string | null;
+    location: string | null;
+    provider: string | null;
+    notes: string | null;
+    aiImagePath: string | null;
+    comments: Array<{
+      authorName: string;
+      body: string;
+      createdAt: string;
+    }>;
+    expenses: Array<{
+      expenseId: number;
+      description: string | null;
+      categoryLabel: string | null;
+      amount: number;
+      currency: string;
+      amountBase: number;
+      baseCurrency: string;
+      exchangeRate?: number;
+      paidByName: string;
+      placeName: string | null;
+      expenseDate: string | null;
+      note?: string | null;
+      aiImagePath: string | null;
+      shares?: Array<{
+        displayName: string;
+        shareAmountBase: number;
+        isPayer: boolean;
+      }>;
+    }>;
+  }>;
+  orphanExpenses: Array<{
+    expenseId: number;
+    description: string | null;
+    categoryLabel: string | null;
+    amount: number;
+    currency: string;
+    amountBase: number;
+    baseCurrency: string;
+    exchangeRate?: number;
+    paidByName: string;
+    placeName: string | null;
+    expenseDate: string | null;
+    note?: string | null;
+    aiImagePath: string | null;
+    shares?: Array<{
+      displayName: string;
+      shareAmountBase: number;
+      isPayer: boolean;
+    }>;
+  }>;
+  ledgerTitle: string | null;
+}): Promise<Buffer> {
+  const pdf = await PDFDocument.create();
+  const font = await pdf.embedFont(StandardFonts.Helvetica);
+  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const margin = OUTER;
+  const contentW = PAGE_W - margin * 2;
+  let page = pdf.addPage([PAGE_W, PAGE_H]);
+  let y = PAGE_H - margin;
+
+  function ensureSpace(need: number) {
+    if (y - need < margin + 24) {
+      page = pdf.addPage([PAGE_W, PAGE_H]);
+      y = PAGE_H - margin;
+    }
+  }
+
+  const range = [
+    formatDateDe(model.startDate) || null,
+    formatDateDe(model.endDate) || null,
+  ]
+    .filter(Boolean)
+    .join(" - ");
+
+  page.drawText("TRAVELBUDDY  ·  REISETAGEBUCH", {
+    x: margin,
+    y: y - 14,
+    size: 11,
+    font: bold,
+    color: C.headerLabel,
+  });
+  y -= 28;
+  const titleLines = wrapText(model.tripTitle, bold, 18, contentW);
+  for (const line of titleLines) {
+    page.drawText(line, {
+      x: margin,
+      y: y - 16,
+      size: 18,
+      font: bold,
+      color: C.ink,
+    });
+    y -= 22;
+  }
+  const meta = [
+    range || null,
+    model.destination?.trim() || null,
+    `${model.events.length} Aktivitaeten`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  if (meta) {
+    page.drawText(toPdfSafeText(meta), {
+      x: margin,
+      y: y - 12,
+      size: 11,
+      font,
+      color: C.muted,
+    });
+    y -= 22;
+  }
+  y -= 8;
+
+  async function drawExpenseMini(
+    exp: (typeof model.events)[0]["expenses"][0]
+  ) {
+    const badgeW = 56;
+    const badgeH = 64;
+    const padX = 10;
+    const padY = 10;
+    const thumb = await loadScaledJpeg(exp.aiImagePath);
+    let img: PDFImage | null = null;
+    let imgW = 0;
+    let imgH = 0;
+    if (thumb) {
+      img = await pdf.embedJpg(thumb);
+      imgW = 56;
+      imgH = 56;
+    }
+    const textX = margin + padX + badgeW + 10;
+    const textW = contentW - padX * 2 - badgeW - 10 - (img ? imgW + 8 : 0);
+    const title = exp.description?.trim() || "Ausgabe";
+    const titleLinesExp = wrapText(title, bold, 11, textW);
+    const detailLines: string[] = [
+      `Bezahlt von: ${exp.paidByName} · ${formatMoney(exp.amountBase, exp.baseCurrency)}`,
+    ];
+    if (exp.placeName) detailLines.push(`Ort: ${exp.placeName}`);
+    if (exp.note?.trim()) detailLines.push(`Notiz: ${exp.note.trim()}`);
+    const detailWrapped = detailLines.flatMap((line) =>
+      wrapText(line, font, 9, textW)
+    );
+    const shareHeader = exp.shares?.length
+      ? `Anteile (${exp.shares.length}):`
+      : null;
+    const shareBody = exp.shares?.length
+      ? exp.shares
+          .map((s) => {
+            const money = formatMoney(s.shareAmountBase, exp.baseCurrency);
+            return `${s.displayName}${s.isPayer ? " (gezahlt)" : ""} ${money}`;
+          })
+          .join(" · ")
+      : null;
+    const shareWrapped = shareBody
+      ? wrapText(shareBody, font, 8, textW)
+      : [];
+    const textColH =
+      titleLinesExp.length * 13 +
+      14 +
+      detailWrapped.length * 11 +
+      (shareHeader ? 10 : 0) +
+      shareWrapped.length * 10 +
+      6;
+    const cardH = Math.max(badgeH, imgH, textColH) + padY * 2;
+    ensureSpace(cardH + 12);
+    const cardBottom = y - cardH;
+    drawRoundedRect(
+      page,
+      margin,
+      cardBottom,
+      contentW,
+      cardH,
+      8,
+      C.card,
+      C.border,
+      1
+    );
+    const innerX = margin + padX;
+    const innerTop = y - padY;
+    drawDateBadge(page, bold, exp.expenseDate, innerX, innerTop, badgeW, badgeH);
+    let ty = innerTop - 2;
+    for (const line of titleLinesExp) {
+      page.drawText(line, {
+        x: textX,
+        y: ty - 11,
+        size: 11,
+        font: bold,
+        color: C.ink,
+      });
+      ty -= 13;
+    }
+    page.drawText(
+      toPdfSafeText(exp.categoryLabel || "Ausgabe").toUpperCase(),
+      {
+        x: textX,
+        y: ty - 9,
+        size: 8,
+        font: bold,
+        color: C.badgeFg,
+      }
+    );
+    ty -= 14;
+    for (const line of detailWrapped) {
+      page.drawText(toPdfSafeText(line), {
+        x: textX,
+        y: ty - 9,
+        size: 9,
+        font,
+        color: C.ink,
+      });
+      ty -= 11;
+    }
+    if (shareHeader) {
+      page.drawText(toPdfSafeText(shareHeader), {
+        x: textX,
+        y: ty - 8,
+        size: 8,
+        font: bold,
+        color: C.badgeFg,
+      });
+      ty -= 10;
+      for (const line of shareWrapped) {
+        page.drawText(toPdfSafeText(line), {
+          x: textX,
+          y: ty - 8,
+          size: 8,
+          font,
+          color: C.ink,
+        });
+        ty -= 10;
+      }
+    }
+    if (img && imgW > 0) {
+      page.drawImage(img, {
+        x: margin + contentW - padX - imgW,
+        y: innerTop - imgH,
+        width: imgW,
+        height: imgH,
+      });
+    }
+    y -= cardH + 8;
+  }
+
+  for (const event of model.events) {
+    const badgeW = 56;
+    const badgeH = 64;
+    const padX = 10;
+    const padY = 10;
+    const thumb = await loadScaledJpeg(event.aiImagePath);
+    let img: PDFImage | null = null;
+    let imgW = 0;
+    let imgH = 0;
+    if (thumb) {
+      img = await pdf.embedJpg(thumb);
+      imgW = 64;
+      imgH = 64;
+    }
+    const textX = margin + padX + badgeW + 10;
+    const textW = contentW - padX * 2 - badgeW - 10 - (img ? imgW + 8 : 0);
+    const titleLinesExp = wrapText(event.title, bold, 13, textW);
+    const time =
+      event.startTime && event.endTime
+        ? `${event.startTime}-${event.endTime}`
+        : event.startTime || event.endTime || null;
+    const placeParts = [event.location, event.provider]
+      .map((p) => p?.trim())
+      .filter(Boolean);
+    const detailLines: string[] = [];
+    if (time) detailLines.push(time);
+    if (placeParts.length) detailLines.push(placeParts.join(" · "));
+    if (event.notes?.trim()) detailLines.push(`Notiz: ${event.notes.trim()}`);
+    const detailWrapped = detailLines.flatMap((line) =>
+      wrapText(line, font, 9, textW)
+    );
+    const textColH =
+      titleLinesExp.length * 15 + 16 + detailWrapped.length * 11 + 8;
+    const cardH = Math.max(badgeH, imgH, textColH) + padY * 2;
+    ensureSpace(cardH + 16);
+    const cardBottom = y - cardH;
+    drawRoundedRect(
+      page,
+      margin,
+      cardBottom,
+      contentW,
+      cardH,
+      10,
+      C.card,
+      C.border,
+      1
+    );
+    const innerX = margin + padX;
+    const innerTop = y - padY;
+    drawDateBadge(page, bold, event.startDate, innerX, innerTop, badgeW, badgeH);
+    let ty = innerTop - 4;
+    for (const line of titleLinesExp) {
+      page.drawText(line, {
+        x: textX,
+        y: ty - 13,
+        size: 13,
+        font: bold,
+        color: C.ink,
+      });
+      ty -= 15;
+    }
+    page.drawText(toPdfSafeText(event.eventType).toUpperCase(), {
+      x: textX,
+      y: ty - 10,
+      size: 8,
+      font: bold,
+      color: C.badgeFg,
+    });
+    ty -= 14;
+    for (const line of detailWrapped) {
+      page.drawText(toPdfSafeText(line), {
+        x: textX,
+        y: ty - 9,
+        size: 9,
+        font,
+        color: C.ink,
+      });
+      ty -= 11;
+    }
+    if (img && imgW > 0) {
+      page.drawImage(img, {
+        x: margin + contentW - padX - imgW,
+        y: innerTop - imgH,
+        width: imgW,
+        height: imgH,
+      });
+    }
+    y -= cardH + 8;
+
+    if (event.comments.length) {
+      ensureSpace(20);
+      page.drawText(
+        toPdfSafeText(`Kommentare (${event.comments.length})`),
+        {
+          x: margin + 4,
+          y: y - 11,
+          size: 9,
+          font: bold,
+          color: C.badgeFg,
+        }
+      );
+      y -= 16;
+      for (const c of event.comments) {
+        const when = formatDateDe(c.createdAt.slice(0, 10)) || "";
+        const header = `${c.authorName}${when ? ` · ${when}` : ""}`;
+        const bodyLines = wrapText(c.body, font, 9, contentW - 16);
+        const blockH = 14 + bodyLines.length * 11 + 10;
+        ensureSpace(blockH);
+        drawRoundedRect(
+          page,
+          margin,
+          y - blockH,
+          contentW,
+          blockH,
+          6,
+          C.soft,
+          C.border,
+          1
+        );
+        page.drawText(toPdfSafeText(header), {
+          x: margin + 8,
+          y: y - 12,
+          size: 8,
+          font: bold,
+          color: C.badgeFg,
+        });
+        let cy = y - 14;
+        for (const line of bodyLines) {
+          page.drawText(toPdfSafeText(line), {
+            x: margin + 8,
+            y: cy - 10,
+            size: 9,
+            font,
+            color: C.ink,
+          });
+          cy -= 11;
+        }
+        y -= blockH + 6;
+      }
+    }
+
+    if (event.expenses.length) {
+      ensureSpace(18);
+      page.drawText(
+        toPdfSafeText(`Ausgaben (${event.expenses.length})`),
+        {
+          x: margin + 4,
+          y: y - 11,
+          size: 9,
+          font: bold,
+          color: C.badgeFg,
+        }
+      );
+      y -= 14;
+      for (const exp of event.expenses) {
+        await drawExpenseMini(exp);
+      }
+    }
+
+    y -= 6;
+  }
+
+  if (model.orphanExpenses.length) {
+    ensureSpace(24);
+    page.drawText(
+      toPdfSafeText(
+        `Weitere Ausgaben${model.ledgerTitle ? ` · ${model.ledgerTitle}` : ""}`
+      ),
+      {
+        x: margin,
+        y: y - 14,
+        size: 12,
+        font: bold,
+        color: C.ink,
+      }
+    );
+    y -= 20;
+    for (const exp of model.orphanExpenses) {
+      await drawExpenseMini(exp);
+    }
+  }
+
+  if (model.events.length === 0 && model.orphanExpenses.length === 0) {
+    page.drawText("Noch keine Eintraege.", {
+      x: margin,
+      y: y - 16,
+      size: 12,
+      font,
+      color: C.muted,
+    });
   }
 
   return Buffer.from(await pdf.save());

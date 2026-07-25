@@ -103,15 +103,15 @@ function sharesHtml(
       const payer = s.isPayer
         ? ` <span style="color:${BRAND.muted};">(gezahlt)</span>`
         : "";
-      return `<div style="display:flex;justify-content:space-between;gap:12px;margin-top:3px;">
+      return `<div style="display:flex;justify-content:space-between;gap:12px;margin-top:2px;font-size:11px;line-height:1.35;">
         <span style="color:${BRAND.ink};">${escapeHtml(s.displayName)}${payer}</span>
         <span style="font-variant-numeric:tabular-nums;font-weight:600;color:${BRAND.ink};">${escapeHtml(money)}</span>
       </div>`;
     })
     .join("");
   return `
-    <div style="margin-top:10px;padding-top:8px;border-top:1px solid ${BRAND.page};">
-      <div style="font-size:11px;font-weight:700;color:${BRAND.finance};letter-spacing:.03em;text-transform:uppercase;">
+    <div style="margin-top:8px;padding-top:6px;border-top:1px solid ${BRAND.page};font-size:11px;">
+      <div style="font-size:10px;font-weight:700;color:${BRAND.finance};letter-spacing:.03em;text-transform:uppercase;">
         Anteile · ${shares.length} ${shares.length === 1 ? "Person" : "Personen"}
       </div>
       ${rows}
@@ -169,7 +169,7 @@ function moneyLines(input: {
   };
 }
 
-function expenseCardHtml(input: ExpenseMailFields): string {
+export function expenseCardHtml(input: ExpenseMailFields): string {
   const title = input.description?.trim() || "Ausgabe";
   const category = input.categoryLabel || "Ausgabe";
   const { money, fxHtml } = moneyLines(input);
