@@ -15,7 +15,16 @@ export function bootstrapDatabase(db: Database.Database): void {
     "schema.sql"
   );
   const schema = fs.readFileSync(schemaPath, "utf8");
-  db.exec(schema);
+  try {
+    db.exec(schema);
+  } catch (error) {
+    // Existing DBs may lack columns referenced by newer CREATE INDEX IF NOT EXISTS
+    // statements. Continue with ensure* migrations which add columns safely.
+    console.error(
+      "[familybrain] schema.sql apply had errors (continuing with migrations):",
+      error instanceof Error ? error.message : error
+    );
+  }
 
   const financeCols = db
     .prepare(`PRAGMA table_info(financial_items)`)
@@ -346,8 +355,6 @@ function ensureFinanceBrainTables(db: Database.Database): void {
       ON finance_ledger_members(ledger_id);
     CREATE INDEX IF NOT EXISTS idx_finance_ledger_members_token
       ON finance_ledger_members(invite_token);
-    CREATE INDEX IF NOT EXISTS idx_finance_ledger_members_user
-      ON finance_ledger_members(user_id);
 
     CREATE TABLE IF NOT EXISTS finance_expenses (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

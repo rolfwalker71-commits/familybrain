@@ -21,16 +21,22 @@ function serializeTrip(trip: ReturnType<typeof listTrips>[number]) {
 }
 
 export async function GET() {
-  const auth = await requireAuth();
-  if (isAuthError(auth)) return auth;
-  let trips = listTrips();
-  if (!auth.isAdmin && auth.userId) {
-    const allowed = new Set(listUserTripIds(auth.userId));
-    trips = trips.filter((t) => allowed.has(t.id));
+  try {
+    const auth = await requireAuth();
+    if (isAuthError(auth)) return auth;
+    let trips = listTrips();
+    if (!auth.isAdmin && auth.userId) {
+      const allowed = new Set(listUserTripIds(auth.userId));
+      trips = trips.filter((t) => allowed.has(t.id));
+    }
+    return NextResponse.json({
+      trips: trips.map(serializeTrip),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("[trips GET]", message);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
-  return NextResponse.json({
-    trips: trips.map(serializeTrip),
-  });
 }
 
 const CreateSchema = z.object({

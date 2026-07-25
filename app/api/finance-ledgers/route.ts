@@ -26,14 +26,20 @@ const CreateSchema = z.object({
 });
 
 export async function GET() {
-  const auth = await requireAuth();
-  if (isAuthError(auth)) return auth;
-  let ledgers = listFinanceLedgers();
-  if (!auth.isAdmin && auth.userId) {
-    const allowed = new Set(listUserLedgerIds(auth.userId));
-    ledgers = ledgers.filter((l) => allowed.has(l.id));
+  try {
+    const auth = await requireAuth();
+    if (isAuthError(auth)) return auth;
+    let ledgers = listFinanceLedgers();
+    if (!auth.isAdmin && auth.userId) {
+      const allowed = new Set(listUserLedgerIds(auth.userId));
+      ledgers = ledgers.filter((l) => allowed.has(l.id));
+    }
+    return NextResponse.json({ ledgers: ledgers.map(serializeLedger) });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("[finance-ledgers GET]", message);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
-  return NextResponse.json({ ledgers: ledgers.map(serializeLedger) });
 }
 
 export async function POST(request: Request) {

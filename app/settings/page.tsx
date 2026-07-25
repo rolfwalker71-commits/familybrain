@@ -171,8 +171,14 @@ function SettingsPageInner() {
 
   useEffect(() => {
     void (async () => {
-      const res = await fetch("/api/settings");
-      const data = await res.json();
+      try {
+        const res = await fetch("/api/settings");
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(
+            data.error || `Einstellungen laden fehlgeschlagen (${res.status})`
+          );
+        }
       setBaseUrl(data.paperlessBaseUrl || "");
       setTokenMasked(data.paperlessApiTokenMasked);
       setHasToken(Boolean(data.hasPaperlessToken));
@@ -243,6 +249,10 @@ function SettingsPageInner() {
       setSmtpFrom(data.smtpFrom || "");
       setEmailConfigured(Boolean(data.emailConfigured));
       setAppPublicUrl(data.appPublicUrl || "");
+      setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      }
     })();
   }, []);
 

@@ -1,2 +1,2 @@
 /** Bumped automatically by `.githooks/pre-commit` / `npm run version:bump`. */
-export const APP_VERSION = "20260725-0933";
+export const APP_VERSION = "20260725-1009";

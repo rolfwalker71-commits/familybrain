@@ -81,7 +81,13 @@ export async function requireAdmin(): Promise<AuthContext | NextResponse> {
 export function isAuthError(
   value: AuthContext | NextResponse
 ): value is NextResponse {
-  return value instanceof NextResponse;
+  return (
+    value instanceof NextResponse ||
+    (typeof value === "object" &&
+      value !== null &&
+      "status" in value &&
+      !("isAdmin" in value))
+  );
 }
 
 export async function requireTripAccess(

@@ -71,8 +71,9 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const auth = await requireAdmin();
-  if (isAuthError(auth)) return auth;
+  try {
+    const auth = await requireAdmin();
+    if (isAuthError(auth)) return auth;
   const paperless = getPaperlessSettings();
   const openai = getOpenAISettings();
   const trilium = getTriliumSettings();
@@ -113,6 +114,11 @@ export async function GET() {
     appPublicUrl: getAppPublicUrlSetting() || "",
     ...getSmtpSettingsPublic(),
   });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("[settings GET]", message);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }
 
 const PutSchema = z.object({

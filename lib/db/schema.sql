@@ -422,8 +422,7 @@ CREATE INDEX IF NOT EXISTS idx_finance_ledger_members_ledger
   ON finance_ledger_members(ledger_id);
 CREATE INDEX IF NOT EXISTS idx_finance_ledger_members_token
   ON finance_ledger_members(invite_token);
-CREATE INDEX IF NOT EXISTS idx_finance_ledger_members_user
-  ON finance_ledger_members(user_id);
+-- idx on user_id is created in bootstrap after ALTER adds the column on existing DBs
 
 CREATE TABLE IF NOT EXISTS finance_expenses (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
