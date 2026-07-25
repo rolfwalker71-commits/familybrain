@@ -13,6 +13,7 @@ import {
   unlinkTripEventCommentImageFile,
   writeTripEventCommentImageFile,
 } from "@/lib/trips/comment-images";
+import { notifyTripEventComment } from "@/lib/trips/notify";
 import {
   createTripEventComment,
   getTripEventById,
@@ -141,6 +142,12 @@ export async function POST(request: Request, context: Ctx) {
       body,
       imagePath: writtenImage,
     });
+    // Always attempt mail; comment create must not fail if SMTP is down.
+    try {
+      await notifyTripEventComment(comment.id);
+    } catch {
+      // ignore mail transport errors
+    }
     return NextResponse.json({
       ok: true,
       comment: serializeTripEventComment(comment, auth),
