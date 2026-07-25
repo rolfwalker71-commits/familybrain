@@ -28,6 +28,14 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -198,6 +206,12 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
   const [aiImageBusyId, setAiImageBusyId] = useState<number | null>(null);
   const [mailBusyId, setMailBusyId] = useState<number | null>(null);
   const [summaryMailBusy, setSummaryMailBusy] = useState(false);
+  const [tripSummaryOpen, setTripSummaryOpen] = useState(false);
+  const [tripSummaryBusy, setTripSummaryBusy] = useState(false);
+  const [tripSummaryRecipients, setTripSummaryRecipients] = useState<
+    Array<{ memberId: number; displayName: string; email: string }>
+  >([]);
+  const [tripSummarySelected, setTripSummarySelected] = useState<number[]>([]);
   const [editBusyId, setEditBusyId] = useState<number | null>(null);
   const aiAttemptedRef = useRef<Set<number>>(new Set());
   const formDefaultsSeededRef = useRef(false);
@@ -687,6 +701,63 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setSummaryMailBusy(false);
+    }
+  }
+
+  async function openTripSummaryDialog() {
+    setError(null);
+    setStatus(null);
+    try {
+      const res = await fetch(
+        `/api/finance-ledgers/${ledgerId}/trip-summary-mail`
+      );
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error || "Empfänger laden fehlgeschlagen");
+      }
+      const list = (json.recipients || []) as Array<{
+        memberId: number;
+        displayName: string;
+        email: string;
+      }>;
+      if (list.length === 0) {
+        throw new Error("Keine Teilnehmer mit E-Mail-Adresse");
+      }
+      setTripSummaryRecipients(list);
+      setTripSummarySelected(list.map((r) => r.memberId));
+      setTripSummaryOpen(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function sendTripSummaryMail() {
+    if (tripSummarySelected.length === 0) return;
+    setTripSummaryBusy(true);
+    setError(null);
+    setStatus(null);
+    try {
+      const res = await fetch(
+        `/api/finance-ledgers/${ledgerId}/trip-summary-mail`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ recipientMemberIds: tripSummarySelected }),
+        }
+      );
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Mailversand fehlgeschlagen");
+      const sent = typeof json.sent === "number" ? json.sent : 0;
+      setTripSummaryOpen(false);
+      setStatus(
+        sent > 0
+          ? `Reise-Übersicht gesendet (${sent} Empfänger).`
+          : "Reise-Übersicht gesendet."
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setTripSummaryBusy(false);
     }
   }
 
@@ -1793,22 +1864,99 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
               <p className="mb-3 text-sm text-muted-foreground">
                 Alle Ausgaben per Mail inkl. PDF an die Gruppe senden.
               </p>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1.5"
-                disabled={summaryMailBusy || expenses.length === 0}
-                onClick={() => void sendExpensesSummaryMail()}
-              >
-                <Mail
-                  className={cn("size-4", summaryMailBusy && "animate-pulse")}
-                />
-                {summaryMailBusy ? "Sendet…" : "Ausgaben-Mail senden"}
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  disabled={summaryMailBusy || expenses.length === 0}
+                  onClick={() => void sendExpensesSummaryMail()}
+                >
+                  <Mail
+                    className={cn(
+                      "size-4",
+                      summaryMailBusy && "animate-pulse"
+                    )}
+                  />
+                  {summaryMailBusy ? "Sendet…" : "Ausgaben-Mail senden"}
+                </Button>
+                {ledger.trip_id ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                    disabled={tripSummaryBusy || expenses.length === 0}
+                    onClick={() => void openTripSummaryDialog()}
+                  >
+                    <Luggage className="size-4" />
+                    Reise-Übersicht senden
+                  </Button>
+                ) : null}
+              </div>
             </SectionCard>
           ) : null}
         </div>
       ) : null}
+
+      <Dialog open={tripSummaryOpen} onOpenChange={setTripSummaryOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Reise-Übersicht per Mail</DialogTitle>
+            <DialogDescription>
+              {ledger.trip_title || ledger.title} — HTML und PDF mit allen
+              Ausgaben, Summe und Netto-Übersicht.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <p className="text-sm font-medium">Wer soll die Mail bekommen?</p>
+            {tripSummaryRecipients.map((r) => {
+              const checked = tripSummarySelected.includes(r.memberId);
+              return (
+                <label
+                  key={r.memberId}
+                  className="flex cursor-pointer items-center gap-3 rounded-lg border border-border/60 px-3 py-2.5 text-sm hover:bg-muted/40"
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => {
+                      setTripSummarySelected((prev) =>
+                        checked
+                          ? prev.filter((id) => id !== r.memberId)
+                          : [...prev, r.memberId]
+                      );
+                    }}
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-medium">{r.displayName}</span>
+                    <span className="block truncate text-xs text-muted-foreground">
+                      {r.email}
+                    </span>
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              disabled={tripSummaryBusy}
+              onClick={() => setTripSummaryOpen(false)}
+            >
+              Abbrechen
+            </Button>
+            <Button
+              disabled={tripSummaryBusy || tripSummarySelected.length === 0}
+              onClick={() => void sendTripSummaryMail()}
+              className="bg-[var(--brand-finance)] text-white hover:bg-[var(--brand-finance)]/90"
+            >
+              {tripSummaryBusy
+                ? "Sendet…"
+                : `Senden (${tripSummarySelected.length})`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

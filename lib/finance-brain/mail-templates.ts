@@ -82,6 +82,7 @@ export type ExpenseMailFields = {
   note?: string | null;
   hasAiImage: boolean;
   aiCid?: string;
+  activityLabel?: string | null;
 };
 
 function moneyLines(input: {
@@ -146,6 +147,11 @@ function expenseCardHtml(input: ExpenseMailFields): string {
           ${
             input.note?.trim()
               ? `<div style="margin-top:6px;font-size:13px;color:${BRAND.muted};">Notiz: ${escapeHtml(input.note.trim())}</div>`
+              : ""
+          }
+          ${
+            input.activityLabel?.trim()
+              ? `<div style="margin-top:6px;font-size:13px;color:${BRAND.muted};">Aktivität: ${escapeHtml(input.activityLabel.trim())}</div>`
               : ""
           }
         </div>
@@ -323,4 +329,201 @@ export function buildSettlementMailHtml(input: {
     .join("\n");
 
   return { subject, html, text };
+}
+
+function barRowHtml(
+  label: string,
+  value: number,
+  maxAbs: number,
+  color: string,
+  currency: string
+): string {
+  const width =
+    maxAbs > 0 ? Math.max(2, Math.round((Math.abs(value) / maxAbs) * 100)) : 0;
+  const money = formatMoney(value, currency);
+  return `
+    <div style="margin-top:6px;">
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:${BRAND.muted};margin-bottom:2px;">
+        <span>${escapeHtml(label)}</span>
+        <span style="font-weight:700;color:${BRAND.ink};">${escapeHtml(money)}</span>
+      </div>
+      <div style="height:10px;background:${BRAND.page};border-radius:999px;overflow:hidden;">
+        <div style="height:10px;width:${width}%;background:${color};border-radius:999px;"></div>
+      </div>
+    </div>`;
+}
+
+export function buildTripLedgerSummaryMailHtml(model: {
+  ledgerTitle: string;
+  tripTitle: string | null;
+  baseCurrency: string;
+  exportedAt: string;
+  expenses: ExpenseMailFields[];
+  totalExpenseBase: number;
+  totalSettlementsBase: number;
+  members: Array<{
+    displayName: string;
+    paidBase: number;
+    settlementsPaidBase: number;
+    netBalance: number;
+  }>;
+  settlements: Array<{
+    fromName: string;
+    toName: string;
+    amountBase: number;
+    settledAt: string | null;
+    note: string | null;
+  }>;
+  openDebts: Array<{ fromName: string; toName: string; amount: number }>;
+}): { subject: string; html: string; text: string } {
+  const headline = model.tripTitle || model.ledgerTitle;
+  const totalLabel = formatMoney(model.totalExpenseBase, model.baseCurrency);
+  const settledLabel = formatMoney(
+    model.totalSettlementsBase,
+    model.baseCurrency
+  );
+  const stand =
+    formatDateDe(model.exportedAt.slice(0, 10)) || model.exportedAt.slice(0, 10);
+  const subject = `FinanzBuddy: Reise-Übersicht «${headline}» · ${model.expenses.length} Ausgaben · ${totalLabel}`;
+
+  const cards = model.expenses
+    .map((e) =>
+      expenseCardHtml({
+        ...e,
+        aiCid: e.aiCid || `expense-ai-${e.expenseId}`,
+      })
+    )
+    .join("");
+
+  const maxAbs = Math.max(
+    1,
+    ...model.members.flatMap((m) => [
+      Math.abs(m.paidBase),
+      Math.abs(m.settlementsPaidBase),
+      Math.abs(m.netBalance),
+    ])
+  );
+
+  const chartHtml = model.members
+    .map(
+      (m) => `
+      <div style="margin-bottom:14px;padding:12px;border:1px solid ${BRAND.border};border-radius:10px;background:${BRAND.card};">
+        <div style="font-size:14px;font-weight:800;color:${BRAND.ink};margin-bottom:6px;">${escapeHtml(m.displayName)}</div>
+        ${barRowHtml("Bezahlt", m.paidBase, maxAbs, BRAND.finance, model.baseCurrency)}
+        ${barRowHtml("Ausgleich gezahlt", m.settlementsPaidBase, maxAbs, "#6b8f7a", model.baseCurrency)}
+        ${barRowHtml("Netto", m.netBalance, maxAbs, m.netBalance >= 0 ? BRAND.finance : "#b45353", model.baseCurrency)}
+      </div>`
+    )
+    .join("");
+
+  const settlementsHtml =
+    model.settlements.length === 0
+      ? `<div style="font-size:13px;color:${BRAND.muted};">Noch keine Ausgleichszahlungen.</div>`
+      : model.settlements
+          .map((s) => {
+            const when = formatDateDe(s.settledAt) || "—";
+            return `<div style="font-size:13px;color:${BRAND.ink};margin-top:6px;">${escapeHtml(s.fromName)} → ${escapeHtml(s.toName)}: <strong>${escapeHtml(formatMoney(s.amountBase, model.baseCurrency))}</strong> <span style="color:${BRAND.muted};">(${escapeHtml(when)}) — erledigt</span></div>`;
+          })
+          .join("");
+
+  const openHtml =
+    model.openDebts.length === 0
+      ? `<div style="font-size:13px;color:${BRAND.muted};margin-top:8px;">Kein offener Ausgleich mehr.</div>`
+      : model.openDebts
+          .map(
+            (d) =>
+              `<div style="font-size:13px;color:${BRAND.muted};margin-top:6px;">Noch offen: ${escapeHtml(d.fromName)} → ${escapeHtml(d.toName)} <strong style="color:${BRAND.ink};">${escapeHtml(formatMoney(d.amount, model.baseCurrency))}</strong></div>`
+          )
+          .join("");
+
+  const html = `<!DOCTYPE html>
+<html><body style="margin:0;padding:24px;background:${BRAND.page};font-family:system-ui,-apple-system,sans-serif;color:${BRAND.ink};">
+  <div style="max-width:640px;margin:0 auto;">
+    <div style="padding:16px 18px;background:${BRAND.financeSoft};border:1px solid ${BRAND.border};border-radius:12px;margin-bottom:16px;">
+      <div style="font-size:12px;font-weight:700;color:${BRAND.finance};letter-spacing:.04em;text-transform:uppercase;">FinanzBuddy · Reise-Übersicht</div>
+      <div style="font-size:20px;font-weight:800;color:${BRAND.finance};margin-top:4px;">${escapeHtml(headline)}</div>
+      <div style="font-size:13px;color:${BRAND.finance};margin-top:6px;">${model.expenses.length} Ausgaben · Summe ${escapeHtml(totalLabel)} · Stand ${escapeHtml(stand)}</div>
+    </div>
+
+    ${cards || `<div style="padding:18px;color:${BRAND.muted};background:${BRAND.card};border-radius:12px;border:1px solid ${BRAND.border};">Noch keine Ausgaben.</div>`}
+
+    <div style="margin-top:8px;padding:16px 18px;background:${BRAND.card};border:1px solid ${BRAND.border};border-radius:12px;">
+      <div style="font-size:15px;font-weight:800;margin-bottom:12px;">Zusammenfassung</div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;">
+        <div style="flex:1;min-width:140px;padding:10px 12px;background:${BRAND.financeSoft};border-radius:10px;">
+          <div style="font-size:11px;color:${BRAND.finance};font-weight:600;">Summe Ausgaben</div>
+          <div style="font-size:16px;font-weight:800;color:${BRAND.ink};margin-top:4px;">${escapeHtml(totalLabel)}</div>
+        </div>
+        <div style="flex:1;min-width:140px;padding:10px 12px;background:${BRAND.page};border-radius:10px;border:1px solid ${BRAND.border};">
+          <div style="font-size:11px;color:${BRAND.muted};font-weight:600;">Ausgleich gezahlt</div>
+          <div style="font-size:16px;font-weight:800;color:${BRAND.ink};margin-top:4px;">${escapeHtml(settledLabel)}</div>
+        </div>
+        <div style="flex:1;min-width:140px;padding:10px 12px;background:${BRAND.page};border-radius:10px;border:1px solid ${BRAND.border};">
+          <div style="font-size:11px;color:${BRAND.muted};font-weight:600;">Offene Ausgleichsvorschläge</div>
+          <div style="font-size:16px;font-weight:800;color:${BRAND.ink};margin-top:4px;">${model.openDebts.length}</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:16px;padding:16px 18px;background:${BRAND.card};border:1px solid ${BRAND.border};border-radius:12px;">
+      <div style="font-size:15px;font-weight:800;margin-bottom:4px;">Wer hat bisher bezahlt / Netto</div>
+      <div style="font-size:12px;color:${BRAND.muted};margin-bottom:10px;">Bezahlt · Ausgleich gezahlt · Netto-Saldo</div>
+      ${chartHtml || `<div style="font-size:13px;color:${BRAND.muted};">Keine Teilnehmer.</div>`}
+    </div>
+
+    <div style="margin-top:16px;padding:16px 18px;background:${BRAND.card};border:1px solid ${BRAND.border};border-radius:12px;">
+      <div style="font-size:15px;font-weight:800;margin-bottom:8px;">Ausgleichsstatus</div>
+      ${settlementsHtml}
+      ${openHtml}
+    </div>
+
+    <div style="padding:12px 4px;font-size:12px;color:${BRAND.muted};">
+      PDF im Anhang — geeignet für Paperless / FamilyBrain.
+    </div>
+  </div>
+</body></html>`;
+
+  const textLines = [
+    `FinanzBuddy: Reise-Übersicht «${headline}»`,
+    `${model.expenses.length} Ausgaben · Summe ${totalLabel} · Stand ${stand}`,
+    "",
+    ...model.expenses.flatMap((e) => {
+      const { money, fxText } = moneyLines(e);
+      return [
+        `— ${e.description?.trim() || "Ausgabe"}`,
+        `  ${e.categoryLabel || "Ausgabe"} · ${e.paidByName} · ${money}`,
+        fxText ? `  ${fxText}` : null,
+        e.placeName ? `  Ort: ${e.placeName}` : null,
+        e.note?.trim() ? `  Notiz: ${e.note.trim()}` : null,
+        e.activityLabel ? `  Aktivität: ${e.activityLabel}` : null,
+        e.expenseDate
+          ? `  Datum: ${formatDateDe(e.expenseDate) || e.expenseDate}`
+          : null,
+        "",
+      ].filter(Boolean) as string[];
+    }),
+    "Zusammenfassung",
+    `Summe Ausgaben: ${totalLabel}`,
+    `Ausgleich gezahlt: ${settledLabel}`,
+    "",
+    "Wer hat bezahlt / Netto:",
+    ...model.members.map(
+      (m) =>
+        `  ${m.displayName}: bezahlt ${formatMoney(m.paidBase, model.baseCurrency)}, Ausgleich ${formatMoney(m.settlementsPaidBase, model.baseCurrency)}, Netto ${formatMoney(m.netBalance, model.baseCurrency)}`
+    ),
+    "",
+    "Ausgleichsstatus:",
+    ...model.settlements.map(
+      (s) =>
+        `  ${s.fromName} → ${s.toName}: ${formatMoney(s.amountBase, model.baseCurrency)} (${formatDateDe(s.settledAt) || "—"})`
+    ),
+    ...model.openDebts.map(
+      (d) =>
+        `  Offen: ${d.fromName} → ${d.toName}: ${formatMoney(d.amount, model.baseCurrency)}`
+    ),
+    "",
+    "PDF im Anhang.",
+  ];
+
+  return { subject, html, text: textLines.join("\n") };
 }

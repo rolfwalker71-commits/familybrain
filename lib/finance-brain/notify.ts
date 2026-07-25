@@ -8,12 +8,14 @@ import {
   buildExpenseMailHtml,
   buildLedgerExpensesMailHtml,
   buildSettlementMailHtml,
+  buildTripLedgerSummaryMailHtml,
   type ExpenseMailFields,
 } from "@/lib/finance-brain/mail-templates";
 import {
   buildExpensePdfBuffer,
   buildLedgerExpensesPdfBuffer,
   buildSettlementPdfBuffer,
+  buildTripLedgerSummaryPdfBuffer,
 } from "@/lib/finance-brain/receipt-pdf";
 import { loadScaledJpeg } from "@/lib/finance-brain/image-scale";
 import {
@@ -26,6 +28,10 @@ import {
   markFinanceExpenseNotified,
   markFinanceSettlementNotified,
 } from "@/lib/finance-brain/queries";
+import {
+  buildTripLedgerSummaryModel,
+  listTripSummaryRecipients,
+} from "@/lib/finance-brain/trip-summary";
 
 function memberEmails(ledgerId: number): string[] {
   return listFinanceLedgerMembers(ledgerId)
@@ -301,5 +307,83 @@ export async function notifyLedgerSettlement(
     return { ok: false, sent: 0, error: result.error };
   }
   markFinanceSettlementNotified(settlementId);
+  return { ok: true, sent: recipients.length };
+}
+
+export async function notifyTripLedgerSummary(
+  ledgerId: number,
+  recipientMemberIds: number[]
+): Promise<NotifyResult> {
+  if (!isEmailConfigured()) {
+    return { ok: false, sent: 0, error: "E-Mail nicht konfiguriert" };
+  }
+
+  const allowed = listTripSummaryRecipients(ledgerId);
+  if (allowed.length === 0) {
+    return { ok: false, sent: 0, error: "Keine Empfänger mit E-Mail-Adresse" };
+  }
+
+  const idSet = new Set(recipientMemberIds);
+  const recipients = allowed.filter((r) => idSet.has(r.memberId));
+  if (recipients.length === 0) {
+    return { ok: false, sent: 0, error: "Keine gültigen Empfänger ausgewählt" };
+  }
+
+  let model;
+  try {
+    model = buildTripLedgerSummaryModel(ledgerId);
+  } catch (err) {
+    return {
+      ok: false,
+      sent: 0,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+
+  if (model.expenses.length === 0) {
+    return { ok: false, sent: 0, error: "Keine Ausgaben vorhanden" };
+  }
+
+  const mail = buildTripLedgerSummaryMailHtml({
+    ledgerTitle: model.ledgerTitle,
+    tripTitle: model.tripTitle,
+    baseCurrency: model.baseCurrency,
+    exportedAt: model.exportedAt,
+    expenses: model.expenses,
+    totalExpenseBase: model.totalExpenseBase,
+    totalSettlementsBase: model.totalSettlementsBase,
+    members: model.members,
+    settlements: model.settlements,
+    openDebts: model.openDebts,
+  });
+
+  const pdf = await buildTripLedgerSummaryPdfBuffer(model);
+
+  const attachments: MailAttachment[] = [
+    {
+      filename: `finanzbuddy-reise-uebersicht-${ledgerId}.pdf`,
+      content: pdf.toString("base64"),
+    },
+  ];
+  for (const expense of model.expenses) {
+    const thumb = await loadScaledJpeg(expense.aiImagePath);
+    if (!thumb) continue;
+    attachments.push({
+      filename: `expense-${expense.expenseId}-ai.jpg`,
+      content: thumb.toString("base64"),
+      content_id: expense.aiCid,
+    });
+  }
+
+  const result = await sendMail({
+    to: recipients.map((r) => r.email),
+    subject: mail.subject,
+    text: mail.text,
+    html: mail.html,
+    attachments,
+  });
+  if (!result.ok) {
+    return { ok: false, sent: 0, error: result.error };
+  }
   return { ok: true, sent: recipients.length };
 }

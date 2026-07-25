@@ -1056,3 +1056,363 @@ export async function buildLedgerExpensesPdfBuffer(input: {
 
   return Buffer.from(await pdf.save());
 }
+
+export async function buildTripLedgerSummaryPdfBuffer(model: {
+  ledgerTitle: string;
+  tripTitle: string | null;
+  baseCurrency: string;
+  exportedAt: string;
+  expenses: Array<{
+    expenseId: number;
+    description: string | null;
+    categoryLabel: string | null;
+    amount: number;
+    currency: string;
+    amountBase: number;
+    baseCurrency: string;
+    exchangeRate?: number;
+    paidByName: string;
+    placeName: string | null;
+    expenseDate: string | null;
+    note?: string | null;
+    activityLabel?: string | null;
+    aiImagePath?: string | null;
+  }>;
+  totalExpenseBase: number;
+  totalSettlementsBase: number;
+  members: Array<{
+    displayName: string;
+    paidBase: number;
+    settlementsPaidBase: number;
+    netBalance: number;
+  }>;
+  settlements: Array<{
+    fromName: string;
+    toName: string;
+    amountBase: number;
+    settledAt: string | null;
+  }>;
+  openDebts: Array<{ fromName: string; toName: string; amount: number }>;
+}): Promise<Buffer> {
+  const pdf = await PDFDocument.create();
+  const font = await pdf.embedFont(StandardFonts.Helvetica);
+  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const headline = model.tripTitle || model.ledgerTitle;
+  const stand =
+    formatDateDe(model.exportedAt.slice(0, 10)) ||
+    model.exportedAt.slice(0, 10);
+
+  function newPage() {
+    const p = pdf.addPage([PAGE_W, PAGE_H]);
+    p.drawRectangle({
+      x: 0,
+      y: 0,
+      width: PAGE_W,
+      height: PAGE_H,
+      color: C.pageBg,
+    });
+    return p;
+  }
+
+  let page = newPage();
+  const margin = OUTER;
+  const contentW = PAGE_W - margin * 2;
+  let y = PAGE_H - margin;
+
+  const ensureSpace = (need: number) => {
+    if (y - need < margin + 40) {
+      page = newPage();
+      y = PAGE_H - margin;
+    }
+  };
+
+  // Header
+  page.drawRectangle({
+    x: margin,
+    y: y - 78,
+    width: contentW,
+    height: 78,
+    color: C.headerBg,
+    borderColor: C.headerBorder,
+    borderWidth: 1,
+  });
+  page.drawText("FINANZBUDDY  ·  REISE-UEBERSICHT", {
+    x: margin + 16,
+    y: y - 28,
+    size: 12,
+    font: bold,
+    color: C.headerLabel,
+  });
+  const titleLines = wrapText(headline, bold, 18, contentW - 32);
+  page.drawText(titleLines[0] || toPdfSafeText(headline), {
+    x: margin + 16,
+    y: y - 50,
+    size: 18,
+    font: bold,
+    color: C.headerTitle,
+  });
+  page.drawText(
+    toPdfSafeText(
+      `${model.expenses.length} Ausgaben · Summe ${formatMoney(model.totalExpenseBase, model.baseCurrency)} · Stand ${stand}`
+    ),
+    {
+      x: margin + 16,
+      y: y - 68,
+      size: 10,
+      font,
+      color: C.headerLabel,
+    }
+  );
+  y -= 98;
+
+  // Expense cards (same structure as ledger summary)
+  for (const exp of model.expenses) {
+    const badgeW = 70;
+    const badgeH = 78;
+    const padX = 12;
+    const padY = 12;
+    const img = await embedOptionalScaledJpeg(
+      pdf,
+      exp.aiImagePath,
+      LEDGER_SUMMARY_AI_THUMB_PX
+    );
+    const imgSize = LEDGER_SUMMARY_AI_THUMB_PX;
+    let imgW = 0;
+    let imgH = 0;
+    if (img) {
+      const scale = Math.min(imgSize / img.width, imgSize / img.height, 1);
+      imgW = img.width * scale;
+      imgH = img.height * scale;
+    }
+
+    const textX = margin + padX + badgeW + 14;
+    const textRight = margin + contentW - padX - (img ? imgW + 12 : 0);
+    const textW = Math.max(120, textRight - textX);
+    const title = exp.description?.trim() || "Ausgabe";
+    const titleLinesExp = wrapText(title, bold, 13, textW).slice(0, 2);
+
+    const hasFx = isForeignCurrency(exp.currency, exp.baseCurrency);
+    const detailLines: string[] = [
+      `Bezahlt von: ${exp.paidByName}`,
+      ...(hasFx
+        ? [
+            `FW Betrag: ${formatMoney(exp.amount, exp.currency)}`,
+            `Betrag ${model.baseCurrency}: ${formatMoney(exp.amountBase, model.baseCurrency)}`,
+          ]
+        : [`Betrag: ${formatMoney(exp.amount, exp.currency)}`]),
+    ];
+    if (exp.placeName) detailLines.push(`Ort: ${exp.placeName}`);
+    if (exp.note?.trim()) detailLines.push(`Notiz: ${exp.note.trim()}`);
+    if (exp.activityLabel) detailLines.push(`Aktivitaet: ${exp.activityLabel}`);
+
+    const detailWrapped = detailLines.flatMap((line) =>
+      wrapText(line, font, 10, textW).map((t) => t)
+    );
+    const textColH =
+      titleLinesExp.length * 15 + 16 + detailWrapped.length * 12 + 8;
+    const cardH =
+      Math.max(badgeH, imgH, textColH) + padY * 2;
+
+    ensureSpace(cardH + 16);
+    const cardBottom = y - cardH;
+    drawRoundedRect(
+      page,
+      margin,
+      cardBottom,
+      contentW,
+      cardH,
+      10,
+      C.card,
+      C.border,
+      1
+    );
+
+    const innerX = margin + padX;
+    const innerTop = y - padY;
+    drawDateBadge(page, bold, exp.expenseDate, innerX, innerTop, badgeW, badgeH);
+
+    let ty = innerTop - 4;
+    for (const line of titleLinesExp) {
+      page.drawText(line, {
+        x: textX,
+        y: ty - 13,
+        size: 13,
+        font: bold,
+        color: C.ink,
+      });
+      ty -= 15;
+    }
+    page.drawText(toPdfSafeText(exp.categoryLabel || "Ausgabe").toUpperCase(), {
+      x: textX,
+      y: ty - 11,
+      size: 9,
+      font: bold,
+      color: C.badgeFg,
+    });
+    ty -= 16;
+    for (const line of detailWrapped) {
+      page.drawText(toPdfSafeText(line), {
+        x: textX,
+        y: ty - 10,
+        size: 10,
+        font,
+        color: C.ink,
+      });
+      ty -= 12;
+    }
+    if (img && imgW > 0) {
+      page.drawImage(img, {
+        x: margin + contentW - padX - imgW,
+        y: innerTop - imgH,
+        width: imgW,
+        height: imgH,
+      });
+    }
+    y -= cardH + 10;
+  }
+
+  // Summary
+  ensureSpace(120);
+  page.drawText("Zusammenfassung", {
+    x: margin,
+    y: y - 16,
+    size: 14,
+    font: bold,
+    color: C.ink,
+  });
+  y -= 34;
+  const summaryBits = [
+    `Summe Ausgaben: ${formatMoney(model.totalExpenseBase, model.baseCurrency)}`,
+    `Ausgleich gezahlt: ${formatMoney(model.totalSettlementsBase, model.baseCurrency)}`,
+    `Offene Vorschlaege: ${model.openDebts.length}`,
+  ];
+  for (const bit of summaryBits) {
+    page.drawText(toPdfSafeText(bit), {
+      x: margin,
+      y: y - 12,
+      size: 11,
+      font,
+      color: C.ink,
+    });
+    y -= 16;
+  }
+  y -= 10;
+
+  // Chart
+  ensureSpace(40 + model.members.length * 58);
+  page.drawText("Wer hat bisher bezahlt / Netto", {
+    x: margin,
+    y: y - 14,
+    size: 14,
+    font: bold,
+    color: C.ink,
+  });
+  y -= 28;
+  const maxAbs = Math.max(
+    1,
+    ...model.members.flatMap((m) => [
+      Math.abs(m.paidBase),
+      Math.abs(m.settlementsPaidBase),
+      Math.abs(m.netBalance),
+    ])
+  );
+  const barMaxW = contentW - 160;
+
+  for (const m of model.members) {
+    ensureSpace(56);
+    page.drawText(toPdfSafeText(m.displayName), {
+      x: margin,
+      y: y - 12,
+      size: 11,
+      font: bold,
+      color: C.ink,
+    });
+    y -= 18;
+    const rows: Array<[string, number, ReturnType<typeof rgb>]> = [
+      ["Bezahlt", m.paidBase, C.headerLabel],
+      ["Ausgleich", m.settlementsPaidBase, rgb(0.42, 0.56, 0.48)],
+      [
+        "Netto",
+        m.netBalance,
+        m.netBalance >= 0 ? C.headerLabel : rgb(0.7, 0.33, 0.33),
+      ],
+    ];
+    for (const [label, value, color] of rows) {
+      const w = Math.max(2, (Math.abs(value) / maxAbs) * barMaxW);
+      page.drawText(label, {
+        x: margin,
+        y: y - 8,
+        size: 8,
+        font,
+        color: C.muted,
+      });
+      page.drawRectangle({
+        x: margin + 70,
+        y: y - 10,
+        width: w,
+        height: 8,
+        color,
+      });
+      page.drawText(
+        toPdfSafeText(formatMoney(value, model.baseCurrency)),
+        {
+          x: margin + 70 + w + 6,
+          y: y - 8,
+          size: 8,
+          font: bold,
+          color: C.ink,
+        }
+      );
+      y -= 14;
+    }
+    y -= 6;
+  }
+
+  // Settlements
+  ensureSpace(80);
+  page.drawText("Ausgleichsstatus", {
+    x: margin,
+    y: y - 14,
+    size: 14,
+    font: bold,
+    color: C.ink,
+  });
+  y -= 28;
+  if (model.settlements.length === 0) {
+    page.drawText("Noch keine Ausgleichszahlungen.", {
+      x: margin,
+      y: y - 12,
+      size: 10,
+      font,
+      color: C.muted,
+    });
+    y -= 18;
+  } else {
+    for (const s of model.settlements) {
+      ensureSpace(18);
+      const line = `${s.fromName} -> ${s.toName}: ${formatMoney(s.amountBase, model.baseCurrency)} (${formatDateDe(s.settledAt) || "-"})`;
+      page.drawText(toPdfSafeText(line), {
+        x: margin,
+        y: y - 11,
+        size: 10,
+        font,
+        color: C.ink,
+      });
+      y -= 15;
+    }
+  }
+  for (const d of model.openDebts) {
+    ensureSpace(18);
+    const line = `Offen: ${d.fromName} -> ${d.toName}: ${formatMoney(d.amount, model.baseCurrency)}`;
+    page.drawText(toPdfSafeText(line), {
+      x: margin,
+      y: y - 11,
+      size: 10,
+      font,
+      color: C.muted,
+    });
+    y -= 15;
+  }
+
+  return Buffer.from(await pdf.save());
+}
