@@ -118,7 +118,7 @@ export function TripCostDashboard({ data }: { data: TripCostDashboardData }) {
               {data.expenseCount} Ausgabe
               {data.expenseCount === 1 ? "" : "n"}
               {data.unlinkedCount > 0
-                ? ` · ${data.unlinkedCount} ohne Aktivität`
+                ? ` · ${data.unlinkedCount} nicht mit Timeline verknüpft`
                 : ""}
             </p>
           </div>
@@ -231,7 +231,7 @@ export function TripCostDashboard({ data }: { data: TripCostDashboardData }) {
             currency={currency}
           />
           <BucketList
-            title="Nach Aktivitätstyp"
+            title="Nach Timeline-Aktivität"
             buckets={data.byEventType}
             currency={currency}
           />

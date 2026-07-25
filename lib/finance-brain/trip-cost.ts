@@ -111,7 +111,7 @@ export function buildTripCostDashboard(
 
     const eventType =
       row.trip_event_id == null
-        ? "Ohne Aktivität"
+        ? "Nicht mit Timeline verknüpft"
         : (row.event_type || "Aktivität").trim() || "Aktivität";
     const evEntry = byEventType.get(eventType) || { total: 0, count: 0 };
     evEntry.total += amount;
