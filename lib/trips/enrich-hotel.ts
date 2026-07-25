@@ -3,6 +3,7 @@ import path from "path";
 import { nowIso } from "@/lib/utils/dates";
 import { ensureTripMediaDirs, getTripMapsDir } from "@/lib/trips/paths";
 import { getNominatimBaseUrl } from "@/lib/trips/settings";
+import { fetchStaticMapPng } from "@/lib/trips/static-map";
 import {
   getTripById,
   getTripEventById,
@@ -442,28 +443,14 @@ async function fetchStaticMap(
   eventId: number
 ): Promise<string | null> {
   ensureTripMediaDirs();
-  // staticmap.openstreetmap.de is often unavailable — cache a single OSM tile instead.
-  const zoom = 15;
-  const n = 2 ** zoom;
-  const x = Math.floor(((lon + 180) / 360) * n);
-  const latRad = (lat * Math.PI) / 180;
-  const y = Math.floor(
-    ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * n
-  );
-  const url = `https://tile.openstreetmap.org/${zoom}/${x}/${y}.png`;
-  try {
-    const response = await fetch(url, {
-      headers: {
-        "User-Agent":
-          "FamilyBrain-TravelBrain/1.0 (https://github.com/rolfwalker71-commits/familybrain)",
-      },
-    });
-    if (!response.ok) return null;
-    const buffer = Buffer.from(await response.arrayBuffer());
-    const fullPath = path.join(getTripMapsDir(), `event-${eventId}.png`);
-    fs.writeFileSync(fullPath, buffer);
-    return fullPath;
-  } catch {
-    return null;
-  }
+  const buffer = await fetchStaticMapPng({
+    lat,
+    lon,
+    zoom: 15,
+    withMarker: true,
+  });
+  if (!buffer) return null;
+  const fullPath = path.join(getTripMapsDir(), `event-${eventId}.png`);
+  fs.writeFileSync(fullPath, buffer);
+  return fullPath;
 }

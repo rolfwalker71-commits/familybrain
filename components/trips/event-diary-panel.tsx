@@ -1,7 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ImagePlus, MessageCircle, Pencil, Trash2, XIcon } from "lucide-react";
+import {
+  CloudSun,
+  ImagePlus,
+  MessageCircle,
+  Pencil,
+  Trash2,
+  XIcon,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { formatDateDe } from "@/lib/finance-brain/format";
@@ -48,6 +55,7 @@ export function EventDiaryPanel({
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [weatherBusy, setWeatherBusy] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editBody, setEditBody] = useState("");
   const [zoomUrl, setZoomUrl] = useState<string | null>(null);
@@ -118,6 +126,70 @@ export function EventDiaryPanel({
     }
   }
 
+  function readDevicePosition(): Promise<GeolocationPosition> {
+    return new Promise((resolve, reject) => {
+      if (typeof navigator === "undefined" || !navigator.geolocation) {
+        reject(
+          new Error(
+            "Standort ist auf diesem Gerät nicht verfügbar (HTTPS oder Browser-GPS nötig)."
+          )
+        );
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(resolve, (err) => {
+        if (err.code === err.PERMISSION_DENIED) {
+          reject(
+            new Error(
+              "Standortzugriff verweigert. Bitte in den Browser-Einstellungen erlauben."
+            )
+          );
+        } else if (err.code === err.TIMEOUT) {
+          reject(new Error("Standort konnte nicht rechtzeitig ermittelt werden."));
+        } else {
+          reject(
+            new Error(
+              err.message || "Standort konnte nicht ermittelt werden."
+            )
+          );
+        }
+      }, {
+        enableHighAccuracy: true,
+        timeout: 20000,
+        maximumAge: 0,
+      });
+    });
+  }
+
+  async function submitWeatherNow() {
+    if (readOnly) return;
+    setWeatherBusy(true);
+    setError(null);
+    try {
+      const pos = await readDevicePosition();
+      const res = await fetch(
+        `/api/trips/${tripId}/events/${eventId}/comments/weather`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            lat: pos.coords.latitude,
+            lon: pos.coords.longitude,
+            accuracy: pos.coords.accuracy,
+          }),
+        }
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Wetter-Kommentar fehlgeschlagen");
+      }
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setWeatherBusy(false);
+    }
+  }
+
   async function saveEdit(commentId: number) {
     if (!editBody.trim()) return;
     setBusy(true);
@@ -160,6 +232,8 @@ export function EventDiaryPanel({
       setBusy(false);
     }
   }
+
+  const anyBusy = busy || weatherBusy;
 
   return (
     <div className={cn("space-y-3", className)}>
@@ -207,7 +281,7 @@ export function EventDiaryPanel({
                       size="icon-xs"
                       variant="ghost"
                       title="Bearbeiten"
-                      disabled={busy}
+                      disabled={anyBusy}
                       onClick={() => {
                         setEditingId(c.id);
                         setEditBody(c.body);
@@ -220,7 +294,7 @@ export function EventDiaryPanel({
                       size="icon-xs"
                       variant="ghost"
                       title="Löschen"
-                      disabled={busy}
+                      disabled={anyBusy}
                       onClick={() => void removeComment(c.id)}
                     >
                       <Trash2 className="size-3.5 text-destructive" />
@@ -241,7 +315,7 @@ export function EventDiaryPanel({
                   <div className="flex gap-2">
                     <Button
                       size="sm"
-                      disabled={busy || !editBody.trim()}
+                      disabled={anyBusy || !editBody.trim()}
                       onClick={() => void saveEdit(c.id)}
                     >
                       Speichern
@@ -249,7 +323,7 @@ export function EventDiaryPanel({
                     <Button
                       size="sm"
                       variant="ghost"
-                      disabled={busy}
+                      disabled={anyBusy}
                       onClick={() => setEditingId(null)}
                     >
                       Abbrechen
@@ -290,7 +364,7 @@ export function EventDiaryPanel({
             rows={3}
             className="min-h-20 bg-background text-sm"
             maxLength={2000}
-            disabled={busy}
+            disabled={anyBusy}
           />
           <input
             ref={fileRef}
@@ -328,7 +402,7 @@ export function EventDiaryPanel({
               size="sm"
               variant="outline"
               className="gap-1.5"
-              disabled={busy}
+              disabled={anyBusy}
               onClick={() => fileRef.current?.click()}
             >
               <ImagePlus className="size-3.5" />
@@ -337,8 +411,20 @@ export function EventDiaryPanel({
             <Button
               type="button"
               size="sm"
+              variant="outline"
               className="gap-1.5"
-              disabled={busy || !body.trim()}
+              disabled={anyBusy}
+              title="Aktuelles Wetter vom Geräte-Standort als Kommentar"
+              onClick={() => void submitWeatherNow()}
+            >
+              <CloudSun className="size-3.5" />
+              {weatherBusy ? "Wetter…" : "Wetter jetzt"}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              className="gap-1.5"
+              disabled={anyBusy || !body.trim()}
               onClick={() => void submitNew()}
             >
               <MessageCircle className="size-3.5" />
