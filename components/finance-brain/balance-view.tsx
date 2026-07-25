@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   ArrowLeftRight,
+  Check,
   Download,
   Link2,
   Luggage,
@@ -17,6 +18,7 @@ import {
   Unlink,
   Users,
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -612,23 +614,27 @@ function ExpenseCard({
           </div>
 
           <div className="min-w-0 flex-1">
-            <p className="truncate font-semibold text-foreground">
-              {exp.description || (isIncome ? "Einnahme" : "Ausgabe")}
-            </p>
+            <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+              <p className="min-w-0 truncate font-semibold text-foreground">
+                {exp.description || (isIncome ? "Einnahme" : "Ausgabe")}
+              </p>
+              {Boolean(exp.pre_settled) ? (
+                <Badge
+                  variant="secondary"
+                  title="Bereits ausgeglichen (nacherfasst) — zählt zu den Kosten, Saldo bleibt neutral"
+                  className="h-5 gap-0.5 border border-[var(--brand-finance)]/25 bg-[var(--brand-finance-soft)] px-1.5 text-[10px] font-semibold text-[var(--brand-finance)] sm:text-[11px]"
+                >
+                  <Check className="size-3" strokeWidth={2.5} aria-hidden />
+                  ausgeglichen
+                </Badge>
+              ) : null}
+            </div>
             <p className="mt-0.5 truncate text-xs text-muted-foreground">
               {isIncome ? "Einnahme" : visual.label}
               {!cashbookMode ? (
                 <>
                   {" · "}
                   {memberName(exp.paid_by_member_id)}
-                </>
-              ) : null}
-              {Boolean(exp.pre_settled) ? (
-                <>
-                  {" · "}
-                  <span className="text-[var(--brand-finance)]">
-                    bereits ausgeglichen
-                  </span>
                 </>
               ) : null}
             </p>
