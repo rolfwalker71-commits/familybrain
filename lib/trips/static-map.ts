@@ -33,7 +33,7 @@ async function fetchOsmTile(
 
 /**
  * Single OSM tile around lat/lon with a simple pin marker.
- * Zoom 11 suits open-ocean context; 15 is city-scale (hotel enrich).
+ * Prefer resolveWeatherMapZoom() for weather comments (sea ≈ 4, urban ≈ 10, land ≈ 11).
  */
 export async function fetchStaticMapPng(input: {
   lat: number;

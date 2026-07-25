@@ -17,6 +17,7 @@ import {
   getTripEventById,
 } from "@/lib/trips/queries";
 import { fetchStaticMapPng } from "@/lib/trips/static-map";
+import { resolveWeatherMapZoom } from "@/lib/trips/map-context";
 import {
   fetchCurrentWeather,
   formatWeatherCommentBody,
@@ -87,10 +88,11 @@ export async function POST(request: Request, context: Ctx) {
       accuracyM,
     });
 
+    const { zoom } = await resolveWeatherMapZoom(lat, lon);
     const mapPng = await fetchStaticMapPng({
       lat,
       lon,
-      zoom: 11,
+      zoom,
       withMarker: true,
     });
     if (mapPng) {

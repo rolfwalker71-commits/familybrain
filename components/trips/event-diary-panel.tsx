@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { formatDateDe } from "@/lib/finance-brain/format";
+import { isWeatherCommentBody } from "@/lib/trips/map-context";
 import { cn } from "@/lib/utils";
 
 export type EventComment = {
@@ -364,26 +365,45 @@ export function EventDiaryPanel({
                     </Button>
                   </div>
                 </div>
+              ) : isWeatherCommentBody(c.body) && c.image_url ? (
+                <div className="mt-1.5 flex flex-col gap-3 sm:flex-row sm:items-start">
+                  <p className="min-w-0 flex-1 whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+                    {c.body}
+                  </p>
+                  <button
+                    type="button"
+                    className="shrink-0 overflow-hidden rounded-lg border border-border/50 self-start"
+                    onClick={() => setZoomUrl(c.image_url)}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={c.image_url}
+                      alt="Standortkarte"
+                      className="size-36 object-cover sm:size-40"
+                    />
+                  </button>
+                </div>
               ) : (
-                <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-foreground">
-                  {c.body}
-                </p>
+                <>
+                  <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+                    {c.body}
+                  </p>
+                  {c.image_url ? (
+                    <button
+                      type="button"
+                      className="mt-2 block overflow-hidden rounded-lg border border-border/50"
+                      onClick={() => setZoomUrl(c.image_url)}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={c.image_url}
+                        alt=""
+                        className="max-h-40 w-auto max-w-full object-cover"
+                      />
+                    </button>
+                  ) : null}
+                </>
               )}
-
-              {c.image_url ? (
-                <button
-                  type="button"
-                  className="mt-2 block overflow-hidden rounded-lg border border-border/50"
-                  onClick={() => setZoomUrl(c.image_url)}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={c.image_url}
-                    alt=""
-                    className="max-h-40 w-auto max-w-full object-cover"
-                  />
-                </button>
-              ) : null}
             </li>
           ))}
         </ul>
