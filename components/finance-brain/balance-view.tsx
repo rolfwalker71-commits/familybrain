@@ -1429,8 +1429,14 @@ export function ExpenseList({
                 onValueChange={(v) => {
                   if (v != null) setPayerFilter(v);
                 }}
+                items={{
+                  __all__: "Alle Zahler",
+                  ...Object.fromEntries(
+                    payerOptions.map((m) => [String(m.id), m.display_name])
+                  ),
+                }}
               >
-                <SelectTrigger className="h-8 bg-background text-sm">
+                <SelectTrigger className="h-8 w-full min-w-0 bg-background text-sm">
                   <SelectValue placeholder="Zahler" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1448,8 +1454,14 @@ export function ExpenseList({
               onValueChange={(v) => {
                 if (v != null) setCategoryFilter(v);
               }}
+              items={{
+                __all__: "Alle Kategorien",
+                ...Object.fromEntries(
+                  categoryOptions.map((label) => [label, label])
+                ),
+              }}
             >
-              <SelectTrigger className="h-8 bg-background text-sm">
+              <SelectTrigger className="h-8 w-full min-w-0 bg-background text-sm">
                 <SelectValue placeholder="Kategorie" />
               </SelectTrigger>
               <SelectContent>
