@@ -5,6 +5,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   ArrowLeftRight,
   Check,
+  Copy,
   Download,
   Link2,
   Luggage,
@@ -438,6 +439,7 @@ function ExpenseCard({
   onDeleteAiImage,
   onResendMail,
   onUpdate,
+  onDuplicate,
   onSetDocument,
   trips,
   lockedTripId,
@@ -461,6 +463,7 @@ function ExpenseCard({
   onDeleteAiImage?: (expenseId: number) => void;
   onResendMail?: (expenseId: number) => void;
   onUpdate?: (expenseId: number, payload: ExpenseEditPayload) => Promise<void>;
+  onDuplicate?: (exp: ExpenseListItem) => void;
   onSetDocument?: (
     expenseId: number,
     documentId: number | null
@@ -1052,6 +1055,21 @@ function ExpenseCard({
             </Button>
           ) : null}
 
+          {onDuplicate && !editing ? (
+            <Button
+              type="button"
+              id={`expense-duplicate-${exp.id}`}
+              size="sm"
+              variant="ghost"
+              className="hidden h-7 px-2 text-xs md:inline-flex"
+              title="Als Vorlage für eine neue Buchung übernehmen"
+              onClick={() => onDuplicate(exp)}
+            >
+              <Copy className="mr-1 size-3.5" />
+              Duplizieren
+            </Button>
+          ) : null}
+
           <div className="hidden flex-wrap items-center gap-1 md:flex">
           {onGenerateAiImage ? (
             <Button
@@ -1247,6 +1265,7 @@ export function ExpenseList({
   onDeleteAiImage,
   onResendMail,
   onUpdateExpense,
+  onDuplicateExpense,
   onSetDocument,
   trips,
   lockedTripId,
@@ -1271,6 +1290,7 @@ export function ExpenseList({
     expenseId: number,
     payload: ExpenseEditPayload
   ) => Promise<void>;
+  onDuplicateExpense?: (exp: ExpenseListItem) => void;
   onSetDocument?: (
     expenseId: number,
     documentId: number | null
@@ -1319,6 +1339,7 @@ export function ExpenseList({
             onDeleteAiImage={onDeleteAiImage}
             onResendMail={onResendMail}
             onUpdate={onUpdateExpense}
+            onDuplicate={onDuplicateExpense}
             onSetDocument={onSetDocument}
             mobileFocused={mobileFocusId === exp.id}
             onMobileFocus={setMobileFocusId}
@@ -1329,7 +1350,7 @@ export function ExpenseList({
         ))
       )}
 
-      {focus && (canEdit || canDelete) ? (
+      {focus && (canEdit || canDelete || onDuplicateExpense) ? (
         <div className="pointer-events-none fixed inset-x-0 bottom-[4.25rem] z-40 md:hidden">
           <div className="pointer-events-auto border-t border-border/80 bg-background/95 px-2 py-2 shadow-[0_-8px_24px_rgba(15,23,42,0.12)] backdrop-blur">
             <p className="truncate px-1 text-[11px] text-muted-foreground">
@@ -1348,6 +1369,17 @@ export function ExpenseList({
                 >
                   <Pencil className="mr-1 size-3.5" />
                   Ändern
+                </Button>
+              ) : null}
+              {onDuplicateExpense ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="shrink-0"
+                  onClick={() => onDuplicateExpense(focus)}
+                >
+                  <Copy className="mr-1 size-3.5" />
+                  Duplizieren
                 </Button>
               ) : null}
               {canEdit && onSetDocument ? (

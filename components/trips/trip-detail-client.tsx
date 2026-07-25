@@ -2763,6 +2763,23 @@ function TripDetailInner({
                           ) : null}
                         </div>
                       ) : null}
+
+                      <EventDiaryPanel
+                        tripId={tripId}
+                        eventId={event.id}
+                        readOnly={readOnly}
+                        shareToken={shareToken || undefined}
+                        className="border-t border-border/40 pt-2"
+                        onCountChange={(count) => {
+                          setEvents((prev) =>
+                            prev.map((e) =>
+                              e.id === event.id
+                                ? { ...e, comment_count: count }
+                                : e
+                            )
+                          );
+                        }}
+                      />
                     </CardContent>
                   </Card>
                 </div>

@@ -54,6 +54,7 @@ import {
   SectionCard,
   SettlementList,
   type BalanceDebt,
+  type ExpenseListItem,
 } from "@/components/finance-brain/balance-view";
 import { TripCostDashboard } from "@/components/finance-brain/trip-cost-dashboard";
 import { PendingReceiptPicker } from "@/components/finance-brain/expense-receipt-controls";
@@ -1229,6 +1230,30 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
     router.replace(q ? `?${q}` : "?", { scroll: false });
   }
 
+  function duplicateExpense(exp: ExpenseListItem) {
+    setExpDesc(exp.description || "");
+    setExpAmount(String(exp.amount));
+    setExpCurrency(exp.currency || data?.ledger.base_currency || "CHF");
+    setExpRate(String(exp.exchange_rate ?? 1));
+    setExpDate(exp.expense_date || todayDateInputValue());
+    setExpPlace(exp.place_name || "");
+    setExpNote(exp.note || "");
+    setExpPayer(String(exp.paid_by_member_id));
+    setExpDirection(exp.direction === "income" ? "income" : "expense");
+    setExpTripEventId(exp.trip_event?.id ?? exp.trip_event_id ?? null);
+    setExpSplit({
+      mode: "equal",
+      memberIds: exp.splits.map((s) => s.member_id),
+    });
+    setExpPreSettled(false);
+    setPendingReceipt(null);
+    setError(null);
+    setStatus(
+      "Vorlage geladen — anpassen und als neue Buchung speichern."
+    );
+    setTab("new");
+  }
+
   if (loading && !data) {
     return <p className="p-6 text-sm text-muted-foreground">Lade Abrechnung…</p>;
   }
@@ -1665,6 +1690,7 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
               isNormal ? undefined : (id) => void resendExpenseMail(id)
             }
             onUpdateExpense={(id, payload) => updateExpense(id, payload)}
+            onDuplicateExpense={duplicateExpense}
             onSetDocument={(id, documentId) =>
               setExpenseDocument(id, documentId)
             }

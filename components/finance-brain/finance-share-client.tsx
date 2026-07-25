@@ -29,6 +29,7 @@ import {
   SectionCard,
   SettlementList,
   type BalanceDebt,
+  type ExpenseListItem,
 } from "@/components/finance-brain/balance-view";
 import { PendingReceiptPicker } from "@/components/finance-brain/expense-receipt-controls";
 import {
@@ -647,6 +648,28 @@ function FinanceShareInner({ token }: { token: string }) {
     router.replace(q ? `?${q}` : "?", { scroll: false });
   }
 
+  function duplicateExpense(exp: ExpenseListItem) {
+    setExpDesc(exp.description || "");
+    setExpAmount(String(exp.amount));
+    setExpCurrency(exp.currency || data?.ledger.base_currency || "CHF");
+    setExpRate(String(exp.exchange_rate ?? 1));
+    setExpDate(exp.expense_date || todayDateInputValue());
+    setExpPlace(exp.place_name || "");
+    setExpNote(exp.note || "");
+    setExpPayer(String(exp.paid_by_member_id));
+    setExpSplit({
+      mode: "equal",
+      memberIds: exp.splits.map((s) => s.member_id),
+    });
+    setExpPreSettled(false);
+    setPendingReceipt(null);
+    setError(null);
+    setStatus(
+      "Vorlage geladen — anpassen und als neue Ausgabe speichern."
+    );
+    setTab("new");
+  }
+
   if (loading && !data) {
     return (
       <p className="p-6 text-center text-sm text-muted-foreground">
@@ -937,6 +960,7 @@ function FinanceShareInner({ token }: { token: string }) {
             onDeleteAiImage={(id) => void deleteAiImage(id)}
             onResendMail={(id) => void resendExpenseMail(id)}
             onUpdateExpense={(id, payload) => updateExpense(id, payload)}
+            onDuplicateExpense={duplicateExpense}
             onSetDocument={(id, documentId) =>
               setExpenseDocument(id, documentId)
             }
