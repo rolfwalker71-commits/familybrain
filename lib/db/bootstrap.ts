@@ -84,6 +84,7 @@ export function bootstrapDatabase(db: Database.Database): void {
   ensureChatCorrectionsTable(db);
   ensureTripsTables(db);
   ensureUsersTable(db);
+  ensureTripTravelersTable(db);
   ensureFinanceBrainTables(db);
   ensureUserAccessTables(db);
 }
@@ -514,6 +515,24 @@ function ensureUsersTable(db: Database.Database): void {
     );
     CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
     CREATE INDEX IF NOT EXISTS idx_users_active ON users(active);
+  `);
+}
+
+function ensureTripTravelersTable(db: Database.Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS trip_travelers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      trip_id INTEGER NOT NULL,
+      display_name TEXT NOT NULL,
+      email TEXT,
+      user_id INTEGER,
+      sort_key INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY(trip_id) REFERENCES trips(id) ON DELETE CASCADE,
+      FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE SET NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_trip_travelers_trip
+      ON trip_travelers(trip_id);
   `);
 }
 

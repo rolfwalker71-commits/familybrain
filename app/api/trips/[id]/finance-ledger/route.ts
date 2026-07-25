@@ -4,6 +4,8 @@ import {
   requireTripAccess,
 } from "@/lib/auth/current-user";
 import {
+  addFinanceLedgerMember,
+  addFinanceLedgerMemberFromUser,
   collectCashbookTotals,
   createFinanceLedger,
   getFinanceLedgerByTripId,
@@ -13,7 +15,8 @@ import {
   buildLedgerBalancePayload,
   serializeLedger,
 } from "@/lib/finance-brain/serialize";
-import { getTripById } from "@/lib/trips/queries";
+import { buildTripCostSummary } from "@/lib/finance-brain/trip-cost";
+import { getTripById, listTripTravelers } from "@/lib/trips/queries";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,12 +45,14 @@ export async function GET(_request: Request, context: Ctx) {
       simplifiedDebts: [],
       minimalDebts: [],
       cashbook: collectCashbookTotals(ledger.id),
+      costSummary: null,
     });
   }
   const balances = buildLedgerBalancePayload(ledger.id);
   return NextResponse.json({
     ledger: serializeLedger(ledger),
     cashbook: null,
+    costSummary: buildTripCostSummary(ledger.id),
     ...balances,
   });
 }
@@ -70,11 +75,22 @@ export async function POST(_request: Request, context: Ctx) {
         created: false,
       });
     }
+    const travelers = listTripTravelers(tripId);
     const ledger = createFinanceLedger({
       title: trip.title,
       tripId,
       ledgerKind: "split",
     });
+    for (const t of travelers) {
+      if (t.user_id) {
+        addFinanceLedgerMemberFromUser(ledger.id, t.user_id);
+      } else {
+        addFinanceLedgerMember(ledger.id, {
+          displayName: t.display_name,
+          email: t.email,
+        });
+      }
+    }
     return NextResponse.json({
       ok: true,
       ledger: serializeLedger(ledger),

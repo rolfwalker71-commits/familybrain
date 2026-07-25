@@ -28,6 +28,7 @@ import {
   ExpenseList,
   SectionCard,
   SettlementList,
+  type BalanceDebt,
 } from "@/components/finance-brain/balance-view";
 import { PendingReceiptPicker } from "@/components/finance-brain/expense-receipt-controls";
 import { ExpenseSplitParticipants } from "@/components/finance-brain/expense-split-participants";
@@ -38,6 +39,9 @@ import {
   type FinanceTabItem,
 } from "@/components/finance-brain/finance-tab-nav";
 import { COMMON_CURRENCIES } from "@/lib/finance-brain/constants";
+import { formatMoney } from "@/lib/finance-brain/format";
+import { confirmSettlementAmount } from "@/lib/finance-brain/settlement-confirm";
+import { capSettlementToCreditorNet } from "@/lib/finance-brain/settlement";
 import { todayDateInputValue } from "@/lib/utils/dates";
 
 type ShareData = {
@@ -145,6 +149,7 @@ function FinanceShareInner({ token }: { token: string }) {
   const [setNote, setSetNote] = useState("");
   const [rateLoading, setRateLoading] = useState(false);
   const [settlementRateLoading, setSettlementRateLoading] = useState(false);
+  const [recordBusyKey, setRecordBusyKey] = useState<string | null>(null);
   const [pendingReceipt, setPendingReceipt] = useState<File | null>(null);
   const [aiImageBusyId, setAiImageBusyId] = useState<number | null>(null);
   const [mailBusyId, setMailBusyId] = useState<number | null>(null);
@@ -446,7 +451,26 @@ function FinanceShareInner({ token }: { token: string }) {
 
   async function addSettlement() {
     const amount = Number(setAmount);
-    if (!amount || !setTo) return;
+    if (!amount || !setTo || !data) return;
+    const creditorNet =
+      data.balances.find((b) => b.memberId === Number(setTo))?.netBalance ?? 0;
+    const toName =
+      data.members.find((m) => m.id === Number(setTo))?.display_name ??
+      "Empfänger";
+    const amountBase =
+      setCurrency === data.ledger.base_currency
+        ? amount
+        : amount * (Number(setRate) || 1);
+    const confirmed = confirmSettlementAmount({
+      fromName: data.member.display_name,
+      toName,
+      suggested: amountBase,
+      creditorNet,
+      currency: data.ledger.base_currency,
+    });
+    if (confirmed == null) return;
+    const postAmount =
+      setCurrency === data.ledger.base_currency ? confirmed : amount;
     try {
       const res = await fetch(
         `/api/share/f/${encodeURIComponent(token)}/settlements`,
@@ -455,7 +479,7 @@ function FinanceShareInner({ token }: { token: string }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             toMemberId: Number(setTo),
-            amount,
+            amount: postAmount,
             currency: setCurrency,
             exchangeRate: Number(setRate) || 1,
             note: setNote.trim() || null,
@@ -466,14 +490,62 @@ function FinanceShareInner({ token }: { token: string }) {
       if (!res.ok) throw new Error(json.error || "Fehler");
       setSetAmount("");
       setSetNote("");
-      setSetCurrency(data?.ledger.base_currency ?? "CHF");
+      setSetCurrency(data.ledger.base_currency);
       setSetRate("1");
       if (typeof json.warning === "string" && json.warning) {
         setError(json.warning);
       }
+      setStatus("Rückzahlung erfasst.");
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function recordSuggestedDebt(debt: BalanceDebt) {
+    if (!data) return;
+    if (debt.fromMemberId !== data.member.id) return;
+    const currency = data.ledger.base_currency;
+    const creditorNet =
+      data.balances.find((b) => b.memberId === debt.toMemberId)?.netBalance ??
+      0;
+    const amount = confirmSettlementAmount({
+      fromName: debt.fromDisplayName,
+      toName: debt.toDisplayName,
+      suggested: debt.amount,
+      creditorNet,
+      currency,
+    });
+    if (amount == null) return;
+    setRecordBusyKey(`debt-${debt.fromMemberId}-${debt.toMemberId}`);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/share/f/${encodeURIComponent(token)}/settlements`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            toMemberId: debt.toMemberId,
+            amount,
+            currency,
+            exchangeRate: 1,
+          }),
+        }
+      );
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Fehler");
+      if (typeof json.warning === "string" && json.warning) {
+        setError(json.warning);
+      }
+      setStatus(
+        `Rückzahlung → ${debt.toDisplayName} (${formatMoney(amount, currency)}) erfasst.`
+      );
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRecordBusyKey(null);
     }
   }
 
@@ -623,6 +695,9 @@ function FinanceShareInner({ token }: { token: string }) {
           minimalDebts={minimalDebts}
           baseCurrency={ledger.base_currency}
           highlightMemberId={member.id}
+          onRecordDebt={recordSuggestedDebt}
+          canRecordDebt={(d) => d.fromMemberId === member.id}
+          recordBusyKey={recordBusyKey}
         />
       ) : null}
 
@@ -916,6 +991,34 @@ function FinanceShareInner({ token }: { token: string }) {
                 >
                   Rückzahlung erfassen
                 </Button>
+                {setAmount && setTo
+                  ? (() => {
+                      const suggested =
+                        setCurrency === ledger.base_currency
+                          ? Number(setAmount)
+                          : Number(setAmount) * (Number(setRate) || 1);
+                      const creditorNet =
+                        balances.find((b) => b.memberId === Number(setTo))
+                          ?.netBalance ?? 0;
+                      const cap = capSettlementToCreditorNet(
+                        suggested,
+                        creditorNet
+                      );
+                      if (!cap.capped || !(suggested > 0)) return null;
+                      const toName =
+                        members.find((m) => m.id === Number(setTo))
+                          ?.display_name ?? "Empfänger";
+                      return (
+                        <p className="text-xs text-amber-800">
+                          Betrag übersteigt das offene Netto von {toName} (
+                          {formatMoney(cap.creditorNet, ledger.base_currency)}
+                          ). Beim Erfassen wird auf{" "}
+                          {formatMoney(cap.amount, ledger.base_currency)}{" "}
+                          begrenzt (Bestätigung).
+                        </p>
+                      );
+                    })()
+                  : null}
               </div>
             </SectionCard>
           ) : (

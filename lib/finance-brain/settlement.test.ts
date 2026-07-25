@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   buildPayerOrientedDebts,
+  capSettlementToCreditorNet,
   computeEqualSplits,
   computeMemberBalances,
   roundMoney,
@@ -224,6 +225,22 @@ describe("settlement", () => {
     assert.equal(minSet.has("Valentyna->Harald:96.5"), true);
     assert.equal(minSet.has("Rolf->Harald:0.5"), true);
     assert.equal(minDebts.length, 3);
+  });
+
+  it("caps settlement to creditor remaining net", () => {
+    const full = capSettlementToCreditorNet(47.5, 47.5);
+    assert.equal(full.capped, false);
+    assert.equal(full.amount, 47.5);
+
+    const over = capSettlementToCreditorNet(48, 47.5);
+    assert.equal(over.capped, true);
+    assert.equal(over.amount, 47.5);
+    assert.equal(over.overpayBy, 0.5);
+    assert.equal(over.creditorNet, 47.5);
+
+    const zeroCreditor = capSettlementToCreditorNet(48, -0.5);
+    assert.equal(zeroCreditor.capped, true);
+    assert.equal(zeroCreditor.amount, 0);
   });
 
   it("splits equally with remainder on last member", () => {

@@ -158,6 +158,41 @@ export function roundMoney(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
+export type CapSettlementResult = {
+  amount: number;
+  capped: boolean;
+  overpayBy: number;
+  creditorNet: number;
+};
+
+/**
+ * Cap a suggested repayment so it does not exceed the creditor's remaining
+ * positive net (what they are still owed overall). Nach Zahler suggestions
+ * can exceed this (e.g. boat share 48 vs net credit 47.50).
+ */
+export function capSettlementToCreditorNet(
+  suggested: number,
+  creditorNet: number,
+  epsilon = 0.005
+): CapSettlementResult {
+  const suggestedAmt = roundMoney(Math.max(0, suggested));
+  const net = roundMoney(Math.max(0, creditorNet));
+  if (suggestedAmt <= net + epsilon) {
+    return {
+      amount: suggestedAmt,
+      capped: false,
+      overpayBy: 0,
+      creditorNet: net,
+    };
+  }
+  return {
+    amount: net,
+    capped: true,
+    overpayBy: roundMoney(suggestedAmt - net),
+    creditorNet: net,
+  };
+}
+
 export function toBaseAmount(
   amount: number,
   currency: string,

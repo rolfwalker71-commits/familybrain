@@ -851,3 +851,114 @@ export function listTravelItemsForDocument(documentId: number) {
     extracted_data: string | null;
   }>;
 }
+
+export type TripTravelerRow = {
+  id: number;
+  trip_id: number;
+  display_name: string;
+  email: string | null;
+  user_id: number | null;
+  sort_key: number;
+  created_at: string;
+};
+
+export function listTripTravelers(tripId: number): TripTravelerRow[] {
+  const db = getDb();
+  return db
+    .prepare(
+      `SELECT * FROM trip_travelers
+       WHERE trip_id = ?
+       ORDER BY sort_key ASC, id ASC`
+    )
+    .all(tripId) as TripTravelerRow[];
+}
+
+export function getTripTravelerById(
+  travelerId: number
+): TripTravelerRow | null {
+  const db = getDb();
+  return (
+    (db
+      .prepare(`SELECT * FROM trip_travelers WHERE id = ?`)
+      .get(travelerId) as TripTravelerRow | undefined) ?? null
+  );
+}
+
+export function createTripTraveler(
+  tripId: number,
+  input: {
+    displayName: string;
+    email?: string | null;
+    userId?: number | null;
+  }
+): TripTravelerRow {
+  if (!getTripById(tripId)) throw new Error("Reise nicht gefunden");
+  const displayName = input.displayName.trim();
+  if (!displayName) throw new Error("Name erforderlich");
+  const db = getDb();
+  const maxSort = db
+    .prepare(
+      `SELECT COALESCE(MAX(sort_key), -1) AS m FROM trip_travelers WHERE trip_id = ?`
+    )
+    .get(tripId) as { m: number };
+  const result = db
+    .prepare(
+      `INSERT INTO trip_travelers
+        (trip_id, display_name, email, user_id, sort_key, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    )
+    .run(
+      tripId,
+      displayName,
+      input.email?.trim() || null,
+      input.userId ?? null,
+      maxSort.m + 1,
+      nowIso()
+    );
+  const row = getTripTravelerById(Number(result.lastInsertRowid));
+  if (!row) throw new Error("Reisende konnte nicht angelegt werden");
+  return row;
+}
+
+export function updateTripTraveler(
+  travelerId: number,
+  input: {
+    displayName?: string;
+    email?: string | null;
+    userId?: number | null;
+    sortKey?: number;
+  }
+): TripTravelerRow {
+  const existing = getTripTravelerById(travelerId);
+  if (!existing) throw new Error("Reisende nicht gefunden");
+  const db = getDb();
+  db.prepare(
+    `UPDATE trip_travelers SET
+       display_name = ?,
+       email = ?,
+       user_id = ?,
+       sort_key = ?
+     WHERE id = ?`
+  ).run(
+    input.displayName !== undefined
+      ? input.displayName.trim() || existing.display_name
+      : existing.display_name,
+    input.email !== undefined
+      ? input.email?.trim() || null
+      : existing.email,
+    input.userId !== undefined ? input.userId : existing.user_id,
+    input.sortKey !== undefined ? input.sortKey : existing.sort_key,
+    travelerId
+  );
+  const row = getTripTravelerById(travelerId);
+  if (!row) throw new Error("Reisende nicht gefunden");
+  return row;
+}
+
+export function deleteTripTraveler(travelerId: number): void {
+  const db = getDb();
+  const result = db
+    .prepare(`DELETE FROM trip_travelers WHERE id = ?`)
+    .run(travelerId);
+  if (result.changes === 0) throw new Error("Reisende nicht gefunden");
+}

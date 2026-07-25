@@ -53,7 +53,9 @@ import {
   ExpenseList,
   SectionCard,
   SettlementList,
+  type BalanceDebt,
 } from "@/components/finance-brain/balance-view";
+import { TripCostDashboard } from "@/components/finance-brain/trip-cost-dashboard";
 import { PendingReceiptPicker } from "@/components/finance-brain/expense-receipt-controls";
 import { ExpenseTripEventPicker } from "@/components/finance-brain/expense-trip-event-picker";
 import { ExpenseSplitParticipants } from "@/components/finance-brain/expense-split-participants";
@@ -65,6 +67,8 @@ import {
 } from "@/components/finance-brain/finance-tab-nav";
 import { COMMON_CURRENCIES, LEDGER_KIND_LABELS } from "@/lib/finance-brain/constants";
 import { formatMoney, formatSignedMoney } from "@/lib/finance-brain/format";
+import { confirmSettlementAmount } from "@/lib/finance-brain/settlement-confirm";
+import { capSettlementToCreditorNet } from "@/lib/finance-brain/settlement";
 import { cn } from "@/lib/utils";
 import { todayDateInputValue } from "@/lib/utils/dates";
 
@@ -157,6 +161,32 @@ type LedgerDetail = {
     incomeTotalBase: number;
     netBase: number;
   };
+  costDashboard?: {
+    baseCurrency: string;
+    totalSpentBase: number;
+    expenseCount: number;
+    unlinkedCount: number;
+    byPerson: Array<{
+      memberId: number;
+      displayName: string;
+      paidBase: number;
+      fairShareBase: number;
+      deltaBase: number;
+      netBalance: number;
+    }>;
+    byCategory: Array<{
+      label: string;
+      totalBase: number;
+      count: number;
+      sharePct: number;
+    }>;
+    byEventType: Array<{
+      label: string;
+      totalBase: number;
+      count: number;
+      sharePct: number;
+    }>;
+  } | null;
 };
 
 type ImportDoc = {
@@ -232,6 +262,7 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
   const [setTo, setSetTo] = useState<string>("");
   const [setNote, setSetNote] = useState("");
   const [settlementRateLoading, setSettlementRateLoading] = useState(false);
+  const [recordBusyKey, setRecordBusyKey] = useState<string | null>(null);
 
   const [importDocs, setImportDocs] = useState<{
     tripDocuments: ImportDoc[];
@@ -870,11 +901,33 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
 
   async function addSettlement() {
     const amount = Number(setAmount);
-    if (!amount || !setFrom || !setTo) return;
+    if (!amount || !setFrom || !setTo || !data) return;
     if (setFrom === setTo) {
       setError("Zahler und Empfänger müssen unterschiedlich sein.");
       return;
     }
+    const creditorNet =
+      data.balances.find((b) => b.memberId === Number(setTo))?.netBalance ?? 0;
+    const toName =
+      data.members.find((m) => m.id === Number(setTo))?.display_name ??
+      "Empfänger";
+    const fromName =
+      data.members.find((m) => m.id === Number(setFrom))?.display_name ??
+      "Zahler";
+    const amountBase =
+      setCurrency === data.ledger.base_currency
+        ? amount
+        : amount * (Number(setRate) || 1);
+    const confirmed = confirmSettlementAmount({
+      fromName,
+      toName,
+      suggested: amountBase,
+      creditorNet,
+      currency: data.ledger.base_currency,
+    });
+    if (confirmed == null) return;
+    const postAmount =
+      setCurrency === data.ledger.base_currency ? confirmed : amount;
     try {
       const res = await fetch(`/api/finance-ledgers/${ledgerId}/settlements`, {
         method: "POST",
@@ -882,7 +935,7 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
         body: JSON.stringify({
           fromMemberId: Number(setFrom),
           toMemberId: Number(setTo),
-          amount,
+          amount: postAmount,
           currency: setCurrency,
           exchangeRate: Number(setRate) || 1,
           note: setNote.trim() || null,
@@ -892,7 +945,7 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
       if (!res.ok) throw new Error(json.error || "Fehler");
       setSetAmount("");
       setSetNote("");
-      setSetCurrency(data?.ledger.base_currency ?? "CHF");
+      setSetCurrency(data.ledger.base_currency);
       setSetRate("1");
       if (typeof json.warning === "string" && json.warning) {
         setError(json.warning);
@@ -903,6 +956,53 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function recordSuggestedDebt(debt: BalanceDebt) {
+    if (!data) return;
+    const currency = data.ledger.base_currency;
+    const creditorNet =
+      data.balances.find((b) => b.memberId === debt.toMemberId)?.netBalance ??
+      0;
+    const amount = confirmSettlementAmount({
+      fromName: debt.fromDisplayName,
+      toName: debt.toDisplayName,
+      suggested: debt.amount,
+      creditorNet,
+      currency,
+    });
+    if (amount == null) return;
+    const busyKey = `debt-${debt.fromMemberId}-${debt.toMemberId}`;
+    setRecordBusyKey(busyKey);
+    setError(null);
+    try {
+      const res = await fetch(`/api/finance-ledgers/${ledgerId}/settlements`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fromMemberId: debt.fromMemberId,
+          toMemberId: debt.toMemberId,
+          amount,
+          currency,
+          exchangeRate: 1,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Fehler");
+      if (typeof json.warning === "string" && json.warning) {
+        setError(json.warning);
+        setStatus("Rückzahlung erfasst – Belegmail fehlgeschlagen.");
+      } else {
+        setStatus(
+          `Rückzahlung ${debt.fromDisplayName} → ${debt.toDisplayName} erfasst.`
+        );
+      }
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRecordBusyKey(null);
     }
   }
 
@@ -1046,6 +1146,7 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
     simplifiedDebts,
     minimalDebts = [],
     cashbook,
+    costDashboard,
   } = data;
   const isNormal = ledger.ledger_kind === "normal";
   const isSplit = !isNormal;
@@ -1151,12 +1252,19 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
 
       {activeTab === "overview" ? (
         !isNormal ? (
-          <BalanceView
-            balances={balances}
-            simplifiedDebts={simplifiedDebts}
-            minimalDebts={minimalDebts}
-            baseCurrency={ledger.base_currency}
-          />
+          <div className="space-y-4">
+            {ledger.trip_id && costDashboard ? (
+              <TripCostDashboard data={costDashboard} />
+            ) : null}
+            <BalanceView
+              balances={balances}
+              simplifiedDebts={simplifiedDebts}
+              minimalDebts={minimalDebts}
+              baseCurrency={ledger.base_currency}
+              onRecordDebt={recordSuggestedDebt}
+              recordBusyKey={recordBusyKey}
+            />
+          </div>
         ) : (
           <SectionCard title="Übersicht" tone="green" icon={Receipt}>
             <div className="grid gap-3 sm:grid-cols-3">
@@ -1561,6 +1669,34 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
                   Erfassen
                 </Button>
               </div>
+              {setAmount && setTo
+                ? (() => {
+                    const suggested =
+                      setCurrency === ledger.base_currency
+                        ? Number(setAmount)
+                        : Number(setAmount) * (Number(setRate) || 1);
+                    const creditorNet =
+                      balances.find((b) => b.memberId === Number(setTo))
+                        ?.netBalance ?? 0;
+                    const cap = capSettlementToCreditorNet(
+                      suggested,
+                      creditorNet
+                    );
+                    if (!cap.capped || !(suggested > 0)) return null;
+                    const toName =
+                      members.find((m) => m.id === Number(setTo))
+                        ?.display_name ?? "Empfänger";
+                    return (
+                      <p className="text-xs text-amber-800 sm:col-span-4">
+                        Betrag übersteigt das offene Netto von {toName} (
+                        {formatMoney(cap.creditorNet, ledger.base_currency)}).
+                        Beim Erfassen wird auf{" "}
+                        {formatMoney(cap.amount, ledger.base_currency)}{" "}
+                        begrenzt (Bestätigung).
+                      </p>
+                    );
+                  })()
+                : null}
               <div className="space-y-1 sm:col-span-4">
                 <Label>Notiz</Label>
                 <Textarea

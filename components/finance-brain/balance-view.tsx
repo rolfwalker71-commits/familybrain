@@ -137,12 +137,17 @@ export type ExpenseEditPayload = {
   splitMemberIds?: number[];
 };
 
+export type BalanceDebt = Debt;
+
 export function BalanceView({
   balances,
   simplifiedDebts,
   minimalDebts = [],
   baseCurrency,
   highlightMemberId,
+  onRecordDebt,
+  canRecordDebt,
+  recordBusyKey,
 }: {
   balances: Balance[];
   /** Nach Zahler / Person (Anteil an dessen Ausgaben). */
@@ -151,7 +156,53 @@ export function BalanceView({
   minimalDebts?: Debt[];
   baseCurrency: string;
   highlightMemberId?: number;
+  onRecordDebt?: (debt: Debt) => void | Promise<void>;
+  canRecordDebt?: (debt: Debt) => boolean;
+  recordBusyKey?: string | null;
 }) {
+  function debtKey(prefix: string, d: Debt, i: number) {
+    return `${prefix}-${d.fromMemberId}-${d.toMemberId}-${i}`;
+  }
+
+  function renderDebtRow(prefix: string, d: Debt, i: number) {
+    const key = debtKey(prefix, d, i);
+    const debtId = `${d.fromMemberId}-${d.toMemberId}`;
+    const showRecord =
+      onRecordDebt && (canRecordDebt ? canRecordDebt(d) : true);
+    const busy =
+      recordBusyKey === key ||
+      recordBusyKey === debtId ||
+      recordBusyKey === `debt-${debtId}`;
+    return (
+      <div
+        key={key}
+        className="flex items-center justify-between gap-2 rounded-xl border border-amber-200/60 bg-white px-3 py-2.5 text-sm"
+      >
+        <div className="min-w-0">
+          <span className="font-medium">{d.fromDisplayName}</span>
+          {" schuldet "}
+          <span className="font-medium">{d.toDisplayName}</span>
+          {" "}
+          <span className="font-semibold text-amber-900">
+            {formatMoney(d.amount, baseCurrency)}
+          </span>
+        </div>
+        {showRecord ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-7 shrink-0 px-2 text-xs"
+            disabled={busy || Boolean(recordBusyKey)}
+            onClick={() => void onRecordDebt?.(d)}
+          >
+            {busy ? "…" : "Erfassen"}
+          </Button>
+        ) : null}
+      </div>
+    );
+  }
+
   return (
     <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
       <Card tone="green" className="overflow-hidden border-border/60 shadow-[0_4px_16px_rgba(20,32,28,0.05)]">
@@ -230,20 +281,7 @@ export function BalanceView({
                 (Rückzahlungen abgezogen; Gegenforderungen zwischen denselben
                 Personen verrechnet).
               </p>
-              {simplifiedDebts.map((d, i) => (
-                <div
-                  key={`payer-${d.fromMemberId}-${d.toMemberId}-${i}`}
-                  className="rounded-xl border border-amber-200/60 bg-white px-3 py-2.5 text-sm"
-                >
-                  <span className="font-medium">{d.fromDisplayName}</span>
-                  {" schuldet "}
-                  <span className="font-medium">{d.toDisplayName}</span>
-                  {" "}
-                  <span className="font-semibold text-amber-900">
-                    {formatMoney(d.amount, baseCurrency)}
-                  </span>
-                </div>
-              ))}
+              {simplifiedDebts.map((d, i) => renderDebtRow("payer", d, i))}
             </>
           )}
         </CardContent>
@@ -266,20 +304,7 @@ export function BalanceView({
                 Transfers bis alle bei null sind — nicht zwingend an den
                 ursprünglichen Zahler.
               </p>
-              {minimalDebts.map((d, i) => (
-                <div
-                  key={`min-${d.fromMemberId}-${d.toMemberId}-${i}`}
-                  className="rounded-xl border border-amber-200/60 bg-white px-3 py-2.5 text-sm"
-                >
-                  <span className="font-medium">{d.fromDisplayName}</span>
-                  {" schuldet "}
-                  <span className="font-medium">{d.toDisplayName}</span>
-                  {" "}
-                  <span className="font-semibold text-amber-900">
-                    {formatMoney(d.amount, baseCurrency)}
-                  </span>
-                </div>
-              ))}
+              {minimalDebts.map((d, i) => renderDebtRow("min", d, i))}
             </>
           )}
         </CardContent>

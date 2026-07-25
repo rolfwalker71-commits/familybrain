@@ -28,10 +28,30 @@ type Cashbook = {
   netBase: number;
 };
 
-export function TripFinanceLedgerCard({ tripId }: { tripId: number }) {
+type CostSummary = {
+  baseCurrency: string;
+  totalSpentBase: number;
+  expenseCount: number;
+  topCategories: Array<{
+    label: string;
+    totalBase: number;
+    count: number;
+    sharePct: number;
+  }>;
+};
+
+export function TripFinanceLedgerCard({
+  tripId,
+  travelerCount = 0,
+}: {
+  tripId: number;
+  /** Reisende on the trip — shown before ledger create. */
+  travelerCount?: number;
+}) {
   const [ledger, setLedger] = useState<LedgerSummary | null>(null);
   const [balances, setBalances] = useState<Balance[]>([]);
   const [cashbook, setCashbook] = useState<Cashbook | null>(null);
+  const [costSummary, setCostSummary] = useState<CostSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
 
@@ -44,10 +64,12 @@ export function TripFinanceLedgerCard({ tripId }: { tripId: number }) {
         setLedger(data.ledger);
         setBalances(data.balances || []);
         setCashbook(data.cashbook ?? null);
+        setCostSummary(data.costSummary ?? null);
       } else {
         setLedger(null);
         setBalances([]);
         setCashbook(null);
+        setCostSummary(null);
       }
     } finally {
       setLoading(false);
@@ -113,6 +135,32 @@ export function TripFinanceLedgerCard({ tripId }: { tripId: number }) {
       {ledger ? (
         <CardContent className="space-y-2 pt-0">
           <p className="text-sm text-muted-foreground">{ledger.title}</p>
+          {costSummary && costSummary.expenseCount > 0 ? (
+            <div className="rounded-md border border-emerald-200/70 bg-white/70 px-2 py-1.5 text-sm">
+              <div className="flex justify-between gap-2">
+                <span className="text-muted-foreground">Reise-Kosten</span>
+                <span className="font-semibold tabular-nums">
+                  {formatMoney(
+                    costSummary.totalSpentBase,
+                    ledger.base_currency
+                  )}
+                </span>
+              </div>
+              {costSummary.topCategories.length > 0 ? (
+                <p className="mt-1 truncate text-[11px] text-muted-foreground">
+                  {costSummary.topCategories
+                    .map((c) => `${c.label} ${c.sharePct}%`)
+                    .join(" · ")}
+                </p>
+              ) : null}
+              <Link
+                href={`/finance-brain/${ledger.id}`}
+                className="mt-1 inline-block text-[11px] font-medium text-[var(--brand-finance)] underline-offset-2 hover:underline"
+              >
+                Kosten-Übersicht öffnen
+              </Link>
+            </div>
+          ) : null}
           {isNormal && cashbook ? (
             <div className="space-y-1">
               <div className="flex justify-between rounded-md border border-emerald-200/70 bg-white/70 px-2 py-1 text-sm">
@@ -178,6 +226,13 @@ export function TripFinanceLedgerCard({ tripId }: { tripId: number }) {
           <p className="text-sm text-muted-foreground">
             Geteilte Kosten für diese Reise erfassen (Settle-Up).
           </p>
+          {travelerCount > 0 ? (
+            <p className="mt-1 text-xs text-[var(--brand-finance)]">
+              {travelerCount} Reisende
+              {travelerCount === 1 ? "r wird" : " werden"} als Teilnehmer
+              übernommen.
+            </p>
+          ) : null}
         </CardContent>
       )}
     </Card>

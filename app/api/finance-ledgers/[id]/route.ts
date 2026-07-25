@@ -23,6 +23,7 @@ import {
   serializeMemberWithToken,
   serializeSettlement,
 } from "@/lib/finance-brain/serialize";
+import { buildTripCostDashboard } from "@/lib/finance-brain/trip-cost";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -76,6 +77,7 @@ export async function GET(_request: Request, context: Ctx) {
     members,
     expenses,
     settlements,
+    costDashboard: buildTripCostDashboard(id),
     ...balances,
   });
 }

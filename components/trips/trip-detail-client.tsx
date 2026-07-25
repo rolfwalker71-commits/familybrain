@@ -75,6 +75,7 @@ import { DocumentPdfThumb } from "@/components/documents/document-pdf-preview";
 import { TripMap } from "@/components/trips/trip-map";
 import { TripExportMenu } from "@/components/trips/trip-export-menu";
 import { TripFinanceLedgerCard } from "@/components/finance-brain/trip-finance-ledger-card";
+import { TripTravelersCard } from "@/components/trips/trip-travelers-card";
 import { BelegNotesBlock } from "@/components/trips/beleg-notes-block";
 import { LinkDocumentsToEventDialog } from "@/components/trips/link-documents-to-event-dialog";
 import {
@@ -568,6 +569,7 @@ function TripDetailInner({
   const [events, setEvents] = useState<TripEvent[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const [travelerCount, setTravelerCount] = useState(0);
   const [editMode, setEditMode] = useState(false);
   /** Mobile edit toolbar focuses actions on one event. */
   const [editFocusEventId, setEditFocusEventId] = useState<number | null>(null);
@@ -1516,7 +1518,18 @@ function TripDetailInner({
 
       {activeTab === "mehr" ? (
         <div className="space-y-6">
-      {!readOnly ? <TripFinanceLedgerCard tripId={tripId} /> : null}
+      {!readOnly ? (
+        <TripTravelersCard
+          tripId={tripId}
+          onCountChange={setTravelerCount}
+        />
+      ) : null}
+      {!readOnly ? (
+        <TripFinanceLedgerCard
+          tripId={tripId}
+          travelerCount={travelerCount}
+        />
+      ) : null}
 
       {!readOnly ? (
       <div className="flex flex-wrap gap-2">

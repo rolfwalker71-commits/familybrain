@@ -390,6 +390,19 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
 CREATE INDEX IF NOT EXISTS idx_users_active ON users(active);
 
+CREATE TABLE IF NOT EXISTS trip_travelers (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  trip_id INTEGER NOT NULL,
+  display_name TEXT NOT NULL,
+  email TEXT,
+  user_id INTEGER,
+  sort_key INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY(trip_id) REFERENCES trips(id) ON DELETE CASCADE,
+  FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE SET NULL
+);
+CREATE INDEX IF NOT EXISTS idx_trip_travelers_trip ON trip_travelers(trip_id);
+
 -- FinanzBrain: group expense ledgers (Settle-Up style) + Normal cashbooks
 CREATE TABLE IF NOT EXISTS finance_ledgers (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
