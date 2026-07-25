@@ -89,7 +89,7 @@ const navItems: NavItem[] = [
     href: "/trips",
     label: "TravelBuddy",
     icon: Luggage,
-    tone: "teal",
+    tone: "green",
   },
   {
     href: "/finance-brain",

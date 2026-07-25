@@ -252,13 +252,13 @@ export function FinanceLedgersListClient() {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid gap-3">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {ledgers.map((ledger) => {
               const kind = ledger.ledger_kind === "normal" ? "normal" : "split";
               return (
                 <div
                   key={ledger.id}
-                  className="relative rounded-xl border border-border bg-card p-4 shadow-[0_2px_4px_rgba(20,32,28,0.06),0_10px_28px_rgba(20,32,28,0.1)]"
+                  className="relative flex flex-col rounded-xl border border-border bg-card p-4 shadow-[0_2px_4px_rgba(20,32,28,0.06),0_10px_28px_rgba(20,32,28,0.1)]"
                 >
                   <Button
                     variant="ghost"
@@ -270,7 +270,7 @@ export function FinanceLedgersListClient() {
                     <Trash2 className="size-4 text-destructive" />
                   </Button>
 
-                  <div className="flex items-start gap-3 pr-10">
+                  <div className="flex min-h-0 flex-1 items-start gap-3 pr-10">
                     <IconCircle
                       icon={pageVisuals.financeBrain.icon}
                       tone="green"

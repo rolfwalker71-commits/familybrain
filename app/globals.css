@@ -62,43 +62,43 @@
   --card-foreground: #14201c;
   --popover: #ffffff;
   --popover-foreground: #14201c;
-  /* FamilyBrain default = teal (Dokumente) */
-  --primary: #0f766e;
+  /* FamilyBrain default = sage (FinanzBuddy reference) */
+  --primary: #3f6b52;
   --primary-foreground: #ffffff;
   --secondary: #e8eeec;
   --secondary-foreground: #14201c;
   --muted: #eef2f0;
   --muted-foreground: #5b6b66;
-  --accent: #ccfbf1;
-  --accent-foreground: #115e59;
+  --accent: #d9e4d1;
+  --accent-foreground: #3f6b52;
   --destructive: #dc2626;
   --border: #d7e0dc;
   --input: #d7e0dc;
-  --ring: #0f766e;
-  --chart-1: #0f766e;
+  --ring: #3f6b52;
+  --chart-1: #3f6b52;
   --chart-2: #f59e0b;
   --chart-3: #ec4899;
-  --chart-4: #3f6b52;
+  --chart-4: #0f766e;
   --chart-5: #14b8a6;
   --radius: 0.625rem;
-  /* Domain accents (Soft-UI mockups) */
-  --brand-docs: #0f766e;
-  --brand-docs-soft: #ccfbf1;
+  /* Domain accents — docs/travel share finance sage so TravelBuddy matches FinanzBuddy */
+  --brand-docs: #3f6b52;
+  --brand-docs-soft: #d9e4d1;
   --brand-finance: #3f6b52;
   --brand-finance-soft: #d9e4d1;
   --brand-settings: #1e3a5f;
   --brand-settings-soft: #e2e8f0;
-  --brand-sync: #4a6b55;
-  --brand-sync-soft: #dde8df;
+  --brand-sync: #3f6b52;
+  --brand-sync-soft: #d9e4d1;
   /* Desktop sidebar stays dark; mobile header uses light tokens */
   --sidebar: #14201c;
   --sidebar-foreground: #d1d5db;
-  --sidebar-primary: #0f766e;
+  --sidebar-primary: #3f6b52;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #1f2e29;
   --sidebar-accent-foreground: #f9fafb;
   --sidebar-border: #1f2e29;
-  --sidebar-ring: #0f766e;
+  --sidebar-ring: #3f6b52;
 }
 
 @layer base {

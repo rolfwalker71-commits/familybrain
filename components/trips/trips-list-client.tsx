@@ -195,7 +195,7 @@ export function TripsListClient() {
         </div>
         <div className={cn(!compact && "sm:col-span-4")}>
           <Button
-            className="w-full bg-[var(--brand-docs)] text-white hover:bg-[var(--brand-docs)]/90 sm:w-auto"
+            className="w-full bg-[var(--brand-finance)] text-white hover:bg-[var(--brand-finance)]/90 sm:w-auto"
             onClick={() => void createTrip()}
             disabled={creating || !title.trim()}
           >
@@ -218,7 +218,7 @@ export function TripsListClient() {
 
       <Card className="hidden border-border shadow-[0_2px_4px_rgba(20,32,28,0.06),0_10px_28px_rgba(20,32,28,0.1)] md:block">
         <CardContent className="p-4">
-          <p className="mb-3 text-sm font-medium text-[var(--brand-docs)]">
+          <p className="mb-3 text-sm font-medium text-[var(--brand-finance)]">
             Neue Reise
           </p>
           <CreateForm />
@@ -297,7 +297,7 @@ export function TripsListClient() {
                 Noch keine Reisen.
               </p>
               <Button
-                className="w-full bg-[var(--brand-docs)] text-white hover:bg-[var(--brand-docs)]/90 md:hidden"
+                className="w-full bg-[var(--brand-finance)] text-white hover:bg-[var(--brand-finance)]/90 md:hidden"
                 onClick={() => setCreateOpen(true)}
               >
                 <Plus className="mr-2 size-4" />
@@ -313,7 +313,7 @@ export function TripsListClient() {
                 className="overflow-hidden border-border shadow-[0_2px_4px_rgba(20,32,28,0.06),0_10px_28px_rgba(20,32,28,0.1)]"
               >
                 <div
-                  className="h-36 bg-gradient-to-br from-[var(--brand-docs-soft)] to-teal-100 bg-cover bg-center"
+                  className="h-36 bg-gradient-to-br from-[var(--brand-finance-soft)] to-emerald-100 bg-cover bg-center"
                   style={
                     trip.cover_url
                       ? { backgroundImage: `url(${trip.cover_url})` }

@@ -35,8 +35,8 @@ export const iconToneClasses = {
   orange: "bg-orange-50 text-orange-600",
   /** Sage / FinanzBuddy */
   green: "bg-[var(--brand-finance-soft)] text-[var(--brand-finance)]",
-  /** Dokumente / MyBrain default */
-  teal: "bg-[var(--brand-docs-soft)] text-[var(--brand-docs)]",
+  /** Dokumente / TravelBuddy — same sage as FinanzBuddy */
+  teal: "bg-[var(--brand-finance-soft)] text-[var(--brand-finance)]",
   sky: "bg-sky-50 text-sky-600",
   indigo: "bg-indigo-50 text-indigo-600",
   violet: "bg-violet-50 text-violet-600",
@@ -51,7 +51,7 @@ export const iconToneSolidClasses = {
   rose: "bg-rose-500 text-white",
   orange: "bg-orange-500 text-white",
   green: "bg-[var(--brand-finance)] text-white",
-  teal: "bg-[var(--brand-docs)] text-white",
+  teal: "bg-[var(--brand-finance)] text-white",
   sky: "bg-sky-500 text-white",
   indigo: "bg-indigo-500 text-white",
   violet: "bg-violet-500 text-white",
@@ -191,8 +191,8 @@ export const pageVisuals = {
   deadlines: { icon: CalendarClock, tone: "teal" as const },
   finance: { icon: Wallet, tone: "green" as const },
   financeBrain: { icon: HandCoins, tone: "green" as const },
-  travel: { icon: Plane, tone: "teal" as const },
-  trips: { icon: Luggage, tone: "teal" as const },
+  travel: { icon: Plane, tone: "green" as const },
+  trips: { icon: Luggage, tone: "green" as const },
   settings: { icon: Settings, tone: "teal" as const },
   summaries: { icon: Sparkles, tone: "teal" as const },
   guides: { icon: BookOpen, tone: "teal" as const },

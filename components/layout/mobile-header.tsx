@@ -42,9 +42,9 @@ function brandForPath(pathname: string): Brand {
       name: "TravelBuddy",
       href: "/trips",
       icon: Luggage,
-      accentClass: "text-[var(--brand-docs)]",
+      accentClass: "text-[var(--brand-finance)]",
       iconWrapClass:
-        "bg-[var(--brand-docs)] text-white shadow-sm shadow-[var(--brand-docs)]/30",
+        "bg-[var(--brand-finance)] text-white shadow-sm shadow-[var(--brand-finance)]/30",
     };
   }
   return {
