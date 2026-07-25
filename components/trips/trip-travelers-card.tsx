@@ -64,7 +64,7 @@ export function TripTravelersCard({
         if (!res.ok) return;
         const data = await res.json();
         setUsers(
-          ((data.users || []) as AppUser[]).filter((u) => u.active !== false)
+          ((data.users || []) as AppUser[]).filter((u) => Boolean(u.active))
         );
       } catch {
         /* optional */
