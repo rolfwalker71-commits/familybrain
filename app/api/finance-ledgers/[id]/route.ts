@@ -6,7 +6,6 @@ import {
   requireLedgerAccess,
 } from "@/lib/auth/current-user";
 import {
-  collectBalanceInputs,
   collectCashbookTotals,
   deleteFinanceLedger,
   getFinanceLedgerById,
@@ -18,7 +17,7 @@ import {
   updateFinanceLedger,
 } from "@/lib/finance-brain/queries";
 import {
-  buildBalancePayload,
+  buildLedgerBalancePayload,
   serializeExpense,
   serializeLedger,
   serializeMemberWithToken,
@@ -70,7 +69,7 @@ export async function GET(_request: Request, context: Ctx) {
       cashbook: collectCashbookTotals(id),
     });
   }
-  const balances = buildBalancePayload(collectBalanceInputs(id));
+  const balances = buildLedgerBalancePayload(id);
   return NextResponse.json({
     ledger: serializeLedger(ledger),
     members,

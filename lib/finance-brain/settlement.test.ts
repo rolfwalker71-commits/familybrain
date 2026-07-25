@@ -1,8 +1,10 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
+  buildPayerOrientedDebts,
   computeEqualSplits,
   computeMemberBalances,
+  roundMoney,
   simplifyDebts,
 } from "./settlement";
 
@@ -108,6 +110,58 @@ describe("settlement", () => {
     assert.equal(debts[0].fromMemberId, 2);
     assert.equal(debts[0].toMemberId, 1);
     assert.equal(debts[0].amount, 50);
+  });
+
+  it("four people: Harald 386 + Rolf 192 equal split (payer-oriented)", () => {
+    // Hotel: others owe Harald 96.50 each
+    // Boat: others owe Rolf 48 each
+    // Net Harald↔Rolf: Rolf owes Harald 48.50
+    const ids = [1, 2, 3, 4];
+    const hotel = computeEqualSplits(386, ids);
+    const boat = computeEqualSplits(192, ids);
+    const paid: Record<number, number> = { 1: 386, 2: 192, 3: 0, 4: 0 };
+    const names = new Map<number, string>([
+      [1, "Harald"],
+      [2, "Rolf"],
+      [3, "Eliane"],
+      [4, "Valentyna"],
+    ]);
+    const rows = computeMemberBalances(
+      ids.map((id) => ({
+        memberId: id,
+        displayName: names.get(id)!,
+        paidBase: paid[id],
+        owedBase: roundMoney((hotel.get(id) || 0) + (boat.get(id) || 0)),
+        settlementsReceivedBase: 0,
+        settlementsPaidBase: 0,
+      }))
+    );
+    const byName = Object.fromEntries(rows.map((r) => [r.displayName, r.net]));
+    assert.equal(byName.Harald, 241.5);
+    assert.equal(byName.Rolf, 47.5);
+    assert.equal(byName.Eliane, -144.5);
+    assert.equal(byName.Valentyna, -144.5);
+
+    const edges = [
+      // hotel → Harald
+      { fromMemberId: 2, toMemberId: 1, amount: hotel.get(2)! },
+      { fromMemberId: 3, toMemberId: 1, amount: hotel.get(3)! },
+      { fromMemberId: 4, toMemberId: 1, amount: hotel.get(4)! },
+      // boat → Rolf
+      { fromMemberId: 1, toMemberId: 2, amount: boat.get(1)! },
+      { fromMemberId: 3, toMemberId: 2, amount: boat.get(3)! },
+      { fromMemberId: 4, toMemberId: 2, amount: boat.get(4)! },
+    ];
+    const debts = buildPayerOrientedDebts(edges, [], names);
+    const label = (d: { fromName: string; toName: string; amount: number }) =>
+      `${d.fromName}->${d.toName}:${d.amount}`;
+    const set = new Set(debts.map(label));
+    assert.equal(set.has("Eliane->Harald:96.5"), true);
+    assert.equal(set.has("Eliane->Rolf:48"), true);
+    assert.equal(set.has("Valentyna->Harald:96.5"), true);
+    assert.equal(set.has("Valentyna->Rolf:48"), true);
+    assert.equal(set.has("Rolf->Harald:48.5"), true);
+    assert.equal(debts.length, 5);
   });
 
   it("splits equally with remainder on last member", () => {

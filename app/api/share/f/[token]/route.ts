@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import {
-  collectBalanceInputs,
   getFinanceLedgerMemberByToken,
   listFinanceExpenses,
   listFinanceExpenseSplits,
@@ -8,7 +7,7 @@ import {
   listFinanceSettlements,
 } from "@/lib/finance-brain/queries";
 import {
-  buildBalancePayload,
+  buildLedgerBalancePayload,
   serializeExpense,
   serializeLedger,
   serializeMember,
@@ -41,7 +40,7 @@ export async function GET(_request: Request, context: Ctx) {
     serializeExpense(e, listFinanceExpenseSplits(e.id), { shareToken: token })
   );
   const settlements = listFinanceSettlements(ledgerId).map(serializeSettlement);
-  const balances = buildBalancePayload(collectBalanceInputs(ledgerId));
+  const balances = buildLedgerBalancePayload(ledgerId);
   return NextResponse.json({
     ok: true,
     member: serializeMember(member),

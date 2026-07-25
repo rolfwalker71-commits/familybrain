@@ -9,7 +9,10 @@ import {
   computeShareSplits,
   roundMoney,
   toBaseAmount,
+  buildPayerOrientedDebts,
   type BalanceInput,
+  type PayerDebtEdge,
+  type SimplifiedDebt,
 } from "@/lib/finance-brain/settlement";
 import {
   getAppUserById,
@@ -1279,6 +1282,40 @@ export function collectBalanceInputs(ledgerId: number): BalanceInput[] {
     settlementsReceivedBase: roundMoney(received.get(m.id) ?? 0),
     settlementsPaidBase: roundMoney(paidOut.get(m.id) ?? 0),
   }));
+}
+
+/**
+ * Open debts: each participant owes the payer their share (minus recorded
+ * settlements). Directions between the same pair are netted.
+ */
+export function collectOpenPayerDebts(ledgerId: number): SimplifiedDebt[] {
+  const members = listFinanceLedgerMembers(ledgerId);
+  const nameById = new Map(members.map((m) => [m.id, m.display_name]));
+  const expenseEdges: PayerDebtEdge[] = [];
+
+  for (const exp of listFinanceExpenses(ledgerId)) {
+    if (coerceExpenseDirection(exp.direction) !== "expense") continue;
+    const payerId = exp.paid_by_member_id;
+    for (const sp of listFinanceExpenseSplits(exp.id)) {
+      if (sp.member_id === payerId) continue;
+      if (sp.share_amount_base <= 0) continue;
+      expenseEdges.push({
+        fromMemberId: sp.member_id,
+        toMemberId: payerId,
+        amount: sp.share_amount_base,
+      });
+    }
+  }
+
+  const settlements: PayerDebtEdge[] = listFinanceSettlements(ledgerId).map(
+    (s) => ({
+      fromMemberId: s.from_member_id,
+      toMemberId: s.to_member_id,
+      amount: s.amount_base,
+    })
+  );
+
+  return buildPayerOrientedDebts(expenseEdges, settlements, nameById);
 }
 
 /** Cashbook totals for Normal ledgers (income − expense in base currency). */

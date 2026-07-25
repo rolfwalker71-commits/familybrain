@@ -1,14 +1,15 @@
-import type { BalanceInput } from "@/lib/finance-brain/settlement";
-import {
-  computeMemberBalances,
-  simplifyDebts,
-} from "@/lib/finance-brain/settlement";
+import type { BalanceInput, SimplifiedDebt } from "@/lib/finance-brain/settlement";
+import { computeMemberBalances } from "@/lib/finance-brain/settlement";
 import type {
   FinanceExpenseRow,
   FinanceExpenseSplitRow,
   FinanceLedgerMemberRow,
   FinanceLedgerRow,
   FinanceSettlementRow,
+} from "@/lib/finance-brain/queries";
+import {
+  collectBalanceInputs,
+  collectOpenPayerDebts,
 } from "@/lib/finance-brain/queries";
 import {
   receiptPublicUrl,
@@ -106,7 +107,10 @@ export function serializeSettlement(settlement: FinanceSettlementRow) {
   return settlement;
 }
 
-export function buildBalancePayload(inputs: BalanceInput[]) {
+export function buildBalancePayload(
+  inputs: BalanceInput[],
+  openDebts?: SimplifiedDebt[]
+) {
   const raw = computeMemberBalances(inputs);
   const balances = raw.map((b) => ({
     memberId: b.memberId,
@@ -117,7 +121,7 @@ export function buildBalancePayload(inputs: BalanceInput[]) {
     settlementsPaidBase: b.settlementsPaidBase,
     netBalance: b.net,
   }));
-  const simplifiedDebts = simplifyDebts(raw).map((d) => ({
+  const simplifiedDebts = (openDebts || []).map((d) => ({
     fromMemberId: d.fromMemberId,
     fromDisplayName: d.fromName,
     toMemberId: d.toMemberId,
@@ -125,4 +129,12 @@ export function buildBalancePayload(inputs: BalanceInput[]) {
     amount: d.amount,
   }));
   return { balances, simplifiedDebts };
+}
+
+/** Saldo + offene Schulden (pro Zahler) für eine Abrechnung. */
+export function buildLedgerBalancePayload(ledgerId: number) {
+  return buildBalancePayload(
+    collectBalanceInputs(ledgerId),
+    collectOpenPayerDebts(ledgerId)
+  );
 }

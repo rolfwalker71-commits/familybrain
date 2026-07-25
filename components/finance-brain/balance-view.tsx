@@ -159,30 +159,44 @@ export function BalanceView({
           {balances.length === 0 ? (
             <p className="text-sm text-muted-foreground">Noch keine Teilnehmer.</p>
           ) : (
-            balances.map((b) => (
-              <div
-                key={b.memberId}
-                className={cn(
-                  "flex items-center justify-between rounded-xl border px-3 py-2.5 text-sm",
-                  highlightMemberId === b.memberId
-                    ? "border-[var(--brand-finance)]/35 bg-[var(--brand-finance-soft)]/60"
-                    : "border-border/50 bg-white"
-                )}
-              >
-                <span className="font-medium">{b.displayName}</span>
-                <span
-                  className={
-                    b.netBalance > 0
-                      ? "font-semibold text-[var(--brand-finance)]"
-                      : b.netBalance < 0
-                        ? "font-semibold text-rose-600"
-                        : "text-muted-foreground"
-                  }
+            <>
+              <p className="text-xs text-muted-foreground">
+                Netto = bezahlt − Anteil. Plus = bekommt Geld zurück, Minus =
+                schuldet noch.
+              </p>
+              {balances.map((b) => (
+                <div
+                  key={b.memberId}
+                  className={cn(
+                    "flex items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-sm",
+                    highlightMemberId === b.memberId
+                      ? "border-[var(--brand-finance)]/35 bg-[var(--brand-finance-soft)]/60"
+                      : "border-border/50 bg-white"
+                  )}
                 >
-                  {formatSignedMoney(b.netBalance, baseCurrency)}
-                </span>
-              </div>
-            ))
+                  <div className="min-w-0">
+                    <div className="font-medium">{b.displayName}</div>
+                    <div className="mt-0.5 text-[11px] text-muted-foreground">
+                      bezahlt {formatMoney(b.paidBase, baseCurrency)}
+                      {" · "}
+                      Anteil {formatMoney(b.owedBase, baseCurrency)}
+                    </div>
+                  </div>
+                  <span
+                    className={cn(
+                      "shrink-0 font-semibold",
+                      b.netBalance > 0
+                        ? "text-[var(--brand-finance)]"
+                        : b.netBalance < 0
+                          ? "text-rose-600"
+                          : "text-muted-foreground"
+                    )}
+                  >
+                    {formatSignedMoney(b.netBalance, baseCurrency)}
+                  </span>
+                </div>
+              ))}
+            </>
           )}
         </CardContent>
       </Card>
@@ -198,20 +212,27 @@ export function BalanceView({
           {simplifiedDebts.length === 0 ? (
             <p className="text-sm text-muted-foreground">Alles ausgeglichen.</p>
           ) : (
-            simplifiedDebts.map((d, i) => (
-              <div
-                key={`${d.fromMemberId}-${d.toMemberId}-${i}`}
-                className="rounded-xl border border-amber-200/60 bg-white px-3 py-2.5 text-sm"
-              >
-                <span className="font-medium">{d.fromDisplayName}</span>
-                {" schuldet "}
-                <span className="font-medium">{d.toDisplayName}</span>
-                {" "}
-                <span className="font-semibold text-amber-900">
-                  {formatMoney(d.amount, baseCurrency)}
-                </span>
-              </div>
-            ))
+            <>
+              <p className="text-xs text-muted-foreground">
+                Wer wem noch Geld schuldet — Anteil an Ausgaben des Zahlers,
+                abzüglich erfasster Rückzahlungen. Gegenforderungen zwischen
+                denselben Personen werden verrechnet.
+              </p>
+              {simplifiedDebts.map((d, i) => (
+                <div
+                  key={`${d.fromMemberId}-${d.toMemberId}-${i}`}
+                  className="rounded-xl border border-amber-200/60 bg-white px-3 py-2.5 text-sm"
+                >
+                  <span className="font-medium">{d.fromDisplayName}</span>
+                  {" schuldet "}
+                  <span className="font-medium">{d.toDisplayName}</span>
+                  {" "}
+                  <span className="font-semibold text-amber-900">
+                    {formatMoney(d.amount, baseCurrency)}
+                  </span>
+                </div>
+              ))}
+            </>
           )}
         </CardContent>
       </Card>
@@ -359,7 +380,7 @@ function ExpenseCard({
     <div
       id={`expense-card-${exp.id}`}
       className={cn(
-        "relative ml-3 mt-3",
+        "relative ml-3 pt-5",
         mobileFocused && "rounded-xl ring-2 ring-[var(--brand-finance)]/30"
       )}
     >
@@ -993,7 +1014,7 @@ export function ExpenseList({
   return (
     <div
       className={cn(
-        "space-y-3",
+        "space-y-5",
         mobileFocusId != null && "pb-36 md:pb-0"
       )}
     >

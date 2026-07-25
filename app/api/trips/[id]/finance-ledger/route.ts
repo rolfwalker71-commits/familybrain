@@ -4,13 +4,15 @@ import {
   requireTripAccess,
 } from "@/lib/auth/current-user";
 import {
-  collectBalanceInputs,
   collectCashbookTotals,
   createFinanceLedger,
   getFinanceLedgerByTripId,
   isNormalLedger,
 } from "@/lib/finance-brain/queries";
-import { buildBalancePayload, serializeLedger } from "@/lib/finance-brain/serialize";
+import {
+  buildLedgerBalancePayload,
+  serializeLedger,
+} from "@/lib/finance-brain/serialize";
 import { getTripById } from "@/lib/trips/queries";
 
 export const runtime = "nodejs";
@@ -41,7 +43,7 @@ export async function GET(_request: Request, context: Ctx) {
       cashbook: collectCashbookTotals(ledger.id),
     });
   }
-  const balances = buildBalancePayload(collectBalanceInputs(ledger.id));
+  const balances = buildLedgerBalancePayload(ledger.id);
   return NextResponse.json({
     ledger: serializeLedger(ledger),
     cashbook: null,

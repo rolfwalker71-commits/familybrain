@@ -82,6 +82,72 @@ export function simplifyDebts(
   return debts;
 }
 
+export type PayerDebtEdge = {
+  fromMemberId: number;
+  toMemberId: number;
+  amount: number;
+};
+
+/**
+ * Open debts oriented by who paid: each split share (except the payer's own)
+ * creates from→payer. Settlements reduce from→to. Same-pair directions are netted.
+ */
+export function buildPayerOrientedDebts(
+  expenseEdges: PayerDebtEdge[],
+  settlements: PayerDebtEdge[],
+  nameById: Map<number, string>,
+  epsilon = 0.005
+): SimplifiedDebt[] {
+  const directed = new Map<string, number>();
+  const key = (from: number, to: number) => `${from}:${to}`;
+
+  const add = (from: number, to: number, amount: number) => {
+    if (from === to || !Number.isFinite(amount) || amount === 0) return;
+    const k = key(from, to);
+    directed.set(k, (directed.get(k) || 0) + amount);
+  };
+
+  for (const e of expenseEdges) add(e.fromMemberId, e.toMemberId, e.amount);
+  for (const s of settlements) add(s.fromMemberId, s.toMemberId, -s.amount);
+
+  const ids = [...nameById.keys()].sort((a, b) => a - b);
+  const debts: SimplifiedDebt[] = [];
+
+  for (let a = 0; a < ids.length; a++) {
+    for (let b = a + 1; b < ids.length; b++) {
+      const idA = ids[a];
+      const idB = ids[b];
+      const ab = directed.get(key(idA, idB)) || 0;
+      const ba = directed.get(key(idB, idA)) || 0;
+      const net = roundMoney(ab - ba);
+      if (net > epsilon) {
+        debts.push({
+          fromMemberId: idA,
+          fromName: nameById.get(idA) || `#${idA}`,
+          toMemberId: idB,
+          toName: nameById.get(idB) || `#${idB}`,
+          amount: net,
+        });
+      } else if (net < -epsilon) {
+        debts.push({
+          fromMemberId: idB,
+          fromName: nameById.get(idB) || `#${idB}`,
+          toMemberId: idA,
+          toName: nameById.get(idA) || `#${idA}`,
+          amount: roundMoney(-net),
+        });
+      }
+    }
+  }
+
+  debts.sort((x, y) => {
+    const byFrom = x.fromName.localeCompare(y.fromName, "de");
+    if (byFrom !== 0) return byFrom;
+    return x.toName.localeCompare(y.toName, "de");
+  });
+  return debts;
+}
+
 export function roundMoney(n: number): number {
   return Math.round(n * 100) / 100;
 }

@@ -1,6 +1,5 @@
 import { formatDateDe } from "@/lib/finance-brain/format";
 import {
-  collectBalanceInputs,
   getFinanceLedgerById,
   getFinanceLedgerMemberById,
   isNormalLedger,
@@ -9,7 +8,7 @@ import {
   listFinanceSettlements,
   type FinanceExpenseRow,
 } from "@/lib/finance-brain/queries";
-import { buildBalancePayload } from "@/lib/finance-brain/serialize";
+import { buildLedgerBalancePayload } from "@/lib/finance-brain/serialize";
 import { getTripById, getTripEventById } from "@/lib/trips/queries";
 import { nowIso } from "@/lib/utils/dates";
 
@@ -116,8 +115,7 @@ export function buildTripLedgerSummaryModel(
     };
   });
 
-  const inputs = collectBalanceInputs(ledgerId);
-  const { balances, simplifiedDebts } = buildBalancePayload(inputs);
+  const { balances, simplifiedDebts } = buildLedgerBalancePayload(ledgerId);
   const members: TripSummaryMemberBar[] = balances.map((b) => ({
     displayName: b.displayName,
     paidBase: b.paidBase,
