@@ -132,7 +132,7 @@ export function ExpenseTripEventPicker({
   }
 
   return (
-    <div className={cn("grid gap-2 sm:grid-cols-2", className)}>
+    <div className={cn("grid gap-2", className)}>
       <div className="space-y-1">
         <Label className={labelCls}>Reise (optional)</Label>
         <Select
@@ -149,10 +149,10 @@ export function ExpenseTripEventPicker({
           }}
           items={tripItems}
         >
-          <SelectTrigger>
+          <SelectTrigger className="w-full min-w-0">
             <SelectValue placeholder="Reise wählen" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent align="start" alignItemWithTrigger={false}>
             {!tripLocked ? (
               <SelectItem value="__none__">Keine Reise</SelectItem>
             ) : null}
@@ -178,7 +178,7 @@ export function ExpenseTripEventPicker({
           }}
           items={eventItems}
         >
-          <SelectTrigger>
+          <SelectTrigger className="w-full min-w-0">
             <SelectValue
               placeholder={
                 loading
@@ -189,7 +189,11 @@ export function ExpenseTripEventPicker({
               }
             />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent
+            align="start"
+            alignItemWithTrigger={false}
+            className="w-max min-w-[var(--anchor-width)] max-w-[min(36rem,calc(100vw-2rem))]"
+          >
             <SelectItem value="__none__">Keine Aktivität</SelectItem>
             {events.map((ev) => (
               <SelectItem key={ev.id} value={String(ev.id)}>

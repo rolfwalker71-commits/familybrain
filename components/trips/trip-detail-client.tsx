@@ -29,11 +29,13 @@ import {
   FileText,
   LayoutList,
   MoreHorizontal,
+  Wallet,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { formatDateDe, formatMoney } from "@/lib/finance-brain/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -161,6 +163,19 @@ type TripEvent = {
     paperless_id: number;
     title: string | null;
     removable?: boolean;
+  }>;
+  linked_expenses?: Array<{
+    id: number;
+    ledger_id: number;
+    ledger_title: string;
+    description: string | null;
+    expense_date: string | null;
+    amount: number;
+    currency: string;
+    amount_base: number;
+    base_currency: string;
+    paid_by_name: string;
+    category_label: string | null;
   }>;
 };
 
@@ -356,6 +371,46 @@ function formatCompactDetailLine(event: TripEvent): string | null {
     time,
   ].filter((p): p is string => Boolean(p && String(p).trim()));
   return parts.length ? parts.join(" | ") : null;
+}
+
+function EventLinkedExpenses({
+  expenses,
+  className,
+}: {
+  expenses: NonNullable<TripEvent["linked_expenses"]>;
+  className?: string;
+}) {
+  if (!expenses.length) return null;
+  return (
+    <div className={cn("space-y-1", className)}>
+      {expenses.map((exp) => {
+        const date = formatDateDe(exp.expense_date) || null;
+        const money = formatMoney(exp.amount, exp.currency);
+        const title = exp.description?.trim() || exp.category_label || "Ausgabe";
+        return (
+          <p
+            key={exp.id}
+            className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground"
+          >
+            <Wallet className="size-3 shrink-0 text-[var(--brand-finance)]" />
+            <Link
+              href={`/finance-brain/${exp.ledger_id}`}
+              className="min-w-0 font-medium text-foreground underline-offset-2 hover:underline"
+            >
+              {date ? `${date} · ` : ""}
+              {title}
+              {" · "}
+              {money}
+            </Link>
+            <span className="text-muted-foreground">
+              · {exp.paid_by_name}
+              {exp.ledger_title ? ` · ${exp.ledger_title}` : ""}
+            </span>
+          </p>
+        );
+      })}
+    </div>
+  );
 }
 
 const VIEW_MODE_STORAGE_KEY = "travelbrain.tripViewMode";
@@ -2531,6 +2586,10 @@ function TripDetailInner({
                             {details}
                           </div>
                         ) : null}
+                        <EventLinkedExpenses
+                          expenses={event.linked_expenses || []}
+                          className="mt-1.5"
+                        />
                       </div>
 
                       {!readOnly || documents.length > 0 ? (
@@ -2750,6 +2809,10 @@ function TripDetailInner({
                             </div>
                           ) : null;
                         })()}
+                        <EventLinkedExpenses
+                          expenses={event.linked_expenses || []}
+                          className="mt-2"
+                        />
                       </div>
                       {/* Desktop edit actions — mobile uses bottom bar */}
                       {editMode ? (

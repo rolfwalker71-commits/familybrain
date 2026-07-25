@@ -487,6 +487,85 @@ export function listFinanceExpenses(ledgerId: number): FinanceExpenseRow[] {
   }));
 }
 
+export type TripEventLinkedExpense = {
+  id: number;
+  ledger_id: number;
+  ledger_title: string;
+  description: string | null;
+  expense_date: string | null;
+  amount: number;
+  currency: string;
+  amount_base: number;
+  base_currency: string;
+  paid_by_name: string;
+  category_label: string | null;
+};
+
+/** Expenses linked to the given trip events (for TravelBuddy cards). */
+export function listLinkedExpensesForTripEvents(
+  eventIds: number[]
+): Map<number, TripEventLinkedExpense[]> {
+  const map = new Map<number, TripEventLinkedExpense[]>();
+  if (eventIds.length === 0) return map;
+  const db = getDb();
+  const placeholders = eventIds.map(() => "?").join(",");
+  const rows = db
+    .prepare(
+      `SELECT
+         e.id,
+         e.ledger_id,
+         e.trip_event_id,
+         e.description,
+         e.expense_date,
+         e.amount,
+         e.currency,
+         e.amount_base,
+         e.category_label,
+         l.title AS ledger_title,
+         l.base_currency,
+         m.display_name AS paid_by_name
+       FROM finance_expenses e
+       JOIN finance_ledgers l ON l.id = e.ledger_id
+       JOIN finance_ledger_members m ON m.id = e.paid_by_member_id
+       WHERE e.trip_event_id IN (${placeholders})
+         AND l.archived_at IS NULL
+       ORDER BY COALESCE(e.expense_date, e.created_at) ASC, e.id ASC`
+    )
+    .all(...eventIds) as Array<{
+    id: number;
+    ledger_id: number;
+    trip_event_id: number;
+    description: string | null;
+    expense_date: string | null;
+    amount: number;
+    currency: string;
+    amount_base: number;
+    category_label: string | null;
+    ledger_title: string;
+    base_currency: string;
+    paid_by_name: string;
+  }>;
+
+  for (const row of rows) {
+    const list = map.get(row.trip_event_id) || [];
+    list.push({
+      id: row.id,
+      ledger_id: row.ledger_id,
+      ledger_title: row.ledger_title,
+      description: row.description,
+      expense_date: row.expense_date,
+      amount: row.amount,
+      currency: row.currency,
+      amount_base: row.amount_base,
+      base_currency: row.base_currency,
+      paid_by_name: row.paid_by_name,
+      category_label: row.category_label,
+    });
+    map.set(row.trip_event_id, list);
+  }
+  return map;
+}
+
 export function getFinanceExpenseById(
   expenseId: number
 ): FinanceExpenseRow | null {

@@ -1,5 +1,9 @@
 import { getDb } from "@/lib/db/client";
 import {
+  listLinkedExpensesForTripEvents,
+  type TripEventLinkedExpense,
+} from "@/lib/finance-brain/queries";
+import {
   aircraftPublicUrl,
   eventAiImagePublicUrl,
   mapPublicUrl,
@@ -22,6 +26,7 @@ export type SerializedTripEvent = TripEventRow & {
   map_image_url: string | null;
   ai_image_url: string | null;
   documents: TripEventDocumentRef[];
+  linked_expenses: TripEventLinkedExpense[];
 };
 
 function collectDocumentIds(
@@ -87,12 +92,15 @@ function loadDocumentRefs(
 export function serializeTripEvent(event: TripEventRow): SerializedTripEvent {
   const linked = listLinkedDocumentIdsForEvents([event.id]).get(event.id) || [];
   const { ids, removable } = collectDocumentIds(event, linked);
+  const expenses =
+    listLinkedExpensesForTripEvents([event.id]).get(event.id) || [];
   return {
     ...event,
     aircraft_image_url: aircraftPublicUrl(event.aircraft_image_path),
     map_image_url: mapPublicUrl(event.map_image_path),
     ai_image_url: eventAiImagePublicUrl(event.ai_image_path),
     documents: loadDocumentRefs(ids, removable),
+    linked_expenses: expenses,
   };
 }
 
@@ -102,6 +110,9 @@ export function serializeTripEvents(
   if (events.length === 0) return [];
 
   const linkedByEvent = listLinkedDocumentIdsForEvents(events.map((e) => e.id));
+  const expensesByEvent = listLinkedExpensesForTripEvents(
+    events.map((e) => e.id)
+  );
   const allIds = new Set<number>();
   const perEvent = events.map((event) => {
     const linked = linkedByEvent.get(event.id) || [];
@@ -130,6 +141,7 @@ export function serializeTripEvents(
           return { ...ref, removable: removable.has(id) };
         })
         .filter((r): r is TripEventDocumentRef => Boolean(r)),
+      linked_expenses: expensesByEvent.get(event.id) || [],
     };
   });
 }
