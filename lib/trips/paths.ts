@@ -32,6 +32,10 @@ export function getTripEventAttachmentsDir(): string {
   return path.join(getTripsDataRoot(), "trip-event-attachments");
 }
 
+export function getTripEventCommentImagesDir(): string {
+  return path.join(getTripsDataRoot(), "trip-event-comment-images");
+}
+
 export function ensureTripMediaDirs(): void {
   for (const dir of [
     getTripCoversDir(),
@@ -39,6 +43,7 @@ export function ensureTripMediaDirs(): void {
     getTripMapsDir(),
     getTripEventAiDir(),
     getTripEventAttachmentsDir(),
+    getTripEventCommentImagesDir(),
   ]) {
     fs.mkdirSync(dir, { recursive: true });
   }

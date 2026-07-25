@@ -12,6 +12,7 @@ import {
 import {
   listAttachmentsForEvents,
   listLinkedDocumentIdsForEvents,
+  countCommentsForEvents,
   type TripEventAttachmentRow,
   type TripEventRow,
 } from "@/lib/trips/queries";
@@ -39,6 +40,7 @@ export type SerializedTripEvent = TripEventRow & {
   documents: TripEventDocumentRef[];
   attachments: TripEventAttachmentRef[];
   linked_expenses: TripEventLinkedExpense[];
+  comment_count: number;
 };
 
 function collectDocumentIds(
@@ -125,6 +127,7 @@ export function serializeTripEvent(event: TripEventRow): SerializedTripEvent {
   )
     .map(serializeAttachment)
     .filter((a): a is TripEventAttachmentRef => Boolean(a));
+  const commentCount = countCommentsForEvents([event.id]).get(event.id) || 0;
   return {
     ...event,
     aircraft_image_url: aircraftPublicUrl(event.aircraft_image_path),
@@ -133,6 +136,7 @@ export function serializeTripEvent(event: TripEventRow): SerializedTripEvent {
     documents: loadDocumentRefs(ids, removable),
     attachments,
     linked_expenses: expenses,
+    comment_count: commentCount,
   };
 }
 
@@ -146,6 +150,7 @@ export function serializeTripEvents(
     events.map((e) => e.id)
   );
   const attachmentsByEvent = listAttachmentsForEvents(events.map((e) => e.id));
+  const commentCounts = countCommentsForEvents(events.map((e) => e.id));
   const allIds = new Set<number>();
   const perEvent = events.map((event) => {
     const linked = linkedByEvent.get(event.id) || [];
@@ -178,6 +183,7 @@ export function serializeTripEvents(
         .filter((r): r is TripEventDocumentRef => Boolean(r)),
       attachments,
       linked_expenses: expensesByEvent.get(event.id) || [],
+      comment_count: commentCounts.get(event.id) || 0,
     };
   });
 }

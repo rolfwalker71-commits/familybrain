@@ -10,6 +10,7 @@ import {
 } from "@/lib/trips/constants";
 import { formatAirportRoute, normalizeIataCode } from "@/lib/trips/iata";
 import { unlinkTripEventAttachmentFile } from "@/lib/trips/attachments";
+import { unlinkTripEventCommentImageFile } from "@/lib/trips/comment-images";
 
 export type TripRow = {
   id: number;
@@ -715,11 +716,15 @@ export function deleteTripEvent(eventId: number): void {
   if (!existing) throw new Error("Ereignis nicht gefunden");
   const attachments =
     listAttachmentsForEvents([eventId]).get(eventId) || [];
+  const comments = listCommentsForEvent(eventId);
   const db = getDb();
   db.prepare(`DELETE FROM trip_events WHERE id = ?`).run(eventId);
   syncTripDatesFromEvents(existing.trip_id);
   for (const att of attachments) {
     unlinkTripEventAttachmentFile(att.file_path);
+  }
+  for (const comment of comments) {
+    unlinkTripEventCommentImageFile(comment.image_path);
   }
 }
 
@@ -946,6 +951,140 @@ export function deleteTripEventAttachment(attachmentId: number): {
     .prepare(`DELETE FROM trip_event_attachments WHERE id = ?`)
     .run(attachmentId);
   return { event, filePath: attachment.file_path };
+}
+
+export type TripEventCommentRow = {
+  id: number;
+  trip_event_id: number;
+  user_id: number | null;
+  author_name: string;
+  body: string;
+  image_path: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export function listCommentsForEvent(
+  eventId: number
+): TripEventCommentRow[] {
+  const db = getDb();
+  return db
+    .prepare(
+      `SELECT * FROM trip_event_comments
+       WHERE trip_event_id = ?
+       ORDER BY created_at ASC, id ASC`
+    )
+    .all(eventId) as TripEventCommentRow[];
+}
+
+export function countCommentsForEvents(
+  eventIds: number[]
+): Map<number, number> {
+  const map = new Map<number, number>();
+  if (eventIds.length === 0) return map;
+  for (const id of eventIds) map.set(id, 0);
+  const db = getDb();
+  const placeholders = eventIds.map(() => "?").join(",");
+  const rows = db
+    .prepare(
+      `SELECT trip_event_id, COUNT(*) AS cnt
+       FROM trip_event_comments
+       WHERE trip_event_id IN (${placeholders})
+       GROUP BY trip_event_id`
+    )
+    .all(...eventIds) as Array<{ trip_event_id: number; cnt: number }>;
+  for (const row of rows) {
+    map.set(row.trip_event_id, row.cnt);
+  }
+  return map;
+}
+
+export function getTripEventCommentById(
+  commentId: number
+): TripEventCommentRow | null {
+  const db = getDb();
+  return (
+    (db
+      .prepare(`SELECT * FROM trip_event_comments WHERE id = ?`)
+      .get(commentId) as TripEventCommentRow | undefined) ?? null
+  );
+}
+
+export function createTripEventComment(
+  eventId: number,
+  input: {
+    userId?: number | null;
+    authorName: string;
+    body: string;
+    imagePath?: string | null;
+  }
+): TripEventCommentRow {
+  const event = getTripEventById(eventId);
+  if (!event) throw new Error("Ereignis nicht gefunden");
+  const body = input.body.trim();
+  if (!body) throw new Error("Kommentartext fehlt");
+  const authorName = input.authorName.trim();
+  if (!authorName) throw new Error("Autor fehlt");
+  const now = nowIso();
+  const db = getDb();
+  const result = db
+    .prepare(
+      `INSERT INTO trip_event_comments (
+         trip_event_id, user_id, author_name, body, image_path, created_at, updated_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?)`
+    )
+    .run(
+      eventId,
+      input.userId ?? null,
+      authorName,
+      body,
+      input.imagePath ?? null,
+      now,
+      now
+    );
+  const row = getTripEventCommentById(Number(result.lastInsertRowid));
+  if (!row) throw new Error("Kommentar konnte nicht gespeichert werden");
+  return row;
+}
+
+export function updateTripEventComment(
+  commentId: number,
+  input: {
+    body?: string;
+    imagePath?: string | null;
+  }
+): TripEventCommentRow {
+  const existing = getTripEventCommentById(commentId);
+  if (!existing) throw new Error("Kommentar nicht gefunden");
+  const body =
+    input.body !== undefined ? input.body.trim() : existing.body;
+  if (!body) throw new Error("Kommentartext fehlt");
+  const imagePath =
+    input.imagePath !== undefined ? input.imagePath : existing.image_path;
+  getDb()
+    .prepare(
+      `UPDATE trip_event_comments SET
+         body = ?,
+         image_path = ?,
+         updated_at = ?
+       WHERE id = ?`
+    )
+    .run(body, imagePath, nowIso(), commentId);
+  const row = getTripEventCommentById(commentId);
+  if (!row) throw new Error("Kommentar nicht gefunden");
+  return row;
+}
+
+export function deleteTripEventComment(commentId: number): {
+  comment: TripEventCommentRow;
+  filePath: string | null;
+} {
+  const comment = getTripEventCommentById(commentId);
+  if (!comment) throw new Error("Kommentar nicht gefunden");
+  getDb()
+    .prepare(`DELETE FROM trip_event_comments WHERE id = ?`)
+    .run(commentId);
+  return { comment, filePath: comment.image_path };
 }
 
 function syncTripDatesFromEvents(tripId: number): void {

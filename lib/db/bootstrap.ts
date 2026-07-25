@@ -187,6 +187,19 @@ function ensureTripsTables(db: Database.Database): void {
     );
     CREATE INDEX IF NOT EXISTS idx_trip_event_attachments_event
       ON trip_event_attachments(trip_event_id);
+    CREATE TABLE IF NOT EXISTS trip_event_comments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      trip_event_id INTEGER NOT NULL,
+      user_id INTEGER,
+      author_name TEXT NOT NULL,
+      body TEXT NOT NULL,
+      image_path TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY(trip_event_id) REFERENCES trip_events(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_trip_event_comments_event
+      ON trip_event_comments(trip_event_id);
     CREATE TABLE IF NOT EXISTS trip_share_links (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       trip_id INTEGER NOT NULL,

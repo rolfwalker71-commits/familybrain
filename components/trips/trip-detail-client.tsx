@@ -72,6 +72,10 @@ import {
 } from "@/components/layout/icon-circle";
 import { CalendarDateBadge } from "@/components/layout/calendar-date-badge";
 import { DocumentPdfThumb } from "@/components/documents/document-pdf-preview";
+import {
+  CommentCountChip,
+  EventDiaryPanel,
+} from "@/components/trips/event-diary-panel";
 import { TripMap } from "@/components/trips/trip-map";
 import { TripExportMenu } from "@/components/trips/trip-export-menu";
 import { TripFinanceLedgerCard } from "@/components/finance-brain/trip-finance-ledger-card";
@@ -172,6 +176,7 @@ type TripEvent = {
     url: string;
     removable?: boolean;
   }>;
+  comment_count?: number;
   linked_expenses?: Array<{
     id: number;
     ledger_id: number;
@@ -2630,8 +2635,14 @@ function TripDetailInner({
                       </div>
 
                       <div className="min-w-0">
-                        <div className="text-sm font-black leading-snug tracking-tight sm:text-base">
-                          {event.title}
+                        <div className="flex min-w-0 items-center gap-1.5">
+                          <div className="min-w-0 flex-1 truncate text-sm font-black leading-snug tracking-tight sm:text-base">
+                            {event.title}
+                          </div>
+                          <CommentCountChip
+                            count={event.comment_count || 0}
+                            className="shrink-0"
+                          />
                         </div>
                         {details ? (
                           <div className="mt-0.5 line-clamp-2 text-xs text-muted-foreground sm:truncate sm:line-clamp-none">
@@ -2858,6 +2869,7 @@ function TripDetailInner({
                           <Badge variant="secondary" className="shrink-0">
                             {coerceTripEventType(event.event_type)}
                           </Badge>
+                          <CommentCountChip count={event.comment_count || 0} />
                           {!readOnly && !editMode ? (
                             <Button
                               size="sm"
@@ -3492,6 +3504,22 @@ function TripDetailInner({
                         </div>
                       );
                     })()}
+                    <EventDiaryPanel
+                      tripId={tripId}
+                      eventId={event.id}
+                      readOnly={readOnly}
+                      shareToken={shareToken || undefined}
+                      className="border-t border-border/40 pt-3"
+                      onCountChange={(count) => {
+                        setEvents((prev) =>
+                          prev.map((e) =>
+                            e.id === event.id
+                              ? { ...e, comment_count: count }
+                              : e
+                          )
+                        );
+                      }}
+                    />
                   </CardContent>
                 </Card>
               </div>
