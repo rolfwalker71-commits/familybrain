@@ -27,6 +27,7 @@ const CreateSchema = z.object({
   splitMode: z.enum(["equal", "coupleEqual"]).optional(),
   place: z.string().max(200).nullable().optional(),
   note: z.string().max(1000).nullable().optional(),
+  preSettled: z.boolean().optional(),
 });
 
 export async function POST(request: Request, context: Ctx) {
@@ -81,6 +82,7 @@ export async function POST(request: Request, context: Ctx) {
               mode: "equal",
               memberIds: parsed.data.memberIds ?? [],
             },
+      preSettled: parsed.data.preSettled,
     });
     expense = await classifyAndStoreExpenseCategory(expense, placeName);
     return NextResponse.json({
@@ -88,6 +90,7 @@ export async function POST(request: Request, context: Ctx) {
       expense: serializeExpense(expense, listFinanceExpenseSplits(expense.id), {
         shareToken: token,
       }),
+      preSettled: Boolean(expense.pre_settled),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

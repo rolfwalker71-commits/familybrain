@@ -169,6 +169,7 @@ function FinanceShareInner({ token }: { token: string }) {
     mode: "equal",
     memberIds: [],
   });
+  const [expPreSettled, setExpPreSettled] = useState(false);
 
   const [setAmount, setSetAmount] = useState("");
   const [setCurrency, setSetCurrency] = useState("CHF");
@@ -303,6 +304,7 @@ function FinanceShareInner({ token }: { token: string }) {
                   coupleIds: expSplit.coupleIds,
                 }
               : { memberIds: expSplit.memberIds }),
+            preSettled: expPreSettled,
           }),
         }
       );
@@ -332,6 +334,7 @@ function FinanceShareInner({ token }: { token: string }) {
       setExpCurrency(data?.ledger.base_currency ?? "CHF");
       setExpRate("1");
       setPendingReceipt(null);
+      setExpPreSettled(false);
       if (data?.members?.length) {
         setExpSplit({
           mode: "equal",
@@ -843,6 +846,24 @@ function FinanceShareInner({ token }: { token: string }) {
                 onChange={setExpSplit}
               />
             </div>
+            <label className="flex cursor-pointer items-start gap-2 rounded-xl border border-border/50 bg-background/60 px-3 py-2.5 text-sm sm:col-span-2">
+              <input
+                type="checkbox"
+                className="mt-0.5 size-4 accent-[var(--brand-finance)]"
+                checked={expPreSettled}
+                onChange={(e) => setExpPreSettled(e.target.checked)}
+              />
+              <span>
+                <span className="font-medium">
+                  Bereits ausgeglichen (nacherfasst)
+                </span>
+                <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                  Zählt zu den Reise-Gesamtkosten. Anteile der anderen werden
+                  automatisch als Rückzahlung an den Zahler gebucht — Saldo
+                  bleibt neutral.
+                </span>
+              </span>
+            </label>
             <div className="space-y-1">
               <Label>Beschreibung</Label>
               <Input

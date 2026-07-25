@@ -77,6 +77,7 @@ export type FinanceExpenseRow = {
   note: string | null;
   direction: ExpenseDirection;
   split_mode: string;
+  pre_settled: number;
   created_at: string;
   updated_at: string;
 };
@@ -101,6 +102,7 @@ export type FinanceSettlementRow = {
   settled_at: string;
   created_by_member_id: number | null;
   notified_at: string | null;
+  related_expense_id: number | null;
   created_at: string;
 };
 
@@ -628,6 +630,7 @@ export function listFinanceExpenses(ledgerId: number): FinanceExpenseRow[] {
   ).map((row) => ({
     ...row,
     direction: coerceExpenseDirection(row.direction),
+    pre_settled: Number(row.pre_settled) || 0,
   }));
 }
 
@@ -718,7 +721,11 @@ export function getFinanceExpenseById(
     .prepare(`SELECT * FROM finance_expenses WHERE id = ?`)
     .get(expenseId) as FinanceExpenseRow | undefined;
   if (!row) return null;
-  return { ...row, direction: coerceExpenseDirection(row.direction) };
+  return {
+    ...row,
+    direction: coerceExpenseDirection(row.direction),
+    pre_settled: Number(row.pre_settled) || 0,
+  };
 }
 
 export function listFinanceExpenseSplits(
@@ -796,12 +803,15 @@ export function createFinanceExpense(
     note?: string | null;
     direction?: ExpenseDirection;
     split?: ExpenseSplitInput;
+    /** Counts in trip totals; auto-settles shares back to payer so nets stay neutral. */
+    preSettled?: boolean;
   }
 ): FinanceExpenseRow {
   const ledger = getFinanceLedgerById(ledgerId);
   if (!ledger) throw new Error("Abrechnung nicht gefunden");
   const direction = coerceExpenseDirection(input.direction);
   const normal = isNormalLedger(ledger);
+  const preSettled = Boolean(input.preSettled) && !normal;
 
   let paidByMemberId = input.paidByMemberId ?? null;
   let split: ExpenseSplitInput;
@@ -837,6 +847,12 @@ export function createFinanceExpense(
   validateSplitTotal(amountBase, splitMap);
   const tripEventId = resolveExpenseTripEventId(ledger, input.tripEventId);
 
+  let note = input.note?.trim() || null;
+  if (preSettled) {
+    const tag = "Bereits ausgeglichen (nacherfasst)";
+    note = note ? `${note}\n${tag}` : tag;
+  }
+
   const db = getDb();
   const ts = nowIso();
   const result = db
@@ -846,8 +862,8 @@ export function createFinanceExpense(
          amount, currency, exchange_rate, amount_base,
          description, expense_date, document_id, trip_event_id,
          place_name, place_lat, place_lon, note, direction,
-         split_mode, created_at, updated_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         split_mode, pre_settled, created_at, updated_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       ledgerId,
@@ -864,16 +880,56 @@ export function createFinanceExpense(
       input.placeName?.trim() || null,
       input.placeLat ?? null,
       input.placeLon ?? null,
-      input.note?.trim() || null,
+      note,
       direction,
       split.mode,
+      preSettled ? 1 : 0,
       ts,
       ts
     );
   const expenseId = Number(result.lastInsertRowid);
   insertSplits(expenseId, split, splitMap);
+  if (preSettled && paidByMemberId != null) {
+    settleExpenseSharesToPayer(expenseId);
+  }
   touchLedger(ledgerId);
   return getFinanceExpenseById(expenseId)!;
+}
+
+/**
+ * Book share repayments to the payer so a pre-settled expense stays net-neutral
+ * while still counting toward trip totals.
+ */
+export function settleExpenseSharesToPayer(
+  expenseId: number
+): FinanceSettlementRow[] {
+  const expense = getFinanceExpenseById(expenseId);
+  if (!expense) throw new Error("Ausgabe nicht gefunden");
+  const ledger = getFinanceLedgerById(expense.ledger_id);
+  if (!ledger) throw new Error("Abrechnung nicht gefunden");
+  const payerId = expense.paid_by_member_id;
+  const label =
+    expense.description?.trim() ||
+    `Ausgabe #${expense.id}`;
+  const created: FinanceSettlementRow[] = [];
+  for (const split of listFinanceExpenseSplits(expenseId)) {
+    if (split.member_id === payerId) continue;
+    if (!(split.share_amount_base > 0.004)) continue;
+    created.push(
+      createFinanceSettlement(expense.ledger_id, {
+        fromMemberId: split.member_id,
+        toMemberId: payerId,
+        amount: split.share_amount_base,
+        currency: ledger.base_currency,
+        exchangeRate: 1,
+        note: `Auto-Ausgleich: ${label}`,
+        settledAt: expense.expense_date || null,
+        createdByMemberId: expense.created_by_member_id,
+        relatedExpenseId: expenseId,
+      })
+    );
+  }
+  return created;
 }
 
 function buildSplitMap(
@@ -1232,6 +1288,13 @@ export function updateFinanceExpense(
   }
 
   touchLedger(existing.ledger_id);
+  if (Number(existing.pre_settled)) {
+    const db = getDb();
+    db.prepare(
+      `DELETE FROM finance_settlements WHERE related_expense_id = ?`
+    ).run(expenseId);
+    settleExpenseSharesToPayer(expenseId);
+  }
   return getFinanceExpenseById(expenseId)!;
 }
 
@@ -1271,6 +1334,9 @@ export function deleteFinanceExpense(expenseId: number): void {
   const existing = getFinanceExpenseById(expenseId);
   if (!existing) throw new Error("Ausgabe nicht gefunden");
   const db = getDb();
+  db.prepare(
+    `DELETE FROM finance_settlements WHERE related_expense_id = ?`
+  ).run(expenseId);
   db.prepare(`DELETE FROM finance_expense_splits WHERE expense_id = ?`).run(
     expenseId
   );
@@ -1311,6 +1377,7 @@ export function createFinanceSettlement(
     note?: string | null;
     settledAt?: string | null;
     createdByMemberId?: number | null;
+    relatedExpenseId?: number | null;
   }
 ): FinanceSettlementRow {
   const ledger = getFinanceLedgerById(ledgerId);
@@ -1342,8 +1409,8 @@ export function createFinanceSettlement(
       `INSERT INTO finance_settlements (
          ledger_id, from_member_id, to_member_id,
          amount, currency, exchange_rate, amount_base,
-         note, settled_at, created_by_member_id, created_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         note, settled_at, created_by_member_id, related_expense_id, created_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       ledgerId,
@@ -1356,6 +1423,7 @@ export function createFinanceSettlement(
       input.note?.trim() || null,
       input.settledAt || ts.slice(0, 10),
       input.createdByMemberId ?? null,
+      input.relatedExpenseId ?? null,
       ts
     );
   touchLedger(ledgerId);

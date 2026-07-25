@@ -141,6 +141,8 @@ export type ExpenseListItem = {
     start_date: string | null;
     start_time: string | null;
   } | null;
+  /** Backfilled expense that was already settled outside the app. */
+  pre_settled?: number | boolean;
   splits: Array<{ member_id: number; share_amount_base: number }>;
 };
 
@@ -619,6 +621,14 @@ function ExpenseCard({
                 <>
                   {" · "}
                   {memberName(exp.paid_by_member_id)}
+                </>
+              ) : null}
+              {Boolean(exp.pre_settled) ? (
+                <>
+                  {" · "}
+                  <span className="text-[var(--brand-finance)]">
+                    bereits ausgeglichen
+                  </span>
                 </>
               ) : null}
             </p>

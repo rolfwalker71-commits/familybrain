@@ -98,7 +98,7 @@ export async function POST(request: Request) {
     const contentLength = Number(request.headers.get("content-length") || 0);
     if (contentLength > MAX_GUIDE_UPLOAD_BYTES) {
       return NextResponse.json(
-        { error: "PDF ist zu gross (max. 50 MB)." },
+        { error: "PDF ist zu gross (max. 500 MB)." },
         { status: 400 }
       );
     }

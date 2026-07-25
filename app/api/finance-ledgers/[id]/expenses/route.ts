@@ -68,6 +68,7 @@ const CreateSchema = z.object({
   note: z.string().max(1000).nullable().optional(),
   direction: z.enum(EXPENSE_DIRECTIONS).optional(),
   split: SplitSchema.optional(),
+  preSettled: z.boolean().optional(),
 });
 
 export async function POST(request: Request, context: Ctx) {
@@ -150,11 +151,13 @@ export async function POST(request: Request, context: Ctx) {
       note: parsed.data.note ?? null,
       direction: parsed.data.direction ?? "expense",
       split,
+      preSettled: parsed.data.preSettled,
     });
     expense = await classifyAndStoreExpenseCategory(expense, placeName);
     return NextResponse.json({
       ok: true,
       expense: serializeExpense(expense, listFinanceExpenseSplits(expense.id)),
+      preSettled: Boolean(expense.pre_settled),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

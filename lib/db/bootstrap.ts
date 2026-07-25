@@ -395,6 +395,7 @@ function ensureFinanceBrainTables(db: Database.Database): void {
       note TEXT,
       direction TEXT NOT NULL DEFAULT 'expense',
       split_mode TEXT NOT NULL DEFAULT 'equal',
+      pre_settled INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       FOREIGN KEY(ledger_id) REFERENCES finance_ledgers(id) ON DELETE CASCADE,
@@ -428,13 +429,16 @@ function ensureFinanceBrainTables(db: Database.Database): void {
       settled_at TEXT NOT NULL,
       created_by_member_id INTEGER,
       notified_at TEXT,
+      related_expense_id INTEGER,
       created_at TEXT NOT NULL,
       FOREIGN KEY(ledger_id) REFERENCES finance_ledgers(id) ON DELETE CASCADE,
       FOREIGN KEY(from_member_id) REFERENCES finance_ledger_members(id),
       FOREIGN KEY(to_member_id) REFERENCES finance_ledger_members(id),
-      FOREIGN KEY(created_by_member_id) REFERENCES finance_ledger_members(id)
+      FOREIGN KEY(created_by_member_id) REFERENCES finance_ledger_members(id),
+      FOREIGN KEY(related_expense_id) REFERENCES finance_expenses(id) ON DELETE CASCADE
     );
     CREATE INDEX IF NOT EXISTS idx_finance_settlements_ledger ON finance_settlements(ledger_id);
+    CREATE INDEX IF NOT EXISTS idx_finance_settlements_expense ON finance_settlements(related_expense_id);
   `);
 
   const expenseCols = db
@@ -476,6 +480,11 @@ function ensureFinanceBrainTables(db: Database.Database): void {
       `ALTER TABLE finance_expenses ADD COLUMN direction TEXT NOT NULL DEFAULT 'expense'`
     );
   }
+  if (!expenseColNames.has("pre_settled")) {
+    db.exec(
+      `ALTER TABLE finance_expenses ADD COLUMN pre_settled INTEGER NOT NULL DEFAULT 0`
+    );
+  }
 
   const ledgerCols = db
     .prepare(`PRAGMA table_info(finance_ledgers)`)
@@ -499,6 +508,14 @@ function ensureFinanceBrainTables(db: Database.Database): void {
   const settlementColNames = new Set(settlementCols.map((c) => c.name));
   if (!settlementColNames.has("notified_at")) {
     db.exec(`ALTER TABLE finance_settlements ADD COLUMN notified_at TEXT`);
+  }
+  if (!settlementColNames.has("related_expense_id")) {
+    db.exec(
+      `ALTER TABLE finance_settlements ADD COLUMN related_expense_id INTEGER`
+    );
+    db.exec(
+      `CREATE INDEX IF NOT EXISTS idx_finance_settlements_expense ON finance_settlements(related_expense_id)`
+    );
   }
 
   const memberCols = db

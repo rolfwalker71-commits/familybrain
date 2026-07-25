@@ -285,6 +285,7 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
   const [expDirection, setExpDirection] = useState<"expense" | "income">(
     "expense"
   );
+  const [expPreSettled, setExpPreSettled] = useState(false);
   const [rateLoading, setRateLoading] = useState(false);
   const [pendingReceipt, setPendingReceipt] = useState<File | null>(null);
   const [aiImageBusyId, setAiImageBusyId] = useState<number | null>(null);
@@ -723,6 +724,7 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
           place: expPlace.trim() || null,
           note: expNote.trim() || null,
           tripEventId: expTripEventId,
+          ...(!isNormal ? { preSettled: expPreSettled } : {}),
         }),
       });
       const json = await res.json();
@@ -752,6 +754,7 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
       setExpCurrency(data?.ledger.base_currency ?? "CHF");
       setExpRate("1");
       setExpDirection("expense");
+      setExpPreSettled(false);
       setPendingReceipt(null);
       if (data?.members?.length) {
         setExpSplit({
@@ -759,6 +762,11 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
           memberIds: data.members.map((m) => m.id),
         });
       }
+      setStatus(
+        json.preSettled
+          ? "Ausgabe nacherfasst – Anteile als Rückzahlungen ausgeglichen."
+          : "Ausgabe erfasst."
+      );
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -1520,6 +1528,26 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
                   onChange={setExpSplit}
                 />
               </div>
+            ) : null}
+            {!isNormal ? (
+              <label className="flex cursor-pointer items-start gap-2 rounded-xl border border-border/50 bg-background/60 px-3 py-2.5 text-sm sm:col-span-2 lg:col-span-4">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 size-4 accent-[var(--brand-finance)]"
+                  checked={expPreSettled}
+                  onChange={(e) => setExpPreSettled(e.target.checked)}
+                />
+                <span>
+                  <span className="font-medium">
+                    Bereits ausgeglichen (nacherfasst)
+                  </span>
+                  <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                    Zählt zu den Reise-Gesamtkosten. Anteile der anderen werden
+                    automatisch als Rückzahlung an den Zahler gebucht — Saldo
+                    bleibt neutral.
+                  </span>
+                </span>
+              </label>
             ) : null}
             <div className="space-y-1 sm:col-span-2">
               <Label>Beschreibung</Label>

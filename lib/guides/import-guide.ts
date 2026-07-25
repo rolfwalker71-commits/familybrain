@@ -17,7 +17,7 @@ import {
 } from "@/lib/guides/storage";
 import { indexKnowledgeGuide } from "@/lib/vectors/index-guide";
 
-export const MAX_GUIDE_UPLOAD_BYTES = 50 * 1024 * 1024;
+export const MAX_GUIDE_UPLOAD_BYTES = 500 * 1024 * 1024;
 /** Stay under common ~10 MB reverse-proxy cuts. */
 export const GUIDE_UPLOAD_CHUNK_BYTES = 8 * 1024 * 1024;
 
@@ -140,7 +140,7 @@ export async function importGuideFromPdfBuffer(
     throw Object.assign(new Error("PDF-Datei fehlt."), { status: 400 });
   }
   if (buffer.length > MAX_GUIDE_UPLOAD_BYTES) {
-    throw Object.assign(new Error("PDF ist zu gross (max. 50 MB)."), {
+    throw Object.assign(new Error("PDF ist zu gross (max. 500 MB)."), {
       status: 400,
     });
   }

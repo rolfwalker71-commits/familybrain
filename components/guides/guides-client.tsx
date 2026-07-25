@@ -81,10 +81,10 @@ export function GuidesClient() {
       return;
     }
 
-    const maxUploadBytes = 50 * 1024 * 1024;
+    const maxUploadBytes = 500 * 1024 * 1024;
     if (file.size > maxUploadBytes) {
       setError(
-        `PDF ist zu gross (${(file.size / (1024 * 1024)).toFixed(1)} MB, max. 50 MB).`
+        `PDF ist zu gross (${(file.size / (1024 * 1024)).toFixed(1)} MB, max. 500 MB).`
       );
       return;
     }

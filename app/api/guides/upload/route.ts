@@ -64,7 +64,7 @@ async function handleInit(request: Request) {
 
   if (totalBytes != null && totalBytes > MAX_GUIDE_UPLOAD_BYTES) {
     return NextResponse.json(
-      { error: "PDF ist zu gross (max. 50 MB)." },
+      { error: "PDF ist zu gross (max. 500 MB)." },
       { status: 400 }
     );
   }
@@ -104,7 +104,7 @@ async function handleChunk(request: Request) {
   }
   if (totalBytes > MAX_GUIDE_UPLOAD_BYTES) {
     return NextResponse.json(
-      { error: "PDF ist zu gross (max. 50 MB)." },
+      { error: "PDF ist zu gross (max. 500 MB)." },
       { status: 400 }
     );
   }
