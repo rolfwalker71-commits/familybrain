@@ -31,6 +31,10 @@ import {
   type BalanceDebt,
   type ExpenseListItem,
 } from "@/components/finance-brain/balance-view";
+import {
+  LedgerOverviewDashboards,
+  scrollToExpenseCard,
+} from "@/components/finance-brain/ledger-overview-dashboards";
 import { PendingReceiptPicker } from "@/components/finance-brain/expense-receipt-controls";
 import {
   ExpenseSplitParticipants,
@@ -76,6 +80,8 @@ type ShareData = {
     has_receipt?: boolean;
     ai_image_url?: string | null;
     has_ai_image?: boolean;
+    pre_settled?: number | boolean;
+    created_at?: string;
     splits: Array<{ member_id: number; share_amount_base: number }>;
   }>;
   settlements: Array<{
@@ -642,7 +648,7 @@ function FinanceShareInner({ token }: { token: string }) {
 
   function setTab(tab: FinanceLedgerTab) {
     const params = new URLSearchParams(searchParams.toString());
-    if (tab === "overview") params.delete("tab");
+    if (tab === "expenses") params.delete("tab");
     else params.set("tab", tab);
     const q = params.toString();
     router.replace(q ? `?${q}` : "?", { scroll: false });
@@ -757,18 +763,34 @@ function FinanceShareInner({ token }: { token: string }) {
       {status ? <p className="text-sm text-muted-foreground">{status}</p> : null}
 
       {activeTab === "overview" ? (
-        <BalanceView
-          balances={balances}
-          simplifiedDebts={simplifiedDebts}
-          minimalDebts={minimalDebts}
-          coupleBalances={coupleBalances}
-          coupleDebts={coupleDebts}
-          baseCurrency={ledger.base_currency}
-          highlightMemberId={member.id}
-          onRecordDebt={recordSuggestedDebt}
-          canRecordDebt={(d) => d.fromMemberId === member.id}
-          recordBusyKey={recordBusyKey}
-        />
+        <div className="space-y-4">
+          <LedgerOverviewDashboards
+            expenses={expenses}
+            settlements={settlements}
+            members={members.map((m) => ({
+              id: m.id,
+              display_name: m.display_name,
+            }))}
+            openDebts={simplifiedDebts}
+            baseCurrency={ledger.base_currency}
+            onOpenExpense={(expenseId) => {
+              setTab("expenses");
+              window.setTimeout(() => scrollToExpenseCard(expenseId), 120);
+            }}
+          />
+          <BalanceView
+            balances={balances}
+            simplifiedDebts={simplifiedDebts}
+            minimalDebts={minimalDebts}
+            coupleBalances={coupleBalances}
+            coupleDebts={coupleDebts}
+            baseCurrency={ledger.base_currency}
+            highlightMemberId={member.id}
+            onRecordDebt={recordSuggestedDebt}
+            canRecordDebt={(d) => d.fromMemberId === member.id}
+            recordBusyKey={recordBusyKey}
+          />
+        </div>
       ) : null}
 
       {activeTab === "new" ? (

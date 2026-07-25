@@ -57,6 +57,10 @@ import {
   type ExpenseListItem,
 } from "@/components/finance-brain/balance-view";
 import { TripCostDashboard } from "@/components/finance-brain/trip-cost-dashboard";
+import {
+  LedgerOverviewDashboards,
+  scrollToExpenseCard,
+} from "@/components/finance-brain/ledger-overview-dashboards";
 import { PendingReceiptPicker } from "@/components/finance-brain/expense-receipt-controls";
 import { ExpenseTripEventPicker } from "@/components/finance-brain/expense-trip-event-picker";
 import {
@@ -132,7 +136,9 @@ type LedgerDetail = {
       title: string | null;
       original_file_name?: string | null;
     } | null;
+    pre_settled?: number | boolean;
     splits: Array<{ member_id: number; share_amount_base: number }>;
+    created_at?: string;
   }>;
   settlements: Array<{
     id: number;
@@ -1224,7 +1230,7 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
 
   function setTab(tab: FinanceLedgerTab) {
     const params = new URLSearchParams(searchParams.toString());
-    if (tab === "overview") params.delete("tab");
+    if (tab === "expenses") params.delete("tab");
     else params.set("tab", tab);
     const q = params.toString();
     router.replace(q ? `?${q}` : "?", { scroll: false });
@@ -1387,6 +1393,20 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
             {ledger.trip_id && costDashboard ? (
               <TripCostDashboard data={costDashboard} />
             ) : null}
+            <LedgerOverviewDashboards
+              expenses={expenses}
+              settlements={settlements}
+              members={members.map((m) => ({
+                id: m.id,
+                display_name: m.display_name,
+              }))}
+              openDebts={simplifiedDebts}
+              baseCurrency={ledger.base_currency}
+              onOpenExpense={(expenseId) => {
+                setTab("expenses");
+                window.setTimeout(() => scrollToExpenseCard(expenseId), 120);
+              }}
+            />
             <BalanceView
               balances={balances}
               simplifiedDebts={simplifiedDebts}
@@ -1399,37 +1419,55 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
             />
           </div>
         ) : (
-          <SectionCard title="Übersicht" tone="green" icon={Receipt}>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-xl border border-border/50 bg-white px-3 py-2.5">
-                <p className="text-xs text-muted-foreground">Ausgaben</p>
-                <p className="text-lg font-semibold">
-                  {formatMoney(
-                    cashbook?.expenseTotalBase ?? 0,
-                    ledger.base_currency
-                  )}
-                </p>
+          <div className="space-y-4">
+            <SectionCard title="Übersicht" tone="green" icon={Receipt}>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="rounded-xl border border-border/50 bg-white px-3 py-2.5">
+                  <p className="text-xs text-muted-foreground">Ausgaben</p>
+                  <p className="text-lg font-semibold">
+                    {formatMoney(
+                      cashbook?.expenseTotalBase ?? 0,
+                      ledger.base_currency
+                    )}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-border/50 bg-white px-3 py-2.5">
+                  <p className="text-xs text-muted-foreground">Einnahmen</p>
+                  <p className="text-lg font-semibold text-[var(--brand-finance)]">
+                    {formatMoney(
+                      cashbook?.incomeTotalBase ?? 0,
+                      ledger.base_currency
+                    )}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-border/50 bg-white px-3 py-2.5">
+                  <p className="text-xs text-muted-foreground">Saldo</p>
+                  <p className="text-lg font-semibold">
+                    {formatSignedMoney(
+                      cashbook?.netBase ?? 0,
+                      ledger.base_currency
+                    )}
+                  </p>
+                </div>
               </div>
-              <div className="rounded-xl border border-border/50 bg-white px-3 py-2.5">
-                <p className="text-xs text-muted-foreground">Einnahmen</p>
-                <p className="text-lg font-semibold text-[var(--brand-finance)]">
-                  {formatMoney(
-                    cashbook?.incomeTotalBase ?? 0,
-                    ledger.base_currency
-                  )}
-                </p>
-              </div>
-              <div className="rounded-xl border border-border/50 bg-white px-3 py-2.5">
-                <p className="text-xs text-muted-foreground">Saldo</p>
-                <p className="text-lg font-semibold">
-                  {formatSignedMoney(
-                    cashbook?.netBase ?? 0,
-                    ledger.base_currency
-                  )}
-                </p>
-              </div>
-            </div>
-          </SectionCard>
+            </SectionCard>
+            <LedgerOverviewDashboards
+              expenses={expenses}
+              settlements={[]}
+              members={members.map((m) => ({
+                id: m.id,
+                display_name: m.display_name,
+              }))}
+              openDebts={[]}
+              baseCurrency={ledger.base_currency}
+              showOpenSettled={false}
+              showPersonMix={false}
+              onOpenExpense={(expenseId) => {
+                setTab("expenses");
+                window.setTimeout(() => scrollToExpenseCard(expenseId), 120);
+              }}
+            />
+          </div>
         )
       ) : null}
 

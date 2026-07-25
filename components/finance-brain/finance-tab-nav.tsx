@@ -24,7 +24,7 @@ export function parseFinanceLedgerTab(
   if (raw && allowed.has(raw as FinanceLedgerTab)) {
     return raw as FinanceLedgerTab;
   }
-  return "overview";
+  return "expenses";
 }
 
 export function FinanceTabNav({

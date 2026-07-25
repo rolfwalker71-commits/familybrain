@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   ArrowLeftRight,
@@ -14,10 +14,12 @@ import {
   Pencil,
   RefreshCw,
   Scale,
+  Search,
   Sparkles,
   Trash2,
   Unlink,
   Users,
+  XIcon,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -1320,23 +1322,177 @@ export function ExpenseList({
   editBusyId?: number | null;
 }) {
   const [mobileFocusId, setMobileFocusId] = useState<number | null>(null);
+  const [query, setQuery] = useState("");
+  const [payerFilter, setPayerFilter] = useState<string>("__all__");
+  const [categoryFilter, setCategoryFilter] = useState<string>("__all__");
+
+  const categoryOptions = useMemo(() => {
+    const labels = new Set<string>();
+    for (const exp of expenses) {
+      labels.add(expenseVisualForExpense(exp).label);
+    }
+    return [...labels].sort((a, b) => a.localeCompare(b, "de"));
+  }, [expenses]);
+
+  const payerOptions = useMemo(() => {
+    const ids = new Set(expenses.map((e) => e.paid_by_member_id));
+    return members
+      .filter((m) => ids.has(m.id))
+      .slice()
+      .sort((a, b) =>
+        a.display_name.localeCompare(b.display_name, "de", {
+          sensitivity: "base",
+        })
+      );
+  }, [expenses, members]);
+
+  const filteredExpenses = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return expenses.filter((exp) => {
+      if (
+        payerFilter !== "__all__" &&
+        String(exp.paid_by_member_id) !== payerFilter
+      ) {
+        return false;
+      }
+      if (categoryFilter !== "__all__") {
+        if (expenseVisualForExpense(exp).label !== categoryFilter) {
+          return false;
+        }
+      }
+      if (!q) return true;
+      const payerName =
+        members.find((m) => m.id === exp.paid_by_member_id)?.display_name || "";
+      const hay = [
+        exp.description,
+        exp.place_name,
+        exp.note,
+        exp.category_label,
+        expenseVisualForExpense(exp).label,
+        payerName,
+        exp.trip_event?.title,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return hay.includes(q);
+    });
+  }, [expenses, members, query, payerFilter, categoryFilter]);
+
+  const filtersActive =
+    query.trim() !== "" ||
+    payerFilter !== "__all__" ||
+    categoryFilter !== "__all__";
+
   const focus =
-    expenses.find((e) => e.id === mobileFocusId) ||
-    (mobileFocusId != null ? expenses[0] : null);
+    filteredExpenses.find((e) => e.id === mobileFocusId) ||
+    (mobileFocusId != null ? filteredExpenses[0] : null);
 
   return (
     <div
       className={cn(
-        "space-y-5",
+        "space-y-4",
         mobileFocusId != null && "pb-36 md:pb-0"
       )}
     >
+      {expenses.length > 0 ? (
+        <div className="space-y-2 rounded-xl border border-border/50 bg-muted/20 p-2.5">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Text suchen…"
+              className="h-8 bg-background pl-8 pr-8 text-sm"
+              aria-label="Ausgaben durchsuchen"
+            />
+            {query ? (
+              <button
+                type="button"
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                title="Suche leeren"
+                onClick={() => setQuery("")}
+              >
+                <XIcon className="size-3.5" />
+              </button>
+            ) : null}
+          </div>
+          <div
+            className={cn(
+              "grid gap-2",
+              cashbookMode ? "sm:grid-cols-1" : "sm:grid-cols-2"
+            )}
+          >
+            {!cashbookMode ? (
+              <Select
+                value={payerFilter}
+                onValueChange={(v) => {
+                  if (v != null) setPayerFilter(v);
+                }}
+              >
+                <SelectTrigger className="h-8 bg-background text-sm">
+                  <SelectValue placeholder="Zahler" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">Alle Zahler</SelectItem>
+                  {payerOptions.map((m) => (
+                    <SelectItem key={m.id} value={String(m.id)}>
+                      {m.display_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : null}
+            <Select
+              value={categoryFilter}
+              onValueChange={(v) => {
+                if (v != null) setCategoryFilter(v);
+              }}
+            >
+              <SelectTrigger className="h-8 bg-background text-sm">
+                <SelectValue placeholder="Kategorie" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">Alle Kategorien</SelectItem>
+                {categoryOptions.map((label) => (
+                  <SelectItem key={label} value={label}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {filtersActive ? (
+            <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+              <span>
+                {filteredExpenses.length} von {expenses.length} angezeigt
+              </span>
+              <button
+                type="button"
+                className="font-medium text-[var(--brand-finance)] hover:underline"
+                onClick={() => {
+                  setQuery("");
+                  setPayerFilter("__all__");
+                  setCategoryFilter("__all__");
+                }}
+              >
+                Filter zurücksetzen
+              </button>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
       {expenses.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           {cashbookMode ? "Noch keine Buchungen." : "Noch keine Ausgaben."}
         </p>
+      ) : filteredExpenses.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          Keine Treffer für die aktuelle Suche/Filter.
+        </p>
       ) : (
-        expenses.map((exp) => (
+        filteredExpenses.map((exp) => (
           <ExpenseCard
             key={exp.id}
             exp={exp}
