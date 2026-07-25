@@ -467,6 +467,51 @@ function ExpenseCard({
           </div>
         </div>
 
+        {!cashbookMode && !isIncome && exp.splits.length > 0 ? (
+          <div className="border-t border-border/40 px-3 py-2">
+            <p className="mb-1 text-[11px] font-medium text-muted-foreground">
+              Anteil pro Person
+            </p>
+            <ul className="grid gap-x-4 gap-y-0.5 sm:grid-cols-2">
+              {[...exp.splits]
+                .sort((a, b) =>
+                  memberName(a.member_id).localeCompare(
+                    memberName(b.member_id),
+                    "de"
+                  )
+                )
+                .map((sp) => {
+                  const isPayer = sp.member_id === exp.paid_by_member_id;
+                  return (
+                    <li
+                      key={sp.member_id}
+                      className="flex items-baseline justify-between gap-2 text-xs"
+                    >
+                      <span
+                        className={cn(
+                          "min-w-0 truncate",
+                          isPayer
+                            ? "font-medium text-foreground"
+                            : "text-muted-foreground"
+                        )}
+                      >
+                        {memberName(sp.member_id)}
+                        {isPayer ? (
+                          <span className="ml-1 font-normal text-muted-foreground">
+                            (gezahlt)
+                          </span>
+                        ) : null}
+                      </span>
+                      <span className="shrink-0 tabular-nums text-foreground">
+                        {formatMoney(sp.share_amount_base, baseCurrency)}
+                      </span>
+                    </li>
+                  );
+                })}
+            </ul>
+          </div>
+        ) : null}
+
         {/* Desktop detail + place/note */}
         <div className="hidden border-t border-border/40 px-3 py-2 md:block">
           <div className="flex min-h-0 flex-col gap-1">
