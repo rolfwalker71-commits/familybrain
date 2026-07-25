@@ -1,7 +1,7 @@
 import { randomBytes } from "crypto";
 import fs from "fs";
 import { getDb } from "@/lib/db/client";
-import { getTripById } from "@/lib/trips/queries";
+import { getTripById, getTripEventById } from "@/lib/trips/queries";
 import { nowIso } from "@/lib/utils/dates";
 import { DEFAULT_BASE_CURRENCY, NORMAL_SOLO_MEMBER_NAME, type ExpenseDirection, type LedgerKind, type SplitMode } from "@/lib/finance-brain/constants";
 import {
@@ -515,6 +515,20 @@ export type ExpenseSplitInput =
       shares: Array<{ memberId: number; units: number }>;
     };
 
+/** Validate optional trip-event link for an expense on this ledger. */
+export function resolveExpenseTripEventId(
+  ledger: FinanceLedgerRow,
+  tripEventId: number | null | undefined
+): number | null {
+  if (tripEventId == null) return null;
+  const event = getTripEventById(tripEventId);
+  if (!event) throw new Error("Reise-Aktivität nicht gefunden");
+  if (ledger.trip_id != null && event.trip_id !== ledger.trip_id) {
+    throw new Error("Aktivität gehört nicht zur verknüpften Reise");
+  }
+  return event.id;
+}
+
 export function createFinanceExpense(
   ledgerId: number,
   input: {
@@ -572,6 +586,7 @@ export function createFinanceExpense(
 
   const splitMap = buildSplitMap(amountBase, split, ledgerId);
   validateSplitTotal(amountBase, splitMap);
+  const tripEventId = resolveExpenseTripEventId(ledger, input.tripEventId);
 
   const db = getDb();
   const ts = nowIso();
@@ -596,7 +611,7 @@ export function createFinanceExpense(
       input.description?.trim() || null,
       input.expenseDate || null,
       input.documentId ?? null,
-      input.tripEventId ?? null,
+      tripEventId,
       input.placeName?.trim() || null,
       input.placeLat ?? null,
       input.placeLon ?? null,
@@ -709,6 +724,7 @@ export function updateFinanceExpense(
     exchangeRate?: number;
     direction?: ExpenseDirection;
     documentId?: number | null;
+    tripEventId?: number | null;
   }
 ): FinanceExpenseRow {
   const existing = getFinanceExpenseById(expenseId);
@@ -744,6 +760,11 @@ export function updateFinanceExpense(
       documentId = input.documentId;
     }
   }
+
+  const tripEventId =
+    input.tripEventId !== undefined
+      ? resolveExpenseTripEventId(ledger, input.tripEventId)
+      : existing.trip_event_id;
 
   const description =
     input.description !== undefined
@@ -810,6 +831,7 @@ export function updateFinanceExpense(
        note = ?,
        direction = ?,
        document_id = ?,
+       trip_event_id = ?,
        updated_at = ?
      WHERE id = ?`
   ).run(
@@ -826,6 +848,7 @@ export function updateFinanceExpense(
     note,
     direction,
     documentId,
+    tripEventId,
     nowIso(),
     expenseId
   );

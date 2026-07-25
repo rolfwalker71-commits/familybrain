@@ -19,7 +19,7 @@ import {
   expenseAiImageSharePublicUrl,
 } from "@/lib/finance-brain/expense-image";
 import { ledgerCoverPublicUrl } from "@/lib/finance-brain/cover";
-import { getTripById } from "@/lib/trips/queries";
+import { getTripById, getTripEventById } from "@/lib/trips/queries";
 import { getDocumentById } from "@/lib/db/queries";
 
 export function serializeLedger(ledger: FinanceLedgerRow) {
@@ -68,6 +68,12 @@ export function serializeExpense(
     expense.document_id != null
       ? getDocumentById(expense.document_id)?.document
       : null;
+  const tripEvent =
+    expense.trip_event_id != null
+      ? getTripEventById(expense.trip_event_id)
+      : null;
+  const tripEventTrip =
+    tripEvent != null ? getTripById(tripEvent.trip_id) : null;
   return {
     ...rest,
     has_receipt: Boolean(receipt_path),
@@ -80,6 +86,16 @@ export function serializeExpense(
           paperless_id: linkedDoc.paperless_id,
           title: linkedDoc.title,
           original_file_name: linkedDoc.original_file_name,
+        }
+      : null,
+    trip_event: tripEvent
+      ? {
+          id: tripEvent.id,
+          trip_id: tripEvent.trip_id,
+          trip_title: tripEventTrip?.title ?? null,
+          title: tripEvent.title,
+          start_date: tripEvent.start_date,
+          start_time: tripEvent.start_time,
         }
       : null,
     splits,

@@ -32,6 +32,7 @@ const PatchSchema = z.object({
   exchangeRate: z.number().positive().optional(),
   direction: z.enum(["expense", "income"]).optional(),
   documentId: z.number().int().positive().nullable().optional(),
+  tripEventId: z.number().int().positive().nullable().optional(),
 });
 
 export async function PATCH(request: Request, context: Ctx) {
@@ -82,6 +83,9 @@ export async function PATCH(request: Request, context: Ctx) {
     }
     if (parsed.data.documentId !== undefined) {
       patch.documentId = parsed.data.documentId;
+    }
+    if (parsed.data.tripEventId !== undefined) {
+      patch.tripEventId = parsed.data.tripEventId;
     }
 
     if (parsed.data.place !== undefined) {

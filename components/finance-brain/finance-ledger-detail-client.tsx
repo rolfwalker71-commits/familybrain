@@ -47,6 +47,7 @@ import {
   SettlementList,
 } from "@/components/finance-brain/balance-view";
 import { PendingReceiptPicker } from "@/components/finance-brain/expense-receipt-controls";
+import { ExpenseTripEventPicker } from "@/components/finance-brain/expense-trip-event-picker";
 import {
   FinanceTabNav,
   parseFinanceLedgerTab,
@@ -188,6 +189,7 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
   const [expPlace, setExpPlace] = useState("");
   const [expNote, setExpNote] = useState("");
   const [expPayer, setExpPayer] = useState<string>("");
+  const [expTripEventId, setExpTripEventId] = useState<number | null>(null);
   const [expDirection, setExpDirection] = useState<"expense" | "income">(
     "expense"
   );
@@ -558,6 +560,7 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
           expenseDate: expDate || null,
           place: expPlace.trim() || null,
           note: expNote.trim() || null,
+          tripEventId: expTripEventId,
         }),
       });
       const json = await res.json();
@@ -583,6 +586,7 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
       setExpDate(todayDateInputValue());
       setExpPlace("");
       setExpNote("");
+      setExpTripEventId(null);
       setExpCurrency(data?.ledger.base_currency ?? "CHF");
       setExpRate("1");
       setExpDirection("expense");
@@ -698,6 +702,7 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
       currency: string;
       exchangeRate: number;
       direction?: "expense" | "income";
+      tripEventId?: number | null;
     }
   ) {
     setEditBusyId(expenseId);
@@ -1216,6 +1221,14 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
                 onChange={(e) => setExpDate(e.target.value)}
               />
             </div>
+            <div className="sm:col-span-2 lg:col-span-4">
+              <ExpenseTripEventPicker
+                trips={trips}
+                lockedTripId={ledger.trip_id}
+                value={expTripEventId}
+                onChange={setExpTripEventId}
+              />
+            </div>
             {expCurrency !== ledger.base_currency && Number(expAmount) > 0 ? (
               <p className="text-xs text-muted-foreground sm:col-span-2 lg:col-span-4">
                 Fremdwährung {expCurrency}: {expAmount} → ≈{" "}
@@ -1261,6 +1274,19 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
             cashbookMode={isNormal}
             canDelete
             canEdit
+            trips={
+              ledger.trip_id != null &&
+              !trips.some((t) => t.id === ledger.trip_id)
+                ? [
+                    {
+                      id: ledger.trip_id,
+                      title: ledger.trip_title || `Reise #${ledger.trip_id}`,
+                    },
+                    ...trips,
+                  ]
+                : trips
+            }
+            lockedTripId={ledger.trip_id}
             onDelete={(id) => void deleteExpense(id)}
             receiptUploadUrl={(expenseId) =>
               `/api/finance-ledgers/${ledgerId}/expenses/${expenseId}/receipt`

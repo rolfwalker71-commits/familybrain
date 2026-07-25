@@ -6,6 +6,7 @@ import {
   ArrowLeftRight,
   Download,
   Link2,
+  Luggage,
   Mail,
   MapPin,
   Pencil,
@@ -58,6 +59,10 @@ import {
   toIsoDateOnly,
 } from "@/components/layout/calendar-date-badge";
 import { LinkPaperlessDocumentDialog } from "@/components/finance-brain/link-paperless-document-dialog";
+import {
+  ExpenseTripEventPicker,
+  type TripPickerOption,
+} from "@/components/finance-brain/expense-trip-event-picker";
 import { cn } from "@/lib/utils";
 
 type Balance = {
@@ -105,6 +110,15 @@ export type ExpenseListItem = {
     title: string | null;
     original_file_name?: string | null;
   } | null;
+  trip_event_id?: number | null;
+  trip_event?: {
+    id: number;
+    trip_id: number;
+    trip_title: string | null;
+    title: string;
+    start_date: string | null;
+    start_time: string | null;
+  } | null;
   splits: Array<{ member_id: number; share_amount_base: number }>;
 };
 
@@ -118,6 +132,7 @@ export type ExpenseEditPayload = {
   currency: string;
   exchangeRate: number;
   direction?: "expense" | "income";
+  tripEventId?: number | null;
 };
 
 export function BalanceView({
@@ -219,6 +234,8 @@ function ExpenseCard({
   onResendMail,
   onUpdate,
   onSetDocument,
+  trips,
+  lockedTripId,
   mobileFocused,
   onMobileFocus,
   aiImageBusy,
@@ -242,6 +259,8 @@ function ExpenseCard({
     expenseId: number,
     documentId: number | null
   ) => Promise<void>;
+  trips?: TripPickerOption[];
+  lockedTripId?: number | null;
   mobileFocused?: boolean;
   onMobileFocus?: (expenseId: number) => void;
   aiImageBusy?: boolean;
@@ -260,6 +279,9 @@ function ExpenseCard({
   const [editAmount, setEditAmount] = useState(String(exp.amount));
   const [editCurrency, setEditCurrency] = useState(exp.currency);
   const [editRate, setEditRate] = useState(String(exp.exchange_rate ?? 1));
+  const [editTripEventId, setEditTripEventId] = useState<number | null>(
+    exp.trip_event?.id ?? exp.trip_event_id ?? null
+  );
   const [editRateLoading, setEditRateLoading] = useState(false);
   const [editDirection, setEditDirection] = useState<"expense" | "income">(
     exp.direction === "income" ? "income" : "expense"
@@ -288,6 +310,7 @@ function ExpenseCard({
     setEditAmount(String(exp.amount));
     setEditCurrency(exp.currency);
     setEditRate(String(exp.exchange_rate ?? 1));
+    setEditTripEventId(exp.trip_event?.id ?? exp.trip_event_id ?? null);
     setEditDirection(exp.direction === "income" ? "income" : "expense");
     setEditing(true);
   }
@@ -327,6 +350,7 @@ function ExpenseCard({
       currency: editCurrency,
       exchangeRate: editCurrency === baseCurrency ? 1 : parsedRate,
       direction: cashbookMode ? editDirection : undefined,
+      tripEventId: editTripEventId,
     });
     setEditing(false);
   }
@@ -469,6 +493,24 @@ function ExpenseCard({
                     `Dokument #${exp.document.id}`}
                 </a>
                 <span className="text-muted-foreground">· Paperless</span>
+              </p>
+            ) : null}
+            {exp.trip_event ? (
+              <p className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                <Luggage className="size-3 shrink-0" />
+                <span>
+                  {formatDateDe(exp.trip_event.start_date) || "Ohne Datum"}
+                  {exp.trip_event.start_time
+                    ? `, ${exp.trip_event.start_time}`
+                    : ""}
+                  {" · "}
+                  <span className="font-medium text-foreground">
+                    {exp.trip_event.title}
+                  </span>
+                  {exp.trip_event.trip_title
+                    ? ` (${exp.trip_event.trip_title})`
+                    : ""}
+                </span>
               </p>
             ) : null}
           </div>
@@ -630,6 +672,18 @@ function ExpenseCard({
                     placeholder="Optional"
                   />
                 </div>
+                {trips && trips.length > 0 ? (
+                  <div className="sm:col-span-2">
+                    <ExpenseTripEventPicker
+                      compact
+                      trips={trips}
+                      lockedTripId={lockedTripId}
+                      initialTripId={exp.trip_event?.trip_id ?? null}
+                      value={editTripEventId}
+                      onChange={setEditTripEventId}
+                    />
+                  </div>
+                ) : null}
                 {editCurrency !== baseCurrency && Number(editAmount) > 0 ? (
                   <p className="text-[11px] text-muted-foreground sm:col-span-2">
                     ≈{" "}
@@ -899,6 +953,8 @@ export function ExpenseList({
   onResendMail,
   onUpdateExpense,
   onSetDocument,
+  trips,
+  lockedTripId,
   aiImageBusyId,
   mailBusyId,
   editBusyId,
@@ -923,6 +979,8 @@ export function ExpenseList({
     expenseId: number,
     documentId: number | null
   ) => Promise<void>;
+  trips?: TripPickerOption[];
+  lockedTripId?: number | null;
   aiImageBusyId?: number | null;
   mailBusyId?: number | null;
   editBusyId?: number | null;
@@ -953,6 +1011,8 @@ export function ExpenseList({
             cashbookMode={cashbookMode}
             canDelete={canDelete}
             canEdit={canEdit}
+            trips={trips}
+            lockedTripId={lockedTripId}
             onDelete={onDelete}
             receiptUploadUrl={
               receiptUploadUrl ? receiptUploadUrl(exp.id) : undefined
