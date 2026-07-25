@@ -37,6 +37,11 @@ const BRAND = {
   border: "#d7e0dc",
   page: "#eef2f0",
   card: "#ffffff",
+  /** Diary expense cards — stand out from white activity cards. */
+  diaryExpenseBg: "#e4efe8",
+  diaryExpenseBorder: "#8fad9a",
+  diaryExpenseAccent: "#2f5d45",
+  diaryAmountBg: "#cfe0d4",
 } as const;
 
 export function escapeHtml(raw: string): string {
@@ -169,23 +174,49 @@ function moneyLines(input: {
   };
 }
 
-export function expenseCardHtml(input: ExpenseMailFields): string {
+export function expenseCardHtml(
+  input: ExpenseMailFields & { variant?: "default" | "diary" }
+): string {
   const title = input.description?.trim() || "Ausgabe";
   const category = input.categoryLabel || "Ausgabe";
   const { money, fxHtml } = moneyLines(input);
   const cid = input.aiCid || `expense-ai-${input.expenseId}`;
   const hasFx = Boolean(fxHtml);
+  const diary = input.variant === "diary";
+
+  const cardBg = diary ? BRAND.diaryExpenseBg : BRAND.card;
+  const cardBorder = diary ? BRAND.diaryExpenseBorder : BRAND.border;
+  const leftBar = diary
+    ? `border-left:5px solid ${BRAND.diaryExpenseAccent};`
+    : "";
+  const indent = diary ? "margin-left:10px;" : "";
+  const ausgabeChip = diary
+    ? `<span style="display:inline-block;background:${BRAND.diaryExpenseAccent};color:#ffffff;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;margin-right:6px;">Ausgabe</span>`
+    : "";
+  const amountPill =
+    diary && !hasFx
+      ? ` <span style="display:inline-block;background:${BRAND.diaryAmountBg};color:${BRAND.diaryExpenseAccent};border-radius:999px;padding:2px 9px;font-size:12px;font-weight:800;font-variant-numeric:tabular-nums;margin-left:4px;">${escapeHtml(money)}</span>`
+      : hasFx
+        ? ""
+        : ` · <strong style="color:${BRAND.ink};">${escapeHtml(money)}</strong>`;
+
   return `
-    <div style="background:${BRAND.card};border-radius:12px;overflow:hidden;border:1px solid ${BRAND.border};margin-bottom:16px;">
+    <div style="background:${cardBg};border-radius:12px;overflow:hidden;border:1px solid ${cardBorder};${leftBar}${indent}margin-bottom:12px;">
       <div style="padding:14px 16px;display:flex;gap:14px;align-items:flex-start;">
         ${dateBadgeHtml(input.expenseDate)}
         <div style="flex:1;min-width:0;">
           <div style="font-size:17px;font-weight:800;line-height:1.25;color:${BRAND.ink};">${escapeHtml(title)}</div>
           <div style="margin-top:8px;font-size:13px;color:${BRAND.muted};">
+            ${ausgabeChip}
             <span style="display:inline-block;background:${BRAND.financeSoft};color:${BRAND.finance};border-radius:4px;padding:2px 6px;font-size:10px;font-weight:700;text-transform:uppercase;margin-right:6px;">${escapeHtml(category)}</span>
-            Bezahlt von ${escapeHtml(input.paidByName)}${hasFx ? "" : ` · <strong style="color:${BRAND.ink};">${escapeHtml(money)}</strong>`}
+            Bezahlt von ${escapeHtml(input.paidByName)}${amountPill}
           </div>
           ${fxHtml}
+          ${
+            diary && hasFx
+              ? `<div style="margin-top:6px;"><span style="display:inline-block;background:${BRAND.diaryAmountBg};color:${BRAND.diaryExpenseAccent};border-radius:999px;padding:2px 9px;font-size:12px;font-weight:800;font-variant-numeric:tabular-nums;">${escapeHtml(formatMoney(input.amountBase, input.baseCurrency))}</span></div>`
+              : ""
+          }
           ${
             input.placeName
               ? `<div style="margin-top:6px;font-size:13px;color:${BRAND.muted};">Ort: ${escapeHtml(input.placeName)}</div>`
@@ -205,7 +236,7 @@ export function expenseCardHtml(input: ExpenseMailFields): string {
         </div>
         ${
           input.hasAiImage
-            ? `<img src="cid:${escapeHtml(cid)}" alt="" width="72" height="72" style="width:72px;height:72px;border-radius:8px;object-fit:cover;border:1px solid ${BRAND.border};flex-shrink:0;" />`
+            ? `<img src="cid:${escapeHtml(cid)}" alt="" width="72" height="72" style="width:72px;height:72px;border-radius:8px;object-fit:cover;border:1px solid ${cardBorder};flex-shrink:0;" />`
             : ""
         }
       </div>

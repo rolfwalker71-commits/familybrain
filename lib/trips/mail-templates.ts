@@ -280,9 +280,9 @@ export function buildTravelDiaryMailHtml(
           : "";
       const expenses =
         event.expenses.length > 0
-          ? `<div style="margin-top:10px;">
-              <div style="font-size:10px;font-weight:700;color:${BRAND.accent};letter-spacing:.03em;text-transform:uppercase;margin-bottom:6px;">Ausgaben · ${event.expenses.length}</div>
-              ${event.expenses.map((e) => expenseCardHtml(e)).join("")}
+          ? `<div style="margin-top:12px;padding:10px 10px 2px;background:${BRAND.page};border-radius:12px;border:1px dashed ${BRAND.border};">
+              <div style="font-size:10px;font-weight:800;color:${BRAND.accent};letter-spacing:.04em;text-transform:uppercase;margin-bottom:8px;">Wallet · Ausgaben · ${event.expenses.length}</div>
+              ${event.expenses.map((e) => expenseCardHtml({ ...e, variant: "diary" })).join("")}
             </div>`
           : "";
       return `
@@ -296,9 +296,9 @@ export function buildTravelDiaryMailHtml(
 
   const orphanBlock =
     model.orphanExpenses.length > 0
-      ? `<div style="margin-top:8px;margin-bottom:16px;">
-          <div style="font-size:12px;font-weight:700;color:${BRAND.accent};letter-spacing:.03em;text-transform:uppercase;margin-bottom:10px;">Weitere Ausgaben${model.ledgerTitle ? ` · ${escapeHtml(model.ledgerTitle)}` : ""}</div>
-          ${model.orphanExpenses.map((e) => expenseCardHtml(e)).join("")}
+      ? `<div style="margin-top:8px;margin-bottom:16px;padding:10px 10px 2px;background:${BRAND.page};border-radius:12px;border:1px dashed ${BRAND.border};">
+          <div style="font-size:11px;font-weight:800;color:${BRAND.accent};letter-spacing:.04em;text-transform:uppercase;margin-bottom:10px;">Wallet · Weitere Ausgaben${model.ledgerTitle ? ` · ${escapeHtml(model.ledgerTitle)}` : ""}</div>
+          ${model.orphanExpenses.map((e) => expenseCardHtml({ ...e, variant: "diary" })).join("")}
         </div>`
       : "";
 

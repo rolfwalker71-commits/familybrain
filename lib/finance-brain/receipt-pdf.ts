@@ -15,6 +15,7 @@ import {
   resolveExchangeRate,
 } from "@/lib/finance-brain/format";
 import { LEDGER_SUMMARY_AI_THUMB_PX, loadScaledJpeg } from "@/lib/finance-brain/image-scale";
+import { isWeatherCommentBody } from "@/lib/trips/map-context";
 
 const PAGE_W = 595.28;
 const PAGE_H = 841.89;
@@ -53,6 +54,10 @@ const C = {
   monthFg: rgb(0.247, 0.42, 0.322),
   white: rgb(1, 1, 1),
   foot: rgb(0.933, 0.949, 0.941),
+  /** Diary expense cards vs white activity cards. */
+  diaryExpenseBg: rgb(0.894, 0.937, 0.91), // #e4efe8
+  diaryExpenseBorder: rgb(0.561, 0.678, 0.604), // #8fad9a
+  diaryExpenseAccent: rgb(0.184, 0.365, 0.271), // #2f5d45
 };
 
 function toPdfSafeText(raw: string): string {
@@ -96,6 +101,25 @@ function wrapText(
   }
   lines.push(current);
   return lines;
+}
+
+/** Preserve explicit newlines, then wrap each paragraph. */
+function wrapMultilineText(
+  text: string,
+  font: PDFFont,
+  size: number,
+  maxWidth: number
+): string[] {
+  const paragraphs = text.replace(/\r\n/g, "\n").split("\n");
+  const lines: string[] = [];
+  for (const para of paragraphs) {
+    if (!para.trim()) {
+      lines.push("");
+      continue;
+    }
+    lines.push(...wrapText(para, font, size, maxWidth));
+  }
+  return lines.length ? lines : [""];
 }
 
 function drawRoundedFill(
@@ -1535,6 +1559,7 @@ export async function buildTravelDiaryPdfBuffer(model: {
       authorName: string;
       body: string;
       createdAt: string;
+      imagePath?: string | null;
     }>;
     expenses: Array<{
       expenseId: number;
@@ -1644,8 +1669,12 @@ export async function buildTravelDiaryPdfBuffer(model: {
   ) {
     const badgeW = 56;
     const badgeH = 64;
-    const padX = 10;
+    const padX = 12;
     const padY = 10;
+    const accentW = 5;
+    const indent = 8;
+    const cardX = margin + indent;
+    const cardW = contentW - indent;
     const thumb = await loadScaledJpeg(exp.aiImagePath);
     let img: PDFImage | null = null;
     let imgW = 0;
@@ -1655,12 +1684,15 @@ export async function buildTravelDiaryPdfBuffer(model: {
       imgW = 56;
       imgH = 56;
     }
-    const textX = margin + padX + badgeW + 10;
-    const textW = contentW - padX * 2 - badgeW - 10 - (img ? imgW + 8 : 0);
+    const textX = cardX + padX + accentW + badgeW + 10;
+    const textW =
+      cardW - padX * 2 - accentW - badgeW - 10 - (img ? imgW + 8 : 0);
     const title = exp.description?.trim() || "Ausgabe";
     const titleLinesExp = wrapText(title, bold, 11, textW);
+    const moneyLabel = formatMoney(exp.amountBase, exp.baseCurrency);
     const detailLines: string[] = [
-      `Bezahlt von: ${exp.paidByName} · ${formatMoney(exp.amountBase, exp.baseCurrency)}`,
+      `Bezahlt von: ${exp.paidByName}`,
+      `Betrag: ${moneyLabel}`,
     ];
     if (exp.placeName) detailLines.push(`Ort: ${exp.placeName}`);
     if (exp.note?.trim()) detailLines.push(`Notiz: ${exp.note.trim()}`);
@@ -1684,6 +1716,7 @@ export async function buildTravelDiaryPdfBuffer(model: {
     const textColH =
       titleLinesExp.length * 13 +
       14 +
+      12 + // AUSGABE + category row
       detailWrapped.length * 11 +
       (shareHeader ? 10 : 0) +
       shareWrapped.length * 10 +
@@ -1693,16 +1726,24 @@ export async function buildTravelDiaryPdfBuffer(model: {
     const cardBottom = y - cardH;
     drawRoundedRect(
       page,
-      margin,
+      cardX,
       cardBottom,
-      contentW,
+      cardW,
       cardH,
       8,
-      C.card,
-      C.border,
+      C.diaryExpenseBg,
+      C.diaryExpenseBorder,
       1
     );
-    const innerX = margin + padX;
+    // Left accent bar
+    page.drawRectangle({
+      x: cardX,
+      y: cardBottom + 4,
+      width: accentW,
+      height: cardH - 8,
+      color: C.diaryExpenseAccent,
+    });
+    const innerX = cardX + padX + accentW;
     const innerTop = y - padY;
     drawDateBadge(page, bold, exp.expenseDate, innerX, innerTop, badgeW, badgeH);
     let ty = innerTop - 2;
@@ -1716,10 +1757,18 @@ export async function buildTravelDiaryPdfBuffer(model: {
       });
       ty -= 13;
     }
+    page.drawText("AUSGABE", {
+      x: textX,
+      y: ty - 9,
+      size: 8,
+      font: bold,
+      color: C.diaryExpenseAccent,
+    });
+    const ausgabeW = bold.widthOfTextAtSize("AUSGABE", 8);
     page.drawText(
       toPdfSafeText(exp.categoryLabel || "Ausgabe").toUpperCase(),
       {
-        x: textX,
+        x: textX + ausgabeW + 8,
         y: ty - 9,
         size: 8,
         font: bold,
@@ -1743,7 +1792,7 @@ export async function buildTravelDiaryPdfBuffer(model: {
         y: ty - 8,
         size: 8,
         font: bold,
-        color: C.badgeFg,
+        color: C.diaryExpenseAccent,
       });
       ty -= 10;
       for (const line of shareWrapped) {
@@ -1759,7 +1808,7 @@ export async function buildTravelDiaryPdfBuffer(model: {
     }
     if (img && imgW > 0) {
       page.drawImage(img, {
-        x: margin + contentW - padX - imgW,
+        x: cardX + cardW - padX - imgW,
         y: innerTop - imgH,
         width: imgW,
         height: imgH,
@@ -1873,13 +1922,47 @@ export async function buildTravelDiaryPdfBuffer(model: {
       for (const c of event.comments) {
         const when = formatDateDe(c.createdAt.slice(0, 10)) || "";
         const header = `${c.authorName}${when ? ` · ${when}` : ""}`;
-        const bodyLines = wrapText(c.body, font, 9, contentW - 16);
-        const blockH = 14 + bodyLines.length * 11 + 10;
-        ensureSpace(blockH);
+        const isWeather = isWeatherCommentBody(c.body);
+        const mapSide = isWeather && Boolean(c.imagePath);
+        const thumbEdge = mapSide ? 140 : 180;
+        const mapImg = c.imagePath
+          ? await embedOptionalScaledJpeg(pdf, c.imagePath, thumbEdge)
+          : null;
+        const pad = 8;
+        const gap = 12;
+        const imgW = mapImg && mapSide ? 120 : 0;
+        const imgH = mapImg && mapSide ? 120 : 0;
+        const textMaxW =
+          contentW - pad * 2 - (mapSide && mapImg ? imgW + gap : 0);
+        const bodyLines = wrapMultilineText(c.body, font, 9, textMaxW);
+        const headerH = 14;
+        const bodyH = Math.max(1, bodyLines.length) * 11;
+        const textColH = headerH + bodyH + 6;
+
+        let belowImgW = 0;
+        let belowImgH = 0;
+        if (mapImg && !mapSide) {
+          const maxBelow = 140;
+          const scale = Math.min(
+            maxBelow / mapImg.width,
+            maxBelow / mapImg.height,
+            1
+          );
+          belowImgW = mapImg.width * scale;
+          belowImgH = mapImg.height * scale;
+        }
+
+        const blockH =
+          (mapSide && mapImg
+            ? Math.max(textColH, imgH + pad)
+            : textColH + (belowImgH > 0 ? belowImgH + 8 : 0)) + pad;
+
+        ensureSpace(blockH + 8);
+        const cardBottom = y - blockH;
         drawRoundedRect(
           page,
           margin,
-          y - blockH,
+          cardBottom,
           contentW,
           blockH,
           6,
@@ -1887,24 +1970,45 @@ export async function buildTravelDiaryPdfBuffer(model: {
           C.border,
           1
         );
+
         page.drawText(toPdfSafeText(header), {
-          x: margin + 8,
+          x: margin + pad,
           y: y - 12,
           size: 8,
           font: bold,
           color: C.badgeFg,
         });
-        let cy = y - 14;
+
+        let cy = y - headerH;
         for (const line of bodyLines) {
-          page.drawText(toPdfSafeText(line), {
-            x: margin + 8,
-            y: cy - 10,
-            size: 9,
-            font,
-            color: C.ink,
-          });
+          if (line) {
+            page.drawText(toPdfSafeText(line), {
+              x: margin + pad,
+              y: cy - 10,
+              size: 9,
+              font,
+              color: C.ink,
+            });
+          }
           cy -= 11;
         }
+
+        if (mapImg && mapSide) {
+          page.drawImage(mapImg, {
+            x: margin + contentW - pad - imgW,
+            y: y - pad - imgH,
+            width: imgW,
+            height: imgH,
+          });
+        } else if (mapImg && belowImgW > 0) {
+          page.drawImage(mapImg, {
+            x: margin + pad,
+            y: cardBottom + pad,
+            width: belowImgW,
+            height: belowImgH,
+          });
+        }
+
         y -= blockH + 6;
       }
     }
@@ -1912,13 +2016,13 @@ export async function buildTravelDiaryPdfBuffer(model: {
     if (event.expenses.length) {
       ensureSpace(18);
       page.drawText(
-        toPdfSafeText(`Ausgaben (${event.expenses.length})`),
+        toPdfSafeText(`Wallet · Ausgaben (${event.expenses.length})`),
         {
           x: margin + 4,
           y: y - 11,
           size: 9,
           font: bold,
-          color: C.badgeFg,
+          color: C.diaryExpenseAccent,
         }
       );
       y -= 14;
@@ -1934,14 +2038,14 @@ export async function buildTravelDiaryPdfBuffer(model: {
     ensureSpace(24);
     page.drawText(
       toPdfSafeText(
-        `Weitere Ausgaben${model.ledgerTitle ? ` · ${model.ledgerTitle}` : ""}`
+        `Wallet · Weitere Ausgaben${model.ledgerTitle ? ` · ${model.ledgerTitle}` : ""}`
       ),
       {
         x: margin,
         y: y - 14,
         size: 12,
         font: bold,
-        color: C.ink,
+        color: C.diaryExpenseAccent,
       }
     );
     y -= 20;
