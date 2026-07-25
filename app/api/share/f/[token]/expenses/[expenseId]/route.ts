@@ -27,10 +27,16 @@ const PatchSchema = z.object({
   exchangeRate: z.number().positive().optional(),
   documentId: z.number().int().positive().nullable().optional(),
   split: z
-    .object({
-      mode: z.literal("equal"),
-      memberIds: z.array(z.number().int().positive()).min(1),
-    })
+    .discriminatedUnion("mode", [
+      z.object({
+        mode: z.literal("equal"),
+        memberIds: z.array(z.number().int().positive()).min(1),
+      }),
+      z.object({
+        mode: z.literal("coupleEqual"),
+        coupleIds: z.array(z.number().int().positive()).min(1),
+      }),
+    ])
     .optional(),
 });
 

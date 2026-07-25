@@ -31,6 +31,10 @@ const SplitSchema = z.discriminatedUnion("mode", [
     memberIds: z.array(z.number().int().positive()).optional(),
   }),
   z.object({
+    mode: z.literal("coupleEqual"),
+    coupleIds: z.array(z.number().int().positive()).min(1),
+  }),
+  z.object({
     mode: z.literal("exact"),
     amounts: z.array(
       z.object({

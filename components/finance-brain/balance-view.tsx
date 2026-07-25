@@ -63,7 +63,10 @@ import {
   ExpenseTripEventPicker,
   type TripPickerOption,
 } from "@/components/finance-brain/expense-trip-event-picker";
-import { ExpenseSplitParticipants } from "@/components/finance-brain/expense-split-participants";
+import {
+  ExpenseSplitParticipants,
+  type ExpenseSplitSelection,
+} from "@/components/finance-brain/expense-split-participants";
 import { cn } from "@/lib/utils";
 
 type Balance = {
@@ -76,12 +79,30 @@ type Balance = {
   netBalance: number;
 };
 
+type CoupleBalance = {
+  coupleId: number;
+  name: string;
+  memberIds: number[];
+  paidBase: number;
+  owedBase: number;
+  settlementsPaidBase: number;
+  settlementsReceivedBase: number;
+  netBalance: number;
+};
+
 type Debt = {
   fromMemberId: number;
   fromDisplayName: string;
   toMemberId: number;
   toDisplayName: string;
   amount: number;
+};
+
+type CoupleDebt = Debt & {
+  fromCoupleId: number;
+  fromCoupleName: string;
+  toCoupleId: number;
+  toCoupleName: string;
 };
 
 export type ExpenseListItem = {
@@ -134,7 +155,7 @@ export type ExpenseEditPayload = {
   exchangeRate: number;
   direction?: "expense" | "income";
   tripEventId?: number | null;
-  splitMemberIds?: number[];
+  split?: ExpenseSplitSelection;
 };
 
 export type BalanceDebt = Debt;
@@ -143,6 +164,8 @@ export function BalanceView({
   balances,
   simplifiedDebts,
   minimalDebts = [],
+  coupleBalances = [],
+  coupleDebts = [],
   baseCurrency,
   highlightMemberId,
   onRecordDebt,
@@ -154,6 +177,8 @@ export function BalanceView({
   simplifiedDebts: Debt[];
   /** Wenigste Überweisungen bis alle Saldi null sind. */
   minimalDebts?: Debt[];
+  coupleBalances?: CoupleBalance[];
+  coupleDebts?: CoupleDebt[];
   baseCurrency: string;
   highlightMemberId?: number;
   onRecordDebt?: (debt: Debt) => void | Promise<void>;
@@ -309,6 +334,87 @@ export function BalanceView({
           )}
         </CardContent>
       </Card>
+
+      {coupleBalances.length > 0 ? (
+        <Card tone="green" className="overflow-hidden border-border/60 shadow-[0_4px_16px_rgba(20,32,28,0.05)]">
+          <CardHeader tone="green" className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base text-[var(--brand-finance)]">
+              <IconCircle icon={Users} tone="green" size="sm" />
+              Saldo je Paar
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <p className="text-xs text-muted-foreground">
+              Summe der Personen-Salden im Paar (inkl. Rückzahlungen).
+            </p>
+            {coupleBalances.map((b) => (
+              <div
+                key={b.coupleId}
+                className="flex items-center justify-between gap-3 rounded-xl border border-border/50 bg-white px-3 py-2.5 text-sm"
+              >
+                <div className="min-w-0">
+                  <div className="font-medium">{b.name}</div>
+                  <div className="mt-0.5 text-[11px] text-muted-foreground">
+                    bezahlt {formatMoney(b.paidBase, baseCurrency)}
+                    {" · "}
+                    Anteil {formatMoney(b.owedBase, baseCurrency)}
+                  </div>
+                </div>
+                <span
+                  className={cn(
+                    "shrink-0 font-semibold",
+                    b.netBalance > 0
+                      ? "text-[var(--brand-finance)]"
+                      : b.netBalance < 0
+                        ? "text-rose-600"
+                        : "text-muted-foreground"
+                  )}
+                >
+                  {formatSignedMoney(b.netBalance, baseCurrency)}
+                </span>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {coupleBalances.length > 0 ? (
+        <Card tone="green" className="overflow-hidden border-border/60 shadow-[0_4px_16px_rgba(20,32,28,0.05)]">
+          <CardHeader tone="green" className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base text-amber-900">
+              <IconCircle icon={ArrowLeftRight} tone="green" size="sm" />
+              Ausgleich zwischen Paaren
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {coupleDebts.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Paare sind ausgeglichen.
+              </p>
+            ) : (
+              <>
+                <p className="text-xs text-muted-foreground">
+                  Vorschlag zwischen Paaren. Erfassen bucht eine Rückzahlung
+                  zwischen Vertretern (tiefstes bzw. höchstes Personen-Netto).
+                </p>
+                {coupleDebts.map((d, i) =>
+                  renderDebtRow(
+                    "couple",
+                    {
+                      fromMemberId: d.fromMemberId,
+                      fromDisplayName: `${d.fromCoupleName} (${d.fromDisplayName})`,
+                      toMemberId: d.toMemberId,
+                      toDisplayName: `${d.toCoupleName} (${d.toDisplayName})`,
+                      amount: d.amount,
+                    },
+                    i
+                  )
+                )}
+              </>
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   );
 }
@@ -316,6 +422,7 @@ export function BalanceView({
 function ExpenseCard({
   exp,
   members,
+  couples = [],
   baseCurrency,
   cashbookMode,
   onDelete,
@@ -338,6 +445,7 @@ function ExpenseCard({
 }: {
   exp: ExpenseListItem;
   members: Array<{ id: number; display_name: string }>;
+  couples?: Array<{ id: number; name: string; memberIds: number[] }>;
   baseCurrency: string;
   cashbookMode?: boolean;
   onDelete?: (id: number) => void;
@@ -376,9 +484,10 @@ function ExpenseCard({
   const [editTripEventId, setEditTripEventId] = useState<number | null>(
     exp.trip_event?.id ?? exp.trip_event_id ?? null
   );
-  const [editSplitMemberIds, setEditSplitMemberIds] = useState<number[]>(() =>
-    exp.splits.map((s) => s.member_id)
-  );
+  const [editSplit, setEditSplit] = useState<ExpenseSplitSelection>(() => ({
+    mode: "equal",
+    memberIds: exp.splits.map((s) => s.member_id),
+  }));
   const [editRateLoading, setEditRateLoading] = useState(false);
   const [editDirection, setEditDirection] = useState<"expense" | "income">(
     exp.direction === "income" ? "income" : "expense"
@@ -408,7 +517,10 @@ function ExpenseCard({
     setEditCurrency(exp.currency);
     setEditRate(String(exp.exchange_rate ?? 1));
     setEditTripEventId(exp.trip_event?.id ?? exp.trip_event_id ?? null);
-    setEditSplitMemberIds(exp.splits.map((s) => s.member_id));
+    setEditSplit({
+      mode: "equal",
+      memberIds: exp.splits.map((s) => s.member_id),
+    });
     setEditDirection(exp.direction === "income" ? "income" : "expense");
     setEditing(true);
   }
@@ -433,12 +545,17 @@ function ExpenseCard({
     }
   }
 
+  function splitValid(sel: ExpenseSplitSelection) {
+    if (sel.mode === "coupleEqual") return sel.coupleIds.length > 0;
+    return sel.memberIds.length > 0;
+  }
+
   async function saveEdit() {
     if (!onUpdate) return;
     const parsedAmount = Number(editAmount);
     const parsedRate = Number(editRate) || 1;
     if (!(parsedAmount > 0)) return;
-    if (!cashbookMode && !isIncome && editSplitMemberIds.length === 0) return;
+    if (!cashbookMode && !isIncome && !splitValid(editSplit)) return;
     await onUpdate(exp.id, {
       description: editDesc.trim() || null,
       expenseDate: editDate || null,
@@ -450,9 +567,7 @@ function ExpenseCard({
       exchangeRate: editCurrency === baseCurrency ? 1 : parsedRate,
       direction: cashbookMode ? editDirection : undefined,
       tripEventId: editTripEventId,
-      ...(!cashbookMode && !isIncome
-        ? { splitMemberIds: editSplitMemberIds }
-        : {}),
+      ...(!cashbookMode && !isIncome ? { split: editSplit } : {}),
     });
     setEditing(false);
   }
@@ -807,8 +922,9 @@ function ExpenseCard({
                     <ExpenseSplitParticipants
                       compact
                       members={members}
-                      selectedIds={editSplitMemberIds}
-                      onChange={setEditSplitMemberIds}
+                      couples={couples}
+                      value={editSplit}
+                      onChange={setEditSplit}
                     />
                   </div>
                 ) : null}
@@ -857,9 +973,7 @@ function ExpenseCard({
                     disabled={
                       editBusy ||
                       !(Number(editAmount) > 0) ||
-                      (!cashbookMode &&
-                        !isIncome &&
-                        editSplitMemberIds.length === 0)
+                      (!cashbookMode && !isIncome && !splitValid(editSplit))
                     }
                     onClick={() => void saveEdit()}
                   >
@@ -1105,6 +1219,7 @@ function ExpenseCard({
 export function ExpenseList({
   expenses,
   members,
+  couples = [],
   baseCurrency,
   cashbookMode,
   onDelete,
@@ -1125,6 +1240,7 @@ export function ExpenseList({
 }: {
   expenses: ExpenseListItem[];
   members: Array<{ id: number; display_name: string }>;
+  couples?: Array<{ id: number; name: string; memberIds: number[] }>;
   baseCurrency: string;
   cashbookMode?: boolean;
   onDelete?: (id: number) => void;
@@ -1171,6 +1287,7 @@ export function ExpenseList({
             key={exp.id}
             exp={exp}
             members={members}
+            couples={couples}
             baseCurrency={baseCurrency}
             cashbookMode={cashbookMode}
             canDelete={canDelete}

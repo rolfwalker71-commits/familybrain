@@ -19,6 +19,13 @@ export type TripCostDashboardData = {
     deltaBase: number;
     netBalance: number;
   }>;
+  byCouple?: Array<{
+    coupleId: number;
+    name: string;
+    paidBase: number;
+    fairShareBase: number;
+    netBalance: number;
+  }>;
   byCategory: Array<{
     label: string;
     totalBase: number;
@@ -181,6 +188,39 @@ export function TripCostDashboard({ data }: { data: TripCostDashboardData }) {
               Delta = bezahlt − Anteil (vor Rückzahlungen). Netto inkl.
               Rückzahlungen.
             </p>
+          </div>
+        ) : null}
+
+        {data.byCouple && data.byCouple.length > 0 ? (
+          <div className="rounded-xl border border-border/50 bg-white px-3 py-2.5">
+            <p className="text-sm font-medium">Kosten je Paar</p>
+            <ul className="mt-2 space-y-2">
+              {data.byCouple.map((c) => (
+                <li
+                  key={c.coupleId}
+                  className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 text-sm"
+                >
+                  <span className="font-medium">{c.name}</span>
+                  <span className="text-[11px] text-muted-foreground sm:order-last sm:w-full">
+                    bezahlt {formatMoney(c.paidBase, currency)}
+                    {" · "}
+                    Anteil {formatMoney(c.fairShareBase, currency)}
+                  </span>
+                  <span
+                    className={cn(
+                      "shrink-0 tabular-nums font-semibold",
+                      c.netBalance > 0
+                        ? "text-[var(--brand-finance)]"
+                        : c.netBalance < 0
+                          ? "text-rose-600"
+                          : "text-muted-foreground"
+                    )}
+                  >
+                    {formatSignedMoney(c.netBalance, currency)}
+                  </span>
+                </li>
+              ))}
+            </ul>
           </div>
         ) : null}
 

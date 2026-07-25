@@ -5,6 +5,7 @@ import { getTripById, getTripEventById } from "@/lib/trips/queries";
 import { nowIso } from "@/lib/utils/dates";
 import { DEFAULT_BASE_CURRENCY, NORMAL_SOLO_MEMBER_NAME, type ExpenseDirection, type LedgerKind, type SplitMode } from "@/lib/finance-brain/constants";
 import {
+  computeCoupleEqualSplits,
   computeEqualSplits,
   computeShareSplits,
   roundMoney,
@@ -38,8 +39,16 @@ export type FinanceLedgerMemberRow = {
   display_name: string;
   email: string | null;
   user_id: number | null;
+  couple_id: number | null;
   invite_token: string;
   invite_revoked_at: string | null;
+  created_at: string;
+};
+
+export type FinanceLedgerCoupleRow = {
+  id: number;
+  ledger_id: number;
+  name: string;
   created_at: string;
 };
 
@@ -417,21 +426,51 @@ export function addFinanceLedgerMemberFromUser(
 
 export function updateFinanceLedgerMember(
   memberId: number,
-  input: { displayName?: string; email?: string | null }
+  input: {
+    displayName?: string;
+    email?: string | null;
+    coupleId?: number | null;
+  }
 ): FinanceLedgerMemberRow {
   const existing = getFinanceLedgerMemberById(memberId);
   if (!existing) throw new Error("Teilnehmer nicht gefunden");
+
+  let nextCoupleId =
+    input.coupleId !== undefined ? input.coupleId : existing.couple_id;
+  if (input.coupleId !== undefined) {
+    const ledger = getFinanceLedgerById(existing.ledger_id);
+    if (!ledger) throw new Error("Abrechnung nicht gefunden");
+    assertSplitLedgerFeatures(ledger, "Paare");
+    if (input.coupleId == null) {
+      nextCoupleId = null;
+    } else {
+      const couple = getFinanceLedgerCoupleById(input.coupleId);
+      if (!couple || couple.ledger_id !== existing.ledger_id) {
+        throw new Error("Paar nicht gefunden");
+      }
+      const inCouple = listFinanceLedgerMembers(existing.ledger_id).filter(
+        (m) => m.couple_id === input.coupleId && m.id !== memberId
+      );
+      if (inCouple.length >= 2) {
+        throw new Error("Ein Paar kann höchstens zwei Personen haben");
+      }
+      nextCoupleId = input.coupleId;
+    }
+  }
+
   const db = getDb();
   db.prepare(
     `UPDATE finance_ledger_members SET
        display_name = ?,
-       email = ?
+       email = ?,
+       couple_id = ?
      WHERE id = ?`
   ).run(
     input.displayName !== undefined
       ? input.displayName.trim()
       : existing.display_name,
     input.email !== undefined ? input.email?.trim() || null : existing.email,
+    nextCoupleId ?? null,
     memberId
   );
   touchLedger(existing.ledger_id);
@@ -466,6 +505,108 @@ export function rotateFinanceLedgerMemberToken(
   ).run(token, memberId);
   touchLedger(existing.ledger_id);
   return getFinanceLedgerMemberById(memberId)!;
+}
+
+export function listFinanceLedgerCouples(
+  ledgerId: number
+): FinanceLedgerCoupleRow[] {
+  const db = getDb();
+  return db
+    .prepare(
+      `SELECT * FROM finance_ledger_couple_groups
+       WHERE ledger_id = ?
+       ORDER BY id ASC`
+    )
+    .all(ledgerId) as FinanceLedgerCoupleRow[];
+}
+
+export function getFinanceLedgerCoupleById(
+  coupleId: number
+): FinanceLedgerCoupleRow | null {
+  const db = getDb();
+  return (
+    (db
+      .prepare(`SELECT * FROM finance_ledger_couple_groups WHERE id = ?`)
+      .get(coupleId) as FinanceLedgerCoupleRow | undefined) ?? null
+  );
+}
+
+export function createFinanceLedgerCouple(
+  ledgerId: number,
+  input: { name: string; memberIds?: number[] }
+): FinanceLedgerCoupleRow {
+  const ledger = getFinanceLedgerById(ledgerId);
+  if (!ledger) throw new Error("Abrechnung nicht gefunden");
+  assertSplitLedgerFeatures(ledger, "Paare");
+  const name = input.name.trim();
+  if (!name) throw new Error("Paar-Name erforderlich");
+  const memberIds = [...new Set(input.memberIds ?? [])];
+  if (memberIds.length > 2) {
+    throw new Error("Ein Paar kann höchstens zwei Personen haben");
+  }
+  for (const id of memberIds) {
+    const m = getFinanceLedgerMemberById(id);
+    if (!m || m.ledger_id !== ledgerId) {
+      throw new Error("Teilnehmer nicht in dieser Abrechnung");
+    }
+    if (m.couple_id != null) {
+      throw new Error(`${m.display_name} ist bereits einem Paar zugeordnet`);
+    }
+  }
+  const db = getDb();
+  const ts = nowIso();
+  const result = db
+    .prepare(
+      `INSERT INTO finance_ledger_couple_groups (ledger_id, name, created_at)
+       VALUES (?, ?, ?)`
+    )
+    .run(ledgerId, name, ts);
+  const coupleId = Number(result.lastInsertRowid);
+  for (const id of memberIds) {
+    db.prepare(
+      `UPDATE finance_ledger_members SET couple_id = ? WHERE id = ?`
+    ).run(coupleId, id);
+  }
+  touchLedger(ledgerId);
+  return getFinanceLedgerCoupleById(coupleId)!;
+}
+
+export function updateFinanceLedgerCouple(
+  coupleId: number,
+  input: { name?: string }
+): FinanceLedgerCoupleRow {
+  const existing = getFinanceLedgerCoupleById(coupleId);
+  if (!existing) throw new Error("Paar nicht gefunden");
+  if (input.name !== undefined) {
+    const name = input.name.trim();
+    if (!name) throw new Error("Paar-Name erforderlich");
+    getDb()
+      .prepare(`UPDATE finance_ledger_couple_groups SET name = ? WHERE id = ?`)
+      .run(name, coupleId);
+    touchLedger(existing.ledger_id);
+  }
+  return getFinanceLedgerCoupleById(coupleId)!;
+}
+
+export function deleteFinanceLedgerCouple(coupleId: number): void {
+  const existing = getFinanceLedgerCoupleById(coupleId);
+  if (!existing) throw new Error("Paar nicht gefunden");
+  const db = getDb();
+  db.prepare(
+    `UPDATE finance_ledger_members SET couple_id = NULL WHERE couple_id = ?`
+  ).run(coupleId);
+  db.prepare(`DELETE FROM finance_ledger_couple_groups WHERE id = ?`).run(
+    coupleId
+  );
+  touchLedger(existing.ledger_id);
+}
+
+/** Default label from two display names. */
+export function defaultCoupleName(names: string[]): string {
+  const cleaned = names.map((n) => n.trim()).filter(Boolean);
+  if (cleaned.length === 0) return "Paar";
+  if (cleaned.length === 1) return cleaned[0];
+  return `${cleaned[0]} & ${cleaned[1]}`;
 }
 
 function touchLedger(ledgerId: number) {
@@ -616,6 +757,7 @@ export function listExpenseShareDisplays(
 
 export type ExpenseSplitInput =
   | { mode: "equal"; memberIds: number[] }
+  | { mode: "coupleEqual"; coupleIds: number[] }
   | { mode: "exact"; amounts: Array<{ memberId: number; amountBase: number }> }
   | {
       mode: "shares";
@@ -753,6 +895,29 @@ function buildSplitMap(
       if (!memberSet.has(id)) throw new Error("Ungültiger Teilnehmer");
     }
     return computeEqualSplits(amountBase, ids);
+  }
+  if (split.mode === "coupleEqual") {
+    const couples = listFinanceLedgerCouples(ledgerId);
+    const coupleSet = new Set(couples.map((c) => c.id));
+    const ids = split.coupleIds.length
+      ? split.coupleIds
+      : couples.map((c) => c.id);
+    if (ids.length === 0) {
+      throw new Error("Mindestens ein Paar wählen");
+    }
+    for (const id of ids) {
+      if (!coupleSet.has(id)) throw new Error("Ungültiges Paar");
+    }
+    const groups = ids.map((coupleId) => ({
+      coupleId,
+      memberIds: members
+        .filter((m) => m.couple_id === coupleId)
+        .map((m) => m.id),
+    }));
+    if (groups.some((g) => g.memberIds.length === 0)) {
+      throw new Error("Gewähltes Paar hat keine Teilnehmer");
+    }
+    return computeCoupleEqualSplits(amountBase, groups);
   }
   if (split.mode === "exact") {
     const out = new Map<number, number>();

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   buildPayerOrientedDebts,
   capSettlementToCreditorNet,
+  computeCoupleEqualSplits,
   computeEqualSplits,
   computeMemberBalances,
   roundMoney,
@@ -241,6 +242,17 @@ describe("settlement", () => {
     const zeroCreditor = capSettlementToCreditorNet(48, -0.5);
     assert.equal(zeroCreditor.capped, true);
     assert.equal(zeroCreditor.amount, 0);
+  });
+
+  it("splits equally by couple then within couple", () => {
+    const splits = computeCoupleEqualSplits(400, [
+      { coupleId: 10, memberIds: [1, 2] },
+      { coupleId: 20, memberIds: [3, 4] },
+    ]);
+    assert.equal(splits.get(1), 100);
+    assert.equal(splits.get(2), 100);
+    assert.equal(splits.get(3), 100);
+    assert.equal(splits.get(4), 100);
   });
 
   it("splits equally with remainder on last member", () => {

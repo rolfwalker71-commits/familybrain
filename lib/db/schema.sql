@@ -425,6 +425,7 @@ CREATE TABLE IF NOT EXISTS finance_ledger_members (
   display_name TEXT NOT NULL,
   email TEXT,
   user_id INTEGER,
+  couple_id INTEGER,
   invite_token TEXT NOT NULL UNIQUE,
   invite_revoked_at TEXT,
   created_at TEXT NOT NULL,
@@ -435,7 +436,19 @@ CREATE INDEX IF NOT EXISTS idx_finance_ledger_members_ledger
   ON finance_ledger_members(ledger_id);
 CREATE INDEX IF NOT EXISTS idx_finance_ledger_members_token
   ON finance_ledger_members(invite_token);
+CREATE INDEX IF NOT EXISTS idx_finance_ledger_members_couple
+  ON finance_ledger_members(couple_id);
 -- idx on user_id is created in bootstrap after ALTER adds the column on existing DBs
+
+CREATE TABLE IF NOT EXISTS finance_ledger_couple_groups (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ledger_id INTEGER NOT NULL,
+  name TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY(ledger_id) REFERENCES finance_ledgers(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_finance_ledger_couples_ledger
+  ON finance_ledger_couple_groups(ledger_id);
 
 CREATE TABLE IF NOT EXISTS finance_expenses (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

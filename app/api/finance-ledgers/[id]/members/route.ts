@@ -50,7 +50,9 @@ export async function GET(_request: Request, context: Ctx) {
     return NextResponse.json({ members: [] });
   }
   return NextResponse.json({
-    members: listFinanceLedgerMembers(id).map(serializeMemberWithToken),
+    members: listFinanceLedgerMembers(id).map((m) =>
+      serializeMemberWithToken(m)
+    ),
   });
 }
 

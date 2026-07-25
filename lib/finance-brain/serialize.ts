@@ -1,11 +1,13 @@
 import type { BalanceInput, SimplifiedDebt } from "@/lib/finance-brain/settlement";
 import {
   computeMemberBalances,
+  roundMoney,
   simplifyDebts,
 } from "@/lib/finance-brain/settlement";
 import type {
   FinanceExpenseRow,
   FinanceExpenseSplitRow,
+  FinanceLedgerCoupleRow,
   FinanceLedgerMemberRow,
   FinanceLedgerRow,
   FinanceSettlementRow,
@@ -13,6 +15,8 @@ import type {
 import {
   collectBalanceInputs,
   collectOpenPayerDebts,
+  listFinanceLedgerCouples,
+  listFinanceLedgerMembers,
 } from "@/lib/finance-brain/queries";
 import {
   receiptPublicUrl,
@@ -46,21 +50,42 @@ export function serializeLedger(ledger: FinanceLedgerRow) {
   };
 }
 
-export function serializeMember(member: FinanceLedgerMemberRow) {
+export function serializeCouple(
+  couple: FinanceLedgerCoupleRow,
+  memberIds: number[]
+) {
+  return {
+    id: couple.id,
+    ledger_id: couple.ledger_id,
+    name: couple.name,
+    created_at: couple.created_at,
+    memberIds,
+  };
+}
+
+export function serializeMember(
+  member: FinanceLedgerMemberRow,
+  coupleName?: string | null
+) {
   return {
     id: member.id,
     ledger_id: member.ledger_id,
     display_name: member.display_name,
     email: member.email,
+    couple_id: member.couple_id ?? null,
+    couple_name: coupleName ?? null,
     invite_revoked_at: member.invite_revoked_at,
     created_at: member.created_at,
     share_url: `/share/f/${member.invite_token}`,
   };
 }
 
-export function serializeMemberWithToken(member: FinanceLedgerMemberRow) {
+export function serializeMemberWithToken(
+  member: FinanceLedgerMemberRow,
+  coupleName?: string | null
+) {
   return {
-    ...serializeMember(member),
+    ...serializeMember(member, coupleName),
     invite_token: member.invite_token,
   };
 }
@@ -122,7 +147,10 @@ export function serializeSettlement(settlement: FinanceSettlementRow) {
 
 export function buildBalancePayload(
   inputs: BalanceInput[],
-  openDebts?: SimplifiedDebt[]
+  openDebts?: SimplifiedDebt[],
+  coupleContext?: {
+    couples: Array<{ id: number; name: string; memberIds: number[] }>;
+  }
 ) {
   const raw = computeMemberBalances(inputs);
   const balances = raw.map((b) => ({
@@ -138,13 +166,94 @@ export function buildBalancePayload(
   const simplifiedDebts = (openDebts || []).map(mapDebt);
   /** Min cash-flow: fewest transfers to zero all nets. */
   const minimalDebts = simplifyDebts(raw).map(mapDebt);
-  return { balances, simplifiedDebts, minimalDebts };
+
+  const couples = coupleContext?.couples ?? [];
+  const byMember = new Map(raw.map((b) => [b.memberId, b]));
+  const coupleBalances = couples.map((c) => {
+    let paidBase = 0;
+    let owedBase = 0;
+    let settlementsPaidBase = 0;
+    let settlementsReceivedBase = 0;
+    let netBalance = 0;
+    for (const mid of c.memberIds) {
+      const b = byMember.get(mid);
+      if (!b) continue;
+      paidBase += b.paidBase;
+      owedBase += b.owedBase;
+      settlementsPaidBase += b.settlementsPaidBase;
+      settlementsReceivedBase += b.settlementsReceivedBase;
+      netBalance += b.net;
+    }
+    return {
+      coupleId: c.id,
+      name: c.name,
+      memberIds: c.memberIds,
+      paidBase: roundMoney(paidBase),
+      owedBase: roundMoney(owedBase),
+      settlementsPaidBase: roundMoney(settlementsPaidBase),
+      settlementsReceivedBase: roundMoney(settlementsReceivedBase),
+      netBalance: roundMoney(netBalance),
+    };
+  });
+
+  const coupleNodes = coupleBalances.map((c) => ({
+    memberId: c.coupleId,
+    displayName: c.name,
+    paidBase: c.paidBase,
+    owedBase: c.owedBase,
+    settlementsReceivedBase: c.settlementsReceivedBase,
+    settlementsPaidBase: c.settlementsPaidBase,
+    net: c.netBalance,
+  }));
+  const rawCoupleDebts = simplifyDebts(coupleNodes);
+
+  const coupleDebts = rawCoupleDebts.map((d) => {
+    const fromCouple = coupleBalances.find((c) => c.coupleId === d.fromMemberId);
+    const toCouple = coupleBalances.find((c) => c.coupleId === d.toMemberId);
+    const fromMembers = (fromCouple?.memberIds ?? [])
+      .map((id) => byMember.get(id))
+      .filter(Boolean) as typeof raw;
+    const toMembers = (toCouple?.memberIds ?? [])
+      .map((id) => byMember.get(id))
+      .filter(Boolean) as typeof raw;
+    // Debtor couple: lowest net pays; creditor couple: highest net receives.
+    const payer = [...fromMembers].sort((a, b) => a.net - b.net)[0];
+    const payee = [...toMembers].sort((a, b) => b.net - a.net)[0];
+    return {
+      fromCoupleId: d.fromMemberId,
+      fromCoupleName: d.fromName,
+      toCoupleId: d.toMemberId,
+      toCoupleName: d.toName,
+      amount: d.amount,
+      fromMemberId: payer?.memberId ?? d.fromMemberId,
+      fromDisplayName: payer?.displayName ?? d.fromName,
+      toMemberId: payee?.memberId ?? d.toMemberId,
+      toDisplayName: payee?.displayName ?? d.toName,
+    };
+  });
+
+  return {
+    balances,
+    simplifiedDebts,
+    minimalDebts,
+    couples,
+    coupleBalances,
+    coupleDebts,
+  };
 }
 
 /** Saldo + beide Ausgleichsansichten für eine Abrechnung. */
 export function buildLedgerBalancePayload(ledgerId: number) {
+  const coupleRows = listFinanceLedgerCouples(ledgerId);
+  const members = listFinanceLedgerMembers(ledgerId);
+  const couples = coupleRows.map((c) => ({
+    id: c.id,
+    name: c.name,
+    memberIds: members.filter((m) => m.couple_id === c.id).map((m) => m.id),
+  }));
   return buildBalancePayload(
     collectBalanceInputs(ledgerId),
-    collectOpenPayerDebts(ledgerId)
+    collectOpenPayerDebts(ledgerId),
+    { couples }
   );
 }

@@ -28,6 +28,13 @@ export type TripCostDashboard = {
   expenseCount: number;
   unlinkedCount: number;
   byPerson: TripCostPerson[];
+  byCouple: Array<{
+    coupleId: number;
+    name: string;
+    paidBase: number;
+    fairShareBase: number;
+    netBalance: number;
+  }>;
   byCategory: TripCostBucket[];
   byEventType: TripCostBucket[];
 };
@@ -113,7 +120,8 @@ export function buildTripCostDashboard(
   }
 
   totalSpentBase = roundMoney(totalSpentBase);
-  const balances = buildLedgerBalancePayload(ledgerId).balances;
+  const balancePayload = buildLedgerBalancePayload(ledgerId);
+  const balances = balancePayload.balances;
 
   return {
     baseCurrency: ledger.base_currency,
@@ -127,6 +135,13 @@ export function buildTripCostDashboard(
       fairShareBase: b.owedBase,
       deltaBase: roundMoney(b.paidBase - b.owedBase),
       netBalance: b.netBalance,
+    })),
+    byCouple: (balancePayload.coupleBalances || []).map((c) => ({
+      coupleId: c.coupleId,
+      name: c.name,
+      paidBase: c.paidBase,
+      fairShareBase: c.owedBase,
+      netBalance: c.netBalance,
     })),
     byCategory: toBuckets(byCategory, totalSpentBase),
     byEventType: toBuckets(byEventType, totalSpentBase),

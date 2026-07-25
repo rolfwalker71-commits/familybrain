@@ -12,6 +12,7 @@ import {
   isNormalLedger,
   listFinanceExpenses,
   listFinanceExpenseSplits,
+  listFinanceLedgerCouples,
   listFinanceLedgerMembers,
   listFinanceSettlements,
   updateFinanceLedger,
@@ -50,9 +51,17 @@ export async function GET(_request: Request, context: Ctx) {
     return NextResponse.json({ error: "Abrechnung nicht gefunden" }, { status: 404 });
   }
   const normal = isNormalLedger(ledger);
+  const coupleNameById = new Map(
+    listFinanceLedgerCouples(id).map((c) => [c.id, c.name])
+  );
   const members = normal
     ? []
-    : listFinanceLedgerMembers(id).map(serializeMemberWithToken);
+    : listFinanceLedgerMembers(id).map((m) =>
+        serializeMemberWithToken(
+          m,
+          m.couple_id != null ? coupleNameById.get(m.couple_id) ?? null : null
+        )
+      );
   const expenses = listFinanceExpenses(id).map((e) =>
     serializeExpense(e, listFinanceExpenseSplits(e.id))
   );

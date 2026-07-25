@@ -21,6 +21,7 @@ type Ctx = { params: Promise<{ id: string; memberId: string }> };
 const PatchSchema = z.object({
   displayName: z.string().min(1).max(80).optional(),
   email: z.string().email().nullable().optional(),
+  coupleId: z.number().int().positive().nullable().optional(),
   rotateToken: z.boolean().optional(),
   revoke: z.boolean().optional(),
 });
@@ -61,6 +62,7 @@ export async function PATCH(request: Request, context: Ctx) {
     const updated = updateFinanceLedgerMember(memberId, {
       displayName: parsed.data.displayName,
       email: parsed.data.email,
+      coupleId: parsed.data.coupleId,
     });
     return NextResponse.json({
       ok: true,

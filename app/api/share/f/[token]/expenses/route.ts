@@ -23,6 +23,8 @@ const CreateSchema = z.object({
   expenseDate: z.string().nullable().optional(),
   paidByMemberId: z.number().int().positive().optional(),
   memberIds: z.array(z.number().int().positive()).optional(),
+  coupleIds: z.array(z.number().int().positive()).optional(),
+  splitMode: z.enum(["equal", "coupleEqual"]).optional(),
   place: z.string().max(200).nullable().optional(),
   note: z.string().max(1000).nullable().optional(),
 });
@@ -69,10 +71,16 @@ export async function POST(request: Request, context: Ctx) {
       placeLat,
       placeLon,
       note: parsed.data.note ?? null,
-      split: {
-        mode: "equal",
-        memberIds: parsed.data.memberIds ?? [],
-      },
+      split:
+        parsed.data.splitMode === "coupleEqual"
+          ? {
+              mode: "coupleEqual",
+              coupleIds: parsed.data.coupleIds ?? [],
+            }
+          : {
+              mode: "equal",
+              memberIds: parsed.data.memberIds ?? [],
+            },
     });
     expense = await classifyAndStoreExpenseCategory(expense, placeName);
     return NextResponse.json({

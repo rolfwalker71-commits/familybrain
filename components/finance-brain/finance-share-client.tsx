@@ -31,7 +31,10 @@ import {
   type BalanceDebt,
 } from "@/components/finance-brain/balance-view";
 import { PendingReceiptPicker } from "@/components/finance-brain/expense-receipt-controls";
-import { ExpenseSplitParticipants } from "@/components/finance-brain/expense-split-participants";
+import {
+  ExpenseSplitParticipants,
+  type ExpenseSplitSelection,
+} from "@/components/finance-brain/expense-split-participants";
 import {
   FinanceTabNav,
   parseFinanceLedgerTab,
@@ -108,6 +111,28 @@ type ShareData = {
     toDisplayName: string;
     amount: number;
   }>;
+  couples?: Array<{ id: number; name: string; memberIds: number[] }>;
+  coupleBalances?: Array<{
+    coupleId: number;
+    name: string;
+    memberIds: number[];
+    paidBase: number;
+    owedBase: number;
+    settlementsPaidBase: number;
+    settlementsReceivedBase: number;
+    netBalance: number;
+  }>;
+  coupleDebts?: Array<{
+    fromCoupleId: number;
+    fromCoupleName: string;
+    toCoupleId: number;
+    toCoupleName: string;
+    amount: number;
+    fromMemberId: number;
+    fromDisplayName: string;
+    toMemberId: number;
+    toDisplayName: string;
+  }>;
 };
 
 export function FinanceShareClient({ token }: { token: string }) {
@@ -140,7 +165,10 @@ function FinanceShareInner({ token }: { token: string }) {
   const [expPlace, setExpPlace] = useState("");
   const [expNote, setExpNote] = useState("");
   const [expPayer, setExpPayer] = useState<string>("");
-  const [expSplitMemberIds, setExpSplitMemberIds] = useState<number[]>([]);
+  const [expSplit, setExpSplit] = useState<ExpenseSplitSelection>({
+    mode: "equal",
+    memberIds: [],
+  });
 
   const [setAmount, setSetAmount] = useState("");
   const [setCurrency, setSetCurrency] = useState("CHF");
@@ -172,9 +200,11 @@ function FinanceShareInner({ token }: { token: string }) {
       }
       setExpPayer(String(json.member.id));
       if (json.members?.length) {
-        setExpSplitMemberIds((prev) =>
-          prev.length > 0 ? prev : json.members.map((m: { id: number }) => m.id)
-        );
+        setExpSplit((prev) => {
+          if (prev.mode === "equal" && prev.memberIds.length > 0) return prev;
+          if (prev.mode === "coupleEqual" && prev.coupleIds.length > 0) return prev;
+          return { mode: "equal", memberIds: json.members.map((m: { id: number }) => m.id) };
+        });
       }
       setError(null);
     } catch (err) {
@@ -240,8 +270,16 @@ function FinanceShareInner({ token }: { token: string }) {
   async function addExpense() {
     const amount = Number(expAmount);
     if (!amount) return;
-    if (expSplitMemberIds.length === 0) {
-      setError("Mindestens eine beteiligte Person wählen");
+    const splitOk =
+      expSplit.mode === "coupleEqual"
+        ? expSplit.coupleIds.length > 0
+        : expSplit.memberIds.length > 0;
+    if (!splitOk) {
+      setError(
+        expSplit.mode === "coupleEqual"
+          ? "Mindestens ein Paar wählen"
+          : "Mindestens eine beteiligte Person wählen"
+      );
       return;
     }
     try {
@@ -259,7 +297,12 @@ function FinanceShareInner({ token }: { token: string }) {
             place: expPlace.trim() || null,
             note: expNote.trim() || null,
             paidByMemberId: expPayer ? Number(expPayer) : undefined,
-            memberIds: expSplitMemberIds,
+            ...(expSplit.mode === "coupleEqual"
+              ? {
+                  splitMode: "coupleEqual" as const,
+                  coupleIds: expSplit.coupleIds,
+                }
+              : { memberIds: expSplit.memberIds }),
           }),
         }
       );
@@ -290,7 +333,10 @@ function FinanceShareInner({ token }: { token: string }) {
       setExpRate("1");
       setPendingReceipt(null);
       if (data?.members?.length) {
-        setExpSplitMemberIds(data.members.map((m) => m.id));
+        setExpSplit({
+          mode: "equal",
+          memberIds: data.members.map((m) => m.id),
+        });
       }
       await load();
     } catch (err) {
@@ -378,7 +424,7 @@ function FinanceShareInner({ token }: { token: string }) {
       amount: number;
       currency: string;
       exchangeRate: number;
-      splitMemberIds?: number[];
+      split?: ExpenseSplitSelection;
     }
   ) {
     setEditBusyId(expenseId);
@@ -397,14 +443,7 @@ function FinanceShareInner({ token }: { token: string }) {
             amount: payload.amount,
             currency: payload.currency,
             exchangeRate: payload.exchangeRate,
-            ...(payload.splitMemberIds
-              ? {
-                  split: {
-                    mode: "equal" as const,
-                    memberIds: payload.splitMemberIds,
-                  },
-                }
-              : {}),
+            ...(payload.split ? { split: payload.split } : {}),
           }),
         }
       );
@@ -629,6 +668,9 @@ function FinanceShareInner({ token }: { token: string }) {
     balances,
     simplifiedDebts,
     minimalDebts = [],
+    couples = [],
+    coupleBalances = [],
+    coupleDebts = [],
   } = data;
   const others = members.filter((m) => m.id !== member.id);
   const memberSelectItems = Object.fromEntries(
@@ -693,6 +735,8 @@ function FinanceShareInner({ token }: { token: string }) {
           balances={balances}
           simplifiedDebts={simplifiedDebts}
           minimalDebts={minimalDebts}
+          coupleBalances={coupleBalances}
+          coupleDebts={coupleDebts}
           baseCurrency={ledger.base_currency}
           highlightMemberId={member.id}
           onRecordDebt={recordSuggestedDebt}
@@ -794,8 +838,9 @@ function FinanceShareInner({ token }: { token: string }) {
             <div className="space-y-1 sm:col-span-2">
               <ExpenseSplitParticipants
                 members={members}
-                selectedIds={expSplitMemberIds}
-                onChange={setExpSplitMemberIds}
+                couples={couples}
+                value={expSplit}
+                onChange={setExpSplit}
               />
             </div>
             <div className="space-y-1">
@@ -841,7 +886,12 @@ function FinanceShareInner({ token }: { token: string }) {
             <Button
               className="w-full"
               onClick={() => void addExpense()}
-              disabled={!expAmount || expSplitMemberIds.length === 0}
+              disabled={
+                !expAmount ||
+                !(expSplit.mode === "coupleEqual"
+                  ? expSplit.coupleIds.length > 0
+                  : expSplit.memberIds.length > 0)
+              }
             >
               <Plus className="mr-2 size-4" />
               Ausgabe speichern
@@ -855,6 +905,7 @@ function FinanceShareInner({ token }: { token: string }) {
           <ExpenseList
             expenses={expenses}
             members={members}
+            couples={couples}
             baseCurrency={ledger.base_currency}
             canEdit
             receiptUploadUrl={(expenseId) =>

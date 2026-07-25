@@ -1,4 +1,4 @@
-export const SPLIT_MODES = ["equal", "exact", "shares"] as const;
+export const SPLIT_MODES = ["equal", "coupleEqual", "exact", "shares"] as const;
 export type SplitMode = (typeof SPLIT_MODES)[number];
 
 export const LEDGER_KINDS = ["split", "normal"] as const;

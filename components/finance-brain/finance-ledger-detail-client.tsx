@@ -58,7 +58,10 @@ import {
 import { TripCostDashboard } from "@/components/finance-brain/trip-cost-dashboard";
 import { PendingReceiptPicker } from "@/components/finance-brain/expense-receipt-controls";
 import { ExpenseTripEventPicker } from "@/components/finance-brain/expense-trip-event-picker";
-import { ExpenseSplitParticipants } from "@/components/finance-brain/expense-split-participants";
+import {
+  ExpenseSplitParticipants,
+  type ExpenseSplitSelection,
+} from "@/components/finance-brain/expense-split-participants";
 import {
   FinanceTabNav,
   parseFinanceLedgerTab,
@@ -79,6 +82,14 @@ type Member = {
   share_url: string;
   invite_token?: string;
   invite_revoked_at: string | null;
+  couple_id?: number | null;
+  couple_name?: string | null;
+};
+
+type Couple = {
+  id: number;
+  name: string;
+  memberIds: number[];
 };
 
 type LedgerDetail = {
@@ -156,6 +167,28 @@ type LedgerDetail = {
     toDisplayName: string;
     amount: number;
   }>;
+  couples?: Couple[];
+  coupleBalances?: Array<{
+    coupleId: number;
+    name: string;
+    memberIds: number[];
+    paidBase: number;
+    owedBase: number;
+    settlementsPaidBase: number;
+    settlementsReceivedBase: number;
+    netBalance: number;
+  }>;
+  coupleDebts?: Array<{
+    fromCoupleId: number;
+    fromCoupleName: string;
+    toCoupleId: number;
+    toCoupleName: string;
+    amount: number;
+    fromMemberId: number;
+    fromDisplayName: string;
+    toMemberId: number;
+    toDisplayName: string;
+  }>;
   cashbook?: {
     expenseTotalBase: number;
     incomeTotalBase: number;
@@ -172,6 +205,13 @@ type LedgerDetail = {
       paidBase: number;
       fairShareBase: number;
       deltaBase: number;
+      netBalance: number;
+    }>;
+    byCouple?: Array<{
+      coupleId: number;
+      name: string;
+      paidBase: number;
+      fairShareBase: number;
       netBalance: number;
     }>;
     byCategory: Array<{
@@ -235,7 +275,12 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
   const [expPlace, setExpPlace] = useState("");
   const [expNote, setExpNote] = useState("");
   const [expPayer, setExpPayer] = useState<string>("");
-  const [expSplitMemberIds, setExpSplitMemberIds] = useState<number[]>([]);
+  const [expSplit, setExpSplit] = useState<ExpenseSplitSelection>({
+    mode: "equal",
+    memberIds: [],
+  });
+  const [couplePick, setCouplePick] = useState<number[]>([]);
+  const [coupleName, setCoupleName] = useState("");
   const [expTripEventId, setExpTripEventId] = useState<number | null>(null);
   const [expDirection, setExpDirection] = useState<"expense" | "income">(
     "expense"
@@ -298,9 +343,14 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
         setSetFrom(String(json.members[0].id));
       }
       if (json.members?.length) {
-        setExpSplitMemberIds((prev) =>
-          prev.length > 0 ? prev : json.members.map((m: { id: number }) => m.id)
-        );
+        setExpSplit((prev) => {
+          if (prev.mode === "equal" && prev.memberIds.length > 0) return prev;
+          if (prev.mode === "coupleEqual" && prev.coupleIds.length > 0) return prev;
+          return {
+            mode: "equal",
+            memberIds: json.members.map((m: { id: number }) => m.id),
+          };
+        });
       }
       setLinkTripId(
         json.ledger.trip_id != null ? String(json.ledger.trip_id) : ""
@@ -570,6 +620,47 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
     }
   }
 
+  async function createCouple() {
+    if (couplePick.length === 0 || couplePick.length > 2) {
+      setError("Bitte eine oder zwei Personen für das Paar wählen");
+      return;
+    }
+    try {
+      const res = await fetch(`/api/finance-ledgers/${ledgerId}/couples`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: coupleName.trim() || undefined,
+          memberIds: couplePick,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Fehler");
+      setCouplePick([]);
+      setCoupleName("");
+      setStatus(`Paar «${json.couple.name}» angelegt.`);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function deleteCouple(coupleId: number) {
+    if (!window.confirm("Paar auflösen? Personen bleiben erhalten.")) return;
+    try {
+      const res = await fetch(
+        `/api/finance-ledgers/${ledgerId}/couples/${coupleId}`,
+        { method: "DELETE" }
+      );
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Fehler");
+      setStatus("Paar aufgelöst.");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
   async function copyShareUrl(path: string) {
     const url = `${window.location.origin}${path}`;
     await navigator.clipboard.writeText(url);
@@ -600,8 +691,16 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
     const isNormal = data?.ledger.ledger_kind === "normal";
     if (!amount) return;
     if (!isNormal && !expPayer) return;
-    if (!isNormal && expSplitMemberIds.length === 0) {
-      setError("Mindestens eine beteiligte Person wählen");
+    const splitOk =
+      expSplit.mode === "coupleEqual"
+        ? expSplit.coupleIds.length > 0
+        : expSplit.memberIds.length > 0;
+    if (!isNormal && !splitOk) {
+      setError(
+        expSplit.mode === "coupleEqual"
+          ? "Mindestens ein Paar wählen"
+          : "Mindestens eine beteiligte Person wählen"
+      );
       return;
     }
     try {
@@ -613,7 +712,7 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
             ? { direction: expDirection }
             : {
                 paidByMemberId: Number(expPayer),
-                split: { mode: "equal", memberIds: expSplitMemberIds },
+                split: expSplit,
                 direction: "expense",
               }),
           amount,
@@ -655,7 +754,10 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
       setExpDirection("expense");
       setPendingReceipt(null);
       if (data?.members?.length) {
-        setExpSplitMemberIds(data.members.map((m) => m.id));
+        setExpSplit({
+          mode: "equal",
+          memberIds: data.members.map((m) => m.id),
+        });
       }
       await load();
     } catch (err) {
@@ -826,7 +928,7 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
       exchangeRate: number;
       direction?: "expense" | "income";
       tripEventId?: number | null;
-      splitMemberIds?: number[];
+      split?: ExpenseSplitSelection;
     }
   ) {
     setEditBusyId(expenseId);
@@ -847,14 +949,7 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
             exchangeRate: payload.exchangeRate,
             direction: payload.direction,
             tripEventId: payload.tripEventId,
-            ...(payload.splitMemberIds
-              ? {
-                  split: {
-                    mode: "equal" as const,
-                    memberIds: payload.splitMemberIds,
-                  },
-                }
-              : {}),
+            ...(payload.split ? { split: payload.split } : {}),
           }),
         }
       );
@@ -1145,6 +1240,9 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
     balances,
     simplifiedDebts,
     minimalDebts = [],
+    couples = [],
+    coupleBalances = [],
+    coupleDebts = [],
     cashbook,
     costDashboard,
   } = data;
@@ -1260,6 +1358,8 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
               balances={balances}
               simplifiedDebts={simplifiedDebts}
               minimalDebts={minimalDebts}
+              coupleBalances={coupleBalances}
+              coupleDebts={coupleDebts}
               baseCurrency={ledger.base_currency}
               onRecordDebt={recordSuggestedDebt}
               recordBusyKey={recordBusyKey}
@@ -1415,8 +1515,9 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
               <div className="sm:col-span-2 lg:col-span-4">
                 <ExpenseSplitParticipants
                   members={members}
-                  selectedIds={expSplitMemberIds}
-                  onChange={setExpSplitMemberIds}
+                  couples={couples}
+                  value={expSplit}
+                  onChange={setExpSplit}
                 />
               </div>
             ) : null}
@@ -1473,7 +1574,10 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
                 onClick={() => void addExpense()}
                 disabled={
                   !expAmount ||
-                  (!isNormal && expSplitMemberIds.length === 0)
+                  (!isNormal &&
+                    !(expSplit.mode === "coupleEqual"
+                      ? expSplit.coupleIds.length > 0
+                      : expSplit.memberIds.length > 0))
                 }
               >
                 Speichern
@@ -1504,6 +1608,7 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
           <ExpenseList
             expenses={expenses}
             members={members}
+            couples={couples}
             baseCurrency={ledger.base_currency}
             cashbookMode={isNormal}
             canDelete
@@ -1935,6 +2040,9 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
                     className="flex flex-wrap items-center gap-2 rounded-md border border-border/60 px-3 py-2 text-sm"
                   >
                     <span className="font-medium">{m.display_name}</span>
+                    {m.couple_name ? (
+                      <Badge variant="secondary">Paar: {m.couple_name}</Badge>
+                    ) : null}
                     {m.email ? (
                       <Badge variant="secondary">{m.email}</Badge>
                     ) : null}
@@ -1970,6 +2078,96 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
                     </div>
                   </div>
                 ))}
+              </div>
+              <div className="mt-5 space-y-3 border-t border-border/50 pt-4">
+                <p className="text-sm font-medium">Paare (2×2)</p>
+                <p className="text-xs text-muted-foreground">
+                  Für Saldo je Paar und Ausgleich zwischen Paaren. Max. zwei
+                  Personen pro Paar.
+                </p>
+                {couples.length > 0 ? (
+                  <ul className="space-y-1.5">
+                    {couples.map((c) => (
+                      <li
+                        key={c.id}
+                        className="flex items-center justify-between gap-2 rounded-md border border-border/60 px-3 py-2 text-sm"
+                      >
+                        <span>
+                          <span className="font-medium">{c.name}</span>
+                          <span className="ml-2 text-xs text-muted-foreground">
+                            {c.memberIds
+                              .map(
+                                (id) =>
+                                  members.find((m) => m.id === id)
+                                    ?.display_name ?? `#${id}`
+                              )
+                              .join(", ")}
+                          </span>
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive"
+                          onClick={() => void deleteCouple(c.id)}
+                        >
+                          Auflösen
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Noch keine Paare.
+                  </p>
+                )}
+                <div className="space-y-2 rounded-xl border border-border/50 bg-background/60 p-2.5">
+                  <Input
+                    placeholder="Paar-Name (optional, z. B. Rolf & Eliane)"
+                    value={coupleName}
+                    onChange={(e) => setCoupleName(e.target.value)}
+                  />
+                  <div className="flex flex-wrap gap-1.5">
+                    {members
+                      .filter((m) => !m.couple_id)
+                      .map((m) => {
+                        const checked = couplePick.includes(m.id);
+                        return (
+                          <button
+                            key={m.id}
+                            type="button"
+                            disabled={
+                              !checked && couplePick.length >= 2
+                            }
+                            className={cn(
+                              "rounded-md border px-2 py-1 text-xs",
+                              checked
+                                ? "border-[var(--brand-finance)] bg-[var(--brand-finance-soft)]"
+                                : "border-border/60"
+                            )}
+                            onClick={() =>
+                              setCouplePick((prev) =>
+                                checked
+                                  ? prev.filter((id) => id !== m.id)
+                                  : prev.length >= 2
+                                    ? prev
+                                    : [...prev, m.id]
+                              )
+                            }
+                          >
+                            {m.display_name}
+                          </button>
+                        );
+                      })}
+                  </div>
+                  <Button
+                    size="sm"
+                    disabled={couplePick.length === 0}
+                    onClick={() => void createCouple()}
+                  >
+                    <Plus className="mr-1 size-3.5" />
+                    Paar anlegen
+                  </Button>
+                </div>
               </div>
               <div className="mt-3">
                 <Button

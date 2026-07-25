@@ -4,38 +4,73 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
 type Member = { id: number; display_name: string };
+type Couple = { id: number; name: string; memberIds: number[] };
+
+export type ExpenseSplitSelection =
+  | { mode: "equal"; memberIds: number[] }
+  | { mode: "coupleEqual"; coupleIds: number[] };
 
 /**
- * Checkbox list: who shares this expense equally.
- * Empty selection is invalid for submit (caller should guard).
+ * Who shares this expense: equal among persons, or equal among couples
+ * (then equal within each couple).
  */
 export function ExpenseSplitParticipants({
   members,
-  selectedIds,
+  couples = [],
+  value,
   onChange,
   compact,
   className,
 }: {
   members: Member[];
-  selectedIds: number[];
-  onChange: (ids: number[]) => void;
+  couples?: Couple[];
+  value: ExpenseSplitSelection;
+  onChange: (next: ExpenseSplitSelection) => void;
   compact?: boolean;
   className?: string;
 }) {
-  const selected = new Set(selectedIds);
-  const allSelected =
-    members.length > 0 && members.every((m) => selected.has(m.id));
+  const hasCouples = couples.length > 0;
+  const mode = value.mode;
+  const selectedMemberIds =
+    mode === "equal" ? new Set(value.memberIds) : new Set<number>();
+  const selectedCoupleIds =
+    mode === "coupleEqual" ? new Set(value.coupleIds) : new Set<number>();
 
-  function toggle(id: number) {
-    if (selected.has(id)) {
-      onChange(selectedIds.filter((x) => x !== id));
+  const allMembersSelected =
+    members.length > 0 && members.every((m) => selectedMemberIds.has(m.id));
+  const allCouplesSelected =
+    couples.length > 0 && couples.every((c) => selectedCoupleIds.has(c.id));
+
+  function setMode(next: "equal" | "coupleEqual") {
+    if (next === "equal") {
+      onChange({
+        mode: "equal",
+        memberIds: members.map((m) => m.id),
+      });
     } else {
-      onChange([...selectedIds, id]);
+      onChange({
+        mode: "coupleEqual",
+        coupleIds: couples.map((c) => c.id),
+      });
     }
   }
 
-  function selectAll() {
-    onChange(members.map((m) => m.id));
+  function toggleMember(id: number) {
+    const ids = value.mode === "equal" ? value.memberIds : [];
+    if (selectedMemberIds.has(id)) {
+      onChange({ mode: "equal", memberIds: ids.filter((x) => x !== id) });
+    } else {
+      onChange({ mode: "equal", memberIds: [...ids, id] });
+    }
+  }
+
+  function toggleCouple(id: number) {
+    const ids = value.mode === "coupleEqual" ? value.coupleIds : [];
+    if (selectedCoupleIds.has(id)) {
+      onChange({ mode: "coupleEqual", coupleIds: ids.filter((x) => x !== id) });
+    } else {
+      onChange({ mode: "coupleEqual", coupleIds: [...ids, id] });
+    }
   }
 
   if (members.length === 0) return null;
@@ -44,54 +79,166 @@ export function ExpenseSplitParticipants({
     <div className={cn("space-y-1.5", className)}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Label className={compact ? "text-xs" : undefined}>
-          Beteiligt (gleicher Anteil)
+          {mode === "coupleEqual"
+            ? "Beteiligt (gleich je Paar)"
+            : "Beteiligt (gleicher Anteil)"}
         </Label>
-        <button
-          type="button"
-          className="text-[11px] font-medium text-[var(--brand-finance)] underline-offset-2 hover:underline"
-          onClick={() => (allSelected ? onChange([]) : selectAll())}
-        >
-          {allSelected ? "Keine" : "Alle"}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {hasCouples ? (
+            <div className="flex rounded-md border border-border/60 p-0.5 text-[11px]">
+              <button
+                type="button"
+                className={cn(
+                  "rounded px-2 py-0.5 font-medium",
+                  mode === "equal"
+                    ? "bg-[var(--brand-finance-soft)] text-[var(--brand-finance)]"
+                    : "text-muted-foreground"
+                )}
+                onClick={() => setMode("equal")}
+              >
+                Personen
+              </button>
+              <button
+                type="button"
+                className={cn(
+                  "rounded px-2 py-0.5 font-medium",
+                  mode === "coupleEqual"
+                    ? "bg-[var(--brand-finance-soft)] text-[var(--brand-finance)]"
+                    : "text-muted-foreground"
+                )}
+                onClick={() => setMode("coupleEqual")}
+              >
+                Paare
+              </button>
+            </div>
+          ) : null}
+          <button
+            type="button"
+            className="text-[11px] font-medium text-[var(--brand-finance)] underline-offset-2 hover:underline"
+            onClick={() => {
+              if (mode === "coupleEqual") {
+                onChange({
+                  mode: "coupleEqual",
+                  coupleIds: allCouplesSelected ? [] : couples.map((c) => c.id),
+                });
+              } else {
+                onChange({
+                  mode: "equal",
+                  memberIds: allMembersSelected
+                    ? []
+                    : members.map((m) => m.id),
+                });
+              }
+            }}
+          >
+            {mode === "coupleEqual"
+              ? allCouplesSelected
+                ? "Keine"
+                : "Alle"
+              : allMembersSelected
+                ? "Keine"
+                : "Alle"}
+          </button>
+        </div>
       </div>
-      <div
-        className={cn(
-          "grid gap-1.5 rounded-lg border border-border/60 bg-background/50 p-2",
-          members.length > 2 ? "sm:grid-cols-2" : "grid-cols-1"
-        )}
-      >
-        {members.map((m) => {
-          const checked = selected.has(m.id);
-          return (
-            <label
-              key={m.id}
-              className={cn(
-                "flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/50",
-                checked && "bg-[var(--brand-finance-soft)]/50"
-              )}
-            >
-              <input
-                type="checkbox"
-                checked={checked}
-                onChange={() => toggle(m.id)}
-                className="size-4 accent-[var(--brand-finance)]"
-              />
-              <span className="min-w-0 truncate font-medium">
-                {m.display_name}
-              </span>
-            </label>
-          );
-        })}
-      </div>
-      {selectedIds.length === 0 ? (
-        <p className="text-[11px] text-rose-600">
-          Mindestens eine Person wählen.
-        </p>
+
+      {mode === "coupleEqual" ? (
+        <>
+          <div
+            className={cn(
+              "grid gap-1.5 rounded-lg border border-border/60 bg-background/50 p-2",
+              couples.length > 2 ? "sm:grid-cols-2" : "grid-cols-1"
+            )}
+          >
+            {couples.map((c) => {
+              const checked = selectedCoupleIds.has(c.id);
+              const names = c.memberIds
+                .map(
+                  (id) =>
+                    members.find((m) => m.id === id)?.display_name ?? `#${id}`
+                )
+                .join(", ");
+              return (
+                <label
+                  key={c.id}
+                  className={cn(
+                    "flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/50",
+                    checked && "bg-[var(--brand-finance-soft)]/50"
+                  )}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggleCouple(c.id)}
+                    className="size-4 accent-[var(--brand-finance)]"
+                  />
+                  <span className="min-w-0 truncate">
+                    <span className="font-medium">{c.name}</span>
+                    {names ? (
+                      <span className="ml-1 text-[11px] text-muted-foreground">
+                        ({names})
+                      </span>
+                    ) : null}
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+          {value.mode === "coupleEqual" && value.coupleIds.length === 0 ? (
+            <p className="text-[11px] text-rose-600">
+              Mindestens ein Paar wählen.
+            </p>
+          ) : (
+            <p className="text-[11px] text-muted-foreground">
+              Betrag zuerst gleich auf Paare, dann innerhalb jedes Paars.
+            </p>
+          )}
+        </>
       ) : (
-        <p className="text-[11px] text-muted-foreground">
-          Betrag wird durch {selectedIds.length} geteilt
-          {selectedIds.length === members.length ? " (ganze Gruppe)" : ""}.
-        </p>
+        <>
+          <div
+            className={cn(
+              "grid gap-1.5 rounded-lg border border-border/60 bg-background/50 p-2",
+              members.length > 2 ? "sm:grid-cols-2" : "grid-cols-1"
+            )}
+          >
+            {members.map((m) => {
+              const checked = selectedMemberIds.has(m.id);
+              return (
+                <label
+                  key={m.id}
+                  className={cn(
+                    "flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/50",
+                    checked && "bg-[var(--brand-finance-soft)]/50"
+                  )}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggleMember(m.id)}
+                    className="size-4 accent-[var(--brand-finance)]"
+                  />
+                  <span className="min-w-0 truncate font-medium">
+                    {m.display_name}
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+          {value.mode === "equal" && value.memberIds.length === 0 ? (
+            <p className="text-[11px] text-rose-600">
+              Mindestens eine Person wählen.
+            </p>
+          ) : value.mode === "equal" ? (
+            <p className="text-[11px] text-muted-foreground">
+              Betrag wird durch {value.memberIds.length} geteilt
+              {value.memberIds.length === members.length
+                ? " (ganze Gruppe)"
+                : ""}
+              .
+            </p>
+          ) : null}
+        </>
       )}
     </div>
   );

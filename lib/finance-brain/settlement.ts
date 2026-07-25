@@ -225,6 +225,31 @@ export function computeEqualSplits(
   return out;
 }
 
+/**
+ * Split amount equally across couples, then equally within each couple's members.
+ * Still returns per-member share amounts.
+ */
+export function computeCoupleEqualSplits(
+  amountBase: number,
+  couples: Array<{ coupleId: number; memberIds: number[] }>
+): Map<number, number> {
+  const out = new Map<number, number>();
+  const valid = couples.filter((c) => c.memberIds.length > 0);
+  if (valid.length === 0) return out;
+  const coupleShares = computeEqualSplits(
+    amountBase,
+    valid.map((c) => c.coupleId)
+  );
+  for (const c of valid) {
+    const coupleAmount = coupleShares.get(c.coupleId) ?? 0;
+    const personShares = computeEqualSplits(coupleAmount, c.memberIds);
+    for (const [memberId, share] of personShares) {
+      out.set(memberId, roundMoney((out.get(memberId) || 0) + share));
+    }
+  }
+  return out;
+}
+
 export function computeShareSplits(
   amountBase: number,
   shares: Array<{ memberId: number; units: number }>

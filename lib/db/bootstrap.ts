@@ -346,6 +346,7 @@ function ensureFinanceBrainTables(db: Database.Database): void {
       display_name TEXT NOT NULL,
       email TEXT,
       user_id INTEGER,
+      couple_id INTEGER,
       invite_token TEXT NOT NULL UNIQUE,
       invite_revoked_at TEXT,
       created_at TEXT NOT NULL,
@@ -356,6 +357,18 @@ function ensureFinanceBrainTables(db: Database.Database): void {
       ON finance_ledger_members(ledger_id);
     CREATE INDEX IF NOT EXISTS idx_finance_ledger_members_token
       ON finance_ledger_members(invite_token);
+    CREATE INDEX IF NOT EXISTS idx_finance_ledger_members_couple
+      ON finance_ledger_members(couple_id);
+
+    CREATE TABLE IF NOT EXISTS finance_ledger_couple_groups (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      ledger_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY(ledger_id) REFERENCES finance_ledgers(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_finance_ledger_couples_ledger
+      ON finance_ledger_couple_groups(ledger_id);
 
     CREATE TABLE IF NOT EXISTS finance_expenses (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -495,10 +508,28 @@ function ensureFinanceBrainTables(db: Database.Database): void {
   if (!memberColNames.has("user_id")) {
     db.exec(`ALTER TABLE finance_ledger_members ADD COLUMN user_id INTEGER`);
   }
+  if (!memberColNames.has("couple_id")) {
+    db.exec(`ALTER TABLE finance_ledger_members ADD COLUMN couple_id INTEGER`);
+  }
   db.exec(
     `CREATE INDEX IF NOT EXISTS idx_finance_ledger_members_user
        ON finance_ledger_members(user_id)`
   );
+  db.exec(
+    `CREATE INDEX IF NOT EXISTS idx_finance_ledger_members_couple
+       ON finance_ledger_members(couple_id)`
+  );
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS finance_ledger_couple_groups (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      ledger_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY(ledger_id) REFERENCES finance_ledgers(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_finance_ledger_couples_ledger
+      ON finance_ledger_couple_groups(ledger_id);
+  `);
 }
 
 function ensureUsersTable(db: Database.Database): void {
