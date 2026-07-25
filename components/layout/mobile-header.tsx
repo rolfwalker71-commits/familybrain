@@ -29,7 +29,7 @@ function brandForPath(pathname: string): Brand {
     pathname.startsWith("/finance-brain/")
   ) {
     return {
-      name: "FinanzBrain",
+      name: "FinanzBuddy",
       href: "/finance-brain",
       icon: HandCoins,
       accentClass: "text-[var(--brand-finance)]",
@@ -39,7 +39,7 @@ function brandForPath(pathname: string): Brand {
   }
   if (pathname === "/trips" || pathname.startsWith("/trips/")) {
     return {
-      name: "TravelBrain",
+      name: "TravelBuddy",
       href: "/trips",
       icon: Luggage,
       accentClass: "text-[var(--brand-docs)]",

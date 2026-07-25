@@ -19,8 +19,8 @@ function Card({
       data-size={size}
       data-tone={tone}
       className={cn(
-        "group/card flex flex-col gap-(--card-spacing) overflow-hidden rounded-xl border border-border/70 py-(--card-spacing) text-sm text-card-foreground shadow-[0_1px_2px_rgba(20,32,28,0.04),0_8px_24px_rgba(20,32,28,0.06)] [--card-spacing:--spacing(4)] has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:--spacing(3)] data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl",
-        surface ? surface.body : "border-border/70 bg-card",
+        "group/card flex flex-col gap-(--card-spacing) overflow-hidden rounded-xl border border-border py-(--card-spacing) text-sm text-card-foreground shadow-[0_2px_4px_rgba(20,32,28,0.06),0_10px_28px_rgba(20,32,28,0.1)] [--card-spacing:--spacing(4)] has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:--spacing(3)] data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl",
+        surface ? surface.body : "border-border bg-card",
         className
       )}
       {...props}

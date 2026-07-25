@@ -37,7 +37,7 @@ export async function POST(request: Request) {
         {
           ok: false,
           error:
-            "Kein AeroDataBox-Key hinterlegt. Bitte zuerst unter TravelBrain speichern.",
+            "Kein AeroDataBox-Key hinterlegt. Bitte zuerst unter TravelBuddy speichern.",
         },
         { status: 400 }
       );

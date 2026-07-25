@@ -195,7 +195,7 @@ export function TripsListClient() {
         </div>
         <div className={cn(!compact && "sm:col-span-4")}>
           <Button
-            className="w-full sm:w-auto"
+            className="w-full bg-[var(--brand-docs)] text-white hover:bg-[var(--brand-docs)]/90 sm:w-auto"
             onClick={() => void createTrip()}
             disabled={creating || !title.trim()}
           >
@@ -210,23 +210,25 @@ export function TripsListClient() {
   return (
     <div className="relative space-y-6 pb-20 md:pb-0">
       <PageHeader
-        title="TravelBrain"
+        title="TravelBuddy"
         description="Reisen planen, Ereignisse sammeln und Timeline verwalten"
         icon={pageVisuals.trips.icon}
         tone={pageVisuals.trips.tone}
       />
 
-      <Card className="hidden border-border/80 shadow-sm md:block">
+      <Card className="hidden border-border shadow-[0_2px_4px_rgba(20,32,28,0.06),0_10px_28px_rgba(20,32,28,0.1)] md:block">
         <CardContent className="p-4">
-          <p className="mb-3 text-sm font-medium">Neue Reise</p>
+          <p className="mb-3 text-sm font-medium text-[var(--brand-docs)]">
+            Neue Reise
+          </p>
           <CreateForm />
         </CardContent>
       </Card>
 
-      <Card className="border-border/80 shadow-sm">
+      <Card className="border-border shadow-[0_2px_4px_rgba(20,32,28,0.06),0_10px_28px_rgba(20,32,28,0.1)]">
         <CardContent className="flex flex-wrap items-center gap-2 p-4">
           <p className="mr-auto text-sm text-muted-foreground">
-            TravelBrain-Backup
+            TravelBuddy-Backup
           </p>
           <a
             href="/api/trips/backup"
@@ -289,13 +291,13 @@ export function TripsListClient() {
         {loading ? (
           <p className="text-sm text-muted-foreground">Lädt Reisen…</p>
         ) : trips.length === 0 ? (
-          <Card className="border-border/80 shadow-sm">
+          <Card className="border-border shadow-[0_2px_4px_rgba(20,32,28,0.06),0_10px_28px_rgba(20,32,28,0.1)]">
             <CardContent className="space-y-3 p-4">
               <p className="text-sm text-muted-foreground">
                 Noch keine Reisen.
               </p>
               <Button
-                className="w-full md:hidden"
+                className="w-full bg-[var(--brand-docs)] text-white hover:bg-[var(--brand-docs)]/90 md:hidden"
                 onClick={() => setCreateOpen(true)}
               >
                 <Plus className="mr-2 size-4" />
@@ -308,10 +310,10 @@ export function TripsListClient() {
             {trips.map((trip) => (
               <Card
                 key={trip.id}
-                className="overflow-hidden border-border/80 shadow-sm"
+                className="overflow-hidden border-border shadow-[0_2px_4px_rgba(20,32,28,0.06),0_10px_28px_rgba(20,32,28,0.1)]"
               >
                 <div
-                  className="h-36 bg-gradient-to-br from-teal-100 to-sky-100 bg-cover bg-center"
+                  className="h-36 bg-gradient-to-br from-[var(--brand-docs-soft)] to-teal-100 bg-cover bg-center"
                   style={
                     trip.cover_url
                       ? { backgroundImage: `url(${trip.cover_url})` }

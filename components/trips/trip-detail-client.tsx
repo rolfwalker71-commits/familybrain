@@ -1358,7 +1358,7 @@ function TripDetailInner({
     return (
       <div className="space-y-4">
         <PageHeader
-          title="TravelBrain"
+          title="TravelBuddy"
           description="Reise wird geladen…"
           icon={pageVisuals.travel.icon}
           tone={pageVisuals.travel.tone}
@@ -2415,7 +2415,7 @@ function TripDetailInner({
                 <div
                   key={event.id}
                   className={cn(
-                    "relative pt-2 pl-3",
+                    "relative pt-3 pl-3",
                     editMode &&
                       dragOverEventId === event.id &&
                       "opacity-80"
@@ -2461,18 +2461,18 @@ function TripDetailInner({
                     icon={visual.icon}
                     tone={visual.tone}
                     size="md"
-                    className="absolute -left-[1.65rem] -top-[1.65rem] z-10 border-2 border-foreground/20 shadow-md"
+                    className="absolute left-3 top-3 z-10 -translate-x-1/2 -translate-y-1/2 border-2 border-foreground/20 shadow-md"
                   />
                   <Card
                     tone={visual.tone}
                     className={cn(
-                      "relative gap-0 overflow-visible py-0",
+                      "relative gap-0 overflow-visible border-border py-0 shadow-[0_2px_4px_rgba(20,32,28,0.06),0_10px_28px_rgba(20,32,28,0.1)]",
                       editMode &&
                         dragOverEventId === event.id &&
                         "ring-2 ring-teal-400/50"
                     )}
                   >
-                    <CardContent className="space-y-2 p-2.5 pl-9 sm:p-3 sm:pl-10">
+                    <CardContent className="space-y-2 p-2.5 sm:p-3">
                       <div className="flex items-start justify-between gap-2">
                         <EventDateHeader event={event} size="sm" />
                         <div className="flex shrink-0 items-center gap-1.5">
@@ -2672,12 +2672,12 @@ function TripDetailInner({
                   icon={visual.icon}
                   tone={visual.tone}
                   size="lg"
-                  className="absolute left-0 top-0 z-10 border-2 border-foreground/20 shadow-md"
+                  className="absolute left-3 top-3 z-10 -translate-x-1/2 -translate-y-1/2 border-2 border-foreground/20 shadow-md"
                 />
                 <Card
                   tone={visual.tone}
                   className={cn(
-                    "relative gap-0 overflow-visible py-0",
+                    "relative gap-0 overflow-visible border-border py-0 shadow-[0_2px_4px_rgba(20,32,28,0.06),0_10px_28px_rgba(20,32,28,0.1)]",
                     editingEventId === event.id && "ring-2 ring-foreground/15",
                     editMode &&
                       editFocusEventId === event.id &&
@@ -2720,7 +2720,7 @@ function TripDetailInner({
                       ) : null}
                     </div>
                   </div>
-                  <CardContent className="space-y-3 p-3 pl-7 sm:p-4 sm:pl-8">
+                  <CardContent className="space-y-3 p-3 sm:p-4">
                     <div className="flex items-start gap-2">
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-1.5">

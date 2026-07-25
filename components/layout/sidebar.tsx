@@ -87,13 +87,13 @@ const navItems: NavItem[] = [
   },
   {
     href: "/trips",
-    label: "TravelBrain",
+    label: "TravelBuddy",
     icon: Luggage,
     tone: "teal",
   },
   {
     href: "/finance-brain",
-    label: "FinanzBrain",
+    label: "FinanzBuddy",
     icon: HandCoins,
     tone: "green",
   },

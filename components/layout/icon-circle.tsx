@@ -33,7 +33,7 @@ export const iconToneClasses = {
   amber: "bg-amber-50 text-amber-600",
   rose: "bg-rose-50 text-rose-500",
   orange: "bg-orange-50 text-orange-600",
-  /** Sage / FinanzBrain */
+  /** Sage / FinanzBuddy */
   green: "bg-[var(--brand-finance-soft)] text-[var(--brand-finance)]",
   /** Dokumente / MyBrain default */
   teal: "bg-[var(--brand-docs-soft)] text-[var(--brand-docs)]",

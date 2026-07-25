@@ -181,7 +181,7 @@ export function renderTripExportHtml(
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>${esc(model.trip.title)} — TravelBrain</title>
+<title>${esc(model.trip.title)} — TravelBuddy</title>
 <style>
   :root { color-scheme: light; }
   * { box-sizing: border-box; }
@@ -285,7 +285,7 @@ export function renderTripExportHtml(
     }
     <header class="hero">
       ${cover ? `<img class="cover" src="${esc(cover)}" alt="" />` : ""}
-      <p class="meta">TravelBrain</p>
+      <p class="meta">TravelBuddy</p>
       <h1>${esc(model.trip.title)}</h1>
       ${
         model.trip.destination

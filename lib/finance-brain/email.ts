@@ -1,4 +1,4 @@
-/** Optional email notifications for FinanzBrain (SMTP, e.g. iCloud+). */
+/** Optional email notifications for FinanzBuddy (SMTP, e.g. iCloud+). */
 
 import nodemailer from "nodemailer";
 import {
@@ -72,7 +72,7 @@ export function buildInviteMailto(input: {
   ledgerTitle: string;
   shareUrl: string;
 }): string {
-  const subject = encodeURIComponent(`FinanzBrain: ${input.ledgerTitle}`);
+  const subject = encodeURIComponent(`FinanzBuddy: ${input.ledgerTitle}`);
   const body = encodeURIComponent(
     `Hallo ${input.memberName},\n\n` +
       `du wurdest zur Abrechnung «${input.ledgerTitle}» eingeladen.\n\n` +
@@ -90,7 +90,7 @@ export async function sendFinanceInviteEmail(input: {
 }): Promise<{ ok: boolean; error?: string }> {
   return sendMail({
     to: input.to,
-    subject: `FinanzBrain: ${input.ledgerTitle}`,
+    subject: `FinanzBuddy: ${input.ledgerTitle}`,
     text:
       `Hallo ${input.memberName},\n\n` +
       `du wurdest zur Abrechnung «${input.ledgerTitle}» eingeladen.\n\n` +
@@ -115,7 +115,7 @@ export async function sendBalanceReminderEmail(input: {
 
   return sendMail({
     to: input.to,
-    subject: `FinanzBrain Saldo: ${input.ledgerTitle}`,
+    subject: `FinanzBuddy Saldo: ${input.ledgerTitle}`,
     text:
       `Hallo ${input.memberName},\n\n` +
       `Stand deiner Abrechnung «${input.ledgerTitle}»:\n${direction}\n\n` +
@@ -132,7 +132,7 @@ export async function sendTestEmail(to: string): Promise<{ ok: boolean; error?: 
       "Wenn du diese Nachricht siehst, ist SMTP korrekt konfiguriert.\n",
     html: `<!DOCTYPE html><body style="font-family:system-ui,sans-serif;padding:24px;">
       <h2>FamilyBrain Testmail</h2>
-      <p>SMTP ist korrekt konfiguriert. FinanzBrain kann Beleg-Mails versenden.</p>
+      <p>SMTP ist korrekt konfiguriert. FinanzBuddy kann Beleg-Mails versenden.</p>
     </body>`,
   });
 }

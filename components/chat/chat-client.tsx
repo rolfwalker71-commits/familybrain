@@ -603,7 +603,7 @@ export function ChatClient() {
                     message.tripEvents.length > 0 ? (
                       <div className="mt-3 space-y-2 border-t border-border/60 pt-3">
                         <div className="text-xs font-medium text-muted-foreground">
-                          TravelBrain
+                          TravelBuddy
                         </div>
                         <div className="flex flex-col gap-2">
                           {message.tripEvents.map((draft, index) => (

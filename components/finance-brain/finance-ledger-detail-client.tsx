@@ -1383,7 +1383,7 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
 
           <SectionCard title="Reise verknüpfen" tone="green" icon={Luggage}>
             <p className="mb-3 text-sm text-muted-foreground">
-              Optional mit einer TravelBrain-Reise verbinden – dann erscheinen
+              Optional mit einer TravelBuddy-Reise verbinden – dann erscheinen
               Reise-Belege zum Import und die Abrechnung auf der
               Reise-Detailseite.
             </p>
@@ -1449,7 +1449,7 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
                     id="trip-rename"
                     value={tripRenameTitle}
                     onChange={(e) => setTripRenameTitle(e.target.value)}
-                    placeholder="Neuer Name der TravelBrain-Reise"
+                    placeholder="Neuer Name der TravelBuddy-Reise"
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
                         e.preventDefault();
@@ -1530,7 +1530,7 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
                         Link
                       </Button>
                       <a
-                        href={`mailto:?subject=${encodeURIComponent(`FinanzBrain: ${ledger.title}`)}&body=${encodeURIComponent(`Dein Link: ${typeof window !== "undefined" ? window.location.origin : ""}${m.share_url}`)}`}
+                        href={`mailto:?subject=${encodeURIComponent(`FinanzBuddy: ${ledger.title}`)}&body=${encodeURIComponent(`Dein Link: ${typeof window !== "undefined" ? window.location.origin : ""}${m.share_url}`)}`}
                         className={cn(
                           buttonVariants({ variant: "ghost", size: "sm" })
                         )}

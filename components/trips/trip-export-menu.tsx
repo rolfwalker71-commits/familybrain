@@ -159,7 +159,7 @@ export function TripExportMenu({
       range ? `Zeitraum: ${range}` : null,
       shareLine,
       "",
-      "Bitte PDF oder HTML als Anhang manuell beifügen (Download in TravelBrain).",
+      "Bitte PDF oder HTML als Anhang manuell beifügen (Download in TravelBuddy).",
     ]
       .filter(Boolean)
       .join("\n");

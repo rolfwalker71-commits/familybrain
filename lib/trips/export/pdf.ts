@@ -245,7 +245,7 @@ export async function buildTripPdfBuffer(
   if (model.coverPath) {
     await drawEmbeddedImage(ctx, model.coverPath, 200);
   }
-  drawLine(ctx, "TravelBrain", {
+  drawLine(ctx, "TravelBuddy", {
     size: 10,
     color: rgb(0.35, 0.35, 0.4),
   });

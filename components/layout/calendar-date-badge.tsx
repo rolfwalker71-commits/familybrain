@@ -41,30 +41,30 @@ export function toIsoDateOnly(raw: string | null | undefined): string | null {
 }
 
 const SIZE_STYLES = {
-  /** Compact — mobile travel/finance cards */
+  /** Compact — mobile travel/finance cards (wider, shorter) */
   sm: {
-    root: "w-12 rounded-lg",
-    month: "px-1 py-1 text-[9px]",
-    body: "px-1 py-1.5",
-    day: "text-[17px]",
-    weekday: "mt-0.5 text-[10px]",
-    time: "mt-0.5 text-[8px]",
+    root: "w-[3.35rem] rounded-md",
+    month: "px-1 py-0.5 text-[10px] font-extrabold",
+    body: "px-1 py-1",
+    day: "text-[18px] font-extrabold",
+    weekday: "mt-px text-[10px]",
+    time: "mt-px text-[8px]",
   },
   /** Default desktop / roomier cards */
   md: {
-    root: "w-14 rounded-lg sm:w-16",
-    month: "px-1 py-1.5 text-[10px] sm:text-[11px]",
-    body: "px-1 py-2",
-    day: "text-[22px] sm:text-[24px]",
+    root: "w-16 rounded-lg sm:w-[4.25rem]",
+    month: "px-1 py-1 text-[11px] font-extrabold sm:text-[12px]",
+    body: "px-1 py-1.5",
+    day: "text-[23px] font-extrabold sm:text-[25px]",
     weekday: "mt-0.5 text-[11px] sm:text-[12px]",
-    time: "mt-1 text-[10px]",
+    time: "mt-0.5 text-[10px]",
   },
 } as const;
 
 export type CalendarDateBadgeSize = keyof typeof SIZE_STYLES;
 
 /**
- * Soft-UI calendar date badge (TravelBrain / FinanzBrain).
+ * Soft-UI calendar date badge (TravelBuddy / FinanzBuddy).
  * Month strip on top, large day, short weekday.
  */
 export function CalendarDateBadge({
@@ -77,7 +77,7 @@ export function CalendarDateBadge({
   isoDate: string;
   time?: string | null;
   size?: CalendarDateBadgeSize;
-  /** teal = MyBrain/TravelBrain; green = FinanzBrain */
+  /** teal = MyBrain/TravelBuddy; green = FinanzBuddy */
   accent?: "teal" | "green";
   className?: string;
 }) {
@@ -89,15 +89,15 @@ export function CalendarDateBadge({
   return (
     <div
       className={cn(
-        "flex shrink-0 flex-col overflow-hidden border border-border/70 bg-card",
-        "shadow-[0_1px_2px_rgba(20,32,28,0.06)]",
+        "flex shrink-0 flex-col overflow-hidden border border-border bg-card",
+        "shadow-[0_1px_2px_rgba(20,32,28,0.08),0_4px_10px_rgba(20,32,28,0.06)]",
         s.root,
         className
       )}
     >
       <div
         className={cn(
-          "shrink-0 text-center font-bold uppercase leading-none tracking-wide",
+          "shrink-0 text-center uppercase leading-none tracking-wide",
           monthTone,
           s.month
         )}
@@ -112,7 +112,7 @@ export function CalendarDateBadge({
       >
         <div
           className={cn(
-            "font-bold leading-none tabular-nums text-foreground",
+            "leading-none tabular-nums text-foreground",
             s.day
           )}
         >

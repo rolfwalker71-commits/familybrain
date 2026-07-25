@@ -118,8 +118,8 @@ export function AddToTripButton({ draft, drafts, onDone, onError }: Props) {
       setNewTitle("");
       onDone?.(
         batch.length > 1
-          ? `${batch.length} Ereignisse zu TravelBrain hinzugefügt.`
-          : "Zu TravelBrain hinzugefügt."
+          ? `${batch.length} Ereignisse zu TravelBuddy hinzugefügt.`
+          : "Zu TravelBuddy hinzugefügt."
       );
     } catch (err) {
       onError?.(err instanceof Error ? err.message : String(err));
@@ -141,7 +141,7 @@ export function AddToTripButton({ draft, drafts, onDone, onError }: Props) {
         size="sm"
         className="h-8 gap-1.5 text-xs"
         onClick={() => setOpen(true)}
-        title="Zu TravelBrain hinzufügen"
+        title="Zu TravelBuddy hinzufügen"
         disabled={batch.length === 0}
       >
         <Luggage className="size-3.5" />

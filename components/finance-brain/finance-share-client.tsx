@@ -545,7 +545,7 @@ function FinanceShareInner({ token }: { token: string }) {
       <div className="space-y-3 text-center">
         <div className="flex justify-center">
           <span className="inline-flex rounded-full bg-[var(--brand-finance-soft)] px-3 py-1 text-xs font-semibold text-[var(--brand-finance)]">
-            FinanzBrain
+            FinanzBuddy
           </span>
         </div>
         <h1 className="text-xl font-semibold tracking-tight">{ledger.title}</h1>

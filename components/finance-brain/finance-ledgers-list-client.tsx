@@ -211,7 +211,7 @@ export function FinanceLedgersListClient() {
   return (
     <div className="relative space-y-6 pb-28 md:pb-0">
       <PageHeader
-        title="FinanzBrain"
+        title="FinanzBuddy"
         description="Abrechnungen einfach im Griff."
         icon={pageVisuals.financeBrain.icon}
         tone={pageVisuals.financeBrain.tone}
@@ -258,7 +258,7 @@ export function FinanceLedgersListClient() {
               return (
                 <div
                   key={ledger.id}
-                  className="relative rounded-xl border border-border/60 bg-card p-4 shadow-[0_4px_16px_rgba(20,32,28,0.05)]"
+                  className="relative rounded-xl border border-border bg-card p-4 shadow-[0_2px_4px_rgba(20,32,28,0.06),0_10px_28px_rgba(20,32,28,0.1)]"
                 >
                   <Button
                     variant="ghost"

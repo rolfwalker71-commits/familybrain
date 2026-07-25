@@ -154,7 +154,7 @@ export function buildExpenseMailHtml(
   const title = input.description?.trim() || "Ausgabe";
   const { money, fxText } = moneyLines(input);
   const category = input.categoryLabel || "Ausgabe";
-  const subject = `FinanzBrain: ${title} · ${money}`;
+  const subject = `FinanzBuddy: ${title} · ${money}`;
   const card = expenseCardHtml({
     ...input,
     expenseId: input.expenseId ?? 0,
@@ -165,7 +165,7 @@ export function buildExpenseMailHtml(
 <html><body style="margin:0;padding:24px;background:#f8fafc;font-family:system-ui,-apple-system,sans-serif;color:#0f172a;">
   <div style="max-width:640px;margin:0 auto;">
     <div style="padding:14px 18px;background:#ffedd5;border:1px solid #fdba74;border-radius:12px 12px 0 0;">
-      <div style="font-size:12px;font-weight:700;color:#9a3412;letter-spacing:.04em;text-transform:uppercase;">FinanzBrain · Neue Ausgabe</div>
+      <div style="font-size:12px;font-weight:700;color:#9a3412;letter-spacing:.04em;text-transform:uppercase;">FinanzBuddy · Neue Ausgabe</div>
       <div style="font-size:14px;color:#7c2d12;margin-top:2px;">${escapeHtml(input.ledgerTitle)}</div>
     </div>
     <div style="border:1px solid #e2e8f0;border-top:0;border-radius:0 0 12px 12px;overflow:hidden;background:#fff;">
@@ -178,7 +178,7 @@ export function buildExpenseMailHtml(
 </body></html>`;
 
   const text = [
-    `FinanzBrain: Neue Ausgabe in «${input.ledgerTitle}»`,
+    `FinanzBuddy: Neue Ausgabe in «${input.ledgerTitle}»`,
     title,
     `${category} · Bezahlt von ${input.paidByName} · ${money}`,
     fxText || null,
@@ -203,7 +203,7 @@ export function buildLedgerExpensesMailHtml(input: {
   const count = input.expenses.length;
   const totalBase = input.expenses.reduce((s, e) => s + e.amountBase, 0);
   const totalLabel = formatMoney(totalBase, input.baseCurrency);
-  const subject = `FinanzBrain: ${input.ledgerTitle} · ${count} Ausgaben · ${totalLabel}`;
+  const subject = `FinanzBuddy: ${input.ledgerTitle} · ${count} Ausgaben · ${totalLabel}`;
 
   const cards = input.expenses
     .map((e) =>
@@ -218,7 +218,7 @@ export function buildLedgerExpensesMailHtml(input: {
 <html><body style="margin:0;padding:24px;background:#f8fafc;font-family:system-ui,-apple-system,sans-serif;color:#0f172a;">
   <div style="max-width:600px;margin:0 auto;">
     <div style="padding:16px 18px;background:#ffedd5;border:1px solid #fdba74;border-radius:12px;margin-bottom:16px;">
-      <div style="font-size:12px;font-weight:700;color:#9a3412;letter-spacing:.04em;text-transform:uppercase;">FinanzBrain · Alle Ausgaben</div>
+      <div style="font-size:12px;font-weight:700;color:#9a3412;letter-spacing:.04em;text-transform:uppercase;">FinanzBuddy · Alle Ausgaben</div>
       <div style="font-size:20px;font-weight:800;color:#7c2d12;margin-top:4px;">${escapeHtml(input.ledgerTitle)}</div>
       <div style="font-size:13px;color:#9a3412;margin-top:6px;">${count} Ausgaben · Summe ${escapeHtml(totalLabel)}</div>
     </div>
@@ -233,7 +233,7 @@ export function buildLedgerExpensesMailHtml(input: {
 </body></html>`;
 
   const textLines = [
-    `FinanzBrain: Alle Ausgaben «${input.ledgerTitle}»`,
+    `FinanzBuddy: Alle Ausgaben «${input.ledgerTitle}»`,
     `${count} Ausgaben · Summe ${totalLabel}`,
     "",
     ...input.expenses.flatMap((e) => {
@@ -267,14 +267,14 @@ export function buildSettlementMailHtml(input: {
   settledAt: string | null;
 }): { subject: string; html: string; text: string } {
   const { money, fxHtml, fxText } = moneyLines(input);
-  const subject = `FinanzBrain: Rückzahlung ${input.fromName} → ${input.toName} · ${money}`;
+  const subject = `FinanzBuddy: Rückzahlung ${input.fromName} → ${input.toName} · ${money}`;
   const settledLabel = formatDateDe(input.settledAt);
 
   const html = `<!DOCTYPE html>
 <html><body style="margin:0;padding:24px;background:#f8fafc;font-family:system-ui,-apple-system,sans-serif;color:#0f172a;">
   <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;">
     <div style="padding:14px 18px;background:#ccfbf1;border-bottom:1px solid #5eead4;">
-      <div style="font-size:12px;font-weight:700;color:#115e59;letter-spacing:.04em;text-transform:uppercase;">FinanzBrain · Rückzahlung</div>
+      <div style="font-size:12px;font-weight:700;color:#115e59;letter-spacing:.04em;text-transform:uppercase;">FinanzBuddy · Rückzahlung</div>
       <div style="font-size:14px;color:#134e4a;margin-top:2px;">${escapeHtml(input.ledgerTitle)}</div>
     </div>
     <div style="padding:18px;display:flex;gap:16px;align-items:flex-start;">
@@ -299,7 +299,7 @@ export function buildSettlementMailHtml(input: {
 </body></html>`;
 
   const text = [
-    `FinanzBrain: Rückzahlung in «${input.ledgerTitle}»`,
+    `FinanzBuddy: Rückzahlung in «${input.ledgerTitle}»`,
     `${input.fromName} → ${input.toName}: ${money}`,
     fxText || null,
     input.note ? `Notiz: ${input.note}` : null,

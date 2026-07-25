@@ -49,7 +49,13 @@ export function PageHeader({
           <IconCircle icon={icon} tone={tone} size="lg" className="rounded-xl" />
         ) : null}
         <div className="min-w-0">
-          <h1 className="break-words text-2xl font-semibold tracking-tight sm:text-3xl">
+          <h1
+            className={cn(
+              "break-words text-2xl font-semibold tracking-tight sm:text-3xl",
+              tone === "green" && "text-[var(--brand-finance)]",
+              tone === "teal" && "text-[var(--brand-docs)]"
+            )}
+          >
             {title}
           </h1>
           {description ? (

@@ -406,7 +406,7 @@ function SettingsPageInner() {
     }
   }
 
-  async function saveTravelBrainSettings() {
+  async function saveTravelBuddySettings() {
     setSaving("travelbrain");
     setError(null);
     setMessage(null);
@@ -453,7 +453,7 @@ function SettingsPageInner() {
           )
         );
       }
-      setMessage("TravelBrain-Einstellungen gespeichert.");
+      setMessage("TravelBuddy-Einstellungen gespeichert.");
       window.dispatchEvent(new Event("trip-map-style-changed"));
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -485,7 +485,7 @@ function SettingsPageInner() {
     }
   }
 
-  async function saveFinanzBrainSettings() {
+  async function saveFinanzBuddySettings() {
     setSaving("finanzbrain");
     setError(null);
     setMessage(null);
@@ -513,7 +513,7 @@ function SettingsPageInner() {
           )
         );
       }
-      setMessage("FinanzBrain-Einstellungen gespeichert.");
+      setMessage("FinanzBuddy-Einstellungen gespeichert.");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -538,7 +538,7 @@ function SettingsPageInner() {
         data.financeExpenseAiImagePromptDefault || ""
       );
       setFinanceExpenseAiImagePromptCustomized(false);
-      setMessage("FinanzBrain KI-Bild-Prompt auf Standard zurückgesetzt.");
+      setMessage("FinanzBuddy KI-Bild-Prompt auf Standard zurückgesetzt.");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -976,7 +976,7 @@ function SettingsPageInner() {
         <CardHeader className="flex flex-row items-center justify-between gap-3">
           <CardTitle className="flex items-center gap-3">
             <IconCircle icon={Luggage} tone="teal" size="sm" />
-            TravelBrain
+            TravelBuddy
           </CardTitle>
           {hasAerodataboxKey ? (
             <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">
@@ -1116,11 +1116,11 @@ function SettingsPageInner() {
           </div>
           <div className="flex flex-col gap-2">
             <Button
-              onClick={() => void saveTravelBrainSettings()}
+              onClick={() => void saveTravelBuddySettings()}
               disabled={saving !== null}
               className={settingsPrimaryBtn}
             >
-              {saving === "travelbrain" ? "Speichert…" : "TravelBrain speichern"}
+              {saving === "travelbrain" ? "Speichert…" : "TravelBuddy speichern"}
             </Button>
             {hasAerodataboxKey ? (
               <Button
@@ -1202,7 +1202,7 @@ function SettingsPageInner() {
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            Für FinanzBrain-Belegmails (Ausgabe / Rückzahlung) inkl. PDF-Anhang.
+            Für FinanzBuddy-Belegmails (Ausgabe / Rückzahlung) inkl. PDF-Anhang.
             Empfohlen: iCloud+ mit App-spezifischem Passwort. Werte können auch
             per Env gesetzt sein (
             <code className="text-[11px]">SMTP_HOST</code>,{" "}
@@ -1353,7 +1353,7 @@ function SettingsPageInner() {
         <CardHeader className="flex flex-row items-center justify-between gap-3">
           <CardTitle className="flex items-center gap-3">
             <IconCircle icon={HandCoins} tone="teal" size="sm" />
-            FinanzBrain
+            FinanzBuddy
           </CardTitle>
           {financeExpenseAiImagePromptCustomized ? (
             <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">
@@ -1367,7 +1367,7 @@ function SettingsPageInner() {
           <p className="text-sm text-muted-foreground">
             Ausgaben werden per KI kategorisiert (Icon oben links). Zusätzlich
             kann ein kleines Illustrationsbild erzeugt werden – analog
-            TravelBrain, mit eigenem Prompt.
+            TravelBuddy, mit eigenem Prompt.
           </p>
           <div className="space-y-2">
             <Label htmlFor="financeExpenseAiImagePrompt">
@@ -1400,13 +1400,13 @@ function SettingsPageInner() {
             </Button>
           </div>
           <Button
-            onClick={() => void saveFinanzBrainSettings()}
+            onClick={() => void saveFinanzBuddySettings()}
             disabled={saving !== null}
             className={settingsPrimaryBtn}
           >
             {saving === "finanzbrain"
               ? "Speichert…"
-              : "FinanzBrain speichern"}
+              : "FinanzBuddy speichern"}
           </Button>
         </CardContent>
       </Card>

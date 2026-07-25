@@ -343,11 +343,11 @@ function ExpenseCard({
         icon={visual.icon}
         tone={visual.tone}
         size="md"
-        className="absolute -left-[1.65rem] -top-[1.65rem] z-10 border-2 border-foreground/20 shadow-md"
+        className="absolute left-0 top-0 z-10 -translate-x-1/2 -translate-y-1/2 border-2 border-foreground/20 shadow-md"
       />
       <div
         className={cn(
-          "overflow-hidden rounded-xl border border-border/60 bg-card text-sm shadow-[0_4px_16px_rgba(20,32,28,0.05)]",
+          "overflow-hidden rounded-xl border border-border bg-card text-sm shadow-[0_2px_4px_rgba(20,32,28,0.06),0_10px_28px_rgba(20,32,28,0.1)]",
           onMobileFocus && !editing && "cursor-pointer md:cursor-default"
         )}
         onClick={
