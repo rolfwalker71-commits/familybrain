@@ -25,8 +25,14 @@ import {
   listTripShareLinks,
 } from "@/lib/trips/share";
 import { TRIP_STATUSES, type TripStatus } from "@/lib/trips/constants";
+import {
+  getAppUserByUsername,
+  grantTripAccess,
+} from "@/lib/users/queries";
 
-export const TRAVELBRAIN_BACKUP_VERSION = 1;
+/** Current export version. Import accepts 1 and 2. */
+export const TRAVELBRAIN_BACKUP_VERSION = 2;
+export const TRAVELBRAIN_BACKUP_MIN_VERSION = 1;
 
 type MediaBlob = {
   kind: "cover" | "aircraft" | "map" | "ai";
@@ -82,6 +88,8 @@ type BackupEvent = {
   document_notes_md: string | null;
   show_document_notes: number;
   document_notes_enriched_at: string | null;
+  /** v2 */
+  ai_image_prompt?: string | null;
   media: MediaBlob[];
   documents: BackupEventDoc[];
 };
@@ -94,9 +102,13 @@ type BackupTrip = {
   destination: string | null;
   summary: string | null;
   notes: string | null;
+  /** v2 */
+  cover_prompt?: string | null;
   cover: MediaBlob | null;
   events: BackupEvent[];
   share_labels: string[];
+  /** v2 – usernames with ACL (no passwords) */
+  access_usernames?: string[];
 };
 
 export type TravelBrainBackup = {
@@ -127,6 +139,21 @@ function eventDocuments(eventId: number): BackupEventDoc[] {
     )
     .all(eventId) as Array<{ paperless_id: number }>;
   return rows.map((r) => ({ paperless_id: r.paperless_id }));
+}
+
+function accessUsernamesForTrip(tripId: number): string[] {
+  const db = getDb();
+  return (
+    db
+      .prepare(
+        `SELECT u.username
+         FROM user_trip_access a
+         JOIN users u ON u.id = a.user_id
+         WHERE a.trip_id = ?
+         ORDER BY u.username COLLATE NOCASE`
+      )
+      .all(tripId) as Array<{ username: string }>
+  ).map((r) => r.username);
 }
 
 function serializeEvent(event: TripEventRow): BackupEvent {
@@ -181,6 +208,7 @@ function serializeEvent(event: TripEventRow): BackupEvent {
     document_notes_md: event.document_notes_md ?? null,
     show_document_notes: event.show_document_notes ?? 1,
     document_notes_enriched_at: event.document_notes_enriched_at ?? null,
+    ai_image_prompt: event.ai_image_prompt ?? null,
     media,
     documents: eventDocuments(event.id),
   };
@@ -197,9 +225,11 @@ function serializeTrip(trip: TripRow): BackupTrip {
     destination: trip.destination,
     summary: trip.summary,
     notes: trip.notes,
+    cover_prompt: trip.cover_prompt ?? null,
     cover: fileToMedia("cover", trip.cover_path),
     events,
     share_labels: shares.map((s) => s.label || "Share"),
+    access_usernames: accessUsernamesForTrip(trip.id),
   };
 }
 
@@ -243,11 +273,17 @@ export function importTravelBrainBackup(payload: TravelBrainBackup): {
   eventsCreated: number;
   linksRestored: number;
   linksSkipped: number;
+  accessRestored: number;
   warnings: string[];
 } {
-  if (!payload || payload.version !== TRAVELBRAIN_BACKUP_VERSION) {
+  if (
+    !payload ||
+    typeof payload.version !== "number" ||
+    payload.version < TRAVELBRAIN_BACKUP_MIN_VERSION ||
+    payload.version > TRAVELBRAIN_BACKUP_VERSION
+  ) {
     throw new Error(
-      `Ungültige Backup-Version (erwartet ${TRAVELBRAIN_BACKUP_VERSION}).`
+      `Ungültige Backup-Version (unterstützt ${TRAVELBRAIN_BACKUP_MIN_VERSION}–${TRAVELBRAIN_BACKUP_VERSION}).`
     );
   }
   if (!Array.isArray(payload.trips)) {
@@ -258,6 +294,7 @@ export function importTravelBrainBackup(payload: TravelBrainBackup): {
   let eventsCreated = 0;
   let linksRestored = 0;
   let linksSkipped = 0;
+  let accessRestored = 0;
   const warnings: string[] = [];
 
   for (const trip of payload.trips) {
@@ -280,13 +317,22 @@ export function importTravelBrainBackup(payload: TravelBrainBackup): {
     if (trip.cover) {
       try {
         const coverPath = writeMediaBlob("cover", trip.cover);
-        updateTrip(created.id, { coverPath });
+        updateTrip(created.id, {
+          coverPath,
+          coverPrompt: trip.cover_prompt ?? null,
+        });
       } catch (err) {
         warnings.push(
           `Cover für «${trip.title}»: ${
             err instanceof Error ? err.message : String(err)
           }`
         );
+      }
+    } else if (trip.cover_prompt) {
+      try {
+        updateTrip(created.id, { coverPrompt: trip.cover_prompt });
+      } catch {
+        /* ignore */
       }
     }
 
@@ -356,6 +402,7 @@ export function importTravelBrainBackup(payload: TravelBrainBackup): {
         showDocumentNotes: ev.show_document_notes !== 0,
         documentNotesEnrichedAt: ev.document_notes_enriched_at,
         aiImagePath,
+        aiImagePrompt: ev.ai_image_prompt ?? null,
       });
       eventsCreated += 1;
 
@@ -390,7 +437,26 @@ export function importTravelBrainBackup(payload: TravelBrainBackup): {
       }
     }
 
-    // Ensure trip still exists
+    for (const username of trip.access_usernames || []) {
+      const user = getAppUserByUsername(username);
+      if (!user) {
+        warnings.push(
+          `Kein App-User «${username}» für Reise-Zugriff («${trip.title}»).`
+        );
+        continue;
+      }
+      try {
+        grantTripAccess(user.id, created.id);
+        accessRestored += 1;
+      } catch (err) {
+        warnings.push(
+          `Zugriff «${username}» / «${trip.title}»: ${
+            err instanceof Error ? err.message : String(err)
+          }`
+        );
+      }
+    }
+
     if (!getTripById(created.id)) {
       warnings.push(`Reise «${trip.title}» nach Import nicht lesbar.`);
     }
@@ -401,6 +467,7 @@ export function importTravelBrainBackup(payload: TravelBrainBackup): {
     eventsCreated,
     linksRestored,
     linksSkipped,
+    accessRestored,
     warnings,
   };
 }

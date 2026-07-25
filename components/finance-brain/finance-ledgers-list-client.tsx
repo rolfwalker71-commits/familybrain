@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Plus, Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Download, Plus, Trash2, Upload } from "lucide-react";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -65,6 +65,8 @@ export function FinanceLedgersListClient() {
   const [memberUserIds, setMemberUserIds] = useState<number[]>([]);
   const [creating, setCreating] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [statusMsg, setStatusMsg] = useState<string | null>(null);
+  const importRef = useRef<HTMLInputElement>(null);
 
   async function load() {
     setLoading(true);
@@ -156,7 +158,39 @@ export function FinanceLedgersListClient() {
     }
   }
 
-  function CreateForm({ compact }: { compact?: boolean }) {
+  async function importBackup(file: File) {
+    setStatusMsg(null);
+    setError(null);
+    try {
+      const text = await file.text();
+      const payload = JSON.parse(text) as unknown;
+      const res = await fetch("/api/finance-ledgers/backup/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Import fehlgeschlagen");
+      const warnCount = Array.isArray(data.warnings) ? data.warnings.length : 0;
+      setStatusMsg(
+        `Import: ${data.ledgersCreated ?? 0} Abrechnungen, ${data.expensesCreated ?? 0} Buchungen` +
+          (warnCount ? `, ${warnCount} Hinweise` : "") +
+          "."
+      );
+      if (Array.isArray(data.warnings) && data.warnings.length) {
+        console.warn("[finanzbuddy backup import]", data.warnings);
+      }
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      if (importRef.current) importRef.current.value = "";
+    }
+  }
+
+  // Render helper (not a nested component) — nested components remount on every
+  // keystroke and steal focus from the Name input.
+  function renderCreateForm(compact?: boolean) {
     return (
       <div className={cn("grid gap-3", !compact && "sm:grid-cols-2")}>
         <div className={cn("space-y-1.5", !compact && "sm:col-span-2")}>
@@ -296,12 +330,55 @@ export function FinanceLedgersListClient() {
             <p className="mb-3 text-sm font-medium text-[var(--brand-finance)]">
               Neue Abrechnung
             </p>
-            <CreateForm />
+            {renderCreateForm()}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {isAdmin ? (
+        <Card className="border-border shadow-[0_2px_4px_rgba(20,32,28,0.06),0_10px_28px_rgba(20,32,28,0.1)]">
+          <CardContent className="flex flex-wrap items-center gap-2 p-4">
+            <p className="mr-auto text-sm text-muted-foreground">
+              FinanzBuddy-Backup
+            </p>
+            <a
+              href="/api/finance-ledgers/backup"
+              className={cn(
+                buttonVariants({ variant: "outline", size: "sm" }),
+                "gap-1.5"
+              )}
+            >
+              <Download className="size-3.5" />
+              Export
+            </a>
+            <input
+              ref={importRef}
+              type="file"
+              accept="application/json,.json"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void importBackup(file);
+              }}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => importRef.current?.click()}
+            >
+              <Upload className="size-3.5" />
+              Import
+            </Button>
           </CardContent>
         </Card>
       ) : null}
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      {statusMsg ? (
+        <p className="text-sm text-muted-foreground">{statusMsg}</p>
+      ) : null}
 
       <div className="space-y-3">
         <h2 className="text-sm font-semibold tracking-tight text-foreground">
@@ -424,7 +501,7 @@ export function FinanceLedgersListClient() {
                 </SheetDescription>
               </SheetHeader>
               <div className="mt-4 pb-6">
-                <CreateForm compact />
+                {renderCreateForm(true)}
               </div>
             </SheetContent>
           </Sheet>

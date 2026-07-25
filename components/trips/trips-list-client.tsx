@@ -150,7 +150,9 @@ export function TripsListClient() {
     }
   }
 
-  function CreateForm({ compact }: { compact?: boolean }) {
+  // Render helper (not a nested component) — nested components remount on every
+  // keystroke and steal focus from text inputs.
+  function renderCreateForm(compact?: boolean) {
     return (
       <div className={cn("grid gap-3", !compact && "sm:grid-cols-4")}>
         <div className={cn("space-y-1.5", !compact && "sm:col-span-2")}>
@@ -225,7 +227,7 @@ export function TripsListClient() {
             <p className="mb-3 text-sm font-medium text-[var(--brand-finance)]">
               Neue Reise
             </p>
-            <CreateForm />
+            {renderCreateForm()}
           </CardContent>
         </Card>
       ) : null}
@@ -408,7 +410,7 @@ export function TripsListClient() {
                 </SheetDescription>
               </SheetHeader>
               <div className="px-4 pb-6">
-                <CreateForm compact />
+                {renderCreateForm(true)}
               </div>
             </SheetContent>
           </Sheet>
