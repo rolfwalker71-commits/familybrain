@@ -172,7 +172,7 @@ async function upsertRemoteDocument(
     typeCache: NameCache;
     correspondentCache: NameCache;
   }
-): Promise<{ isNew: boolean; changed: boolean }> {
+): Promise<{ isNew: boolean; changed: boolean; localId: number }> {
   const resolved = await resolveNames(
     client,
     doc,
@@ -181,7 +181,7 @@ async function upsertRemoteDocument(
     caches.correspondentCache
   );
   const content = doc.content ?? "";
-  return upsertDocument({
+  const upserted = upsertDocument({
     paperless_id: doc.id,
     title: doc.title ?? null,
     content,
@@ -199,6 +199,33 @@ async function upsertRemoteDocument(
     raw_metadata: JSON.stringify(doc),
     tags: resolved.tags,
   });
+  return { ...upserted, localId: upserted.id };
+}
+
+/** Fetch a remote Paperless document and upsert into the local index. */
+export async function ingestPaperlessDocumentById(
+  paperlessId: number
+): Promise<{ localId: number; paperlessId: number }> {
+  const client = createClient();
+  const doc = await client.getDocument(paperlessId);
+  const upserted = await upsertRemoteDocument(client, doc, {
+    tagCache: new Map(),
+    typeCache: new Map(),
+    correspondentCache: new Map(),
+  });
+  return { localId: upserted.localId, paperlessId };
+}
+
+/** Upload a PDF to Paperless, wait for consumption, upsert locally. */
+export async function uploadAndIngestPaperlessDocument(input: {
+  buffer: Buffer;
+  filename: string;
+  title?: string | null;
+}): Promise<{ localId: number; paperlessId: number }> {
+  const client = createClient();
+  const taskId = await client.postDocument(input);
+  const paperlessId = await client.waitForPostedDocument(taskId);
+  return ingestPaperlessDocumentById(paperlessId);
 }
 
 async function syncDocumentPages(

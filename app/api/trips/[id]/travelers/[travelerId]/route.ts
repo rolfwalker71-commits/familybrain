@@ -9,6 +9,7 @@ import {
   getTripTravelerById,
   updateTripTraveler,
 } from "@/lib/trips/queries";
+import { grantTripAccess } from "@/lib/users/queries";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -58,6 +59,9 @@ export async function PATCH(request: Request, context: Ctx) {
       userId: parsed.data.userId,
       sortKey: parsed.data.sortKey,
     });
+    if (traveler.user_id) {
+      grantTripAccess(traveler.user_id, tripId);
+    }
     return NextResponse.json({ ok: true, traveler });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

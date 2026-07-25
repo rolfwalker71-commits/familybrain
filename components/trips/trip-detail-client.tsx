@@ -1809,16 +1809,12 @@ function TripDetailInner({
                   <DocumentPdfThumb
                     paperlessId={doc.paperless_id}
                     title={doc.title}
-                    href={`/documents/${doc.id}`}
                     size="square"
                   />
                   <div className="min-w-0 flex-1">
-                    <Link
-                      href={`/documents/${doc.id}`}
-                      className="text-sm font-medium hover:underline"
-                    >
+                    <p className="text-sm font-medium">
                       {doc.title || `Dokument #${doc.id}`}
-                    </Link>
+                    </p>
                     <p className="truncate text-xs text-muted-foreground">
                       {doc.eventTitle}
                     </p>
@@ -2362,8 +2358,7 @@ function TripDetailInner({
                   Belege
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Mehrere Paperless-PDFs können verknüpft werden. Neue PDFs zuerst
-                  in Paperless importieren.
+                  PDF hochladen oder bestehendes Dokument verknüpfen.
                 </p>
                 <Button
                   size="sm"
@@ -2373,7 +2368,7 @@ function TripDetailInner({
                   onClick={() => setLinkDocsEventId(editingEventId)}
                 >
                   <FilePlus2 className="size-3.5" />
-                  Belege verknüpfen
+                  PDF / Belege
                 </Button>
               </div>
             ) : null}
@@ -2614,7 +2609,6 @@ function TripDetailInner({
                                   key={doc.id}
                                   paperlessId={doc.paperless_id}
                                   title={doc.title}
-                                  href={`/documents/${doc.id}`}
                                   size="square"
                                   removing={busy}
                                   onRemove={
@@ -2632,6 +2626,17 @@ function TripDetailInner({
                           ) : (
                             <div className="flex-1" />
                           )}
+                          {!readOnly ? (
+                            <Button
+                              size="icon-xs"
+                              variant="ghost"
+                              title="PDF hochladen / Belege verknüpfen"
+                              disabled={busy}
+                              onClick={() => setLinkDocsEventId(event.id)}
+                            >
+                              <FilePlus2 className="size-3.5" />
+                            </Button>
+                          ) : null}
                           {!readOnly && !editMode ? (
                             <Button
                               size="sm"
@@ -2660,15 +2665,6 @@ function TripDetailInner({
                                   : "Wählen"}
                               </Button>
                               <div className="hidden shrink-0 items-center gap-0.5 md:flex">
-                                <Button
-                                  size="icon-xs"
-                                  variant="ghost"
-                                  title="Belege verknüpfen"
-                                  disabled={busy}
-                                  onClick={() => setLinkDocsEventId(event.id)}
-                                >
-                                  <FilePlus2 className="size-3.5" />
-                                </Button>
                                 <Button
                                   size="icon-xs"
                                   variant="ghost"
@@ -2828,6 +2824,19 @@ function TripDetailInner({
                         />
                       </div>
                       {/* Desktop edit actions — mobile uses bottom bar */}
+                      {!readOnly && !editMode ? (
+                        <div className="hidden shrink-0 items-center gap-0.5 md:flex">
+                          <Button
+                            size="icon-xs"
+                            variant="ghost"
+                            title="PDF hochladen / Belege verknüpfen"
+                            disabled={busy}
+                            onClick={() => setLinkDocsEventId(event.id)}
+                          >
+                            <FilePlus2 className="size-3.5" />
+                          </Button>
+                        </div>
+                      ) : null}
                       {editMode ? (
                         <div className="hidden shrink-0 flex-col items-center gap-0.5 md:flex">
                           <button
@@ -2869,7 +2878,7 @@ function TripDetailInner({
                           <Button
                             size="icon-xs"
                             variant="ghost"
-                            title="Belege verknüpfen"
+                            title="PDF hochladen / Belege verknüpfen"
                             disabled={busy}
                             onClick={() => {
                               setEditFocusEventId(event.id);
@@ -3048,7 +3057,6 @@ function TripDetailInner({
                               key={doc.id}
                               paperlessId={doc.paperless_id}
                               title={doc.title}
-                              href={`/documents/${doc.id}`}
                               removing={busy}
                               onRemove={
                                 doc.removable !== false

@@ -9,7 +9,7 @@ import {
   getTripById,
   listTripTravelers,
 } from "@/lib/trips/queries";
-import { getAppUserById } from "@/lib/users/queries";
+import { getAppUserById, grantTripAccess } from "@/lib/users/queries";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -82,6 +82,9 @@ export async function POST(request: Request, context: Ctx) {
       email,
       userId,
     });
+    if (userId) {
+      grantTripAccess(userId, tripId);
+    }
     return NextResponse.json({ ok: true, traveler });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

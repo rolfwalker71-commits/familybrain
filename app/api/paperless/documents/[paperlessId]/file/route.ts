@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
+import {
+  isAuthError,
+  requireAuth,
+} from "@/lib/auth/current-user";
 import { PaperlessClient, PaperlessError } from "@/lib/paperless/client";
 import { getPaperlessSettings } from "@/lib/db/queries";
+import { userCanAccessPaperlessDocument } from "@/lib/users/queries";
 
 export const runtime = "nodejs";
 
@@ -19,10 +24,23 @@ function createClient() {
 
 export async function GET(request: Request, { params }: Params) {
   try {
+    const auth = await requireAuth();
+    if (isAuthError(auth)) return auth;
+
     const { paperlessId } = await params;
     const id = Number(paperlessId);
     if (!Number.isFinite(id)) {
       return NextResponse.json({ error: "Ungültige ID" }, { status: 400 });
+    }
+
+    if (
+      !auth.isAdmin &&
+      (!auth.userId || !userCanAccessPaperlessDocument(auth.userId, id))
+    ) {
+      return NextResponse.json(
+        { error: "Kein Zugriff auf dieses Dokument." },
+        { status: 403 }
+      );
     }
 
     const { searchParams } = new URL(request.url);

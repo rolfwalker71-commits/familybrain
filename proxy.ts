@@ -46,6 +46,13 @@ function isLimitedUserAllowedPath(pathname: string): boolean {
   ) {
     return true;
   }
+  // Trip/finance PDF thumbs + viewers (route still checks trip/ledger access).
+  if (
+    pathname.startsWith("/api/paperless/documents/") &&
+    pathname.endsWith("/file")
+  ) {
+    return true;
+  }
   return false;
 }
 

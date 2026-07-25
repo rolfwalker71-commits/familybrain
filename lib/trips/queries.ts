@@ -740,6 +740,53 @@ export function listLinkedDocumentIdsForEvents(
   return map;
 }
 
+/** Documents already linked to any event on this trip (for traveler re-link UI). */
+export function listTripLinkedDocuments(
+  tripId: number,
+  options?: { search?: string; limit?: number }
+): Array<{
+  id: number;
+  title: string | null;
+  original_file_name: string | null;
+  correspondent_name: string | null;
+  created_date: string | null;
+}> {
+  const db = getDb();
+  const limit = Math.min(Math.max(options?.limit ?? 80, 1), 200);
+  const search = options?.search?.trim();
+  const params: unknown[] = [tripId];
+  let searchSql = "";
+  if (search) {
+    searchSql = `AND (
+      LOWER(COALESCE(d.title, '')) LIKE LOWER(?)
+      OR LOWER(COALESCE(d.original_file_name, '')) LIKE LOWER(?)
+      OR LOWER(COALESCE(d.correspondent_name, '')) LIKE LOWER(?)
+    )`;
+    const q = `%${search}%`;
+    params.push(q, q, q);
+  }
+  params.push(limit);
+  return db
+    .prepare(
+      `SELECT DISTINCT d.id, d.title, d.original_file_name, d.correspondent_name, d.created_date
+       FROM paperless_documents d
+       INNER JOIN trip_event_documents ted ON ted.document_id = d.id
+       INNER JOIN trip_events te ON te.id = ted.trip_event_id
+       WHERE te.trip_id = ?
+         AND COALESCE(d.sync_status, 'synced') != 'missing'
+         ${searchSql}
+       ORDER BY COALESCE(d.created_date, '') DESC, d.id DESC
+       LIMIT ?`
+    )
+    .all(...params) as Array<{
+    id: number;
+    title: string | null;
+    original_file_name: string | null;
+    correspondent_name: string | null;
+    created_date: string | null;
+  }>;
+}
+
 export function linkTripEventDocument(
   eventId: number,
   documentId: number

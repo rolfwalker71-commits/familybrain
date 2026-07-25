@@ -159,11 +159,20 @@ export function deleteAppUser(id: number): void {
 
 export function listUserTripIds(userId: number): number[] {
   const db = getDb();
-  return (
+  const fromAccess = (
     db
       .prepare(`SELECT trip_id FROM user_trip_access WHERE user_id = ?`)
       .all(userId) as Array<{ trip_id: number }>
   ).map((r) => r.trip_id);
+  const fromTravelers = (
+    db
+      .prepare(
+        `SELECT DISTINCT trip_id FROM trip_travelers
+         WHERE user_id = ? AND trip_id IS NOT NULL`
+      )
+      .all(userId) as Array<{ trip_id: number }>
+  ).map((r) => r.trip_id);
+  return [...new Set([...fromAccess, ...fromTravelers])];
 }
 
 export function listUserLedgerIds(userId: number): number[] {
@@ -177,12 +186,90 @@ export function listUserLedgerIds(userId: number): number[] {
 
 export function userHasTripAccess(userId: number, tripId: number): boolean {
   const db = getDb();
-  const row = db
+  const access = db
     .prepare(
       `SELECT 1 AS ok FROM user_trip_access WHERE user_id = ? AND trip_id = ?`
     )
     .get(userId, tripId) as { ok: number } | undefined;
-  return Boolean(row);
+  if (access) return true;
+  const traveler = db
+    .prepare(
+      `SELECT 1 AS ok FROM trip_travelers WHERE user_id = ? AND trip_id = ?`
+    )
+    .get(userId, tripId) as { ok: number } | undefined;
+  return Boolean(traveler);
+}
+
+/**
+ * Limited users may only fetch Paperless files that are linked to a trip or
+ * finance ledger they can access.
+ */
+export function userCanAccessPaperlessDocument(
+  userId: number,
+  paperlessId: number
+): boolean {
+  const db = getDb();
+  const doc = db
+    .prepare(
+      `SELECT id FROM paperless_documents
+       WHERE paperless_id = ?
+         AND COALESCE(sync_status, 'synced') != 'missing'`
+    )
+    .get(paperlessId) as { id: number } | undefined;
+  if (!doc) return false;
+
+  const viaTripEvent = db
+    .prepare(
+      `SELECT 1 AS ok
+       FROM trip_event_documents ted
+       INNER JOIN trip_events te ON te.id = ted.trip_event_id
+       WHERE ted.document_id = ?
+         AND (
+           EXISTS (
+             SELECT 1 FROM user_trip_access uta
+             WHERE uta.user_id = ? AND uta.trip_id = te.trip_id
+           )
+           OR EXISTS (
+             SELECT 1 FROM trip_travelers tt
+             WHERE tt.user_id = ? AND tt.trip_id = te.trip_id
+           )
+         )
+       LIMIT 1`
+    )
+    .get(doc.id, userId, userId) as { ok: number } | undefined;
+  if (viaTripEvent) return true;
+
+  const viaLegacyEventDoc = db
+    .prepare(
+      `SELECT 1 AS ok
+       FROM trip_events te
+       WHERE te.document_id = ?
+         AND (
+           EXISTS (
+             SELECT 1 FROM user_trip_access uta
+             WHERE uta.user_id = ? AND uta.trip_id = te.trip_id
+           )
+           OR EXISTS (
+             SELECT 1 FROM trip_travelers tt
+             WHERE tt.user_id = ? AND tt.trip_id = te.trip_id
+           )
+         )
+       LIMIT 1`
+    )
+    .get(doc.id, userId, userId) as { ok: number } | undefined;
+  if (viaLegacyEventDoc) return true;
+
+  const viaExpense = db
+    .prepare(
+      `SELECT 1 AS ok
+       FROM finance_expenses fe
+       INNER JOIN user_ledger_access ula
+         ON ula.ledger_id = fe.ledger_id AND ula.user_id = ?
+       WHERE fe.document_id = ?
+       LIMIT 1`
+    )
+    .get(userId, doc.id) as { ok: number } | undefined;
+  return Boolean(viaExpense);
 }
 
 export function userHasLedgerAccess(userId: number, ledgerId: number): boolean {

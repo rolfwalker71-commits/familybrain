@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { FilePlus2, Search } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { FilePlus2, Search, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -46,6 +46,8 @@ export function LinkDocumentsToEventDialog({
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<number[]>([]);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const excludeKey = excludeDocumentIds.slice().sort((a, b) => a - b).join(",");
 
@@ -69,7 +71,9 @@ export function LinkDocumentsToEventDialog({
         try {
           const params = new URLSearchParams({ limit: "80" });
           if (search.trim()) params.set("search", search.trim());
-          const res = await fetch(`/api/documents?${params}`);
+          const res = await fetch(
+            `/api/trips/${tripId}/documents?${params}`
+          );
           const data = await res.json();
           if (cancelled) return;
           if (!res.ok) {
@@ -94,7 +98,7 @@ export function LinkDocumentsToEventDialog({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [open, search, excludeKey, onError]);
+  }, [open, search, excludeKey, onError, tripId]);
 
   function toggle(id: number) {
     setSelected((prev) =>
@@ -134,19 +138,70 @@ export function LinkDocumentsToEventDialog({
     }
   }
 
+  async function uploadPdf(file: File) {
+    setUploading(true);
+    try {
+      const form = new FormData();
+      form.set("file", file);
+      form.set("title", file.name.replace(/\.pdf$/i, ""));
+      const res = await fetch(
+        `/api/trips/${tripId}/events/${eventId}/documents/upload`,
+        { method: "POST", body: form }
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Upload fehlgeschlagen");
+      onOpenChange(false);
+      onLinked?.("PDF hochgeladen und verknüpft.");
+    } catch (err) {
+      onError?.(err instanceof Error ? err.message : String(err));
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
+  const busy = saving || uploading;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Belege verknüpfen</DialogTitle>
           <DialogDescription>
-            Bestehende Paperless-Dokumente mit dieser Aktivität verknüpfen.
-            PDFs importierst du zuerst in Paperless; danach erscheinen sie hier.
+            PDF direkt hochladen oder ein bestehendes Dokument mit dieser
+            Aktivität verknüpfen.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
+          <div className="rounded-lg border border-dashed border-border/80 bg-muted/20 px-3 py-3">
+            <input
+              ref={fileRef}
+              type="file"
+              accept="application/pdf,.pdf"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void uploadPdf(file);
+              }}
+            />
+            <Button
+              type="button"
+              variant="secondary"
+              className="w-full gap-1.5"
+              disabled={busy}
+              onClick={() => fileRef.current?.click()}
+            >
+              <Upload className="size-4" />
+              {uploading ? "Wird hochgeladen…" : "PDF hochladen"}
+            </Button>
+            <p className="mt-1.5 text-[11px] text-muted-foreground">
+              Wird in Paperless importiert und mit der Aktivität verknüpft
+              (max. 40 MB).
+            </p>
+          </div>
+
           <div className="space-y-1.5">
-            <Label htmlFor="doc-search">Suche</Label>
+            <Label htmlFor="doc-search">Bestehende Dokumente</Label>
             <div className="relative">
               <Search className="pointer-events-none absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
               <Input
@@ -163,7 +218,7 @@ export function LinkDocumentsToEventDialog({
               <p className="p-3 text-sm text-muted-foreground">Lädt…</p>
             ) : docs.length === 0 ? (
               <p className="p-3 text-sm text-muted-foreground">
-                Keine Dokumente gefunden.
+                Keine Dokumente gefunden. Lade ein PDF hoch oder suche anders.
               </p>
             ) : (
               docs.map((doc) => {
@@ -205,22 +260,22 @@ export function LinkDocumentsToEventDialog({
         <DialogFooter>
           <Button
             variant="ghost"
-            disabled={saving}
+            disabled={busy}
             onClick={() => onOpenChange(false)}
           >
             Abbrechen
           </Button>
           <Button
-            disabled={saving || selected.length === 0}
+            disabled={busy || selected.length === 0}
             onClick={() => void submit()}
             className="gap-1.5"
           >
             <FilePlus2 className="size-4" />
             {saving
               ? "Verknüpft…"
-              : selected.length > 1
-                ? `${selected.length} verknüpfen`
-                : "Verknüpfen"}
+              : selected.length <= 1
+                ? "Verknüpfen"
+                : `${selected.length} verknüpfen`}
           </Button>
         </DialogFooter>
       </DialogContent>
