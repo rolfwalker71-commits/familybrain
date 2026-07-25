@@ -2058,6 +2058,43 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
           </SectionCard>
 
           {!isNormal ? (
+            <SectionCard title="Ausgaben-Mail" tone="green" icon={Mail}>
+              <p className="mb-3 text-sm text-muted-foreground">
+                Alle Ausgaben per Mail inkl. PDF an die Gruppe senden.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  disabled={summaryMailBusy || expenses.length === 0}
+                  onClick={() => void sendExpensesSummaryMail()}
+                >
+                  <Mail
+                    className={cn(
+                      "size-4",
+                      summaryMailBusy && "animate-pulse"
+                    )}
+                  />
+                  {summaryMailBusy ? "Sendet…" : "Ausgaben-Mail senden"}
+                </Button>
+                {ledger.trip_id ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                    disabled={tripSummaryBusy || expenses.length === 0}
+                    onClick={() => void openTripSummaryDialog()}
+                  >
+                    <Luggage className="size-4" />
+                    Reise-Übersicht senden
+                  </Button>
+                ) : null}
+              </div>
+            </SectionCard>
+          ) : null}
+
+          {!isNormal ? (
             <SectionCard
               title="Teilnehmer & Einladungs-Links"
               tone="green"
@@ -2301,43 +2338,6 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
               </>
             )}
           </SectionCard>
-
-          {!isNormal ? (
-            <SectionCard title="Ausgaben-Mail" tone="green" icon={Mail}>
-              <p className="mb-3 text-sm text-muted-foreground">
-                Alle Ausgaben per Mail inkl. PDF an die Gruppe senden.
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5"
-                  disabled={summaryMailBusy || expenses.length === 0}
-                  onClick={() => void sendExpensesSummaryMail()}
-                >
-                  <Mail
-                    className={cn(
-                      "size-4",
-                      summaryMailBusy && "animate-pulse"
-                    )}
-                  />
-                  {summaryMailBusy ? "Sendet…" : "Ausgaben-Mail senden"}
-                </Button>
-                {ledger.trip_id ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-1.5"
-                    disabled={tripSummaryBusy || expenses.length === 0}
-                    onClick={() => void openTripSummaryDialog()}
-                  >
-                    <Luggage className="size-4" />
-                    Reise-Übersicht senden
-                  </Button>
-                ) : null}
-              </div>
-            </SectionCard>
-          ) : null}
         </div>
       ) : null}
 

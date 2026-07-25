@@ -221,7 +221,7 @@ export const EXPENSE_CATEGORIES: CategoryDef[] = [
     tone: "green",
     icon: Ship,
     scene: "ferry deck or harbor atmosphere",
-    keywords: ["schiff", "ferry", "fähre", "boot", "boat", "cruise"],
+    keywords: ["schiff", "ferry", "fähre", "boot", "boat", "cruise", "kreuzfahrt"],
   },
   {
     label: "Versicherung",

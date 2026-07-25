@@ -2769,6 +2769,8 @@ function TripDetailInner({
                         eventId={event.id}
                         readOnly={readOnly}
                         shareToken={shareToken || undefined}
+                        collapsible
+                        defaultCollapsed
                         className="border-t border-border/40 pt-2"
                         onCountChange={(count) => {
                           setEvents((prev) =>

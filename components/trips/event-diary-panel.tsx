@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  ChevronDown,
   CloudSun,
   ImagePlus,
   MessageCircle,
@@ -31,6 +32,9 @@ type Props = {
   shareToken?: string;
   className?: string;
   onCountChange?: (count: number) => void;
+  /** When true, header toggles the thread (default collapsed if defaultCollapsed). */
+  collapsible?: boolean;
+  defaultCollapsed?: boolean;
 };
 
 function formatCommentWhen(iso: string): string {
@@ -47,6 +51,8 @@ export function EventDiaryPanel({
   shareToken,
   className,
   onCountChange,
+  collapsible = false,
+  defaultCollapsed = true,
 }: Props) {
   const [comments, setComments] = useState<EventComment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -59,6 +65,9 @@ export function EventDiaryPanel({
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editBody, setEditBody] = useState("");
   const [zoomUrl, setZoomUrl] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState(
+    () => collapsible && defaultCollapsed
+  );
   const fileRef = useRef<HTMLInputElement>(null);
 
   const listUrl = shareToken
@@ -234,19 +243,44 @@ export function EventDiaryPanel({
   }
 
   const anyBusy = busy || weatherBusy;
+  const open = !collapsible || !collapsed;
+  const countLabel = `(${comments.length})`;
 
   return (
     <div className={cn("space-y-3", className)}>
-      <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-        <MessageCircle className="size-4 text-muted-foreground" />
-        Tagebuch
-        {comments.length > 0 ? (
-          <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
-            {comments.length}
+      {collapsible ? (
+        <button
+          type="button"
+          className="flex w-full items-center gap-2 text-left text-sm font-medium text-foreground"
+          aria-expanded={open}
+          onClick={() => setCollapsed((v) => !v)}
+        >
+          <MessageCircle className="size-4 shrink-0 text-muted-foreground" />
+          <span className="min-w-0 flex-1">
+            Tagebuch{" "}
+            <span className="font-semibold text-muted-foreground">
+              {countLabel}
+            </span>
           </span>
-        ) : null}
-      </div>
+          <ChevronDown
+            className={cn(
+              "size-4 shrink-0 text-muted-foreground transition-transform",
+              open && "rotate-180"
+            )}
+          />
+        </button>
+      ) : (
+        <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+          <MessageCircle className="size-4 text-muted-foreground" />
+          Tagebuch{" "}
+          <span className="font-semibold text-muted-foreground">
+            {countLabel}
+          </span>
+        </div>
+      )}
 
+      {open ? (
+        <>
       {error ? (
         <p className="text-sm text-destructive">{error}</p>
       ) : null}
@@ -432,6 +466,8 @@ export function EventDiaryPanel({
             </Button>
           </div>
         </div>
+      ) : null}
+        </>
       ) : null}
 
       {zoomUrl ? (

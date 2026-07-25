@@ -206,14 +206,14 @@ export function BalanceView({
     return (
       <div
         key={key}
-        className="flex items-center justify-between gap-2 rounded-xl border border-amber-200/60 bg-white px-3 py-2.5 text-sm"
+        className="flex items-center justify-between gap-2 rounded-lg border border-amber-200/60 bg-white px-2.5 py-1.5 text-sm leading-snug"
       >
         <div className="min-w-0">
           <span className="font-medium">{d.fromDisplayName}</span>
           {" schuldet "}
           <span className="font-medium">{d.toDisplayName}</span>
           {" "}
-          <span className="font-semibold text-amber-900">
+          <span className="font-semibold tabular-nums text-amber-900">
             {formatMoney(d.amount, baseCurrency)}
           </span>
         </div>
@@ -222,7 +222,7 @@ export function BalanceView({
             type="button"
             size="sm"
             variant="outline"
-            className="h-7 shrink-0 px-2 text-xs"
+            className="h-6 shrink-0 px-2 text-[11px]"
             disabled={busy || Boolean(recordBusyKey)}
             onClick={() => void onRecordDebt?.(d)}
           >
@@ -234,28 +234,32 @@ export function BalanceView({
   }
 
   return (
-    <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
-      <Card tone="green" className="overflow-hidden border-border/60 shadow-[0_4px_16px_rgba(20,32,28,0.05)]">
-        <CardHeader tone="green" className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-base text-[var(--brand-finance)]">
+    <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
+      <Card
+        size="sm"
+        tone="green"
+        className="overflow-hidden border-border/60 shadow-[0_4px_16px_rgba(20,32,28,0.05)]"
+      >
+        <CardHeader tone="green" className="py-1.5">
+          <CardTitle className="flex items-center gap-2 text-[15px]! text-[var(--brand-finance)]">
             <IconCircle icon={Scale} tone="green" size="sm" />
             Saldo pro Person
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2">
+        <CardContent className="space-y-1.5">
           {balances.length === 0 ? (
             <p className="text-sm text-muted-foreground">Noch keine Teilnehmer.</p>
           ) : (
             <>
-              <p className="text-xs text-muted-foreground">
-                Netto = bezahlt − Anteil. Plus = bekommt Geld zurück, Minus =
-                schuldet noch.
+              <p className="text-[11px] leading-snug text-muted-foreground">
+                Netto = bezahlt − Anteil (+ Rückzahlungen). Plus = Guthaben,
+                Minus = Schuld.
               </p>
               {balances.map((b) => (
                 <div
                   key={b.memberId}
                   className={cn(
-                    "flex items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-sm",
+                    "flex items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5 text-sm leading-snug",
                     highlightMemberId === b.memberId
                       ? "border-[var(--brand-finance)]/35 bg-[var(--brand-finance-soft)]/60"
                       : "border-border/50 bg-white"
@@ -263,7 +267,7 @@ export function BalanceView({
                 >
                   <div className="min-w-0">
                     <div className="font-medium">{b.displayName}</div>
-                    <div className="mt-0.5 text-[11px] text-muted-foreground">
+                    <div className="mt-0.5 truncate text-[10px] leading-tight text-muted-foreground">
                       bezahlt {formatMoney(b.paidBase, baseCurrency)}
                       {" · "}
                       Anteil {formatMoney(b.owedBase, baseCurrency)}
@@ -277,7 +281,7 @@ export function BalanceView({
                   </div>
                   <span
                     className={cn(
-                      "shrink-0 font-semibold",
+                      "shrink-0 font-semibold tabular-nums",
                       b.netBalance > 0
                         ? "text-[var(--brand-finance)]"
                         : b.netBalance < 0
@@ -294,22 +298,25 @@ export function BalanceView({
         </CardContent>
       </Card>
 
-      <Card tone="green" className="overflow-hidden border-border/60 shadow-[0_4px_16px_rgba(20,32,28,0.05)]">
-        <CardHeader tone="green" className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-base text-amber-900">
+      <Card
+        size="sm"
+        tone="green"
+        className="overflow-hidden border-border/60 shadow-[0_4px_16px_rgba(20,32,28,0.05)]"
+      >
+        <CardHeader tone="green" className="py-1.5">
+          <CardTitle className="flex items-center gap-2 text-[15px]! text-amber-900">
             <IconCircle icon={ArrowLeftRight} tone="green" size="sm" />
             Nach Zahler
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2">
+        <CardContent className="space-y-1.5">
           {simplifiedDebts.length === 0 ? (
             <p className="text-sm text-muted-foreground">Alles ausgeglichen.</p>
           ) : (
             <>
-              <p className="text-xs text-muted-foreground">
-                Wer wem noch den Anteil an dessen Ausgaben schuldet
-                (Rückzahlungen abgezogen; Gegenforderungen zwischen denselben
-                Personen verrechnet).
+              <p className="text-[11px] leading-snug text-muted-foreground">
+                Anteil an Ausgaben des Zahlers (Rückzahlungen / Gegenforderungen
+                verrechnet).
               </p>
               {simplifiedDebts.map((d, i) => renderDebtRow("payer", d, i))}
             </>
@@ -317,22 +324,25 @@ export function BalanceView({
         </CardContent>
       </Card>
 
-      <Card tone="green" className="overflow-hidden border-border/60 shadow-[0_4px_16px_rgba(20,32,28,0.05)] lg:col-span-2 xl:col-span-1">
-        <CardHeader tone="green" className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-base text-amber-900">
+      <Card
+        size="sm"
+        tone="green"
+        className="overflow-hidden border-border/60 shadow-[0_4px_16px_rgba(20,32,28,0.05)] lg:col-span-2 xl:col-span-1"
+      >
+        <CardHeader tone="green" className="py-1.5">
+          <CardTitle className="flex items-center gap-2 text-[15px]! text-amber-900">
             <IconCircle icon={ArrowLeftRight} tone="green" size="sm" />
             Wenigste Überweisungen
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2">
+        <CardContent className="space-y-1.5">
           {minimalDebts.length === 0 ? (
             <p className="text-sm text-muted-foreground">Alles ausgeglichen.</p>
           ) : (
             <>
-              <p className="text-xs text-muted-foreground">
-                Aus dem Netto-Saldo (inkl. erfasster Rückzahlungen). Wenigste
-                Transfers bis alle bei null sind — nicht zwingend an den
-                ursprünglichen Zahler.
+              <p className="text-[11px] leading-snug text-muted-foreground">
+                Minimale Transfers aus dem Netto-Saldo bis alle ausgeglichen
+                sind.
               </p>
               {minimalDebts.map((d, i) => renderDebtRow("min", d, i))}
             </>
@@ -341,25 +351,29 @@ export function BalanceView({
       </Card>
 
       {coupleBalances.length > 0 ? (
-        <Card tone="green" className="overflow-hidden border-border/60 shadow-[0_4px_16px_rgba(20,32,28,0.05)]">
-          <CardHeader tone="green" className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-base text-[var(--brand-finance)]">
+        <Card
+          size="sm"
+          tone="green"
+          className="overflow-hidden border-border/60 shadow-[0_4px_16px_rgba(20,32,28,0.05)]"
+        >
+          <CardHeader tone="green" className="py-1.5">
+            <CardTitle className="flex items-center gap-2 text-[15px]! text-[var(--brand-finance)]">
               <IconCircle icon={Users} tone="green" size="sm" />
               Saldo je Paar
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
-            <p className="text-xs text-muted-foreground">
-              Summe der Personen-Salden im Paar (inkl. Rückzahlungen).
+          <CardContent className="space-y-1.5">
+            <p className="text-[11px] leading-snug text-muted-foreground">
+              Summe der Personen-Salden im Paar.
             </p>
             {coupleBalances.map((b) => (
               <div
                 key={b.coupleId}
-                className="flex items-center justify-between gap-3 rounded-xl border border-border/50 bg-white px-3 py-2.5 text-sm"
+                className="flex items-center justify-between gap-2 rounded-lg border border-border/50 bg-white px-2.5 py-1.5 text-sm leading-snug"
               >
                 <div className="min-w-0">
                   <div className="font-medium">{b.name}</div>
-                  <div className="mt-0.5 text-[11px] text-muted-foreground">
+                  <div className="mt-0.5 truncate text-[10px] leading-tight text-muted-foreground">
                     bezahlt {formatMoney(b.paidBase, baseCurrency)}
                     {" · "}
                     Anteil {formatMoney(b.owedBase, baseCurrency)}
@@ -367,7 +381,7 @@ export function BalanceView({
                 </div>
                 <span
                   className={cn(
-                    "shrink-0 font-semibold",
+                    "shrink-0 font-semibold tabular-nums",
                     b.netBalance > 0
                       ? "text-[var(--brand-finance)]"
                       : b.netBalance < 0
@@ -384,23 +398,27 @@ export function BalanceView({
       ) : null}
 
       {coupleBalances.length > 0 ? (
-        <Card tone="green" className="overflow-hidden border-border/60 shadow-[0_4px_16px_rgba(20,32,28,0.05)]">
-          <CardHeader tone="green" className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-base text-amber-900">
+        <Card
+          size="sm"
+          tone="green"
+          className="overflow-hidden border-border/60 shadow-[0_4px_16px_rgba(20,32,28,0.05)]"
+        >
+          <CardHeader tone="green" className="py-1.5">
+            <CardTitle className="flex items-center gap-2 text-[15px]! text-amber-900">
               <IconCircle icon={ArrowLeftRight} tone="green" size="sm" />
               Ausgleich zwischen Paaren
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
+          <CardContent className="space-y-1.5">
             {coupleDebts.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 Paare sind ausgeglichen.
               </p>
             ) : (
               <>
-                <p className="text-xs text-muted-foreground">
-                  Vorschlag zwischen Paaren. Erfassen bucht eine Rückzahlung
-                  zwischen Vertretern (tiefstes bzw. höchstes Personen-Netto).
+                <p className="text-[11px] leading-snug text-muted-foreground">
+                  Vorschlag zwischen Paaren (Erfassen = Rückzahlung der
+                  Vertreter).
                 </p>
                 {coupleDebts.map((d, i) =>
                   renderDebtRow(
