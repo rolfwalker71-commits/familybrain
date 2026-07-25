@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
+import { isAuthError, requireAdmin } from "@/lib/auth/current-user";
 import { buildTravelBrainBackup } from "@/lib/trips/backup";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  const auth = await requireAdmin();
+  if (isAuthError(auth)) return auth;
   try {
     const backup = buildTravelBrainBackup();
     const stamp = backup.exported_at.slice(0, 10);

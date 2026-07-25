@@ -7,6 +7,7 @@ export type SettingsTab =
   | "paperless"
   | "travel"
   | "mail"
+  | "users"
   | "more";
 
 export type SettingsTabItem = AppTabItem<SettingsTab>;
@@ -19,6 +20,7 @@ export function parseSettingsTab(
     raw === "paperless" ||
     raw === "travel" ||
     raw === "mail" ||
+    raw === "users" ||
     raw === "more"
   ) {
     return raw;

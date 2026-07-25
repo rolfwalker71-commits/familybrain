@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isAuthError, requireAdmin } from "@/lib/auth/current-user";
 import {
   importTravelBrainBackup,
   TRAVELBRAIN_BACKUP_VERSION,
@@ -9,6 +10,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
+  const auth = await requireAdmin();
+  if (isAuthError(auth)) return auth;
   try {
     const body = (await request.json()) as TravelBrainBackup;
     if (!body || typeof body !== "object") {

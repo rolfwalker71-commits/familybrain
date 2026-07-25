@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAnalysis } from "@/components/analysis/analysis-provider";
+import { useAuth } from "@/components/auth/auth-provider";
 import { APP_VERSION } from "@/lib/app-version";
 import { IconCircle, type IconTone } from "@/components/layout/icon-circle";
 
@@ -123,7 +124,15 @@ export function Sidebar({
 }) {
   const pathname = usePathname();
   const analysis = useAnalysis();
+  const { me } = useAuth();
   const { isRunning } = analysis;
+  const isLimitedUser = me?.kind === "user";
+  const visibleNav = isLimitedUser
+    ? navItems.filter(
+        (item) => item.href === "/trips" || item.href === "/finance-brain"
+      )
+    : navItems;
+  const homeHref = isLimitedUser ? "/trips" : "/dashboard";
 
   return (
     <aside
@@ -133,7 +142,7 @@ export function Sidebar({
       )}
     >
       <div className="px-5 py-6">
-        <Link href="/dashboard" className="flex items-center gap-3">
+        <Link href={homeHref} className="flex items-center gap-3">
           <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground shadow-sm">
             <Brain className="h-6 w-6" />
           </span>
@@ -144,11 +153,13 @@ export function Sidebar({
       </div>
 
       <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto px-3 pb-4">
-        {navItems.map((item) => {
+        {visibleNav.map((item) => {
           const active =
             pathname === item.href || pathname.startsWith(`${item.href}/`);
           const count =
-            item.countKey != null ? Number(analysis[item.countKey] || 0) : null;
+            !isLimitedUser && item.countKey != null
+              ? Number(analysis[item.countKey] || 0)
+              : null;
           const showCount = count != null && count > 0;
 
           return (

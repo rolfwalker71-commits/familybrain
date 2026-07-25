@@ -1,4 +1,8 @@
 import { NextResponse } from "next/server";
+import {
+  isAuthError,
+  requireTripAccess,
+} from "@/lib/auth/current-user";
 import { z } from "zod";
 import {
   getTripEventById,
@@ -29,6 +33,8 @@ export async function POST(request: Request, context: Ctx) {
     ) {
       return NextResponse.json({ error: "Ungültige ID" }, { status: 400 });
     }
+    const auth = await requireTripAccess(tripId);
+    if (isAuthError(auth)) return auth;
     const existing = getTripEventById(eventId);
     if (!existing || existing.trip_id !== tripId) {
       return NextResponse.json(
@@ -62,6 +68,8 @@ export async function DELETE(request: Request, context: Ctx) {
     ) {
       return NextResponse.json({ error: "Ungültige ID" }, { status: 400 });
     }
+    const auth = await requireTripAccess(tripId);
+    if (isAuthError(auth)) return auth;
     const existing = getTripEventById(eventId);
     if (!existing || existing.trip_id !== tripId) {
       return NextResponse.json(

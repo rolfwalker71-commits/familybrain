@@ -1,4 +1,8 @@
 import { NextResponse } from "next/server";
+import {
+  isAuthError,
+  requireTripAccess,
+} from "@/lib/auth/current-user";
 import { enrichTripDocumentNotes } from "@/lib/trips/enrich-notes";
 import { getTripById } from "@/lib/trips/queries";
 import { serializeTripEvents } from "@/lib/trips/serialize-event";
@@ -15,6 +19,8 @@ export async function POST(_request: Request, context: Ctx) {
     if (!Number.isInteger(tripId) || tripId <= 0) {
       return NextResponse.json({ error: "Ungültige ID" }, { status: 400 });
     }
+    const auth = await requireTripAccess(tripId);
+    if (isAuthError(auth)) return auth;
     if (!getTripById(tripId)) {
       return NextResponse.json({ error: "Reise nicht gefunden" }, { status: 404 });
     }

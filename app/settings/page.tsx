@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { KeyRound, Server, BookOpen, MessageSquareText, Luggage, HandCoins, Mail, MoreHorizontal } from "lucide-react";
+import { KeyRound, Server, BookOpen, MessageSquareText, Luggage, HandCoins, Mail, MoreHorizontal, Users } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,6 +25,7 @@ import {
   type SettingsTab,
   type SettingsTabItem,
 } from "@/components/settings/settings-tab-nav";
+import { SettingsUsersPanel } from "@/components/settings/settings-users-panel";
 
 
 const ICLOUD_SMTP = {
@@ -160,6 +161,7 @@ function SettingsPageInner() {
   const [hasSmtpPassword, setHasSmtpPassword] = useState(false);
   const [smtpFrom, setSmtpFrom] = useState("");
   const [emailConfigured, setEmailConfigured] = useState(false);
+  const [appPublicUrl, setAppPublicUrl] = useState("");
   const [testMailTo, setTestMailTo] = useState("");
   const [testMailBusy, setTestMailBusy] = useState(false);
   const [flightTestNumber, setFlightTestNumber] = useState("LX1594");
@@ -240,6 +242,7 @@ function SettingsPageInner() {
       setHasSmtpPassword(Boolean(data.hasSmtpPassword));
       setSmtpFrom(data.smtpFrom || "");
       setEmailConfigured(Boolean(data.emailConfigured));
+      setAppPublicUrl(data.appPublicUrl || "");
     })();
   }, []);
 
@@ -565,6 +568,7 @@ function SettingsPageInner() {
           smtpUser: smtpUser.trim() || null,
           smtpPassword: smtpPassword || undefined,
           smtpFrom: smtpFrom.trim() || null,
+          appPublicUrl: appPublicUrl.trim() || null,
         }),
       });
       const data = await res.json();
@@ -577,6 +581,7 @@ function SettingsPageInner() {
       setHasSmtpPassword(Boolean(data.hasSmtpPassword));
       setSmtpFrom(data.smtpFrom || "");
       setEmailConfigured(Boolean(data.emailConfigured));
+      setAppPublicUrl(data.appPublicUrl || "");
       setSmtpPassword("");
       setMessage("SMTP-Einstellungen gespeichert.");
     } catch (err) {
@@ -742,6 +747,7 @@ function SettingsPageInner() {
     { id: "paperless", label: "Paperless", icon: Server },
     { id: "travel", label: "Travel", icon: Luggage },
     { id: "mail", label: "Mail", icon: Mail },
+    { id: "users", label: "User", icon: Users },
     { id: "more", label: "Mehr", icon: MoreHorizontal },
   ];
 
@@ -1208,6 +1214,19 @@ function SettingsPageInner() {
             <code className="text-[11px]">SMTP_HOST</code>,{" "}
             <code className="text-[11px]">SMTP_USER</code>, …).
           </p>
+          <div className="space-y-2">
+            <Label htmlFor="appPublicUrl">Öffentliche App-URL</Label>
+            <Input
+              id="appPublicUrl"
+              value={appPublicUrl}
+              onChange={(e) => setAppPublicUrl(e.target.value)}
+              placeholder="https://familybrain.example.com"
+            />
+            <p className="text-xs text-muted-foreground">
+              Basis für Links in Einladungs- und Erinnerungsmails (nicht
+              localhost).
+            </p>
+          </div>
           <div className="flex flex-wrap gap-2">
             <Button
               type="button"
@@ -1346,6 +1365,8 @@ function SettingsPageInner() {
         </CardContent>
       </Card>
       ) : null}
+
+      {activeTab === "users" ? <SettingsUsersPanel /> : null}
 
       {activeTab === "more" ? (
         <div className="space-y-4">

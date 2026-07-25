@@ -74,7 +74,9 @@ export function bootstrapDatabase(db: Database.Database): void {
   ensureKnowledgeGuidesTables(db);
   ensureChatCorrectionsTable(db);
   ensureTripsTables(db);
+  ensureUsersTable(db);
   ensureFinanceBrainTables(db);
+  ensureUserAccessTables(db);
 }
 
 function ensureTripsTables(db: Database.Database): void {
@@ -333,15 +335,19 @@ function ensureFinanceBrainTables(db: Database.Database): void {
       ledger_id INTEGER NOT NULL,
       display_name TEXT NOT NULL,
       email TEXT,
+      user_id INTEGER,
       invite_token TEXT NOT NULL UNIQUE,
       invite_revoked_at TEXT,
       created_at TEXT NOT NULL,
-      FOREIGN KEY(ledger_id) REFERENCES finance_ledgers(id) ON DELETE CASCADE
+      FOREIGN KEY(ledger_id) REFERENCES finance_ledgers(id) ON DELETE CASCADE,
+      FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE SET NULL
     );
     CREATE INDEX IF NOT EXISTS idx_finance_ledger_members_ledger
       ON finance_ledger_members(ledger_id);
     CREATE INDEX IF NOT EXISTS idx_finance_ledger_members_token
       ON finance_ledger_members(invite_token);
+    CREATE INDEX IF NOT EXISTS idx_finance_ledger_members_user
+      ON finance_ledger_members(user_id);
 
     CREATE TABLE IF NOT EXISTS finance_expenses (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -473,4 +479,55 @@ function ensureFinanceBrainTables(db: Database.Database): void {
   if (!settlementColNames.has("notified_at")) {
     db.exec(`ALTER TABLE finance_settlements ADD COLUMN notified_at TEXT`);
   }
+
+  const memberCols = db
+    .prepare(`PRAGMA table_info(finance_ledger_members)`)
+    .all() as Array<{ name: string }>;
+  const memberColNames = new Set(memberCols.map((c) => c.name));
+  if (!memberColNames.has("user_id")) {
+    db.exec(`ALTER TABLE finance_ledger_members ADD COLUMN user_id INTEGER`);
+  }
+  db.exec(
+    `CREATE INDEX IF NOT EXISTS idx_finance_ledger_members_user
+       ON finance_ledger_members(user_id)`
+  );
+}
+
+function ensureUsersTable(db: Database.Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT NOT NULL UNIQUE,
+      email TEXT NOT NULL,
+      password_hash TEXT NOT NULL,
+      display_name TEXT NOT NULL,
+      active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+    CREATE INDEX IF NOT EXISTS idx_users_active ON users(active);
+  `);
+}
+
+function ensureUserAccessTables(db: Database.Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS user_trip_access (
+      user_id INTEGER NOT NULL,
+      trip_id INTEGER NOT NULL,
+      PRIMARY KEY (user_id, trip_id),
+      FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY(trip_id) REFERENCES trips(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_user_trip_access_trip ON user_trip_access(trip_id);
+
+    CREATE TABLE IF NOT EXISTS user_ledger_access (
+      user_id INTEGER NOT NULL,
+      ledger_id INTEGER NOT NULL,
+      PRIMARY KEY (user_id, ledger_id),
+      FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY(ledger_id) REFERENCES finance_ledgers(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_user_ledger_access_ledger ON user_ledger_access(ledger_id);
+  `);
 }

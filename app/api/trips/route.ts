@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import {
+  isAuthError,
+  requireAdmin,
+  requireAuth,
+} from "@/lib/auth/current-user";
 import { coverPublicUrl } from "@/lib/trips/cover";
 import { TRIP_STATUSES } from "@/lib/trips/constants";
 import { createTrip, listTrips } from "@/lib/trips/queries";
+import { listUserTripIds } from "@/lib/users/queries";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,8 +21,15 @@ function serializeTrip(trip: ReturnType<typeof listTrips>[number]) {
 }
 
 export async function GET() {
+  const auth = await requireAuth();
+  if (isAuthError(auth)) return auth;
+  let trips = listTrips();
+  if (!auth.isAdmin && auth.userId) {
+    const allowed = new Set(listUserTripIds(auth.userId));
+    trips = trips.filter((t) => allowed.has(t.id));
+  }
   return NextResponse.json({
-    trips: listTrips().map(serializeTrip),
+    trips: trips.map(serializeTrip),
   });
 }
 
@@ -31,6 +44,8 @@ const CreateSchema = z.object({
 });
 
 export async function POST(request: Request) {
+  const auth = await requireAdmin();
+  if (isAuthError(auth)) return auth;
   try {
     const body = await request.json();
     const parsed = CreateSchema.safeParse(body);

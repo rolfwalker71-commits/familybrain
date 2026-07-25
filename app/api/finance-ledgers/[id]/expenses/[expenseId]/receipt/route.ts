@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import {
+  isAuthError,
+  requireLedgerAccess,
+} from "@/lib/auth/current-user";
+import {
   clearExpenseReceipt,
   saveExpenseReceiptUpload,
 } from "@/lib/finance-brain/receipts";
@@ -22,6 +26,8 @@ export async function POST(request: Request, context: Ctx) {
   try {
     const { id: idRaw, expenseId: expenseIdRaw } = await context.params;
     const ledgerId = Number(idRaw);
+    const auth = await requireLedgerAccess(ledgerId);
+    if (isAuthError(auth)) return auth;
     const expenseId = Number(expenseIdRaw);
     if (!getFinanceLedgerById(ledgerId)) {
       return NextResponse.json({ error: "Abrechnung nicht gefunden" }, { status: 404 });
@@ -69,6 +75,8 @@ export async function DELETE(_request: Request, context: Ctx) {
   try {
     const { id: idRaw, expenseId: expenseIdRaw } = await context.params;
     const ledgerId = Number(idRaw);
+    const auth = await requireLedgerAccess(ledgerId);
+    if (isAuthError(auth)) return auth;
     const expenseId = Number(expenseIdRaw);
     if (!getFinanceLedgerById(ledgerId)) {
       return NextResponse.json({ error: "Abrechnung nicht gefunden" }, { status: 404 });

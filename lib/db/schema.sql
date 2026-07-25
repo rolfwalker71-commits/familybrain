@@ -376,6 +376,20 @@ CREATE TABLE IF NOT EXISTS trip_share_links (
 CREATE INDEX IF NOT EXISTS idx_trip_share_links_trip ON trip_share_links(trip_id);
 CREATE INDEX IF NOT EXISTS idx_trip_share_links_token ON trip_share_links(token);
 
+-- App users (limited access to assigned trips + finance ledgers)
+CREATE TABLE IF NOT EXISTS users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  username TEXT NOT NULL UNIQUE,
+  email TEXT NOT NULL,
+  password_hash TEXT NOT NULL,
+  display_name TEXT NOT NULL,
+  active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+CREATE INDEX IF NOT EXISTS idx_users_active ON users(active);
+
 -- FinanzBrain: group expense ledgers (Settle-Up style) + Normal cashbooks
 CREATE TABLE IF NOT EXISTS finance_ledgers (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -397,15 +411,19 @@ CREATE TABLE IF NOT EXISTS finance_ledger_members (
   ledger_id INTEGER NOT NULL,
   display_name TEXT NOT NULL,
   email TEXT,
+  user_id INTEGER,
   invite_token TEXT NOT NULL UNIQUE,
   invite_revoked_at TEXT,
   created_at TEXT NOT NULL,
-  FOREIGN KEY(ledger_id) REFERENCES finance_ledgers(id) ON DELETE CASCADE
+  FOREIGN KEY(ledger_id) REFERENCES finance_ledgers(id) ON DELETE CASCADE,
+  FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE SET NULL
 );
 CREATE INDEX IF NOT EXISTS idx_finance_ledger_members_ledger
   ON finance_ledger_members(ledger_id);
 CREATE INDEX IF NOT EXISTS idx_finance_ledger_members_token
   ON finance_ledger_members(invite_token);
+CREATE INDEX IF NOT EXISTS idx_finance_ledger_members_user
+  ON finance_ledger_members(user_id);
 
 CREATE TABLE IF NOT EXISTS finance_expenses (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -472,4 +490,22 @@ CREATE TABLE IF NOT EXISTS finance_settlements (
   FOREIGN KEY(created_by_member_id) REFERENCES finance_ledger_members(id)
 );
 CREATE INDEX IF NOT EXISTS idx_finance_settlements_ledger ON finance_settlements(ledger_id);
+
+CREATE TABLE IF NOT EXISTS user_trip_access (
+  user_id INTEGER NOT NULL,
+  trip_id INTEGER NOT NULL,
+  PRIMARY KEY (user_id, trip_id),
+  FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY(trip_id) REFERENCES trips(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_user_trip_access_trip ON user_trip_access(trip_id);
+
+CREATE TABLE IF NOT EXISTS user_ledger_access (
+  user_id INTEGER NOT NULL,
+  ledger_id INTEGER NOT NULL,
+  PRIMARY KEY (user_id, ledger_id),
+  FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY(ledger_id) REFERENCES finance_ledgers(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_user_ledger_access_ledger ON user_ledger_access(ledger_id);
 

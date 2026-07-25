@@ -1,6 +1,10 @@
 import fs from "fs";
 import path from "path";
 import { NextResponse } from "next/server";
+import {
+  isAuthError,
+  requireLedgerAccess,
+} from "@/lib/auth/current-user";
 import { resolveFinanceLedgerCoverPath } from "@/lib/finance-brain/cover";
 import { contentTypeForReceipt } from "@/lib/finance-brain/receipts";
 import { getDb } from "@/lib/db/client";
@@ -27,6 +31,8 @@ export async function GET(_request: Request, context: Ctx) {
   if (!row) {
     return NextResponse.json({ error: "Nicht gefunden" }, { status: 404 });
   }
+  const auth = await requireLedgerAccess(row.id);
+  if (isAuthError(auth)) return auth;
   const buffer = fs.readFileSync(full);
   return new NextResponse(buffer, {
     headers: {

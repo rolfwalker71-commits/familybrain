@@ -1,6 +1,10 @@
 import fs from "fs";
 import { NextResponse } from "next/server";
 import {
+  isAuthError,
+  requireLedgerAccess,
+} from "@/lib/auth/current-user";
+import {
   generateFinanceLedgerCover,
   ledgerCoverPublicUrl,
   saveFinanceLedgerCoverUpload,
@@ -24,6 +28,8 @@ export async function GET(request: Request, context: Ctx) {
     if (!Number.isInteger(id) || id <= 0) {
       return NextResponse.json({ error: "Ungültige ID" }, { status: 400 });
     }
+    const auth = await requireLedgerAccess(id);
+    if (isAuthError(auth)) return auth;
     const ledger = getFinanceLedgerById(id);
     if (!ledger) {
       return NextResponse.json(
@@ -69,6 +75,8 @@ export async function POST(request: Request, context: Ctx) {
     if (!Number.isInteger(id) || id <= 0) {
       return NextResponse.json({ error: "Ungültige ID" }, { status: 400 });
     }
+    const auth = await requireLedgerAccess(id);
+    if (isAuthError(auth)) return auth;
     const ledger = getFinanceLedgerById(id);
     if (!ledger) {
       return NextResponse.json(

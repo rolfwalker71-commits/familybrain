@@ -1,4 +1,8 @@
 import { NextResponse } from "next/server";
+import {
+  isAuthError,
+  requireLedgerAccess,
+} from "@/lib/auth/current-user";
 import { z } from "zod";
 import {
   createFinanceExpense,
@@ -33,6 +37,8 @@ const ImportSchema = z.object({
 export async function GET(_request: Request, context: Ctx) {
   const { id: idRaw } = await context.params;
   const id = Number(idRaw);
+  const auth = await requireLedgerAccess(id);
+  if (isAuthError(auth)) return auth;
   const ledger = getFinanceLedgerById(id);
   if (!ledger) {
     return NextResponse.json({ error: "Abrechnung nicht gefunden" }, { status: 404 });
@@ -51,6 +57,8 @@ export async function POST(request: Request, context: Ctx) {
   try {
     const { id: idRaw } = await context.params;
     const id = Number(idRaw);
+    const auth = await requireLedgerAccess(id);
+    if (isAuthError(auth)) return auth;
     const ledger = getFinanceLedgerById(id);
     if (!ledger) {
       return NextResponse.json({ error: "Abrechnung nicht gefunden" }, { status: 404 });

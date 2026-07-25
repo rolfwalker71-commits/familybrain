@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import {
+  isAuthError,
+  requireLedgerAccess,
+} from "@/lib/auth/current-user";
+import {
   notifyFailed,
   notifyLedgerExpense,
 } from "@/lib/finance-brain/notify";
@@ -18,6 +22,8 @@ export async function POST(_request: Request, context: Ctx) {
   try {
     const { id: idRaw, expenseId: expenseIdRaw } = await context.params;
     const ledgerId = Number(idRaw);
+    const auth = await requireLedgerAccess(ledgerId);
+    if (isAuthError(auth)) return auth;
     const expenseId = Number(expenseIdRaw);
     if (!getFinanceLedgerById(ledgerId)) {
       return NextResponse.json(

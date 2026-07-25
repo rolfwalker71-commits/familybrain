@@ -1,4 +1,8 @@
 import { NextResponse } from "next/server";
+import {
+  isAuthError,
+  requireLedgerAccess,
+} from "@/lib/auth/current-user";
 import { z } from "zod";
 import {
   collectBalanceInputs,
@@ -13,6 +17,7 @@ import {
   sendBalanceReminderEmail,
 } from "@/lib/finance-brain/email";
 import { computeMemberBalances } from "@/lib/finance-brain/settlement";
+import { absoluteAppUrl } from "@/lib/app-url";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,6 +32,8 @@ export async function POST(request: Request, context: Ctx) {
   try {
     const { id: idRaw } = await context.params;
     const ledgerId = Number(idRaw);
+    const auth = await requireLedgerAccess(ledgerId);
+    if (isAuthError(auth)) return auth;
     const ledger = getFinanceLedgerById(ledgerId);
     if (!ledger) {
       return NextResponse.json({ error: "Abrechnung nicht gefunden" }, { status: 404 });
@@ -44,7 +51,6 @@ export async function POST(request: Request, context: Ctx) {
       return NextResponse.json({ error: "Ungültige Eingabe" }, { status: 400 });
     }
 
-    const origin = new URL(request.url).origin;
     const members = listFinanceLedgerMembers(ledgerId);
     const targets = parsed.data.memberId
       ? members.filter((m) => m.id === parsed.data.memberId)
@@ -62,7 +68,7 @@ export async function POST(request: Request, context: Ctx) {
 
     for (const member of targets) {
       const serialized = serializeMemberWithToken(member);
-      const shareUrl = `${origin}${serialized.share_url}`;
+      const shareUrl = absoluteAppUrl(serialized.share_url, request);
       const netBalance = balanceByMember.get(member.id) ?? 0;
 
       if (!member.email) {

@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import {
+  isAuthError,
+  requireLedgerAccess,
+} from "@/lib/auth/current-user";
+import {
   notifyFailed,
   notifyLedgerExpensesSummary,
 } from "@/lib/finance-brain/notify";
@@ -15,6 +19,8 @@ export async function POST(_request: Request, context: Ctx) {
   try {
     const { id: idRaw } = await context.params;
     const ledgerId = Number(idRaw);
+    const auth = await requireLedgerAccess(ledgerId);
+    if (isAuthError(auth)) return auth;
     if (!getFinanceLedgerById(ledgerId)) {
       return NextResponse.json(
         { error: "Abrechnung nicht gefunden" },

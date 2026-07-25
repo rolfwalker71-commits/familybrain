@@ -3,90 +3,87 @@ import { z } from "zod";
 import {
   isAuthError,
   requireAdmin,
-  requireTripAccess,
 } from "@/lib/auth/current-user";
+import { hashPassword } from "@/lib/auth/password";
 import {
-  coverPublicUrl,
-} from "@/lib/trips/cover";
-import { TRIP_STATUSES } from "@/lib/trips/constants";
-import {
-  deleteTrip,
-  getTripById,
-  listTripEvents,
-  updateTrip,
-} from "@/lib/trips/queries";
-import { serializeTripEvents } from "@/lib/trips/serialize-event";
+  deleteAppUser,
+  getAppUserPublic,
+  updateAppUser,
+} from "@/lib/users/queries";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 120;
 
 type Ctx = { params: Promise<{ id: string }> };
 
+const PatchSchema = z.object({
+  username: z.string().min(1).max(80).optional(),
+  email: z.string().email().max(200).optional(),
+  displayName: z.string().min(1).max(120).optional(),
+  password: z.string().min(6).max(200).optional(),
+  active: z.boolean().optional(),
+});
+
 export async function GET(_request: Request, context: Ctx) {
+  const auth = await requireAdmin();
+  if (isAuthError(auth)) return auth;
   const { id: idRaw } = await context.params;
   const id = Number(idRaw);
   if (!Number.isInteger(id) || id <= 0) {
     return NextResponse.json({ error: "Ungültige ID" }, { status: 400 });
   }
-  const auth = await requireTripAccess(id);
-  if (isAuthError(auth)) return auth;
-  const trip = getTripById(id);
-  if (!trip) {
-    return NextResponse.json({ error: "Reise nicht gefunden" }, { status: 404 });
+  const user = getAppUserPublic(id);
+  if (!user) {
+    return NextResponse.json({ error: "Benutzer nicht gefunden" }, { status: 404 });
   }
-  return NextResponse.json({
-    trip: { ...trip, cover_url: coverPublicUrl(trip.cover_path) },
-    events: serializeTripEvents(listTripEvents(id)),
-  });
+  return NextResponse.json({ user });
 }
 
-const PatchSchema = z.object({
-  title: z.string().min(1).max(200).optional(),
-  status: z.enum(TRIP_STATUSES).optional(),
-  startDate: z.string().nullable().optional(),
-  endDate: z.string().nullable().optional(),
-  destination: z.string().nullable().optional(),
-  summary: z.string().nullable().optional(),
-  notes: z.string().nullable().optional(),
-});
-
 export async function PATCH(request: Request, context: Ctx) {
+  const auth = await requireAdmin();
+  if (isAuthError(auth)) return auth;
   try {
     const { id: idRaw } = await context.params;
     const id = Number(idRaw);
     if (!Number.isInteger(id) || id <= 0) {
       return NextResponse.json({ error: "Ungültige ID" }, { status: 400 });
     }
-    const auth = await requireTripAccess(id);
-    if (isAuthError(auth)) return auth;
-    const body = await request.json();
-    const parsed = PatchSchema.safeParse(body);
+    const parsed = PatchSchema.safeParse(await request.json());
     if (!parsed.success) {
       return NextResponse.json({ error: "Ungültige Eingabe" }, { status: 400 });
     }
-    const trip = updateTrip(id, parsed.data);
-    return NextResponse.json({
-      ok: true,
-      trip: { ...trip, cover_url: coverPublicUrl(trip.cover_path) },
+    const passwordHash = parsed.data.password
+      ? await hashPassword(parsed.data.password)
+      : undefined;
+    updateAppUser(id, {
+      username: parsed.data.username,
+      email: parsed.data.email,
+      displayName: parsed.data.displayName,
+      passwordHash,
+      active: parsed.data.active,
     });
+    return NextResponse.json({ ok: true, user: getAppUserPublic(id) });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    const status = message.includes("nicht gefunden") ? 404 : 500;
+    const status = message.includes("nicht gefunden")
+      ? 404
+      : message.includes("bereits")
+        ? 409
+        : 500;
     return NextResponse.json({ error: message }, { status });
   }
 }
 
 export async function DELETE(_request: Request, context: Ctx) {
+  const auth = await requireAdmin();
+  if (isAuthError(auth)) return auth;
   try {
     const { id: idRaw } = await context.params;
     const id = Number(idRaw);
     if (!Number.isInteger(id) || id <= 0) {
       return NextResponse.json({ error: "Ungültige ID" }, { status: 400 });
     }
-    const auth = await requireAdmin();
-    if (isAuthError(auth)) return auth;
-    deleteTrip(id);
+    deleteAppUser(id);
     return NextResponse.json({ ok: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

@@ -29,6 +29,26 @@ function isPublicPath(pathname: string): boolean {
   return false;
 }
 
+function isLimitedUserAllowedPath(pathname: string): boolean {
+  if (pathname === "/api/auth/me" || pathname === "/api/auth/logout") {
+    return true;
+  }
+  if (pathname === "/trips" || pathname.startsWith("/trips/")) return true;
+  if (pathname === "/finance-brain" || pathname.startsWith("/finance-brain/")) {
+    return true;
+  }
+  if (pathname === "/api/trips" || pathname.startsWith("/api/trips/")) {
+    return true;
+  }
+  if (
+    pathname === "/api/finance-ledgers" ||
+    pathname.startsWith("/api/finance-ledgers/")
+  ) {
+    return true;
+  }
+  return false;
+}
+
 function hasValidOrigin(request: NextRequest): boolean {
   if (SAFE_METHODS.has(request.method)) return true;
   const origin = request.headers.get("origin");
@@ -91,17 +111,34 @@ export async function proxy(request: NextRequest) {
     session = auth.configured
       ? await verifySessionToken(
           request.cookies.get(SESSION_COOKIE_NAME)?.value,
-          auth.sessionSecret,
-          auth.username
+          auth.sessionSecret
         )
       : null;
   } catch (error) {
     console.error("[familybrain] Session verification failed:", error);
   }
 
+  // Legacy admin cookies without kind must still match env username.
+  if (
+    session?.kind === "admin" &&
+    session.username !== auth.username
+  ) {
+    session = null;
+  }
+
   if (session) {
     if (pathname === "/login") {
-      return NextResponse.redirect(new URL("/dashboard", origin));
+      const home = session.kind === "user" ? "/trips" : "/dashboard";
+      return NextResponse.redirect(new URL(home, origin));
+    }
+    if (session.kind === "user" && !isLimitedUserAllowedPath(pathname)) {
+      if (pathname.startsWith("/api/")) {
+        return NextResponse.json(
+          { error: "Keine Berechtigung." },
+          { status: 403 }
+        );
+      }
+      return NextResponse.redirect(new URL("/trips", origin));
     }
     return NextResponse.next();
   }

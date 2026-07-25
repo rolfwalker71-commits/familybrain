@@ -24,6 +24,7 @@ import {
 import { PageHeader } from "@/components/layout/page-primitives";
 import { IconCircle, pageVisuals } from "@/components/layout/icon-circle";
 import { SoftFab } from "@/components/layout/soft-ui";
+import { useAuth } from "@/components/auth/auth-provider";
 import {
   COMMON_CURRENCIES,
   LEDGER_KIND_LABELS,
@@ -42,14 +43,26 @@ type Ledger = {
   updated_at: string;
 };
 
+type AppUserOption = {
+  id: number;
+  username: string;
+  display_name: string;
+  email: string;
+  active: number;
+};
+
 export function FinanceLedgersListClient() {
+  const { me, loading: authLoading } = useAuth();
+  const isAdmin = !authLoading && me?.kind !== "user";
   const [ledgers, setLedgers] = useState<Ledger[]>([]);
+  const [users, setUsers] = useState<AppUserOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [baseCurrency, setBaseCurrency] = useState("CHF");
   const [ledgerKind, setLedgerKind] = useState<LedgerKind>("split");
   const [memberNames, setMemberNames] = useState("");
+  const [memberUserIds, setMemberUserIds] = useState<number[]>([]);
   const [creating, setCreating] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
 
@@ -68,9 +81,27 @@ export function FinanceLedgersListClient() {
     }
   }
 
+  async function loadUsers() {
+    if (!isAdmin) return;
+    try {
+      const res = await fetch("/api/users");
+      const data = await res.json();
+      if (!res.ok) return;
+      setUsers(
+        (data.users || []).filter((u: AppUserOption) => Boolean(u.active))
+      );
+    } catch {
+      /* ignore */
+    }
+  }
+
   useEffect(() => {
     void load();
   }, []);
+
+  useEffect(() => {
+    void loadUsers();
+  }, [isAdmin]);
 
   async function createLedger() {
     if (!title.trim()) return;
@@ -89,12 +120,17 @@ export function FinanceLedgersListClient() {
           ledgerKind,
           memberNames:
             ledgerKind === "split" && names.length ? names : undefined,
+          memberUserIds:
+            ledgerKind === "split" && memberUserIds.length
+              ? memberUserIds
+              : undefined,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Anlegen fehlgeschlagen");
       setTitle("");
       setMemberNames("");
+      setMemberUserIds([]);
       setLedgerKind("split");
       setCreateOpen(false);
       await load();
@@ -183,17 +219,53 @@ export function FinanceLedgersListClient() {
           </Select>
         </div>
         {ledgerKind === "split" ? (
-          <div className={cn("space-y-1.5", !compact && "sm:col-span-2")}>
-            <Label htmlFor={compact ? "memberNamesMobile" : "memberNames"}>
-              Teilnehmer (optional)
-            </Label>
-            <Input
-              id={compact ? "memberNamesMobile" : "memberNames"}
-              placeholder="Anna, Ben, Chris"
-              value={memberNames}
-              onChange={(e) => setMemberNames(e.target.value)}
-            />
-          </div>
+          <>
+            {users.length > 0 ? (
+              <div className={cn("space-y-1.5", !compact && "sm:col-span-2")}>
+                <Label>App-User als Teilnehmer</Label>
+                <div className="max-h-40 space-y-1 overflow-y-auto rounded-lg border border-border/50 p-2">
+                  {users.map((user) => (
+                    <label
+                      key={user.id}
+                      className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/60"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={memberUserIds.includes(user.id)}
+                        onChange={() => {
+                          setMemberUserIds((prev) =>
+                            prev.includes(user.id)
+                              ? prev.filter((id) => id !== user.id)
+                              : [...prev, user.id]
+                          );
+                        }}
+                      />
+                      <span className="truncate">
+                        {user.display_name}{" "}
+                        <span className="text-muted-foreground">
+                          (@{user.username})
+                        </span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Gewählte User erhalten Split-Mitgliedschaft und App-Zugriff.
+                </p>
+              </div>
+            ) : null}
+            <div className={cn("space-y-1.5", !compact && "sm:col-span-2")}>
+              <Label htmlFor={compact ? "memberNamesMobile" : "memberNames"}>
+                Weitere Teilnehmer (optional)
+              </Label>
+              <Input
+                id={compact ? "memberNamesMobile" : "memberNames"}
+                placeholder="Anna, Ben, Chris"
+                value={memberNames}
+                onChange={(e) => setMemberNames(e.target.value)}
+              />
+            </div>
+          </>
         ) : null}
         <div className={cn(!compact && "sm:col-span-2")}>
           <Button
@@ -218,15 +290,16 @@ export function FinanceLedgersListClient() {
         tone={pageVisuals.financeBrain.tone}
       />
 
-      {/* Desktop create form */}
-      <Card tone="green" className="hidden md:block">
-        <CardContent className="p-4">
-          <p className="mb-3 text-sm font-medium text-[var(--brand-finance)]">
-            Neue Abrechnung
-          </p>
-          <CreateForm />
-        </CardContent>
-      </Card>
+      {isAdmin ? (
+        <Card tone="green" className="hidden md:block">
+          <CardContent className="p-4">
+            <p className="mb-3 text-sm font-medium text-[var(--brand-finance)]">
+              Neue Abrechnung
+            </p>
+            <CreateForm />
+          </CardContent>
+        </Card>
+      ) : null}
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
@@ -243,13 +316,15 @@ export function FinanceLedgersListClient() {
               <p className="text-sm text-muted-foreground">
                 Noch keine Abrechnungen.
               </p>
-              <Button
-                className="w-full bg-[var(--brand-finance)] text-white hover:bg-[var(--brand-finance)]/90 md:hidden"
-                onClick={() => setCreateOpen(true)}
-              >
-                <Plus className="mr-2 size-4" />
-                Erste Abrechnung anlegen
-              </Button>
+              {isAdmin ? (
+                <Button
+                  className="w-full bg-[var(--brand-finance)] text-white hover:bg-[var(--brand-finance)]/90 md:hidden"
+                  onClick={() => setCreateOpen(true)}
+                >
+                  <Plus className="mr-2 size-4" />
+                  Erste Abrechnung anlegen
+                </Button>
+              ) : null}
             </CardContent>
           </Card>
         ) : (
@@ -270,49 +345,58 @@ export function FinanceLedgersListClient() {
                     }
                   />
                   <div className="relative flex flex-1 flex-col p-4">
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    className="absolute top-3 right-3 z-10"
-                    onClick={() => void removeLedger(ledger.id, ledger.title)}
-                    aria-label="Löschen"
-                  >
-                    <Trash2 className="size-4 text-destructive" />
-                  </Button>
+                    {isAdmin ? (
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        className="absolute top-3 right-3 z-10"
+                        onClick={() =>
+                          void removeLedger(ledger.id, ledger.title)
+                        }
+                        aria-label="Löschen"
+                      >
+                        <Trash2 className="size-4 text-destructive" />
+                      </Button>
+                    ) : null}
 
-                  <div className="flex min-h-0 flex-1 items-start gap-3 pr-10">
-                    <IconCircle
-                      icon={pageVisuals.financeBrain.icon}
-                      tone="green"
-                      size="lg"
-                      className="rounded-xl"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p className="font-semibold text-foreground">
-                        {ledger.title}
-                      </p>
-                      {ledger.trip_title ? (
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          Reise: {ledger.trip_title}
+                    <div
+                      className={cn(
+                        "flex min-h-0 flex-1 items-start gap-3",
+                        isAdmin && "pr-10"
+                      )}
+                    >
+                      <IconCircle
+                        icon={pageVisuals.financeBrain.icon}
+                        tone="green"
+                        size="lg"
+                        className="rounded-xl"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-foreground">
+                          {ledger.title}
                         </p>
-                      ) : null}
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        <span className="inline-flex rounded-full bg-muted px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground">
-                          {LEDGER_KIND_LABELS[kind]}
-                        </span>
-                        <span className="inline-flex rounded-full bg-muted px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground">
-                          {ledger.base_currency}
-                        </span>
+                        {ledger.trip_title ? (
+                          <p className="mt-0.5 text-xs text-muted-foreground">
+                            Reise: {ledger.trip_title}
+                          </p>
+                        ) : null}
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          <span className="inline-flex rounded-full bg-muted px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+                            {LEDGER_KIND_LABELS[kind]}
+                          </span>
+                          <span className="inline-flex rounded-full bg-muted px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+                            {ledger.base_currency}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <Link
-                    href={`/finance-brain/${ledger.id}`}
-                    className="mt-4 flex w-full items-center justify-center rounded-xl bg-[var(--brand-finance-soft)] px-4 py-2.5 text-sm font-semibold text-[var(--brand-finance)] transition-colors hover:opacity-90"
-                  >
-                    Öffnen
-                  </Link>
+                    <Link
+                      href={`/finance-brain/${ledger.id}`}
+                      className="mt-4 flex w-full items-center justify-center rounded-xl bg-[var(--brand-finance-soft)] px-4 py-2.5 text-sm font-semibold text-[var(--brand-finance)] transition-colors hover:opacity-90"
+                    >
+                      Öffnen
+                    </Link>
                   </div>
                 </div>
               );
@@ -321,28 +405,31 @@ export function FinanceLedgersListClient() {
         )}
       </div>
 
-      <SoftFab
-        accent="green"
-        label="Neue Abrechnung"
-        aria-label="Neue Abrechnung"
-        onClick={() => setCreateOpen(true)}
-      >
-        <Plus className="size-6" />
-      </SoftFab>
+      {isAdmin ? (
+        <>
+          <SoftFab
+            className="md:hidden"
+            onClick={() => setCreateOpen(true)}
+            aria-label="Neue Abrechnung"
+          >
+            <Plus className="size-6" />
+          </SoftFab>
 
-      <Sheet open={createOpen} onOpenChange={setCreateOpen}>
-        <SheetContent side="bottom" className="max-h-[90dvh] overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>Neue Abrechnung</SheetTitle>
-            <SheetDescription>
-              Split oder normales Haushaltsbuch anlegen.
-            </SheetDescription>
-          </SheetHeader>
-          <div className="px-4 pb-6">
-            <CreateForm compact />
-          </div>
-        </SheetContent>
-      </Sheet>
+          <Sheet open={createOpen} onOpenChange={setCreateOpen}>
+            <SheetContent side="bottom" className="max-h-[90vh] overflow-y-auto">
+              <SheetHeader>
+                <SheetTitle>Neue Abrechnung</SheetTitle>
+                <SheetDescription>
+                  Split oder normales Kassenbuch anlegen.
+                </SheetDescription>
+              </SheetHeader>
+              <div className="mt-4 pb-6">
+                <CreateForm compact />
+              </div>
+            </SheetContent>
+          </Sheet>
+        </>
+      ) : null}
     </div>
   );
 }

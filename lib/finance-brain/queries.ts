@@ -11,6 +11,10 @@ import {
   toBaseAmount,
   type BalanceInput,
 } from "@/lib/finance-brain/settlement";
+import {
+  getAppUserById,
+  grantLedgerAccess,
+} from "@/lib/users/queries";
 
 export type FinanceLedgerRow = {
   id: number;
@@ -30,6 +34,7 @@ export type FinanceLedgerMemberRow = {
   ledger_id: number;
   display_name: string;
   email: string | null;
+  user_id: number | null;
   invite_token: string;
   invite_revoked_at: string | null;
   created_at: string;
@@ -175,6 +180,7 @@ export function createFinanceLedger(input: {
   baseCurrency?: string;
   tripId?: number | null;
   memberNames?: string[];
+  memberUserIds?: number[];
   ledgerKind?: LedgerKind;
 }): FinanceLedgerRow {
   const db = getDb();
@@ -209,6 +215,16 @@ export function createFinanceLedger(input: {
     const names = input.memberNames?.filter((n) => n.trim()) ?? [];
     for (const name of names) {
       addFinanceLedgerMember(ledgerId, { displayName: name });
+    }
+    const userIds = [
+      ...new Set(
+        (input.memberUserIds ?? []).filter(
+          (id) => Number.isInteger(id) && id > 0
+        )
+      ),
+    ];
+    for (const userId of userIds) {
+      addFinanceLedgerMemberFromUser(ledgerId, userId);
     }
   }
   const ledger = getFinanceLedgerById(ledgerId);
@@ -328,7 +344,11 @@ export function getFinanceLedgerMemberByToken(
 
 export function addFinanceLedgerMember(
   ledgerId: number,
-  input: { displayName: string; email?: string | null }
+  input: {
+    displayName: string;
+    email?: string | null;
+    userId?: number | null;
+  }
 ): FinanceLedgerMemberRow {
   const ledger = getFinanceLedgerById(ledgerId);
   if (!ledger) {
@@ -351,13 +371,14 @@ export function addFinanceLedgerMember(
   const result = db
     .prepare(
       `INSERT INTO finance_ledger_members
-         (ledger_id, display_name, email, invite_token, invite_revoked_at, created_at)
-       VALUES (?, ?, ?, ?, NULL, ?)`
+         (ledger_id, display_name, email, user_id, invite_token, invite_revoked_at, created_at)
+       VALUES (?, ?, ?, ?, ?, NULL, ?)`
     )
     .run(
       ledgerId,
       displayName,
       input.email?.trim() || null,
+      input.userId ?? null,
       token,
       ts
     );
@@ -365,6 +386,30 @@ export function addFinanceLedgerMember(
   return db
     .prepare(`SELECT * FROM finance_ledger_members WHERE id = ?`)
     .get(Number(result.lastInsertRowid)) as FinanceLedgerMemberRow;
+}
+
+export function addFinanceLedgerMemberFromUser(
+  ledgerId: number,
+  userId: number
+): FinanceLedgerMemberRow {
+  const user = getAppUserById(userId);
+  if (!user || !user.active) {
+    throw new Error(`Benutzer ${userId} nicht gefunden`);
+  }
+  const existing = listFinanceLedgerMembers(ledgerId).find(
+    (m) => m.user_id === userId
+  );
+  if (existing) {
+    grantLedgerAccess(userId, ledgerId);
+    return existing;
+  }
+  const member = addFinanceLedgerMember(ledgerId, {
+    displayName: user.display_name || user.username,
+    email: user.email,
+    userId: user.id,
+  });
+  grantLedgerAccess(userId, ledgerId);
+  return member;
 }
 
 export function updateFinanceLedgerMember(

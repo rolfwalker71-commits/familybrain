@@ -3,8 +3,12 @@ import {
   SESSION_MAX_AGE_SECONDS,
 } from "./config";
 
-type SessionPayload = {
+export type SessionKind = "admin" | "user";
+
+export type SessionPayload = {
+  kind: SessionKind;
   username: string;
+  userId?: number;
   expiresAt: number;
 };
 
@@ -20,7 +24,7 @@ function bytesToBase64Url(bytes: Uint8Array): string {
 function base64UrlToBytes(value: string): Uint8Array {
   const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
   const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
-  const binary = atob(padded);
+  const binary = atob(base64);
   return Uint8Array.from(binary, (char) => char.charCodeAt(0));
 }
 
@@ -34,14 +38,33 @@ function decodePayload(value: string): SessionPayload | null {
   try {
     const parsed = JSON.parse(
       new TextDecoder().decode(base64UrlToBytes(value))
-    ) as Partial<SessionPayload>;
+    ) as Partial<SessionPayload> & { kind?: string };
     if (
       typeof parsed.username !== "string" ||
       typeof parsed.expiresAt !== "number"
     ) {
       return null;
     }
+    const kind: SessionKind =
+      parsed.kind === "user"
+        ? "user"
+        : parsed.kind === "admin"
+          ? "admin"
+          : // Legacy cookies without kind → treat as admin
+            "admin";
+    if (kind === "user") {
+      if (typeof parsed.userId !== "number" || parsed.userId <= 0) {
+        return null;
+      }
+      return {
+        kind,
+        username: parsed.username,
+        userId: parsed.userId,
+        expiresAt: parsed.expiresAt,
+      };
+    }
     return {
+      kind: "admin",
       username: parsed.username,
       expiresAt: parsed.expiresAt,
     };
@@ -71,12 +94,18 @@ async function sign(value: string, secret: string): Promise<string> {
 }
 
 export async function createSessionToken(
-  username: string,
+  input: {
+    kind: SessionKind;
+    username: string;
+    userId?: number;
+  },
   secret: string,
   now = Date.now()
 ): Promise<string> {
   const payload = encodePayload({
-    username,
+    kind: input.kind,
+    username: input.username,
+    userId: input.kind === "user" ? input.userId : undefined,
     expiresAt: now + SESSION_MAX_AGE_SECONDS * 1000,
   });
   return `${payload}.${await sign(payload, secret)}`;
@@ -85,7 +114,6 @@ export async function createSessionToken(
 export async function verifySessionToken(
   token: string | null | undefined,
   secret: string,
-  expectedUsername: string,
   now = Date.now()
 ): Promise<SessionPayload | null> {
   if (!token || !secret) return null;
@@ -109,11 +137,7 @@ export async function verifySessionToken(
   }
 
   const payload = decodePayload(payloadPart);
-  if (
-    !payload ||
-    payload.username !== expectedUsername ||
-    payload.expiresAt <= now
-  ) {
+  if (!payload || payload.expiresAt <= now) {
     return null;
   }
   return payload;

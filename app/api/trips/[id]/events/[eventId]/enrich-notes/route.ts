@@ -1,4 +1,8 @@
 import { NextResponse } from "next/server";
+import {
+  isAuthError,
+  requireTripAccess,
+} from "@/lib/auth/current-user";
 import { enrichEventDocumentNotes } from "@/lib/trips/enrich-notes";
 import { getTripEventById } from "@/lib/trips/queries";
 import { serializeTripEvent } from "@/lib/trips/serialize-event";
@@ -21,6 +25,8 @@ export async function POST(_request: Request, context: Ctx) {
     ) {
       return NextResponse.json({ error: "Ungültige ID" }, { status: 400 });
     }
+    const auth = await requireTripAccess(tripId);
+    if (isAuthError(auth)) return auth;
     const existing = getTripEventById(eventId);
     if (!existing || existing.trip_id !== tripId) {
       return NextResponse.json({ error: "Ereignis nicht gefunden" }, { status: 404 });

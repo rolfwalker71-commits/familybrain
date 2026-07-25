@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import {
+  isAuthError,
+  requireAdmin,
+} from "@/lib/auth/current-user";
 import { sendTestEmail } from "@/lib/finance-brain/email";
 import { isEmailConfigured } from "@/lib/finance-brain/mail-settings";
 
@@ -11,6 +15,8 @@ const Schema = z.object({
 });
 
 export async function POST(request: Request) {
+  const auth = await requireAdmin();
+  if (isAuthError(auth)) return auth;
   try {
     if (!isEmailConfigured()) {
       return NextResponse.json(

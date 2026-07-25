@@ -1,4 +1,8 @@
 import { NextResponse } from "next/server";
+import {
+  isAuthError,
+  requireTripAccess,
+} from "@/lib/auth/current-user";
 import { tripEventsToCalendarEvents } from "@/lib/trips/ics";
 import { getTripById, listTripEvents } from "@/lib/trips/queries";
 import { buildIcsCalendar } from "@/lib/utils/ics";
@@ -14,6 +18,8 @@ export async function GET(_request: Request, context: Ctx) {
   if (!Number.isInteger(id) || id <= 0) {
     return NextResponse.json({ error: "Ungültige ID" }, { status: 400 });
   }
+  const auth = await requireTripAccess(id);
+  if (isAuthError(auth)) return auth;
   const trip = getTripById(id);
   if (!trip) {
     return NextResponse.json({ error: "Reise nicht gefunden" }, { status: 404 });

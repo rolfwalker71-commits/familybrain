@@ -1,4 +1,8 @@
 import { NextResponse } from "next/server";
+import {
+  isAuthError,
+  requireTripAccess,
+} from "@/lib/auth/current-user";
 import { z } from "zod";
 import { TRIP_EVENT_TYPES } from "@/lib/trips/constants";
 import {
@@ -57,6 +61,8 @@ export async function GET(_request: Request, context: Ctx) {
   if (!Number.isInteger(id) || id <= 0) {
     return NextResponse.json({ error: "Ungültige ID" }, { status: 400 });
   }
+  const auth = await requireTripAccess(id);
+  if (isAuthError(auth)) return auth;
   if (!getTripById(id)) {
     return NextResponse.json({ error: "Reise nicht gefunden" }, { status: 404 });
   }
@@ -72,6 +78,8 @@ export async function POST(request: Request, context: Ctx) {
     if (!Number.isInteger(id) || id <= 0) {
       return NextResponse.json({ error: "Ungültige ID" }, { status: 400 });
     }
+    const auth = await requireTripAccess(id);
+    if (isAuthError(auth)) return auth;
     const body = await request.json();
     const parsed = CreateSchema.safeParse(body);
     if (!parsed.success) {

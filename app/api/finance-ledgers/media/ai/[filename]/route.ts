@@ -2,6 +2,10 @@ import fs from "fs";
 import path from "path";
 import { NextResponse } from "next/server";
 import {
+  isAuthError,
+  requireLedgerAccess,
+} from "@/lib/auth/current-user";
+import {
   contentTypeForReceipt,
 } from "@/lib/finance-brain/receipts";
 import { resolveFinanceExpenseAiPath } from "@/lib/finance-brain/expense-image";
@@ -21,14 +25,16 @@ export async function GET(_request: Request, context: Ctx) {
   const base = path.basename(full);
   const row = getDb()
     .prepare(
-      `SELECT id FROM finance_expenses
+      `SELECT ledger_id FROM finance_expenses
        WHERE ai_image_path LIKE ? OR ai_image_path LIKE ?
        LIMIT 1`
     )
-    .get(`%/${base}`, `%\\${base}`) as { id: number } | undefined;
+    .get(`%/${base}`, `%\\${base}`) as { ledger_id: number } | undefined;
   if (!row) {
     return NextResponse.json({ error: "Nicht gefunden" }, { status: 404 });
   }
+  const auth = await requireLedgerAccess(row.ledger_id);
+  if (isAuthError(auth)) return auth;
   const buffer = fs.readFileSync(full);
   return new NextResponse(buffer, {
     headers: {

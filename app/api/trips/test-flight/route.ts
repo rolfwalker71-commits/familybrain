@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { isAuthError, requireAdmin } from "@/lib/auth/current-user";
 import {
   getAeroDataBoxApiKey,
   getAeroDataBoxBaseUrl,
@@ -21,6 +22,8 @@ function normalizeFlightNumber(raw: string): string {
 }
 
 export async function POST(request: Request) {
+  const auth = await requireAdmin();
+  if (isAuthError(auth)) return auth;
   try {
     const body = await request.json().catch(() => ({}));
     const parsed = BodySchema.safeParse(body);

@@ -1,4 +1,8 @@
 import { NextResponse } from "next/server";
+import {
+  isAuthError,
+  requireLedgerAccess,
+} from "@/lib/auth/current-user";
 import { z } from "zod";
 import {
   deleteFinanceSettlement,
@@ -27,6 +31,8 @@ export async function PATCH(request: Request, context: Ctx) {
   try {
     const { id: idRaw, settlementId: settlementIdRaw } = await context.params;
     const ledgerId = Number(idRaw);
+    const auth = await requireLedgerAccess(ledgerId);
+    if (isAuthError(auth)) return auth;
     const settlementId = Number(settlementIdRaw);
     if (!getFinanceLedgerById(ledgerId)) {
       return NextResponse.json({ error: "Abrechnung nicht gefunden" }, { status: 404 });
@@ -63,6 +69,8 @@ export async function DELETE(_request: Request, context: Ctx) {
   try {
     const { id: idRaw, settlementId: settlementIdRaw } = await context.params;
     const ledgerId = Number(idRaw);
+    const auth = await requireLedgerAccess(ledgerId);
+    if (isAuthError(auth)) return auth;
     const settlementId = Number(settlementIdRaw);
     if (!getFinanceLedgerById(ledgerId)) {
       return NextResponse.json({ error: "Abrechnung nicht gefunden" }, { status: 404 });

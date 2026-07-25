@@ -1,4 +1,8 @@
 import { NextResponse } from "next/server";
+import {
+  isAuthError,
+  requireTripAccess,
+} from "@/lib/auth/current-user";
 import { z } from "zod";
 import {
   applyHotelPlaceEnrichment,
@@ -35,6 +39,8 @@ export async function POST(request: Request, context: Ctx) {
   try {
     const { id: idRaw, eventId: eventIdRaw } = await context.params;
     const tripId = Number(idRaw);
+    const auth = await requireTripAccess(tripId);
+    if (isAuthError(auth)) return auth;
     const eventId = Number(eventIdRaw);
     const existing = getTripEventById(eventId);
     if (!existing || existing.trip_id !== tripId) {

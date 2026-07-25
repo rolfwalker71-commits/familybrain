@@ -1,11 +1,17 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import {
+  isAuthError,
+  requireAdmin,
+  requireAuth,
+} from "@/lib/auth/current-user";
+import {
   createFinanceLedger,
   listFinanceLedgers,
 } from "@/lib/finance-brain/queries";
 import { serializeLedger } from "@/lib/finance-brain/serialize";
 import { COMMON_CURRENCIES, LEDGER_KINDS } from "@/lib/finance-brain/constants";
+import { listUserLedgerIds } from "@/lib/users/queries";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,15 +21,24 @@ const CreateSchema = z.object({
   baseCurrency: z.string().min(3).max(3).optional(),
   tripId: z.number().int().positive().nullable().optional(),
   memberNames: z.array(z.string().min(1).max(80)).optional(),
+  memberUserIds: z.array(z.number().int().positive()).optional(),
   ledgerKind: z.enum(LEDGER_KINDS).optional(),
 });
 
 export async function GET() {
-  const ledgers = listFinanceLedgers().map(serializeLedger);
-  return NextResponse.json({ ledgers });
+  const auth = await requireAuth();
+  if (isAuthError(auth)) return auth;
+  let ledgers = listFinanceLedgers();
+  if (!auth.isAdmin && auth.userId) {
+    const allowed = new Set(listUserLedgerIds(auth.userId));
+    ledgers = ledgers.filter((l) => allowed.has(l.id));
+  }
+  return NextResponse.json({ ledgers: ledgers.map(serializeLedger) });
 }
 
 export async function POST(request: Request) {
+  const auth = await requireAdmin();
+  if (isAuthError(auth)) return auth;
   try {
     const body = await request.json();
     const parsed = CreateSchema.safeParse(body);
@@ -45,6 +60,10 @@ export async function POST(request: Request) {
         parsed.data.ledgerKind === "normal"
           ? undefined
           : parsed.data.memberNames,
+      memberUserIds:
+        parsed.data.ledgerKind === "normal"
+          ? undefined
+          : parsed.data.memberUserIds,
       ledgerKind: parsed.data.ledgerKind ?? "split",
     });
     return NextResponse.json({

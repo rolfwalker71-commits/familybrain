@@ -56,11 +56,23 @@ import {
   getSmtpSettingsPublic,
   saveSmtpSettings,
 } from "@/lib/finance-brain/mail-settings";
+import {
+  APP_PUBLIC_URL_KEY,
+  getAppPublicUrlSetting,
+  normalizeAppPublicUrl,
+} from "@/lib/app-url";
+import { setSetting } from "@/lib/db/migrations";
+import {
+  isAuthError,
+  requireAdmin,
+} from "@/lib/auth/current-user";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  const auth = await requireAdmin();
+  if (isAuthError(auth)) return auth;
   const paperless = getPaperlessSettings();
   const openai = getOpenAISettings();
   const trilium = getTriliumSettings();
@@ -98,6 +110,7 @@ export async function GET() {
     financeExpenseAiImagePromptCustomized: isExpenseAiImagePromptCustomized(),
     financeExpenseAiImagePromptDefault: DEFAULT_EXPENSE_AI_IMAGE_PROMPT,
     financeExpenseAiImagePromptPlaceholders: EXPENSE_AI_IMAGE_PROMPT_PLACEHOLDERS,
+    appPublicUrl: getAppPublicUrlSetting() || "",
     ...getSmtpSettingsPublic(),
   });
 }
@@ -127,9 +140,12 @@ const PutSchema = z.object({
   smtpPassword: z.string().optional(),
   clearSmtpPassword: z.boolean().optional(),
   smtpFrom: z.string().max(320).nullable().optional(),
+  appPublicUrl: z.string().max(500).nullable().optional(),
 });
 
 export async function PUT(request: Request) {
+  const auth = await requireAdmin();
+  if (isAuthError(auth)) return auth;
   const body = await request.json();
   const parsed = PutSchema.safeParse(body);
   if (!parsed.success) {
@@ -137,6 +153,16 @@ export async function PUT(request: Request) {
       { error: "Ungültige Eingabe", details: parsed.error.flatten() },
       { status: 400 }
     );
+  }
+
+  if (parsed.data.appPublicUrl !== undefined) {
+    try {
+      const normalized = normalizeAppPublicUrl(parsed.data.appPublicUrl);
+      setSetting(APP_PUBLIC_URL_KEY, normalized);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return NextResponse.json({ error: message }, { status: 400 });
+    }
   }
 
   if (parsed.data.paperlessBaseUrl) {
@@ -309,6 +335,7 @@ export async function PUT(request: Request) {
     financeExpenseAiImagePromptCustomized: isExpenseAiImagePromptCustomized(),
     financeExpenseAiImagePromptDefault: DEFAULT_EXPENSE_AI_IMAGE_PROMPT,
     financeExpenseAiImagePromptPlaceholders: EXPENSE_AI_IMAGE_PROMPT_PLACEHOLDERS,
+    appPublicUrl: getAppPublicUrlSetting() || "",
     ...getSmtpSettingsPublic(),
   });
 }

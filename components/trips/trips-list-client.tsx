@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/sheet";
 import { PageHeader } from "@/components/layout/page-primitives";
 import { pageVisuals } from "@/components/layout/icon-circle";
+import { useAuth } from "@/components/auth/auth-provider";
 import { toSwissDate } from "@/lib/utils/dates";
 import { TRIP_STATUSES } from "@/lib/trips/constants";
 
@@ -48,6 +49,8 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 export function TripsListClient() {
+  const { me, loading: authLoading } = useAuth();
+  const isAdmin = !authLoading && me?.kind !== "user";
   const [trips, setTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -216,15 +219,18 @@ export function TripsListClient() {
         tone={pageVisuals.trips.tone}
       />
 
-      <Card className="hidden border-border shadow-[0_2px_4px_rgba(20,32,28,0.06),0_10px_28px_rgba(20,32,28,0.1)] md:block">
-        <CardContent className="p-4">
-          <p className="mb-3 text-sm font-medium text-[var(--brand-finance)]">
-            Neue Reise
-          </p>
-          <CreateForm />
-        </CardContent>
-      </Card>
+      {isAdmin ? (
+        <Card className="hidden border-border shadow-[0_2px_4px_rgba(20,32,28,0.06),0_10px_28px_rgba(20,32,28,0.1)] md:block">
+          <CardContent className="p-4">
+            <p className="mb-3 text-sm font-medium text-[var(--brand-finance)]">
+              Neue Reise
+            </p>
+            <CreateForm />
+          </CardContent>
+        </Card>
+      ) : null}
 
+      {isAdmin ? (
       <Card className="border-border shadow-[0_2px_4px_rgba(20,32,28,0.06),0_10px_28px_rgba(20,32,28,0.1)]">
         <CardContent className="flex flex-wrap items-center gap-2 p-4">
           <p className="mr-auto text-sm text-muted-foreground">
@@ -262,6 +268,7 @@ export function TripsListClient() {
           </Button>
         </CardContent>
       </Card>
+      ) : null}
 
       {error ? (
         <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
@@ -277,15 +284,17 @@ export function TripsListClient() {
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-2">
           <h2 className="text-sm font-semibold tracking-tight">Meine Reisen</h2>
-          <Button
-            size="sm"
-            variant="outline"
-            className="md:hidden"
-            onClick={() => setCreateOpen(true)}
-          >
-            <Plus className="mr-1 size-4" />
-            Neu
-          </Button>
+          {isAdmin ? (
+            <Button
+              size="sm"
+              variant="outline"
+              className="md:hidden"
+              onClick={() => setCreateOpen(true)}
+            >
+              <Plus className="mr-1 size-4" />
+              Neu
+            </Button>
+          ) : null}
         </div>
 
         {loading ? (
@@ -296,13 +305,15 @@ export function TripsListClient() {
               <p className="text-sm text-muted-foreground">
                 Noch keine Reisen.
               </p>
-              <Button
-                className="w-full bg-[var(--brand-finance)] text-white hover:bg-[var(--brand-finance)]/90 md:hidden"
-                onClick={() => setCreateOpen(true)}
-              >
-                <Plus className="mr-2 size-4" />
-                Erste Reise anlegen
-              </Button>
+              {isAdmin ? (
+                <Button
+                  className="w-full bg-[var(--brand-finance)] text-white hover:bg-[var(--brand-finance)]/90 md:hidden"
+                  onClick={() => setCreateOpen(true)}
+                >
+                  <Plus className="mr-2 size-4" />
+                  Erste Reise anlegen
+                </Button>
+              ) : null}
             </CardContent>
           </Card>
         ) : (
@@ -359,14 +370,16 @@ export function TripsListClient() {
                     >
                       Öffnen
                     </Link>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => void removeTrip(trip.id, trip.title)}
-                      title="Reise löschen"
-                    >
-                      <Trash2 className="size-4" />
-                    </Button>
+                    {isAdmin ? (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => void removeTrip(trip.id, trip.title)}
+                        title="Reise löschen"
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    ) : null}
                   </div>
                 </CardContent>
               </Card>
@@ -375,28 +388,32 @@ export function TripsListClient() {
         )}
       </div>
 
-      <button
-        type="button"
-        className="fixed right-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-30 flex size-14 items-center justify-center rounded-full bg-foreground text-background shadow-lg md:hidden"
-        aria-label="Neue Reise"
-        onClick={() => setCreateOpen(true)}
-      >
-        <Plus className="size-6" />
-      </button>
+      {isAdmin ? (
+        <>
+          <button
+            type="button"
+            className="fixed right-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-30 flex size-14 items-center justify-center rounded-full bg-foreground text-background shadow-lg md:hidden"
+            aria-label="Neue Reise"
+            onClick={() => setCreateOpen(true)}
+          >
+            <Plus className="size-6" />
+          </button>
 
-      <Sheet open={createOpen} onOpenChange={setCreateOpen}>
-        <SheetContent side="bottom" className="max-h-[90dvh] overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>Neue Reise</SheetTitle>
-            <SheetDescription>
-              Titel und optional Ziel festlegen.
-            </SheetDescription>
-          </SheetHeader>
-          <div className="px-4 pb-6">
-            <CreateForm compact />
-          </div>
-        </SheetContent>
-      </Sheet>
+          <Sheet open={createOpen} onOpenChange={setCreateOpen}>
+            <SheetContent side="bottom" className="max-h-[90dvh] overflow-y-auto">
+              <SheetHeader>
+                <SheetTitle>Neue Reise</SheetTitle>
+                <SheetDescription>
+                  Titel und optional Ziel festlegen.
+                </SheetDescription>
+              </SheetHeader>
+              <div className="px-4 pb-6">
+                <CreateForm compact />
+              </div>
+            </SheetContent>
+          </Sheet>
+        </>
+      ) : null}
     </div>
   );
 }

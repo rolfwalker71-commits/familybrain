@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import {
+  isAuthError,
+  requireTripAccess,
+} from "@/lib/auth/current-user";
+import {
   buildTripExportModel,
   buildTripPdfBuffer,
   tripExportFilename,
@@ -17,6 +21,8 @@ export async function GET(_request: Request, context: Ctx) {
     if (!Number.isInteger(id) || id <= 0) {
       return NextResponse.json({ error: "Ungültige ID" }, { status: 400 });
     }
+    const auth = await requireTripAccess(id);
+    if (isAuthError(auth)) return auth;
     const model = buildTripExportModel(id);
     if (!model) {
       return NextResponse.json({ error: "Reise nicht gefunden" }, { status: 404 });

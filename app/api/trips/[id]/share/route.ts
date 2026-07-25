@@ -1,4 +1,8 @@
 import { NextResponse } from "next/server";
+import {
+  isAuthError,
+  requireTripAccess,
+} from "@/lib/auth/current-user";
 import { z } from "zod";
 import { getTripById } from "@/lib/trips/queries";
 import {
@@ -22,6 +26,8 @@ export async function GET(_request: Request, context: Ctx) {
   if (!Number.isInteger(tripId) || tripId <= 0) {
     return NextResponse.json({ error: "Ungültige ID" }, { status: 400 });
   }
+  const auth = await requireTripAccess(tripId);
+  if (isAuthError(auth)) return auth;
   if (!getTripById(tripId)) {
     return NextResponse.json({ error: "Reise nicht gefunden" }, { status: 404 });
   }
@@ -35,6 +41,8 @@ export async function POST(request: Request, context: Ctx) {
     if (!Number.isInteger(tripId) || tripId <= 0) {
       return NextResponse.json({ error: "Ungültige ID" }, { status: 400 });
     }
+    const auth = await requireTripAccess(tripId);
+    if (isAuthError(auth)) return auth;
     if (!getTripById(tripId)) {
       return NextResponse.json({ error: "Reise nicht gefunden" }, { status: 404 });
     }
@@ -58,6 +66,8 @@ export async function DELETE(request: Request, context: Ctx) {
     if (!Number.isInteger(tripId) || tripId <= 0) {
       return NextResponse.json({ error: "Ungültige ID" }, { status: 400 });
     }
+    const auth = await requireTripAccess(tripId);
+    if (isAuthError(auth)) return auth;
     const url = new URL(request.url);
     const shareId = Number(url.searchParams.get("shareId"));
     if (!Number.isInteger(shareId) || shareId <= 0) {

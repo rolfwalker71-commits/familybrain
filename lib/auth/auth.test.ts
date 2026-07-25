@@ -16,20 +16,40 @@ const secret = "a-secure-test-secret-with-more-than-32-characters";
 
 test("session tokens verify and expire", async () => {
   const now = Date.UTC(2026, 6, 19);
-  const token = await createSessionToken("admin", secret, now);
+  const token = await createSessionToken(
+    { kind: "admin", username: "admin" },
+    secret,
+    now
+  );
   assert.equal(
-    (await verifySessionToken(token, secret, "admin", now + 1000))?.username,
+    (await verifySessionToken(token, secret, now + 1000))?.username,
     "admin"
   );
-  assert.equal(await verifySessionToken(token, secret, "other", now), null);
   assert.equal(
-    await verifySessionToken(`${token}tampered`, secret, "admin", now),
+    (await verifySessionToken(token, secret, now + 1000))?.kind,
+    "admin"
+  );
+  assert.equal(
+    await verifySessionToken(`${token}tampered`, secret, now),
     null
   );
   assert.equal(
-    await verifySessionToken(token, secret, "admin", now + 31 * 24 * 60 * 60 * 1000),
+    await verifySessionToken(token, secret, now + 31 * 24 * 60 * 60 * 1000),
     null
   );
+});
+
+test("user session tokens include userId", async () => {
+  const now = Date.UTC(2026, 6, 19);
+  const token = await createSessionToken(
+    { kind: "user", username: "anna", userId: 7 },
+    secret,
+    now
+  );
+  const session = await verifySessionToken(token, secret, now + 1000);
+  assert.equal(session?.kind, "user");
+  assert.equal(session?.userId, 7);
+  assert.equal(session?.username, "anna");
 });
 
 test("plain and scrypt configured passwords verify", async () => {

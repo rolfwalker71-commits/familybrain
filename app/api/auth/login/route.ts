@@ -2,7 +2,10 @@ import { cookies, headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getAuthConfiguration } from "@/lib/auth/config";
-import { verifyConfiguredPassword } from "@/lib/auth/password";
+import {
+  verifyConfiguredPassword,
+  verifyPasswordHash,
+} from "@/lib/auth/password";
 import {
   clearLoginFailures,
   loginRateLimitStatus,
@@ -12,6 +15,7 @@ import {
   createSessionToken,
   sessionCookieOptions,
 } from "@/lib/auth/session";
+import { getAppUserByUsername } from "@/lib/users/queries";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -66,12 +70,41 @@ export async function POST(request: Request) {
     );
   }
 
-  const valid = await verifyConfiguredPassword(
+  const adminValid = await verifyConfiguredPassword(
     parsed.data.username,
     parsed.data.password,
     config
   );
-  if (!valid) {
+
+  let token: string | null = null;
+  let home = "/dashboard";
+
+  if (adminValid) {
+    token = await createSessionToken(
+      { kind: "admin", username: config.username },
+      config.sessionSecret
+    );
+    home = "/dashboard";
+  } else {
+    const user = getAppUserByUsername(parsed.data.username);
+    if (
+      user &&
+      user.active &&
+      (await verifyPasswordHash(parsed.data.password, user.password_hash))
+    ) {
+      token = await createSessionToken(
+        {
+          kind: "user",
+          username: user.username,
+          userId: user.id,
+        },
+        config.sessionSecret
+      );
+      home = "/trips";
+    }
+  }
+
+  if (!token) {
     recordLoginFailure(address);
     return NextResponse.json(
       { error: "Benutzername oder Passwort ist falsch." },
@@ -80,9 +113,8 @@ export async function POST(request: Request) {
   }
 
   clearLoginFailures(address);
-  const token = await createSessionToken(config.username, config.sessionSecret);
   const { name, ...options } = sessionCookieOptions();
   const cookieStore = await cookies();
   cookieStore.set(name, token, options);
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, home });
 }
