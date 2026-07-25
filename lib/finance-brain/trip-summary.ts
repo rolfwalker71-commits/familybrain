@@ -3,6 +3,7 @@ import {
   getFinanceLedgerById,
   getFinanceLedgerMemberById,
   isNormalLedger,
+  listExpenseShareDisplays,
   listFinanceExpenses,
   listFinanceLedgerMembers,
   listFinanceSettlements,
@@ -29,6 +30,11 @@ export type TripSummaryExpense = {
   aiCid: string;
   aiImagePath: string | null;
   activityLabel: string | null;
+  shares: Array<{
+    displayName: string;
+    shareAmountBase: number;
+    isPayer: boolean;
+  }>;
 };
 
 export type TripSummaryMemberBar = {
@@ -95,6 +101,14 @@ export function buildTripLedgerSummaryModel(
   );
   const expenses: TripSummaryExpense[] = expensesRaw.map((expense) => {
     const payer = getFinanceLedgerMemberById(expense.paid_by_member_id);
+    const shares = listExpenseShareDisplays(
+      expense.id,
+      expense.paid_by_member_id
+    ).map((s) => ({
+      displayName: s.displayName,
+      shareAmountBase: s.shareAmountBase,
+      isPayer: s.isPayer,
+    }));
     return {
       expenseId: expense.id,
       description: expense.description,
@@ -112,6 +126,7 @@ export function buildTripLedgerSummaryModel(
       aiCid: `expense-ai-${expense.id}`,
       aiImagePath: expense.ai_image_path,
       activityLabel: activityLabelForExpense(expense),
+      shares,
     };
   });
 

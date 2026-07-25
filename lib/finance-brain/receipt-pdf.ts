@@ -396,6 +396,11 @@ export async function buildExpensePdfBuffer(input: {
   note?: string | null;
   aiImagePath?: string | null;
   expenseId: number;
+  shares?: Array<{
+    displayName: string;
+    shareAmountBase: number;
+    isPayer: boolean;
+  }>;
 }): Promise<Buffer> {
   const pdf = await PDFDocument.create();
   const page = pdf.addPage([PAGE_W, PAGE_H]);
@@ -572,6 +577,17 @@ export async function buildExpensePdfBuffer(input: {
   rows.push(["Kategorie", input.categoryLabel || "Ausgabe"]);
   if (input.note?.trim()) {
     rows.push(["Notiz", input.note.trim()]);
+  }
+  if (input.shares?.length) {
+    rows.push([
+      `Anteile (${input.shares.length})`,
+      input.shares
+        .map((s) => {
+          const money = formatMoney(s.shareAmountBase, input.baseCurrency);
+          return `${s.displayName}${s.isPayer ? " (gezahlt)" : ""}: ${money}`;
+        })
+        .join(" · "),
+    ]);
   }
   rows.push(["Beleg-ID", String(input.expenseId)]);
 
@@ -830,6 +846,12 @@ export type LedgerExpensePdfItem = {
   expenseDate: string | null;
   note?: string | null;
   aiImagePath?: string | null;
+  activityLabel?: string | null;
+  shares?: Array<{
+    displayName: string;
+    shareAmountBase: number;
+    isPayer: boolean;
+  }>;
 };
 
 export async function buildLedgerExpensesPdfBuffer(input: {
@@ -959,6 +981,21 @@ export async function buildLedgerExpensesPdfBuffer(input: {
         ? [{ text: `Ort: ${exp.placeName.trim()}` }]
         : []),
       ...(exp.note?.trim() ? [{ text: `Notiz: ${exp.note.trim()}` }] : []),
+      ...(exp.shares?.length
+        ? [
+            {
+              text: `Anteile (${exp.shares.length}): ${exp.shares
+                .map((s) => {
+                  const money = formatMoney(
+                    s.shareAmountBase,
+                    exp.baseCurrency
+                  );
+                  return `${s.displayName}${s.isPayer ? " (gezahlt)" : ""} ${money}`;
+                })
+                .join(" · ")}`,
+            },
+          ]
+        : []),
       { text: `Beleg-ID: ${exp.expenseId}` },
     ];
 
@@ -1077,6 +1114,11 @@ export async function buildTripLedgerSummaryPdfBuffer(model: {
     note?: string | null;
     activityLabel?: string | null;
     aiImagePath?: string | null;
+    shares?: Array<{
+      displayName: string;
+      shareAmountBase: number;
+      isPayer: boolean;
+    }>;
   }>;
   totalExpenseBase: number;
   totalSettlementsBase: number;
@@ -1204,6 +1246,16 @@ export async function buildTripLedgerSummaryPdfBuffer(model: {
     if (exp.placeName) detailLines.push(`Ort: ${exp.placeName}`);
     if (exp.note?.trim()) detailLines.push(`Notiz: ${exp.note.trim()}`);
     if (exp.activityLabel) detailLines.push(`Aktivitaet: ${exp.activityLabel}`);
+    if (exp.shares?.length) {
+      detailLines.push(
+        `Anteile (${exp.shares.length}): ${exp.shares
+          .map((s) => {
+            const money = formatMoney(s.shareAmountBase, model.baseCurrency);
+            return `${s.displayName}${s.isPayer ? " (gezahlt)" : ""} ${money}`;
+          })
+          .join(" · ")}`
+      );
+    }
 
     const detailWrapped = detailLines.flatMap((line) =>
       wrapText(line, font, 10, textW).map((t) => t)

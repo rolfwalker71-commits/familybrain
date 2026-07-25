@@ -23,6 +23,7 @@ import {
   getFinanceLedgerById,
   getFinanceLedgerMemberById,
   getFinanceSettlementById,
+  listExpenseShareDisplays,
   listFinanceExpenses,
   listFinanceLedgerMembers,
   markFinanceExpenseNotified,
@@ -56,6 +57,14 @@ function toExpenseMailFields(
   ledger: NonNullable<ReturnType<typeof getFinanceLedgerById>>,
   paidByName: string
 ): ExpenseMailFields {
+  const shares = listExpenseShareDisplays(
+    expense.id,
+    expense.paid_by_member_id
+  ).map((s) => ({
+    displayName: s.displayName,
+    shareAmountBase: s.shareAmountBase,
+    isPayer: s.isPayer,
+  }));
   return {
     expenseId: expense.id,
     description: expense.description,
@@ -71,6 +80,7 @@ function toExpenseMailFields(
     note: expense.note,
     hasAiImage: Boolean(expense.ai_image_path),
     aiCid: `expense-ai-${expense.id}`,
+    shares,
   };
 }
 
@@ -124,6 +134,7 @@ export async function notifyLedgerExpense(
     note: expense.note,
     aiImagePath: expense.ai_image_path,
     expenseId: expense.id,
+    shares: fields.shares,
   });
 
   const attachments: MailAttachment[] = [
@@ -191,24 +202,23 @@ export async function notifyLedgerExpensesSummary(
   const pdf = await buildLedgerExpensesPdfBuffer({
     ledgerTitle: ledger.title,
     baseCurrency: ledger.base_currency,
-    expenses: expenses.map((expense) => {
-      const payer = getFinanceLedgerMemberById(expense.paid_by_member_id);
-      return {
-        expenseId: expense.id,
-        description: expense.description,
-        categoryLabel: expense.category_label,
-        amount: expense.amount,
-        currency: expense.currency,
-        amountBase: expense.amount_base,
-        baseCurrency: ledger.base_currency,
-        exchangeRate: expense.exchange_rate,
-        paidByName: payer?.display_name || `#${expense.paid_by_member_id}`,
-        placeName: expense.place_name,
-        expenseDate: expense.expense_date,
-        note: expense.note,
-        aiImagePath: expense.ai_image_path,
-      };
-    }),
+    expenses: fields.map((f) => ({
+      expenseId: f.expenseId,
+      description: f.description,
+      categoryLabel: f.categoryLabel,
+      amount: f.amount,
+      currency: f.currency,
+      amountBase: f.amountBase,
+      baseCurrency: f.baseCurrency,
+      exchangeRate: f.exchangeRate,
+      paidByName: f.paidByName,
+      placeName: f.placeName,
+      expenseDate: f.expenseDate,
+      note: f.note,
+      aiImagePath:
+        expenses.find((e) => e.id === f.expenseId)?.ai_image_path ?? null,
+      shares: f.shares,
+    })),
   });
 
   const attachments: MailAttachment[] = [

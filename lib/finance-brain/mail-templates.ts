@@ -67,6 +67,12 @@ export function dateBadgeHtml(isoDate: string | null | undefined): string {
     </div>`;
 }
 
+export type ExpenseShareMailField = {
+  displayName: string;
+  shareAmountBase: number;
+  isPayer: boolean;
+};
+
 export type ExpenseMailFields = {
   expenseId: number;
   description: string | null;
@@ -83,7 +89,48 @@ export type ExpenseMailFields = {
   hasAiImage: boolean;
   aiCid?: string;
   activityLabel?: string | null;
+  shares?: ExpenseShareMailField[];
 };
+
+function sharesHtml(
+  shares: ExpenseShareMailField[] | undefined,
+  baseCurrency: string
+): string {
+  if (!shares?.length) return "";
+  const rows = shares
+    .map((s) => {
+      const money = formatMoney(s.shareAmountBase, baseCurrency);
+      const payer = s.isPayer
+        ? ` <span style="color:${BRAND.muted};">(gezahlt)</span>`
+        : "";
+      return `<div style="display:flex;justify-content:space-between;gap:12px;margin-top:3px;">
+        <span style="color:${BRAND.ink};">${escapeHtml(s.displayName)}${payer}</span>
+        <span style="font-variant-numeric:tabular-nums;font-weight:600;color:${BRAND.ink};">${escapeHtml(money)}</span>
+      </div>`;
+    })
+    .join("");
+  return `
+    <div style="margin-top:10px;padding-top:8px;border-top:1px solid ${BRAND.page};">
+      <div style="font-size:11px;font-weight:700;color:${BRAND.finance};letter-spacing:.03em;text-transform:uppercase;">
+        Anteile · ${shares.length} ${shares.length === 1 ? "Person" : "Personen"}
+      </div>
+      ${rows}
+    </div>`;
+}
+
+function sharesTextLines(
+  shares: ExpenseShareMailField[] | undefined,
+  baseCurrency: string
+): string[] {
+  if (!shares?.length) return [];
+  return [
+    `Anteile (${shares.length}):`,
+    ...shares.map((s) => {
+      const money = formatMoney(s.shareAmountBase, baseCurrency);
+      return `  ${s.displayName}${s.isPayer ? " (gezahlt)" : ""}: ${money}`;
+    }),
+  ];
+}
 
 function moneyLines(input: {
   amount: number;
@@ -154,6 +201,7 @@ function expenseCardHtml(input: ExpenseMailFields): string {
               ? `<div style="margin-top:6px;font-size:13px;color:${BRAND.muted};">Aktivität: ${escapeHtml(input.activityLabel.trim())}</div>`
               : ""
           }
+          ${sharesHtml(input.shares, input.baseCurrency)}
         </div>
         ${
           input.hasAiImage
@@ -206,6 +254,7 @@ export function buildExpenseMailHtml(
     input.expenseDate
       ? `Datum: ${formatDateDe(input.expenseDate) || input.expenseDate}`
       : null,
+    ...sharesTextLines(input.shares, input.baseCurrency),
     "PDF im Anhang.",
   ]
     .filter(Boolean)
@@ -264,6 +313,9 @@ export function buildLedgerExpensesMailHtml(input: {
         e.placeName ? `  Ort: ${e.placeName}` : null,
         e.note?.trim() ? `  Notiz: ${e.note.trim()}` : null,
         e.expenseDate ? `  Datum: ${formatDateDe(e.expenseDate) || e.expenseDate}` : null,
+        ...sharesTextLines(e.shares, e.baseCurrency).map((l) =>
+          l.startsWith("Anteile") ? `  ${l}` : `  ${l}`
+        ),
         "",
       ].filter(Boolean) as string[];
     }),
@@ -499,6 +551,9 @@ export function buildTripLedgerSummaryMailHtml(model: {
         e.expenseDate
           ? `  Datum: ${formatDateDe(e.expenseDate) || e.expenseDate}`
           : null,
+        ...sharesTextLines(e.shares, e.baseCurrency).map((l) =>
+          l.startsWith("  ") ? `  ${l.trimStart()}` : `  ${l}`
+        ),
         "",
       ].filter(Boolean) as string[];
     }),

@@ -589,6 +589,31 @@ export function listFinanceExpenseSplits(
     .all(expenseId) as FinanceExpenseSplitRow[];
 }
 
+export type ExpenseShareDisplay = {
+  memberId: number;
+  displayName: string;
+  shareAmountBase: number;
+  isPayer: boolean;
+};
+
+/** Split participants for mail/PDF (sorted by name). */
+export function listExpenseShareDisplays(
+  expenseId: number,
+  paidByMemberId: number
+): ExpenseShareDisplay[] {
+  return listFinanceExpenseSplits(expenseId)
+    .map((s) => {
+      const m = getFinanceLedgerMemberById(s.member_id);
+      return {
+        memberId: s.member_id,
+        displayName: m?.display_name || `#${s.member_id}`,
+        shareAmountBase: s.share_amount_base,
+        isPayer: s.member_id === paidByMemberId,
+      };
+    })
+    .sort((a, b) => a.displayName.localeCompare(b.displayName, "de"));
+}
+
 export type ExpenseSplitInput =
   | { mode: "equal"; memberIds: number[] }
   | { mode: "exact"; amounts: Array<{ memberId: number; amountBase: number }> }

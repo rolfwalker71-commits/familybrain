@@ -426,30 +426,30 @@ function ExpenseCard({
   }
 
   return (
-    <div
-      id={`expense-card-${exp.id}`}
-      className={cn(
-        "relative ml-3 pt-5",
-        mobileFocused && "rounded-xl ring-2 ring-[var(--brand-finance)]/30"
-      )}
-    >
-      <IconCircle
-        icon={visual.icon}
-        tone={visual.tone}
-        size="md"
-        className="absolute left-0 top-0 z-10 -translate-x-1/2 -translate-y-1/2 border-2 border-foreground/20 shadow-md"
-      />
+    <div id={`expense-card-${exp.id}`} className="ml-3 pt-5">
       <div
         className={cn(
-          "overflow-hidden rounded-xl border border-border bg-card text-sm shadow-[0_2px_4px_rgba(20,32,28,0.06),0_10px_28px_rgba(20,32,28,0.1)]",
-          onMobileFocus && !editing && "cursor-pointer md:cursor-default"
+          "relative",
+          mobileFocused && "rounded-xl ring-2 ring-[var(--brand-finance)]/30"
         )}
-        onClick={
-          onMobileFocus && !editing
-            ? () => onMobileFocus(exp.id)
-            : undefined
-        }
       >
+        <IconCircle
+          icon={visual.icon}
+          tone={visual.tone}
+          size="md"
+          className="absolute left-0 top-0 z-10 -translate-x-1/2 -translate-y-1/2 border-2 border-foreground/20 shadow-md"
+        />
+        <div
+          className={cn(
+            "overflow-hidden rounded-xl border border-border bg-card text-sm shadow-[0_2px_4px_rgba(20,32,28,0.06),0_10px_28px_rgba(20,32,28,0.1)]",
+            onMobileFocus && !editing && "cursor-pointer md:cursor-default"
+          )}
+          onClick={
+            onMobileFocus && !editing
+              ? () => onMobileFocus(exp.id)
+              : undefined
+          }
+        >
         {/* Soft row: type icon · date · title/meta · amount + AI thumb */}
         <div className="flex items-center gap-3 px-3 py-3">
           <div className="shrink-0">
@@ -1000,6 +1000,7 @@ function ExpenseCard({
             ) : null}
           </div>
         </div>
+      </div>
       </div>
 
       <Dialog open={zoomOpen} onOpenChange={setZoomOpen}>
