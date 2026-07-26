@@ -15,6 +15,18 @@ export type CalendarEvent = {
   /** Optional local end time on endDate (or startDate). */
   endTime?: string;
   url?: string;
+  /** ICS CATEGORIES */
+  categories?: string[];
+  /** ICS GEO (lat;lon) */
+  geo?: { lat: number; lon: number };
+  /**
+   * ICS ATTACH — URI (may need auth) and/or inline base64 binary
+   * (best-effort for calendar apps that support attachments).
+   */
+  attachments?: Array<
+    | { uri: string; mimeType?: string }
+    | { dataBase64: string; mimeType: string; filename?: string }
+  >;
 };
 
 function pad(n: number) {
@@ -121,6 +133,50 @@ function plusOneHour(
   return `${dt.getUTCFullYear()}${pad(dt.getUTCMonth() + 1)}${pad(dt.getUTCDate())}T${pad(dt.getUTCHours())}${pad(dt.getUTCMinutes())}00`;
 }
 
+function appendEventExtras(lines: string[], event: CalendarEvent) {
+  if (event.description) {
+    lines.push(`DESCRIPTION:${escapeIcsText(event.description)}`);
+  }
+  if (event.location) {
+    lines.push(`LOCATION:${escapeIcsText(event.location)}`);
+  }
+  if (event.url) {
+    lines.push(`URL:${escapeIcsText(event.url)}`);
+  }
+  if (event.categories?.length) {
+    lines.push(
+      `CATEGORIES:${event.categories.map((c) => escapeIcsText(c)).join(",")}`
+    );
+  }
+  if (
+    event.geo &&
+    Number.isFinite(event.geo.lat) &&
+    Number.isFinite(event.geo.lon)
+  ) {
+    lines.push(`GEO:${event.geo.lat};${event.geo.lon}`);
+  }
+  for (const att of event.attachments || []) {
+    if ("uri" in att && att.uri) {
+      const fmt = att.mimeType
+        ? `;FMTTYPE=${att.mimeType}`
+        : "";
+      lines.push(`ATTACH${fmt}:${escapeIcsText(att.uri)}`);
+      continue;
+    }
+    if ("dataBase64" in att && att.dataBase64) {
+      const params = [
+        `FMTTYPE=${att.mimeType || "application/octet-stream"}`,
+        "ENCODING=BASE64",
+        "VALUE=BINARY",
+      ];
+      if (att.filename) {
+        params.push(`FILENAME=${escapeIcsText(att.filename)}`);
+      }
+      lines.push(`ATTACH;${params.join(";")}:${att.dataBase64}`);
+    }
+  }
+}
+
 export function buildIcsCalendar(events: CalendarEvent[]): string {
   const lines: string[] = [
     "BEGIN:VCALENDAR",
@@ -154,15 +210,7 @@ export function buildIcsCalendar(events: CalendarEvent[]): string {
       lines.push(`DTSTART:${startDt}`);
       lines.push(`DTEND:${endDt}`);
       lines.push(`SUMMARY:${escapeIcsText(event.title)}`);
-      if (event.description) {
-        lines.push(`DESCRIPTION:${escapeIcsText(event.description)}`);
-      }
-      if (event.location) {
-        lines.push(`LOCATION:${escapeIcsText(event.location)}`);
-      }
-      if (event.url) {
-        lines.push(`URL:${escapeIcsText(event.url)}`);
-      }
+      appendEventExtras(lines, event);
       lines.push("END:VEVENT");
       continue;
     }
@@ -179,15 +227,7 @@ export function buildIcsCalendar(events: CalendarEvent[]): string {
     lines.push(`DTSTART;VALUE=DATE:${start}`);
     lines.push(`DTEND;VALUE=DATE:${end}`);
     lines.push(`SUMMARY:${escapeIcsText(event.title)}`);
-    if (event.description) {
-      lines.push(`DESCRIPTION:${escapeIcsText(event.description)}`);
-    }
-    if (event.location) {
-      lines.push(`LOCATION:${escapeIcsText(event.location)}`);
-    }
-    if (event.url) {
-      lines.push(`URL:${escapeIcsText(event.url)}`);
-    }
+    appendEventExtras(lines, event);
     lines.push("END:VEVENT");
   }
 

@@ -12,7 +12,22 @@ export const dynamic = "force-dynamic";
 
 type Ctx = { params: Promise<{ id: string }> };
 
-export async function GET(_request: Request, context: Ctx) {
+function requestOrigin(request: Request): string {
+  const url = new URL(request.url);
+  const forwardedHost = request.headers.get("x-forwarded-host");
+  const host =
+    forwardedHost?.split(",")[0]?.trim() ||
+    request.headers.get("host") ||
+    url.host;
+  const forwardedProto = request.headers
+    .get("x-forwarded-proto")
+    ?.split(",")[0]
+    ?.trim();
+  const proto = forwardedProto || url.protocol.replace(":", "") || "http";
+  return `${proto}://${host}`;
+}
+
+export async function GET(request: Request, context: Ctx) {
   const { id: idRaw } = await context.params;
   const id = Number(idRaw);
   if (!Number.isInteger(id) || id <= 0) {
@@ -24,7 +39,11 @@ export async function GET(_request: Request, context: Ctx) {
   if (!trip) {
     return NextResponse.json({ error: "Reise nicht gefunden" }, { status: 404 });
   }
-  const calendarEvents = tripEventsToCalendarEvents(trip, listTripEvents(id));
+  const calendarEvents = await tripEventsToCalendarEvents(
+    trip,
+    listTripEvents(id),
+    { absoluteOrigin: requestOrigin(request), embedAiImages: true }
+  );
   if (calendarEvents.length === 0) {
     return NextResponse.json(
       { error: "Keine datierten Ereignisse für den Kalender-Export." },
@@ -32,10 +51,17 @@ export async function GET(_request: Request, context: Ctx) {
     );
   }
 
+  const slug = trip.title
+    .toLowerCase()
+    .replace(/[^a-z0-9äöü]+/gi, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 40);
+  const filename = `tripbook-${id}${slug ? `-${slug}` : ""}.ics`;
+
   return new NextResponse(buildIcsCalendar(calendarEvents), {
     headers: {
       "Content-Type": "text/calendar; charset=utf-8",
-      "Content-Disposition": `attachment; filename="travelbrain-${id}.ics"`,
+      "Content-Disposition": `attachment; filename="${filename}"`,
     },
   });
 }
