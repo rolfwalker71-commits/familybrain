@@ -82,7 +82,7 @@ export function CalendarDateBadge({
   isoDate: string;
   time?: string | null;
   size?: CalendarDateBadgeSize;
-  /** teal = MyBrain/TravelBuddy; green = FinanzBuddy */
+  /** teal = TripBook/TravelBuddy; green = FinanzBuddy */
   accent?: "teal" | "green";
   className?: string;
 }) {

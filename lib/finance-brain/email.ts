@@ -126,12 +126,12 @@ export async function sendBalanceReminderEmail(input: {
 export async function sendTestEmail(to: string): Promise<{ ok: boolean; error?: string }> {
   return sendMail({
     to,
-    subject: "FamilyBrain Testmail",
+    subject: "TripBook Testmail",
     text:
-      "Hallo,\n\ndies ist eine Testmail aus den FamilyBrain-Einstellungen.\n" +
+      "Hallo,\n\ndies ist eine Testmail aus den TripBook-Einstellungen.\n" +
       "Wenn du diese Nachricht siehst, ist SMTP korrekt konfiguriert.\n",
     html: `<!DOCTYPE html><body style="font-family:system-ui,sans-serif;padding:24px;">
-      <h2>FamilyBrain Testmail</h2>
+      <h2>TripBook Testmail</h2>
       <p>SMTP ist korrekt konfiguriert. FinanzBuddy kann Beleg-Mails versenden.</p>
     </body>`,
   });

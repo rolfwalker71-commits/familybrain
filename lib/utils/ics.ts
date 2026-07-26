@@ -125,7 +125,7 @@ export function buildIcsCalendar(events: CalendarEvent[]): string {
   const lines: string[] = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//FamilyBrain//CH//DE",
+    "PRODID:-//TripBook//CH//DE",
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
   ];

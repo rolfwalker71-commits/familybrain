@@ -5,6 +5,7 @@ import { AppTabNav, type AppTabItem } from "@/components/layout/app-tab-nav";
 
 export type FinanceLedgerTab =
   | "overview"
+  | "payments"
   | "new"
   | "expenses"
   | "settle"
@@ -18,7 +19,7 @@ export function parseFinanceLedgerTab(
 ): FinanceLedgerTab {
   const allowed = new Set<FinanceLedgerTab>(
     opts.isSplit
-      ? ["overview", "new", "expenses", "settle", "more"]
+      ? ["overview", "payments", "new", "expenses", "settle", "more"]
       : ["overview", "new", "expenses", "more"]
   );
   if (raw && allowed.has(raw as FinanceLedgerTab)) {

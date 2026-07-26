@@ -104,6 +104,7 @@ function expenseFieldsForId(
     displayName: s.displayName,
     shareAmountBase: s.shareAmountBase,
     isPayer: s.isPayer,
+    avatarCid: s.avatarPath ? `avatar-${s.memberId}` : undefined,
   }));
   return {
     expenseId: expense.id,

@@ -411,6 +411,9 @@ CREATE TABLE IF NOT EXISTS users (
   email TEXT NOT NULL,
   password_hash TEXT NOT NULL,
   display_name TEXT NOT NULL,
+  gender TEXT,
+  avatar_path TEXT,
+  avatar_prompt TEXT,
   active INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL

@@ -61,7 +61,7 @@ export function getSmtpFrom(): string {
   const configured = envOrSetting(SMTP_FROM_SETTING, "SMTP_FROM");
   if (configured) return configured;
   const user = getSmtpUser();
-  return user ? `FamilyBrain <${user}>` : "";
+  return user ? `TripBook <${user}>` : "";
 }
 
 export function getSmtpSettings(): SmtpSettings {

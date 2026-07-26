@@ -23,7 +23,7 @@ export async function geocodePlace(
     const res = await fetch(url.toString(), {
       headers: {
         Accept: "application/json",
-        "User-Agent": "FamilyBrain-FinanzBrain/1.0",
+        "User-Agent": "TripBook-FinanzBrain/1.0",
       },
       signal: AbortSignal.timeout(8000),
     });

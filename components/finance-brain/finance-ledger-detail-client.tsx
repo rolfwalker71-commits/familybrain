@@ -22,6 +22,7 @@ import {
   RefreshCw,
   RotateCw,
   ArrowLeftRight,
+  Scale,
   Sparkles,
   Unlink,
   Users,
@@ -77,6 +78,7 @@ import { COMMON_CURRENCIES, LEDGER_KIND_LABELS } from "@/lib/finance-brain/const
 import { formatMoney, formatSignedMoney } from "@/lib/finance-brain/format";
 import { confirmSettlementAmount } from "@/lib/finance-brain/settlement-confirm";
 import { capSettlementToCreditorNet } from "@/lib/finance-brain/settlement";
+import { NameWithAvatar } from "@/components/users/user-avatar";
 import { cn } from "@/lib/utils";
 import { todayDateInputValue } from "@/lib/utils/dates";
 
@@ -89,6 +91,8 @@ type Member = {
   invite_revoked_at: string | null;
   couple_id?: number | null;
   couple_name?: string | null;
+  user_id?: number | null;
+  avatar_url?: string | null;
 };
 
 type Couple = {
@@ -1293,6 +1297,7 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
   const tabItems: FinanceTabItem[] = isSplit
     ? [
         { id: "overview", label: "Übersicht", icon: LayoutDashboard },
+        { id: "payments", label: "Zahlungsinfos", icon: Scale },
         { id: "new", label: "Neu", icon: Plus, emphasize: true },
         { id: "expenses", label: "Ausgaben", icon: List },
         { id: "settle", label: "Ausgleich", icon: ArrowLeftRight },
@@ -1407,16 +1412,6 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
                 window.setTimeout(() => scrollToExpenseCard(expenseId), 120);
               }}
             />
-            <BalanceView
-              balances={balances}
-              simplifiedDebts={simplifiedDebts}
-              minimalDebts={minimalDebts}
-              coupleBalances={coupleBalances}
-              coupleDebts={coupleDebts}
-              baseCurrency={ledger.base_currency}
-              onRecordDebt={recordSuggestedDebt}
-              recordBusyKey={recordBusyKey}
-            />
           </div>
         ) : (
           <div className="space-y-4">
@@ -1469,6 +1464,19 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
             />
           </div>
         )
+      ) : null}
+
+      {activeTab === "payments" && !isNormal ? (
+        <BalanceView
+          balances={balances}
+          simplifiedDebts={simplifiedDebts}
+          minimalDebts={minimalDebts}
+          coupleBalances={coupleBalances}
+          coupleDebts={coupleDebts}
+          baseCurrency={ledger.base_currency}
+          onRecordDebt={recordSuggestedDebt}
+          recordBusyKey={recordBusyKey}
+        />
       ) : null}
 
       {activeTab === "new" ? (
@@ -2168,7 +2176,12 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
                     key={m.id}
                     className="flex flex-wrap items-center gap-2 rounded-md border border-border/60 px-3 py-2 text-sm"
                   >
-                    <span className="font-medium">{m.display_name}</span>
+                    <NameWithAvatar
+                      name={m.display_name}
+                      src={m.avatar_url}
+                      size="sm"
+                      nameClassName="font-medium"
+                    />
                     {m.couple_name ? (
                       <Badge variant="secondary">Paar: {m.couple_name}</Badge>
                     ) : null}

@@ -21,6 +21,7 @@ import {
   buildTravelDiaryModel,
   listTravelDiaryRecipients,
 } from "@/lib/trips/travel-diary";
+import { listExpenseShareDisplays } from "@/lib/finance-brain/queries";
 import { getAppUserById } from "@/lib/users/queries";
 
 export type NotifyResult = {
@@ -280,6 +281,28 @@ export async function notifyTravelDiary(
         content_id: expense.aiCid || `expense-ai-${expense.expenseId}`,
       });
     }
+  }
+
+  const avatarPaths = new Map<string, string>();
+  const allDiaryExpenses = [
+    ...model.events.flatMap((e) => e.expenses),
+    ...model.orphanExpenses,
+  ];
+  for (const expense of allDiaryExpenses) {
+    for (const share of listExpenseShareDisplays(expense.expenseId, 0)) {
+      if (share.avatarPath) {
+        avatarPaths.set(`avatar-${share.memberId}`, share.avatarPath);
+      }
+    }
+  }
+  for (const [cid, filePath] of avatarPaths) {
+    const scaled = await loadScaledJpeg(filePath, 64);
+    if (!scaled) continue;
+    attachments.push({
+      filename: `${cid}.jpg`,
+      content: scaled.toString("base64"),
+      content_id: cid,
+    });
   }
 
   const result = await sendMail({

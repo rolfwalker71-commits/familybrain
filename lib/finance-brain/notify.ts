@@ -86,15 +86,25 @@ function toExpenseMailFields(
   expense: NonNullable<ReturnType<typeof getFinanceExpenseById>>,
   ledger: NonNullable<ReturnType<typeof getFinanceLedgerById>>,
   paidByName: string
-): ExpenseMailFields {
+): ExpenseMailFields & {
+  shareAvatarPaths: Array<{ cid: string; path: string }>;
+} {
+  const shareAvatarPaths: Array<{ cid: string; path: string }> = [];
   const shares = listExpenseShareDisplays(
     expense.id,
     expense.paid_by_member_id
-  ).map((s) => ({
-    displayName: s.displayName,
-    shareAmountBase: s.shareAmountBase,
-    isPayer: s.isPayer,
-  }));
+  ).map((s) => {
+    const cid = s.avatarPath ? `avatar-${s.memberId}` : undefined;
+    if (cid && s.avatarPath) {
+      shareAvatarPaths.push({ cid, path: s.avatarPath });
+    }
+    return {
+      displayName: s.displayName,
+      shareAmountBase: s.shareAmountBase,
+      isPayer: s.isPayer,
+      avatarCid: cid,
+    };
+  });
   return {
     expenseId: expense.id,
     description: expense.description,
@@ -111,6 +121,7 @@ function toExpenseMailFields(
     hasAiImage: Boolean(expense.ai_image_path),
     aiCid: `expense-ai-${expense.id}`,
     shares,
+    shareAvatarPaths,
   };
 }
 
@@ -143,7 +154,11 @@ export async function notifyLedgerExpense(
 
   const payer = getFinanceLedgerMemberById(expense.paid_by_member_id);
   const paidByName = payer?.display_name || `#${expense.paid_by_member_id}`;
-  const fields = toExpenseMailFields(expense, ledger, paidByName);
+  const { shareAvatarPaths, ...fields } = toExpenseMailFields(
+    expense,
+    ledger,
+    paidByName
+  );
   const mail = buildExpenseMailHtml({
     ledgerTitle: ledger.title,
     ...fields,
@@ -178,6 +193,15 @@ export async function notifyLedgerExpense(
       filename: `expense-${expense.id}-ai.png`,
       content: fs.readFileSync(expense.ai_image_path).toString("base64"),
       content_id: "expense-ai",
+    });
+  }
+  for (const av of shareAvatarPaths) {
+    const scaled = await loadScaledJpeg(av.path, 64);
+    if (!scaled) continue;
+    attachments.push({
+      filename: `${av.cid}.jpg`,
+      content: scaled.toString("base64"),
+      content_id: av.cid,
     });
   }
 
@@ -216,7 +240,7 @@ export async function notifyLedgerExpensesSummary(
     return { ok: false, sent: 0, error: "Keine Ausgaben vorhanden" };
   }
 
-  const fields = expenses.map((expense) => {
+  const fieldsRaw = expenses.map((expense) => {
     const payer = getFinanceLedgerMemberById(expense.paid_by_member_id);
     return toExpenseMailFields(
       expense,
@@ -224,6 +248,13 @@ export async function notifyLedgerExpensesSummary(
       payer?.display_name || `#${expense.paid_by_member_id}`
     );
   });
+  const fields = fieldsRaw.map(({ shareAvatarPaths: _a, ...f }) => f);
+  const avatarByCid = new Map<string, string>();
+  for (const f of fieldsRaw) {
+    for (const av of f.shareAvatarPaths) {
+      if (!avatarByCid.has(av.cid)) avatarByCid.set(av.cid, av.path);
+    }
+  }
 
   const mail = buildLedgerExpensesMailHtml({
     ledgerTitle: ledger.title,
@@ -266,6 +297,15 @@ export async function notifyLedgerExpensesSummary(
       filename: `expense-${expense.id}-ai.jpg`,
       content: thumb.toString("base64"),
       content_id: `expense-ai-${expense.id}`,
+    });
+  }
+  for (const [cid, filePath] of avatarByCid) {
+    const scaled = await loadScaledJpeg(filePath, 64);
+    if (!scaled) continue;
+    attachments.push({
+      filename: `${cid}.jpg`,
+      content: scaled.toString("base64"),
+      content_id: cid,
     });
   }
 

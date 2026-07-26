@@ -71,7 +71,7 @@ async function geocodeFetch(url: string): Promise<Response> {
   lastGeocodeAt = Date.now();
   return fetch(url, {
     headers: {
-      "User-Agent": "FamilyBrain-TravelBrain/1.0 (local family app)",
+      "User-Agent": "TripBook-TravelBrain/1.0 (local family app)",
       Accept: "application/json",
     },
   });

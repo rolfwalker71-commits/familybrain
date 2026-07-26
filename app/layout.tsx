@@ -15,16 +15,16 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "MyBrain",
-    template: "%s · MyBrain",
+    default: "TripBook",
+    template: "%s · TripBook",
   },
-  description: "Lokale AI-Wissensschicht für Paperless-ngx",
-  applicationName: "MyBrain",
+  description: "Reiseplanung und Reisekosten — Tagebuch, Ausgaben und Abrechnung",
+  applicationName: "TripBook",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "MyBrain",
+    title: "TripBook",
   },
   formatDetection: {
     telephone: false,

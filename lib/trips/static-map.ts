@@ -1,7 +1,7 @@
 import sharp from "sharp";
 
 const USER_AGENT =
-  "FamilyBrain-TravelBrain/1.0 (https://github.com/rolfwalker71-commits/familybrain)";
+  "TripBook-TravelBrain/1.0 (https://github.com/rolfwalker71-commits/familybrain)";
 
 function tileXY(lat: number, lon: number, zoom: number): { x: number; y: number } {
   const n = 2 ** zoom;

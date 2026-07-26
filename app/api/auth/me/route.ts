@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAuthContext } from "@/lib/auth/current-user";
+import { userAvatarPublicUrl } from "@/lib/users/avatar";
 import {
   getAppUserById,
   listUserLedgerIds,
@@ -23,6 +24,7 @@ export async function GET() {
       username: ctx.username,
       displayName: ctx.username,
       isAdmin: true,
+      avatarUrl: null,
     });
   }
   const user = ctx.userId ? getAppUserById(ctx.userId) : null;
@@ -38,6 +40,8 @@ export async function GET() {
     displayName: user.display_name,
     email: user.email,
     userId: user.id,
+    gender: user.gender,
+    avatarUrl: userAvatarPublicUrl(user.avatar_path),
     isAdmin: false,
     tripIds: listUserTripIds(user.id),
     ledgerIds: listUserLedgerIds(user.id),

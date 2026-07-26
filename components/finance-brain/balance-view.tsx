@@ -73,10 +73,12 @@ import {
   type ExpenseSplitSelection,
 } from "@/components/finance-brain/expense-split-participants";
 import { cn } from "@/lib/utils";
+import { NameWithAvatar } from "@/components/users/user-avatar";
 
 type Balance = {
   memberId: number;
   displayName: string;
+  avatarUrl?: string | null;
   paidBase: number;
   owedBase: number;
   settlementsReceivedBase: number;
@@ -98,8 +100,10 @@ type CoupleBalance = {
 type Debt = {
   fromMemberId: number;
   fromDisplayName: string;
+  fromAvatarUrl?: string | null;
   toMemberId: number;
   toDisplayName: string;
+  toAvatarUrl?: string | null;
   amount: number;
 };
 
@@ -210,11 +214,20 @@ export function BalanceView({
         key={key}
         className="flex items-center justify-between gap-2 rounded-lg border border-amber-200/60 bg-white px-2.5 py-1.5 text-sm leading-snug"
       >
-        <div className="min-w-0">
-          <span className="font-medium">{d.fromDisplayName}</span>
-          {" schuldet "}
-          <span className="font-medium">{d.toDisplayName}</span>
-          {" "}
+        <div className="flex min-w-0 flex-wrap items-center gap-x-1 gap-y-0.5">
+          <NameWithAvatar
+            name={d.fromDisplayName}
+            src={d.fromAvatarUrl}
+            size="xs"
+            nameClassName="font-medium"
+          />
+          <span className="text-muted-foreground">schuldet</span>
+          <NameWithAvatar
+            name={d.toDisplayName}
+            src={d.toAvatarUrl}
+            size="xs"
+            nameClassName="font-medium"
+          />
           <span className="font-semibold tabular-nums text-amber-900">
             {formatMoney(d.amount, baseCurrency)}
           </span>
@@ -268,7 +281,12 @@ export function BalanceView({
                   )}
                 >
                   <div className="min-w-0">
-                    <div className="font-medium">{b.displayName}</div>
+                    <NameWithAvatar
+                      name={b.displayName}
+                      src={b.avatarUrl}
+                      size="sm"
+                      nameClassName="font-medium"
+                    />
                     <div className="mt-0.5 truncate text-[10px] leading-tight text-muted-foreground">
                       bezahlt {formatMoney(b.paidBase, baseCurrency)}
                       {" · "}

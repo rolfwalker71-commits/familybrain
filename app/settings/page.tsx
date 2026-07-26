@@ -630,7 +630,7 @@ function SettingsPageInner() {
     setSmtpPort(String(ICLOUD_SMTP.port));
     setSmtpSecure(ICLOUD_SMTP.secure);
     if (smtpUser.trim() && !smtpFrom.trim()) {
-      setSmtpFrom(`FamilyBrain <${smtpUser.trim()}>`);
+      setSmtpFrom(`TripBook <${smtpUser.trim()}>`);
     }
     setMessage(
       "iCloud+-Preset gesetzt. Als Passwort ein App-spezifisches Passwort von appleid.apple.com verwenden."
@@ -776,7 +776,7 @@ function SettingsPageInner() {
     <div className="space-y-6 pb-28 md:space-y-8 md:pb-0">
       <PageHeader
         title="Einstellungen"
-        description="Verbindungen, KI und Chat-Verhalten für FamilyBrain."
+        description="Verbindungen, KI und Chat-Verhalten für TripBook."
         icon={pageVisuals.settings.icon}
         tone={pageVisuals.settings.tone}
       />
@@ -1326,7 +1326,7 @@ function SettingsPageInner() {
                 id="smtpFrom"
                 value={smtpFrom}
                 onChange={(e) => setSmtpFrom(e.target.value)}
-                placeholder="FamilyBrain <name@icloud.com>"
+                placeholder="TripBook <name@icloud.com>"
               />
               <p className="text-xs text-muted-foreground">
                 Bei iCloud muss die From-Adresse deine iCloud-Mail (oder eine

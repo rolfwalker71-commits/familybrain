@@ -1,5 +1,6 @@
 import { randomBytes } from "crypto";
 import fs from "fs";
+import path from "path";
 import { getDb } from "@/lib/db/client";
 import { getTripById, getTripEventById } from "@/lib/trips/queries";
 import { nowIso } from "@/lib/utils/dates";
@@ -742,6 +743,8 @@ export type ExpenseShareDisplay = {
   displayName: string;
   shareAmountBase: number;
   isPayer: boolean;
+  avatarUrl: string | null;
+  avatarPath: string | null;
 };
 
 /** Split participants for mail/PDF (sorted by name). */
@@ -752,11 +755,18 @@ export function listExpenseShareDisplays(
   return listFinanceExpenseSplits(expenseId)
     .map((s) => {
       const m = getFinanceLedgerMemberById(s.member_id);
+      const user = m?.user_id != null ? getAppUserById(m.user_id) : null;
       return {
         memberId: s.member_id,
         displayName: m?.display_name || `#${s.member_id}`,
         shareAmountBase: s.share_amount_base,
         isPayer: s.member_id === paidByMemberId,
+        avatarUrl: user?.avatar_path
+          ? `/api/users/media/avatar/${encodeURIComponent(
+              path.basename(user.avatar_path)
+            )}`
+          : null,
+        avatarPath: user?.avatar_path ?? null,
       };
     })
     .sort((a, b) => a.displayName.localeCompare(b.displayName, "de"));

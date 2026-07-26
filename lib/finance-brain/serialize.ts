@@ -15,6 +15,7 @@ import type {
 import {
   collectBalanceInputs,
   collectOpenPayerDebts,
+  getFinanceLedgerMemberById,
   listFinanceLedgerCouples,
   listFinanceLedgerMembers,
 } from "@/lib/finance-brain/queries";
@@ -29,6 +30,7 @@ import {
 import { ledgerCoverPublicUrl } from "@/lib/finance-brain/cover";
 import { getTripById, getTripEventById } from "@/lib/trips/queries";
 import { getDocumentById } from "@/lib/db/queries";
+import { avatarUrlForUserId } from "@/lib/users/avatar";
 
 function mapDebt(d: SimplifiedDebt) {
   return {
@@ -72,6 +74,8 @@ export function serializeMember(
     ledger_id: member.ledger_id,
     display_name: member.display_name,
     email: member.email,
+    user_id: member.user_id ?? null,
+    avatar_url: avatarUrlForUserId(member.user_id),
     couple_id: member.couple_id ?? null,
     couple_name: coupleName ?? null,
     invite_revoked_at: member.invite_revoked_at,
@@ -153,19 +157,39 @@ export function buildBalancePayload(
   }
 ) {
   const raw = computeMemberBalances(inputs);
-  const balances = raw.map((b) => ({
-    memberId: b.memberId,
-    displayName: b.displayName,
-    paidBase: b.paidBase,
-    owedBase: b.owedBase,
-    settlementsReceivedBase: b.settlementsReceivedBase,
-    settlementsPaidBase: b.settlementsPaidBase,
-    netBalance: b.net,
-  }));
+  const balances = raw.map((b) => {
+    const member = getFinanceLedgerMemberById(b.memberId);
+    return {
+      memberId: b.memberId,
+      displayName: b.displayName,
+      avatarUrl: avatarUrlForUserId(member?.user_id),
+      paidBase: b.paidBase,
+      owedBase: b.owedBase,
+      settlementsReceivedBase: b.settlementsReceivedBase,
+      settlementsPaidBase: b.settlementsPaidBase,
+      netBalance: b.net,
+    };
+  });
   /** Payer-oriented: share of each expense owed to who paid. */
-  const simplifiedDebts = (openDebts || []).map(mapDebt);
+  const simplifiedDebts = (openDebts || []).map((d) => {
+    const from = getFinanceLedgerMemberById(d.fromMemberId);
+    const to = getFinanceLedgerMemberById(d.toMemberId);
+    return {
+      ...mapDebt(d),
+      fromAvatarUrl: avatarUrlForUserId(from?.user_id),
+      toAvatarUrl: avatarUrlForUserId(to?.user_id),
+    };
+  });
   /** Min cash-flow: fewest transfers to zero all nets. */
-  const minimalDebts = simplifyDebts(raw).map(mapDebt);
+  const minimalDebts = simplifyDebts(raw).map((d) => {
+    const from = getFinanceLedgerMemberById(d.fromMemberId);
+    const to = getFinanceLedgerMemberById(d.toMemberId);
+    return {
+      ...mapDebt(d),
+      fromAvatarUrl: avatarUrlForUserId(from?.user_id),
+      toAvatarUrl: avatarUrlForUserId(to?.user_id),
+    };
+  });
 
   const couples = coupleContext?.couples ?? [];
   const byMember = new Map(raw.map((b) => [b.memberId, b]));

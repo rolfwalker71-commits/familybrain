@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Brain, HandCoins, Luggage, Menu } from "lucide-react";
+import { BookOpen, HandCoins, Luggage, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -18,7 +18,7 @@ import { Sidebar } from "./sidebar";
 type Brand = {
   name: string;
   href: string;
-  icon: typeof Brain;
+  icon: typeof BookOpen;
   accentClass: string;
   iconWrapClass: string;
 };
@@ -48,9 +48,9 @@ function brandForPath(pathname: string): Brand {
     };
   }
   return {
-    name: "MyBrain",
+    name: "TripBook",
     href: "/dashboard",
-    icon: Brain,
+    icon: BookOpen,
     accentClass: "text-[var(--brand-docs)]",
     iconWrapClass:
       "bg-[var(--brand-docs)] text-white shadow-sm shadow-[var(--brand-docs)]/30",
@@ -84,7 +84,7 @@ export function MobileHeader() {
         >
           <SheetHeader className="sr-only">
             <SheetTitle>Navigation</SheetTitle>
-            <SheetDescription>MyBrain Hauptnavigation</SheetDescription>
+            <SheetDescription>TripBook Hauptnavigation</SheetDescription>
           </SheetHeader>
           <Sidebar className="w-full" onNavigate={() => setOpen(false)} />
         </SheetContent>

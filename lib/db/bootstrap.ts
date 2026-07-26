@@ -580,6 +580,9 @@ function ensureUsersTable(db: Database.Database): void {
       email TEXT NOT NULL,
       password_hash TEXT NOT NULL,
       display_name TEXT NOT NULL,
+      gender TEXT,
+      avatar_path TEXT,
+      avatar_prompt TEXT,
       active INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
@@ -587,6 +590,19 @@ function ensureUsersTable(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
     CREATE INDEX IF NOT EXISTS idx_users_active ON users(active);
   `);
+  const cols = db.prepare(`PRAGMA table_info(users)`).all() as Array<{
+    name: string;
+  }>;
+  const names = new Set(cols.map((c) => c.name));
+  if (!names.has("gender")) {
+    db.exec(`ALTER TABLE users ADD COLUMN gender TEXT`);
+  }
+  if (!names.has("avatar_path")) {
+    db.exec(`ALTER TABLE users ADD COLUMN avatar_path TEXT`);
+  }
+  if (!names.has("avatar_prompt")) {
+    db.exec(`ALTER TABLE users ADD COLUMN avatar_prompt TEXT`);
+  }
 }
 
 function ensureTripTravelersTable(db: Database.Database): void {

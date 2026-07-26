@@ -2,10 +2,10 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "MyBrain",
-    short_name: "MyBrain",
+    name: "TripBook",
+    short_name: "TripBook",
     description:
-      "Private Wissensschicht für Paperless-Dokumente, Fristen, Finanzen und Reisen.",
+      "Reiseplanung und Reisekosten in einem — Tagebuch, Ausgaben und Abrechnung.",
     start_url: "/dashboard",
     scope: "/",
     display: "standalone",

@@ -10,6 +10,7 @@ import {
   Receipt,
   RefreshCw,
   ArrowLeftRight,
+  Scale,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -722,6 +723,7 @@ function FinanceShareInner({ token }: { token: string }) {
   });
   const tabItems: FinanceTabItem[] = [
     { id: "overview", label: "Übersicht", icon: LayoutDashboard },
+    { id: "payments", label: "Zahlungsinfos", icon: Scale },
     { id: "new", label: "Neu", icon: Plus, emphasize: true },
     { id: "expenses", label: "Ausgaben", icon: List },
     { id: "settle", label: "Ausgleich", icon: ArrowLeftRight },
@@ -778,19 +780,22 @@ function FinanceShareInner({ token }: { token: string }) {
               window.setTimeout(() => scrollToExpenseCard(expenseId), 120);
             }}
           />
-          <BalanceView
-            balances={balances}
-            simplifiedDebts={simplifiedDebts}
-            minimalDebts={minimalDebts}
-            coupleBalances={coupleBalances}
-            coupleDebts={coupleDebts}
-            baseCurrency={ledger.base_currency}
-            highlightMemberId={member.id}
-            onRecordDebt={recordSuggestedDebt}
-            canRecordDebt={(d) => d.fromMemberId === member.id}
-            recordBusyKey={recordBusyKey}
-          />
         </div>
+      ) : null}
+
+      {activeTab === "payments" ? (
+        <BalanceView
+          balances={balances}
+          simplifiedDebts={simplifiedDebts}
+          minimalDebts={minimalDebts}
+          coupleBalances={coupleBalances}
+          coupleDebts={coupleDebts}
+          baseCurrency={ledger.base_currency}
+          highlightMemberId={member.id}
+          onRecordDebt={recordSuggestedDebt}
+          canRecordDebt={(d) => d.fromMemberId === member.id}
+          recordBusyKey={recordBusyKey}
+        />
       ) : null}
 
       {activeTab === "new" ? (

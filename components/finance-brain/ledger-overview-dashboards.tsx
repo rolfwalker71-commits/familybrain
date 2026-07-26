@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { IconCircle } from "@/components/layout/icon-circle";
-import { formatMoney, formatSignedMoney } from "@/lib/finance-brain/format";
+import { formatDateDe, formatMoney, formatSignedMoney } from "@/lib/finance-brain/format";
 import {
   buildCurrencyBuckets,
   buildOpenSettledSummary,
@@ -200,7 +200,9 @@ export function LedgerOverviewDashboards({
                     <span className="font-medium">{e.description}</span>
                     <span className="mt-0.5 block truncate text-[10px] text-muted-foreground">
                       {e.categoryLabel} · {e.payerName}
-                      {e.expenseDate ? ` · ${e.expenseDate}` : ""}
+                      {e.expenseDate
+                        ? ` · ${formatDateDe(e.expenseDate) || e.expenseDate}`
+                        : ""}
                     </span>
                   </span>
                   <span className="shrink-0 font-semibold tabular-nums">

@@ -22,6 +22,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useAnalysis } from "@/components/analysis/analysis-provider";
 import { useAuth } from "@/components/auth/auth-provider";
+import { UserAvatar } from "@/components/users/user-avatar";
 import { APP_VERSION } from "@/lib/app-version";
 import { IconCircle, type IconTone } from "@/components/layout/icon-circle";
 
@@ -144,23 +145,31 @@ export function Sidebar({
       <div className="px-5 py-6">
         <Link href={homeHref} className="flex items-center gap-3">
           <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground shadow-sm">
-            <Brain className="h-6 w-6" />
+            <BookOpen className="h-6 w-6" />
           </span>
           <span className="text-3xl font-extrabold leading-none tracking-tight text-white">
-            MyBrain
+            TripBook
           </span>
         </Link>
         {me ? (
-          <div className="mt-4 rounded-xl bg-white/10 px-3 py-2.5 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1)]">
-            <p className="text-[11px] font-medium leading-none text-sidebar-foreground/65">
-              Angemeldet als:
-            </p>
-            <p
-              className="mt-1.5 truncate text-sm font-semibold tracking-tight text-white"
-              title={me.displayName}
-            >
-              {me.displayName}
-            </p>
+          <div className="mt-4 flex items-center gap-2.5 rounded-xl bg-white/10 px-3 py-2.5 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1)]">
+            <UserAvatar
+              name={me.displayName}
+              src={me.avatarUrl}
+              size="md"
+              className="ring-white/30"
+            />
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] font-medium leading-none text-sidebar-foreground/65">
+                Angemeldet als:
+              </p>
+              <p
+                className="mt-1.5 truncate text-sm font-semibold tracking-tight text-white"
+                title={me.displayName}
+              >
+                {me.displayName}
+              </p>
+            </div>
           </div>
         ) : null}
       </div>

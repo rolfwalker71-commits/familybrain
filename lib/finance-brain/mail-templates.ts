@@ -76,6 +76,7 @@ export type ExpenseShareMailField = {
   displayName: string;
   shareAmountBase: number;
   isPayer: boolean;
+  avatarCid?: string;
 };
 
 export type ExpenseMailFields = {
@@ -108,8 +109,11 @@ function sharesHtml(
       const payer = s.isPayer
         ? ` <span style="color:${BRAND.muted};">(gezahlt)</span>`
         : "";
+      const avatar = s.avatarCid
+        ? `<img src="cid:${escapeHtml(s.avatarCid)}" alt="" width="18" height="18" style="width:18px;height:18px;border-radius:999px;object-fit:cover;vertical-align:middle;margin-right:6px;border:1px solid ${BRAND.border};" />`
+        : "";
       return `<div style="display:flex;justify-content:space-between;gap:12px;margin-top:2px;font-size:11px;line-height:1.35;">
-        <span style="color:${BRAND.ink};">${escapeHtml(s.displayName)}${payer}</span>
+        <span style="color:${BRAND.ink};">${avatar}${escapeHtml(s.displayName)}${payer}</span>
         <span style="font-variant-numeric:tabular-nums;font-weight:600;color:${BRAND.ink};">${escapeHtml(money)}</span>
       </div>`;
     })
@@ -269,7 +273,7 @@ export function buildExpenseMailHtml(
     <div style="border:1px solid ${BRAND.border};border-top:0;border-radius:0 0 12px 12px;overflow:hidden;background:${BRAND.card};">
       <div style="padding:16px 16px 4px;">${card}</div>
       <div style="padding:12px 18px 18px;font-size:12px;color:${BRAND.muted};border-top:1px solid ${BRAND.page};">
-        Beleg-PDF im Anhang — geeignet für Paperless / FamilyBrain.
+        Beleg-PDF im Anhang — geeignet für Paperless / TripBook.
       </div>
     </div>
   </div>
@@ -326,7 +330,7 @@ export function buildLedgerExpensesMailHtml(input: {
       `<div style="padding:18px;color:${BRAND.muted};background:${BRAND.card};border-radius:12px;border:1px solid ${BRAND.border};">Noch keine Ausgaben.</div>`
     }
     <div style="padding:12px 4px;font-size:12px;color:${BRAND.muted};">
-      Übersicht-PDF im Anhang — geeignet für Paperless / FamilyBrain.
+      Übersicht-PDF im Anhang — geeignet für Paperless / TripBook.
     </div>
   </div>
 </body></html>`;
@@ -395,7 +399,7 @@ export function buildSettlementMailHtml(input: {
       </div>
     </div>
     <div style="padding:12px 18px 18px;font-size:12px;color:${BRAND.muted};border-top:1px solid ${BRAND.page};">
-      Beleg-PDF im Anhang — geeignet für Paperless / FamilyBrain.
+      Beleg-PDF im Anhang — geeignet für Paperless / TripBook.
     </div>
   </div>
 </body></html>`;
@@ -561,7 +565,7 @@ export function buildTripLedgerSummaryMailHtml(model: {
     </div>
 
     <div style="padding:12px 4px;font-size:12px;color:${BRAND.muted};">
-      PDF im Anhang — geeignet für Paperless / FamilyBrain.
+      PDF im Anhang — geeignet für Paperless / TripBook.
     </div>
   </div>
 </body></html>`;

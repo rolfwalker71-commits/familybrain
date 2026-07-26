@@ -1,3 +1,7 @@
+import { getAuthContext } from "@/lib/auth/current-user";
+import { userAvatarPublicUrl } from "@/lib/users/avatar";
+import { getAppUserById } from "@/lib/users/queries";
+import { UserAvatar } from "@/components/users/user-avatar";
 import Link from "next/link";
 import {
   FileText,
@@ -53,8 +57,15 @@ function StatCard({
   );
 }
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
   const stats = getDashboardStats();
+  const auth = await getAuthContext();
+  const user =
+    auth && !auth.isAdmin && auth.userId
+      ? getAppUserById(auth.userId)
+      : null;
+  const welcomeName = user?.display_name || auth?.username || null;
+  const welcomeAvatar = userAvatarPublicUrl(user?.avatar_path);
   const upcoming = (
     listDeadlines("open") as {
       id: number;
@@ -70,6 +81,17 @@ export default function DashboardPage() {
 
   return (
     <div className="min-w-0 space-y-6 pb-6 md:space-y-8">
+      {welcomeName ? (
+        <div className="flex items-center gap-3 rounded-2xl border border-border/60 bg-[var(--brand-finance-soft)]/50 px-4 py-3">
+          <UserAvatar name={welcomeName} src={welcomeAvatar} size="lg" />
+          <div className="min-w-0">
+            <p className="text-xs font-medium text-muted-foreground">Willkommen</p>
+            <p className="truncate text-lg font-semibold tracking-tight">
+              {welcomeName}
+            </p>
+          </div>
+        </div>
+      ) : null}
       <PageHeader
         title="Dashboard"
         description="Überblick über deine Dokumente und Analysen"

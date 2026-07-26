@@ -1,5 +1,8 @@
 import { getDb } from "@/lib/db/client";
 import { nowIso } from "@/lib/utils/dates";
+import path from "path";
+
+export type UserGender = "male" | "female" | null;
 
 export type AppUserRow = {
   id: number;
@@ -7,23 +10,58 @@ export type AppUserRow = {
   email: string;
   password_hash: string;
   display_name: string;
+  gender: UserGender;
+  avatar_path: string | null;
+  avatar_prompt: string | null;
   active: number;
   created_at: string;
   updated_at: string;
 };
 
-export type AppUserPublic = Omit<AppUserRow, "password_hash"> & {
+export type AppUserPublic = Omit<
+  AppUserRow,
+  "password_hash" | "avatar_path" | "avatar_prompt"
+> & {
   trip_ids: number[];
   ledger_ids: number[];
+  avatar_url: string | null;
 };
+
+function normalizeGender(raw: string | null | undefined): UserGender {
+  if (raw === "male" || raw === "female") return raw;
+  return null;
+}
+
+function avatarUrlFromPath(avatarPath: string | null | undefined): string | null {
+  if (!avatarPath) return null;
+  return `/api/users/media/avatar/${encodeURIComponent(
+    path.basename(avatarPath)
+  )}`;
+}
 
 function mapPublic(
   row: AppUserRow,
   tripIds: number[],
   ledgerIds: number[]
 ): AppUserPublic {
-  const { password_hash: _hash, ...rest } = row;
-  return { ...rest, trip_ids: tripIds, ledger_ids: ledgerIds };
+  const { password_hash: _hash, avatar_path, avatar_prompt: _prompt, ...rest } =
+    row;
+  return {
+    ...rest,
+    gender: normalizeGender(row.gender),
+    avatar_url: avatarUrlFromPath(avatar_path),
+    trip_ids: tripIds,
+    ledger_ids: ledgerIds,
+  };
+}
+
+function coerceUserRow(row: AppUserRow): AppUserRow {
+  return {
+    ...row,
+    gender: normalizeGender(row.gender),
+    avatar_path: row.avatar_path ?? null,
+    avatar_prompt: row.avatar_prompt ?? null,
+  };
 }
 
 export function listAppUsers(): AppUserPublic[] {
@@ -34,7 +72,11 @@ export function listAppUsers(): AppUserPublic[] {
     )
     .all() as AppUserRow[];
   return rows.map((row) =>
-    mapPublic(row, listUserTripIds(row.id), listUserLedgerIds(row.id))
+    mapPublic(
+      coerceUserRow(row),
+      listUserTripIds(row.id),
+      listUserLedgerIds(row.id)
+    )
   );
 }
 
@@ -43,7 +85,7 @@ export function getAppUserById(id: number): AppUserRow | null {
   const row = db
     .prepare(`SELECT * FROM users WHERE id = ?`)
     .get(id) as AppUserRow | undefined;
-  return row ?? null;
+  return row ? coerceUserRow(row) : null;
 }
 
 export function getAppUserByUsername(username: string): AppUserRow | null {
@@ -51,7 +93,7 @@ export function getAppUserByUsername(username: string): AppUserRow | null {
   const row = db
     .prepare(`SELECT * FROM users WHERE username = ? COLLATE NOCASE`)
     .get(username.trim()) as AppUserRow | undefined;
-  return row ?? null;
+  return row ? coerceUserRow(row) : null;
 }
 
 export function getAppUserPublic(id: number): AppUserPublic | null {
@@ -66,6 +108,7 @@ export function createAppUser(input: {
   displayName: string;
   passwordHash: string;
   active?: boolean;
+  gender?: UserGender;
 }): AppUserRow {
   const db = getDb();
   const ts = nowIso();
@@ -79,14 +122,15 @@ export function createAppUser(input: {
     const result = db
       .prepare(
         `INSERT INTO users
-           (username, email, password_hash, display_name, active, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`
+           (username, email, password_hash, display_name, gender, avatar_path, avatar_prompt, active, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?)`
       )
       .run(
         username,
         email,
         input.passwordHash,
         displayName,
+        input.gender ?? null,
         input.active === false ? 0 : 1,
         ts,
         ts
@@ -109,6 +153,7 @@ export function updateAppUser(
     displayName?: string;
     passwordHash?: string;
     active?: boolean;
+    gender?: UserGender;
   }
 ): AppUserRow {
   const existing = getAppUserById(id);
@@ -121,6 +166,7 @@ export function updateAppUser(
          email = ?,
          password_hash = ?,
          display_name = ?,
+         gender = ?,
          active = ?,
          updated_at = ?
        WHERE id = ?`
@@ -133,6 +179,7 @@ export function updateAppUser(
       input.displayName !== undefined
         ? input.displayName.trim() || existing.display_name
         : existing.display_name,
+      input.gender !== undefined ? input.gender : existing.gender,
       input.active !== undefined
         ? input.active
           ? 1
@@ -149,6 +196,23 @@ export function updateAppUser(
     throw error;
   }
   return getAppUserById(id)!;
+}
+
+export function setUserAvatar(
+  userId: number,
+  input: {
+    avatarPath: string | null;
+    avatarPrompt: string | null;
+  }
+): AppUserRow {
+  const existing = getAppUserById(userId);
+  if (!existing) throw new Error("Benutzer nicht gefunden");
+  getDb()
+    .prepare(
+      `UPDATE users SET avatar_path = ?, avatar_prompt = ?, updated_at = ? WHERE id = ?`
+    )
+    .run(input.avatarPath, input.avatarPrompt, nowIso(), userId);
+  return getAppUserById(userId)!;
 }
 
 export function deleteAppUser(id: number): void {

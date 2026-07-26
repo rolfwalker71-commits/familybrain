@@ -20,6 +20,7 @@ const CreateSchema = z.object({
   displayName: z.string().min(1).max(120).optional(),
   password: z.string().min(6).max(200),
   active: z.boolean().optional(),
+  gender: z.enum(["male", "female"]).nullable().optional(),
 });
 
 export async function GET() {
@@ -43,7 +44,18 @@ export async function POST(request: Request) {
       displayName: parsed.data.displayName || parsed.data.username,
       passwordHash,
       active: parsed.data.active,
+      gender: parsed.data.gender ?? null,
     });
+    // Default: AI avatar when OpenAI is configured.
+    try {
+      const { hasOpenAIKey } = await import("@/lib/ai/client");
+      if (hasOpenAIKey()) {
+        const { generateUserAvatar } = await import("@/lib/users/avatar");
+        await generateUserAvatar(user.id);
+      }
+    } catch {
+      // Avatar optional — user can generate later
+    }
     return NextResponse.json({
       ok: true,
       user: getAppUserPublic(user.id),

@@ -676,7 +676,7 @@ export async function buildExpensePdfBuffer(input: {
     height: 1,
     color: C.border,
   });
-  page.drawText("Beleg-PDF - geeignet fuer Paperless / FamilyBrain", {
+  page.drawText("Beleg-PDF - geeignet fuer Paperless / TripBook", {
     x: contentX,
     y: cardBottom + 22,
     size: 11,
@@ -845,7 +845,7 @@ export async function buildSettlementPdfBuffer(input: {
     CARD_RADIUS,
     C.foot
   );
-  page.drawText("Beleg-PDF - geeignet fuer Paperless / FamilyBrain", {
+  page.drawText("Beleg-PDF - geeignet fuer Paperless / TripBook", {
     x: contentX,
     y: cardBottom + 22,
     size: 11,

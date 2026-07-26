@@ -170,7 +170,7 @@ export async function fetchCurrentWeather(
     headers: {
       Accept: "application/json",
       "User-Agent":
-        "FamilyBrain-TravelBrain/1.0 (https://github.com/rolfwalker71-commits/familybrain)",
+        "TripBook-TravelBrain/1.0 (https://github.com/rolfwalker71-commits/familybrain)",
     },
     cache: "no-store",
   });

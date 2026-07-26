@@ -4,7 +4,7 @@
  */
 
 const USER_AGENT =
-  "FamilyBrain-TravelBrain/1.0 (https://github.com/rolfwalker71-commits/familybrain)";
+  "TripBook-TravelBrain/1.0 (https://github.com/rolfwalker71-commits/familybrain)";
 
 export type MapLocationKind = "sea" | "urban" | "land";
 

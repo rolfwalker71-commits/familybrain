@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Brain, Loader2, LockKeyhole } from "lucide-react";
+import { BookOpen, Loader2, LockKeyhole } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -48,10 +48,10 @@ export function LoginForm({ nextPath }: { nextPath: string }) {
       <CardHeader className="space-y-5 px-6 pb-2 pt-7 sm:px-8">
         <div className="flex items-center gap-4">
           <span className="flex size-14 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/25">
-            <Brain className="size-7" />
+            <BookOpen className="size-7" />
           </span>
           <div>
-            <p className="text-sm font-medium text-primary">MyBrain</p>
+            <p className="text-sm font-medium text-primary">TripBook</p>
             <CardTitle className="text-2xl">Willkommen zurück</CardTitle>
           </div>
         </div>
