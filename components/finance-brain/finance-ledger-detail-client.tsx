@@ -2002,7 +2002,7 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
                 className="gap-1.5"
               >
                 <Sparkles className="size-4" />
-                Mit AI erzeugen
+                {ledger.cover_url ? "Neu generieren" : "Mit AI erzeugen"}
               </Button>
               <Button
                 variant="outline"

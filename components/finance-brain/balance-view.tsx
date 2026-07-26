@@ -74,6 +74,7 @@ import {
 } from "@/components/finance-brain/expense-split-participants";
 import { cn } from "@/lib/utils";
 import { NameWithAvatar } from "@/components/users/user-avatar";
+import { AiImagePreview } from "@/components/layout/ai-image-preview";
 
 type Balance = {
   memberId: number;
@@ -683,26 +684,17 @@ function ExpenseCard({
 
           <div className="flex shrink-0 flex-col items-end gap-1.5">
             {exp.ai_image_url ? (
-              <button
-                type="button"
-                title="Tippen zum Vergrössern"
-                className="relative shrink-0 overflow-hidden rounded-lg border border-border/50 shadow-sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setZoomOpen(true);
-                }}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={exp.ai_image_url}
-                  alt=""
-                  className="h-12 w-12 object-cover sm:h-14 sm:w-14"
-                />
-                <span className="absolute right-0.5 top-0.5 inline-flex items-center gap-0.5 rounded bg-[var(--brand-finance)]/90 px-1 py-px text-[8px] font-bold uppercase tracking-wide text-white">
-                  <Sparkles className="size-2.5" />
-                  AI
-                </span>
-              </button>
+              <AiImagePreview
+                src={exp.ai_image_url}
+                brand="finance"
+                busy={aiImageBusy}
+                onOpen={() => setZoomOpen(true)}
+                onRegenerate={
+                  onGenerateAiImage
+                    ? () => onGenerateAiImage(exp.id)
+                    : undefined
+                }
+              />
             ) : aiImageBusy ? (
               <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-dashed border-[var(--brand-finance)]/35 bg-[var(--brand-finance-soft)] text-[10px] font-medium text-[var(--brand-finance)] sm:h-14 sm:w-14">
                 KI…
@@ -1236,19 +1228,24 @@ function ExpenseCard({
             />
           ) : null}
           {onDeleteAiImage || onGenerateAiImage ? (
-            <DialogFooter className="gap-2 sm:gap-0">
+            <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-end">
               {onGenerateAiImage ? (
                 <Button
                   variant="secondary"
+                  className="w-full gap-1.5 sm:w-auto"
                   disabled={aiImageBusy}
                   onClick={() => onGenerateAiImage(exp.id)}
                 >
-                  Neu generieren
+                  <RefreshCw
+                    className={cn("size-3.5", aiImageBusy && "animate-spin")}
+                  />
+                  {aiImageBusy ? "Generiert…" : "Neu generieren"}
                 </Button>
               ) : null}
               {onDeleteAiImage ? (
                 <Button
                   variant="destructive"
+                  className="w-full sm:w-auto"
                   disabled={aiImageBusy}
                   onClick={() => {
                     onDeleteAiImage(exp.id);

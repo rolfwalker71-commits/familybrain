@@ -30,6 +30,7 @@ import {
   FileText,
   LayoutList,
   MoreHorizontal,
+  RefreshCw,
   Wallet,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -65,6 +66,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { PageHeader } from "@/components/layout/page-primitives";
+import { AiImagePreview } from "@/components/layout/ai-image-preview";
 import {
   IconCircle,
   pageVisuals,
@@ -1409,6 +1411,39 @@ function TripDetailInner({
     }
   }
 
+  /** Schnelles Neu-generieren (ohne Prompt-Dialog), z. B. unter Preview / Zoom. */
+  async function regenerateEventAiImage(eventId: number) {
+    setAiImageBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/trips/${tripId}/events/${eventId}/ai-image`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ useSettings: true }),
+        }
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Bildgenerierung fehlgeschlagen");
+      await load();
+      const url =
+        typeof data.event?.ai_image_url === "string"
+          ? data.event.ai_image_url
+          : null;
+      if (url) {
+        setAiZoom((prev) =>
+          prev && prev.eventId === eventId ? { ...prev, url } : prev
+        );
+      }
+      setStatus("KI-Bild neu erzeugt.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setAiImageBusy(false);
+    }
+  }
+
   async function deleteAiImage(eventId: number) {
     setAiImageBusy(true);
     setError(null);
@@ -1866,7 +1901,7 @@ function TripDetailInner({
             className="gap-1.5"
           >
             <Sparkles className="size-4" />
-            Mit AI erzeugen
+            {trip.cover_url ? "Neu generieren" : "Mit AI erzeugen"}
           </Button>
           <Button
             variant="outline"
@@ -2680,25 +2715,25 @@ function TripDetailInner({
                             </button>
                           ) : null}
                           {event.ai_image_url ? (
-                            <button
-                              type="button"
-                              title="Tippen zum Vergrössern"
-                              className="shrink-0 overflow-hidden rounded-md border border-border/60 shadow-sm"
-                              onClick={() =>
+                            <AiImagePreview
+                              src={event.ai_image_url}
+                              alt=""
+                              brand="travel"
+                              busy={aiImageBusy}
+                              imageClassName="h-11 w-11 object-cover sm:h-12 sm:w-12"
+                              onOpen={() =>
                                 setAiZoom({
                                   url: event.ai_image_url!,
                                   title: event.title,
                                   eventId: event.id,
                                 })
                               }
-                            >
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img
-                                src={event.ai_image_url}
-                                alt=""
-                                className="h-11 w-11 object-cover sm:h-12 sm:w-12"
-                              />
-                            </button>
+                              onRegenerate={
+                                !readOnly
+                                  ? () => void regenerateEventAiImage(event.id)
+                                  : undefined
+                              }
+                            />
                           ) : null}
                         </div>
                       </div>
@@ -2928,25 +2963,25 @@ function TripDetailInner({
                         <EventDateHeader event={event} size="sm" />
                       </div>
                       {event.ai_image_url ? (
-                        <button
-                          type="button"
-                          title="Tippen zum Vergrössern"
-                          className="shrink-0 overflow-hidden rounded-md border border-border/60 shadow-sm"
-                          onClick={() =>
+                        <AiImagePreview
+                          src={event.ai_image_url}
+                          alt=""
+                          brand="travel"
+                          busy={aiImageBusy}
+                          imageClassName="h-12 w-12 object-cover sm:h-16 sm:w-16"
+                          onOpen={() =>
                             setAiZoom({
                               url: event.ai_image_url!,
                               title: event.title,
                               eventId: event.id,
                             })
                           }
-                        >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={event.ai_image_url}
-                            alt=""
-                            className="h-12 w-12 object-cover sm:h-16 sm:w-16"
-                          />
-                        </button>
+                          onRegenerate={
+                            !readOnly
+                              ? () => void regenerateEventAiImage(event.id)
+                              : undefined
+                          }
+                        />
                       ) : null}
                     </div>
                   </div>
@@ -3699,11 +3734,23 @@ function TripDetailInner({
             />
           ) : null}
           {!readOnly && aiZoom?.eventId != null ? (
-            <DialogFooter className="gap-2 sm:gap-0">
+            <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-end">
+              <Button
+                type="button"
+                variant="secondary"
+                className="w-full gap-1.5 sm:w-auto"
+                disabled={aiImageBusy || aiBatch != null}
+                onClick={() => void regenerateEventAiImage(aiZoom.eventId!)}
+              >
+                <RefreshCw
+                  className={cn("size-4", aiImageBusy && "animate-spin")}
+                />
+                {aiImageBusy ? "Generiert…" : "Neu generieren"}
+              </Button>
               <Button
                 type="button"
                 variant="outline"
-                className="gap-1.5"
+                className="w-full gap-1.5 sm:w-auto"
                 onClick={() => void downloadEventAiImage(aiZoom.eventId!)}
               >
                 <Download className="size-4" />
@@ -3713,7 +3760,7 @@ function TripDetailInner({
                 <Button
                   type="button"
                   variant="outline"
-                  className="gap-1.5"
+                  className="w-full gap-1.5 sm:w-auto"
                   disabled={aiImageBusy}
                   onClick={() => pickReplaceAiImage(aiZoom.eventId!)}
                 >
@@ -3804,7 +3851,14 @@ function TripDetailInner({
               className="gap-1.5"
             >
               <Sparkles className="size-4" />
-              {aiImageBusy ? "Generiert…" : "Bild erzeugen"}
+              {aiImageBusy
+                ? "Generiert…"
+                : aiImageEventId != null &&
+                    events.some(
+                      (e) => e.id === aiImageEventId && e.ai_image_url
+                    )
+                  ? "Neu generieren"
+                  : "Bild erzeugen"}
             </Button>
           </DialogFooter>
         </DialogContent>

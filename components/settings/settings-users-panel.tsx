@@ -443,7 +443,11 @@ export function SettingsUsersPanel() {
                             onClick={() => void generateAvatar(user.id)}
                           >
                             <Sparkles className="size-3.5" />
-                            {avatarBusy ? "…" : "KI-Avatar"}
+                            {avatarBusy
+                              ? "…"
+                              : user.avatar_url
+                                ? "Neu generieren"
+                                : "KI-Avatar"}
                           </Button>
                           <Button
                             type="button"
