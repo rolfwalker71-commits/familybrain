@@ -687,13 +687,7 @@ function ExpenseCard({
               <AiImagePreview
                 src={exp.ai_image_url}
                 brand="finance"
-                busy={aiImageBusy}
                 onOpen={() => setZoomOpen(true)}
-                onRegenerate={
-                  onGenerateAiImage
-                    ? () => onGenerateAiImage(exp.id)
-                    : undefined
-                }
               />
             ) : aiImageBusy ? (
               <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-dashed border-[var(--brand-finance)]/35 bg-[var(--brand-finance-soft)] text-[10px] font-medium text-[var(--brand-finance)] sm:h-14 sm:w-14">

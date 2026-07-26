@@ -2719,7 +2719,6 @@ function TripDetailInner({
                               src={event.ai_image_url}
                               alt=""
                               brand="travel"
-                              busy={aiImageBusy}
                               imageClassName="h-11 w-11 object-cover sm:h-12 sm:w-12"
                               onOpen={() =>
                                 setAiZoom({
@@ -2727,11 +2726,6 @@ function TripDetailInner({
                                   title: event.title,
                                   eventId: event.id,
                                 })
-                              }
-                              onRegenerate={
-                                !readOnly
-                                  ? () => void regenerateEventAiImage(event.id)
-                                  : undefined
                               }
                             />
                           ) : null}
@@ -2967,7 +2961,6 @@ function TripDetailInner({
                           src={event.ai_image_url}
                           alt=""
                           brand="travel"
-                          busy={aiImageBusy}
                           imageClassName="h-12 w-12 object-cover sm:h-16 sm:w-16"
                           onOpen={() =>
                             setAiZoom({
@@ -2975,11 +2968,6 @@ function TripDetailInner({
                               title: event.title,
                               eventId: event.id,
                             })
-                          }
-                          onRegenerate={
-                            !readOnly
-                              ? () => void regenerateEventAiImage(event.id)
-                              : undefined
                           }
                         />
                       ) : null}
