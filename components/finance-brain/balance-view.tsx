@@ -182,6 +182,7 @@ export function BalanceView({
   coupleBalances = [],
   coupleDebts = [],
   expenses = [],
+  settlements = [],
   baseCurrency,
   highlightMemberId,
   onRecordDebt,
@@ -197,6 +198,14 @@ export function BalanceView({
   coupleDebts?: CoupleDebt[];
   /** Für Prüfen-Matrix (Buchung × Teilnehmer). */
   expenses?: ExpenseListItem[];
+  /** Für Zell-Aufschlüsselung Wer→wem. */
+  settlements?: Array<{
+    id: number;
+    from_member_id: number;
+    to_member_id: number;
+    amount_base: number;
+    note: string | null;
+  }>;
   baseCurrency: string;
   highlightMemberId?: number;
   onRecordDebt?: (debt: Debt) => void | Promise<void>;
@@ -624,6 +633,13 @@ export function BalanceView({
               displayName: b.displayName,
             }))}
             debts={simplifiedDebts}
+            settlements={settlements.map((s) => ({
+              id: s.id,
+              fromMemberId: s.from_member_id,
+              toMemberId: s.to_member_id,
+              amountBase: s.amount_base,
+              note: s.note,
+            }))}
             baseCurrency={baseCurrency}
             balanceNetByMemberId={Object.fromEntries(
               balances.map((b) => [b.memberId, b.netBalance])

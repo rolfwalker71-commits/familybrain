@@ -800,6 +800,7 @@ function FinanceShareInner({ token }: { token: string }) {
           coupleBalances={coupleBalances}
           coupleDebts={coupleDebts}
           expenses={expenses}
+          settlements={settlements}
           baseCurrency={ledger.base_currency}
           highlightMemberId={member.id}
           onRecordDebt={recordSuggestedDebt}

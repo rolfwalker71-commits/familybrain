@@ -155,3 +155,153 @@ export function debtGridAmount(
 ): number {
   return grid.amounts[debtKey(fromMemberId, toMemberId)] || 0;
 }
+
+export type PairDebtSettlement = {
+  id?: number;
+  fromMemberId: number;
+  toMemberId: number;
+  amountBase: number;
+  note?: string | null;
+};
+
+export type PairDebtLineKind =
+  | "owe_from_booking"
+  | "credit_from_booking"
+  | "settlement_paid"
+  | "settlement_received";
+
+export type PairDebtLine = {
+  kind: PairDebtLineKind;
+  /** Signed contribution toward from→to net (positive = increases debt). */
+  signedAmount: number;
+  label: string;
+  expenseId?: number;
+  settlementId?: number;
+  preSettled?: boolean;
+};
+
+export type PairDebtExplanation = {
+  fromMemberId: number;
+  toMemberId: number;
+  fromName: string;
+  toName: string;
+  /** Gross: from's shares on to's expenses. */
+  oweTotal: number;
+  /** Gross: to's shares on from's expenses. */
+  creditTotal: number;
+  /** Settlements from→to (reduce debt). */
+  settlementPaidTotal: number;
+  /** Settlements to→from (increase from→to net). */
+  settlementReceivedTotal: number;
+  /** Net from owes to (same logic as Nach Zahler). */
+  netAmount: number;
+  lines: PairDebtLine[];
+};
+
+/**
+ * Trace a Nach-Zahler cell: bookings + settlements between two people,
+ * netted the same way as buildPayerOrientedDebts.
+ */
+export function explainPairDebt(
+  expenses: ShareMatrixExpense[],
+  settlements: PairDebtSettlement[],
+  fromMemberId: number,
+  toMemberId: number,
+  nameById: Map<number, string>
+): PairDebtExplanation {
+  const fromName = nameById.get(fromMemberId) || `#${fromMemberId}`;
+  const toName = nameById.get(toMemberId) || `#${toMemberId}`;
+  const lines: PairDebtLine[] = [];
+  let oweTotal = 0;
+  let creditTotal = 0;
+  let settlementPaidTotal = 0;
+  let settlementReceivedTotal = 0;
+
+  for (const exp of expenses) {
+    if ((exp.direction || "expense") === "income") continue;
+    const payerId = exp.paid_by_member_id;
+    const label = exp.description?.trim() || "Ausgabe";
+    const preSettled = Boolean(exp.pre_settled);
+
+    if (payerId === toMemberId) {
+      const share = exp.splits.find((s) => s.member_id === fromMemberId);
+      const amt = roundMoney(Number(share?.share_amount_base) || 0);
+      if (amt <= 0) continue;
+      oweTotal = roundMoney(oweTotal + amt);
+      lines.push({
+        kind: "owe_from_booking",
+        signedAmount: amt,
+        label,
+        expenseId: exp.id,
+        preSettled,
+      });
+    } else if (payerId === fromMemberId) {
+      const share = exp.splits.find((s) => s.member_id === toMemberId);
+      const amt = roundMoney(Number(share?.share_amount_base) || 0);
+      if (amt <= 0) continue;
+      creditTotal = roundMoney(creditTotal + amt);
+      lines.push({
+        kind: "credit_from_booking",
+        signedAmount: -amt,
+        label,
+        expenseId: exp.id,
+        preSettled,
+      });
+    }
+  }
+
+  for (const s of settlements) {
+    const amt = roundMoney(Number(s.amountBase) || 0);
+    if (amt <= 0) continue;
+    const note = s.note?.trim() || "Rückzahlung";
+    if (s.fromMemberId === fromMemberId && s.toMemberId === toMemberId) {
+      settlementPaidTotal = roundMoney(settlementPaidTotal + amt);
+      lines.push({
+        kind: "settlement_paid",
+        signedAmount: -amt,
+        label: note,
+        settlementId: s.id,
+      });
+    } else if (
+      s.fromMemberId === toMemberId &&
+      s.toMemberId === fromMemberId
+    ) {
+      settlementReceivedTotal = roundMoney(settlementReceivedTotal + amt);
+      lines.push({
+        kind: "settlement_received",
+        signedAmount: amt,
+        label: note,
+        settlementId: s.id,
+      });
+    }
+  }
+
+  const kindOrder: Record<PairDebtLineKind, number> = {
+    owe_from_booking: 0,
+    credit_from_booking: 1,
+    settlement_paid: 2,
+    settlement_received: 3,
+  };
+  lines.sort(
+    (a, b) =>
+      kindOrder[a.kind] - kindOrder[b.kind] ||
+      Math.abs(b.signedAmount) - Math.abs(a.signedAmount)
+  );
+
+  const netAmount = roundMoney(
+    oweTotal - creditTotal - settlementPaidTotal + settlementReceivedTotal
+  );
+
+  return {
+    fromMemberId,
+    toMemberId,
+    fromName,
+    toName,
+    oweTotal,
+    creditTotal,
+    settlementPaidTotal,
+    settlementReceivedTotal,
+    netAmount,
+    lines,
+  };
+}

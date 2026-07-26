@@ -9,6 +9,10 @@ import {
   buildDebtGrid,
   buildShareMatrix,
   debtGridAmount,
+  explainPairDebt,
+  type PairDebtExplanation,
+  type PairDebtLineKind,
+  type PairDebtSettlement,
   type ShareMatrixExpense,
   type ShareMatrixMember,
 } from "@/lib/finance-brain/settlement-audit";
@@ -20,21 +24,49 @@ type Debt = {
   amount: number;
 };
 
+const LINE_SECTION: Record<
+  PairDebtLineKind,
+  { title: (from: string, to: string) => string; tone: string }
+> = {
+  owe_from_booking: {
+    title: (from, to) => `${from} schuldet aus Ausgaben von ${to}`,
+    tone: "text-amber-900",
+  },
+  credit_from_booking: {
+    title: (from, to) => `Abzüglich: ${to} schuldet aus Ausgaben von ${from}`,
+    tone: "text-[var(--brand-finance)]",
+  },
+  settlement_paid: {
+    title: (from, to) => `Rückzahlungen ${from} → ${to}`,
+    tone: "text-[var(--brand-finance)]",
+  },
+  settlement_received: {
+    title: (from, to) => `Rückzahlungen ${to} → ${from}`,
+    tone: "text-amber-900",
+  },
+};
+
 export function SettlementAuditPanel({
   expenses,
   members,
   debts,
+  settlements = [],
   baseCurrency,
   balanceNetByMemberId,
 }: {
   expenses: ShareMatrixExpense[];
   members: ShareMatrixMember[];
   debts: Debt[];
+  settlements?: PairDebtSettlement[];
   baseCurrency: string;
   /** Optional: actual saldo nets (incl. settlements) for comparison. */
   balanceNetByMemberId?: Record<number, number>;
 }) {
   const [open, setOpen] = useState(false);
+  const [selectedPair, setSelectedPair] = useState<{
+    fromId: number;
+    toId: number;
+  } | null>(null);
 
   const matrix = useMemo(
     () => buildShareMatrix(expenses, members),
@@ -51,8 +83,27 @@ export function SettlementAuditPanel({
     return map;
   }, [members]);
 
+  const pairExplain = useMemo((): PairDebtExplanation | null => {
+    if (!selectedPair) return null;
+    return explainPairDebt(
+      expenses,
+      settlements,
+      selectedPair.fromId,
+      selectedPair.toId,
+      nameById
+    );
+  }, [selectedPair, expenses, settlements, nameById]);
+
   if (members.length === 0 || matrix.rows.length === 0) {
     return null;
+  }
+
+  function togglePair(fromId: number, toId: number) {
+    setSelectedPair((prev) =>
+      prev && prev.fromId === fromId && prev.toId === toId
+        ? null
+        : { fromId, toId }
+    );
   }
 
   return (
@@ -258,7 +309,8 @@ export function SettlementAuditPanel({
               Wer → wem (Nach Zahler)
             </p>
             <p className="mb-2 text-[11px] leading-snug text-muted-foreground">
-              Zeile schuldet Spalte. Entspricht der Liste «Nach Zahler».
+              Zeile schuldet Spalte. Betrag antippen für die Aufschlüsselung
+              (Buchungen + Rückzahlungen).
             </p>
             <div className="overflow-x-auto rounded-lg border border-border/50">
               <table className="w-full min-w-[20rem] border-collapse text-left text-[11px]">
@@ -295,17 +347,34 @@ export function SettlementAuditPanel({
                           );
                         }
                         const amt = debtGridAmount(debtGrid, from.id, to.id);
+                        const isSelected =
+                          selectedPair?.fromId === from.id &&
+                          selectedPair?.toId === to.id;
+                        if (amt <= 0) {
+                          return (
+                            <td
+                              key={to.id}
+                              className="px-2 py-1 text-right text-muted-foreground/40"
+                            >
+                              —
+                            </td>
+                          );
+                        }
                         return (
-                          <td
-                            key={to.id}
-                            className={cn(
-                              "px-2 py-1 text-right tabular-nums",
-                              amt > 0
-                                ? "font-medium text-amber-900"
-                                : "text-muted-foreground/40"
-                            )}
-                          >
-                            {amt > 0 ? formatMoney(amt, baseCurrency) : "—"}
+                          <td key={to.id} className="px-1 py-0.5 text-right">
+                            <button
+                              type="button"
+                              onClick={() => togglePair(from.id, to.id)}
+                              aria-pressed={isSelected}
+                              className={cn(
+                                "w-full rounded px-1 py-1 text-right tabular-nums font-medium transition-colors",
+                                isSelected
+                                  ? "bg-amber-100 text-amber-950 ring-1 ring-amber-300"
+                                  : "text-amber-900 hover:bg-amber-50"
+                              )}
+                            >
+                              {formatMoney(amt, baseCurrency)}
+                            </button>
                           </td>
                         );
                       })}
@@ -341,9 +410,125 @@ export function SettlementAuditPanel({
                 </tfoot>
               </table>
             </div>
+
+            {pairExplain ? (
+              <PairDebtBreakdown
+                explain={pairExplain}
+                baseCurrency={baseCurrency}
+                onClose={() => setSelectedPair(null)}
+              />
+            ) : null}
           </div>
         </CardContent>
       ) : null}
     </Card>
+  );
+}
+
+function PairDebtBreakdown({
+  explain,
+  baseCurrency,
+  onClose,
+}: {
+  explain: PairDebtExplanation;
+  baseCurrency: string;
+  onClose: () => void;
+}) {
+  const kinds: PairDebtLineKind[] = [
+    "owe_from_booking",
+    "credit_from_booking",
+    "settlement_paid",
+    "settlement_received",
+  ];
+
+  return (
+    <div className="mt-3 rounded-lg border border-amber-200/80 bg-amber-50/40 p-3">
+      <div className="mb-2 flex items-start justify-between gap-2">
+        <div>
+          <p className="text-[12px] font-semibold text-foreground">
+            {explain.fromName} → {explain.toName}
+          </p>
+          <p className="text-[11px] text-muted-foreground">
+            Netto{" "}
+            <span className="font-semibold tabular-nums text-amber-950">
+              {formatMoney(Math.max(0, explain.netAmount), baseCurrency)}
+            </span>
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="text-[11px] text-muted-foreground underline-offset-2 hover:underline"
+        >
+          Schliessen
+        </button>
+      </div>
+
+      <div className="space-y-3">
+        {kinds.map((kind) => {
+          const sectionLines = explain.lines.filter((l) => l.kind === kind);
+          if (sectionLines.length === 0) return null;
+          const meta = LINE_SECTION[kind];
+          const sectionSum = sectionLines.reduce(
+            (s, l) => s + l.signedAmount,
+            0
+          );
+          return (
+            <div key={kind}>
+              <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                {meta.title(explain.fromName, explain.toName)}
+              </p>
+              <ul className="space-y-0.5">
+                {sectionLines.map((line, i) => (
+                  <li
+                    key={`${kind}-${line.expenseId ?? line.settlementId ?? i}`}
+                    className="flex items-baseline justify-between gap-3 text-[11px]"
+                  >
+                    <span className="min-w-0 truncate text-foreground">
+                      {line.label}
+                      {line.preSettled ? (
+                        <span className="ml-1 text-muted-foreground">
+                          · ausgeglichen
+                        </span>
+                      ) : null}
+                    </span>
+                    <span
+                      className={cn(
+                        "shrink-0 tabular-nums font-medium",
+                        meta.tone
+                      )}
+                    >
+                      {formatSignedMoney(line.signedAmount, baseCurrency)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <p
+                className={cn(
+                  "mt-0.5 text-right text-[11px] font-semibold tabular-nums",
+                  meta.tone
+                )}
+              >
+                Σ {formatSignedMoney(sectionSum, baseCurrency)}
+              </p>
+            </div>
+          );
+        })}
+      </div>
+
+      <p className="mt-3 border-t border-amber-200/70 pt-2 text-[11px] leading-snug text-muted-foreground">
+        Rechnung: Anteile an {explain.toName}s Ausgaben (
+        {formatMoney(explain.oweTotal, baseCurrency)}) − Anteile von{" "}
+        {explain.toName} an {explain.fromName}s Ausgaben (
+        {formatMoney(explain.creditTotal, baseCurrency)}) − Rückzahlungen{" "}
+        {explain.fromName}→{explain.toName} (
+        {formatMoney(explain.settlementPaidTotal, baseCurrency)}) + Rückzahlungen{" "}
+        {explain.toName}→{explain.fromName} (
+        {formatMoney(explain.settlementReceivedTotal, baseCurrency)}) ={" "}
+        <span className="font-semibold text-foreground">
+          {formatMoney(Math.max(0, explain.netAmount), baseCurrency)}
+        </span>
+      </p>
+    </div>
   );
 }
