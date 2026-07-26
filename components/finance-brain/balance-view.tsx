@@ -1343,6 +1343,7 @@ export function ExpenseList({
   const [query, setQuery] = useState("");
   const [payerFilter, setPayerFilter] = useState<string>("__all__");
   const [categoryFilter, setCategoryFilter] = useState<string>("__all__");
+  const [coupleFilter, setCoupleFilter] = useState<string>("__all__");
 
   const categoryOptions = useMemo(() => {
     const labels = new Set<string>();
@@ -1364,8 +1365,24 @@ export function ExpenseList({
       );
   }, [expenses, members]);
 
+  const coupleOptions = useMemo(
+    () =>
+      couples
+        .slice()
+        .sort((a, b) =>
+          a.name.localeCompare(b.name, "de", { sensitivity: "base" })
+        ),
+    [couples]
+  );
+
   const filteredExpenses = useMemo(() => {
     const q = query.trim().toLowerCase();
+    const coupleMemberIds =
+      coupleFilter !== "__all__"
+        ? new Set(
+            couples.find((c) => String(c.id) === coupleFilter)?.memberIds ?? []
+          )
+        : null;
     return expenses.filter((exp) => {
       if (
         payerFilter !== "__all__" &&
@@ -1377,6 +1394,14 @@ export function ExpenseList({
         if (expenseVisualForExpense(exp).label !== categoryFilter) {
           return false;
         }
+      }
+      if (coupleMemberIds) {
+        if (!coupleMemberIds.has(exp.paid_by_member_id)) return false;
+        const involved =
+          exp.splits.length > 0
+            ? exp.splits.map((s) => s.member_id)
+            : [exp.paid_by_member_id];
+        if (!involved.every((id) => coupleMemberIds.has(id))) return false;
       }
       if (!q) return true;
       const payerName =
@@ -1395,12 +1420,27 @@ export function ExpenseList({
         .toLowerCase();
       return hay.includes(q);
     });
-  }, [expenses, members, query, payerFilter, categoryFilter]);
+  }, [
+    expenses,
+    members,
+    couples,
+    query,
+    payerFilter,
+    categoryFilter,
+    coupleFilter,
+  ]);
 
   const filtersActive =
     query.trim() !== "" ||
     payerFilter !== "__all__" ||
-    categoryFilter !== "__all__";
+    categoryFilter !== "__all__" ||
+    coupleFilter !== "__all__";
+
+  const filterCols = cashbookMode
+    ? "sm:grid-cols-1"
+    : coupleOptions.length > 0
+      ? "sm:grid-cols-3"
+      : "sm:grid-cols-2";
 
   const focus =
     filteredExpenses.find((e) => e.id === mobileFocusId) ||
@@ -1435,12 +1475,7 @@ export function ExpenseList({
               </button>
             ) : null}
           </div>
-          <div
-            className={cn(
-              "grid gap-2",
-              cashbookMode ? "sm:grid-cols-1" : "sm:grid-cols-2"
-            )}
-          >
+          <div className={cn("grid gap-2", filterCols)}>
             {!cashbookMode ? (
               <Select
                 value={payerFilter}
@@ -1491,6 +1526,32 @@ export function ExpenseList({
                 ))}
               </SelectContent>
             </Select>
+            {!cashbookMode && coupleOptions.length > 0 ? (
+              <Select
+                value={coupleFilter}
+                onValueChange={(v) => {
+                  if (v != null) setCoupleFilter(v);
+                }}
+                items={{
+                  __all__: "Alle Paare",
+                  ...Object.fromEntries(
+                    coupleOptions.map((c) => [String(c.id), c.name])
+                  ),
+                }}
+              >
+                <SelectTrigger className="h-8 w-full min-w-0 bg-background text-sm">
+                  <SelectValue placeholder="Paar" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">Alle Paare</SelectItem>
+                  {coupleOptions.map((c) => (
+                    <SelectItem key={c.id} value={String(c.id)}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : null}
           </div>
           {filtersActive ? (
             <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
@@ -1504,6 +1565,7 @@ export function ExpenseList({
                   setQuery("");
                   setPayerFilter("__all__");
                   setCategoryFilter("__all__");
+                  setCoupleFilter("__all__");
                 }}
               >
                 Filter zurücksetzen

@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { UserAvatar } from "@/components/users/user-avatar";
 import { formatDateDe } from "@/lib/finance-brain/format";
 import { isWeatherCommentBody } from "@/lib/trips/map-context";
 import { cn } from "@/lib/utils";
@@ -19,6 +20,7 @@ import { cn } from "@/lib/utils";
 export type EventComment = {
   id: number;
   author_name: string;
+  avatar_url?: string | null;
   body: string;
   image_url: string | null;
   created_at: string;
@@ -300,14 +302,22 @@ export function EventDiaryPanel({
               className="rounded-xl border border-border/60 bg-background/80 px-3 py-2.5"
             >
               <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-foreground">
-                    {c.author_name}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground">
-                    {formatCommentWhen(c.created_at)}
-                    {c.updated_at !== c.created_at ? " · bearbeitet" : ""}
-                  </p>
+                <div className="flex min-w-0 items-start gap-2.5">
+                  <UserAvatar
+                    name={c.author_name}
+                    src={c.avatar_url}
+                    size="sm"
+                    className="mt-0.5"
+                  />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-foreground">
+                      {c.author_name}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {formatCommentWhen(c.created_at)}
+                      {c.updated_at !== c.created_at ? " · bearbeitet" : ""}
+                    </p>
+                  </div>
                 </div>
                 {!readOnly && c.can_edit ? (
                   <div className="flex shrink-0 gap-0.5">

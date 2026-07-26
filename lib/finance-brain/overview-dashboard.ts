@@ -60,6 +60,22 @@ export type CurrencyBucket = {
   sharePct: number;
 };
 
+/** Generic named slice for pie charts (category / member / currency). */
+export type NamedAmountBucket = {
+  key: string;
+  label: string;
+  amountBase: number;
+  count: number;
+  sharePct: number;
+};
+
+export type OverviewBalance = {
+  memberId: number;
+  displayName: string;
+  paidBase: number;
+  owedBase: number;
+};
+
 export type OpenSettledSummary = {
   totalSpentBase: number;
   openDebtBase: number;
@@ -255,6 +271,111 @@ export function buildCurrencyBuckets(
       (a, b) =>
         b.amountBase - a.amountBase || a.currency.localeCompare(b.currency)
     );
+}
+
+function sortNamedBuckets(buckets: NamedAmountBucket[]): NamedAmountBucket[] {
+  return buckets.sort(
+    (a, b) =>
+      b.amountBase - a.amountBase ||
+      a.label.localeCompare(b.label, "de")
+  );
+}
+
+/** Ausgaben nach Kategorie (Settle Up: «Ausgaben nach Kategorien»). */
+export function buildCategoryBuckets(
+  expenses: OverviewExpense[]
+): NamedAmountBucket[] {
+  const rows = onlyExpenses(expenses);
+  const map = new Map<string, { amountBase: number; count: number }>();
+  let totalBase = 0;
+  for (const e of rows) {
+    const label = expenseVisualForExpense(e).label || "Keine Kategorie";
+    const entry = map.get(label) || { amountBase: 0, count: 0 };
+    const amount = Number(e.amount_base) || 0;
+    entry.amountBase += amount;
+    entry.count += 1;
+    map.set(label, entry);
+    totalBase += amount;
+  }
+  totalBase = roundMoney(totalBase);
+  return sortNamedBuckets(
+    [...map.entries()].map(([label, v]) => ({
+      key: label,
+      label,
+      amountBase: roundMoney(v.amountBase),
+      count: v.count,
+      sharePct: pct(v.amountBase, totalBase),
+    }))
+  );
+}
+
+/** Wer hat bezahlt (Settle Up: «Von Mitgliedern bezahlt»). */
+export function buildPaidByBuckets(
+  expenses: OverviewExpense[],
+  members: OverviewMember[]
+): NamedAmountBucket[] {
+  const nameOf = (id: number) =>
+    members.find((m) => m.id === id)?.display_name || `#${id}`;
+  const rows = onlyExpenses(expenses);
+  const map = new Map<number, { amountBase: number; count: number }>();
+  let totalBase = 0;
+  for (const e of rows) {
+    const entry = map.get(e.paid_by_member_id) || {
+      amountBase: 0,
+      count: 0,
+    };
+    const amount = Number(e.amount_base) || 0;
+    entry.amountBase += amount;
+    entry.count += 1;
+    map.set(e.paid_by_member_id, entry);
+    totalBase += amount;
+  }
+  totalBase = roundMoney(totalBase);
+  return sortNamedBuckets(
+    [...map.entries()].map(([memberId, v]) => ({
+      key: String(memberId),
+      label: nameOf(memberId),
+      amountBase: roundMoney(v.amountBase),
+      count: v.count,
+      sharePct: pct(v.amountBase, totalBase),
+    }))
+  );
+}
+
+/**
+ * Ausgabenanteile je Mitglied (Settle Up: «Ausgaben nach Mitgliedern»).
+ * Nutzt die fairen Anteile (owedBase) aus den Salden.
+ */
+export function buildMemberShareBuckets(
+  balances: OverviewBalance[]
+): NamedAmountBucket[] {
+  const totalBase = roundMoney(
+    balances.reduce((s, b) => s + (Number(b.owedBase) || 0), 0)
+  );
+  return sortNamedBuckets(
+    balances
+      .filter((b) => (Number(b.owedBase) || 0) > 0)
+      .map((b) => ({
+        key: String(b.memberId),
+        label: b.displayName,
+        amountBase: roundMoney(Number(b.owedBase) || 0),
+        count: 0,
+        sharePct: pct(Number(b.owedBase) || 0, totalBase),
+      }))
+  );
+}
+
+/** Währungs-Buckets als NamedAmountBucket für Pie-Charts. */
+export function buildCurrencyNamedBuckets(
+  expenses: OverviewExpense[]
+): NamedAmountBucket[] {
+  return buildCurrencyBuckets(expenses).map((c) => ({
+    key: c.currency,
+    label: c.currency,
+    amountBase: c.amountBase,
+    count: c.count,
+    sharePct: c.sharePct,
+  }));
 }
 
 export function buildOpenSettledSummary(

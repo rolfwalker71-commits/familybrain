@@ -26,6 +26,8 @@ export type TravelDiaryComment = {
   hasImage: boolean;
   imageCid: string;
   imagePath: string | null;
+  avatarCid?: string;
+  avatarPath?: string | null;
 };
 
 export type TravelDiaryExpense = ExpenseMailFields & {
@@ -138,15 +140,24 @@ export function buildTravelDiaryModel(tripId: number): TravelDiaryModel {
   const baseCurrency = ledger?.base_currency ?? null;
 
   const diaryEvents: TravelDiaryEvent[] = events.map((event) => {
-    const comments = listCommentsForEvent(event.id).map((c) => ({
-      commentId: c.id,
-      authorName: c.author_name,
-      body: c.body,
-      createdAt: c.created_at,
-      hasImage: Boolean(c.image_path),
-      imageCid: `comment-${c.id}`,
-      imagePath: c.image_path,
-    }));
+    const comments = listCommentsForEvent(event.id).map((c) => {
+      const user = c.user_id != null ? getAppUserById(c.user_id) : null;
+      const avatarPath = user?.avatar_path ?? null;
+      return {
+        commentId: c.id,
+        authorName: c.author_name,
+        body: c.body,
+        createdAt: c.created_at,
+        hasImage: Boolean(c.image_path),
+        imageCid: `comment-${c.id}`,
+        imagePath: c.image_path,
+        avatarCid:
+          c.user_id != null && avatarPath
+            ? `avatar-user-${c.user_id}`
+            : undefined,
+        avatarPath,
+      };
+    });
 
     const expenseRows = linked.get(event.id) || [];
     const expenses: TravelDiaryExpense[] = [];

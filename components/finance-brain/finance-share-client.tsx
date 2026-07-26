@@ -773,6 +773,12 @@ function FinanceShareInner({ token }: { token: string }) {
               id: m.id,
               display_name: m.display_name,
             }))}
+            balances={balances.map((b) => ({
+              memberId: b.memberId,
+              displayName: b.displayName,
+              paidBase: b.paidBase,
+              owedBase: b.owedBase,
+            }))}
             openDebts={simplifiedDebts}
             baseCurrency={ledger.base_currency}
             onOpenExpense={(expenseId) => {

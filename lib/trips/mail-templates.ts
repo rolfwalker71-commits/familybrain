@@ -31,6 +31,7 @@ export type TripEventCommentMailInput = {
   hasAiImage: boolean;
   aiCid?: string;
   authorName: string;
+  authorAvatarCid?: string;
   commentBody: string;
   hasCommentImage: boolean;
   commentImageCid?: string;
@@ -124,6 +125,7 @@ function eventHeaderHtml(input: {
 
 function commentBubbleHtml(input: {
   authorName: string;
+  authorAvatarCid?: string;
   body: string;
   createdAt: string;
   hasImage: boolean;
@@ -147,10 +149,13 @@ function commentBubbleHtml(input: {
             ? `<div style="margin-top:10px;"><img src="cid:${escapeHtml(input.imageCid)}" alt="Kommentar-Bild" style="max-width:100%;height:auto;border-radius:8px;border:1px solid ${BRAND.border};" /></div>`
             : ""
         }`;
+  const avatar = input.authorAvatarCid
+    ? `<img src="cid:${escapeHtml(input.authorAvatarCid)}" alt="" width="22" height="22" style="width:22px;height:22px;border-radius:999px;object-fit:cover;border:1px solid ${BRAND.border};vertical-align:middle;margin-right:8px;" />`
+    : "";
   return `
     <div style="background:${BRAND.page};border-radius:10px;border:1px solid ${BRAND.border};padding:12px 14px;margin-bottom:10px;">
-      <div style="display:flex;justify-content:space-between;gap:12px;align-items:baseline;">
-        <div style="font-size:11px;font-weight:700;color:${BRAND.accent};letter-spacing:.03em;text-transform:uppercase;">${escapeHtml(input.authorName)}</div>
+      <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;">
+        <div style="font-size:11px;font-weight:700;color:${BRAND.accent};letter-spacing:.03em;text-transform:uppercase;">${avatar}${escapeHtml(input.authorName)}</div>
         <div style="font-size:11px;color:${BRAND.muted};white-space:nowrap;">${escapeHtml(commentWhen(input.createdAt))}</div>
       </div>
       ${content}
@@ -196,7 +201,11 @@ export function buildTripEventCommentMailHtml(
       <div style="padding:16px 16px 4px;">${header}</div>
       <div style="padding:4px 16px 16px;">
         <div style="background:${BRAND.page};border-radius:10px;border:1px solid ${BRAND.border};padding:14px 16px;">
-          <div style="font-size:12px;font-weight:700;color:${BRAND.accent};letter-spacing:.03em;text-transform:uppercase;">${escapeHtml(input.authorName)}</div>
+          <div style="font-size:12px;font-weight:700;color:${BRAND.accent};letter-spacing:.03em;text-transform:uppercase;">${
+            input.authorAvatarCid
+              ? `<img src="cid:${escapeHtml(input.authorAvatarCid)}" alt="" width="22" height="22" style="width:22px;height:22px;border-radius:999px;object-fit:cover;border:1px solid ${BRAND.border};vertical-align:middle;margin-right:8px;" />`
+              : ""
+          }${escapeHtml(input.authorName)}</div>
           ${commentContent}
         </div>
       </div>
@@ -269,6 +278,7 @@ export function buildTravelDiaryMailHtml(
                 .map((c) =>
                   commentBubbleHtml({
                     authorName: c.authorName,
+                    authorAvatarCid: c.avatarCid,
                     body: c.body,
                     createdAt: c.createdAt,
                     hasImage: c.hasImage,

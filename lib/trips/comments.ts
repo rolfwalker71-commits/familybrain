@@ -1,6 +1,7 @@
 import path from "path";
 import type { AuthContext } from "@/lib/auth/current-user";
 import { getAppUserById } from "@/lib/users/queries";
+import { avatarUrlForUserId } from "@/lib/users/avatar";
 import { tripEventCommentImagePublicUrl } from "@/lib/trips/comment-images";
 import type { TripEventCommentRow } from "@/lib/trips/queries";
 
@@ -12,6 +13,7 @@ export type SerializedTripEventComment = {
   trip_event_id: number;
   user_id: number | null;
   author_name: string;
+  avatar_url: string | null;
   body: string;
   image_url: string | null;
   created_at: string;
@@ -61,6 +63,7 @@ export function serializeTripEventComment(
     trip_event_id: row.trip_event_id,
     user_id: row.user_id,
     author_name: row.author_name,
+    avatar_url: avatarUrlForUserId(row.user_id),
     body: row.body,
     image_url: imageUrl,
     created_at: row.created_at,

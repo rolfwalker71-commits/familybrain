@@ -1560,6 +1560,7 @@ export async function buildTravelDiaryPdfBuffer(model: {
       body: string;
       createdAt: string;
       imagePath?: string | null;
+      avatarPath?: string | null;
     }>;
     expenses: Array<{
       expenseId: number;
@@ -1928,12 +1929,21 @@ export async function buildTravelDiaryPdfBuffer(model: {
         const mapImg = c.imagePath
           ? await embedOptionalScaledJpeg(pdf, c.imagePath, thumbEdge)
           : null;
+        const avatarImg = c.avatarPath
+          ? await embedOptionalScaledJpeg(pdf, c.avatarPath, 48)
+          : null;
+        const avatarSize = avatarImg ? 18 : 0;
+        const avatarGap = avatarImg ? 6 : 0;
         const pad = 8;
         const gap = 12;
         const imgW = mapImg && mapSide ? 120 : 0;
         const imgH = mapImg && mapSide ? 120 : 0;
         const textMaxW =
-          contentW - pad * 2 - (mapSide && mapImg ? imgW + gap : 0);
+          contentW -
+          pad * 2 -
+          (mapSide && mapImg ? imgW + gap : 0) -
+          avatarSize -
+          avatarGap;
         const bodyLines = wrapMultilineText(c.body, font, 9, textMaxW);
         const headerH = 14;
         const bodyH = Math.max(1, bodyLines.length) * 11;
@@ -1971,8 +1981,18 @@ export async function buildTravelDiaryPdfBuffer(model: {
           1
         );
 
+        const textStartX = margin + pad + avatarSize + avatarGap;
+        if (avatarImg) {
+          page.drawImage(avatarImg, {
+            x: margin + pad,
+            y: y - pad - avatarSize,
+            width: avatarSize,
+            height: avatarSize,
+          });
+        }
+
         page.drawText(toPdfSafeText(header), {
-          x: margin + pad,
+          x: textStartX,
           y: y - 12,
           size: 8,
           font: bold,
@@ -1983,7 +2003,7 @@ export async function buildTravelDiaryPdfBuffer(model: {
         for (const line of bodyLines) {
           if (line) {
             page.drawText(toPdfSafeText(line), {
-              x: margin + pad,
+              x: textStartX,
               y: cy - 10,
               size: 9,
               font,

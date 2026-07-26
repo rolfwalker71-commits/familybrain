@@ -123,6 +123,15 @@ export async function notifyTripEventComment(
   const hasCommentImage = Boolean(
     comment.image_path && fs.existsSync(comment.image_path)
   );
+  const authorUser =
+    comment.user_id != null ? getAppUserById(comment.user_id) : null;
+  const authorAvatarPath =
+    authorUser?.avatar_path && fs.existsSync(authorUser.avatar_path)
+      ? authorUser.avatar_path
+      : null;
+  const authorAvatarCid = authorAvatarPath
+    ? `avatar-user-${comment.user_id}`
+    : undefined;
 
   const mail = buildTripEventCommentMailHtml({
     tripTitle: trip.title,
@@ -137,6 +146,7 @@ export async function notifyTripEventComment(
     hasAiImage,
     aiCid: "event-ai",
     authorName: comment.author_name,
+    authorAvatarCid,
     commentBody: comment.body,
     hasCommentImage,
     commentImageCid: "comment-image",
@@ -172,6 +182,16 @@ export async function notifyTripEventComment(
         filename: `comment-${comment.id}.jpg`,
         content: fs.readFileSync(comment.image_path).toString("base64"),
         content_id: "comment-image",
+      });
+    }
+  }
+  if (authorAvatarCid && authorAvatarPath) {
+    const scaled = await loadScaledJpeg(authorAvatarPath, 64);
+    if (scaled) {
+      attachments.push({
+        filename: `${authorAvatarCid}.jpg`,
+        content: scaled.toString("base64"),
+        content_id: authorAvatarCid,
       });
     }
   }
@@ -292,6 +312,13 @@ export async function notifyTravelDiary(
     for (const share of listExpenseShareDisplays(expense.expenseId, 0)) {
       if (share.avatarPath) {
         avatarPaths.set(`avatar-${share.memberId}`, share.avatarPath);
+      }
+    }
+  }
+  for (const event of model.events) {
+    for (const comment of event.comments) {
+      if (comment.avatarCid && comment.avatarPath) {
+        avatarPaths.set(comment.avatarCid, comment.avatarPath);
       }
     }
   }

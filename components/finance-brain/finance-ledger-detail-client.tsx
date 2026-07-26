@@ -1405,6 +1405,12 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
                 id: m.id,
                 display_name: m.display_name,
               }))}
+              balances={balances.map((b) => ({
+                memberId: b.memberId,
+                displayName: b.displayName,
+                paidBase: b.paidBase,
+                owedBase: b.owedBase,
+              }))}
               openDebts={simplifiedDebts}
               baseCurrency={ledger.base_currency}
               onOpenExpense={(expenseId) => {
@@ -1456,7 +1462,7 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
               openDebts={[]}
               baseCurrency={ledger.base_currency}
               showOpenSettled={false}
-              showPersonMix={false}
+              showMemberCharts={false}
               onOpenExpense={(expenseId) => {
                 setTab("expenses");
                 window.setTimeout(() => scrollToExpenseCard(expenseId), 120);
