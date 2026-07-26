@@ -46,6 +46,34 @@ export function coerceTripEventType(raw: string | null | undefined): TripEventTy
   return EVENT_TYPE_ALIASES[trimmed] || "Ausflug";
 }
 
+/**
+ * Semantic emoji for calendar ICS titles — mirrors Lucide icons on trip events
+ * (Plane, TrainFront, Car, Bus, BedDouble, Ship, MapPin, Ticket).
+ */
+export const TRIP_EVENT_TYPE_EMOJI: Record<string, string> = {
+  Flug: "✈️",
+  Zugreisen: "🚆",
+  Bahn: "🚆",
+  Mietauto: "🚗",
+  Mietwagen: "🚗",
+  Transfer: "🚌",
+  Hotel: "🏨",
+  Unterkunft: "🏨",
+  Kreuzfahrt: "🚢",
+  Ausflug: "📍",
+  Aktivität: "📍",
+  Sonstiges: "🎫",
+};
+
+export function tripEventTypeEmoji(type: string | null | undefined): string {
+  const trimmed = (type || "").trim();
+  if (trimmed && TRIP_EVENT_TYPE_EMOJI[trimmed]) {
+    return TRIP_EVENT_TYPE_EMOJI[trimmed];
+  }
+  const coerced = coerceTripEventType(trimmed);
+  return TRIP_EVENT_TYPE_EMOJI[coerced] || "📍";
+}
+
 export type TripEventDraft = {
   type: string;
   title: string;

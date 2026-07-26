@@ -1,5 +1,6 @@
 import type { CalendarEvent } from "@/lib/utils/ics";
 import type { TripEventRow, TripRow } from "@/lib/trips/queries";
+import { tripEventTypeEmoji } from "@/lib/trips/constants";
 import { eventAiImagePublicUrl } from "@/lib/trips/cover";
 import { loadScaledJpeg } from "@/lib/finance-brain/image-scale";
 
@@ -179,7 +180,7 @@ export async function tripEventsToCalendarEvents(
 
     out.push({
       uid: `tripbook-trip-${trip.id}-event-${event.id}@tripbook`,
-      title: `${event.event_type}: ${event.title}`,
+      title: `${tripEventTypeEmoji(event.event_type)} ${event.event_type}: ${event.title}`,
       description: buildTripEventCalendarDescription(trip, event, {
         absoluteOrigin: opts?.absoluteOrigin,
         aiImageAttached,

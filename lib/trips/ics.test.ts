@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { buildTripEventCalendarDescription } from "./ics";
+import { buildTripEventCalendarDescription, tripEventsToCalendarEvents } from "./ics";
+import { tripEventTypeEmoji } from "./constants";
 import type { TripEventRow, TripRow } from "./queries";
 import { buildIcsCalendar } from "@/lib/utils/ics";
 
@@ -85,6 +86,26 @@ function baseEvent(over: Partial<TripEventRow> = {}): TripEventRow {
 }
 
 describe("trip calendar ICS description", () => {
+  it("maps event types to semantic emojis like the UI icons", () => {
+    assert.equal(tripEventTypeEmoji("Flug"), "✈️");
+    assert.equal(tripEventTypeEmoji("Zugreisen"), "🚆");
+    assert.equal(tripEventTypeEmoji("Hotel"), "🏨");
+    assert.equal(tripEventTypeEmoji("Kreuzfahrt"), "🚢");
+    assert.equal(tripEventTypeEmoji("Mietauto"), "🚗");
+    assert.equal(tripEventTypeEmoji("Transfer"), "🚌");
+    assert.equal(tripEventTypeEmoji("Ausflug"), "📍");
+  });
+
+  it("prefixes SUMMARY with the type emoji", async () => {
+    const events = await tripEventsToCalendarEvents(
+      baseTrip(),
+      [baseEvent({ ai_image_path: null })],
+      { embedAiImages: false }
+    );
+    assert.equal(events.length, 1);
+    assert.equal(events[0].title, "✈️ Flug: ZRH → MIA");
+  });
+
   it("includes flight context, notes, and document notes", () => {
     const desc = buildTripEventCalendarDescription(baseTrip(), baseEvent(), {
       aiImageAttached: true,
