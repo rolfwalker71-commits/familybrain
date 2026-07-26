@@ -222,7 +222,9 @@ export function BalanceView({
             size="xs"
             nameClassName="font-medium"
           />
-          <span className="text-muted-foreground">schuldet</span>
+          <span className="text-muted-foreground" aria-hidden>
+            →
+          </span>
           <NameWithAvatar
             name={d.toDisplayName}
             src={d.toAvatarUrl}
