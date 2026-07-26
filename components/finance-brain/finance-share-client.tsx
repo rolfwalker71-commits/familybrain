@@ -192,6 +192,9 @@ function FinanceShareInner({ token }: { token: string }) {
   const [aiImageBusyId, setAiImageBusyId] = useState<number | null>(null);
   const [mailBusyId, setMailBusyId] = useState<number | null>(null);
   const [editBusyId, setEditBusyId] = useState<number | null>(null);
+  const [coupleSettleBusyId, setCoupleSettleBusyId] = useState<number | null>(
+    null
+  );
   const aiAttemptedRef = useRef<Set<number>>(new Set());
   const formDefaultsSeededRef = useRef(false);
 
@@ -648,6 +651,32 @@ function FinanceShareInner({ token }: { token: string }) {
     }
   }
 
+  async function settleCoupleExpense(expenseId: number) {
+    setCoupleSettleBusyId(expenseId);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/share/f/${encodeURIComponent(token)}/expenses/${expenseId}/couple-settle`,
+        { method: "POST" }
+      );
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Paar-Ausgleich fehlgeschlagen");
+      const preview = json.preview as
+        | { fromName?: string; toName?: string }
+        | undefined;
+      setStatus(
+        preview?.fromName && preview?.toName
+          ? `Paar-Ausgleich ${preview.fromName} → ${preview.toName} gebucht.`
+          : "Paar-Ausgleich gebucht."
+      );
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setCoupleSettleBusyId(null);
+    }
+  }
+
   function setTab(tab: FinanceLedgerTab) {
     const params = new URLSearchParams(searchParams.toString());
     if (tab === "expenses") params.delete("tab");
@@ -999,12 +1028,14 @@ function FinanceShareInner({ token }: { token: string }) {
             onResendMail={(id) => void resendExpenseMail(id)}
             onUpdateExpense={(id, payload) => updateExpense(id, payload)}
             onDuplicateExpense={duplicateExpense}
+            onCoupleSettle={(id) => void settleCoupleExpense(id)}
             onSetDocument={(id, documentId) =>
               setExpenseDocument(id, documentId)
             }
             aiImageBusyId={aiImageBusyId}
             mailBusyId={mailBusyId}
             editBusyId={editBusyId}
+            coupleSettleBusyId={coupleSettleBusyId}
           />
         </SectionCard>
       ) : null}

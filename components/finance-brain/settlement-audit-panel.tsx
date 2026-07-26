@@ -16,6 +16,7 @@ import {
   type ShareMatrixExpense,
   type ShareMatrixMember,
 } from "@/lib/finance-brain/settlement-audit";
+import { expenseSettledBadge } from "@/lib/finance-brain/constants";
 import { cn } from "@/lib/utils";
 
 type Debt = {
@@ -168,9 +169,11 @@ export function SettlementAuditPanel({
                   >
                     <td className="sticky left-0 z-10 max-w-[10rem] truncate bg-inherit px-2 py-1 font-medium">
                       {row.description}
-                      {row.preSettled ? (
+                      {row.settledStatus !== 0 ? (
                         <span className="ml-1 text-[9px] font-normal text-muted-foreground">
-                          · ausgeglichen
+                          ·{" "}
+                          {expenseSettledBadge(row.settledStatus)?.label ??
+                            "ausgeglichen"}
                         </span>
                       ) : null}
                     </td>

@@ -310,6 +310,9 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
   >([]);
   const [tripSummarySelected, setTripSummarySelected] = useState<number[]>([]);
   const [editBusyId, setEditBusyId] = useState<number | null>(null);
+  const [coupleSettleBusyId, setCoupleSettleBusyId] = useState<number | null>(
+    null
+  );
   const aiAttemptedRef = useRef<Set<number>>(new Set());
   const formDefaultsSeededRef = useRef(false);
 
@@ -1184,6 +1187,32 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
     }
   }
 
+  async function settleCoupleExpense(expenseId: number) {
+    setCoupleSettleBusyId(expenseId);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/finance-ledgers/${ledgerId}/expenses/${expenseId}/couple-settle`,
+        { method: "POST" }
+      );
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Paar-Ausgleich fehlgeschlagen");
+      const preview = json.preview as
+        | { fromName?: string; toName?: string; amountBase?: number }
+        | undefined;
+      setStatus(
+        preview?.fromName && preview?.toName
+          ? `Paar-Ausgleich ${preview.fromName} → ${preview.toName} gebucht.`
+          : "Paar-Ausgleich gebucht."
+      );
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setCoupleSettleBusyId(null);
+    }
+  }
+
   async function importDocument(doc: ImportDoc) {
     const isNormal = data?.ledger.ledger_kind === "normal";
     if (!isNormal && !importPayer) return;
@@ -1748,12 +1777,14 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
             }
             onUpdateExpense={(id, payload) => updateExpense(id, payload)}
             onDuplicateExpense={duplicateExpense}
+            onCoupleSettle={(id) => void settleCoupleExpense(id)}
             onSetDocument={(id, documentId) =>
               setExpenseDocument(id, documentId)
             }
             aiImageBusyId={aiImageBusyId}
             mailBusyId={mailBusyId}
             editBusyId={editBusyId}
+            coupleSettleBusyId={coupleSettleBusyId}
           />
         </SectionCard>
       ) : null}

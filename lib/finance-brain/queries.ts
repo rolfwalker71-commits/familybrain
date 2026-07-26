@@ -4,7 +4,7 @@ import path from "path";
 import { getDb } from "@/lib/db/client";
 import { getTripById, getTripEventById } from "@/lib/trips/queries";
 import { nowIso } from "@/lib/utils/dates";
-import { DEFAULT_BASE_CURRENCY, NORMAL_SOLO_MEMBER_NAME, type ExpenseDirection, type LedgerKind, type SplitMode } from "@/lib/finance-brain/constants";
+import { DEFAULT_BASE_CURRENCY, EXPENSE_SETTLED_STATUS, NORMAL_SOLO_MEMBER_NAME, type ExpenseDirection, type LedgerKind, type SplitMode } from "@/lib/finance-brain/constants";
 import {
   computeCoupleEqualSplits,
   computeEqualSplits,
@@ -893,7 +893,7 @@ export function createFinanceExpense(
       note,
       direction,
       split.mode,
-      preSettled ? 1 : 0,
+      preSettled ? EXPENSE_SETTLED_STATUS.preSettled : EXPENSE_SETTLED_STATUS.open,
       ts,
       ts
     );
@@ -911,7 +911,8 @@ export function createFinanceExpense(
  * while still counting toward trip totals.
  */
 export function settleExpenseSharesToPayer(
-  expenseId: number
+  expenseId: number,
+  options?: { notePrefix?: string }
 ): FinanceSettlementRow[] {
   const expense = getFinanceExpenseById(expenseId);
   if (!expense) throw new Error("Ausgabe nicht gefunden");
@@ -921,6 +922,7 @@ export function settleExpenseSharesToPayer(
   const label =
     expense.description?.trim() ||
     `Ausgabe #${expense.id}`;
+  const notePrefix = options?.notePrefix?.trim() || "Auto-Ausgleich";
   const created: FinanceSettlementRow[] = [];
   for (const split of listFinanceExpenseSplits(expenseId)) {
     if (split.member_id === payerId) continue;
@@ -932,7 +934,7 @@ export function settleExpenseSharesToPayer(
         amount: split.share_amount_base,
         currency: ledger.base_currency,
         exchangeRate: 1,
-        note: `Auto-Ausgleich: ${label}`,
+        note: `${notePrefix}: ${label}`,
         settledAt: expense.expense_date || null,
         createdByMemberId: expense.created_by_member_id,
         relatedExpenseId: expenseId,
@@ -940,6 +942,92 @@ export function settleExpenseSharesToPayer(
     );
   }
   return created;
+}
+
+export type CoupleExpenseSettlePreview = {
+  fromMemberId: number;
+  fromName: string;
+  toMemberId: number;
+  toName: string;
+  amountBase: number;
+};
+
+/**
+ * True when the expense has exactly two positive shares and both members
+ * belong to the same couple, with one of them as payer.
+ */
+export function getCoupleExpenseSettlePreview(
+  expenseId: number
+): CoupleExpenseSettlePreview | null {
+  const expense = getFinanceExpenseById(expenseId);
+  if (!expense) return null;
+  if (coerceExpenseDirection(expense.direction) !== "expense") return null;
+  if (Number(expense.pre_settled) !== EXPENSE_SETTLED_STATUS.open) return null;
+
+  const payerId = expense.paid_by_member_id;
+  if (payerId == null) return null;
+
+  const positive = listFinanceExpenseSplits(expenseId).filter(
+    (s) => s.share_amount_base > 0.004
+  );
+  if (positive.length !== 2) return null;
+
+  const payerSplit = positive.find((s) => s.member_id === payerId);
+  const partnerSplit = positive.find((s) => s.member_id !== payerId);
+  if (!payerSplit || !partnerSplit) return null;
+
+  const payer = getFinanceLedgerMemberById(payerId);
+  const partner = getFinanceLedgerMemberById(partnerSplit.member_id);
+  if (!payer || !partner) return null;
+  if (payer.ledger_id !== expense.ledger_id || partner.ledger_id !== expense.ledger_id) {
+    return null;
+  }
+  if (
+    payer.couple_id == null ||
+    partner.couple_id == null ||
+    payer.couple_id !== partner.couple_id
+  ) {
+    return null;
+  }
+
+  return {
+    fromMemberId: partner.id,
+    fromName: partner.display_name,
+    toMemberId: payer.id,
+    toName: payer.display_name,
+    amountBase: roundMoney(partnerSplit.share_amount_base),
+  };
+}
+
+/**
+ * Book the partner's share as repayment and mark the expense
+ * «Manuell ausgeglichen» (pre_settled = 2).
+ */
+export function settleCoupleExpenseManually(expenseId: number): {
+  expense: FinanceExpenseRow;
+  settlements: FinanceSettlementRow[];
+  preview: CoupleExpenseSettlePreview;
+} {
+  const preview = getCoupleExpenseSettlePreview(expenseId);
+  if (!preview) {
+    throw new Error(
+      "Paar-Ausgleich nur möglich, wenn genau ein Paar beteiligt ist und die Buchung noch offen ist."
+    );
+  }
+
+  const settlements = settleExpenseSharesToPayer(expenseId, {
+    notePrefix: "Manueller Paar-Ausgleich",
+  });
+
+  const db = getDb();
+  db.prepare(
+    `UPDATE finance_expenses SET pre_settled = ?, updated_at = ? WHERE id = ?`
+  ).run(EXPENSE_SETTLED_STATUS.manualCouple, nowIso(), expenseId);
+
+  const expense = getFinanceExpenseById(expenseId);
+  if (!expense) throw new Error("Ausgabe nicht gefunden");
+  touchLedger(expense.ledger_id);
+  return { expense, settlements, preview };
 }
 
 function buildSplitMap(
@@ -1303,7 +1391,11 @@ export function updateFinanceExpense(
     db.prepare(
       `DELETE FROM finance_settlements WHERE related_expense_id = ?`
     ).run(expenseId);
-    settleExpenseSharesToPayer(expenseId);
+    const notePrefix =
+      Number(existing.pre_settled) === EXPENSE_SETTLED_STATUS.manualCouple
+        ? "Manueller Paar-Ausgleich"
+        : "Auto-Ausgleich";
+    settleExpenseSharesToPayer(expenseId, { notePrefix });
   }
   return getFinanceExpenseById(expenseId)!;
 }

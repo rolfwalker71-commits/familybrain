@@ -20,7 +20,8 @@ export type ShareMatrixRow = {
   description: string;
   payerId: number;
   amountBase: number;
-  preSettled: boolean;
+  /** 0 open, 1 pre-settled, 2 manual couple */
+  settledStatus: number;
   /** Share per member id; 0 if not involved. */
   sharesByMemberId: Record<number, number>;
 };
@@ -71,7 +72,7 @@ export function buildShareMatrix(
       description: exp.description?.trim() || "Ausgabe",
       payerId: exp.paid_by_member_id,
       amountBase,
-      preSettled: Boolean(exp.pre_settled),
+      settledStatus: Number(exp.pre_settled) || 0,
       sharesByMemberId,
     });
   }
@@ -221,7 +222,7 @@ export function explainPairDebt(
     if ((exp.direction || "expense") === "income") continue;
     const payerId = exp.paid_by_member_id;
     const label = exp.description?.trim() || "Ausgabe";
-    const preSettled = Boolean(exp.pre_settled);
+    const settledStatus = Number(exp.pre_settled) || 0;
 
     if (payerId === toMemberId) {
       const share = exp.splits.find((s) => s.member_id === fromMemberId);
@@ -233,7 +234,7 @@ export function explainPairDebt(
         signedAmount: amt,
         label,
         expenseId: exp.id,
-        preSettled,
+        preSettled: settledStatus !== 0,
       });
     } else if (payerId === fromMemberId) {
       const share = exp.splits.find((s) => s.member_id === toMemberId);
@@ -245,7 +246,7 @@ export function explainPairDebt(
         signedAmount: -amt,
         label,
         expenseId: exp.id,
-        preSettled,
+        preSettled: settledStatus !== 0,
       });
     }
   }

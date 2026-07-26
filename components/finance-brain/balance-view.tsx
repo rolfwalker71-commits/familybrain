@@ -50,7 +50,12 @@ import {
   formatMoneyFxSummary,
   formatSignedMoney,
 } from "@/lib/finance-brain/format";
-import { COMMON_CURRENCIES } from "@/lib/finance-brain/constants";
+import {
+  COMMON_CURRENCIES,
+  expenseSettledBadge,
+  EXPENSE_SETTLED_STATUS,
+  isExpenseSettled,
+} from "@/lib/finance-brain/constants";
 import {
   expenseVisualForExpense,
   settlementVisual,
@@ -174,6 +179,47 @@ export type ExpenseEditPayload = {
 };
 
 export type BalanceDebt = Debt;
+
+export type CoupleSettlePreview = {
+  fromMemberId: number;
+  fromName: string;
+  toMemberId: number;
+  toName: string;
+  amountBase: number;
+};
+
+/** Client-side: exactly one couple, two positive shares, payer is one of them. */
+export function coupleSettlePreviewForExpense(
+  exp: ExpenseListItem,
+  members: Array<{ id: number; display_name: string }>,
+  couples: Array<{ id: number; name: string; memberIds: number[] }>
+): CoupleSettlePreview | null {
+  if ((exp.direction || "expense") === "income") return null;
+  if (Number(exp.pre_settled) !== EXPENSE_SETTLED_STATUS.open) return null;
+  const positive = exp.splits.filter((s) => Number(s.share_amount_base) > 0.004);
+  if (positive.length !== 2) return null;
+  const payerId = exp.paid_by_member_id;
+  const partner = positive.find((s) => s.member_id !== payerId);
+  const payerShare = positive.find((s) => s.member_id === payerId);
+  if (!partner || !payerShare) return null;
+  const couple = couples.find(
+    (c) =>
+      c.memberIds.includes(payerId) && c.memberIds.includes(partner.member_id)
+  );
+  if (!couple) return null;
+  const fromName =
+    members.find((m) => m.id === partner.member_id)?.display_name ||
+    `#${partner.member_id}`;
+  const toName =
+    members.find((m) => m.id === payerId)?.display_name || `#${payerId}`;
+  return {
+    fromMemberId: partner.member_id,
+    fromName,
+    toMemberId: payerId,
+    toName,
+    amountBase: Number(partner.share_amount_base) || 0,
+  };
+}
 
 export function BalanceView({
   balances,
@@ -667,6 +713,7 @@ function ExpenseCard({
   onResendMail,
   onUpdate,
   onDuplicate,
+  onCoupleSettle,
   onSetDocument,
   trips,
   lockedTripId,
@@ -675,6 +722,7 @@ function ExpenseCard({
   aiImageBusy,
   mailBusy,
   editBusy,
+  coupleSettleBusy,
 }: {
   exp: ExpenseListItem;
   members: Array<{ id: number; display_name: string }>;
@@ -691,6 +739,7 @@ function ExpenseCard({
   onResendMail?: (expenseId: number) => void;
   onUpdate?: (expenseId: number, payload: ExpenseEditPayload) => Promise<void>;
   onDuplicate?: (exp: ExpenseListItem) => void;
+  onCoupleSettle?: (expenseId: number) => void | Promise<void>;
   onSetDocument?: (
     expenseId: number,
     documentId: number | null
@@ -702,6 +751,7 @@ function ExpenseCard({
   aiImageBusy?: boolean;
   mailBusy?: boolean;
   editBusy?: boolean;
+  coupleSettleBusy?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [zoomOpen, setZoomOpen] = useState(false);
@@ -730,6 +780,13 @@ function ExpenseCard({
   const isIncome = (exp.direction || "expense") === "income";
   const memberName = (id: number) =>
     members.find((m) => m.id === id)?.display_name ?? `#${id}`;
+  const coupleSettle = useMemo(
+    () =>
+      cashbookMode
+        ? null
+        : coupleSettlePreviewForExpense(exp, members, couples),
+    [cashbookMode, exp, members, couples]
+  );
 
   const visual = expenseVisualForExpense(exp);
   const isoDate = toIsoDateOnly(exp.expense_date);
@@ -849,14 +906,20 @@ function ExpenseCard({
                 {exp.description || (isIncome ? "Einnahme" : "Ausgabe")}
               </p>
               {Boolean(exp.pre_settled) ? (
-                <Badge
-                  variant="secondary"
-                  title="Bereits ausgeglichen (nacherfasst) — zählt zu den Kosten, Saldo bleibt neutral"
-                  className="h-5 gap-0.5 border border-[var(--brand-finance)]/25 bg-[var(--brand-finance-soft)] px-1.5 text-[10px] font-semibold text-[var(--brand-finance)] sm:text-[11px]"
-                >
-                  <Check className="size-3" strokeWidth={2.5} aria-hidden />
-                  ausgeglichen
-                </Badge>
+                (() => {
+                  const badge = expenseSettledBadge(exp.pre_settled);
+                  if (!badge) return null;
+                  return (
+                    <Badge
+                      variant="secondary"
+                      title={badge.title}
+                      className="h-5 gap-0.5 border border-[var(--brand-finance)]/25 bg-[var(--brand-finance-soft)] px-1.5 text-[10px] font-semibold text-[var(--brand-finance)] sm:text-[11px]"
+                    >
+                      <Check className="size-3" strokeWidth={2.5} aria-hidden />
+                      {badge.label}
+                    </Badge>
+                  );
+                })()
               ) : null}
             </div>
             <p className="mt-0.5 truncate text-xs text-muted-foreground">
@@ -1282,6 +1345,27 @@ function ExpenseCard({
             </Button>
           ) : null}
 
+          {canEdit && onCoupleSettle && coupleSettle && !editing ? (
+            <Button
+              type="button"
+              id={`expense-couple-settle-${exp.id}`}
+              size="sm"
+              variant="ghost"
+              className="hidden h-7 px-2 text-xs text-[var(--brand-finance)] md:inline-flex"
+              disabled={coupleSettleBusy}
+              title={`${coupleSettle.fromName} → ${coupleSettle.toName}: ${formatMoney(coupleSettle.amountBase, baseCurrency)} als Paar-Ausgleich`}
+              onClick={() => {
+                const ok = window.confirm(
+                  `${coupleSettle.fromName} → ${coupleSettle.toName}: ${formatMoney(coupleSettle.amountBase, baseCurrency)} als Paar-Ausgleich buchen?\n\nStatus danach: «Manuell ausgeglichen».`
+                );
+                if (ok) void onCoupleSettle(exp.id);
+              }}
+            >
+              <Users className="mr-1 size-3.5" />
+              Paar-Ausgleich
+            </Button>
+          ) : null}
+
           <div className="hidden flex-wrap items-center gap-1 md:flex">
           {onGenerateAiImage ? (
             <Button
@@ -1483,12 +1567,14 @@ export function ExpenseList({
   onResendMail,
   onUpdateExpense,
   onDuplicateExpense,
+  onCoupleSettle,
   onSetDocument,
   trips,
   lockedTripId,
   aiImageBusyId,
   mailBusyId,
   editBusyId,
+  coupleSettleBusyId,
 }: {
   expenses: ExpenseListItem[];
   members: Array<{ id: number; display_name: string }>;
@@ -1508,6 +1594,7 @@ export function ExpenseList({
     payload: ExpenseEditPayload
   ) => Promise<void>;
   onDuplicateExpense?: (exp: ExpenseListItem) => void;
+  onCoupleSettle?: (expenseId: number) => void | Promise<void>;
   onSetDocument?: (
     expenseId: number,
     documentId: number | null
@@ -1517,6 +1604,7 @@ export function ExpenseList({
   aiImageBusyId?: number | null;
   mailBusyId?: number | null;
   editBusyId?: number | null;
+  coupleSettleBusyId?: number | null;
 }) {
   const [mobileFocusId, setMobileFocusId] = useState<number | null>(null);
   const [query, setQuery] = useState("");
@@ -1567,7 +1655,7 @@ export function ExpenseList({
           )
         : null;
     return expenses.filter((exp) => {
-      if (settledFilter === "__hide__" && Boolean(exp.pre_settled)) {
+      if (settledFilter === "__hide__" && isExpenseSettled(exp.pre_settled)) {
         return false;
       }
       if (
@@ -1813,17 +1901,19 @@ export function ExpenseList({
             onResendMail={onResendMail}
             onUpdate={onUpdateExpense}
             onDuplicate={onDuplicateExpense}
+            onCoupleSettle={onCoupleSettle}
             onSetDocument={onSetDocument}
             mobileFocused={mobileFocusId === exp.id}
             onMobileFocus={setMobileFocusId}
             aiImageBusy={aiImageBusyId === exp.id}
             mailBusy={mailBusyId === exp.id}
             editBusy={editBusyId === exp.id}
+            coupleSettleBusy={coupleSettleBusyId === exp.id}
           />
         ))
       )}
 
-      {focus && (canEdit || canDelete || onDuplicateExpense) ? (
+      {focus && (canEdit || canDelete || onDuplicateExpense || onCoupleSettle) ? (
         <div className="pointer-events-none fixed inset-x-0 bottom-[4.25rem] z-40 md:hidden">
           <div className="pointer-events-auto border-t border-border/80 bg-background/95 px-2 py-2 shadow-[0_-8px_24px_rgba(15,23,42,0.12)] backdrop-blur">
             <p className="truncate px-1 text-[11px] text-muted-foreground">
@@ -1853,6 +1943,25 @@ export function ExpenseList({
                 >
                   <Copy className="mr-1 size-3.5" />
                   Duplizieren
+                </Button>
+              ) : null}
+              {canEdit &&
+              onCoupleSettle &&
+              !cashbookMode &&
+              coupleSettlePreviewForExpense(focus, members, couples) ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="shrink-0 text-[var(--brand-finance)]"
+                  disabled={coupleSettleBusyId === focus.id}
+                  onClick={() => {
+                    document
+                      .getElementById(`expense-couple-settle-${focus.id}`)
+                      ?.click();
+                  }}
+                >
+                  <Users className="mr-1 size-3.5" />
+                  Paar-Ausgleich
                 </Button>
               ) : null}
               {canEdit && onSetDocument ? (
