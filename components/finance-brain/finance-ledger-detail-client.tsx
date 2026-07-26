@@ -1482,6 +1482,7 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
           minimalDebts={minimalDebts}
           coupleBalances={coupleBalances}
           coupleDebts={coupleDebts}
+          expenses={expenses}
           baseCurrency={ledger.base_currency}
           onRecordDebt={recordSuggestedDebt}
           recordBusyKey={recordBusyKey}

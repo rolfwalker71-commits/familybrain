@@ -799,6 +799,7 @@ function FinanceShareInner({ token }: { token: string }) {
           minimalDebts={minimalDebts}
           coupleBalances={coupleBalances}
           coupleDebts={coupleDebts}
+          expenses={expenses}
           baseCurrency={ledger.base_currency}
           highlightMemberId={member.id}
           onRecordDebt={recordSuggestedDebt}

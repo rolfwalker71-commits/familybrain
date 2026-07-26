@@ -76,6 +76,7 @@ import {
 import { cn } from "@/lib/utils";
 import { NameWithAvatar } from "@/components/users/user-avatar";
 import { AiImagePreview } from "@/components/layout/ai-image-preview";
+import { SettlementAuditPanel } from "@/components/finance-brain/settlement-audit-panel";
 import { explainSimplifyDebts } from "@/lib/finance-brain/settlement";
 
 type Balance = {
@@ -180,6 +181,7 @@ export function BalanceView({
   minimalDebts = [],
   coupleBalances = [],
   coupleDebts = [],
+  expenses = [],
   baseCurrency,
   highlightMemberId,
   onRecordDebt,
@@ -193,6 +195,8 @@ export function BalanceView({
   minimalDebts?: Debt[];
   coupleBalances?: CoupleBalance[];
   coupleDebts?: CoupleDebt[];
+  /** Für Prüfen-Matrix (Buchung × Teilnehmer). */
+  expenses?: ExpenseListItem[];
   baseCurrency: string;
   highlightMemberId?: number;
   onRecordDebt?: (debt: Debt) => void | Promise<void>;
@@ -278,6 +282,7 @@ export function BalanceView({
   }
 
   return (
+    <>
     <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
       <Card
         size="sm"
@@ -609,6 +614,24 @@ export function BalanceView({
         </Card>
       ) : null}
     </div>
+
+      {expenses.length > 0 && balances.length > 0 ? (
+        <div className="mt-3">
+          <SettlementAuditPanel
+            expenses={expenses}
+            members={balances.map((b) => ({
+              id: b.memberId,
+              displayName: b.displayName,
+            }))}
+            debts={simplifiedDebts}
+            baseCurrency={baseCurrency}
+            balanceNetByMemberId={Object.fromEntries(
+              balances.map((b) => [b.memberId, b.netBalance])
+            )}
+          />
+        </div>
+      ) : null}
+    </>
   );
 }
 
