@@ -29,6 +29,7 @@ export type OverviewSettlement = {
 export type OverviewMember = {
   id: number;
   display_name: string;
+  avatar_url?: string | null;
 };
 
 export type OverviewDebt = {
@@ -67,6 +68,7 @@ export type NamedAmountBucket = {
   amountBase: number;
   count: number;
   sharePct: number;
+  avatarUrl?: string | null;
 };
 
 export type OverviewBalance = {
@@ -74,6 +76,7 @@ export type OverviewBalance = {
   displayName: string;
   paidBase: number;
   owedBase: number;
+  avatarUrl?: string | null;
 };
 
 export type OpenSettledSummary = {
@@ -314,8 +317,7 @@ export function buildPaidByBuckets(
   expenses: OverviewExpense[],
   members: OverviewMember[]
 ): NamedAmountBucket[] {
-  const nameOf = (id: number) =>
-    members.find((m) => m.id === id)?.display_name || `#${id}`;
+  const memberOf = (id: number) => members.find((m) => m.id === id);
   const rows = onlyExpenses(expenses);
   const map = new Map<number, { amountBase: number; count: number }>();
   let totalBase = 0;
@@ -332,13 +334,17 @@ export function buildPaidByBuckets(
   }
   totalBase = roundMoney(totalBase);
   return sortNamedBuckets(
-    [...map.entries()].map(([memberId, v]) => ({
-      key: String(memberId),
-      label: nameOf(memberId),
-      amountBase: roundMoney(v.amountBase),
-      count: v.count,
-      sharePct: pct(v.amountBase, totalBase),
-    }))
+    [...map.entries()].map(([memberId, v]) => {
+      const m = memberOf(memberId);
+      return {
+        key: String(memberId),
+        label: m?.display_name || `#${memberId}`,
+        amountBase: roundMoney(v.amountBase),
+        count: v.count,
+        sharePct: pct(v.amountBase, totalBase),
+        avatarUrl: m?.avatar_url ?? null,
+      };
+    })
   );
 }
 
@@ -361,6 +367,7 @@ export function buildMemberShareBuckets(
         amountBase: roundMoney(Number(b.owedBase) || 0),
         count: 0,
         sharePct: pct(Number(b.owedBase) || 0, totalBase),
+        avatarUrl: b.avatarUrl ?? null,
       }))
   );
 }

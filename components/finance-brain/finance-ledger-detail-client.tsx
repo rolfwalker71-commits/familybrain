@@ -158,6 +158,7 @@ type LedgerDetail = {
   balances: Array<{
     memberId: number;
     displayName: string;
+    avatarUrl?: string | null;
     paidBase: number;
     owedBase: number;
     settlementsReceivedBase: number;
@@ -1404,12 +1405,14 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
               members={members.map((m) => ({
                 id: m.id,
                 display_name: m.display_name,
+                avatar_url: m.avatar_url,
               }))}
               balances={balances.map((b) => ({
                 memberId: b.memberId,
                 displayName: b.displayName,
                 paidBase: b.paidBase,
                 owedBase: b.owedBase,
+                avatarUrl: b.avatarUrl,
               }))}
               openDebts={simplifiedDebts}
               baseCurrency={ledger.base_currency}

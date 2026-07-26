@@ -61,7 +61,7 @@ type ShareData = {
     base_currency: string;
     trip_title: string | null;
   };
-  members: Array<{ id: number; display_name: string }>;
+  members: Array<{ id: number; display_name: string; avatar_url?: string | null }>;
   expenses: Array<{
     id: number;
     description: string | null;
@@ -99,6 +99,7 @@ type ShareData = {
   balances: Array<{
     memberId: number;
     displayName: string;
+    avatarUrl?: string | null;
     paidBase: number;
     owedBase: number;
     settlementsReceivedBase: number;
@@ -772,12 +773,14 @@ function FinanceShareInner({ token }: { token: string }) {
             members={members.map((m) => ({
               id: m.id,
               display_name: m.display_name,
+              avatar_url: m.avatar_url,
             }))}
             balances={balances.map((b) => ({
               memberId: b.memberId,
               displayName: b.displayName,
               paidBase: b.paidBase,
               owedBase: b.owedBase,
+              avatarUrl: b.avatarUrl,
             }))}
             openDebts={simplifiedDebts}
             baseCurrency={ledger.base_currency}

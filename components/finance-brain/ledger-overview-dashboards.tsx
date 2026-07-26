@@ -130,6 +130,7 @@ export function LedgerOverviewDashboards({
           icon={Tags}
           buckets={categories}
           baseCurrency={baseCurrency}
+          legendVisual="category"
         />
         {showMemberCharts ? (
           <FinancePieCard
@@ -137,6 +138,7 @@ export function LedgerOverviewDashboards({
             icon={Users}
             buckets={memberShares}
             baseCurrency={baseCurrency}
+            legendVisual="avatar"
           />
         ) : null}
         {showMemberCharts ? (
@@ -145,6 +147,7 @@ export function LedgerOverviewDashboards({
             icon={UserRound}
             buckets={paidBy}
             baseCurrency={baseCurrency}
+            legendVisual="avatar"
           />
         ) : null}
         <FinancePieCard

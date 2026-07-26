@@ -4,7 +4,9 @@ import { useId, useMemo, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { IconCircle } from "@/components/layout/icon-circle";
+import { UserAvatar } from "@/components/users/user-avatar";
 import { formatMoney } from "@/lib/finance-brain/format";
+import { expenseVisualFromLabel } from "@/lib/finance-brain/expense-category";
 import type { NamedAmountBucket } from "@/lib/finance-brain/overview-dashboard";
 import { cn } from "@/lib/utils";
 
@@ -21,6 +23,8 @@ export const FINANCE_PIE_COLORS = [
   "#5c6b7a",
   "#9a7b5c",
 ] as const;
+
+export type FinancePieLegendVisual = "swatch" | "category" | "avatar";
 
 type Slice = NamedAmountBucket & {
   color: string;
@@ -175,11 +179,51 @@ function PieChart({
   );
 }
 
+function LegendMark({
+  slice,
+  visual,
+}: {
+  slice: Slice;
+  visual: FinancePieLegendVisual;
+}) {
+  if (visual === "category") {
+    const cat = expenseVisualFromLabel(slice.label);
+    return (
+      <IconCircle
+        icon={cat.icon}
+        tone={cat.tone}
+        size="sm"
+        className="shrink-0"
+      />
+    );
+  }
+  if (visual === "avatar") {
+    return (
+      <span className="relative shrink-0">
+        <UserAvatar name={slice.label} src={slice.avatarUrl} size="xs" />
+        <span
+          className="absolute -bottom-0.5 -right-0.5 size-2 rounded-full ring-1 ring-white"
+          style={{ backgroundColor: slice.color }}
+          aria-hidden
+        />
+      </span>
+    );
+  }
+  return (
+    <span
+      className="size-2.5 shrink-0 rounded-full"
+      style={{ backgroundColor: slice.color }}
+      aria-hidden
+    />
+  );
+}
+
 export function FinancePieCard({
   title,
   icon: Icon,
   buckets,
   baseCurrency,
+  legendVisual = "swatch",
   emptyText = "Noch keine Ausgaben.",
   headerAction,
 }: {
@@ -187,6 +231,7 @@ export function FinancePieCard({
   icon: LucideIcon;
   buckets: NamedAmountBucket[];
   baseCurrency: string;
+  legendVisual?: FinancePieLegendVisual;
   emptyText?: string;
   headerAction?: ReactNode;
 }) {
@@ -220,14 +265,10 @@ export function FinancePieCard({
               {slices.map((s) => (
                 <li
                   key={s.key}
-                  className="flex items-baseline justify-between gap-2 text-sm leading-snug"
+                  className="flex items-center justify-between gap-2 text-sm leading-snug"
                 >
                   <span className="flex min-w-0 items-center gap-1.5">
-                    <span
-                      className="size-2.5 shrink-0 rounded-full"
-                      style={{ backgroundColor: s.color }}
-                      aria-hidden
-                    />
+                    <LegendMark slice={s} visual={legendVisual} />
                     <span className="truncate font-medium">{s.label}</span>
                   </span>
                   <span
