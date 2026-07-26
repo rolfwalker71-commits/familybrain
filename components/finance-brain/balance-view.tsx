@@ -5,6 +5,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   ArrowLeftRight,
   Check,
+  ChevronDown,
   Copy,
   Download,
   Link2,
@@ -75,6 +76,7 @@ import {
 import { cn } from "@/lib/utils";
 import { NameWithAvatar } from "@/components/users/user-avatar";
 import { AiImagePreview } from "@/components/layout/ai-image-preview";
+import { explainSimplifyDebts } from "@/lib/finance-brain/settlement";
 
 type Balance = {
   memberId: number;
@@ -197,9 +199,33 @@ export function BalanceView({
   canRecordDebt?: (debt: Debt) => boolean;
   recordBusyKey?: string | null;
 }) {
+  const [minExplainOpen, setMinExplainOpen] = useState(false);
+
   function debtKey(prefix: string, d: Debt, i: number) {
     return `${prefix}-${d.fromMemberId}-${d.toMemberId}-${i}`;
   }
+
+  const minTransfersExplain = useMemo(
+    () =>
+      explainSimplifyDebts(
+        balances.map((b) => ({
+          memberId: b.memberId,
+          displayName: b.displayName,
+          paidBase: b.paidBase,
+          owedBase: b.owedBase,
+          settlementsReceivedBase: b.settlementsReceivedBase,
+          settlementsPaidBase: b.settlementsPaidBase,
+          net: b.netBalance,
+        }))
+      ),
+    [balances]
+  );
+
+  const avatarByMemberId = useMemo(() => {
+    const map = new Map<number, string | null | undefined>();
+    for (const b of balances) map.set(b.memberId, b.avatarUrl);
+    return map;
+  }, [balances]);
 
   function renderDebtRow(prefix: string, d: Debt, i: number) {
     const key = debtKey(prefix, d, i);
@@ -368,6 +394,127 @@ export function BalanceView({
                 sind.
               </p>
               {minimalDebts.map((d, i) => renderDebtRow("min", d, i))}
+              <div className="border-t border-border/40 pt-1.5">
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between gap-2 rounded-md px-1 py-1 text-left text-[11px] font-medium text-[var(--brand-finance)] hover:bg-muted/40"
+                  aria-expanded={minExplainOpen}
+                  onClick={() => setMinExplainOpen((o) => !o)}
+                >
+                  <span>Aufschlüsselung</span>
+                  <ChevronDown
+                    className={cn(
+                      "size-3.5 shrink-0 transition-transform",
+                      minExplainOpen && "rotate-180"
+                    )}
+                  />
+                </button>
+                {minExplainOpen ? (
+                  <div className="mt-1.5 space-y-2.5 rounded-lg border border-border/50 bg-muted/15 px-2.5 py-2">
+                    <p className="text-[11px] leading-snug text-muted-foreground">
+                      Nicht aus einzelnen Buchungen, sondern aus dem
+                      Netto-Saldo (siehe «Saldo pro Person»). Schuldner und
+                      Gläubiger werden nacheinander mit{" "}
+                      <span className="font-medium text-foreground">
+                        min(Schuld, Guthaben)
+                      </span>{" "}
+                      verrechnet.
+                    </p>
+                    <div>
+                      <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        1. Ausgangslage
+                      </p>
+                      <ul className="space-y-1">
+                        {minTransfersExplain.openings.map((o) => (
+                          <li
+                            key={o.memberId}
+                            className="flex items-center justify-between gap-2 text-xs leading-snug"
+                          >
+                            <NameWithAvatar
+                              name={o.displayName}
+                              src={avatarByMemberId.get(o.memberId)}
+                              size="xs"
+                              nameClassName="font-medium"
+                            />
+                            <span
+                              className={cn(
+                                "shrink-0 tabular-nums font-semibold",
+                                o.role === "creditor"
+                                  ? "text-[var(--brand-finance)]"
+                                  : o.role === "debtor"
+                                    ? "text-rose-600"
+                                    : "text-muted-foreground"
+                              )}
+                            >
+                              {formatSignedMoney(o.net, baseCurrency)}
+                              <span className="ml-1 font-normal text-muted-foreground">
+                                {o.role === "creditor"
+                                  ? "Guthaben"
+                                  : o.role === "debtor"
+                                    ? "Schuld"
+                                    : "ausgeglichen"}
+                              </span>
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div>
+                      <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        2. Matching-Schritte
+                      </p>
+                      {minTransfersExplain.steps.length === 0 ? (
+                        <p className="text-xs text-muted-foreground">
+                          Keine Transfers nötig.
+                        </p>
+                      ) : (
+                        <ol className="space-y-1.5">
+                          {minTransfersExplain.steps.map((s) => (
+                            <li
+                              key={`${s.step}-${s.fromMemberId}-${s.toMemberId}`}
+                              className="rounded-md border border-border/40 bg-white px-2 py-1.5 text-xs leading-snug"
+                            >
+                              <div className="flex flex-wrap items-center gap-x-1 gap-y-0.5">
+                                <span className="tabular-nums text-muted-foreground">
+                                  {s.step}.
+                                </span>
+                                <NameWithAvatar
+                                  name={s.fromName}
+                                  src={avatarByMemberId.get(s.fromMemberId)}
+                                  size="xs"
+                                  nameClassName="font-medium"
+                                />
+                                <span className="text-muted-foreground" aria-hidden>
+                                  →
+                                </span>
+                                <NameWithAvatar
+                                  name={s.toName}
+                                  src={avatarByMemberId.get(s.toMemberId)}
+                                  size="xs"
+                                  nameClassName="font-medium"
+                                />
+                                <span className="font-semibold tabular-nums text-amber-900">
+                                  {formatMoney(s.amount, baseCurrency)}
+                                </span>
+                              </div>
+                              <p className="mt-0.5 text-[10px] text-muted-foreground">
+                                Rest Schuld {s.fromName}:{" "}
+                                {formatMoney(s.debtorRemaining, baseCurrency)}
+                                {" · "}
+                                Rest Guthaben {s.toName}:{" "}
+                                {formatMoney(
+                                  s.creditorRemaining,
+                                  baseCurrency
+                                )}
+                              </p>
+                            </li>
+                          ))}
+                        </ol>
+                      )}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
             </>
           )}
         </CardContent>

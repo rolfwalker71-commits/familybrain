@@ -6,6 +6,7 @@ import {
   computeCoupleEqualSplits,
   computeEqualSplits,
   computeMemberBalances,
+  explainSimplifyDebts,
   roundMoney,
   simplifyDebts,
 } from "./settlement";
@@ -112,6 +113,68 @@ describe("settlement", () => {
     assert.equal(debts[0].fromMemberId, 2);
     assert.equal(debts[0].toMemberId, 1);
     assert.equal(debts[0].amount, 50);
+
+    const explained = explainSimplifyDebts(balances);
+    assert.deepEqual(explained.debts, debts);
+    assert.equal(explained.steps.length, 1);
+    assert.equal(explained.steps[0].fromName, "B");
+    assert.equal(explained.steps[0].toName, "A");
+    assert.equal(explained.steps[0].amount, 50);
+    assert.equal(explained.steps[0].debtorRemaining, 0);
+    assert.equal(explained.steps[0].creditorRemaining, 0);
+    const debtorOpen = explained.openings.find((o) => o.memberId === 2);
+    const creditorOpen = explained.openings.find((o) => o.memberId === 1);
+    assert.equal(debtorOpen?.role, "debtor");
+    assert.equal(debtorOpen?.net, -50);
+    assert.equal(creditorOpen?.role, "creditor");
+    assert.equal(creditorOpen?.net, 50);
+  });
+
+  it("explainSimplifyDebts matches multi-party simplifyDebts", () => {
+    const balances = computeMemberBalances([
+      {
+        memberId: 1,
+        displayName: "Rolf",
+        paidBase: 500,
+        owedBase: 100,
+        settlementsReceivedBase: 0,
+        settlementsPaidBase: 0,
+      },
+      {
+        memberId: 2,
+        displayName: "Harald",
+        paidBase: 300,
+        owedBase: 100,
+        settlementsReceivedBase: 0,
+        settlementsPaidBase: 0,
+      },
+      {
+        memberId: 3,
+        displayName: "Eliane",
+        paidBase: 0,
+        owedBase: 350,
+        settlementsReceivedBase: 0,
+        settlementsPaidBase: 0,
+      },
+      {
+        memberId: 4,
+        displayName: "Valentyna",
+        paidBase: 0,
+        owedBase: 350,
+        settlementsReceivedBase: 0,
+        settlementsPaidBase: 0,
+      },
+    ]);
+    const debts = simplifyDebts(balances);
+    const explained = explainSimplifyDebts(balances);
+    assert.deepEqual(explained.debts, debts);
+    assert.equal(explained.steps.length, debts.length);
+    for (let i = 0; i < debts.length; i++) {
+      assert.equal(explained.steps[i].fromMemberId, debts[i].fromMemberId);
+      assert.equal(explained.steps[i].toMemberId, debts[i].toMemberId);
+      assert.equal(explained.steps[i].amount, debts[i].amount);
+      assert.equal(explained.steps[i].step, i + 1);
+    }
   });
 
   it("four people: Harald 386 + Rolf 192 equal split (payer-oriented)", () => {

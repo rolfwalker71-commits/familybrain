@@ -19,6 +19,32 @@ export type SimplifiedDebt = {
   amount: number;
 };
 
+export type SimplifyDebtOpening = {
+  memberId: number;
+  displayName: string;
+  net: number;
+  role: "debtor" | "creditor" | "settled";
+};
+
+export type SimplifyDebtStep = {
+  step: number;
+  fromMemberId: number;
+  fromName: string;
+  toMemberId: number;
+  toName: string;
+  amount: number;
+  /** Remaining debt of the payer after this transfer. */
+  debtorRemaining: number;
+  /** Remaining credit of the receiver after this transfer. */
+  creditorRemaining: number;
+};
+
+export type SimplifyDebtsExplanation = {
+  openings: SimplifyDebtOpening[];
+  steps: SimplifyDebtStep[];
+  debts: SimplifiedDebt[];
+};
+
 export function computeMemberBalances(rows: BalanceInput[]): MemberBalance[] {
   return rows.map((row) => ({
     ...row,
@@ -38,35 +64,79 @@ export function simplifyDebts(
   balances: MemberBalance[],
   epsilon = 0.005
 ): SimplifiedDebt[] {
+  return explainSimplifyDebts(balances, epsilon).debts;
+}
+
+/**
+ * Same matching as simplifyDebts, plus openings + numbered matching steps
+ * for the «Wenigste Überweisungen» breakdown UI.
+ */
+export function explainSimplifyDebts(
+  balances: MemberBalance[],
+  epsilon = 0.005
+): SimplifyDebtsExplanation {
   type Node = { id: number; name: string; amount: number };
   const creditors: Node[] = [];
   const debtors: Node[] = [];
+  const openings: SimplifyDebtOpening[] = [];
 
   for (const b of balances) {
     const net = roundMoney(b.net);
     if (net > epsilon) {
       creditors.push({ id: b.memberId, name: b.displayName, amount: net });
+      openings.push({
+        memberId: b.memberId,
+        displayName: b.displayName,
+        net,
+        role: "creditor",
+      });
     } else if (net < -epsilon) {
       debtors.push({
         id: b.memberId,
         name: b.displayName,
         amount: roundMoney(-net),
       });
+      openings.push({
+        memberId: b.memberId,
+        displayName: b.displayName,
+        net,
+        role: "debtor",
+      });
+    } else {
+      openings.push({
+        memberId: b.memberId,
+        displayName: b.displayName,
+        net: 0,
+        role: "settled",
+      });
     }
   }
 
-  creditors.sort((a, b) => b.amount - a.amount || a.name.localeCompare(b.name, "de"));
-  debtors.sort((a, b) => b.amount - a.amount || a.name.localeCompare(b.name, "de"));
+  openings.sort(
+    (a, b) =>
+      a.net - b.net || a.displayName.localeCompare(b.displayName, "de")
+  );
+  creditors.sort(
+    (a, b) => b.amount - a.amount || a.name.localeCompare(b.name, "de")
+  );
+  debtors.sort(
+    (a, b) => b.amount - a.amount || a.name.localeCompare(b.name, "de")
+  );
 
   const debts: SimplifiedDebt[] = [];
+  const steps: SimplifyDebtStep[] = [];
   let i = 0;
   let j = 0;
+  let step = 0;
 
   while (i < debtors.length && j < creditors.length) {
     const debtor = debtors[i];
     const creditor = creditors[j];
     const pay = roundMoney(Math.min(debtor.amount, creditor.amount));
     if (pay > epsilon) {
+      debtor.amount = roundMoney(debtor.amount - pay);
+      creditor.amount = roundMoney(creditor.amount - pay);
+      step += 1;
       debts.push({
         fromMemberId: debtor.id,
         fromName: debtor.name,
@@ -74,8 +144,16 @@ export function simplifyDebts(
         toName: creditor.name,
         amount: pay,
       });
-      debtor.amount = roundMoney(debtor.amount - pay);
-      creditor.amount = roundMoney(creditor.amount - pay);
+      steps.push({
+        step,
+        fromMemberId: debtor.id,
+        fromName: debtor.name,
+        toMemberId: creditor.id,
+        toName: creditor.name,
+        amount: pay,
+        debtorRemaining: debtor.amount <= epsilon ? 0 : debtor.amount,
+        creditorRemaining: creditor.amount <= epsilon ? 0 : creditor.amount,
+      });
     } else {
       // Dust only — advance the smaller side so we never loop forever.
       if (debtor.amount <= creditor.amount) debtor.amount = 0;
@@ -85,7 +163,7 @@ export function simplifyDebts(
     if (creditor.amount <= epsilon) j += 1;
   }
 
-  return debts;
+  return { openings, steps, debts };
 }
 
 export type PayerDebtEdge = {
