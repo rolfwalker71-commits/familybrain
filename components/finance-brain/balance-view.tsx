@@ -1484,6 +1484,10 @@ export function ExpenseList({
   const [payerFilter, setPayerFilter] = useState<string>("__all__");
   const [categoryFilter, setCategoryFilter] = useState<string>("__all__");
   const [coupleFilter, setCoupleFilter] = useState<string>("__all__");
+  /** Einblenden (default) vs. ausblenden von «bereits ausgeglichen»-Buchungen. */
+  const [settledFilter, setSettledFilter] = useState<"__show__" | "__hide__">(
+    "__show__"
+  );
 
   const categoryOptions = useMemo(() => {
     const labels = new Set<string>();
@@ -1524,6 +1528,9 @@ export function ExpenseList({
           )
         : null;
     return expenses.filter((exp) => {
+      if (settledFilter === "__hide__" && Boolean(exp.pre_settled)) {
+        return false;
+      }
       if (
         payerFilter !== "__all__" &&
         String(exp.paid_by_member_id) !== payerFilter
@@ -1568,19 +1575,21 @@ export function ExpenseList({
     payerFilter,
     categoryFilter,
     coupleFilter,
+    settledFilter,
   ]);
 
   const filtersActive =
     query.trim() !== "" ||
     payerFilter !== "__all__" ||
     categoryFilter !== "__all__" ||
-    coupleFilter !== "__all__";
+    coupleFilter !== "__all__" ||
+    settledFilter !== "__show__";
 
   const filterCols = cashbookMode
-    ? "sm:grid-cols-1"
+    ? "sm:grid-cols-2"
     : coupleOptions.length > 0
-      ? "sm:grid-cols-3"
-      : "sm:grid-cols-2";
+      ? "sm:grid-cols-2 lg:grid-cols-4"
+      : "sm:grid-cols-3";
 
   const focus =
     filteredExpenses.find((e) => e.id === mobileFocusId) ||
@@ -1692,6 +1701,24 @@ export function ExpenseList({
                 </SelectContent>
               </Select>
             ) : null}
+            <Select
+              value={settledFilter}
+              onValueChange={(v) => {
+                if (v === "__show__" || v === "__hide__") setSettledFilter(v);
+              }}
+              items={{
+                __show__: "Ausgeglichene: Ja",
+                __hide__: "Ausgeglichene: Nein",
+              }}
+            >
+              <SelectTrigger className="h-8 w-full min-w-0 bg-background text-sm">
+                <SelectValue placeholder="Ausgeglichene" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__show__">Ausgeglichene: Ja</SelectItem>
+                <SelectItem value="__hide__">Ausgeglichene: Nein</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           {filtersActive ? (
             <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
@@ -1706,6 +1733,7 @@ export function ExpenseList({
                   setPayerFilter("__all__");
                   setCategoryFilter("__all__");
                   setCoupleFilter("__all__");
+                  setSettledFilter("__show__");
                 }}
               >
                 Filter zurücksetzen
