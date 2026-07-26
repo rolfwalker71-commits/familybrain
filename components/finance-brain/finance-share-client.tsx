@@ -1144,11 +1144,13 @@ function FinanceShareInner({ token }: { token: string }) {
                           ?.display_name ?? "Empfänger";
                       return (
                         <p className="text-xs text-amber-800">
-                          Betrag übersteigt das offene Netto von {toName} (
+                          Betrag übersteigt das offene Gesamt-Netto von {toName}{" "}
+                          (
                           {formatMoney(cap.creditorNet, ledger.base_currency)}
-                          ). Beim Erfassen wird auf{" "}
+                          ). Du kannst beim Erfassen den vollen Betrag trotzdem
+                          buchen oder auf{" "}
                           {formatMoney(cap.amount, ledger.base_currency)}{" "}
-                          begrenzt (Bestätigung).
+                          begrenzen.
                         </p>
                       );
                     })()

@@ -1902,13 +1902,14 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
                     const toName =
                       members.find((m) => m.id === Number(setTo))
                         ?.display_name ?? "Empfänger";
-                    return (
+                      return (
                       <p className="text-xs text-amber-800 sm:col-span-4">
-                        Betrag übersteigt das offene Netto von {toName} (
+                        Betrag übersteigt das offene Gesamt-Netto von {toName} (
                         {formatMoney(cap.creditorNet, ledger.base_currency)}).
-                        Beim Erfassen wird auf{" "}
+                        Du kannst beim Erfassen den vollen Betrag trotzdem
+                        buchen oder auf{" "}
                         {formatMoney(cap.amount, ledger.base_currency)}{" "}
-                        begrenzt (Bestätigung).
+                        begrenzen.
                       </p>
                     );
                   })()

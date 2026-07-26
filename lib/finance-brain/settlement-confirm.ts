@@ -6,7 +6,8 @@ import { formatMoney } from "@/lib/finance-brain/format";
 
 /**
  * Confirm a suggested repayment. If it would overpay the creditor's remaining
- * net, offer to cap. Returns the amount to post, or null if cancelled / zero.
+ * overall net, warn and let the user book the full amount or cap to net.
+ * Returns the amount to post, or null if cancelled / zero.
  */
 export function confirmSettlementAmount(input: {
   fromName: string;
@@ -19,7 +20,7 @@ export function confirmSettlementAmount(input: {
   if (!(suggested > 0)) return null;
 
   const cap = capSettlementToCreditorNet(suggested, input.creditorNet);
-  if (!(cap.amount > 0)) {
+  if (!(cap.amount > 0) && !cap.capped) {
     window.alert(
       `${input.toName} hat kein offenes Netto-Guthaben mehr — Rückzahlung nicht sinnvoll.`
     );
@@ -27,10 +28,27 @@ export function confirmSettlementAmount(input: {
   }
 
   if (cap.capped) {
-    const ok = window.confirm(
-      `${input.fromName} → ${input.toName}: Vorschlag ${formatMoney(suggested, input.currency)} übersteigt das offene Netto von ${input.toName} (${formatMoney(cap.creditorNet, input.currency)}) um ${formatMoney(cap.overpayBy, input.currency)}.\n\nAuf ${formatMoney(cap.amount, input.currency)} begrenzen und erfassen?`
+    // Creditor net can be lower than a single «Nach Zahler» share when the
+    // creditor also owes others or has counter-claims in the ledger.
+    const bookFull = window.confirm(
+      `${input.fromName} → ${input.toName}: ${formatMoney(suggested, input.currency)} übersteigt das offene Gesamt-Netto von ${input.toName} (${formatMoney(cap.creditorNet, input.currency)}) um ${formatMoney(cap.overpayBy, input.currency)}.\n\n` +
+        `Das Netto ist der Saldo über alle Buchungen — einzelne Anteile können höher sein.\n\n` +
+        `OK = vollen Betrag ${formatMoney(suggested, input.currency)} trotzdem buchen\n` +
+        `Abbrechen = andere Option`
     );
-    return ok ? cap.amount : null;
+    if (bookFull) return suggested;
+
+    if (!(cap.amount > 0)) {
+      window.alert(
+        `${input.toName} hat kein offenes Netto-Guthaben — ohne Überzahlung nichts zu erfassen.`
+      );
+      return null;
+    }
+
+    const bookCapped = window.confirm(
+      `Stattdessen auf ${formatMoney(cap.amount, input.currency)} (offenes Netto von ${input.toName}) begrenzen und erfassen?`
+    );
+    return bookCapped ? cap.amount : null;
   }
 
   const ok = window.confirm(
