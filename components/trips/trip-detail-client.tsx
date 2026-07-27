@@ -501,17 +501,15 @@ function eventDenseFacts(event: TripEvent): string[] {
 
 function EventDenseFactsColumn({
   event,
-  onOpenAi,
   size = "md",
 }: {
   event: TripEvent;
-  onOpenAi?: () => void;
   size?: "sm" | "md";
 }) {
   const facts = eventDenseFactItems(event);
   const docCount =
     (event.documents?.length || 0) + (event.attachments?.length || 0);
-  if (facts.length === 0 && docCount === 0 && !event.ai_image_url) return null;
+  if (facts.length === 0 && docCount === 0) return null;
   return (
     <div
       className={cn(
@@ -540,20 +538,28 @@ function EventDenseFactsColumn({
           {docCount} {docCount === 1 ? "Beleg" : "Belege"}
         </Badge>
       ) : null}
-      {event.ai_image_url && onOpenAi ? (
-        <AiImagePreview
-          src={event.ai_image_url}
-          alt=""
-          brand="travel"
-          imageClassName={
-            size === "sm"
-              ? "mt-1 h-9 w-9 object-cover"
-              : "mt-1 h-10 w-10 object-cover"
-          }
-          onOpen={onOpenAi}
-        />
-      ) : null}
     </div>
+  );
+}
+
+/** Fixed-size AI thumb in the card middle (same for every event). ~3–4 text lines. */
+function EventCardAiImage({
+  event,
+  onOpen,
+}: {
+  event: TripEvent;
+  onOpen: () => void;
+}) {
+  if (!event.ai_image_url) return null;
+  return (
+    <AiImagePreview
+      src={event.ai_image_url}
+      alt=""
+      brand="travel"
+      className="shrink-0 self-center"
+      imageClassName="h-[4.5rem] w-[4.5rem] rounded-lg object-cover"
+      onOpen={onOpen}
+    />
   );
 }
 
@@ -3445,26 +3451,23 @@ function TripDetailInner({
                           hideAmount={eventDenseFacts(event).length > 0}
                         />
                         </div>
+                        <EventCardAiImage
+                          event={event}
+                          onOpen={() =>
+                            setAiZoom({
+                              url: event.ai_image_url!,
+                              title: event.title,
+                              eventId: event.id,
+                            })
+                          }
+                        />
                         <div
                           className="hidden self-stretch w-px bg-border sm:block"
                           aria-hidden
                         />
                         <div className="flex shrink-0 flex-col items-end gap-1">
                           <EventStatusPill event={event} />
-                          <EventDenseFactsColumn
-                            event={event}
-                            size="sm"
-                            onOpenAi={
-                              event.ai_image_url
-                                ? () =>
-                                    setAiZoom({
-                                      url: event.ai_image_url!,
-                                      title: event.title,
-                                      eventId: event.id,
-                                    })
-                                : undefined
-                            }
-                          />
+                          <EventDenseFactsColumn event={event} size="sm" />
                         </div>
                       </div>
 
@@ -3728,6 +3731,16 @@ function TripDetailInner({
                           hideAmount={eventDenseFacts(event).length > 0}
                         />
                       </div>
+                      <EventCardAiImage
+                        event={event}
+                        onOpen={() =>
+                          setAiZoom({
+                            url: event.ai_image_url!,
+                            title: event.title,
+                            eventId: event.id,
+                          })
+                        }
+                      />
                       <div
                         className="hidden self-stretch w-px bg-border sm:block"
                         aria-hidden
@@ -3735,19 +3748,7 @@ function TripDetailInner({
                       <div className="flex shrink-0 items-start gap-2">
                         <div className="flex flex-col items-end gap-1.5">
                           <EventStatusPill event={event} />
-                          <EventDenseFactsColumn
-                            event={event}
-                            onOpenAi={
-                              event.ai_image_url
-                                ? () =>
-                                    setAiZoom({
-                                      url: event.ai_image_url!,
-                                      title: event.title,
-                                      eventId: event.id,
-                                    })
-                                : undefined
-                            }
-                          />
+                          <EventDenseFactsColumn event={event} />
                         </div>
                       {/* Desktop edit actions — mobile uses bottom bar */}
                       {editMode ? (
