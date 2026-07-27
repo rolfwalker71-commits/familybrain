@@ -52,6 +52,7 @@ import {
   stickyStripClass,
 } from "@/components/layout/date-timeline-strip";
 import { useIsStandalonePwa } from "@/hooks/use-standalone-pwa";
+import { SpeedDialFab } from "@/components/layout/speed-dial-fab";
 import { COMMON_CURRENCIES } from "@/lib/finance-brain/constants";
 import { formatMoney } from "@/lib/finance-brain/format";
 import { confirmSettlementAmount } from "@/lib/finance-brain/settlement-confirm";
@@ -1248,6 +1249,24 @@ function FinanceShareInner({ token }: { token: string }) {
           </SectionCard>
         </div>
       ) : null}
+
+      <SpeedDialFab
+        accent="finance"
+        actions={[
+          {
+            id: "new",
+            label: "Ausgabe",
+            icon: Plus,
+            onSelect: () => setTab("new"),
+          },
+          {
+            id: "settle",
+            label: "Rückzahlung",
+            icon: ArrowLeftRight,
+            onSelect: () => setTab("settle"),
+          },
+        ]}
+      />
     </div>
   );
 }

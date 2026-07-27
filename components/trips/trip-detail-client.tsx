@@ -92,6 +92,11 @@ import {
   daysUntilIso,
   formatCountdownDe,
 } from "@/components/layout/status-strip";
+import {
+  SoftChip,
+  SoftChipRow,
+  SpeedDialFab,
+} from "@/components/layout/speed-dial-fab";
 import { useIsStandalonePwa } from "@/hooks/use-standalone-pwa";
 import { useActiveDateFromScroll } from "@/hooks/use-active-date-from-scroll";
 import { DocumentPdfThumb } from "@/components/documents/document-pdf-preview";
@@ -111,6 +116,11 @@ import {
   type TripTabItem,
 } from "@/components/trips/trip-tab-nav";
 import type { AppTabOverflowItem } from "@/components/layout/app-tab-nav";
+import {
+  fetchCurrentWeather,
+  weatherConditionIcon,
+  type CurrentWeather,
+} from "@/lib/trips/weather";
 import { LinkDocumentsToEventDialog } from "@/components/trips/link-documents-to-event-dialog";
 
 import {
@@ -822,6 +832,83 @@ function TripDetailInner({
     };
   }, [events]);
 
+  const weatherPoint = useMemo(() => {
+    for (const e of events) {
+      if (e.lat != null && e.lon != null) return { lat: e.lat, lon: e.lon };
+      if (e.arrival_lat != null && e.arrival_lon != null) {
+        return { lat: e.arrival_lat, lon: e.arrival_lon };
+      }
+      if (e.departure_lat != null && e.departure_lon != null) {
+        return { lat: e.departure_lat, lon: e.departure_lon };
+      }
+    }
+    return null;
+  }, [events]);
+
+  const [weather, setWeather] = useState<CurrentWeather | null>(null);
+
+  useEffect(() => {
+    if (!weatherPoint) {
+      setWeather(null);
+      return;
+    }
+    let cancelled = false;
+    void fetchCurrentWeather(weatherPoint.lat, weatherPoint.lon)
+      .then((w) => {
+        if (!cancelled) setWeather(w);
+      })
+      .catch(() => {
+        if (!cancelled) setWeather(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [weatherPoint?.lat, weatherPoint?.lon]);
+
+  const missingChecklist = useMemo(() => {
+    const types = new Set(
+      events.map((e) => coerceTripEventType(e.event_type))
+    );
+    const missing: string[] = [];
+    if (!types.has("Flug") && !types.has("Zugreisen")) missing.push("Transport");
+    if (!types.has("Hotel") && !types.has("Unterkunft") && !types.has("Kreuzfahrt")) {
+      missing.push("Unterkunft");
+    }
+    if (!types.has("Ausflug") && events.length > 0) missing.push("Aktivität");
+    const hasDocs = events.some(
+      (e) => (e.documents?.length || 0) + (e.attachments?.length || 0) > 0
+    );
+    if (!hasDocs && events.length > 0) missing.push("Belege");
+    return missing;
+  }, [events]);
+
+  const routeMapPoints = useMemo(() => {
+    const pts: Array<{ lat: number; lon: number; label?: string }> = [];
+    for (const e of events) {
+      if (e.lat != null && e.lon != null) {
+        pts.push({ lat: e.lat, lon: e.lon, label: e.title });
+      } else if (e.departure_lat != null && e.departure_lon != null) {
+        pts.push({
+          lat: e.departure_lat,
+          lon: e.departure_lon,
+          label: e.title,
+        });
+      }
+      if (
+        e.arrival_lat != null &&
+        e.arrival_lon != null &&
+        (e.departure_lat !== e.arrival_lat || e.departure_lon !== e.arrival_lon)
+      ) {
+        pts.push({
+          lat: e.arrival_lat,
+          lon: e.arrival_lon,
+          label: e.title,
+        });
+      }
+    }
+    return pts.slice(0, 12);
+  }, [events]);
+
   useEffect(() => {
     setViewMode(readViewMode());
   }, []);
@@ -969,9 +1056,13 @@ function TripDetailInner({
     setEventSheetOpen(true);
   }
 
-  function openNewEvent() {
+  function openNewEvent(presetType?: string) {
     setEditingEventId(null);
-    setEventForm(createEmptyEventForm());
+    const form = createEmptyEventForm();
+    if (presetType) {
+      form.eventType = coerceTripEventType(presetType);
+    }
+    setEventForm(form);
     setPlaceEnrichTarget("place");
     setEventSheetOpen(true);
   }
@@ -1845,6 +1936,35 @@ function TripDetailInner({
             ) : undefined
           }
         />
+      ) : null}
+
+      {(weather || missingChecklist.length > 0) &&
+      (activeTab === "ablauf" || readOnly) ? (
+        <SoftChipRow>
+          {weather ? (
+            <SoftChip className="border-sky-500/25 bg-sky-50 text-sky-900">
+              <span aria-hidden>{weatherConditionIcon(weather.weatherCode)}</span>
+              {Math.round(weather.temperatureC)} °C · {weather.weatherLabelDe}
+            </SoftChip>
+          ) : null}
+          {missingChecklist.length > 0 ? (
+            <SoftChip>
+              Was fehlt: {missingChecklist.join(" · ")}
+            </SoftChip>
+          ) : null}
+        </SoftChipRow>
+      ) : null}
+
+      {activeTab === "ablauf" && routeMapPoints.length >= 2 && !readOnly ? (
+        <div className="overflow-hidden rounded-xl border border-border/60">
+          <TripMap
+            points={routeMapPoints}
+            drawRoute
+            routeStyle="straight"
+            compact
+            heightClassName="h-36 sm:h-44"
+          />
+        </div>
       ) : null}
 
       {!readOnly && activeTab !== "ablauf" ? (
@@ -4319,6 +4439,38 @@ function TripDetailInner({
             })()}
           </div>
         </div>
+      ) : null}
+
+      {!readOnly && !editMode ? (
+        <SpeedDialFab
+          accent="travel"
+          actions={[
+            {
+              id: "flug",
+              label: "Flug",
+              icon: Plane,
+              onSelect: () => openNewEvent("Flug"),
+            },
+            {
+              id: "hotel",
+              label: "Hotel",
+              icon: BedDouble,
+              onSelect: () => openNewEvent("Hotel"),
+            },
+            {
+              id: "aktivitaet",
+              label: "Aktivität",
+              icon: Ticket,
+              onSelect: () => openNewEvent("Ausflug"),
+            },
+            {
+              id: "finanzen",
+              label: "Finanzen",
+              icon: Wallet,
+              onSelect: () => setTab("finanzen"),
+            },
+          ]}
+        />
       ) : null}
     </div>
   );

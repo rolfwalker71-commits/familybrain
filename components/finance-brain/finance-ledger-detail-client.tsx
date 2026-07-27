@@ -83,6 +83,7 @@ import {
 import {
   StatusStrip,
 } from "@/components/layout/status-strip";
+import { SpeedDialFab } from "@/components/layout/speed-dial-fab";
 import { COMMON_CURRENCIES, LEDGER_KIND_LABELS } from "@/lib/finance-brain/constants";
 import { formatMoney, formatSignedMoney } from "@/lib/finance-brain/format";
 import { confirmSettlementAmount } from "@/lib/finance-brain/settlement-confirm";
@@ -2602,6 +2603,28 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <SpeedDialFab
+        accent="finance"
+        actions={[
+          {
+            id: "new",
+            label: isNormal ? "Buchung" : "Ausgabe",
+            icon: Plus,
+            onSelect: () => setTab("new"),
+          },
+          ...(isSplit
+            ? [
+                {
+                  id: "settle",
+                  label: "Rückzahlung",
+                  icon: ArrowLeftRight,
+                  onSelect: () => setTab("settle"),
+                },
+              ]
+            : []),
+        ]}
+      />
     </div>
   );
 }
