@@ -8,9 +8,11 @@ import {
   BedDouble,
   BookOpen,
   Bus,
+  Calendar,
   Car,
   ChevronDown,
   ChevronUp,
+  Clock,
   Download,
   GripVertical,
   ImagePlus,
@@ -22,6 +24,7 @@ import {
   Replace,
   Ship,
   Sparkles,
+  Tag,
   Ticket,
   TrainFront,
   Trash2,
@@ -80,7 +83,6 @@ import {
   toneSurface,
   type IconTone,
 } from "@/components/layout/icon-circle";
-import { CalendarDateBadge } from "@/components/layout/calendar-date-badge";
 import {
   DateTimelineStrip,
   scrollToDateAnchor,
@@ -318,54 +320,118 @@ function parseEventIsoDate(raw: string | null | undefined): string | null {
   return iso || null;
 }
 
-function EventDateHeader({
-  event,
-  reserveEndSlot = false,
-  size = "sm",
-}: {
-  event: TripEvent;
-  /** Keep title columns aligned when some events only have a start date. */
-  reserveEndSlot?: boolean;
-  size?: "sm" | "md";
-}) {
+/** Short "Mo, 3. Nov" / "Mo, 3. Nov · 14:00–16:00" style line for under the title. */
+function formatEventDateLine(event: TripEvent): string | null {
   const startIso = parseEventIsoDate(event.start_date);
   if (!startIso) return null;
   const endIso = parseEventIsoDate(event.end_date);
-  const showEnd = Boolean(endIso && endIso !== startIso && endIso >= startIso);
   const startTime = toTimeInputValue(event.start_time) || null;
   const endTime = toTimeInputValue(event.end_time) || null;
-  // Match CalendarDateBadge widths (time renders below the badge).
-  const badgeW = size === "sm" ? "w-[4.55rem]" : "w-[5rem] sm:w-[5.25rem]";
-  const reserveW =
-    size === "sm" ? "w-[11rem]" : "w-[13rem] sm:w-[13.75rem]";
+  const fmtDate = (iso: string) => {
+    const [y, m, d] = iso.split("-").map(Number);
+    return new Intl.DateTimeFormat("de-CH", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+    }).format(new Date(y, m - 1, d));
+  };
+  const showEnd = Boolean(endIso && endIso !== startIso && endIso >= startIso);
+  if (showEnd && endIso) {
+    return `${fmtDate(startIso)} – ${fmtDate(endIso)}`;
+  }
+  const datePart = fmtDate(startIso);
+  const timePart = startTime
+    ? endTime
+      ? `${startTime}–${endTime}`
+      : startTime
+    : null;
+  return timePart ? `${datePart} · ${timePart}` : datePart;
+}
 
+/** Full de-CH day heading, e.g. "Montag, 3. November 2025", for day anchors. */
+function formatEventDayHeadingDe(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Intl.DateTimeFormat("de-CH", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(new Date(y, m - 1, d));
+}
+
+function EventDayHeading({ iso }: { iso: string }) {
   return (
-    <div
+    <div className="flex items-center gap-1.5 pt-1 pb-1.5 pl-0.5 text-foreground">
+      <Calendar className="size-4 shrink-0 text-muted-foreground" />
+      <h3 className="truncate text-sm font-bold sm:text-base">
+        {formatEventDayHeadingDe(iso)}
+      </h3>
+    </div>
+  );
+}
+
+/** Time · dot · dashed connector rail to the left of an event card. */
+function EventTimelineRail({
+  event,
+  tone,
+  showConnector,
+}: {
+  event: TripEvent;
+  tone: IconTone;
+  showConnector: boolean;
+}) {
+  const time = toTimeInputValue(event.start_time);
+  return (
+    <div className="flex w-8 shrink-0 flex-col items-center sm:w-9">
+      <span className="h-3.5 text-[10px] font-semibold tabular-nums text-muted-foreground sm:text-[11px]">
+        {time || ""}
+      </span>
+      <span
+        className={cn(
+          "mt-1 size-2.5 shrink-0 rounded-full ring-4 ring-background",
+          toneSurface(tone).title
+        )}
+        aria-hidden
+      />
+      <span
+        className={cn(
+          "mt-1 w-px flex-1 border-l",
+          showConnector ? "border-dashed border-border/70" : "border-transparent"
+        )}
+        aria-hidden
+      />
+    </div>
+  );
+}
+
+/** Booked (has a booking reference or any linked docs/attachments) vs. planned. */
+function eventIsBooked(event: TripEvent): boolean {
+  const docCount =
+    (event.documents?.length || 0) + (event.attachments?.length || 0);
+  return Boolean(event.booking_reference?.trim()) || docCount > 0;
+}
+
+function EventStatusPill({
+  event,
+  className,
+}: {
+  event: TripEvent;
+  className?: string;
+}) {
+  const booked = eventIsBooked(event);
+  return (
+    <Badge
+      variant={booked ? "secondary" : "outline"}
       className={cn(
-        "flex shrink-0 items-center gap-1.5",
-        reserveEndSlot && reserveW
+        "h-5 shrink-0 px-1.5 text-[10px] font-semibold",
+        booked
+          ? "border-[var(--brand-finance)]/25 bg-[var(--brand-finance-soft)] text-[var(--brand-finance)]"
+          : "text-muted-foreground",
+        className
       )}
     >
-      <CalendarDateBadge isoDate={startIso} time={startTime} size={size} />
-      {showEnd && endIso ? (
-        <>
-          <span className="w-4 shrink-0 text-center text-[10px] font-bold text-muted-foreground sm:w-5 sm:text-xs">
-            bis
-          </span>
-          <CalendarDateBadge isoDate={endIso} time={endTime} size={size} />
-        </>
-      ) : reserveEndSlot ? (
-        <>
-          <span
-            className="invisible w-4 shrink-0 text-center text-[10px] font-bold sm:w-5 sm:text-xs"
-            aria-hidden
-          >
-            bis
-          </span>
-          <div className={cn("invisible h-0 shrink-0", badgeW)} aria-hidden />
-        </>
-      ) : null}
-    </div>
+      {booked ? "Gebucht" : "Geplant"}
+    </Badge>
   );
 }
 
@@ -396,26 +462,41 @@ function formatEventMetaLine(event: TripEvent): string | null {
   return parts.length ? parts.join(" · ") : null;
 }
 
-/** Key facts for the right column — one place only (cards + compact). */
-function eventDenseFacts(event: TripEvent): string[] {
-  const facts: string[] = [];
+type DenseFactItem = { key: string; icon: LucideIcon; label: string };
+
+/** Key facts for the right column, each tagged with a small icon. */
+function eventDenseFactItems(event: TripEvent): DenseFactItem[] {
+  const items: DenseFactItem[] = [];
   const type = coerceTripEventType(event.event_type);
   if (event.flight_number && (type === "Flug" || type === "Zugreisen")) {
-    facts.push(event.flight_number);
+    items.push({ key: "flight", icon: Ticket, label: event.flight_number });
   }
   const st = toTimeInputValue(event.start_time);
   const et = toTimeInputValue(event.end_time);
-  if (st) facts.push(et ? `${st}–${et}` : st);
-  if (event.cabin_class) facts.push(event.cabin_class);
+  if (st) {
+    items.push({ key: "time", icon: Clock, label: et ? `${st}–${et}` : st });
+  }
+  if (event.cabin_class) {
+    items.push({ key: "cabin", icon: Tag, label: event.cabin_class });
+  }
   const linked = event.linked_expenses || [];
   if (linked.length > 0) {
     const sum = linked.reduce(
       (acc, e) => acc + (e.amount_base || e.amount || 0),
       0
     );
-    facts.push(formatMoney(sum, linked[0].base_currency || "CHF"));
+    items.push({
+      key: "amount",
+      icon: Wallet,
+      label: formatMoney(sum, linked[0].base_currency || "CHF"),
+    });
   }
-  return facts;
+  return items;
+}
+
+/** Key facts for the right column — one place only (cards + compact). */
+function eventDenseFacts(event: TripEvent): string[] {
+  return eventDenseFactItems(event).map((f) => f.label);
 }
 
 function EventDenseFactsColumn({
@@ -427,22 +508,38 @@ function EventDenseFactsColumn({
   onOpenAi?: () => void;
   size?: "sm" | "md";
 }) {
-  const facts = eventDenseFacts(event);
-  if (facts.length === 0 && !event.ai_image_url) return null;
+  const facts = eventDenseFactItems(event);
+  const docCount =
+    (event.documents?.length || 0) + (event.attachments?.length || 0);
+  if (facts.length === 0 && docCount === 0 && !event.ai_image_url) return null;
   return (
     <div
       className={cn(
-        "flex shrink-0 flex-col items-end gap-0.5 text-right font-semibold tabular-nums text-foreground/85",
-        size === "sm"
-          ? "min-w-[6.5rem] text-[11px] leading-snug"
-          : "min-w-[7.5rem] text-xs sm:min-w-[9rem] sm:text-sm"
+        "flex shrink-0 flex-col items-end gap-1",
+        size === "sm" ? "min-w-[6rem]" : "min-w-[7rem] sm:min-w-[8.5rem]"
       )}
     >
       {facts.map((f) => (
-        <span key={f} className="leading-snug">
-          {f}
+        <span
+          key={f.key}
+          className={cn(
+            "inline-flex items-center gap-1 font-semibold tabular-nums text-foreground/85",
+            size === "sm" ? "text-[11px] leading-snug" : "text-xs sm:text-sm"
+          )}
+        >
+          {f.label}
+          <f.icon className="size-3 shrink-0 text-muted-foreground" />
         </span>
       ))}
+      {docCount > 0 ? (
+        <Badge
+          variant="outline"
+          className="h-5 gap-1 px-1.5 text-[10px] font-semibold"
+        >
+          <FileText className="size-3" />
+          {docCount} {docCount === 1 ? "Beleg" : "Belege"}
+        </Badge>
+      ) : null}
       {event.ai_image_url && onOpenAi ? (
         <AiImagePreview
           src={event.ai_image_url}
@@ -3205,7 +3302,7 @@ function TripDetailInner({
               viewMode === "compact" ? "gap-2.5" : "gap-5"
             )}
           >
-          {events.map((event) => {
+          {events.map((event, eventIndex) => {
             const visual = eventVisual(event.event_type);
             const dayIso = parseEventIsoDate(event.start_date);
             const isDayAnchor = firstOfDayEventIds.has(event.id);
@@ -3214,6 +3311,10 @@ function TripDetailInner({
             const dayAnchorClass = isDayAnchor
               ? "scroll-mt-36 lg:scroll-mt-48"
               : undefined;
+            const nextEvent = events[eventIndex + 1];
+            const isLastOfDay =
+              !nextEvent || firstOfDayEventIds.has(nextEvent.id);
+            const dateLine = formatEventDateLine(event);
             if (viewMode === "compact") {
               const details = formatCompactDetailLine(event);
               const documents = event.documents || [];
@@ -3223,56 +3324,61 @@ function TripDetailInner({
                   key={event.id}
                   id={dayAnchorId}
                   data-event-id={event.id}
-                  className={cn(
-                    "relative pt-3 pl-2",
-                    dayAnchorClass,
-                    editMode &&
-                      dragOverEventId === event.id &&
-                      "opacity-80"
-                  )}
-                  onDragOver={
-                    editMode
-                      ? (e) => {
-                          e.preventDefault();
-                          if (dragEventId != null && dragEventId !== event.id) {
-                            setDragOverEventId(event.id);
+                  className={dayAnchorClass}
+                >
+                  {isDayAnchor && dayIso ? (
+                    <EventDayHeading iso={dayIso} />
+                  ) : null}
+                  <div
+                    className={cn(
+                      "flex gap-2 pt-1",
+                      editMode &&
+                        dragOverEventId === event.id &&
+                        "opacity-80"
+                    )}
+                    onDragOver={
+                      editMode
+                        ? (e) => {
+                            e.preventDefault();
+                            if (dragEventId != null && dragEventId !== event.id) {
+                              setDragOverEventId(event.id);
+                            }
                           }
-                        }
-                      : undefined
-                  }
-                  onDrop={
-                    editMode
-                      ? (e) => {
-                          e.preventDefault();
-                          if (dragEventId == null || dragEventId === event.id) {
+                        : undefined
+                    }
+                    onDrop={
+                      editMode
+                        ? (e) => {
+                            e.preventDefault();
+                            if (dragEventId == null || dragEventId === event.id) {
+                              setDragEventId(null);
+                              setDragOverEventId(null);
+                              return;
+                            }
+                            const fromId = dragEventId;
+                            const toId = event.id;
                             setDragEventId(null);
                             setDragOverEventId(null);
-                            return;
+                            const fromIndex = events.findIndex(
+                              (x) => x.id === fromId
+                            );
+                            const toIndex = events.findIndex((x) => x.id === toId);
+                            if (fromIndex < 0 || toIndex < 0) return;
+                            const next = [...events];
+                            const [moved] = next.splice(fromIndex, 1);
+                            next.splice(toIndex, 0, moved);
+                            setEvents(next);
+                            void persistEventOrder(next);
                           }
-                          const fromId = dragEventId;
-                          const toId = event.id;
-                          setDragEventId(null);
-                          setDragOverEventId(null);
-                          const fromIndex = events.findIndex(
-                            (x) => x.id === fromId
-                          );
-                          const toIndex = events.findIndex((x) => x.id === toId);
-                          if (fromIndex < 0 || toIndex < 0) return;
-                          const next = [...events];
-                          const [moved] = next.splice(fromIndex, 1);
-                          next.splice(toIndex, 0, moved);
-                          setEvents(next);
-                          void persistEventOrder(next);
-                        }
-                      : undefined
-                  }
-                >
-                  <IconCircle
-                    icon={visual.icon}
+                        : undefined
+                    }
+                  >
+                  <EventTimelineRail
+                    event={event}
                     tone={visual.tone}
-                    size="md"
-                    className="absolute left-4 top-3 z-10 -translate-x-1/2 -translate-y-1/2 border-2 border-foreground/20"
+                    showConnector={!isLastOfDay}
                   />
+                  <div className="min-w-0 flex-1 pb-2">
                   <Card
                     tone={visual.tone}
                     className={cn(
@@ -3283,9 +3389,22 @@ function TripDetailInner({
                     )}
                   >
                     <CardContent className="space-y-2 p-2.5 sm:p-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <EventDateHeader event={event} size="sm" />
-                        <div className="flex shrink-0 items-center gap-1.5">
+                      <div className="flex items-start gap-2.5">
+                        <IconCircle
+                          icon={visual.icon}
+                          tone={visual.tone}
+                          size="md"
+                          className="mt-0.5 shrink-0"
+                        />
+                        <div className="min-w-0 flex-1">
+                        <div className="flex min-w-0 items-center gap-1.5">
+                          <div className="min-w-0 flex-1 truncate text-sm font-black leading-snug tracking-tight sm:text-base">
+                            {event.title}
+                          </div>
+                          <CommentCountChip
+                            count={event.comment_count || 0}
+                            className="shrink-0"
+                          />
                           {editMode ? (
                             <button
                               type="button"
@@ -3309,44 +3428,44 @@ function TripDetailInner({
                             </button>
                           ) : null}
                         </div>
-                      </div>
-
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex min-w-0 items-center gap-1.5">
-                            <div className="min-w-0 flex-1 truncate text-sm font-black leading-snug tracking-tight sm:text-base">
-                              {event.title}
-                            </div>
-                            <CommentCountChip
-                              count={event.comment_count || 0}
-                              className="shrink-0"
-                            />
+                        {dateLine ? (
+                          <div className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
+                            <Calendar className="size-3 shrink-0" />
+                            <span className="truncate">{dateLine}</span>
                           </div>
-                          {details ? (
-                            <div className="mt-0.5 line-clamp-2 text-xs text-muted-foreground sm:truncate sm:line-clamp-none">
-                              {details}
-                            </div>
-                          ) : null}
-                          <EventLinkedExpenses
-                            expenses={event.linked_expenses || []}
-                            className="mt-1.5"
-                            hideAmount={eventDenseFacts(event).length > 0}
+                        ) : null}
+                        {details ? (
+                          <div className="mt-0.5 line-clamp-2 text-xs text-muted-foreground sm:truncate sm:line-clamp-none">
+                            {details}
+                          </div>
+                        ) : null}
+                        <EventLinkedExpenses
+                          expenses={event.linked_expenses || []}
+                          className="mt-1.5"
+                          hideAmount={eventDenseFacts(event).length > 0}
+                        />
+                        </div>
+                        <div
+                          className="hidden self-stretch w-px bg-border sm:block"
+                          aria-hidden
+                        />
+                        <div className="flex shrink-0 flex-col items-end gap-1">
+                          <EventStatusPill event={event} />
+                          <EventDenseFactsColumn
+                            event={event}
+                            size="sm"
+                            onOpenAi={
+                              event.ai_image_url
+                                ? () =>
+                                    setAiZoom({
+                                      url: event.ai_image_url!,
+                                      title: event.title,
+                                      eventId: event.id,
+                                    })
+                                : undefined
+                            }
                           />
                         </div>
-                        <EventDenseFactsColumn
-                          event={event}
-                          size="sm"
-                          onOpenAi={
-                            event.ai_image_url
-                              ? () =>
-                                  setAiZoom({
-                                    url: event.ai_image_url!,
-                                    title: event.title,
-                                    eventId: event.id,
-                                  })
-                              : undefined
-                          }
-                        />
                       </div>
 
                       {!readOnly || documents.length > 0 || attachments.length > 0 ? (
@@ -3479,6 +3598,8 @@ function TripDetailInner({
                       />
                     </CardContent>
                   </Card>
+                  </div>
+                  </div>
                 </div>
               );
             }
@@ -3487,9 +3608,12 @@ function TripDetailInner({
                 key={event.id}
                 id={dayAnchorId}
                 data-event-id={event.id}
+                className={dayAnchorClass}
+              >
+              {isDayAnchor && dayIso ? <EventDayHeading iso={dayIso} /> : null}
+              <div
                 className={cn(
-                  "relative pt-3 pl-2",
-                  dayAnchorClass,
+                  "flex gap-2 pt-1",
                   editMode && dragOverEventId === event.id && "opacity-80"
                 )}
                 onDragOver={
@@ -3527,12 +3651,12 @@ function TripDetailInner({
                     : undefined
                 }
               >
-                <IconCircle
-                  icon={visual.icon}
-                  tone={visual.tone}
-                  size="lg"
-                  className="absolute left-4 top-3 z-10 -translate-x-1/2 -translate-y-1/2 border-2 border-foreground/20"
-                />
+              <EventTimelineRail
+                event={event}
+                tone={visual.tone}
+                showConnector={!isLastOfDay}
+              />
+              <div className="min-w-0 flex-1 pb-2">
                 <Card
                   tone={visual.tone}
                   className={cn(
@@ -3546,96 +3670,85 @@ function TripDetailInner({
                       "ring-2 ring-teal-400/50"
                   )}
                 >
-                  <div
-                    className={cn(
-                      "rounded-t-[0.7rem] px-3 py-2.5 pl-7 sm:px-4 sm:py-3 sm:pl-8",
-                      toneSurface(visual.tone).title
-                    )}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="min-w-0 flex-1">
-                        <EventDateHeader event={event} size="sm" />
-                      </div>
-                    </div>
-                  </div>
                   <CardContent className="space-y-3 p-3 sm:p-4">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="flex items-start gap-3">
+                      <IconCircle
+                        icon={visual.icon}
+                        tone={visual.tone}
+                        size="lg"
+                        className="mt-0.5 shrink-0"
+                      />
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-1.5">
-                          <Badge variant="secondary" className="shrink-0">
-                            {coerceTripEventType(event.event_type)}
-                          </Badge>
+                          <div className="min-w-0 flex-1 text-lg font-black leading-snug tracking-tight sm:text-2xl">
+                            {event.title}
+                          </div>
                           <CommentCountChip count={event.comment_count || 0} />
-                          {(() => {
-                            const n =
-                              (event.documents?.length || 0) +
-                              (event.attachments?.length || 0);
-                            if (n === 0) return null;
-                            return (
-                              <Badge
-                                variant="outline"
-                                className="h-6 gap-1 px-1.5 text-[10px] font-semibold"
-                              >
-                                <FileText className="size-3" />
-                                {n} {n === 1 ? "Beleg" : "Belege"}
-                              </Badge>
-                            );
-                          })()}
-                          {!readOnly && !editMode ? (
-                            <>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-7 px-2 text-xs"
-                                onClick={() => startEditEvent(event)}
-                              >
-                                <Pencil className="mr-1 size-3.5" />
-                                Ändern
-                              </Button>
-                              <EventActionsMenu
-                                items={[
-                                  {
-                                    label: "Beleg / PDF",
-                                    icon: FilePlus2,
-                                    disabled: busy,
-                                    onClick: () =>
-                                      setLinkDocsEventId(event.id),
-                                  },
-                                  {
-                                    label: "KI-Bild",
-                                    icon: ImagePlus,
-                                    disabled:
-                                      busy || aiImageBusy || aiBatch != null,
-                                    onClick: () => openAiImageDialog(event),
-                                  },
-                                ]}
-                              />
-                            </>
-                          ) : null}
                         </div>
-                        <div className="mt-1 text-lg font-black leading-snug tracking-tight sm:text-2xl">
-                          {event.title}
-                        </div>
+                        {dateLine ? (
+                          <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <Calendar className="size-3.5 shrink-0" />
+                            <span>{dateLine}</span>
+                          </div>
+                        ) : null}
+                        {!readOnly && !editMode ? (
+                          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 px-2 text-xs"
+                              onClick={() => startEditEvent(event)}
+                            >
+                              <Pencil className="mr-1 size-3.5" />
+                              Ändern
+                            </Button>
+                            <EventActionsMenu
+                              items={[
+                                {
+                                  label: "Beleg / PDF",
+                                  icon: FilePlus2,
+                                  disabled: busy,
+                                  onClick: () =>
+                                    setLinkDocsEventId(event.id),
+                                },
+                                {
+                                  label: "KI-Bild",
+                                  icon: ImagePlus,
+                                  disabled:
+                                    busy || aiImageBusy || aiBatch != null,
+                                  onClick: () => openAiImageDialog(event),
+                                },
+                              ]}
+                            />
+                          </div>
+                        ) : null}
                         <EventLinkedExpenses
                           expenses={event.linked_expenses || []}
                           className="mt-2"
                           hideAmount={eventDenseFacts(event).length > 0}
                         />
                       </div>
+                      <div
+                        className="hidden self-stretch w-px bg-border sm:block"
+                        aria-hidden
+                      />
                       <div className="flex shrink-0 items-start gap-2">
-                        <EventDenseFactsColumn
-                          event={event}
-                          onOpenAi={
-                            event.ai_image_url
-                              ? () =>
-                                  setAiZoom({
-                                    url: event.ai_image_url!,
-                                    title: event.title,
-                                    eventId: event.id,
-                                  })
-                              : undefined
-                          }
-                        />
+                        <div className="flex flex-col items-end gap-1.5">
+                          <EventStatusPill event={event} />
+                          <EventDenseFactsColumn
+                            event={event}
+                            onOpenAi={
+                              event.ai_image_url
+                                ? () =>
+                                    setAiZoom({
+                                      url: event.ai_image_url!,
+                                      title: event.title,
+                                      eventId: event.id,
+                                    })
+                                : undefined
+                            }
+                          />
+                        </div>
                       {/* Desktop edit actions — mobile uses bottom bar */}
                       {editMode ? (
                         <div className="hidden shrink-0 flex-col items-center gap-0.5 md:flex">
@@ -4248,6 +4361,8 @@ function TripDetailInner({
                     />
                   </CardContent>
                 </Card>
+              </div>
+              </div>
               </div>
             );
           })

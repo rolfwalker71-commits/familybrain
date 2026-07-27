@@ -77,10 +77,7 @@ import {
   IconCircle,
   type IconTone,
 } from "@/components/layout/icon-circle";
-import {
-  CalendarDateBadge,
-  toIsoDateOnly,
-} from "@/components/layout/calendar-date-badge";
+import { toIsoDateOnly } from "@/components/layout/calendar-date-badge";
 import {
   DateTimelineStrip,
   uniqueSortedIsoDates,
@@ -98,7 +95,7 @@ import {
   type ExpenseSplitSelection,
 } from "@/components/finance-brain/expense-split-participants";
 import { cn } from "@/lib/utils";
-import { NameWithAvatar } from "@/components/users/user-avatar";
+import { NameWithAvatar, UserAvatar } from "@/components/users/user-avatar";
 import { AiImagePreview } from "@/components/layout/ai-image-preview";
 import { SettlementAuditPanel } from "@/components/finance-brain/settlement-audit-panel";
 import { explainSimplifyDebts } from "@/lib/finance-brain/settlement";
@@ -875,6 +872,12 @@ function ExpenseCard({
 
   const visual = expenseVisualForExpense(exp);
   const isoDate = toIsoDateOnly(exp.expense_date);
+  const participantIds = Array.from(
+    new Set<number>([
+      exp.paid_by_member_id,
+      ...exp.splits.map((s) => s.member_id),
+    ])
+  );
   const fx = formatMoneyFxSummary({
     amount: exp.amount,
     currency: exp.currency,
@@ -956,12 +959,6 @@ function ExpenseCard({
           mobileFocused && "rounded-xl ring-2 ring-[var(--brand-finance)]/30"
         )}
       >
-        <IconCircle
-          icon={visual.icon}
-          tone={visual.tone}
-          size="md"
-          className="absolute left-0 top-0 z-10 -translate-x-1/2 -translate-y-1/2 border-2 border-foreground/20 shadow-md"
-        />
         <div
           className={cn(
             "overflow-hidden rounded-xl border border-border bg-card text-sm",
@@ -973,17 +970,14 @@ function ExpenseCard({
               : undefined
           }
         >
-        {/* Soft row: type icon · date · title/meta · amount + AI thumb */}
+        {/* Soft row: type icon · title/meta + participants · amount + AI thumb */}
         <div className="flex items-center gap-3 px-3 py-3">
-          <div className="shrink-0">
-            {isoDate ? (
-              <CalendarDateBadge isoDate={isoDate} size="sm" accent="green" />
-            ) : (
-              <span className="flex size-12 items-center justify-center rounded-lg bg-muted text-[10px] font-medium text-muted-foreground">
-                —
-              </span>
-            )}
-          </div>
+          <IconCircle
+            icon={visual.icon}
+            tone={visual.tone}
+            size="md"
+            className="shrink-0"
+          />
 
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 flex-wrap items-center gap-1.5">
@@ -1007,15 +1001,30 @@ function ExpenseCard({
                 })()
               ) : null}
             </div>
-            <p className="mt-0.5 truncate text-xs text-muted-foreground">
-              {isIncome ? "Einnahme" : visual.label}
-              {!cashbookMode ? (
-                <>
-                  {" · "}
-                  {memberName(exp.paid_by_member_id)}
-                </>
+            <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-1.5">
+              <p className="truncate text-xs text-muted-foreground">
+                {isoDate ? formatDateDe(isoDate) : "Ohne Datum"}
+                {" · "}
+                {isIncome ? "Einnahme" : visual.label}
+              </p>
+              {!cashbookMode && participantIds.length > 0 ? (
+                <div className="flex -space-x-1.5">
+                  {participantIds.slice(0, 4).map((id) => (
+                    <span key={id} title={memberName(id)}>
+                      <UserAvatar
+                        name={memberName(id)}
+                        size="xs"
+                        className={cn(
+                          "ring-2 ring-card",
+                          id === exp.paid_by_member_id &&
+                            "ring-[var(--brand-finance)]"
+                        )}
+                      />
+                    </span>
+                  ))}
+                </div>
               ) : null}
-            </p>
+            </div>
           </div>
 
           <div className="flex shrink-0 flex-col items-end gap-1">
