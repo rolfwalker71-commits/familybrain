@@ -1070,7 +1070,7 @@ function ExpenseCard({
             </div>
           </div>
 
-          <div className="flex shrink-0 flex-col items-end gap-1">
+          <div className="flex shrink-0 flex-col items-end gap-0.5">
             <p
               className={cn(
                 "text-right text-base font-bold tabular-nums sm:text-lg",
@@ -1080,6 +1080,20 @@ function ExpenseCard({
               {isIncome ? "+" : ""}
               {formatMoney(exp.amount_base, baseCurrency)}
             </p>
+            {fx.hasFx ? (
+              <div className="max-w-[9.5rem] text-right text-xs leading-snug text-muted-foreground sm:max-w-[11rem]">
+                <p className="tabular-nums">{fx.primary}</p>
+                <p className="text-[11px] tabular-nums">
+                  {formatExchangeRateLine({
+                    currency: exp.currency,
+                    baseCurrency,
+                    exchangeRate: exp.exchange_rate,
+                    amount: exp.amount,
+                    amountBase: exp.amount_base,
+                  })}
+                </p>
+              </div>
+            ) : null}
             {exp.document || exp.document_id ? (
               <span className="inline-flex items-center gap-1 rounded-full bg-[var(--brand-finance-soft)] px-2 py-0.5 text-[10px] font-semibold text-[var(--brand-finance)]">
                 <FileText className="size-3" />
