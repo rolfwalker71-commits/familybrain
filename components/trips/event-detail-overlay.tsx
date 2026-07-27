@@ -18,7 +18,9 @@ import {
   Ticket,
   TrainFront,
   Trash2,
+  Wallet,
 } from "lucide-react";
+import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -443,6 +445,7 @@ export function EventDetailOverlay({
 
   const documents = event.documents || [];
   const attachments = event.attachments || [];
+  const linkedExpenses = event.linked_expenses || [];
   const hasDocuments = documents.length > 0 || attachments.length > 0;
   const flightEnrichmentNotice =
     type === "Flug" ? parseFlightEnrichmentNotice(event.enrichment_json) : null;
@@ -453,6 +456,7 @@ export function EventDetailOverlay({
   );
   const hasBelegSlide = Boolean(
     hasDocuments ||
+      linkedExpenses.length > 0 ||
       event.notes?.trim() ||
       event.aircraft_image_url ||
       flightEnrichmentNotice ||
@@ -767,6 +771,44 @@ export function EventDetailOverlay({
                         />
                       ))}
                     </div>
+                  </div>
+                ) : null}
+
+                {linkedExpenses.length > 0 ? (
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold text-muted-foreground">
+                      FinanzBuddy
+                    </p>
+                    <ul className="space-y-1.5">
+                      {linkedExpenses.map((exp) => (
+                        <li key={exp.id}>
+                          <Link
+                            href={`/finance-brain/${exp.ledger_id}`}
+                            className="flex items-start gap-2 rounded-xl border border-border/60 bg-muted/20 px-3 py-2.5 text-sm text-foreground underline-offset-2 hover:underline"
+                          >
+                            <Wallet className="mt-0.5 size-4 shrink-0 text-[var(--brand-finance)]" />
+                            <span className="min-w-0">
+                              <span className="font-medium">
+                                {exp.description?.trim() ||
+                                  exp.category_label ||
+                                  "Ausgabe"}
+                              </span>
+                              {" · "}
+                              {formatMoney(
+                                exp.amount_base || exp.amount,
+                                exp.base_currency || exp.currency
+                              )}
+                              <span className="block text-xs text-muted-foreground">
+                                {exp.ledger_title}
+                                {exp.paid_by_name
+                                  ? ` · ${exp.paid_by_name}`
+                                  : ""}
+                              </span>
+                            </span>
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 ) : null}
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState, useCallback, useEffect, type ReactNode } from "react";
+import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import {
   ArrowLeftRight,
@@ -1068,6 +1069,21 @@ function ExpenseCard({
                 </div>
               ) : null}
             </div>
+            {exp.trip_event ? (
+              <Link
+                href={`/trips/${exp.trip_event.trip_id}`}
+                onClick={(e) => e.stopPropagation()}
+                className="mt-1.5 inline-flex max-w-full items-center gap-1 rounded-full bg-[var(--brand-docs-soft)] px-2 py-0.5 text-[10px] font-semibold text-[var(--brand-docs)] hover:opacity-90"
+                title={
+                  exp.trip_event.trip_title
+                    ? `${exp.trip_event.title} · ${exp.trip_event.trip_title}`
+                    : exp.trip_event.title
+                }
+              >
+                <Luggage className="size-3 shrink-0" />
+                <span className="truncate">{exp.trip_event.title}</span>
+              </Link>
+            ) : null}
           </div>
 
           <div className="flex shrink-0 flex-col items-end gap-0.5">
@@ -1594,8 +1610,12 @@ function ExpenseCard({
                       </a>
                     ) : null}
                     {exp.trip_event ? (
-                      <p className="flex items-start gap-2 text-sm text-muted-foreground">
-                        <Luggage className="mt-0.5 size-4 shrink-0 text-[var(--brand-finance)]" />
+                      <Link
+                        href={`/trips/${exp.trip_event.trip_id}`}
+                        className="flex items-start gap-2 rounded-xl border border-border/60 bg-muted/20 px-3 py-2.5 text-sm text-muted-foreground underline-offset-2 hover:underline"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Luggage className="mt-0.5 size-4 shrink-0 text-[var(--brand-docs)]" />
                         <span>
                           {formatDateDe(exp.trip_event.start_date) ||
                             "Ohne Datum"}
@@ -1610,7 +1630,7 @@ function ExpenseCard({
                             ? ` (${exp.trip_event.trip_title})`
                             : ""}
                         </span>
-                      </p>
+                      </Link>
                     ) : null}
                     {exp.receipt_url ? (
                       <a

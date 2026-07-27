@@ -508,7 +508,8 @@ function EventDenseFactsColumn({
   const facts = eventDenseFactItems(event);
   const docCount =
     (event.documents?.length || 0) + (event.attachments?.length || 0);
-  if (facts.length === 0 && docCount === 0) return null;
+  const financeCount = event.linked_expenses?.length || 0;
+  if (facts.length === 0 && docCount === 0 && financeCount === 0) return null;
   return (
     <div
       className={cn(
@@ -535,6 +536,12 @@ function EventDenseFactsColumn({
         <span className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-[var(--brand-finance-soft)] px-2 py-0.5 text-[10px] font-semibold text-[var(--brand-finance)]">
           <FileText className="size-3" />
           {docCount} {docCount === 1 ? "Beleg" : "Belege"}
+        </span>
+      ) : null}
+      {financeCount > 0 ? (
+        <span className="inline-flex items-center gap-1 rounded-full bg-[var(--brand-finance-soft)] px-2 py-0.5 text-[10px] font-semibold text-[var(--brand-finance)]">
+          <Wallet className="size-3" />
+          {financeCount === 1 ? "1 FinanzBuddy" : `${financeCount} FinanzBuddy`}
         </span>
       ) : null}
     </div>
@@ -3295,6 +3302,17 @@ function TripDetailInner({
                         {details ? (
                           <div className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
                             {details}
+                          </div>
+                        ) : null}
+                        {(event.linked_expenses?.length || 0) > 0 ? (
+                          <div
+                            className="mt-1.5"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <EventLinkedExpenses
+                              expenses={event.linked_expenses || []}
+                              hideAmount={eventDenseFacts(event).length > 0}
+                            />
                           </div>
                         ) : null}
                         </div>
