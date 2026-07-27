@@ -395,9 +395,126 @@ function formatEventMetaLine(event: TripEvent): string | null {
   return parts.length ? parts.join(" · ") : null;
 }
 
+/** Key facts for the right column — one place only (cards + compact). */
+function eventDenseFacts(event: TripEvent): string[] {
+  const facts: string[] = [];
+  const type = coerceTripEventType(event.event_type);
+  if (event.flight_number && (type === "Flug" || type === "Zugreisen")) {
+    facts.push(event.flight_number);
+  }
+  const st = toTimeInputValue(event.start_time);
+  const et = toTimeInputValue(event.end_time);
+  if (st) facts.push(et ? `${st}–${et}` : st);
+  if (event.cabin_class) facts.push(event.cabin_class);
+  const linked = event.linked_expenses || [];
+  if (linked.length > 0) {
+    const sum = linked.reduce(
+      (acc, e) => acc + (e.amount_base || e.amount || 0),
+      0
+    );
+    facts.push(formatMoney(sum, linked[0].base_currency || "CHF"));
+  }
+  return facts;
+}
+
+function EventDenseFactsColumn({
+  event,
+  onOpenAi,
+  size = "md",
+}: {
+  event: TripEvent;
+  onOpenAi?: () => void;
+  size?: "sm" | "md";
+}) {
+  const facts = eventDenseFacts(event);
+  if (facts.length === 0 && !event.ai_image_url) return null;
+  return (
+    <div
+      className={cn(
+        "flex shrink-0 flex-col items-end gap-0.5 text-right font-semibold tabular-nums text-foreground/85",
+        size === "sm"
+          ? "min-w-[6.5rem] text-[11px] leading-snug"
+          : "min-w-[7.5rem] text-xs sm:min-w-[9rem] sm:text-sm"
+      )}
+    >
+      {facts.map((f) => (
+        <span key={f} className="leading-snug">
+          {f}
+        </span>
+      ))}
+      {event.ai_image_url && onOpenAi ? (
+        <AiImagePreview
+          src={event.ai_image_url}
+          alt=""
+          brand="travel"
+          imageClassName={
+            size === "sm"
+              ? "mt-1 h-9 w-9 object-cover"
+              : "mt-1 h-10 w-10 object-cover"
+          }
+          onOpen={onOpenAi}
+        />
+      ) : null}
+    </div>
+  );
+}
+
 function formatCompactDetailLine(event: TripEvent): string | null {
-  // Same compact facts as the full card meta (flight / route); hide booking refs.
-  return formatEventMetaLine(event);
+  // Only route/context not already in the dense right column.
+  const type = coerceTripEventType(event.event_type);
+  const dense = new Set(eventDenseFacts(event));
+  const transferRoute = isDualPlaceType(type)
+    ? event.origin_place && event.destination_place
+      ? `${event.origin_place} → ${event.destination_place}`
+      : event.origin_place || event.destination_place || null
+    : null;
+  const flightRoute =
+    type === "Flug" && (event.departure_airport || event.arrival_airport)
+      ? [event.departure_airport, event.arrival_airport]
+          .filter(Boolean)
+          .join(" → ")
+      : null;
+  const route = transferRoute || flightRoute;
+  if (!route || dense.has(route)) return null;
+  // Skip if flight_number alone was the only meta (already in dense).
+  return route;
+}
+
+function EventLinkedExpenses({
+  expenses,
+  className,
+  /** When amount already shown in dense column — only ledger + payer. */
+  hideAmount = false,
+}: {
+  expenses: NonNullable<TripEvent["linked_expenses"]>;
+  className?: string;
+  hideAmount?: boolean;
+}) {
+  if (!expenses.length) return null;
+  return (
+    <div className={cn("space-y-1", className)}>
+      {expenses.map((exp) => {
+        const money = formatMoney(exp.amount, exp.currency);
+        return (
+          <p
+            key={exp.id}
+            className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground"
+          >
+            <Wallet className="size-3 shrink-0 text-[var(--brand-finance)]" />
+            <Link
+              href={`/finance-brain/${exp.ledger_id}`}
+              className="min-w-0 font-medium text-foreground underline-offset-2 hover:underline"
+            >
+              {hideAmount
+                ? exp.ledger_title || "Abrechnung"
+                : `${exp.description?.trim() || exp.category_label || "Ausgabe"} · ${money}`}
+            </Link>
+            <span className="text-muted-foreground">· {exp.paid_by_name}</span>
+          </p>
+        );
+      })}
+    </div>
+  );
 }
 
 function EventActionsMenu({
@@ -449,46 +566,6 @@ function EventActionsMenu({
         ))}
       </DropdownMenuContent>
     </DropdownMenu>
-  );
-}
-
-function EventLinkedExpenses({
-  expenses,
-  className,
-}: {
-  expenses: NonNullable<TripEvent["linked_expenses"]>;
-  className?: string;
-}) {
-  if (!expenses.length) return null;
-  return (
-    <div className={cn("space-y-1", className)}>
-      {expenses.map((exp) => {
-        const date = formatDateDe(exp.expense_date) || null;
-        const money = formatMoney(exp.amount, exp.currency);
-        const title = exp.description?.trim() || exp.category_label || "Ausgabe";
-        return (
-          <p
-            key={exp.id}
-            className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground"
-          >
-            <Wallet className="size-3 shrink-0 text-[var(--brand-finance)]" />
-            <Link
-              href={`/finance-brain/${exp.ledger_id}`}
-              className="min-w-0 font-medium text-foreground underline-offset-2 hover:underline"
-            >
-              {date ? `${date} · ` : ""}
-              {title}
-              {" · "}
-              {money}
-            </Link>
-            <span className="text-muted-foreground">
-              · {exp.paid_by_name}
-              {exp.ledger_title ? ` · ${exp.ledger_title}` : ""}
-            </span>
-          </p>
-        );
-      })}
-    </div>
   );
 }
 
@@ -3102,42 +3179,44 @@ function TripDetailInner({
                               <GripVertical className="size-4" />
                             </button>
                           ) : null}
-                          {event.ai_image_url ? (
-                            <AiImagePreview
-                              src={event.ai_image_url}
-                              alt=""
-                              brand="travel"
-                              imageClassName="h-11 w-11 object-cover sm:h-12 sm:w-12"
-                              onOpen={() =>
-                                setAiZoom({
-                                  url: event.ai_image_url!,
-                                  title: event.title,
-                                  eventId: event.id,
-                                })
-                              }
-                            />
-                          ) : null}
                         </div>
                       </div>
 
-                      <div className="min-w-0">
-                        <div className="flex min-w-0 items-center gap-1.5">
-                          <div className="min-w-0 flex-1 truncate text-sm font-black leading-snug tracking-tight sm:text-base">
-                            {event.title}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex min-w-0 items-center gap-1.5">
+                            <div className="min-w-0 flex-1 truncate text-sm font-black leading-snug tracking-tight sm:text-base">
+                              {event.title}
+                            </div>
+                            <CommentCountChip
+                              count={event.comment_count || 0}
+                              className="shrink-0"
+                            />
                           </div>
-                          <CommentCountChip
-                            count={event.comment_count || 0}
-                            className="shrink-0"
+                          {details ? (
+                            <div className="mt-0.5 line-clamp-2 text-xs text-muted-foreground sm:truncate sm:line-clamp-none">
+                              {details}
+                            </div>
+                          ) : null}
+                          <EventLinkedExpenses
+                            expenses={event.linked_expenses || []}
+                            className="mt-1.5"
+                            hideAmount={eventDenseFacts(event).length > 0}
                           />
                         </div>
-                        {details ? (
-                          <div className="mt-0.5 line-clamp-2 text-xs text-muted-foreground sm:truncate sm:line-clamp-none">
-                            {details}
-                          </div>
-                        ) : null}
-                        <EventLinkedExpenses
-                          expenses={event.linked_expenses || []}
-                          className="mt-1.5"
+                        <EventDenseFactsColumn
+                          event={event}
+                          size="sm"
+                          onOpenAi={
+                            event.ai_image_url
+                              ? () =>
+                                  setAiZoom({
+                                    url: event.ai_image_url!,
+                                    title: event.title,
+                                    eventId: event.id,
+                                  })
+                              : undefined
+                          }
                         />
                       </div>
 
@@ -3407,83 +3486,26 @@ function TripDetailInner({
                         <div className="mt-1 text-lg font-black leading-snug tracking-tight sm:text-2xl">
                           {event.title}
                         </div>
-                        {(() => {
-                          const meta = formatEventMetaLine(event);
-                          return meta ? (
-                            <div className="mt-1 text-xs text-muted-foreground sm:hidden">
-                              {meta}
-                            </div>
-                          ) : null;
-                        })()}
                         <EventLinkedExpenses
                           expenses={event.linked_expenses || []}
                           className="mt-2"
+                          hideAmount={eventDenseFacts(event).length > 0}
                         />
                       </div>
                       <div className="flex shrink-0 items-start gap-2">
-                        {(() => {
-                          const facts: string[] = [];
-                          if (event.flight_number)
-                            facts.push(event.flight_number);
-                          const st = toTimeInputValue(event.start_time);
-                          const et = toTimeInputValue(event.end_time);
-                          if (st)
-                            facts.push(et ? `${st}–${et}` : st);
-                          if (event.cabin_class)
-                            facts.push(event.cabin_class);
-                          const linked = event.linked_expenses || [];
-                          if (linked.length > 0) {
-                            const sum = linked.reduce(
-                              (acc, e) => acc + (e.amount_base || e.amount || 0),
-                              0
-                            );
-                            facts.push(
-                              formatMoney(sum, linked[0].base_currency || "CHF")
-                            );
-                          }
-                          if (facts.length === 0 && event.ai_image_url) {
-                            return (
-                              <AiImagePreview
-                                src={event.ai_image_url}
-                                alt=""
-                                brand="travel"
-                                imageClassName="h-12 w-12 object-cover sm:h-14 sm:w-14"
-                                onOpen={() =>
+                        <EventDenseFactsColumn
+                          event={event}
+                          onOpenAi={
+                            event.ai_image_url
+                              ? () =>
                                   setAiZoom({
                                     url: event.ai_image_url!,
                                     title: event.title,
                                     eventId: event.id,
                                   })
-                                }
-                              />
-                            );
+                              : undefined
                           }
-                          if (facts.length === 0) return null;
-                          return (
-                            <div className="flex min-w-[7.5rem] flex-col items-end gap-0.5 text-right text-xs font-semibold tabular-nums text-foreground/85 sm:min-w-[9rem] sm:text-sm">
-                              {facts.map((f) => (
-                                <span key={f} className="leading-snug">
-                                  {f}
-                                </span>
-                              ))}
-                              {event.ai_image_url ? (
-                                <AiImagePreview
-                                  src={event.ai_image_url}
-                                  alt=""
-                                  brand="travel"
-                                  imageClassName="mt-1 h-10 w-10 object-cover"
-                                  onOpen={() =>
-                                    setAiZoom({
-                                      url: event.ai_image_url!,
-                                      title: event.title,
-                                      eventId: event.id,
-                                    })
-                                  }
-                                />
-                              ) : null}
-                            </div>
-                          );
-                        })()}
+                        />
                       {/* Desktop edit actions — mobile uses bottom bar */}
                       {editMode ? (
                         <div className="hidden shrink-0 flex-col items-center gap-0.5 md:flex">
@@ -3773,14 +3795,7 @@ function TripDetailInner({
                                     : null
                                 }
                               />
-                              <DetailRow
-                                label="Flugnr."
-                                value={event.flight_number}
-                              />
-                              <DetailRow
-                                label="Klasse"
-                                value={event.cabin_class}
-                              />
+                              {/* Flugnr. / Klasse: nur rechts in Dense-Facts, nicht nochmals hier */}
                               <DetailRow
                                 label="Dauer"
                                 value={
@@ -3833,7 +3848,14 @@ function TripDetailInner({
                               />
                               <DetailRow
                                 label="Anbieter"
-                                value={event.provider}
+                                value={
+                                  event.provider &&
+                                  event.airline &&
+                                  event.provider.trim().toLowerCase() ===
+                                    event.airline.trim().toLowerCase()
+                                    ? null
+                                    : event.provider
+                                }
                               />
                             </div>
                           )}
@@ -3854,7 +3876,10 @@ function TripDetailInner({
                                 label={dualLabels.destination}
                                 value={routePlaces.destination || null}
                               />
-                              {type === "Zugreisen" ? (
+                              {type === "Zugreisen" &&
+                              !eventDenseFacts(event).includes(
+                                event.flight_number || ""
+                              ) ? (
                                 <DetailRow
                                   label="Zugnr."
                                   value={event.flight_number}
