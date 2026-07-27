@@ -1076,7 +1076,7 @@ function ExpenseCard({
           if (!open) setEditing(false);
         }}
       >
-        <DialogContent className="flex max-h-[92dvh] w-[min(96vw,26rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl md:max-w-3xl lg:max-w-4xl">
+        <DialogContent className="flex max-h-[92dvh] w-[min(96vw,26rem)] flex-col gap-0 overflow-hidden p-0 sm:w-[min(96vw,48rem)] sm:max-w-3xl md:w-[min(96vw,56rem)] md:max-w-4xl lg:w-[min(96vw,72rem)] lg:max-w-5xl">
           <DialogHeader className="shrink-0 border-b border-border/50 px-4 py-3 pr-12 text-left">
             <DialogTitle className="truncate text-base">
               {editing
@@ -1334,10 +1334,20 @@ function ExpenseCard({
                       {formatMoney(exp.amount_base, baseCurrency)}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      {isoDate ? formatDateDe(isoDate) : "Ohne Datum"}
-                      {" · "}
                       {isIncome ? "Einnahme" : visual.label}
                     </p>
+                    {isoDate ? (
+                      <div className="mx-auto grid w-fit grid-cols-[auto_auto] gap-x-2 gap-y-0.5 text-left text-sm text-muted-foreground">
+                        <span className="font-semibold text-foreground/80">
+                          Von
+                        </span>
+                        <span className="tabular-nums">
+                          {formatDateDe(isoDate)}
+                        </span>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">Ohne Datum</p>
+                    )}
                   </div>
                   <div className="flex flex-wrap items-center justify-center gap-2">
                     {Boolean(exp.pre_settled)

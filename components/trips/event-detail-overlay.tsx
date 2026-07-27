@@ -6,9 +6,7 @@ import {
   Armchair,
   BedDouble,
   Bus,
-  Calendar,
   Car,
-  Clock,
   FilePlus2,
   ImagePlus,
   Info,
@@ -234,32 +232,38 @@ function parseEventIsoDate(raw: string | null | undefined): string | null {
   return null;
 }
 
-/** Short "Mo, 3. Nov" / "Mo, 3. Nov · 14:00–16:00" style line under the title. */
-function formatEventDateLine(event: EventDetailEvent): string | null {
+/** Short weekday date, e.g. "So. 25. Okt." */
+function formatShortDateDe(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Intl.DateTimeFormat("de-CH", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  }).format(new Date(y, m - 1, d));
+}
+
+/** Overlay: "Von Datum · Uhrzeit" / "Bis Datum · Uhrzeit". */
+function formatEventFromTo(event: EventDetailEvent): {
+  from: string;
+  to: string | null;
+} | null {
   const startIso = parseEventIsoDate(event.start_date);
   if (!startIso) return null;
   const endIso = parseEventIsoDate(event.end_date);
   const startTime = toTimeInputValue(event.start_time) || null;
   const endTime = toTimeInputValue(event.end_time) || null;
-  const fmtDate = (iso: string) => {
-    const [y, m, d] = iso.split("-").map(Number);
-    return new Intl.DateTimeFormat("de-CH", {
-      weekday: "short",
-      day: "numeric",
-      month: "short",
-    }).format(new Date(y, m - 1, d));
-  };
-  const showEnd = Boolean(endIso && endIso !== startIso && endIso >= startIso);
-  if (showEnd && endIso) {
-    return `${fmtDate(startIso)} – ${fmtDate(endIso)}`;
+
+  const from = [formatShortDateDe(startIso), startTime].filter(Boolean).join(" · ");
+
+  const hasEndDate = Boolean(endIso && endIso !== startIso);
+  const hasEndTime = Boolean(endTime);
+  if (!hasEndDate && !hasEndTime) {
+    return { from, to: null };
   }
-  const datePart = fmtDate(startIso);
-  const timePart = startTime
-    ? endTime
-      ? `${startTime}–${endTime}`
-      : startTime
-    : null;
-  return timePart ? `${datePart} · ${timePart}` : datePart;
+
+  const toDateIso = endIso || startIso;
+  const to = [formatShortDateDe(toDateIso), endTime].filter(Boolean).join(" · ");
+  return { from, to };
 }
 
 type DenseFactItem = { key: string; icon: LucideIcon; label: string };
@@ -269,11 +273,6 @@ function eventDenseFactItems(event: EventDetailEvent): DenseFactItem[] {
   const type = coerceTripEventType(event.event_type);
   if (event.flight_number && (type === "Flug" || type === "Zugreisen")) {
     items.push({ key: "flight", icon: Ticket, label: event.flight_number });
-  }
-  const st = toTimeInputValue(event.start_time);
-  const et = toTimeInputValue(event.end_time);
-  if (st) {
-    items.push({ key: "time", icon: Clock, label: et ? `${st}–${et}` : st });
   }
   if (event.cabin_class) {
     items.push({ key: "cabin", icon: Armchair, label: event.cabin_class });
@@ -391,7 +390,7 @@ export function EventDetailOverlay({
   const dual = isDualPlaceType(type);
   const dualLabels = dualPlaceLabels(type);
   const routePlaces = splitTransferPlaces(event);
-  const dateLine = formatEventDateLine(event);
+  const fromTo = formatEventFromTo(event);
   const routeLine = eventRouteLine(event);
   const denseFacts = eventDenseFactItems(event);
   const mapModel = getEventMapModel(event);
@@ -468,7 +467,7 @@ export function EventDetailOverlay({
       open={open}
       onOpenChange={onOpenChange}
     >
-      <DialogContent className="flex max-h-[92dvh] w-[min(96vw,26rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl md:max-w-3xl lg:max-w-4xl">
+      <DialogContent className="flex max-h-[92dvh] w-[min(96vw,26rem)] flex-col gap-0 overflow-hidden p-0 sm:w-[min(96vw,48rem)] sm:max-w-3xl md:w-[min(96vw,56rem)] md:max-w-4xl lg:w-[min(96vw,72rem)] lg:max-w-5xl">
         <DialogHeader className="shrink-0 border-b border-border/50 px-4 py-3 pr-12 text-left">
           <DialogTitle className="truncate text-base">{event.title}</DialogTitle>
           <DialogDescription className="sr-only">
@@ -513,11 +512,19 @@ export function EventDetailOverlay({
                   <EventStatusPill event={event} />
                   <CommentCountChip count={event.comment_count || 0} />
                 </div>
-                {dateLine ? (
-                  <p className="flex items-center justify-center gap-1.5 text-sm text-muted-foreground">
-                    <Calendar className="size-4 shrink-0" />
-                    {dateLine}
-                  </p>
+                {fromTo ? (
+                  <div className="mx-auto grid w-fit grid-cols-[auto_auto] gap-x-2 gap-y-0.5 text-left text-sm text-muted-foreground">
+                    <span className="font-semibold text-foreground/80">Von</span>
+                    <span className="tabular-nums">{fromTo.from}</span>
+                    {fromTo.to ? (
+                      <>
+                        <span className="font-semibold text-foreground/80">
+                          Bis
+                        </span>
+                        <span className="tabular-nums">{fromTo.to}</span>
+                      </>
+                    ) : null}
+                  </div>
                 ) : null}
                 {routeLine ? (
                   <p className="text-sm font-medium text-foreground">
