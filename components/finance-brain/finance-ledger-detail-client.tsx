@@ -962,6 +962,7 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
       exchangeRate: number;
       direction?: "expense" | "income";
       tripEventId?: number | null;
+      categoryLabel?: string;
       split?: ExpenseSplitSelection;
     }
   ) {
@@ -983,6 +984,7 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
             exchangeRate: payload.exchangeRate,
             direction: payload.direction,
             tripEventId: payload.tripEventId,
+            categoryLabel: payload.categoryLabel,
             ...(payload.split ? { split: payload.split } : {}),
           }),
         }

@@ -69,6 +69,7 @@ import {
 import {
   expenseVisualForExpense,
   settlementVisual,
+  EXPENSE_CATEGORY_LABELS,
 } from "@/lib/finance-brain/expense-category";
 import {
   ExpenseReceiptControls,
@@ -193,6 +194,7 @@ export type ExpenseEditPayload = {
   exchangeRate: number;
   direction?: "expense" | "income";
   tripEventId?: number | null;
+  categoryLabel?: string;
   split?: ExpenseSplitSelection;
 };
 
@@ -861,6 +863,9 @@ function ExpenseCard({
   const [editDirection, setEditDirection] = useState<"expense" | "income">(
     exp.direction === "income" ? "income" : "expense"
   );
+  const [editCategory, setEditCategory] = useState(
+    () => expenseVisualForExpense(exp).label
+  );
 
   const isIncome = (exp.direction || "expense") === "income";
   const memberName = (id: number) =>
@@ -877,11 +882,13 @@ function ExpenseCard({
 
   const visual = expenseVisualForExpense(exp);
   const isoDate = toIsoDateOnly(exp.expense_date);
+  /** Avatars = Anteilnehmer only (not payer-only extras). */
   const participantIds = Array.from(
-    new Set<number>([
-      exp.paid_by_member_id,
-      ...exp.splits.map((s) => s.member_id),
-    ])
+    new Set(
+      exp.splits
+        .filter((s) => Number(s.share_amount_base) > 0.004)
+        .map((s) => s.member_id)
+    )
   );
   const fx = formatMoneyFxSummary({
     amount: exp.amount,
@@ -906,6 +913,7 @@ function ExpenseCard({
       memberIds: exp.splits.map((s) => s.member_id),
     });
     setEditDirection(exp.direction === "income" ? "income" : "expense");
+    setEditCategory(expenseVisualForExpense(exp).label);
     setDetailOpen(true);
     setEditing(true);
   }
@@ -952,6 +960,7 @@ function ExpenseCard({
       exchangeRate: editCurrency === baseCurrency ? 1 : parsedRate,
       direction: cashbookMode ? editDirection : undefined,
       tripEventId: editTripEventId,
+      categoryLabel: editCategory,
       ...(!cashbookMode && !isIncome ? { split: editSplit } : {}),
     });
     setEditing(false);
@@ -1097,6 +1106,30 @@ function ExpenseCard({
                     value={editDesc}
                     onChange={(e) => setEditDesc(e.target.value)}
                   />
+                </div>
+                <div className="space-y-1 sm:col-span-2">
+                  <Label className="text-xs">Kategorie</Label>
+                  <Select
+                    value={editCategory}
+                    onValueChange={(v) => {
+                      if (v == null) return;
+                      setEditCategory(v);
+                    }}
+                    items={Object.fromEntries(
+                      EXPENSE_CATEGORY_LABELS.map((label) => [label, label])
+                    )}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {EXPENSE_CATEGORY_LABELS.map((label) => (
+                        <SelectItem key={label} value={label}>
+                          {label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs">Betrag</Label>

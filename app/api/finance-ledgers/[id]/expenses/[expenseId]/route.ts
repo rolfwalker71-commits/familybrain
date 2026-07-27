@@ -5,12 +5,14 @@ import {
 } from "@/lib/auth/current-user";
 import { z } from "zod";
 import { classifyAndStoreExpenseCategory } from "@/lib/finance-brain/expense-classify";
+import { expenseVisualFromLabel } from "@/lib/finance-brain/expense-category";
 import { geocodePlace } from "@/lib/finance-brain/geocode";
 import {
   deleteFinanceExpense,
   getFinanceExpenseById,
   getFinanceLedgerById,
   listFinanceExpenseSplits,
+  setFinanceExpenseCategory,
   updateFinanceExpense,
 } from "@/lib/finance-brain/queries";
 import { serializeExpense } from "@/lib/finance-brain/serialize";
@@ -33,6 +35,8 @@ const PatchSchema = z.object({
   direction: z.enum(["expense", "income"]).optional(),
   documentId: z.number().int().positive().nullable().optional(),
   tripEventId: z.number().int().positive().nullable().optional(),
+  /** Manual category override; skips AI reclassification when set. */
+  categoryLabel: z.string().min(1).max(80).optional(),
   split: z
     .discriminatedUnion("mode", [
       z.object({
@@ -117,10 +121,18 @@ export async function PATCH(request: Request, context: Ctx) {
     }
 
     let expense = updateFinanceExpense(expenseId, patch);
-    expense = await classifyAndStoreExpenseCategory(
-      expense,
-      expense.place_name
-    );
+    if (parsed.data.categoryLabel !== undefined) {
+      const visual = expenseVisualFromLabel(parsed.data.categoryLabel);
+      expense = setFinanceExpenseCategory(expenseId, {
+        categoryLabel: visual.label,
+        categoryTone: visual.tone,
+      });
+    } else {
+      expense = await classifyAndStoreExpenseCategory(
+        expense,
+        expense.place_name
+      );
+    }
     return NextResponse.json({
       ok: true,
       expense: serializeExpense(expense, listFinanceExpenseSplits(expenseId)),

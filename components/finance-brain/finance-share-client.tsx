@@ -446,6 +446,7 @@ function FinanceShareInner({ token }: { token: string }) {
       amount: number;
       currency: string;
       exchangeRate: number;
+      categoryLabel?: string;
       split?: ExpenseSplitSelection;
     }
   ) {
@@ -465,6 +466,7 @@ function FinanceShareInner({ token }: { token: string }) {
             amount: payload.amount,
             currency: payload.currency,
             exchangeRate: payload.exchangeRate,
+            categoryLabel: payload.categoryLabel,
             ...(payload.split ? { split: payload.split } : {}),
           }),
         }
