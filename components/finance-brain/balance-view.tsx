@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, useCallback, type ReactNode } from "react";
+import { useMemo, useRef, useState, useCallback, useEffect, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   ArrowLeftRight,
@@ -94,6 +94,8 @@ import {
 } from "@/components/finance-brain/expense-trip-event-picker";
 import {
   ExpenseSplitParticipants,
+  coercePayerId,
+  eligiblePayerIdsFromSplit,
   type ExpenseSplitSelection,
 } from "@/components/finance-brain/expense-split-participants";
 import { cn } from "@/lib/utils";
@@ -898,6 +900,30 @@ function ExpenseCard({
     exchangeRate: exp.exchange_rate,
   });
 
+  const eligibleEditPayerIds = useMemo(
+    () => eligiblePayerIdsFromSplit(editSplit, couples || [], members),
+    [editSplit, couples, members]
+  );
+  const eligibleEditPayers = useMemo(
+    () => members.filter((m) => eligibleEditPayerIds.includes(m.id)),
+    [members, eligibleEditPayerIds]
+  );
+
+  useEffect(() => {
+    if (cashbookMode || isIncome || !editing) return;
+    const next = coercePayerId(Number(editPayer) || null, eligibleEditPayerIds);
+    if (next != null && String(next) !== editPayer) {
+      setEditPayer(String(next));
+    }
+  }, [
+    cashbookMode,
+    isIncome,
+    editing,
+    editSplit,
+    editPayer,
+    eligibleEditPayerIds,
+  ]);
+
   function startEdit() {
     setEditDesc(exp.description || "");
     setEditDate(exp.expense_date || "");
@@ -1230,42 +1256,48 @@ function ExpenseCard({
                     </Select>
                   </div>
                 ) : (
-                  <div className="space-y-1">
-                    <Label className="text-xs">Bezahlt von</Label>
-                    <Select
-                      value={editPayer}
-                      onValueChange={(v) => {
-                        if (v == null) return;
-                        setEditPayer(v);
-                      }}
-                      items={Object.fromEntries(
-                        members.map((m) => [String(m.id), m.display_name])
-                      )}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {members.map((m) => (
-                          <SelectItem key={m.id} value={String(m.id)}>
-                            {m.display_name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <>
+                    {!isIncome ? (
+                      <div className="sm:col-span-2">
+                        <ExpenseSplitParticipants
+                          compact
+                          members={members}
+                          couples={couples}
+                          value={editSplit}
+                          onChange={setEditSplit}
+                        />
+                      </div>
+                    ) : null}
+                    <div className="space-y-1">
+                      <Label className="text-xs">Bezahlt von</Label>
+                      <Select
+                        value={editPayer}
+                        onValueChange={(v) => {
+                          if (v == null) return;
+                          setEditPayer(v);
+                        }}
+                        items={Object.fromEntries(
+                          eligibleEditPayers.map((m) => [
+                            String(m.id),
+                            m.display_name,
+                          ])
+                        )}
+                        disabled={eligibleEditPayers.length === 0}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Aus Beteiligung" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {eligibleEditPayers.map((m) => (
+                            <SelectItem key={m.id} value={String(m.id)}>
+                              {m.display_name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </>
                 )}
-                {!cashbookMode && !isIncome ? (
-                  <div className="sm:col-span-2">
-                    <ExpenseSplitParticipants
-                      compact
-                      members={members}
-                      couples={couples}
-                      value={editSplit}
-                      onChange={setEditSplit}
-                    />
-                  </div>
-                ) : null}
                 <div className="space-y-1 sm:col-span-2">
                   <Label className="text-xs">Ort</Label>
                   <Input

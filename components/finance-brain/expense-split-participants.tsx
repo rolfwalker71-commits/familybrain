@@ -10,6 +10,40 @@ export type ExpenseSplitSelection =
   | { mode: "equal"; memberIds: number[] }
   | { mode: "coupleEqual"; coupleIds: number[] };
 
+/** Members who may be payer given the current Beteiligung selection. */
+export function eligiblePayerIdsFromSplit(
+  split: ExpenseSplitSelection,
+  couples: Couple[],
+  members: Member[]
+): number[] {
+  const memberSet = new Set(members.map((m) => m.id));
+  if (split.mode === "equal") {
+    return split.memberIds.filter((id) => memberSet.has(id));
+  }
+  const ids = new Set<number>();
+  for (const couple of couples) {
+    if (!split.coupleIds.includes(couple.id)) continue;
+    for (const mid of couple.memberIds) {
+      if (memberSet.has(mid)) ids.add(mid);
+    }
+  }
+  return [...ids];
+}
+
+/**
+ * Keep payer inside the eligible set; prefer current if still valid.
+ */
+export function coercePayerId(
+  currentPayerId: number | null | undefined,
+  eligibleIds: number[]
+): number | null {
+  if (eligibleIds.length === 0) return null;
+  if (currentPayerId != null && eligibleIds.includes(currentPayerId)) {
+    return currentPayerId;
+  }
+  return eligibleIds[0] ?? null;
+}
+
 /**
  * Who shares this expense: equal among persons, or equal among couples
  * (then equal within each couple).

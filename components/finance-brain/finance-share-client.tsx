@@ -39,6 +39,8 @@ import {
 import { PendingReceiptPicker } from "@/components/finance-brain/expense-receipt-controls";
 import {
   ExpenseSplitParticipants,
+  coercePayerId,
+  eligiblePayerIdsFromSplit,
   type ExpenseSplitSelection,
 } from "@/components/finance-brain/expense-split-participants";
 import {
@@ -237,6 +239,22 @@ function FinanceShareInner({ token }: { token: string }) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (!data?.members?.length) return;
+    const eligible = eligiblePayerIdsFromSplit(
+      expSplit,
+      data.couples || [],
+      data.members
+    );
+    const next = coercePayerId(
+      expPayer ? Number(expPayer) : null,
+      eligible
+    );
+    if (next != null && String(next) !== expPayer) {
+      setExpPayer(String(next));
+    }
+  }, [expSplit, data, expPayer]);
 
   useEffect(() => {
     if (!data || aiImageBusyId != null) return;
@@ -751,6 +769,20 @@ function FinanceShareInner({ token }: { token: string }) {
       m.id === member.id ? `${m.display_name} (ich)` : m.display_name,
     ])
   );
+  const eligibleExpensePayerIds = eligiblePayerIdsFromSplit(
+    expSplit,
+    couples,
+    members
+  );
+  const expensePayerMembers = members.filter((m) =>
+    eligibleExpensePayerIds.includes(m.id)
+  );
+  const expensePayerSelectItems = Object.fromEntries(
+    expensePayerMembers.map((m) => [
+      String(m.id),
+      m.id === member.id ? `${m.display_name} (ich)` : m.display_name,
+    ])
+  );
   const otherSelectItems = Object.fromEntries(
     others.map((m) => [String(m.id), m.display_name])
   );
@@ -923,6 +955,14 @@ function FinanceShareInner({ token }: { token: string }) {
                 </div>
               </div>
             </div>
+            <div className="space-y-1 sm:col-span-2">
+              <ExpenseSplitParticipants
+                members={members}
+                couples={couples}
+                value={expSplit}
+                onChange={setExpSplit}
+              />
+            </div>
             <div className="space-y-1">
               <Label>Bezahlt von</Label>
               <Select
@@ -931,13 +971,14 @@ function FinanceShareInner({ token }: { token: string }) {
                   if (v == null) return;
                   setExpPayer(v);
                 }}
-                items={memberSelectItems}
+                items={expensePayerSelectItems}
+                disabled={expensePayerMembers.length === 0}
               >
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Aus Beteiligung" />
                 </SelectTrigger>
                 <SelectContent>
-                  {members.map((m) => (
+                  {expensePayerMembers.map((m) => (
                     <SelectItem key={m.id} value={String(m.id)}>
                       {m.display_name}
                       {m.id === member.id ? " (ich)" : ""}
@@ -945,14 +986,9 @@ function FinanceShareInner({ token }: { token: string }) {
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-            <div className="space-y-1 sm:col-span-2">
-              <ExpenseSplitParticipants
-                members={members}
-                couples={couples}
-                value={expSplit}
-                onChange={setExpSplit}
-              />
+              <p className="text-[11px] text-muted-foreground">
+                Nur Personen aus der gewählten Beteiligung.
+              </p>
             </div>
             <label className="flex cursor-pointer items-start gap-2 rounded-xl border border-border/50 bg-background/60 px-3 py-2.5 text-sm sm:col-span-2">
               <input

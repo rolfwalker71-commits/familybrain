@@ -71,6 +71,8 @@ import { PendingReceiptPicker } from "@/components/finance-brain/expense-receipt
 import { ExpenseTripEventPicker } from "@/components/finance-brain/expense-trip-event-picker";
 import {
   ExpenseSplitParticipants,
+  coercePayerId,
+  eligiblePayerIdsFromSplit,
   type ExpenseSplitSelection,
 } from "@/components/finance-brain/expense-split-participants";
 import {
@@ -434,6 +436,23 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
     void loadImport();
     void loadTrips();
   }, [load, loadImport, loadTrips]);
+
+  /** Zahler nur aus der aktuellen Beteiligung (Personen/Paare). */
+  useEffect(() => {
+    if (!data?.members?.length) return;
+    const eligible = eligiblePayerIdsFromSplit(
+      expSplit,
+      data.couples || [],
+      data.members
+    );
+    const next = coercePayerId(
+      expPayer ? Number(expPayer) : null,
+      eligible
+    );
+    if (next != null && String(next) !== expPayer) {
+      setExpPayer(String(next));
+    }
+  }, [expSplit, data, expPayer]);
 
   useEffect(() => {
     if (!data || aiImageBusyId != null) return;
@@ -1391,6 +1410,17 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
   const memberSelectItems = Object.fromEntries(
     members.map((m) => [String(m.id), m.display_name])
   );
+  const eligibleExpensePayerIds = eligiblePayerIdsFromSplit(
+    expSplit,
+    couples,
+    members
+  );
+  const expensePayerMembers = members.filter((m) =>
+    eligibleExpensePayerIds.includes(m.id)
+  );
+  const expensePayerSelectItems = Object.fromEntries(
+    expensePayerMembers.map((m) => [String(m.id), m.display_name])
+  );
   const tripSelectItems = {
     __none__: "Keine Reise",
     ...Object.fromEntries(trips.map((t) => [String(t.id), t.title])),
@@ -1683,6 +1713,16 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
               </div>
             </div>
             {!isNormal ? (
+              <div className="sm:col-span-2 lg:col-span-4">
+                <ExpenseSplitParticipants
+                  members={members}
+                  couples={couples}
+                  value={expSplit}
+                  onChange={setExpSplit}
+                />
+              </div>
+            ) : null}
+            {!isNormal ? (
               <div className="space-y-1">
                 <Label>Bezahlt von</Label>
                 <Select
@@ -1691,29 +1731,23 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
                     if (v == null) return;
                     setExpPayer(v);
                   }}
-                  items={memberSelectItems}
+                  items={expensePayerSelectItems}
+                  disabled={expensePayerMembers.length === 0}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Person" />
+                    <SelectValue placeholder="Person aus Beteiligung" />
                   </SelectTrigger>
                   <SelectContent>
-                    {members.map((m) => (
+                    {expensePayerMembers.map((m) => (
                       <SelectItem key={m.id} value={String(m.id)}>
                         {m.display_name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-            ) : null}
-            {!isNormal ? (
-              <div className="sm:col-span-2 lg:col-span-4">
-                <ExpenseSplitParticipants
-                  members={members}
-                  couples={couples}
-                  value={expSplit}
-                  onChange={setExpSplit}
-                />
+                <p className="text-[11px] text-muted-foreground">
+                  Nur Personen aus der gewählten Beteiligung.
+                </p>
               </div>
             ) : null}
             {!isNormal ? (
