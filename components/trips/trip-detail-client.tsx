@@ -31,6 +31,7 @@ import {
   LayoutList,
   MoreHorizontal,
   RefreshCw,
+  Users,
   Wallet,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -86,6 +87,11 @@ import {
   stickyStripClass,
   uniqueSortedIsoDates,
 } from "@/components/layout/date-timeline-strip";
+import {
+  StatusStrip,
+  daysUntilIso,
+  formatCountdownDe,
+} from "@/components/layout/status-strip";
 import { useIsStandalonePwa } from "@/hooks/use-standalone-pwa";
 import { useActiveDateFromScroll } from "@/hooks/use-active-date-from-scroll";
 import { DocumentPdfThumb } from "@/components/documents/document-pdf-preview";
@@ -98,13 +104,14 @@ import { TripExportMenu } from "@/components/trips/trip-export-menu";
 import { TripFinanceLedgerCard } from "@/components/finance-brain/trip-finance-ledger-card";
 import { TripTravelersCard } from "@/components/trips/trip-travelers-card";
 import { BelegNotesBlock } from "@/components/trips/beleg-notes-block";
-import { LinkDocumentsToEventDialog } from "@/components/trips/link-documents-to-event-dialog";
 import {
   TripTabNav,
   parseTripDetailTab,
   type TripDetailTab,
   type TripTabItem,
 } from "@/components/trips/trip-tab-nav";
+import type { AppTabOverflowItem } from "@/components/layout/app-tab-nav";
+import { LinkDocumentsToEventDialog } from "@/components/trips/link-documents-to-event-dialog";
 
 import {
   toDateInputValue,
@@ -746,6 +753,74 @@ function TripDetailInner({
 
   const stickyEnabled = !isPwa;
   const stickyBelowHeader = !readOnly;
+
+  const [ledgerStrip, setLedgerStrip] = useState<{
+    label: string;
+    href?: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (readOnly) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(`/api/trips/${tripId}/finance-ledger`);
+        const data = await res.json();
+        if (cancelled || !res.ok || !data.ledger) {
+          if (!cancelled) setLedgerStrip(null);
+          return;
+        }
+        const currency = data.ledger.base_currency || "CHF";
+        if (data.cashbook) {
+          setLedgerStrip({
+            label: `Kasse ${formatMoney(data.cashbook.netBase, currency)}`,
+            href: `/finance-brain/${data.ledger.id}`,
+          });
+          return;
+        }
+        const bals = (data.balances || []) as Array<{ netBalance: number }>;
+        const open = bals.filter((b) => Math.abs(b.netBalance) > 0.009).length;
+        setLedgerStrip({
+          label:
+            open === 0
+              ? `Saldo ausgeglichen · ${currency}`
+              : `${open} offene Saldi · Ledger`,
+          href: `/finance-brain/${data.ledger.id}`,
+        });
+      } catch {
+        if (!cancelled) setLedgerStrip(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [tripId, readOnly, events.length]);
+
+  const nextEventStatus = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const upcoming = events
+      .map((e) => ({
+        event: e,
+        iso: parseEventIsoDate(e.start_date),
+      }))
+      .filter((x): x is { event: TripEvent; iso: string } => Boolean(x.iso))
+      .sort((a, b) => a.iso.localeCompare(b.iso));
+    const next =
+      upcoming.find((x) => {
+        const [y, m, d] = x.iso.split("-").map(Number);
+        const dt = new Date(y, m - 1, d);
+        return dt.getTime() >= today.getTime();
+      }) ?? upcoming[upcoming.length - 1];
+    if (!next) return null;
+    const days = daysUntilIso(next.iso);
+    const when = formatCountdownDe(days);
+    return {
+      title: next.event.title,
+      when,
+      time: toTimeInputValue(next.event.start_time) || null,
+    };
+  }, [events]);
 
   useEffect(() => {
     setViewMode(readViewMode());
@@ -1635,10 +1710,28 @@ function TripDetailInner({
   const activeTab = parseTripDetailTab(searchParams.get("tab"));
   const tabItems: TripTabItem[] = [
     { id: "ablauf", label: "Ablauf", icon: LayoutList },
-    { id: "neu", label: "Neu", icon: Plus },
-    { id: "belege", label: "Belege", icon: FileText },
-    { id: "mehr", label: "Mehr", icon: MoreHorizontal },
+    { id: "finanzen", label: "Finanzen", icon: Wallet },
+    { id: "reisende", label: "Reisende", icon: Users },
+    { id: "dokumente", label: "Dokumente", icon: FileText },
   ];
+  const overflowItems: AppTabOverflowItem[] = readOnly
+    ? []
+    : [
+        {
+          id: "neu",
+          label: "Neuer Eintrag",
+          icon: Plus,
+          onSelect: () => setTab("neu"),
+          active: activeTab === "neu",
+        },
+        {
+          id: "mehr",
+          label: "Extras & Bearbeiten",
+          icon: MoreHorizontal,
+          onSelect: () => setTab("mehr"),
+          active: activeTab === "mehr",
+        },
+      ];
 
   function setTab(tab: TripDetailTab) {
     const params = new URLSearchParams(searchParams.toString());
@@ -1717,6 +1810,43 @@ function TripDetailInner({
         </div>
       </div>
 
+      {nextEventStatus || ledgerStrip ? (
+        <StatusStrip
+          accent="travel"
+          primary={
+            nextEventStatus ? (
+              <span>
+                <span className="font-semibold">Nächster Termin: </span>
+                {nextEventStatus.title}
+                {nextEventStatus.time ? ` · ${nextEventStatus.time}` : ""}
+                {nextEventStatus.when ? (
+                  <span className="text-current/70">
+                    {" "}
+                    · {nextEventStatus.when}
+                  </span>
+                ) : null}
+              </span>
+            ) : (
+              <span className="text-current/70">Noch keine Termine</span>
+            )
+          }
+          secondary={
+            ledgerStrip ? (
+              ledgerStrip.href && !readOnly ? (
+                <Link
+                  href={ledgerStrip.href}
+                  className="underline-offset-2 hover:underline"
+                >
+                  {ledgerStrip.label}
+                </Link>
+              ) : (
+                ledgerStrip.label
+              )
+            ) : undefined
+          }
+        />
+      ) : null}
+
       {!readOnly && activeTab !== "ablauf" ? (
         <div
           data-sticky-detail-chrome
@@ -1727,7 +1857,12 @@ function TripDetailInner({
             "py-2"
           )}
         >
-          <TripTabNav items={tabItems} active={activeTab} onChange={setTab} />
+          <TripTabNav
+            items={tabItems}
+            active={activeTab}
+            onChange={setTab}
+            overflowItems={overflowItems}
+          />
         </div>
       ) : null}
 
@@ -1742,21 +1877,22 @@ function TripDetailInner({
         </div>
       ) : null}
 
-      {activeTab === "mehr" ? (
-        <div className="space-y-6">
-      {!readOnly ? (
+      {activeTab === "reisende" && !readOnly ? (
         <TripTravelersCard
           tripId={tripId}
           onCountChange={setTravelerCount}
         />
       ) : null}
-      {!readOnly ? (
+
+      {activeTab === "finanzen" && !readOnly ? (
         <TripFinanceLedgerCard
           tripId={tripId}
           travelerCount={travelerCount}
         />
       ) : null}
 
+      {activeTab === "mehr" ? (
+        <div className="space-y-6">
       {!readOnly ? (
       <div className="flex flex-wrap gap-2">
         <TripExportMenu
@@ -2025,10 +2161,10 @@ function TripDetailInner({
         </Card>
       ) : null}
 
-      {activeTab === "belege" && !readOnly ? (
+      {activeTab === "dokumente" && !readOnly ? (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Belege</CardTitle>
+            <CardTitle className="text-base">Dokumente</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
             {allDocuments.length === 0 ? (
@@ -2659,7 +2795,12 @@ function TripDetailInner({
           )}
         >
           {!readOnly ? (
-            <TripTabNav items={tabItems} active={activeTab} onChange={setTab} />
+            <TripTabNav
+              items={tabItems}
+              active={activeTab}
+              onChange={setTab}
+              overflowItems={overflowItems}
+            />
           ) : null}
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-lg font-semibold">Timeline</h2>
@@ -3086,31 +3227,31 @@ function TripDetailInner({
                       <div className="min-w-0 flex-1">
                         <EventDateHeader event={event} size="sm" />
                       </div>
-                      {event.ai_image_url ? (
-                        <AiImagePreview
-                          src={event.ai_image_url}
-                          alt=""
-                          brand="travel"
-                          imageClassName="h-12 w-12 object-cover sm:h-16 sm:w-16"
-                          onOpen={() =>
-                            setAiZoom({
-                              url: event.ai_image_url!,
-                              title: event.title,
-                              eventId: event.id,
-                            })
-                          }
-                        />
-                      ) : null}
                     </div>
                   </div>
                   <CardContent className="space-y-3 p-3 sm:p-4">
-                    <div className="flex items-start gap-2">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-1.5">
                           <Badge variant="secondary" className="shrink-0">
                             {coerceTripEventType(event.event_type)}
                           </Badge>
                           <CommentCountChip count={event.comment_count || 0} />
+                          {(() => {
+                            const n =
+                              (event.documents?.length || 0) +
+                              (event.attachments?.length || 0);
+                            if (n === 0) return null;
+                            return (
+                              <Badge
+                                variant="outline"
+                                className="h-6 gap-1 px-1.5 text-[10px] font-semibold"
+                              >
+                                <FileText className="size-3" />
+                                {n} {n === 1 ? "Beleg" : "Belege"}
+                              </Badge>
+                            );
+                          })()}
                           {!readOnly && !editMode ? (
                             <>
                               <Button
@@ -3149,7 +3290,7 @@ function TripDetailInner({
                         {(() => {
                           const meta = formatEventMetaLine(event);
                           return meta ? (
-                            <div className="mt-1 text-xs text-muted-foreground">
+                            <div className="mt-1 text-xs text-muted-foreground sm:hidden">
                               {meta}
                             </div>
                           ) : null;
@@ -3159,6 +3300,70 @@ function TripDetailInner({
                           className="mt-2"
                         />
                       </div>
+                      <div className="flex shrink-0 items-start gap-2">
+                        {(() => {
+                          const facts: string[] = [];
+                          if (event.flight_number)
+                            facts.push(event.flight_number);
+                          const st = toTimeInputValue(event.start_time);
+                          const et = toTimeInputValue(event.end_time);
+                          if (st)
+                            facts.push(et ? `${st}–${et}` : st);
+                          if (event.cabin_class)
+                            facts.push(event.cabin_class);
+                          const linked = event.linked_expenses || [];
+                          if (linked.length > 0) {
+                            const sum = linked.reduce(
+                              (acc, e) => acc + (e.amount_base || e.amount || 0),
+                              0
+                            );
+                            facts.push(
+                              formatMoney(sum, linked[0].base_currency || "CHF")
+                            );
+                          }
+                          if (facts.length === 0 && event.ai_image_url) {
+                            return (
+                              <AiImagePreview
+                                src={event.ai_image_url}
+                                alt=""
+                                brand="travel"
+                                imageClassName="h-12 w-12 object-cover sm:h-14 sm:w-14"
+                                onOpen={() =>
+                                  setAiZoom({
+                                    url: event.ai_image_url!,
+                                    title: event.title,
+                                    eventId: event.id,
+                                  })
+                                }
+                              />
+                            );
+                          }
+                          if (facts.length === 0) return null;
+                          return (
+                            <div className="flex min-w-[7.5rem] flex-col items-end gap-0.5 text-right text-xs font-semibold tabular-nums text-foreground/85 sm:min-w-[9rem] sm:text-sm">
+                              {facts.map((f) => (
+                                <span key={f} className="leading-snug">
+                                  {f}
+                                </span>
+                              ))}
+                              {event.ai_image_url ? (
+                                <AiImagePreview
+                                  src={event.ai_image_url}
+                                  alt=""
+                                  brand="travel"
+                                  imageClassName="mt-1 h-10 w-10 object-cover"
+                                  onOpen={() =>
+                                    setAiZoom({
+                                      url: event.ai_image_url!,
+                                      title: event.title,
+                                      eventId: event.id,
+                                    })
+                                  }
+                                />
+                              ) : null}
+                            </div>
+                          );
+                        })()}
                       {/* Desktop edit actions — mobile uses bottom bar */}
                       {editMode ? (
                         <div className="hidden shrink-0 flex-col items-center gap-0.5 md:flex">
@@ -3229,6 +3434,7 @@ function TripDetailInner({
                           />
                         </div>
                       ) : null}
+                      </div>
                     </div>
                     {editMode ? (
                       <button

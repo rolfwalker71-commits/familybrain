@@ -78,7 +78,11 @@ import {
   parseFinanceLedgerTab,
   type FinanceLedgerTab,
   type FinanceTabItem,
+  type AppTabOverflowItem,
 } from "@/components/finance-brain/finance-tab-nav";
+import {
+  StatusStrip,
+} from "@/components/layout/status-strip";
 import { COMMON_CURRENCIES, LEDGER_KIND_LABELS } from "@/lib/finance-brain/constants";
 import { formatMoney, formatSignedMoney } from "@/lib/finance-brain/format";
 import { confirmSettlementAmount } from "@/lib/finance-brain/settlement-confirm";
@@ -1332,19 +1336,52 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
   });
   const tabItems: FinanceTabItem[] = isSplit
     ? [
-        { id: "overview", label: "Übersicht", icon: LayoutDashboard },
-        { id: "payments", label: "Zahlungsinfos", icon: Scale },
-        { id: "new", label: "Neu", icon: Plus, emphasize: true },
         { id: "expenses", label: "Ausgaben", icon: List },
+        { id: "overview", label: "Übersicht", icon: LayoutDashboard },
         { id: "settle", label: "Ausgleich", icon: ArrowLeftRight },
-        { id: "more", label: "Mehr", icon: MoreHorizontal },
+        { id: "new", label: "Neu", icon: Plus, emphasize: true },
       ]
     : [
+        { id: "expenses", label: "Buchungen", icon: List },
         { id: "overview", label: "Übersicht", icon: LayoutDashboard },
         { id: "new", label: "Neu", icon: Plus, emphasize: true },
-        { id: "expenses", label: "Buchungen", icon: List },
-        { id: "more", label: "Mehr", icon: MoreHorizontal },
       ];
+  const overflowItems: AppTabOverflowItem[] = [
+    ...(isSplit
+      ? [
+          {
+            id: "payments",
+            label: "Zahlungsinfos",
+            icon: Scale,
+            onSelect: () => setTab("payments"),
+            active: activeTab === "payments",
+          } satisfies AppTabOverflowItem,
+        ]
+      : []),
+    {
+      id: "more",
+      label: "Einstellungen",
+      icon: MoreHorizontal,
+      onSelect: () => setTab("more"),
+      active: activeTab === "more",
+    },
+  ];
+  const statusPrimary =
+    isNormal
+      ? cashbook
+        ? `Saldo ${formatSignedMoney(cashbook.netBase, ledger.base_currency)}`
+        : `${expenses.length} Buchungen`
+      : minimalDebts.length === 0
+        ? "Alles ausgeglichen"
+        : `${minimalDebts[0].fromDisplayName} → ${minimalDebts[0].toDisplayName}: ${formatMoney(minimalDebts[0].amount, ledger.base_currency)}`;
+  const statusSecondary =
+    !isNormal && minimalDebts.length > 1
+      ? `${minimalDebts.length} minimale Transfers`
+      : !isNormal && minimalDebts.length === 1
+        ? "1 minimale Transfer"
+        : isNormal && cashbook
+          ? `${expenses.length} Buchungen`
+          : undefined;
   const hasImport =
     importDocs.tripDocuments.length > 0 ||
     importDocs.paperlessItems.length > 0;
@@ -1427,6 +1464,17 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
         ) : null}
       </div>
 
+      <StatusStrip
+        accent="finance"
+        primary={
+          <span>
+            <span className="font-semibold">Status: </span>
+            {statusPrimary}
+          </span>
+        }
+        secondary={statusSecondary}
+      />
+
       {activeTab === "expenses" ? null : (
         <div
           data-sticky-detail-chrome
@@ -1435,7 +1483,12 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
             "space-y-2 py-2"
           )}
         >
-          <FinanceTabNav items={tabItems} active={activeTab} onChange={setTab} />
+          <FinanceTabNav
+            items={tabItems}
+            active={activeTab}
+            onChange={setTab}
+            overflowItems={overflowItems}
+          />
         </div>
       )}
 
@@ -1808,6 +1861,7 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
                     items={tabItems}
                     active={activeTab}
                     onChange={setTab}
+                    overflowItems={overflowItems}
                   />
                   {chrome}
                 </div>
@@ -1834,6 +1888,7 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
                   items={tabItems}
                   active={activeTab}
                   onChange={setTab}
+                  overflowItems={overflowItems}
                 />
                 {chrome}
               </div>

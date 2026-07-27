@@ -1018,27 +1018,38 @@ function ExpenseCard({
             </p>
           </div>
 
-          <div className="flex shrink-0 flex-col items-end gap-1.5">
-            {exp.ai_image_url ? (
-              <AiImagePreview
-                src={exp.ai_image_url}
-                brand="finance"
-                onOpen={() => setZoomOpen(true)}
-              />
-            ) : aiImageBusy ? (
-              <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-dashed border-[var(--brand-finance)]/35 bg-[var(--brand-finance-soft)] text-[10px] font-medium text-[var(--brand-finance)] sm:h-14 sm:w-14">
-                KI…
-              </div>
-            ) : null}
+          <div className="flex shrink-0 flex-col items-end gap-1">
             <p
               className={cn(
-                "text-right text-sm font-bold tabular-nums",
+                "text-right text-base font-bold tabular-nums sm:text-lg",
                 isIncome ? "text-[var(--brand-finance)]" : "text-foreground"
               )}
             >
               {isIncome ? "+" : ""}
               {formatMoney(exp.amount_base, baseCurrency)}
             </p>
+            <div className="flex flex-wrap items-center justify-end gap-1">
+              {exp.document || exp.document_id ? (
+                <Badge
+                  variant="outline"
+                  className="h-5 gap-1 px-1.5 text-[10px] font-semibold"
+                >
+                  <Link2 className="size-3" />
+                  1 Beleg
+                </Badge>
+              ) : null}
+              {exp.ai_image_url ? (
+                <AiImagePreview
+                  src={exp.ai_image_url}
+                  brand="finance"
+                  onOpen={() => setZoomOpen(true)}
+                />
+              ) : aiImageBusy ? (
+                <div className="flex h-8 w-8 items-center justify-center rounded-md border border-dashed border-[var(--brand-finance)]/35 bg-[var(--brand-finance-soft)] text-[9px] font-medium text-[var(--brand-finance)]">
+                  KI…
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
 

@@ -1,8 +1,15 @@
 "use client";
 
 import type { LucideIcon } from "lucide-react";
+import { MoreHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { IconTone } from "@/components/layout/icon-circle";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export type AppTabItem<T extends string = string> = {
   id: T;
@@ -10,6 +17,16 @@ export type AppTabItem<T extends string = string> = {
   icon: LucideIcon;
   /** Emphasize this tab as a primary action (e.g. Neu). */
   emphasize?: boolean;
+};
+
+/** Overflow / secondary actions behind «…» (desktop + PWA bottom bar). */
+export type AppTabOverflowItem = {
+  id: string;
+  label: string;
+  icon: LucideIcon;
+  onSelect: () => void;
+  /** Highlight «…» when this secondary surface is active. */
+  active?: boolean;
 };
 
 const accentActive: Record<IconTone | "primary", string> = {
@@ -24,20 +41,6 @@ const accentActive: Record<IconTone | "primary", string> = {
   sky: "text-sky-600",
   indigo: "text-indigo-600",
   violet: "text-violet-600",
-};
-
-const accentPill: Record<IconTone | "primary", string> = {
-  primary: "bg-primary/12",
-  teal: "bg-[var(--brand-docs-soft)]",
-  green: "bg-[var(--brand-finance-soft)]",
-  slate: "bg-[var(--brand-settings-soft)]",
-  blue: "bg-blue-50",
-  amber: "bg-amber-50",
-  rose: "bg-rose-50",
-  orange: "bg-orange-50",
-  sky: "bg-sky-50",
-  indigo: "bg-indigo-50",
-  violet: "bg-violet-50",
 };
 
 const accentSolid: Record<IconTone | "primary", string> = {
@@ -61,6 +64,7 @@ export function AppTabNav<T extends string>({
   className,
   alwaysBottom = false,
   accent = "primary",
+  overflowItems,
 }: {
   items: AppTabItem<T>[];
   active: T;
@@ -70,10 +74,84 @@ export function AppTabNav<T extends string>({
   alwaysBottom?: boolean;
   /** Domain accent for the active soft-pill. */
   accent?: IconTone | "primary";
+  /** Secondary actions in «…» — keep primary row ≤4 for PWA thumb reach. */
+  overflowItems?: AppTabOverflowItem[];
 }) {
   const activeText = accentActive[accent];
-  const activePill = accentPill[accent];
   const solid = accentSolid[accent];
+  const hasOverflow = Boolean(overflowItems && overflowItems.length > 0);
+  const overflowActive = Boolean(overflowItems?.some((o) => o.active));
+
+  function renderOverflowTrigger(variant: "desktop" | "mobile") {
+    if (!hasOverflow || !overflowItems) return null;
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={
+            <button
+              type="button"
+              className={
+                variant === "desktop"
+                  ? cn(
+                      "inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium transition-colors",
+                      overflowActive
+                        ? cn("bg-card shadow-sm", activeText)
+                        : "text-muted-foreground hover:text-foreground"
+                    )
+                  : cn(
+                      "flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-xl px-1 py-1 text-[10px] font-bold tracking-tight transition-colors",
+                      overflowActive ? "text-foreground" : "text-foreground/55"
+                    )
+              }
+              aria-label="Weitere Aktionen"
+            />
+          }
+        >
+          {variant === "desktop" ? (
+            <>
+              <MoreHorizontal className="size-4 shrink-0" />
+              …
+            </>
+          ) : (
+            <>
+              <span
+                className={cn(
+                  "flex size-9 items-center justify-center rounded-lg transition-colors",
+                  overflowActive && "bg-foreground/8"
+                )}
+              >
+                <MoreHorizontal
+                  className="size-5 stroke-[2.75] text-foreground"
+                  absoluteStrokeWidth
+                />
+              </span>
+              <span className="truncate">…</span>
+            </>
+          )}
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align="end"
+          side={variant === "mobile" ? "top" : "bottom"}
+          sideOffset={variant === "mobile" ? 10 : 4}
+          className="min-w-48"
+        >
+          {overflowItems.map((item) => {
+            const Icon = item.icon;
+            return (
+              <DropdownMenuItem
+                key={item.id}
+                onClick={() => item.onSelect()}
+                className={cn(item.active && activeText)}
+              >
+                <Icon className="size-4" />
+                {item.label}
+              </DropdownMenuItem>
+            );
+          })}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  }
 
   return (
     <>
@@ -105,6 +183,7 @@ export function AppTabNav<T extends string>({
             </button>
           );
         })}
+        {renderOverflowTrigger("desktop")}
       </div>
 
       <nav
@@ -147,9 +226,7 @@ export function AppTabNav<T extends string>({
                     <Icon
                       className={cn(
                         "size-5 stroke-[2.75]",
-                        isEmphasize
-                          ? "text-inherit"
-                          : "text-foreground"
+                        isEmphasize ? "text-inherit" : "text-foreground"
                       )}
                       absoluteStrokeWidth
                     />
@@ -158,6 +235,7 @@ export function AppTabNav<T extends string>({
                 </button>
               );
             })}
+            {renderOverflowTrigger("mobile")}
           </div>
         </div>
       </nav>

@@ -758,11 +758,19 @@ function FinanceShareInner({ token }: { token: string }) {
     isSplit: true,
   });
   const tabItems: FinanceTabItem[] = [
-    { id: "overview", label: "Übersicht", icon: LayoutDashboard },
-    { id: "payments", label: "Zahlungsinfos", icon: Scale },
-    { id: "new", label: "Neu", icon: Plus, emphasize: true },
     { id: "expenses", label: "Ausgaben", icon: List },
+    { id: "overview", label: "Übersicht", icon: LayoutDashboard },
     { id: "settle", label: "Ausgleich", icon: ArrowLeftRight },
+    { id: "new", label: "Neu", icon: Plus, emphasize: true },
+  ];
+  const overflowItems = [
+    {
+      id: "payments",
+      label: "Zahlungsinfos",
+      icon: Scale,
+      onSelect: () => setTab("payments"),
+      active: activeTab === "payments",
+    },
   ];
 
   return (
@@ -785,6 +793,7 @@ function FinanceShareInner({ token }: { token: string }) {
         active={activeTab}
         onChange={setTab}
         alwaysBottom
+        overflowItems={overflowItems}
       />
 
       <Button

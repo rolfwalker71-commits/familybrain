@@ -1,7 +1,11 @@
 "use client";
 
 import type { LucideIcon } from "lucide-react";
-import { AppTabNav, type AppTabItem } from "@/components/layout/app-tab-nav";
+import {
+  AppTabNav,
+  type AppTabItem,
+  type AppTabOverflowItem,
+} from "@/components/layout/app-tab-nav";
 
 export type FinanceLedgerTab =
   | "overview"
@@ -34,12 +38,14 @@ export function FinanceTabNav({
   onChange,
   className,
   alwaysBottom,
+  overflowItems,
 }: {
   items: FinanceTabItem[];
   active: FinanceLedgerTab;
   onChange: (tab: FinanceLedgerTab) => void;
   className?: string;
   alwaysBottom?: boolean;
+  overflowItems?: AppTabOverflowItem[];
 }) {
   return (
     <AppTabNav
@@ -49,9 +55,10 @@ export function FinanceTabNav({
       className={className}
       alwaysBottom={alwaysBottom}
       accent="green"
+      overflowItems={overflowItems}
     />
   );
 }
 
 // Re-export for convenience
-export type { LucideIcon };
+export type { LucideIcon, AppTabOverflowItem };
