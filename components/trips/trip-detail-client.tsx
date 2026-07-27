@@ -83,6 +83,7 @@ import {
 import { CalendarDateBadge } from "@/components/layout/calendar-date-badge";
 import {
   DateTimelineStrip,
+  scrollToDateAnchor,
   stickyDetailChromeClass,
   stickyStripClass,
   uniqueSortedIsoDates,
@@ -884,7 +885,8 @@ function TripDetailInner({
   }, [tripId, readOnly, events.length]);
 
   const nextEventStatus = useMemo(() => {
-    const today = new Date();
+    const now = new Date();
+    const today = new Date(now);
     today.setHours(0, 0, 0, 0);
     const upcoming = events
       .map((e) => ({
@@ -892,31 +894,110 @@ function TripDetailInner({
         iso: parseEventIsoDate(e.start_date),
       }))
       .filter((x): x is { event: TripEvent; iso: string } => Boolean(x.iso))
-      .sort((a, b) => a.iso.localeCompare(b.iso));
+      .sort((a, b) => {
+        const c = a.iso.localeCompare(b.iso);
+        if (c !== 0) return c;
+        return (toTimeInputValue(a.event.start_time) || "").localeCompare(
+          toTimeInputValue(b.event.start_time) || ""
+        );
+      });
+
+    const eventStartMs = (iso: string, e: TripEvent) => {
+      const [y, m, d] = iso.split("-").map(Number);
+      const t = toTimeInputValue(e.start_time);
+      const [hh, mm] = t ? t.split(":").map(Number) : [0, 0];
+      return new Date(y, m - 1, d, hh || 0, mm || 0).getTime();
+    };
+
+    // Prefer the soonest not-yet-finished event (same day: by time).
     const next =
       upcoming.find((x) => {
-        const [y, m, d] = x.iso.split("-").map(Number);
-        const dt = new Date(y, m - 1, d);
-        return dt.getTime() >= today.getTime();
+        const start = eventStartMs(x.iso, x.event);
+        const endIso = parseEventIsoDate(x.event.end_date) || x.iso;
+        const endT = toTimeInputValue(x.event.end_time);
+        const [ey, em, ed] = endIso.split("-").map(Number);
+        const [eh, emin] = endT
+          ? endT.split(":").map(Number)
+          : [23, 59];
+        const end = new Date(ey, em - 1, ed, eh || 23, emin || 59).getTime();
+        return end >= now.getTime() || start >= today.getTime();
       }) ?? upcoming[upcoming.length - 1];
+
     if (!next) return null;
     const days = daysUntilIso(next.iso);
-    const when = formatCountdownDe(days);
+    let when = formatCountdownDe(days);
+    const startMs = eventStartMs(next.iso, next.event);
+    const minsUntil = Math.round((startMs - now.getTime()) / 60_000);
+    if (days === 0) {
+      if (minsUntil <= 0 && minsUntil > -180) when = "läuft jetzt";
+      else if (minsUntil > 0 && minsUntil < 60) when = `in ${minsUntil} Min.`;
+      else if (minsUntil >= 60 && minsUntil < 24 * 60) {
+        when = `heute · in ${Math.round(minsUntil / 60)} Std.`;
+      } else if (minsUntil <= -180) when = "heute";
+    }
+
+    const type = coerceTripEventType(next.event.event_type);
+    const dual = isDualPlaceType(type);
+    const places = splitTransferPlaces(next.event);
+    const placeHint =
+      type === "Flug" &&
+      (next.event.departure_airport || next.event.arrival_airport)
+        ? `${next.event.departure_airport || "—"} → ${next.event.arrival_airport || "—"}`
+        : dual && (places.origin || places.destination)
+          ? [places.origin, places.destination].filter(Boolean).join(" → ")
+          : next.event.place_name ||
+            (next.event.location &&
+            !textsOverlap(next.event.location, next.event.title)
+              ? next.event.location
+              : null);
+
+    const facts = [
+      type,
+      next.event.flight_number || null,
+      placeHint,
+      toTimeInputValue(next.event.start_time) || null,
+      when,
+    ].filter(Boolean) as string[];
+
     return {
+      eventId: next.event.id,
+      iso: next.iso,
       title: next.event.title,
+      type,
+      facts,
       when,
       time: toTimeInputValue(next.event.start_time) || null,
+      placeHint,
+      flightNumber: next.event.flight_number || null,
     };
   }, [events]);
 
   const weatherPoint = useMemo(() => {
     for (const e of events) {
-      if (e.lat != null && e.lon != null) return { lat: e.lat, lon: e.lon };
+      const label =
+        e.place_name ||
+        e.arrival_airport ||
+        e.destination_place ||
+        e.departure_airport ||
+        e.origin_place ||
+        (e.location && !textsOverlap(e.location, e.title) ? e.location : null) ||
+        e.title;
+      if (e.lat != null && e.lon != null) {
+        return { lat: e.lat, lon: e.lon, label };
+      }
       if (e.arrival_lat != null && e.arrival_lon != null) {
-        return { lat: e.arrival_lat, lon: e.arrival_lon };
+        return {
+          lat: e.arrival_lat,
+          lon: e.arrival_lon,
+          label: e.arrival_airport || e.destination_place || label,
+        };
       }
       if (e.departure_lat != null && e.departure_lon != null) {
-        return { lat: e.departure_lat, lon: e.departure_lon };
+        return {
+          lat: e.departure_lat,
+          lon: e.departure_lon,
+          label: e.departure_airport || e.origin_place || label,
+        };
       }
     }
     return null;
@@ -947,15 +1028,36 @@ function TripDetailInner({
       events.map((e) => coerceTripEventType(e.event_type))
     );
     const missing: string[] = [];
-    if (!types.has("Flug") && !types.has("Zugreisen")) missing.push("Transport");
-    if (!types.has("Hotel") && !types.has("Unterkunft") && !types.has("Kreuzfahrt")) {
+    // Only essential trip building blocks — not "Ausflug/Aktivität" (too noisy).
+    if (
+      events.length > 0 &&
+      !types.has("Flug") &&
+      !types.has("Zugreisen") &&
+      !types.has("Transfer") &&
+      !types.has("Mietauto")
+    ) {
+      missing.push("Transport");
+    }
+    if (
+      events.length > 0 &&
+      !types.has("Hotel") &&
+      !types.has("Unterkunft") &&
+      !types.has("Kreuzfahrt")
+    ) {
       missing.push("Unterkunft");
     }
-    if (!types.has("Ausflug") && events.length > 0) missing.push("Aktivität");
-    const hasDocs = events.some(
-      (e) => (e.documents?.length || 0) + (e.attachments?.length || 0) > 0
-    );
-    if (!hasDocs && events.length > 0) missing.push("Belege");
+    const bookable = events.filter((e) => {
+      const t = coerceTripEventType(e.event_type);
+      return t === "Flug" || t === "Hotel" || t === "Unterkunft" || t === "Kreuzfahrt";
+    });
+    if (
+      bookable.length > 0 &&
+      !bookable.some(
+        (e) => (e.documents?.length || 0) + (e.attachments?.length || 0) > 0
+      )
+    ) {
+      missing.push("Belege");
+    }
     return missing;
   }, [events]);
 
@@ -1983,17 +2085,41 @@ function TripDetailInner({
           accent="travel"
           primary={
             nextEventStatus ? (
-              <span>
-                <span className="font-semibold">Nächster Termin: </span>
-                {nextEventStatus.title}
-                {nextEventStatus.time ? ` · ${nextEventStatus.time}` : ""}
-                {nextEventStatus.when ? (
-                  <span className="text-current/70">
-                    {" "}
-                    · {nextEventStatus.when}
-                  </span>
-                ) : null}
-              </span>
+              <button
+                type="button"
+                className="w-full text-left"
+                onClick={() => {
+                  const el = document.querySelector<HTMLElement>(
+                    `[data-event-id="${nextEventStatus.eventId}"]`
+                  );
+                  if (el) {
+                    el.scrollIntoView({ behavior: "smooth", block: "start" });
+                    return;
+                  }
+                  scrollToDateAnchor(`event-day-${nextEventStatus.iso}`);
+                }}
+              >
+                <span className="font-semibold">
+                  {nextEventStatus.when === "läuft jetzt"
+                    ? "Jetzt: "
+                    : "Nächster Termin: "}
+                </span>
+                <span className="font-medium">{nextEventStatus.title}</span>
+                <span className="mt-0.5 block text-[11px] font-normal text-current/75 sm:mt-0 sm:inline sm:before:content-['_|_']">
+                  {[
+                    nextEventStatus.type,
+                    nextEventStatus.flightNumber,
+                    nextEventStatus.placeHint &&
+                    nextEventStatus.placeHint !== nextEventStatus.title
+                      ? nextEventStatus.placeHint
+                      : null,
+                    nextEventStatus.time,
+                    nextEventStatus.when,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </span>
+              </button>
             ) : (
               <span className="text-current/70">Noch keine Termine</span>
             )
@@ -2018,15 +2144,17 @@ function TripDetailInner({
       {(weather || missingChecklist.length > 0) &&
       (activeTab === "ablauf" || readOnly) ? (
         <SoftChipRow>
-          {weather ? (
+          {weather && weatherPoint ? (
             <SoftChip className="border-sky-500/25 bg-sky-50 text-sky-900">
               <span aria-hidden>{weatherConditionIcon(weather.weatherCode)}</span>
+              <span className="font-semibold">{weatherPoint.label}</span>
+              <span className="opacity-70">·</span>
               {Math.round(weather.temperatureC)} °C · {weather.weatherLabelDe}
             </SoftChip>
           ) : null}
           {missingChecklist.length > 0 ? (
-            <SoftChip>
-              Was fehlt: {missingChecklist.join(" · ")}
+            <SoftChip title="Optionale Hinweise zu noch fehlenden Bausteinen der Reise">
+              Noch offen: {missingChecklist.join(" · ")}
             </SoftChip>
           ) : null}
         </SoftChipRow>
@@ -3094,6 +3222,7 @@ function TripDetailInner({
                 <div
                   key={event.id}
                   id={dayAnchorId}
+                  data-event-id={event.id}
                   className={cn(
                     "relative pt-3 pl-2",
                     dayAnchorClass,
@@ -3357,6 +3486,7 @@ function TripDetailInner({
               <div
                 key={event.id}
                 id={dayAnchorId}
+                data-event-id={event.id}
                 className={cn(
                   "relative pt-3 pl-2",
                   dayAnchorClass,
