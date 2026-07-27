@@ -28,14 +28,18 @@ function dayLabel(iso: string): { month: string; day: string; weekday: string } 
   };
 }
 
-export function uniqueSortedIsoDates(isos: Array<string | null | undefined>): string[] {
+export function uniqueSortedIsoDates(
+  isos: Array<string | null | undefined>,
+  order: "asc" | "desc" = "asc"
+): string[] {
   const set = new Set<string>();
   for (const raw of isos) {
     if (!raw) continue;
     const m = String(raw).trim().match(/^(\d{4}-\d{2}-\d{2})/);
     if (m) set.add(m[1]);
   }
-  return [...set].sort();
+  const sorted = [...set].sort();
+  return order === "desc" ? sorted.reverse() : sorted;
 }
 
 export function scrollToDateAnchor(anchorId: string) {

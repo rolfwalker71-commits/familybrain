@@ -2938,17 +2938,23 @@ function TripDetailInner({
                                   disabled: busy,
                                   onClick: () => setLinkDocsEventId(event.id),
                                 },
+                                {
+                                  label: "KI-Bild",
+                                  icon: ImagePlus,
+                                  disabled:
+                                    busy ||
+                                    aiImageBusy ||
+                                    aiBatch != null,
+                                  onClick: () => openAiImageDialog(event),
+                                },
                                 ...(editMode
                                   ? [
                                       {
-                                        label: "KI-Bild",
-                                        icon: ImagePlus,
-                                        disabled:
-                                          busy ||
-                                          aiImageBusy ||
-                                          aiBatch != null,
+                                        label: "Löschen",
+                                        icon: Trash2,
+                                        variant: "destructive" as const,
                                         onClick: () =>
-                                          openAiImageDialog(event),
+                                          void removeEvent(event.id),
                                       },
                                     ]
                                   : []),
@@ -3098,6 +3104,13 @@ function TripDetailInner({
                                     disabled: busy,
                                     onClick: () =>
                                       setLinkDocsEventId(event.id),
+                                  },
+                                  {
+                                    label: "KI-Bild",
+                                    icon: ImagePlus,
+                                    disabled:
+                                      busy || aiImageBusy || aiBatch != null,
+                                    onClick: () => openAiImageDialog(event),
                                   },
                                 ]}
                               />

@@ -1815,7 +1815,11 @@ export function ExpenseList({
     (settledFilter !== "__show__" ? 1 : 0);
 
   const expenseDayDates = useMemo(
-    () => uniqueSortedIsoDates(filteredExpenses.map((e) => e.expense_date)),
+    () =>
+      uniqueSortedIsoDates(
+        filteredExpenses.map((e) => e.expense_date),
+        "desc"
+      ),
     [filteredExpenses]
   );
 

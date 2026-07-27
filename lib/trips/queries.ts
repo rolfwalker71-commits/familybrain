@@ -230,10 +230,12 @@ export function listTripEvents(tripId: number): TripEventRow[] {
 }
 
 function ensureTripEventDataMigrations(): void {
-  if (getSetting("trip_events_order_v1") === "1") return;
+  // v2: re-run chronological sort after create used to append by max(sort_key).
+  if (getSetting("trip_events_order_v2") === "1") return;
   migrateCruisePortEventTypes();
   resequenceAllTripEventsByDate();
   setSetting("trip_events_order_v1", "1");
+  setSetting("trip_events_order_v2", "1");
 }
 
 export function reorderTripEvents(
@@ -264,33 +266,39 @@ export function reorderTripEvents(
   return listTripEvents(tripId);
 }
 
+/** Order one trip's events chronologically into sort_key gaps. */
+export function resequenceTripEventsByDate(tripId: number): void {
+  const db = getDb();
+  const update = db.prepare(
+    `UPDATE trip_events SET sort_key = ? WHERE id = ?`
+  );
+  const rows = db
+    .prepare(
+      `SELECT id FROM trip_events
+       WHERE trip_id = ?
+       ORDER BY
+         CASE WHEN start_date IS NULL OR start_date = '' THEN 1 ELSE 0 END,
+         start_date ASC,
+         COALESCE(start_time, '99:99') ASC,
+         sort_key ASC,
+         id ASC`
+    )
+    .all(tripId) as Array<{ id: number }>;
+  const tx = db.transaction(() => {
+    rows.forEach((row, index) => {
+      update.run((index + 1) * 10, row.id);
+    });
+  });
+  tx();
+}
+
 /** One-time: order events chronologically into sort_key gaps. */
 export function resequenceAllTripEventsByDate(): void {
   const db = getDb();
   const trips = db.prepare(`SELECT id FROM trips`).all() as Array<{ id: number }>;
-  const update = db.prepare(
-    `UPDATE trip_events SET sort_key = ? WHERE id = ?`
-  );
-  const tx = db.transaction(() => {
-    for (const trip of trips) {
-      const rows = db
-        .prepare(
-          `SELECT id FROM trip_events
-           WHERE trip_id = ?
-           ORDER BY
-             CASE WHEN start_date IS NULL OR start_date = '' THEN 1 ELSE 0 END,
-             start_date ASC,
-             COALESCE(start_time, '99:99') ASC,
-             sort_key ASC,
-             id ASC`
-        )
-        .all(trip.id) as Array<{ id: number }>;
-      rows.forEach((row, index) => {
-        update.run((index + 1) * 10, row.id);
-      });
-    }
-  });
-  tx();
+  for (const trip of trips) {
+    resequenceTripEventsByDate(trip.id);
+  }
 }
 
 /** Ports of call were previously stored as Aktivität — promote to Kreuzfahrt. */
@@ -494,6 +502,10 @@ export function createTripEvent(
   const docId = input.documentId ?? null;
   if (docId != null && docId > 0) {
     linkTripEventDocument(event.id, docId);
+  }
+  // Keep timeline chronological unless an explicit sortKey was provided.
+  if (input.sortKey === undefined) {
+    resequenceTripEventsByDate(tripId);
   }
   syncTripDatesFromEvents(tripId);
   return getTripEventById(event.id) ?? event;
@@ -707,8 +719,20 @@ export function updateTripEvent(
 
   const event = getTripEventById(eventId);
   if (!event) throw new Error("Ereignis nicht gefunden");
+
+  const dateOrTimeChanged =
+    (input.startDate !== undefined &&
+      (input.startDate || null) !== (existing.start_date || null)) ||
+    (input.startTime !== undefined &&
+      (input.startTime || null) !== (existing.start_time || null));
+
+  // Re-slot when date/time changes; skip when caller only moved sort_key.
+  if (input.sortKey === undefined && dateOrTimeChanged) {
+    resequenceTripEventsByDate(event.trip_id);
+  }
+
   syncTripDatesFromEvents(event.trip_id);
-  return event;
+  return getTripEventById(eventId) ?? event;
 }
 
 export function deleteTripEvent(eventId: number): void {
