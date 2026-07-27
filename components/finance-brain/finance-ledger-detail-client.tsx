@@ -48,7 +48,10 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { PageHeader } from "@/components/layout/page-primitives";
-import { stickyDetailChromeClass } from "@/components/layout/date-timeline-strip";
+import {
+  stickyDetailChromeClass,
+  stickyStripClass,
+} from "@/components/layout/date-timeline-strip";
 import { pageVisuals } from "@/components/layout/icon-circle";
 import { useIsStandalonePwa } from "@/hooks/use-standalone-pwa";
 import {
@@ -1797,22 +1800,45 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
           mailBusyId={mailBusyId}
           editBusyId={editBusyId}
           coupleSettleBusyId={coupleSettleBusyId}
-          renderStickyChrome={(chrome) => (
-            <div
-              data-sticky-detail-chrome
-              className={cn(
-                stickyDetailChromeClass(!isPwa),
-                "-mx-1 space-y-2 px-1 py-2"
-              )}
-            >
-              <FinanceTabNav
-                items={tabItems}
-                active={activeTab}
-                onChange={setTab}
-              />
-              {chrome}
-            </div>
-          )}
+          renderStickyChrome={(chrome, strip) =>
+            isPwa ? (
+              <>
+                <div className="-mx-1 space-y-2 px-1 py-2">
+                  <FinanceTabNav
+                    items={tabItems}
+                    active={activeTab}
+                    onChange={setTab}
+                  />
+                  {chrome}
+                </div>
+                {strip ? (
+                  <div
+                    className={cn(
+                      stickyStripClass({ belowMobileHeader: true }),
+                      "-mx-1 px-1"
+                    )}
+                  >
+                    {strip}
+                  </div>
+                ) : null}
+              </>
+            ) : (
+              <div
+                data-sticky-detail-chrome
+                className={cn(
+                  stickyDetailChromeClass(true),
+                  "-mx-1 space-y-2 px-1 py-2"
+                )}
+              >
+                <FinanceTabNav
+                  items={tabItems}
+                  active={activeTab}
+                  onChange={setTab}
+                />
+                {chrome}
+              </div>
+            )
+          }
         />
       ) : null}
 

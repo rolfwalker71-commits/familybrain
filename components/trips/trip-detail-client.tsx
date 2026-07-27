@@ -83,6 +83,7 @@ import { CalendarDateBadge } from "@/components/layout/calendar-date-badge";
 import {
   DateTimelineStrip,
   stickyDetailChromeClass,
+  stickyStripClass,
   uniqueSortedIsoDates,
 } from "@/components/layout/date-timeline-strip";
 import { useIsStandalonePwa } from "@/hooks/use-standalone-pwa";
@@ -2683,13 +2684,25 @@ function TripDetailInner({
               </Button>
             </div>
           </div>
-          <DateTimelineStrip
-            dates={eventDayDates}
-            anchorIdForDate={eventDayAnchorId}
-            activeDate={activeEventDay}
-            accent="travel"
-          />
         </div>
+        {eventDayDates.length > 0 ? (
+          <div
+            className={cn(
+              stickyStripClass({
+                belowMobileHeader: stickyBelowHeader,
+                belowChrome: stickyEnabled,
+              }),
+              "py-1"
+            )}
+          >
+            <DateTimelineStrip
+              dates={eventDayDates}
+              anchorIdForDate={eventDayAnchorId}
+              activeDate={activeEventDay}
+              accent="travel"
+            />
+          </div>
+        ) : null}
         {editMode ? (
           <p className="text-xs text-muted-foreground">
             Reihenfolge per ▲/▼ oder am Griff ziehen (Desktop).

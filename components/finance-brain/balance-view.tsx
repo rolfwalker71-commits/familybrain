@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useCallback, type ReactNode } from "react";
+import { useMemo, useRef, useState, useCallback, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   ArrowLeftRight,
@@ -19,7 +19,6 @@ import {
   RefreshCw,
   Scale,
   Search,
-  Sparkles,
   Trash2,
   Unlink,
   Users,
@@ -85,6 +84,7 @@ import {
 import {
   DateTimelineStrip,
   uniqueSortedIsoDates,
+  stickyStripClass,
 } from "@/components/layout/date-timeline-strip";
 import { useIsStandalonePwa } from "@/hooks/use-standalone-pwa";
 import { useActiveDateFromScroll } from "@/hooks/use-active-date-from-scroll";
@@ -278,6 +278,9 @@ export function BalanceView({
   recordBusyKey?: string | null;
 }) {
   const [minExplainOpen, setMinExplainOpen] = useState(false);
+  const [extraPanel, setExtraPanel] = useState<
+    "payer" | "couples" | "coupleTransfers" | null
+  >(null);
 
   function debtKey(prefix: string, d: Debt, i: number) {
     return `${prefix}-${d.fromMemberId}-${d.toMemberId}-${i}`;
@@ -357,7 +360,37 @@ export function BalanceView({
 
   return (
     <>
-    <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
+    <div className="mb-3 flex justify-end">
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={<Button variant="outline" size="sm" className="gap-1.5" />}
+        >
+          <MoreHorizontal className="size-4" />
+          Mehr Auswertungen
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuItem onClick={() => setExtraPanel("payer")}>
+            <ArrowLeftRight className="size-4" />
+            Nach Zahler
+          </DropdownMenuItem>
+          {coupleBalances.length > 0 ? (
+            <DropdownMenuItem onClick={() => setExtraPanel("couples")}>
+              <Users className="size-4" />
+              Saldo je Paar
+            </DropdownMenuItem>
+          ) : null}
+          {coupleBalances.length > 0 ? (
+            <DropdownMenuItem
+              onClick={() => setExtraPanel("coupleTransfers")}
+            >
+              <ArrowLeftRight className="size-4" />
+              Ausgleich zwischen Paaren
+            </DropdownMenuItem>
+          ) : null}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+    <div className="grid gap-3 lg:grid-cols-2">
       <Card
         size="sm"
         tone="green"
@@ -430,32 +463,6 @@ export function BalanceView({
         size="sm"
         tone="green"
         className="overflow-hidden border-border/60 shadow-[0_4px_16px_rgba(20,32,28,0.05)]"
-      >
-        <CardHeader tone="green" className="py-1.5">
-          <CardTitle className="flex items-center gap-2 text-[15px]! text-amber-900">
-            <IconCircle icon={ArrowLeftRight} tone="green" size="sm" />
-            Nach Zahler
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-1.5">
-          {simplifiedDebts.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Alles ausgeglichen.</p>
-          ) : (
-            <>
-              <p className="text-[11px] leading-snug text-muted-foreground">
-                Anteil an Ausgaben des Zahlers (Rückzahlungen / Gegenforderungen
-                verrechnet).
-              </p>
-              {simplifiedDebts.map((d, i) => renderDebtRow("payer", d, i))}
-            </>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card
-        size="sm"
-        tone="green"
-        className="overflow-hidden border-border/60 shadow-[0_4px_16px_rgba(20,32,28,0.05)] lg:col-span-2 xl:col-span-1"
       >
         <CardHeader tone="green" className="py-1.5">
           <CardTitle className="flex items-center gap-2 text-[15px]! text-amber-900">
@@ -599,95 +606,153 @@ export function BalanceView({
         </CardContent>
       </Card>
 
-      {coupleBalances.length > 0 ? (
-        <Card
-          size="sm"
-          tone="green"
-          className="overflow-hidden border-border/60 shadow-[0_4px_16px_rgba(20,32,28,0.05)]"
-        >
-          <CardHeader tone="green" className="py-1.5">
-            <CardTitle className="flex items-center gap-2 text-[15px]! text-[var(--brand-finance)]">
-              <IconCircle icon={Users} tone="green" size="sm" />
-              Saldo je Paar
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-1.5">
-            <p className="text-[11px] leading-snug text-muted-foreground">
-              Summe der Personen-Salden im Paar.
-            </p>
-            {coupleBalances.map((b) => (
-              <div
-                key={b.coupleId}
-                className="flex items-center justify-between gap-2 rounded-lg border border-border/50 bg-white px-2.5 py-1.5 text-sm leading-snug"
-              >
-                <div className="min-w-0">
-                  <div className="font-medium">{b.name}</div>
-                  <div className="mt-0.5 truncate text-[10px] leading-tight text-muted-foreground">
-                    bezahlt {formatMoney(b.paidBase, baseCurrency)}
-                    {" · "}
-                    Anteil {formatMoney(b.owedBase, baseCurrency)}
-                  </div>
-                </div>
-                <span
-                  className={cn(
-                    "shrink-0 font-semibold tabular-nums",
-                    b.netBalance > 0
-                      ? "text-[var(--brand-finance)]"
-                      : b.netBalance < 0
-                        ? "text-rose-600"
-                        : "text-muted-foreground"
-                  )}
-                >
-                  {formatSignedMoney(b.netBalance, baseCurrency)}
-                </span>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      ) : null}
-
-      {coupleBalances.length > 0 ? (
-        <Card
-          size="sm"
-          tone="green"
-          className="overflow-hidden border-border/60 shadow-[0_4px_16px_rgba(20,32,28,0.05)]"
-        >
-          <CardHeader tone="green" className="py-1.5">
-            <CardTitle className="flex items-center gap-2 text-[15px]! text-amber-900">
-              <IconCircle icon={ArrowLeftRight} tone="green" size="sm" />
-              Ausgleich zwischen Paaren
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-1.5">
-            {coupleDebts.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                Paare sind ausgeglichen.
-              </p>
-            ) : (
-              <>
-                <p className="text-[11px] leading-snug text-muted-foreground">
-                  Vorschlag zwischen Paaren (Erfassen = Rückzahlung der
-                  Vertreter).
-                </p>
-                {coupleDebts.map((d, i) =>
-                  renderDebtRow(
-                    "couple",
-                    {
-                      fromMemberId: d.fromMemberId,
-                      fromDisplayName: `${d.fromCoupleName} (${d.fromDisplayName})`,
-                      toMemberId: d.toMemberId,
-                      toDisplayName: `${d.toCoupleName} (${d.toDisplayName})`,
-                      amount: d.amount,
-                    },
-                    i
-                  )
-                )}
-              </>
-            )}
-          </CardContent>
-        </Card>
-      ) : null}
     </div>
+
+      <Dialog
+        open={extraPanel !== null}
+        onOpenChange={(open) => {
+          if (!open) setExtraPanel(null);
+        }}
+      >
+        <DialogContent className="max-w-3xl p-0">
+          <DialogHeader className="px-4 pt-4">
+            <DialogTitle>
+              {extraPanel === "payer"
+                ? "Nach Zahler"
+                : extraPanel === "couples"
+                  ? "Saldo je Paar"
+                  : extraPanel === "coupleTransfers"
+                    ? "Ausgleich zwischen Paaren"
+                    : "Auswertung"}
+            </DialogTitle>
+            <DialogDescription>
+              Zusätzliche Finanz-Auswertung als Overlay.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[75vh] overflow-y-auto px-4 pb-4">
+            {extraPanel === "payer" ? (
+              <Card
+                size="sm"
+                tone="green"
+                className="overflow-hidden border-border/60 shadow-[0_4px_16px_rgba(20,32,28,0.05)]"
+              >
+                <CardHeader tone="green" className="py-1.5">
+                  <CardTitle className="flex items-center gap-2 text-[15px]! text-amber-900">
+                    <IconCircle icon={ArrowLeftRight} tone="green" size="sm" />
+                    Nach Zahler
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-1.5">
+                  {simplifiedDebts.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      Alles ausgeglichen.
+                    </p>
+                  ) : (
+                    <>
+                      <p className="text-[11px] leading-snug text-muted-foreground">
+                        Anteil an Ausgaben des Zahlers (Rückzahlungen /
+                        Gegenforderungen verrechnet).
+                      </p>
+                      {simplifiedDebts.map((d, i) =>
+                        renderDebtRow("payer-dialog", d, i)
+                      )}
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            ) : null}
+
+            {extraPanel === "couples" ? (
+              <Card
+                size="sm"
+                tone="green"
+                className="overflow-hidden border-border/60 shadow-[0_4px_16px_rgba(20,32,28,0.05)]"
+              >
+                <CardHeader tone="green" className="py-1.5">
+                  <CardTitle className="flex items-center gap-2 text-[15px]! text-[var(--brand-finance)]">
+                    <IconCircle icon={Users} tone="green" size="sm" />
+                    Saldo je Paar
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-1.5">
+                  <p className="text-[11px] leading-snug text-muted-foreground">
+                    Summe der Personen-Salden im Paar.
+                  </p>
+                  {coupleBalances.map((b) => (
+                    <div
+                      key={b.coupleId}
+                      className="flex items-center justify-between gap-2 rounded-lg border border-border/50 bg-white px-2.5 py-1.5 text-sm leading-snug"
+                    >
+                      <div className="min-w-0">
+                        <div className="font-medium">{b.name}</div>
+                        <div className="mt-0.5 truncate text-[10px] leading-tight text-muted-foreground">
+                          bezahlt {formatMoney(b.paidBase, baseCurrency)}
+                          {" · "}
+                          Anteil {formatMoney(b.owedBase, baseCurrency)}
+                        </div>
+                      </div>
+                      <span
+                        className={cn(
+                          "shrink-0 font-semibold tabular-nums",
+                          b.netBalance > 0
+                            ? "text-[var(--brand-finance)]"
+                            : b.netBalance < 0
+                              ? "text-rose-600"
+                              : "text-muted-foreground"
+                        )}
+                      >
+                        {formatSignedMoney(b.netBalance, baseCurrency)}
+                      </span>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            ) : null}
+
+            {extraPanel === "coupleTransfers" ? (
+              <Card
+                size="sm"
+                tone="green"
+                className="overflow-hidden border-border/60 shadow-[0_4px_16px_rgba(20,32,28,0.05)]"
+              >
+                <CardHeader tone="green" className="py-1.5">
+                  <CardTitle className="flex items-center gap-2 text-[15px]! text-amber-900">
+                    <IconCircle icon={ArrowLeftRight} tone="green" size="sm" />
+                    Ausgleich zwischen Paaren
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-1.5">
+                  {coupleDebts.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      Paare sind ausgeglichen.
+                    </p>
+                  ) : (
+                    <>
+                      <p className="text-[11px] leading-snug text-muted-foreground">
+                        Vorschlag zwischen Paaren (Erfassen = Rückzahlung der
+                        Vertreter).
+                      </p>
+                      {coupleDebts.map((d, i) =>
+                        renderDebtRow(
+                          "couple-dialog",
+                          {
+                            fromMemberId: d.fromMemberId,
+                            fromDisplayName: `${d.fromCoupleName} (${d.fromDisplayName})`,
+                            toMemberId: d.toMemberId,
+                            toDisplayName: `${d.toCoupleName} (${d.toDisplayName})`,
+                            amount: d.amount,
+                          },
+                          i
+                        )
+                      )}
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {expenses.length > 0 && balances.length > 0 ? (
         <div className="mt-3">
@@ -1693,13 +1758,17 @@ export function ExpenseList({
   mailBusyId?: number | null;
   editBusyId?: number | null;
   coupleSettleBusyId?: number | null;
-  /** Wrap search/filter + date strip (e.g. with tab nav) in sticky chrome. */
-  renderStickyChrome?: (chrome: ReactNode) => ReactNode;
+  /**
+   * Wrap search/filter + tab nav in sticky chrome.
+   * Second arg is the date-timeline strip which the caller may render separately
+   * (e.g. in its own always-sticky container).
+   */
+  renderStickyChrome?: (chrome: ReactNode, strip: ReactNode) => ReactNode;
 }) {
   const isPwa = useIsStandalonePwa();
   const [mobileFocusId, setMobileFocusId] = useState<number | null>(null);
   const [query, setQuery] = useState("");
-  const [toolsOpen, setToolsOpen] = useState(true);
+  const [toolsOpen, setToolsOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [payerFilter, setPayerFilter] = useState<string>("__all__");
   const [categoryFilter, setCategoryFilter] = useState<string>("__all__");
@@ -1708,10 +1777,6 @@ export function ExpenseList({
   const [settledFilter, setSettledFilter] = useState<"__show__" | "__hide__">(
     "__show__"
   );
-
-  useEffect(() => {
-    if (isPwa) setToolsOpen(false);
-  }, [isPwa]);
 
   const categoryOptions = useMemo(() => {
     const labels = new Set<string>();
@@ -2075,17 +2140,36 @@ export function ExpenseList({
           {filteredExpenses.length} von {expenses.length} · Filter anpassen
         </button>
       ) : null}
-      <DateTimelineStrip
-        dates={expenseDayDates}
-        anchorIdForDate={expenseDayAnchorId}
-        activeDate={activeExpenseDay}
-        accent="finance"
-      />
+      {renderStickyChrome ? (
+        <DateTimelineStrip
+          dates={expenseDayDates}
+          anchorIdForDate={expenseDayAnchorId}
+          activeDate={activeExpenseDay}
+          accent="finance"
+        />
+      ) : null}
     </div>
   );
 
+  const stripElement = (
+    <DateTimelineStrip
+      dates={expenseDayDates}
+      anchorIdForDate={expenseDayAnchorId}
+      activeDate={activeExpenseDay}
+      accent="finance"
+    />
+  );
+
+  // When no renderStickyChrome callback: render strip as its own sticky element.
+  const stripNode =
+    !renderStickyChrome && expenseDayDates.length > 0 ? (
+      <div className={cn(stickyStripClass({ belowMobileHeader: true }), "-mx-1 px-1")}>
+        {stripElement}
+      </div>
+    ) : null;
+
   const chromeNode = renderStickyChrome
-    ? renderStickyChrome(chromeInner)
+    ? renderStickyChrome(chromeInner, expenseDayDates.length > 0 ? stripElement : null)
     : chromeInner;
 
   let prevExpenseDay: string | null = null;
@@ -2098,6 +2182,7 @@ export function ExpenseList({
       )}
     >
       {chromeNode}
+      {stripNode}
 
       {expenses.length === 0 ? (
         <p className="text-sm text-muted-foreground">

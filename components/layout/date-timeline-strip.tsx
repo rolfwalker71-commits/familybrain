@@ -163,3 +163,37 @@ export function stickyDetailChromeClass(
       : "top-0"
   );
 }
+
+/**
+ * Always-sticky class for the date timeline strip alone (used in PWA mode
+ * where the full chrome isn't sticky but the strip should still follow scroll).
+ *
+ * - belowChrome: true  → strip sits below an already-sticky chrome element
+ *                        (adds extra offset for its approximate height ~56 px on mobile)
+ * - belowChrome: false → strip is the only sticky element, sits below MobileHeader
+ */
+export function stickyStripClass(opts?: {
+  belowMobileHeader?: boolean;
+  belowChrome?: boolean;
+}): string {
+  const belowHeader = opts?.belowMobileHeader !== false;
+  const belowChrome = opts?.belowChrome === true;
+
+  // Desktop: main scrolls → top-0 (or below chrome ~48 px)
+  const lgTop = belowChrome ? "lg:top-12" : "lg:top-0";
+
+  // Mobile: below MobileHeader (3.5 rem + safe-area), optionally + chrome (~3.5 rem)
+  const mobileTop = belowHeader
+    ? belowChrome
+      ? "top-[calc(7rem+env(safe-area-inset-top,0px))]"
+      : "top-[calc(3.5rem+env(safe-area-inset-top,0px))]"
+    : belowChrome
+      ? "top-14"
+      : "top-0";
+
+  return cn(
+    "sticky z-[19] border-b border-border/40 bg-background/95 py-1.5 backdrop-blur supports-[backdrop-filter]:bg-background/90",
+    lgTop,
+    mobileTop
+  );
+}

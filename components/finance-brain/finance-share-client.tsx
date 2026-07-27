@@ -47,7 +47,10 @@ import {
   type FinanceLedgerTab,
   type FinanceTabItem,
 } from "@/components/finance-brain/finance-tab-nav";
-import { stickyDetailChromeClass } from "@/components/layout/date-timeline-strip";
+import {
+  stickyDetailChromeClass,
+  stickyStripClass,
+} from "@/components/layout/date-timeline-strip";
 import { useIsStandalonePwa } from "@/hooks/use-standalone-pwa";
 import { COMMON_CURRENCIES } from "@/lib/finance-brain/constants";
 import { formatMoney } from "@/lib/finance-brain/format";
@@ -1038,19 +1041,33 @@ function FinanceShareInner({ token }: { token: string }) {
           mailBusyId={mailBusyId}
           editBusyId={editBusyId}
           coupleSettleBusyId={coupleSettleBusyId}
-          renderStickyChrome={(chrome) => (
-            <div
-              data-sticky-detail-chrome
-              className={cn(
-                stickyDetailChromeClass(!isPwa, {
-                  belowMobileHeader: false,
-                }),
-                "-mx-1 space-y-2 px-1 py-2"
-              )}
-            >
-              {chrome}
-            </div>
-          )}
+          renderStickyChrome={(chrome, strip) =>
+            isPwa ? (
+              <>
+                <div className="-mx-1 space-y-2 px-1 py-2">{chrome}</div>
+                {strip ? (
+                  <div
+                    className={cn(
+                      stickyStripClass({ belowMobileHeader: false }),
+                      "-mx-1 px-1"
+                    )}
+                  >
+                    {strip}
+                  </div>
+                ) : null}
+              </>
+            ) : (
+              <div
+                data-sticky-detail-chrome
+                className={cn(
+                  stickyDetailChromeClass(true, { belowMobileHeader: false }),
+                  "-mx-1 space-y-2 px-1 py-2"
+                )}
+              >
+                {chrome}
+              </div>
+            )
+          }
         />
       ) : null}
 
