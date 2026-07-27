@@ -806,7 +806,11 @@ function ExpenseCard({
   coupleSettleBusy,
 }: {
   exp: ExpenseListItem;
-  members: Array<{ id: number; display_name: string }>;
+  members: Array<{
+    id: number;
+    display_name: string;
+    avatar_url?: string | null;
+  }>;
   couples?: Array<{ id: number; name: string; memberIds: number[] }>;
   baseCurrency: string;
   cashbookMode?: boolean;
@@ -862,6 +866,8 @@ function ExpenseCard({
   const isIncome = (exp.direction || "expense") === "income";
   const memberName = (id: number) =>
     members.find((m) => m.id === id)?.display_name ?? `#${id}`;
+  const memberAvatar = (id: number) =>
+    members.find((m) => m.id === id)?.avatar_url ?? null;
   const coupleSettle = useMemo(
     () =>
       cashbookMode
@@ -970,18 +976,18 @@ function ExpenseCard({
               : undefined
           }
         >
-        {/* Soft row: type icon · title/meta + participants · amount + AI thumb */}
-        <div className="flex items-center gap-3 px-3 py-3">
+        {/* Soft row: type icon · title/meta · AI thumb · amount */}
+        <div className="flex items-center gap-3 px-3 py-3 sm:gap-4">
           <IconCircle
             icon={visual.icon}
             tone={visual.tone}
-            size="md"
-            className="shrink-0"
+            size="lg"
+            className="h-14 w-14 shrink-0 [&_svg]:h-7 [&_svg]:w-7"
           />
 
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-              <p className="min-w-0 truncate font-semibold text-foreground">
+              <p className="min-w-0 truncate text-base font-black leading-snug tracking-tight text-foreground sm:text-xl md:text-2xl">
                 {exp.description || (isIncome ? "Einnahme" : "Ausgabe")}
               </p>
               {Boolean(exp.pre_settled) ? (
@@ -1001,7 +1007,7 @@ function ExpenseCard({
                 })()
               ) : null}
             </div>
-            <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-1.5">
+            <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
               <p className="truncate text-xs text-muted-foreground">
                 {isoDate ? formatDateDe(isoDate) : "Ohne Datum"}
                 {" · "}
@@ -1013,6 +1019,7 @@ function ExpenseCard({
                     <span key={id} title={memberName(id)}>
                       <UserAvatar
                         name={memberName(id)}
+                        src={memberAvatar(id)}
                         size="xs"
                         className={cn(
                           "ring-2 ring-card",
@@ -1027,6 +1034,20 @@ function ExpenseCard({
             </div>
           </div>
 
+          {exp.ai_image_url ? (
+            <AiImagePreview
+              src={exp.ai_image_url}
+              brand="finance"
+              className="shrink-0 self-center"
+              imageClassName="h-[4.5rem] w-[4.5rem] rounded-lg object-cover"
+              onOpen={() => setZoomOpen(true)}
+            />
+          ) : aiImageBusy ? (
+            <div className="flex h-[4.5rem] w-[4.5rem] shrink-0 items-center justify-center self-center rounded-lg border border-dashed border-[var(--brand-finance)]/35 bg-[var(--brand-finance-soft)] text-[10px] font-medium text-[var(--brand-finance)]">
+              KI…
+            </div>
+          ) : null}
+
           <div className="flex shrink-0 flex-col items-end gap-1">
             <p
               className={cn(
@@ -1037,28 +1058,15 @@ function ExpenseCard({
               {isIncome ? "+" : ""}
               {formatMoney(exp.amount_base, baseCurrency)}
             </p>
-            <div className="flex flex-wrap items-center justify-end gap-1">
-              {exp.document || exp.document_id ? (
-                <Badge
-                  variant="outline"
-                  className="h-5 gap-1 px-1.5 text-[10px] font-semibold"
-                >
-                  <Link2 className="size-3" />
-                  1 Beleg
-                </Badge>
-              ) : null}
-              {exp.ai_image_url ? (
-                <AiImagePreview
-                  src={exp.ai_image_url}
-                  brand="finance"
-                  onOpen={() => setZoomOpen(true)}
-                />
-              ) : aiImageBusy ? (
-                <div className="flex h-8 w-8 items-center justify-center rounded-md border border-dashed border-[var(--brand-finance)]/35 bg-[var(--brand-finance-soft)] text-[9px] font-medium text-[var(--brand-finance)]">
-                  KI…
-                </div>
-              ) : null}
-            </div>
+            {exp.document || exp.document_id ? (
+              <Badge
+                variant="outline"
+                className="h-5 gap-1 px-1.5 text-[10px] font-semibold"
+              >
+                <Link2 className="size-3" />
+                1 Beleg
+              </Badge>
+            ) : null}
           </div>
         </div>
 
@@ -1750,7 +1758,11 @@ export function ExpenseList({
   renderStickyChrome,
 }: {
   expenses: ExpenseListItem[];
-  members: Array<{ id: number; display_name: string }>;
+  members: Array<{
+    id: number;
+    display_name: string;
+    avatar_url?: string | null;
+  }>;
   couples?: Array<{ id: number; name: string; memberIds: number[] }>;
   baseCurrency: string;
   cashbookMode?: boolean;
