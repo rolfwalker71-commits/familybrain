@@ -89,14 +89,13 @@ function eventHeaderHtml(input: {
       : null;
   const mb = input.marginBottom === false ? "0" : "16px";
   return `
-    <div style="background:${BRAND.card};border-radius:12px;overflow:hidden;border:1px solid ${BRAND.border};margin-bottom:${mb};">
+    <div style="background:${BRAND.card};border-radius:8px;overflow:hidden;border:1px solid ${BRAND.border};margin-bottom:${mb};">
       <div style="padding:14px 16px;display:flex;gap:14px;align-items:flex-start;">
-        ${dateBadgeHtml(input.startDate)}
+        ${dateBadgeHtml(input.startDate, time)}
         <div style="flex:1;min-width:0;">
           <div style="font-size:17px;font-weight:800;line-height:1.25;color:${BRAND.ink};">${escapeHtml(input.eventTitle)}</div>
           <div style="margin-top:8px;font-size:13px;color:${BRAND.muted};">
             <span style="display:inline-block;background:${BRAND.accentSoft};color:${BRAND.accent};border-radius:4px;padding:2px 6px;font-size:10px;font-weight:700;text-transform:uppercase;margin-right:6px;">${escapeHtml(input.eventType)}</span>
-            ${time ? escapeHtml(time) : ""}
           </div>
           ${
             endIso

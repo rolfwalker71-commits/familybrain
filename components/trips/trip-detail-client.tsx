@@ -58,6 +58,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Sheet,
   SheetContent,
   SheetDescription,
@@ -302,9 +308,10 @@ function EventDateHeader({
   const showEnd = Boolean(endIso && endIso !== startIso && endIso >= startIso);
   const startTime = toTimeInputValue(event.start_time) || null;
   const endTime = toTimeInputValue(event.end_time) || null;
-  const badgeW = size === "sm" ? "w-[3.15rem]" : "w-[4.5rem] sm:w-[4.85rem]";
+  // Match CalendarDateBadge widths (time renders below the badge).
+  const badgeW = size === "sm" ? "w-[4.55rem]" : "w-[5rem] sm:w-[5.25rem]";
   const reserveW =
-    size === "sm" ? "w-[7.6rem]" : "w-[11.25rem] sm:w-[12.25rem]";
+    size === "sm" ? "w-[11rem]" : "w-[13rem] sm:w-[13.75rem]";
 
   return (
     <div
@@ -347,46 +354,77 @@ function formatEventMetaLine(event: TripEvent): string | null {
           ? event.location
           : null)
     : null;
+  const flightRoute =
+    type === "Flug" &&
+    (event.departure_airport || event.arrival_airport)
+      ? [event.departure_airport, event.arrival_airport]
+          .filter(Boolean)
+          .join(" → ")
+      : null;
   const parts = [
     event.flight_number && (type === "Flug" || type === "Zugreisen")
       ? event.flight_number
       : null,
-    transferRoute,
+    transferRoute || flightRoute,
   ].filter(Boolean);
   return parts.length ? parts.join(" · ") : null;
 }
 
 function formatCompactDetailLine(event: TripEvent): string | null {
-  const type = coerceTripEventType(event.event_type);
-  const startT = toTimeInputValue(event.start_time);
-  const endT = toTimeInputValue(event.end_time);
-  const time =
-    startT || endT ? [startT, endT].filter(Boolean).join("–") : null;
-  const route =
-    event.origin_place || event.destination_place
-      ? [event.origin_place, event.destination_place].filter(Boolean).join(" → ")
-      : event.departure_airport || event.arrival_airport
-        ? [event.departure_airport, event.arrival_airport]
-            .filter(Boolean)
-            .join(" → ")
-        : null;
-  const place =
-    event.place_name ||
-    (route
-      ? null
-      : event.location && !textsOverlap(event.location, event.title)
-        ? event.location
-        : null);
-  const parts = [
-    type,
-    event.airline,
-    event.flight_number,
-    route || place,
-    event.provider,
-    event.booking_reference,
-    time,
-  ].filter((p): p is string => Boolean(p && String(p).trim()));
-  return parts.length ? parts.join(" | ") : null;
+  // Same compact facts as the full card meta (flight / route); hide booking refs.
+  return formatEventMetaLine(event);
+}
+
+function EventActionsMenu({
+  items,
+  triggerClassName,
+  triggerSize = "icon-xs",
+  triggerVariant = "ghost",
+  align = "end",
+}: {
+  items: Array<{
+    label: string;
+    icon: LucideIcon;
+    onClick: () => void;
+    disabled?: boolean;
+    variant?: "default" | "destructive";
+  }>;
+  triggerClassName?: string;
+  triggerSize?: "icon-xs" | "icon-sm" | "sm";
+  triggerVariant?: "ghost" | "outline" | "secondary";
+  align?: "start" | "end" | "center";
+}) {
+  if (!items.length) return null;
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <Button
+            type="button"
+            size={triggerSize}
+            variant={triggerVariant}
+            className={triggerClassName}
+            aria-label="Mehr"
+          />
+        }
+      >
+        <MoreHorizontal className="size-3.5" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align={align} className="w-auto min-w-44">
+        {items.map((item) => (
+          <DropdownMenuItem
+            key={item.label}
+            disabled={item.disabled}
+            variant={item.variant}
+            onClick={item.onClick}
+          >
+            <item.icon className="size-3.5" />
+            {item.label}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 }
 
 function EventLinkedExpenses({
@@ -2631,7 +2669,7 @@ function TripDetailInner({
                 <div
                   key={event.id}
                   className={cn(
-                    "relative pt-3 pl-3",
+                    "relative pt-3 pl-2",
                     editMode &&
                       dragOverEventId === event.id &&
                       "opacity-80"
@@ -2677,12 +2715,12 @@ function TripDetailInner({
                     icon={visual.icon}
                     tone={visual.tone}
                     size="md"
-                    className="absolute left-3 top-3 z-10 -translate-x-1/2 -translate-y-1/2 border-2 border-foreground/20 shadow-md"
+                    className="absolute left-4 top-3 z-10 -translate-x-1/2 -translate-y-1/2 border-2 border-foreground/20"
                   />
                   <Card
                     tone={visual.tone}
                     className={cn(
-                      "relative gap-0 overflow-visible border-border py-0 shadow-[0_2px_4px_rgba(20,32,28,0.06),0_10px_28px_rgba(20,32,28,0.1)]",
+                      "relative gap-0 overflow-visible border border-border py-0 shadow-none",
                       editMode &&
                         dragOverEventId === event.id &&
                         "ring-2 ring-teal-400/50"
@@ -2798,66 +2836,61 @@ function TripDetailInner({
                           ) : (
                             <div className="flex-1" />
                           )}
-                          {!readOnly ? (
+                          {!readOnly && editMode ? (
                             <Button
-                              size="icon-xs"
-                              variant="ghost"
-                              title="PDF hochladen / Belege verknüpfen"
-                              disabled={busy}
-                              onClick={() => setLinkDocsEventId(event.id)}
+                              size="sm"
+                              variant={
+                                editFocusEventId === event.id
+                                  ? "secondary"
+                                  : "ghost"
+                              }
+                              className="h-7 shrink-0 px-2 text-xs md:hidden"
+                              onClick={() => setEditFocusEventId(event.id)}
                             >
-                              <FilePlus2 className="size-3.5" />
+                              {editFocusEventId === event.id
+                                ? "Aktiv"
+                                : "Wählen"}
                             </Button>
                           ) : null}
-                          {!readOnly && !editMode ? (
+                          {!readOnly ? (
                             <Button
                               size="sm"
                               variant="ghost"
-                              className="h-7 shrink-0 px-2 text-xs"
+                              className={cn(
+                                "h-7 shrink-0 px-2 text-xs",
+                                editMode && "hidden md:inline-flex"
+                              )}
                               onClick={() => startEditEvent(event)}
                             >
                               <Pencil className="mr-1 size-3.5" />
                               Ändern
                             </Button>
                           ) : null}
-                          {!readOnly && editMode ? (
-                            <>
-                              <Button
-                                size="sm"
-                                variant={
-                                  editFocusEventId === event.id
-                                    ? "secondary"
-                                    : "ghost"
-                                }
-                                className="h-7 shrink-0 px-2 text-xs md:hidden"
-                                onClick={() => setEditFocusEventId(event.id)}
-                              >
-                                {editFocusEventId === event.id
-                                  ? "Aktiv"
-                                  : "Wählen"}
-                              </Button>
-                              <div className="hidden shrink-0 items-center gap-0.5 md:flex">
-                                <Button
-                                  size="icon-xs"
-                                  variant="ghost"
-                                  title="KI-Bild"
-                                  disabled={
-                                    busy || aiImageBusy || aiBatch != null
-                                  }
-                                  onClick={() => openAiImageDialog(event)}
-                                >
-                                  <ImagePlus className="size-3.5" />
-                                </Button>
-                                <Button
-                                  size="icon-xs"
-                                  variant="ghost"
-                                  title="Ändern"
-                                  onClick={() => startEditEvent(event)}
-                                >
-                                  <Pencil className="size-3.5" />
-                                </Button>
-                              </div>
-                            </>
+                          {!readOnly ? (
+                            <EventActionsMenu
+                              items={[
+                                {
+                                  label: "Beleg / PDF",
+                                  icon: FilePlus2,
+                                  disabled: busy,
+                                  onClick: () => setLinkDocsEventId(event.id),
+                                },
+                                ...(editMode
+                                  ? [
+                                      {
+                                        label: "KI-Bild",
+                                        icon: ImagePlus,
+                                        disabled:
+                                          busy ||
+                                          aiImageBusy ||
+                                          aiBatch != null,
+                                        onClick: () =>
+                                          openAiImageDialog(event),
+                                      },
+                                    ]
+                                  : []),
+                              ]}
+                            />
                           ) : null}
                         </div>
                       ) : null}
@@ -2889,7 +2922,7 @@ function TripDetailInner({
               <div
                 key={event.id}
                 className={cn(
-                  "relative pt-3 pl-3",
+                  "relative pt-3 pl-2",
                   editMode && dragOverEventId === event.id && "opacity-80"
                 )}
                 onDragOver={
@@ -2931,12 +2964,12 @@ function TripDetailInner({
                   icon={visual.icon}
                   tone={visual.tone}
                   size="lg"
-                  className="absolute left-3 top-3 z-10 -translate-x-1/2 -translate-y-1/2 border-2 border-foreground/20 shadow-md"
+                  className="absolute left-4 top-3 z-10 -translate-x-1/2 -translate-y-1/2 border-2 border-foreground/20"
                 />
                 <Card
                   tone={visual.tone}
                   className={cn(
-                    "relative gap-0 overflow-visible border-border py-0 shadow-[0_2px_4px_rgba(20,32,28,0.06),0_10px_28px_rgba(20,32,28,0.1)]",
+                    "relative gap-0 overflow-visible border border-border py-0 shadow-none",
                     editingEventId === event.id && "ring-2 ring-foreground/15",
                     editMode &&
                       editFocusEventId === event.id &&
@@ -2982,15 +3015,28 @@ function TripDetailInner({
                           </Badge>
                           <CommentCountChip count={event.comment_count || 0} />
                           {!readOnly && !editMode ? (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-7 px-2 text-xs"
-                              onClick={() => startEditEvent(event)}
-                            >
-                              <Pencil className="mr-1 size-3.5" />
-                              Ändern
-                            </Button>
+                            <>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 px-2 text-xs"
+                                onClick={() => startEditEvent(event)}
+                              >
+                                <Pencil className="mr-1 size-3.5" />
+                                Ändern
+                              </Button>
+                              <EventActionsMenu
+                                items={[
+                                  {
+                                    label: "Beleg / PDF",
+                                    icon: FilePlus2,
+                                    disabled: busy,
+                                    onClick: () =>
+                                      setLinkDocsEventId(event.id),
+                                  },
+                                ]}
+                              />
+                            </>
                           ) : null}
                         </div>
                         <div className="mt-1 text-lg font-black leading-snug tracking-tight sm:text-2xl">
@@ -3010,19 +3056,6 @@ function TripDetailInner({
                         />
                       </div>
                       {/* Desktop edit actions — mobile uses bottom bar */}
-                      {!readOnly && !editMode ? (
-                        <div className="hidden shrink-0 items-center gap-0.5 md:flex">
-                          <Button
-                            size="icon-xs"
-                            variant="ghost"
-                            title="PDF hochladen / Belege verknüpfen"
-                            disabled={busy}
-                            onClick={() => setLinkDocsEventId(event.id)}
-                          >
-                            <FilePlus2 className="size-3.5" />
-                          </Button>
-                        </div>
-                      ) : null}
                       {editMode ? (
                         <div className="hidden shrink-0 flex-col items-center gap-0.5 md:flex">
                           <button
@@ -3061,38 +3094,35 @@ function TripDetailInner({
                             <Pencil className="mr-1 size-3.5" />
                             Ändern
                           </Button>
-                          <Button
-                            size="icon-xs"
-                            variant="ghost"
-                            title="PDF hochladen / Belege verknüpfen"
-                            disabled={busy}
-                            onClick={() => {
-                              setEditFocusEventId(event.id);
-                              setLinkDocsEventId(event.id);
-                            }}
-                          >
-                            <FilePlus2 className="size-3.5" />
-                          </Button>
-                          <Button
-                            size="icon-xs"
-                            variant="ghost"
-                            title="KI-Bild"
-                            disabled={busy || aiImageBusy || aiBatch != null}
-                            onClick={() => {
-                              setEditFocusEventId(event.id);
-                              openAiImageDialog(event);
-                            }}
-                          >
-                            <ImagePlus className="size-3.5" />
-                          </Button>
-                          <Button
-                            size="icon-xs"
-                            variant="ghost"
-                            title="Löschen"
-                            onClick={() => void removeEvent(event.id)}
-                          >
-                            <Trash2 className="size-3.5" />
-                          </Button>
+                          <EventActionsMenu
+                            items={[
+                              {
+                                label: "Beleg / PDF",
+                                icon: FilePlus2,
+                                disabled: busy,
+                                onClick: () => {
+                                  setEditFocusEventId(event.id);
+                                  setLinkDocsEventId(event.id);
+                                },
+                              },
+                              {
+                                label: "KI-Bild",
+                                icon: ImagePlus,
+                                disabled:
+                                  busy || aiImageBusy || aiBatch != null,
+                                onClick: () => {
+                                  setEditFocusEventId(event.id);
+                                  openAiImageDialog(event);
+                                },
+                              },
+                              {
+                                label: "Löschen",
+                                icon: Trash2,
+                                variant: "destructive",
+                                onClick: () => void removeEvent(event.id),
+                              },
+                            ]}
+                          />
                         </div>
                       ) : null}
                     </div>
@@ -3931,35 +3961,31 @@ function TripDetailInner({
                       <Pencil className="mr-1 size-3.5" />
                       Ändern
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="shrink-0"
-                      disabled={busy}
-                      onClick={() => setLinkDocsEventId(focus.id)}
-                    >
-                      <FilePlus2 className="mr-1 size-3.5" />
-                      Beleg
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="shrink-0"
-                      disabled={busy || aiImageBusy}
-                      onClick={() => openAiImageDialog(focus)}
-                    >
-                      <ImagePlus className="mr-1 size-3.5" />
-                      KI
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="shrink-0 text-destructive"
-                      onClick={() => void removeEvent(focus.id)}
-                    >
-                      <Trash2 className="mr-1 size-3.5" />
-                      Löschen
-                    </Button>
+                    <EventActionsMenu
+                      triggerSize="icon-sm"
+                      triggerVariant="outline"
+                      triggerClassName="shrink-0"
+                      items={[
+                        {
+                          label: "Beleg / PDF",
+                          icon: FilePlus2,
+                          disabled: busy,
+                          onClick: () => setLinkDocsEventId(focus.id),
+                        },
+                        {
+                          label: "KI-Bild",
+                          icon: ImagePlus,
+                          disabled: busy || aiImageBusy,
+                          onClick: () => openAiImageDialog(focus),
+                        },
+                        {
+                          label: "Löschen",
+                          icon: Trash2,
+                          variant: "destructive",
+                          onClick: () => void removeEvent(focus.id),
+                        },
+                      ]}
+                    />
                     <Button
                       size="sm"
                       variant="secondary"

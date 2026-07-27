@@ -11,7 +11,7 @@ function esc(raw: string | null | undefined): string {
     .replace(/"/g, "&quot;");
 }
 
-function eventWhen(event: TripExportEvent): string {
+function eventWhen(event: TripExportEvent): { date: string; time: string | null } {
   const start = event.start_date ? toSwissDate(event.start_date) : "";
   const end =
     event.end_date && event.end_date !== event.start_date
@@ -19,11 +19,12 @@ function eventWhen(event: TripExportEvent): string {
       : "";
   const st = toTimeInputValue(event.start_time);
   const et = toTimeInputValue(event.end_time);
-  const times =
-    st || et
-      ? ` · ${[st, et].filter(Boolean).join(" – ")}`
-      : "";
-  return `${start}${end}${times}`.trim() || "ohne Datum";
+  const time =
+    st || et ? [st, et].filter(Boolean).join(" – ") : null;
+  return {
+    date: `${start}${end}`.trim() || "ohne Datum",
+    time,
+  };
 }
 
 function eventDetailsHtml(event: TripExportEvent): string {
@@ -123,12 +124,14 @@ export function renderTripExportHtml(
         seenNoteDocIds,
         seenNotesMd
       );
+      const when = eventWhen(event);
       return `
 <section class="event">
   <header>
     <span class="type">${esc(event.event_type)}</span>
     <h2>${esc(event.title)}</h2>
-    <p class="when">${esc(eventWhen(event))}</p>
+    <p class="when">${esc(when.date)}</p>
+    ${when.time ? `<p class="when-time">${esc(when.time)}</p>` : ""}
   </header>
   <div class="details">${eventDetailsHtml(event)}</div>
   ${eventDocsHtml(event)}
@@ -233,7 +236,8 @@ export function renderTripExportHtml(
     margin-bottom: 0.25rem;
   }
   .event h2 { font-size: 1.15rem; margin: 0 0 0.2rem; }
-  .when { color: #666; margin: 0 0 0.6rem; font-size: 0.9rem; }
+  .when { color: #666; margin: 0; font-size: 0.9rem; }
+  .when-time { color: #666; margin: 0.15rem 0 0.6rem; font-size: 0.85rem; font-variant-numeric: tabular-nums; }
   .row { display: grid; grid-template-columns: 6.5rem 1fr; gap: 0.35rem; font-size: 0.9rem; margin: 0.15rem 0; }
   .k { color: #777; }
   .v { white-space: pre-wrap; }

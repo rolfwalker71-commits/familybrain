@@ -1,17 +1,20 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   ArrowLeftRight,
+  Camera,
   Check,
   ChevronDown,
   Copy,
   Download,
+  Filter,
   Link2,
   Luggage,
   Mail,
   MapPin,
+  MoreHorizontal,
   Pencil,
   RefreshCw,
   Scale,
@@ -33,6 +36,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -60,7 +70,10 @@ import {
   expenseVisualForExpense,
   settlementVisual,
 } from "@/lib/finance-brain/expense-category";
-import { ExpenseReceiptControls } from "@/components/finance-brain/expense-receipt-controls";
+import {
+  ExpenseReceiptControls,
+  type ExpenseReceiptControlsHandle,
+} from "@/components/finance-brain/expense-receipt-controls";
 import {
   IconCircle,
   type IconTone,
@@ -757,6 +770,7 @@ function ExpenseCard({
   const [zoomOpen, setZoomOpen] = useState(false);
   const [linkDocOpen, setLinkDocOpen] = useState(false);
   const [docBusy, setDocBusy] = useState(false);
+  const receiptRef = useRef<ExpenseReceiptControlsHandle>(null);
   const [editDesc, setEditDesc] = useState(exp.description || "");
   const [editDate, setEditDate] = useState(exp.expense_date || "");
   const [editPayer, setEditPayer] = useState(String(exp.paid_by_member_id));
@@ -879,7 +893,7 @@ function ExpenseCard({
         />
         <div
           className={cn(
-            "overflow-hidden rounded-xl border border-border bg-card text-sm shadow-[0_2px_4px_rgba(20,32,28,0.06),0_10px_28px_rgba(20,32,28,0.1)]",
+            "overflow-hidden rounded-xl border border-border bg-card text-sm",
             onMobileFocus && !editing && "cursor-pointer md:cursor-default"
           )}
           onClick={
@@ -1286,16 +1300,18 @@ function ExpenseCard({
             ) : null}
 
         <div
-          className="flex flex-wrap items-center gap-2 border-t border-border/40 px-3 py-2"
+          className="flex flex-wrap items-center gap-1.5 border-t border-border/40 px-3 py-2"
           onClick={(e) => e.stopPropagation()}
         >
           {receiptUploadUrl ? (
             <ExpenseReceiptControls
+              ref={receiptRef}
               expenseId={exp.id}
               receiptUrl={exp.receipt_url}
               uploadUrl={receiptUploadUrl}
               onChanged={onReceiptChanged}
               compact
+              triggerOnly
             />
           ) : exp.receipt_url ? (
             <a
@@ -1308,7 +1324,7 @@ function ExpenseCard({
               <img
                 src={exp.receipt_url}
                 alt="Beleg"
-                className="h-10 w-10 rounded border border-border/60 object-cover"
+                className="h-8 w-8 rounded border border-border object-cover"
               />
             </a>
           ) : null}
@@ -1327,21 +1343,6 @@ function ExpenseCard({
             >
               <Pencil className="mr-1 size-3.5" />
               Ändern
-            </Button>
-          ) : null}
-
-          {onDuplicate && !editing ? (
-            <Button
-              type="button"
-              id={`expense-duplicate-${exp.id}`}
-              size="sm"
-              variant="ghost"
-              className="hidden h-7 px-2 text-xs md:inline-flex"
-              title="Als Vorlage für eine neue Buchung übernehmen"
-              onClick={() => onDuplicate(exp)}
-            >
-              <Copy className="mr-1 size-3.5" />
-              Duplizieren
             </Button>
           ) : null}
 
@@ -1366,115 +1367,195 @@ function ExpenseCard({
             </Button>
           ) : null}
 
-          <div className="hidden flex-wrap items-center gap-1 md:flex">
-          {onGenerateAiImage ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              className="h-7 px-2 text-xs"
-              disabled={aiImageBusy}
-              onClick={() => onGenerateAiImage(exp.id)}
-              title={
-                exp.ai_image_url ? "KI-Bild neu erzeugen" : "KI-Bild erzeugen"
-              }
-            >
-              <RefreshCw
-                className={cn("mr-1 size-3.5", aiImageBusy && "animate-spin")}
-              />
-              {exp.ai_image_url ? "KI-Bild neu" : "KI-Bild"}
-            </Button>
-          ) : null}
-
+          {/* Hidden triggers for mobile action bar */}
           {canEdit && onSetDocument && !editing ? (
+            <button
+              type="button"
+              id={`expense-link-doc-${exp.id}`}
+              className="sr-only"
+              tabIndex={-1}
+              aria-hidden
+              onClick={() => setLinkDocOpen(true)}
+            />
+          ) : null}
+          {receiptUploadUrl ? (
             <>
-              <Button
+              <button
                 type="button"
-                size="sm"
-                variant="ghost"
-                className="h-7 px-2 text-xs"
-                disabled={docBusy || editBusy}
-                id={`expense-link-doc-${exp.id}`}
-                onClick={() => setLinkDocOpen(true)}
-              >
-                <Link2 className="mr-1 size-3.5" />
-                {exp.document ? "Beleg ändern" : "Beleg verknüpfen"}
-              </Button>
-              {exp.document ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  className="h-7 px-2 text-xs text-destructive"
-                  disabled={docBusy || editBusy}
-                  onClick={() => {
-                    if (
-                      !window.confirm(
-                        "Paperless-Verknüpfung wirklich entfernen?"
-                      )
-                    ) {
-                      return;
-                    }
-                    setDocBusy(true);
-                    void onSetDocument(exp.id, null).finally(() =>
-                      setDocBusy(false)
-                    );
-                  }}
-                >
-                  <Unlink className="mr-1 size-3.5" />
-                  Beleg lösen
-                </Button>
-              ) : null}
+                id={`expense-receipt-pick-${exp.id}`}
+                className="sr-only"
+                tabIndex={-1}
+                aria-hidden
+                onClick={() => receiptRef.current?.pickFile()}
+              />
+              <button
+                type="button"
+                id={`expense-receipt-preview-${exp.id}`}
+                className="sr-only"
+                tabIndex={-1}
+                aria-hidden
+                onClick={() => receiptRef.current?.openPreview()}
+              />
+              <button
+                type="button"
+                id={`expense-receipt-remove-${exp.id}`}
+                className="sr-only"
+                tabIndex={-1}
+                aria-hidden
+                onClick={() => void receiptRef.current?.remove()}
+              />
             </>
           ) : null}
 
-          {onResendMail ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              className="h-7 px-2 text-xs"
-              disabled={mailBusy || aiImageBusy}
-              onClick={() => onResendMail(exp.id)}
-              title="Belegmail erneut an die Gruppe senden"
-            >
-              <Mail
-                className={cn("mr-1 size-3.5", mailBusy && "animate-pulse")}
-              />
-              {mailBusy ? "Sendet…" : "Mail erneut"}
-            </Button>
-          ) : null}
-
-          {exp.ai_image_url && onDeleteAiImage ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              className="h-7 px-2 text-xs text-destructive"
-              disabled={aiImageBusy}
-              onClick={() => onDeleteAiImage(exp.id)}
-              title="KI-Bild löschen"
-            >
-              <Trash2 className="mr-1 size-3.5" />
-              KI-Bild
-            </Button>
-          ) : null}
-          </div>
-
-          <div className="ml-auto flex items-center gap-1">
-            {canDelete && onDelete ? (
-              <Button
-                type="button"
-                size="icon-xs"
-                variant="ghost"
-                className="hidden text-destructive hover:text-destructive md:inline-flex"
-                title="Ausgabe löschen"
-                onClick={() => onDelete(exp.id)}
+          {!editing &&
+          (receiptUploadUrl ||
+            onDuplicate ||
+            onGenerateAiImage ||
+            (exp.ai_image_url && onDeleteAiImage) ||
+            (canEdit && onSetDocument) ||
+            onResendMail ||
+            (canDelete && onDelete)) ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    type="button"
+                    size="icon-xs"
+                    variant="ghost"
+                    className="ml-auto hidden md:inline-flex"
+                    aria-label="Mehr"
+                  />
+                }
               >
-                <Trash2 className="size-3.5" />
-              </Button>
-            ) : null}
-          </div>
+                <MoreHorizontal className="size-4" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-auto min-w-48">
+                {receiptUploadUrl ? (
+                  <>
+                    {exp.receipt_url ? (
+                      <DropdownMenuItem
+                        onClick={() => receiptRef.current?.openPreview()}
+                      >
+                        <Camera className="size-3.5" />
+                        Foto anzeigen
+                      </DropdownMenuItem>
+                    ) : null}
+                    <DropdownMenuItem
+                      onClick={() => receiptRef.current?.pickFile()}
+                    >
+                      <Camera className="size-3.5" />
+                      {exp.receipt_url ? "Foto ersetzen" : "Foto"}
+                    </DropdownMenuItem>
+                    {exp.receipt_url ? (
+                      <DropdownMenuItem
+                        variant="destructive"
+                        onClick={() => void receiptRef.current?.remove()}
+                      >
+                        <Trash2 className="size-3.5" />
+                        Foto entfernen
+                      </DropdownMenuItem>
+                    ) : null}
+                    <DropdownMenuSeparator />
+                  </>
+                ) : null}
+
+                {onDuplicate ? (
+                  <DropdownMenuItem onClick={() => onDuplicate(exp)}>
+                    <Copy className="size-3.5" />
+                    Duplizieren
+                  </DropdownMenuItem>
+                ) : null}
+
+                {onGenerateAiImage ? (
+                  <DropdownMenuItem
+                    disabled={aiImageBusy}
+                    onClick={() => onGenerateAiImage(exp.id)}
+                  >
+                    <RefreshCw
+                      className={cn(
+                        "size-3.5",
+                        aiImageBusy && "animate-spin"
+                      )}
+                    />
+                    {exp.ai_image_url ? "KI-Bild neu" : "KI-Bild erzeugen"}
+                  </DropdownMenuItem>
+                ) : null}
+
+                {exp.ai_image_url && onDeleteAiImage ? (
+                  <DropdownMenuItem
+                    variant="destructive"
+                    disabled={aiImageBusy}
+                    onClick={() => onDeleteAiImage(exp.id)}
+                  >
+                    <Trash2 className="size-3.5" />
+                    KI-Bild löschen
+                  </DropdownMenuItem>
+                ) : null}
+
+                {canEdit && onSetDocument ? (
+                  <>
+                    <DropdownMenuItem
+                      disabled={docBusy || editBusy}
+                      onClick={() => setLinkDocOpen(true)}
+                    >
+                      <Link2 className="size-3.5" />
+                      {exp.document ? "Beleg ändern" : "Beleg verknüpfen"}
+                    </DropdownMenuItem>
+                    {exp.document ? (
+                      <DropdownMenuItem
+                        variant="destructive"
+                        disabled={docBusy || editBusy}
+                        onClick={() => {
+                          if (
+                            !window.confirm(
+                              "Paperless-Verknüpfung wirklich entfernen?"
+                            )
+                          ) {
+                            return;
+                          }
+                          setDocBusy(true);
+                          void onSetDocument(exp.id, null).finally(() =>
+                            setDocBusy(false)
+                          );
+                        }}
+                      >
+                        <Unlink className="size-3.5" />
+                        Beleg lösen
+                      </DropdownMenuItem>
+                    ) : null}
+                  </>
+                ) : null}
+
+                {onResendMail ? (
+                  <DropdownMenuItem
+                    disabled={mailBusy || aiImageBusy}
+                    onClick={() => onResendMail(exp.id)}
+                  >
+                    <Mail
+                      className={cn(
+                        "size-3.5",
+                        mailBusy && "animate-pulse"
+                      )}
+                    />
+                    {mailBusy ? "Sendet…" : "Mail erneut"}
+                  </DropdownMenuItem>
+                ) : null}
+
+                {canDelete && onDelete ? (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      variant="destructive"
+                      onClick={() => onDelete(exp.id)}
+                    >
+                      <Trash2 className="size-3.5" />
+                      Löschen
+                    </DropdownMenuItem>
+                  </>
+                ) : null}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : null}
         </div>
       </div>
       </div>
@@ -1608,6 +1689,7 @@ export function ExpenseList({
 }) {
   const [mobileFocusId, setMobileFocusId] = useState<number | null>(null);
   const [query, setQuery] = useState("");
+  const [filterOpen, setFilterOpen] = useState(false);
   const [payerFilter, setPayerFilter] = useState<string>("__all__");
   const [categoryFilter, setCategoryFilter] = useState<string>("__all__");
   const [coupleFilter, setCoupleFilter] = useState<string>("__all__");
@@ -1712,15 +1794,30 @@ export function ExpenseList({
     coupleFilter !== "__all__" ||
     settledFilter !== "__show__";
 
-  const filterCols = cashbookMode
-    ? "sm:grid-cols-2"
-    : coupleOptions.length > 0
-      ? "sm:grid-cols-2 lg:grid-cols-4"
-      : "sm:grid-cols-3";
+  const activeFilterCount =
+    (payerFilter !== "__all__" ? 1 : 0) +
+    (categoryFilter !== "__all__" ? 1 : 0) +
+    (coupleFilter !== "__all__" ? 1 : 0) +
+    (settledFilter !== "__show__" ? 1 : 0);
 
   const focus =
     filteredExpenses.find((e) => e.id === mobileFocusId) ||
     (mobileFocusId != null ? filteredExpenses[0] : null);
+
+  const focusCoupleSettle =
+    focus && !cashbookMode
+      ? coupleSettlePreviewForExpense(focus, members, couples)
+      : null;
+
+  const focusHasMoreActions = Boolean(
+    focus &&
+      (receiptUploadUrl ||
+        onGenerateAiImage ||
+        (focus.ai_image_url && onDeleteAiImage) ||
+        (canEdit && onSetDocument) ||
+        onResendMail ||
+        (canDelete && onDelete))
+  );
 
   return (
     <div
@@ -1730,123 +1827,150 @@ export function ExpenseList({
       )}
     >
       {expenses.length > 0 ? (
-        <div className="space-y-2 rounded-xl border border-border/50 bg-muted/20 p-2.5">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Text suchen…"
-              className="h-8 bg-background pl-8 pr-8 text-sm"
-              aria-label="Ausgaben durchsuchen"
-            />
-            {query ? (
-              <button
-                type="button"
-                className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-                title="Suche leeren"
-                onClick={() => setQuery("")}
-              >
-                <XIcon className="size-3.5" />
-              </button>
-            ) : null}
+        <div className="space-y-2 rounded-xl border border-border bg-muted/20 p-2.5">
+          <div className="flex items-center gap-2">
+            <div className="relative min-w-0 flex-1">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Text suchen…"
+                className="h-8 bg-background pl-8 pr-8 text-sm"
+                aria-label="Ausgaben durchsuchen"
+              />
+              {query ? (
+                <button
+                  type="button"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  title="Suche leeren"
+                  onClick={() => setQuery("")}
+                >
+                  <XIcon className="size-3.5" />
+                </button>
+              ) : null}
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="relative h-8 shrink-0 gap-1.5 bg-background px-2.5"
+              aria-expanded={filterOpen}
+              aria-controls="expense-list-filters"
+              onClick={() => setFilterOpen((o) => !o)}
+            >
+              <Filter className="size-3.5" />
+              Filter
+              {activeFilterCount > 0 ? (
+                <Badge
+                  variant="secondary"
+                  className="h-5 min-w-5 justify-center px-1 text-[10px] font-semibold"
+                >
+                  {activeFilterCount}
+                </Badge>
+              ) : null}
+            </Button>
           </div>
-          <div className={cn("grid gap-2", filterCols)}>
-            {!cashbookMode ? (
+          {filterOpen ? (
+            <div
+              id="expense-list-filters"
+              className="grid gap-2 rounded-lg border border-border bg-background p-2.5 sm:grid-cols-2"
+            >
+              {!cashbookMode ? (
+                <Select
+                  value={payerFilter}
+                  onValueChange={(v) => {
+                    if (v != null) setPayerFilter(v);
+                  }}
+                  items={{
+                    __all__: "Alle Zahler",
+                    ...Object.fromEntries(
+                      payerOptions.map((m) => [String(m.id), m.display_name])
+                    ),
+                  }}
+                >
+                  <SelectTrigger className="h-8 w-full min-w-0 text-sm">
+                    <SelectValue placeholder="Zahler" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">Alle Zahler</SelectItem>
+                    {payerOptions.map((m) => (
+                      <SelectItem key={m.id} value={String(m.id)}>
+                        {m.display_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : null}
               <Select
-                value={payerFilter}
+                value={categoryFilter}
                 onValueChange={(v) => {
-                  if (v != null) setPayerFilter(v);
+                  if (v != null) setCategoryFilter(v);
                 }}
                 items={{
-                  __all__: "Alle Zahler",
+                  __all__: "Alle Kategorien",
                   ...Object.fromEntries(
-                    payerOptions.map((m) => [String(m.id), m.display_name])
+                    categoryOptions.map((label) => [label, label])
                   ),
                 }}
               >
-                <SelectTrigger className="h-8 w-full min-w-0 bg-background text-sm">
-                  <SelectValue placeholder="Zahler" />
+                <SelectTrigger className="h-8 w-full min-w-0 text-sm">
+                  <SelectValue placeholder="Kategorie" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__all__">Alle Zahler</SelectItem>
-                  {payerOptions.map((m) => (
-                    <SelectItem key={m.id} value={String(m.id)}>
-                      {m.display_name}
+                  <SelectItem value="__all__">Alle Kategorien</SelectItem>
+                  {categoryOptions.map((label) => (
+                    <SelectItem key={label} value={label}>
+                      {label}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-            ) : null}
-            <Select
-              value={categoryFilter}
-              onValueChange={(v) => {
-                if (v != null) setCategoryFilter(v);
-              }}
-              items={{
-                __all__: "Alle Kategorien",
-                ...Object.fromEntries(
-                  categoryOptions.map((label) => [label, label])
-                ),
-              }}
-            >
-              <SelectTrigger className="h-8 w-full min-w-0 bg-background text-sm">
-                <SelectValue placeholder="Kategorie" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">Alle Kategorien</SelectItem>
-                {categoryOptions.map((label) => (
-                  <SelectItem key={label} value={label}>
-                    {label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {!cashbookMode && coupleOptions.length > 0 ? (
+              {!cashbookMode && coupleOptions.length > 0 ? (
+                <Select
+                  value={coupleFilter}
+                  onValueChange={(v) => {
+                    if (v != null) setCoupleFilter(v);
+                  }}
+                  items={{
+                    __all__: "Alle Paare",
+                    ...Object.fromEntries(
+                      coupleOptions.map((c) => [String(c.id), c.name])
+                    ),
+                  }}
+                >
+                  <SelectTrigger className="h-8 w-full min-w-0 text-sm">
+                    <SelectValue placeholder="Paar" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">Alle Paare</SelectItem>
+                    {coupleOptions.map((c) => (
+                      <SelectItem key={c.id} value={String(c.id)}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : null}
               <Select
-                value={coupleFilter}
+                value={settledFilter}
                 onValueChange={(v) => {
-                  if (v != null) setCoupleFilter(v);
+                  if (v === "__show__" || v === "__hide__") setSettledFilter(v);
                 }}
                 items={{
-                  __all__: "Alle Paare",
-                  ...Object.fromEntries(
-                    coupleOptions.map((c) => [String(c.id), c.name])
-                  ),
+                  __show__: "Ausgeglichene: Ja",
+                  __hide__: "Ausgeglichene: Nein",
                 }}
               >
-                <SelectTrigger className="h-8 w-full min-w-0 bg-background text-sm">
-                  <SelectValue placeholder="Paar" />
+                <SelectTrigger className="h-8 w-full min-w-0 text-sm">
+                  <SelectValue placeholder="Ausgeglichene" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__all__">Alle Paare</SelectItem>
-                  {coupleOptions.map((c) => (
-                    <SelectItem key={c.id} value={String(c.id)}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="__show__">Ausgeglichene: Ja</SelectItem>
+                  <SelectItem value="__hide__">Ausgeglichene: Nein</SelectItem>
                 </SelectContent>
               </Select>
-            ) : null}
-            <Select
-              value={settledFilter}
-              onValueChange={(v) => {
-                if (v === "__show__" || v === "__hide__") setSettledFilter(v);
-              }}
-              items={{
-                __show__: "Ausgeglichene: Ja",
-                __hide__: "Ausgeglichene: Nein",
-              }}
-            >
-              <SelectTrigger className="h-8 w-full min-w-0 bg-background text-sm">
-                <SelectValue placeholder="Ausgeglichene" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__show__">Ausgeglichene: Ja</SelectItem>
-                <SelectItem value="__hide__">Ausgeglichene: Nein</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+            </div>
+          ) : null}
           {filtersActive ? (
             <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
               <span>
@@ -1915,7 +2039,7 @@ export function ExpenseList({
 
       {focus && (canEdit || canDelete || onDuplicateExpense || onCoupleSettle) ? (
         <div className="pointer-events-none fixed inset-x-0 bottom-[4.25rem] z-40 md:hidden">
-          <div className="pointer-events-auto border-t border-border/80 bg-background/95 px-2 py-2 shadow-[0_-8px_24px_rgba(15,23,42,0.12)] backdrop-blur">
+          <div className="pointer-events-auto border-t border-border bg-background/95 px-2 py-2 backdrop-blur">
             <p className="truncate px-1 text-[11px] text-muted-foreground">
               {focus.description ||
                 (focus.direction === "income" ? "Einnahme" : "Ausgabe")}
@@ -1945,10 +2069,7 @@ export function ExpenseList({
                   Duplizieren
                 </Button>
               ) : null}
-              {canEdit &&
-              onCoupleSettle &&
-              !cashbookMode &&
-              coupleSettlePreviewForExpense(focus, members, couples) ? (
+              {canEdit && onCoupleSettle && focusCoupleSettle ? (
                 <Button
                   size="sm"
                   variant="outline"
@@ -1964,80 +2085,147 @@ export function ExpenseList({
                   Paar-Ausgleich
                 </Button>
               ) : null}
-              {canEdit && onSetDocument ? (
-                <>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="shrink-0"
-                    disabled={editBusyId === focus.id}
-                    onClick={() => {
-                      const el = document.getElementById(
-                        `expense-link-doc-${focus.id}`
-                      );
-                      el?.click();
-                    }}
+              {focusHasMoreActions ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger
+                    render={
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="shrink-0 px-2"
+                        aria-label="Mehr"
+                      />
+                    }
                   >
-                    <Link2 className="mr-1 size-3.5" />
-                    Beleg
-                  </Button>
-                  {focus.document ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="shrink-0 text-destructive"
-                      disabled={editBusyId === focus.id}
-                      onClick={() => {
-                        if (
-                          !window.confirm(
-                            "Paperless-Verknüpfung wirklich entfernen?"
-                          )
-                        ) {
-                          return;
-                        }
-                        void onSetDocument(focus.id, null);
-                      }}
-                    >
-                      <Unlink className="mr-1 size-3.5" />
-                      Lösen
-                    </Button>
-                  ) : null}
-                </>
-              ) : null}
-              {onGenerateAiImage ? (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="shrink-0"
-                  disabled={aiImageBusyId === focus.id}
-                  onClick={() => onGenerateAiImage(focus.id)}
-                >
-                  <RefreshCw className="mr-1 size-3.5" />
-                  KI
-                </Button>
-              ) : null}
-              {onResendMail ? (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="shrink-0"
-                  disabled={mailBusyId === focus.id}
-                  onClick={() => onResendMail(focus.id)}
-                >
-                  <Mail className="mr-1 size-3.5" />
-                  Mail
-                </Button>
-              ) : null}
-              {canDelete && onDelete ? (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="shrink-0 text-destructive"
-                  onClick={() => onDelete(focus.id)}
-                >
-                  <Trash2 className="mr-1 size-3.5" />
-                  Löschen
-                </Button>
+                    <MoreHorizontal className="size-4" />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-auto min-w-48">
+                    {receiptUploadUrl ? (
+                      <>
+                        {focus.receipt_url ? (
+                          <DropdownMenuItem
+                            onClick={() => {
+                              document
+                                .getElementById(
+                                  `expense-receipt-preview-${focus.id}`
+                                )
+                                ?.click();
+                            }}
+                          >
+                            <Camera className="size-3.5" />
+                            Foto anzeigen
+                          </DropdownMenuItem>
+                        ) : null}
+                        <DropdownMenuItem
+                          onClick={() => {
+                            document
+                              .getElementById(
+                                `expense-receipt-pick-${focus.id}`
+                              )
+                              ?.click();
+                          }}
+                        >
+                          <Camera className="size-3.5" />
+                          {focus.receipt_url ? "Foto ersetzen" : "Foto"}
+                        </DropdownMenuItem>
+                        {focus.receipt_url ? (
+                          <DropdownMenuItem
+                            variant="destructive"
+                            onClick={() => {
+                              document
+                                .getElementById(
+                                  `expense-receipt-remove-${focus.id}`
+                                )
+                                ?.click();
+                            }}
+                          >
+                            <Trash2 className="size-3.5" />
+                            Foto entfernen
+                          </DropdownMenuItem>
+                        ) : null}
+                        <DropdownMenuSeparator />
+                      </>
+                    ) : null}
+                    {canEdit && onSetDocument ? (
+                      <>
+                        <DropdownMenuItem
+                          disabled={editBusyId === focus.id}
+                          onClick={() => {
+                            document
+                              .getElementById(`expense-link-doc-${focus.id}`)
+                              ?.click();
+                          }}
+                        >
+                          <Link2 className="size-3.5" />
+                          {focus.document
+                            ? "Beleg ändern"
+                            : "Beleg verknüpfen"}
+                        </DropdownMenuItem>
+                        {focus.document ? (
+                          <DropdownMenuItem
+                            variant="destructive"
+                            disabled={editBusyId === focus.id}
+                            onClick={() => {
+                              if (
+                                !window.confirm(
+                                  "Paperless-Verknüpfung wirklich entfernen?"
+                                )
+                              ) {
+                                return;
+                              }
+                              void onSetDocument(focus.id, null);
+                            }}
+                          >
+                            <Unlink className="size-3.5" />
+                            Beleg lösen
+                          </DropdownMenuItem>
+                        ) : null}
+                      </>
+                    ) : null}
+                    {onGenerateAiImage ? (
+                      <DropdownMenuItem
+                        disabled={aiImageBusyId === focus.id}
+                        onClick={() => onGenerateAiImage(focus.id)}
+                      >
+                        <RefreshCw className="size-3.5" />
+                        {focus.ai_image_url
+                          ? "KI-Bild neu"
+                          : "KI-Bild erzeugen"}
+                      </DropdownMenuItem>
+                    ) : null}
+                    {focus.ai_image_url && onDeleteAiImage ? (
+                      <DropdownMenuItem
+                        variant="destructive"
+                        disabled={aiImageBusyId === focus.id}
+                        onClick={() => onDeleteAiImage(focus.id)}
+                      >
+                        <Trash2 className="size-3.5" />
+                        KI-Bild löschen
+                      </DropdownMenuItem>
+                    ) : null}
+                    {onResendMail ? (
+                      <DropdownMenuItem
+                        disabled={mailBusyId === focus.id}
+                        onClick={() => onResendMail(focus.id)}
+                      >
+                        <Mail className="size-3.5" />
+                        Mail erneut
+                      </DropdownMenuItem>
+                    ) : null}
+                    {canDelete && onDelete ? (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          variant="destructive"
+                          onClick={() => onDelete(focus.id)}
+                        >
+                          <Trash2 className="size-3.5" />
+                          Löschen
+                        </DropdownMenuItem>
+                      </>
+                    ) : null}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               ) : null}
               <Button
                 size="sm"

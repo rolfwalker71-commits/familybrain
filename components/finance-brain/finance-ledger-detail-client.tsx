@@ -1409,13 +1409,17 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
       />
 
       <div
-        className="relative h-40 overflow-hidden rounded-xl bg-gradient-to-br from-[var(--brand-finance-soft)] to-emerald-100 bg-cover bg-center sm:h-52"
+        className="relative h-40 overflow-hidden rounded-lg bg-gradient-to-br from-[var(--brand-finance-soft)] to-emerald-50 bg-cover bg-center sm:h-52"
         style={
           ledger.cover_url
             ? { backgroundImage: `url(${ledger.cover_url})` }
             : undefined
         }
-      />
+      >
+        {ledger.cover_url ? (
+          <div className="absolute inset-0 bg-gradient-to-t from-black/45 to-transparent" />
+        ) : null}
+      </div>
 
       <FinanceTabNav items={tabItems} active={activeTab} onChange={setTab} />
 

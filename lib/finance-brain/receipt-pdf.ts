@@ -246,12 +246,13 @@ function drawDateBadge(
   x: number,
   topY: number,
   w = 78,
-  h = 86
+  h = 86,
+  time?: string | null
 ) {
   const bottom = topY - h;
   const rr = Math.min(8, w / 4, h / 5);
 
-  // Order: month → weekday (full) → day → year
+  // Order inside badge: month → weekday (full) → day → year (no time)
   drawRoundedRect(page, x, bottom, w, h, rr, C.card, C.border, 1);
 
   const headerH = 16;
@@ -333,6 +334,18 @@ function drawDateBadge(
     font: bold,
     color: C.muted,
   });
+
+  const timeLabel = time?.trim() ? toPdfSafeText(time.trim()) : "";
+  if (timeLabel) {
+    const timeSize = 8;
+    page.drawText(timeLabel, {
+      x: x + Math.max(0, (w - bold.widthOfTextAtSize(timeLabel, timeSize)) / 2),
+      y: bottom - timeSize - 3,
+      size: timeSize,
+      font: bold,
+      color: C.muted,
+    });
+  }
 }
 
 function drawLabeledRow(
@@ -1843,7 +1856,6 @@ export async function buildTravelDiaryPdfBuffer(model: {
       .map((p) => p?.trim())
       .filter(Boolean);
     const detailLines: string[] = [];
-    if (time) detailLines.push(time);
     if (placeParts.length) detailLines.push(placeParts.join(" · "));
     if (event.notes?.trim()) detailLines.push(`Notiz: ${event.notes.trim()}`);
     const detailWrapped = detailLines.flatMap((line) =>
@@ -1851,7 +1863,7 @@ export async function buildTravelDiaryPdfBuffer(model: {
     );
     const textColH =
       titleLinesExp.length * 15 + 16 + detailWrapped.length * 11 + 8;
-    const cardH = Math.max(badgeH, imgH, textColH) + padY * 2;
+    const cardH = Math.max(badgeH + (time ? 14 : 0), imgH, textColH) + padY * 2;
     ensureSpace(cardH + 16);
     const cardBottom = y - cardH;
     drawRoundedRect(
@@ -1867,7 +1879,16 @@ export async function buildTravelDiaryPdfBuffer(model: {
     );
     const innerX = margin + padX;
     const innerTop = y - padY;
-    drawDateBadge(page, bold, event.startDate, innerX, innerTop, badgeW, badgeH);
+    drawDateBadge(
+      page,
+      bold,
+      event.startDate,
+      innerX,
+      innerTop,
+      badgeW,
+      badgeH,
+      time
+    );
     let ty = innerTop - 4;
     for (const line of titleLinesExp) {
       page.drawText(line, {

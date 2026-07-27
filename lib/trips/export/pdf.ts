@@ -132,7 +132,7 @@ function drawLine(
   }
 }
 
-function eventWhen(event: TripExportEvent): string {
+function eventWhen(event: TripExportEvent): { date: string; time: string | null } {
   const start = event.start_date ? toSwissDate(event.start_date) : "";
   const end =
     event.end_date && event.end_date !== event.start_date
@@ -140,9 +140,11 @@ function eventWhen(event: TripExportEvent): string {
       : "";
   const st = toTimeInputValue(event.start_time);
   const et = toTimeInputValue(event.end_time);
-  const times =
-    st || et ? ` · ${[st, et].filter(Boolean).join(" – ")}` : "";
-  return `${start}${end}${times}`.trim() || "ohne Datum";
+  const time = st || et ? [st, et].filter(Boolean).join(" – ") : null;
+  return {
+    date: `${start}${end}`.trim() || "ohne Datum",
+    time,
+  };
 }
 
 function detailLines(event: TripExportEvent): string[] {
@@ -291,10 +293,17 @@ export async function buildTripPdfBuffer(
       color: rgb(0.15, 0.4, 0.85),
     });
     drawLine(ctx, event.title, { bold: true, size: 14 });
-    drawLine(ctx, eventWhen(event), {
+    const when = eventWhen(event);
+    drawLine(ctx, when.date, {
       size: 10,
       color: rgb(0.4, 0.4, 0.4),
     });
+    if (when.time) {
+      drawLine(ctx, when.time, {
+        size: 9,
+        color: rgb(0.45, 0.45, 0.45),
+      });
+    }
     for (const line of detailLines(event)) {
       drawLine(ctx, line, { size: 10 });
     }

@@ -52,7 +52,7 @@ const SIZE_STYLES = {
     weekday: "text-[8.5px] font-semibold leading-none tracking-tight",
     day: "text-[19px] font-black leading-none",
     year: "text-[9px] font-bold leading-none",
-    time: "text-[8px] font-semibold leading-none",
+    time: "mt-0.5 text-[9px] font-semibold leading-tight",
   },
   /** Desktop — still compact */
   md: {
@@ -62,15 +62,15 @@ const SIZE_STYLES = {
     weekday: "text-[9px] font-semibold leading-none tracking-tight sm:text-[10px]",
     day: "text-[24px] font-black leading-none sm:text-[26px]",
     year: "text-[10px] font-bold leading-none sm:text-[11px]",
-    time: "text-[9px] font-semibold leading-none",
+    time: "mt-1 text-[10px] font-semibold leading-tight sm:text-[11px]",
   },
 } as const;
 
 export type CalendarDateBadgeSize = keyof typeof SIZE_STYLES;
 
 /**
- * Soft-UI calendar date badge (TravelBuddy / FinanzBuddy).
- * Order: month → weekday (full) → day → year → time.
+ * Flat calendar date badge. Order inside badge: month → weekday → day → year.
+ * Time (if any) is always rendered below the badge, never inside it.
  */
 export function CalendarDateBadge({
   isoDate,
@@ -91,50 +91,56 @@ export function CalendarDateBadge({
     accent === "green"
       ? "bg-[var(--brand-finance-soft)] text-[var(--brand-finance)]"
       : "bg-[var(--brand-docs-soft)] text-[var(--brand-docs)]";
+  const timeLabel = time?.trim() || null;
   return (
-    <div
-      className={cn(
-        "flex shrink-0 flex-col overflow-hidden border border-border bg-card",
-        "shadow-[0_1px_2px_rgba(20,32,28,0.08),0_4px_10px_rgba(20,32,28,0.06)]",
-        s.root,
-        className
-      )}
-    >
+    <div className={cn("flex shrink-0 flex-col items-center", className)}>
       <div
         className={cn(
-          "shrink-0 text-center uppercase tracking-wide",
-          monthTone,
-          s.month
-        )}
-      >
-        {monthShortDe(isoDate)}
-      </div>
-      <div
-        className={cn(
-          "flex flex-col items-center justify-center bg-card",
-          s.body
+          "flex flex-col overflow-hidden border border-border bg-card",
+          s.root
         )}
       >
         <div
           className={cn(
-            "w-full text-center text-muted-foreground",
-            s.weekday
+            "shrink-0 text-center uppercase tracking-wide",
+            monthTone,
+            s.month
           )}
         >
-          {weekdayLongDe(isoDate)}
+          {monthShortDe(isoDate)}
         </div>
-        <div className={cn("tabular-nums text-foreground", s.day)}>
-          {dayNumber(isoDate)}
-        </div>
-        <div className={cn("tabular-nums text-muted-foreground", s.year)}>
-          {yearNumber(isoDate)}
-        </div>
-        {time ? (
-          <div className={cn("tabular-nums text-muted-foreground", s.time)}>
-            {time}
+        <div
+          className={cn(
+            "flex flex-col items-center justify-center bg-card",
+            s.body
+          )}
+        >
+          <div
+            className={cn(
+              "w-full text-center text-muted-foreground",
+              s.weekday
+            )}
+          >
+            {weekdayLongDe(isoDate)}
           </div>
-        ) : null}
+          <div className={cn("tabular-nums text-foreground", s.day)}>
+            {dayNumber(isoDate)}
+          </div>
+          <div className={cn("tabular-nums text-muted-foreground", s.year)}>
+            {yearNumber(isoDate)}
+          </div>
+        </div>
       </div>
+      {timeLabel ? (
+        <div
+          className={cn(
+            "w-full text-center tabular-nums text-muted-foreground",
+            s.time
+          )}
+        >
+          {timeLabel}
+        </div>
+      ) : null}
     </div>
   );
 }

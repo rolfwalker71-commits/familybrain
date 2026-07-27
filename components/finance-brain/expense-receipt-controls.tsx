@@ -1,23 +1,44 @@
 "use client";
 
-import { useRef, useState } from "react";
+import {
+  forwardRef,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from "react";
 import { Camera, Image as ImageIcon, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-export function ExpenseReceiptControls({
-  expenseId,
-  receiptUrl,
-  uploadUrl,
-  onChanged,
-  compact,
-}: {
-  expenseId: number;
-  receiptUrl?: string | null;
-  uploadUrl: string;
-  onChanged?: () => void;
-  compact?: boolean;
-}) {
+export type ExpenseReceiptControlsHandle = {
+  pickFile: () => void;
+  openPreview: () => void;
+  remove: () => Promise<void>;
+  busy: boolean;
+};
+
+export const ExpenseReceiptControls = forwardRef<
+  ExpenseReceiptControlsHandle,
+  {
+    expenseId: number;
+    receiptUrl?: string | null;
+    uploadUrl: string;
+    onChanged?: () => void;
+    compact?: boolean;
+    /** Hide button chrome; use ref / thumb for menu-driven UIs. */
+    triggerOnly?: boolean;
+  }
+>(function ExpenseReceiptControls(
+  {
+    expenseId,
+    receiptUrl,
+    uploadUrl,
+    onChanged,
+    compact,
+    triggerOnly,
+  },
+  ref
+) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -57,69 +78,103 @@ export function ExpenseReceiptControls({
     }
   }
 
+  useImperativeHandle(
+    ref,
+    () => ({
+      pickFile: () => fileRef.current?.click(),
+      openPreview: () => {
+        if (receiptUrl) setPreviewOpen(true);
+      },
+      remove,
+      busy,
+    }),
+    [busy, receiptUrl, uploadUrl, onChanged]
+  );
+
   return (
-    <div className={cn("flex flex-col gap-1", compact ? "" : "mt-1")}>
-      <div className="flex flex-wrap items-center gap-1">
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*"
-          capture="environment"
-          className="hidden"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) void upload(file);
-          }}
-        />
-        {receiptUrl ? (
-          <>
-            <button
-              type="button"
-              className="overflow-hidden rounded border border-border/60"
-              onClick={() => setPreviewOpen(true)}
-              title="Foto anzeigen"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={receiptUrl}
-                alt={`Beleg ${expenseId}`}
-                className="h-10 w-10 object-cover"
-              />
-            </button>
+    <div className={cn("flex flex-col gap-1", compact || triggerOnly ? "" : "mt-1")}>
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) void upload(file);
+        }}
+      />
+
+      {triggerOnly ? (
+        receiptUrl ? (
+          <button
+            type="button"
+            className="overflow-hidden rounded border border-border"
+            onClick={() => setPreviewOpen(true)}
+            title="Foto anzeigen"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={receiptUrl}
+              alt={`Beleg ${expenseId}`}
+              className="h-8 w-8 object-cover"
+            />
+          </button>
+        ) : null
+      ) : (
+        <div className="flex flex-wrap items-center gap-1">
+          {receiptUrl ? (
+            <>
+              <button
+                type="button"
+                className="overflow-hidden rounded border border-border/60"
+                onClick={() => setPreviewOpen(true)}
+                title="Foto anzeigen"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={receiptUrl}
+                  alt={`Beleg ${expenseId}`}
+                  className="h-10 w-10 object-cover"
+                />
+              </button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={busy}
+                onClick={() => fileRef.current?.click()}
+              >
+                <Camera className="mr-1 size-3.5" />
+                Ersetzen
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={busy}
+                onClick={() => void remove()}
+              >
+                <Trash2 className="size-3.5 text-destructive" />
+              </Button>
+            </>
+          ) : (
             <Button
               type="button"
-              variant="ghost"
+              variant="outline"
               size="sm"
               disabled={busy}
               onClick={() => fileRef.current?.click()}
             >
               <Camera className="mr-1 size-3.5" />
-              Ersetzen
+              Foto
             </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              disabled={busy}
-              onClick={() => void remove()}
-            >
-              <Trash2 className="size-3.5 text-destructive" />
-            </Button>
-          </>
-        ) : (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={busy}
-            onClick={() => fileRef.current?.click()}
-          >
-            <Camera className="mr-1 size-3.5" />
-            Foto
-          </Button>
-        )}
-      </div>
-      {error ? <p className="text-xs text-destructive">{error}</p> : null}
+          )}
+        </div>
+      )}
+      {error && !triggerOnly ? (
+        <p className="text-xs text-destructive">{error}</p>
+      ) : null}
 
       {previewOpen && receiptUrl ? (
         <div
@@ -146,7 +201,7 @@ export function ExpenseReceiptControls({
       ) : null}
     </div>
   );
-}
+});
 
 export function PendingReceiptPicker({
   file,

@@ -80,7 +80,7 @@
   --chart-3: #ec4899;
   --chart-4: #0f766e;
   --chart-5: #14b8a6;
-  --radius: 0.625rem;
+  --radius: 0.5rem;
   /* Domain accents — docs/travel share finance sage so TravelBuddy matches FinanzBuddy */
   --brand-docs: #3f6b52;
   --brand-docs-soft: #d9e4d1;
@@ -90,14 +90,14 @@
   --brand-settings-soft: #e2e8f0;
   --brand-sync: #3f6b52;
   --brand-sync-soft: #d9e4d1;
-  /* Desktop sidebar stays dark; mobile header uses light tokens */
-  --sidebar: #14201c;
-  --sidebar-foreground: #d1d5db;
+  /* Soft-dark sidebar (slightly lifted vs near-black) */
+  --sidebar: #1a2b26;
+  --sidebar-foreground: #d4dbd8;
   --sidebar-primary: #3f6b52;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #1f2e29;
+  --sidebar-accent: #243832;
   --sidebar-accent-foreground: #f9fafb;
-  --sidebar-border: #1f2e29;
+  --sidebar-border: #2a3d36;
   --sidebar-ring: #3f6b52;
 }
 

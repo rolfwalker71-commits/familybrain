@@ -52,7 +52,10 @@ export function escapeHtml(raw: string): string {
     .replace(/"/g, "&quot;");
 }
 
-export function dateBadgeHtml(isoDate: string | null | undefined): string {
+export function dateBadgeHtml(
+  isoDate: string | null | undefined,
+  time?: string | null
+): string {
   if (!isoDate || !/^\d{4}-\d{2}-\d{2}/.test(isoDate)) {
     return `<div style="font-size:12px;color:${BRAND.muted};">Ohne Datum</div>`;
   }
@@ -61,14 +64,21 @@ export function dateBadgeHtml(isoDate: string | null | undefined): string {
   const day = String(Number(iso.slice(8, 10)));
   const year = iso.slice(0, 4);
   const weekday = weekdayLongDe(iso);
+  const timeLabel = time?.trim() || "";
+  const timeHtml = timeLabel
+    ? `<div style="margin-top:4px;width:72px;text-align:center;font-size:10px;font-weight:600;color:${BRAND.muted};font-variant-numeric:tabular-nums;line-height:1.2;">${escapeHtml(timeLabel)}</div>`
+    : "";
   return `
-    <div style="width:72px;border-radius:8px;overflow:hidden;border:1px solid ${BRAND.border};box-shadow:0 1px 2px rgba(20,32,28,.08),0 4px 10px rgba(20,32,28,.06);font-family:system-ui,sans-serif;flex-shrink:0;background:${BRAND.card};">
-      <div style="background:${BRAND.financeSoft};color:${BRAND.finance};text-align:center;font-size:11px;font-weight:900;padding:3px 1px 2px;letter-spacing:.04em;text-transform:uppercase;line-height:1;">${month}</div>
-      <div style="background:${BRAND.card};text-align:center;padding:3px 1px 4px;">
-        <div style="font-size:8.5px;font-weight:600;color:${BRAND.muted};line-height:1.1;letter-spacing:-0.02em;">${escapeHtml(weekday)}</div>
-        <div style="font-size:19px;font-weight:900;color:${BRAND.ink};line-height:1;margin-top:2px;font-variant-numeric:tabular-nums;">${day}</div>
-        <div style="font-size:9px;font-weight:700;color:${BRAND.muted};margin-top:2px;line-height:1;font-variant-numeric:tabular-nums;">${year}</div>
+    <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;">
+      <div style="width:72px;border-radius:6px;overflow:hidden;border:1px solid ${BRAND.border};font-family:system-ui,sans-serif;background:${BRAND.card};">
+        <div style="background:${BRAND.financeSoft};color:${BRAND.finance};text-align:center;font-size:11px;font-weight:900;padding:3px 1px 2px;letter-spacing:.04em;text-transform:uppercase;line-height:1;">${month}</div>
+        <div style="background:${BRAND.card};text-align:center;padding:3px 1px 4px;">
+          <div style="font-size:8.5px;font-weight:600;color:${BRAND.muted};line-height:1.1;letter-spacing:-0.02em;">${escapeHtml(weekday)}</div>
+          <div style="font-size:19px;font-weight:900;color:${BRAND.ink};line-height:1;margin-top:2px;font-variant-numeric:tabular-nums;">${day}</div>
+          <div style="font-size:9px;font-weight:700;color:${BRAND.muted};margin-top:2px;line-height:1;font-variant-numeric:tabular-nums;">${year}</div>
+        </div>
       </div>
+      ${timeHtml}
     </div>`;
 }
 
