@@ -1075,6 +1075,7 @@ function FinanceShareInner({ token }: { token: string }) {
                 )}
               >
                 {chrome}
+                {strip}
               </div>
             )
           }

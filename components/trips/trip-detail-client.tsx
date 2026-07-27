@@ -98,6 +98,8 @@ import {
   TodayAgendaWidget,
   pickAgendaDay,
 } from "@/components/trips/today-agenda-widget";
+import { EventDetailOverlay } from "@/components/trips/event-detail-overlay";
+import { EventMapSnippet, getEventMapModel } from "@/components/trips/event-map-snippet";
 import {
   SoftChip,
   SoftChipRow,
@@ -108,7 +110,6 @@ import { useActiveDateFromScroll } from "@/hooks/use-active-date-from-scroll";
 import { DocumentPdfThumb } from "@/components/documents/document-pdf-preview";
 import {
   CommentCountChip,
-  EventDiaryPanel,
 } from "@/components/trips/event-diary-panel";
 import { TripMap } from "@/components/trips/trip-map";
 import { TripExportMenu } from "@/components/trips/trip-export-menu";
@@ -671,21 +672,6 @@ function EventActionsMenu({
   );
 }
 
-const VIEW_MODE_STORAGE_KEY = "travelbrain.tripViewMode";
-
-type TripViewMode = "cards" | "compact";
-
-function readViewMode(): TripViewMode {
-  if (typeof window === "undefined") return "cards";
-  try {
-    return window.localStorage.getItem(VIEW_MODE_STORAGE_KEY) === "compact"
-      ? "compact"
-      : "cards";
-  } catch {
-    return "cards";
-  }
-}
-
 function splitTransferPlaces(event: TripEvent): {
   origin: string;
   destination: string;
@@ -831,7 +817,7 @@ function TripDetailInner({
   const [editMode, setEditMode] = useState(false);
   /** Mobile edit toolbar focuses actions on one event. */
   const [editFocusEventId, setEditFocusEventId] = useState<number | null>(null);
-  const [viewMode, setViewMode] = useState<TripViewMode>("cards");
+  const [detailEventId, setDetailEventId] = useState<number | null>(null);
   const [aiBatch, setAiBatch] = useState<{
     current: number;
     total: number;
@@ -1116,19 +1102,6 @@ function TripDetailInner({
     }
     return pts.slice(0, 12);
   }, [events]);
-
-  useEffect(() => {
-    setViewMode(readViewMode());
-  }, []);
-
-  function changeViewMode(mode: TripViewMode) {
-    setViewMode(mode);
-    try {
-      window.localStorage.setItem(VIEW_MODE_STORAGE_KEY, mode);
-    } catch {
-      /* ignore */
-    }
-  }
 
   async function saveMeta() {
     setBusy(true);
@@ -3127,26 +3100,6 @@ function TripDetailInner({
           ) : null}
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-lg font-semibold">Timeline</h2>
-            <div className="flex items-center gap-1 rounded-lg border border-border/70 bg-muted/30 p-0.5">
-              <Button
-                type="button"
-                size="sm"
-                variant={viewMode === "cards" ? "default" : "ghost"}
-                className="h-7 px-2.5"
-                onClick={() => changeViewMode("cards")}
-              >
-                Karten
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant={viewMode === "compact" ? "default" : "ghost"}
-                className="h-7 px-2.5"
-                onClick={() => changeViewMode("compact")}
-              >
-                Kompakt
-              </Button>
-            </div>
           </div>
         </div>
         {eventDayDates.length > 0 ? (
@@ -3200,7 +3153,7 @@ function TripDetailInner({
           <div
             className={cn(
               "flex flex-col",
-              viewMode === "compact" ? "gap-2.5" : "gap-5"
+              "gap-2.5"
             )}
           >
           {events.map((event, eventIndex) => {
@@ -3216,10 +3169,8 @@ function TripDetailInner({
             const isLastOfDay =
               !nextEvent || firstOfDayEventIds.has(nextEvent.id);
             const dateLine = formatEventDateLine(event);
-            if (viewMode === "compact") {
+            {
               const details = formatCompactDetailLine(event);
-              const documents = event.documents || [];
-              const attachments = event.attachments || [];
               return (
                 <div
                   key={event.id}
@@ -3281,11 +3232,17 @@ function TripDetailInner({
                   <div className="min-w-0 flex-1 pb-2">
                   <Card
                     className={cn(
-                      "relative gap-0 overflow-visible border border-border bg-card py-0 shadow-none",
+                      "relative gap-0 overflow-hidden border border-border bg-card py-0 shadow-none transition-shadow",
+                      detailEventId === event.id &&
+                        "ring-2 ring-[var(--brand-docs)]/30",
                       editMode &&
                         dragOverEventId === event.id &&
-                        "ring-2 ring-teal-400/50"
+                        "ring-2 ring-teal-400/50",
+                      !editMode && "cursor-pointer hover:bg-muted/20"
                     )}
+                    onClick={() => {
+                      if (!editMode) setDetailEventId(event.id);
+                    }}
                   >
                     <CardContent className="space-y-2 p-2.5 sm:p-3">
                       <div className="flex items-start gap-2.5">
@@ -3296,7 +3253,7 @@ function TripDetailInner({
                           size="md"
                           className="mt-0.5 shrink-0"
                         />
-                        <div className="min-w-0 flex-1">
+                        <div className="min-w-0 flex-1 overflow-hidden">
                         <div className="flex min-w-0 items-center gap-1.5">
                           <div className="min-w-0 flex-1 truncate text-sm font-black leading-snug tracking-tight sm:text-base">
                             {event.title}
@@ -3311,6 +3268,7 @@ function TripDetailInner({
                               draggable
                               title="Ziehen zum Sortieren"
                               className="hidden cursor-grab touch-none rounded p-0.5 text-muted-foreground hover:bg-muted active:cursor-grabbing sm:inline-flex"
+                              onClick={(e) => e.stopPropagation()}
                               onDragStart={(e) => {
                                 setDragEventId(event.id);
                                 e.dataTransfer.effectAllowed = "move";
@@ -3335,15 +3293,10 @@ function TripDetailInner({
                           </div>
                         ) : null}
                         {details ? (
-                          <div className="mt-0.5 line-clamp-2 text-xs text-muted-foreground sm:truncate sm:line-clamp-none">
+                          <div className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
                             {details}
                           </div>
                         ) : null}
-                        <EventLinkedExpenses
-                          expenses={event.linked_expenses || []}
-                          className="mt-1.5"
-                          hideAmount={eventDenseFacts(event).length > 0}
-                        />
                         </div>
                         <div className="flex shrink-0 flex-col items-end gap-1">
                           <EventStatusPill event={event} />
@@ -3353,305 +3306,41 @@ function TripDetailInner({
                           className="hidden self-stretch w-px bg-border sm:block"
                           aria-hidden
                         />
-                        <EventCardAiImage
-                          event={event}
-                          onOpen={() =>
-                            setAiZoom({
-                              url: event.ai_image_url!,
-                              title: event.title,
-                              eventId: event.id,
-                            })
-                          }
-                        />
+                        <div
+                          onClick={(e) => e.stopPropagation()}
+                          onKeyDown={(e) => e.stopPropagation()}
+                        >
+                          <EventCardAiImage
+                            event={event}
+                            onOpen={() =>
+                              setAiZoom({
+                                url: event.ai_image_url!,
+                                title: event.title,
+                                eventId: event.id,
+                              })
+                            }
+                          />
+                        </div>
                       </div>
 
-                      {!readOnly || documents.length > 0 || attachments.length > 0 ? (
-                        <div className="flex items-center gap-2">
-                          {documents.length > 0 || attachments.length > 0 ? (
-                            <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto">
-                              {documents.map((doc) => (
-                                <DocumentPdfThumb
-                                  key={`p-${doc.id}`}
-                                  paperlessId={doc.paperless_id}
-                                  title={doc.title}
-                                  size="square"
-                                  removing={busy}
-                                  onRemove={
-                                    editMode && doc.removable !== false
-                                      ? () =>
-                                          void unlinkEventDocument(
-                                            event.id,
-                                            doc.id
-                                          )
-                                      : undefined
-                                  }
-                                />
-                              ))}
-                              {attachments.map((att) => (
-                                <DocumentPdfThumb
-                                  key={`a-${att.id}`}
-                                  pdfUrl={att.url}
-                                  thumbUrl={null}
-                                  title={att.title || att.original_filename}
-                                  size="square"
-                                  removing={busy}
-                                  onRemove={
-                                    editMode && att.removable !== false
-                                      ? () =>
-                                          void deleteEventAttachment(
-                                            event.id,
-                                            att.id
-                                          )
-                                      : undefined
-                                  }
-                                />
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="flex-1" />
-                          )}
-                          {!readOnly && editMode ? (
-                            <Button
-                              size="sm"
-                              variant={
-                                editFocusEventId === event.id
-                                  ? "secondary"
-                                  : "ghost"
-                              }
-                              className="h-7 shrink-0 px-2 text-xs md:hidden"
-                              onClick={() => setEditFocusEventId(event.id)}
-                            >
-                              {editFocusEventId === event.id
-                                ? "Aktiv"
-                                : "Wählen"}
-                            </Button>
-                          ) : null}
-                          {!readOnly ? (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className={cn(
-                                "h-7 shrink-0 px-2 text-xs",
-                                editMode && "hidden md:inline-flex"
-                              )}
-                              onClick={() => startEditEvent(event)}
-                            >
-                              <Pencil className="mr-1 size-3.5" />
-                              Ändern
-                            </Button>
-                          ) : null}
-                          {!readOnly ? (
-                            <EventActionsMenu
-                              items={[
-                                {
-                                  label: "Beleg / PDF",
-                                  icon: FilePlus2,
-                                  disabled: busy,
-                                  onClick: () => setLinkDocsEventId(event.id),
-                                },
-                                {
-                                  label: "KI-Bild",
-                                  icon: ImagePlus,
-                                  disabled:
-                                    busy ||
-                                    aiImageBusy ||
-                                    aiBatch != null,
-                                  onClick: () => openAiImageDialog(event),
-                                },
-                                ...(editMode
-                                  ? [
-                                      {
-                                        label: "Löschen",
-                                        icon: Trash2,
-                                        variant: "destructive" as const,
-                                        onClick: () =>
-                                          void removeEvent(event.id),
-                                      },
-                                    ]
-                                  : []),
-                              ]}
-                            />
-                          ) : null}
+                      {getEventMapModel(event) ? (
+                        <div
+                          className="overflow-hidden rounded-lg"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <EventMapSnippet
+                            event={event}
+                            heightClassName="h-28 sm:h-32"
+                            compact
+                          />
                         </div>
                       ) : null}
 
-                      <EventDiaryPanel
-                        tripId={tripId}
-                        eventId={event.id}
-                        readOnly={readOnly}
-                        shareToken={shareToken || undefined}
-                        collapsible
-                        defaultCollapsed
-                        className="border-t border-border/40 pt-2"
-                        onCountChange={(count) => {
-                          setEvents((prev) =>
-                            prev.map((e) =>
-                              e.id === event.id
-                                ? { ...e, comment_count: count }
-                                : e
-                            )
-                          );
-                        }}
-                      />
-                    </CardContent>
-                  </Card>
-                  </div>
-                  </div>
-                </div>
-              );
-            }
-            return (
-              <div
-                key={event.id}
-                id={dayAnchorId}
-                data-event-id={event.id}
-                className={dayAnchorClass}
-              >
-              {isDayAnchor && dayIso ? <EventDayHeading iso={dayIso} /> : null}
-              <div
-                className={cn(
-                  "flex gap-2 pt-1",
-                  editMode && dragOverEventId === event.id && "opacity-80"
-                )}
-                onDragOver={
-                  editMode
-                    ? (e) => {
-                        e.preventDefault();
-                        if (dragEventId != null && dragEventId !== event.id) {
-                          setDragOverEventId(event.id);
-                        }
-                      }
-                    : undefined
-                }
-                onDrop={
-                  editMode
-                    ? (e) => {
-                        e.preventDefault();
-                        if (dragEventId == null || dragEventId === event.id) {
-                          setDragEventId(null);
-                          setDragOverEventId(null);
-                          return;
-                        }
-                        const fromId = dragEventId;
-                        const toId = event.id;
-                        setDragEventId(null);
-                        setDragOverEventId(null);
-                        const fromIndex = events.findIndex((x) => x.id === fromId);
-                        const toIndex = events.findIndex((x) => x.id === toId);
-                        if (fromIndex < 0 || toIndex < 0) return;
-                        const next = [...events];
-                        const [moved] = next.splice(fromIndex, 1);
-                        next.splice(toIndex, 0, moved);
-                        setEvents(next);
-                        void persistEventOrder(next);
-                      }
-                    : undefined
-                }
-              >
-              <EventTimelineRail
-                event={event}
-                showConnector={!isLastOfDay}
-              />
-              <div className="min-w-0 flex-1 pb-2">
-                <Card
-                  className={cn(
-                    "relative gap-0 overflow-visible border border-border bg-card py-0 shadow-none",
-                    editingEventId === event.id && "ring-2 ring-foreground/15",
-                    editMode &&
-                      editFocusEventId === event.id &&
-                      "ring-2 ring-teal-400/40",
-                    editMode &&
-                      dragOverEventId === event.id &&
-                      "ring-2 ring-teal-400/50"
-                  )}
-                >
-                  <CardContent className="space-y-3 p-3 sm:p-4">
-                    <div className="flex items-start gap-3">
-                      <IconCircle
-                        icon={visual.icon}
-                        tone="green"
-                        shape="rounded"
-                        size="lg"
-                        className="mt-0.5 shrink-0"
-                      />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <div className="min-w-0 flex-1 text-lg font-black leading-snug tracking-tight sm:text-2xl">
-                            {event.title}
-                          </div>
-                          <CommentCountChip count={event.comment_count || 0} />
-                        </div>
-                        {dateLine ? (
-                          <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-                            <Calendar className="size-3.5 shrink-0" />
-                            <span>{dateLine}</span>
-                          </div>
-                        ) : null}
-                        {!readOnly && !editMode ? (
-                          <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-7 px-2 text-xs"
-                              onClick={() => startEditEvent(event)}
-                            >
-                              <Pencil className="mr-1 size-3.5" />
-                              Ändern
-                            </Button>
-                            <EventActionsMenu
-                              items={[
-                                {
-                                  label: "Beleg / PDF",
-                                  icon: FilePlus2,
-                                  disabled: busy,
-                                  onClick: () =>
-                                    setLinkDocsEventId(event.id),
-                                },
-                                {
-                                  label: "KI-Bild",
-                                  icon: ImagePlus,
-                                  disabled:
-                                    busy || aiImageBusy || aiBatch != null,
-                                  onClick: () => openAiImageDialog(event),
-                                },
-                              ]}
-                            />
-                          </div>
-                        ) : null}
-                        <EventLinkedExpenses
-                          expenses={event.linked_expenses || []}
-                          className="mt-2"
-                          hideAmount={eventDenseFacts(event).length > 0}
-                        />
-                      </div>
-                      <div className="flex shrink-0 items-start gap-2">
-                        <div className="flex flex-col items-end gap-1.5">
-                          <EventStatusPill event={event} />
-                          <EventDenseFactsColumn event={event} />
-                        </div>
-                      {/* Desktop edit actions — mobile uses bottom bar */}
                       {editMode ? (
-                        <div className="hidden shrink-0 flex-col items-center gap-0.5 md:flex">
-                          <button
-                            type="button"
-                            draggable
-                            title="Ziehen zum Sortieren"
-                            className="cursor-grab touch-none rounded p-1 text-muted-foreground hover:bg-background/70 active:cursor-grabbing"
-                            onDragStart={(e) => {
-                              setDragEventId(event.id);
-                              e.dataTransfer.effectAllowed = "move";
-                              e.dataTransfer.setData(
-                                "text/plain",
-                                String(event.id)
-                              );
-                            }}
-                            onDragEnd={() => {
-                              setDragEventId(null);
-                              setDragOverEventId(null);
-                            }}
-                          >
-                            <GripVertical className="size-4" />
-                          </button>
+                        <div
+                          className="flex items-center justify-end gap-2"
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           <Button
                             size="sm"
                             variant={
@@ -3659,612 +3348,78 @@ function TripDetailInner({
                                 ? "secondary"
                                 : "ghost"
                             }
-                            className="h-7 px-2 text-xs"
-                            onClick={() => {
-                              setEditFocusEventId(event.id);
-                              startEditEvent(event);
-                            }}
+                            className="h-7 shrink-0 px-2 text-xs md:hidden"
+                            onClick={() => setEditFocusEventId(event.id)}
+                          >
+                            {editFocusEventId === event.id ? "Aktiv" : "Wählen"}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="hidden h-7 shrink-0 px-2 text-xs md:inline-flex"
+                            onClick={() => startEditEvent(event)}
                           >
                             <Pencil className="mr-1 size-3.5" />
                             Ändern
                           </Button>
-                          <EventActionsMenu
-                            items={[
-                              {
-                                label: "Beleg / PDF",
-                                icon: FilePlus2,
-                                disabled: busy,
-                                onClick: () => {
-                                  setEditFocusEventId(event.id);
-                                  setLinkDocsEventId(event.id);
-                                },
-                              },
-                              {
-                                label: "KI-Bild",
-                                icon: ImagePlus,
-                                disabled:
-                                  busy || aiImageBusy || aiBatch != null,
-                                onClick: () => {
-                                  setEditFocusEventId(event.id);
-                                  openAiImageDialog(event);
-                                },
-                              },
-                              {
-                                label: "Löschen",
-                                icon: Trash2,
-                                variant: "destructive",
-                                onClick: () => void removeEvent(event.id),
-                              },
-                            ]}
-                          />
                         </div>
                       ) : null}
-                      </div>
-                      <div
-                        className="hidden self-stretch w-px bg-border sm:block"
-                        aria-hidden
-                      />
-                      <EventCardAiImage
-                        event={event}
-                        onOpen={() =>
-                          setAiZoom({
-                            url: event.ai_image_url!,
-                            title: event.title,
-                            eventId: event.id,
-                          })
-                        }
-                      />
-                    </div>
-                    {editMode ? (
-                      <button
-                        type="button"
-                        className={cn(
-                          "w-full rounded-md border border-dashed px-2 py-1.5 text-left text-xs md:hidden",
-                          editFocusEventId === event.id
-                            ? "border-foreground/40 bg-background/80 font-medium"
-                            : "border-border/60 text-muted-foreground"
-                        )}
-                        onClick={() => setEditFocusEventId(event.id)}
-                      >
-                        {editFocusEventId === event.id
-                          ? "Für Aktionen unten ausgewählt"
-                          : "Tippen zum Auswählen"}
-                      </button>
-                    ) : null}
-
-                    {(() => {
-                      const type = coerceTripEventType(event.event_type);
-                      const dual = isDualPlaceType(type);
-                      const dualLabels = dualPlaceLabels(type);
-                      const routePlaces = splitTransferPlaces(event);
-                      const showPlaceName =
-                        Boolean(event.place_name) &&
-                        !textsOverlap(event.place_name, event.title);
-                      const address =
-                        type === "Flug" || dual
-                          ? event.address
-                          : event.address ||
-                            (event.location &&
-                            !textsOverlap(event.location, event.title) &&
-                            !textsOverlap(event.location, event.place_name)
-                              ? event.location
-                              : null);
-                      const hasFlightDetails =
-                        type === "Flug" &&
-                        Boolean(
-                          event.airline ||
-                            event.flight_number ||
-                            event.cabin_class ||
-                            event.departure_airport ||
-                            event.arrival_airport ||
-                            event.duration_minutes ||
-                            event.aircraft_reg ||
-                            event.aircraft_type ||
-                            event.departure_terminal ||
-                            event.arrival_terminal ||
-                            event.departure_gate ||
-                            event.arrival_gate ||
-                            event.check_in_desk ||
-                            event.baggage_belt
-                        );
-                      const hasDualPlaceDetails = Boolean(
-                        dual &&
-                          (routePlaces.origin ||
-                            routePlaces.destination ||
-                            (type === "Zugreisen" && event.flight_number))
-                      );
-                      const hasPlaceDetails = Boolean(
-                        showPlaceName ||
-                          address ||
-                          event.phone ||
-                          event.website
-                      );
-                      const hasPlaceMap =
-                        (event.lat != null && event.lon != null) ||
-                        Boolean(event.map_image_url);
-                      const hasFlightRouteMap =
-                        type === "Flug" &&
-                        event.departure_lat != null &&
-                        event.departure_lon != null &&
-                        event.arrival_lat != null &&
-                        event.arrival_lon != null;
-                      const hasStraightRouteMap =
-                        type !== "Flug" &&
-                        event.departure_lat != null &&
-                        event.departure_lon != null &&
-                        event.arrival_lat != null &&
-                        event.arrival_lon != null;
-                      const endpointPoint =
-                        type !== "Flug" && !hasStraightRouteMap
-                          ? event.departure_lat != null &&
-                            event.departure_lon != null
-                            ? {
-                                lat: event.departure_lat,
-                                lon: event.departure_lon,
-                                label: routePlaces.origin || dualLabels.origin,
-                              }
-                            : event.arrival_lat != null &&
-                                event.arrival_lon != null
-                              ? {
-                                  lat: event.arrival_lat,
-                                  lon: event.arrival_lon,
-                                  label:
-                                    routePlaces.destination ||
-                                    dualLabels.destination,
-                                }
-                              : null
-                          : null;
-                      const hasRouteMap =
-                        hasFlightRouteMap || hasStraightRouteMap;
-                      const hasMap =
-                        hasPlaceMap || hasRouteMap || Boolean(endpointPoint);
-                      const hasGenericDetails = Boolean(
-                        event.provider ||
-                          event.booking_reference ||
-                          (type !== "Flug" && event.flight_number)
-                      );
-                      const documents = event.documents || [];
-                      const attachments = event.attachments || [];
-                      const hasDocuments =
-                        documents.length > 0 || attachments.length > 0;
-                      const flightEnrichmentNotice =
-                        type === "Flug"
-                          ? parseFlightEnrichmentNotice(event.enrichment_json)
-                          : null;
-
-                      if (
-                        !hasFlightDetails &&
-                        !hasDualPlaceDetails &&
-                        !hasPlaceDetails &&
-                        !hasMap &&
-                        !hasGenericDetails &&
-                        !hasDocuments &&
-                        !event.aircraft_image_url &&
-                        !event.ai_image_url &&
-                        !event.notes &&
-                        !flightEnrichmentNotice &&
-                        !(
-                          event.document_notes_md?.trim() &&
-                          event.show_document_notes !== 0 &&
-                          event.show_document_notes !== false
-                        )
-                      ) {
-                        return null;
-                      }
-
-                      const documentThumbs =
-                        !readOnly && hasDocuments ? (
-                        <div className="max-w-full overflow-x-auto pb-1">
-                          <div
-                            className="grid w-max grid-flow-col justify-start gap-2"
-                            style={{ gridAutoColumns: "3.5rem" }}
-                          >
-                          {documents.map((doc) => (
-                            <DocumentPdfThumb
-                              key={`p-${doc.id}`}
-                              paperlessId={doc.paperless_id}
-                              title={doc.title}
-                              removing={busy}
-                              onRemove={
-                                doc.removable !== false
-                                  ? () =>
-                                      void unlinkEventDocument(event.id, doc.id)
-                                  : undefined
-                              }
-                            />
-                          ))}
-                          {attachments.map((att) => (
-                            <DocumentPdfThumb
-                              key={`a-${att.id}`}
-                              pdfUrl={att.url}
-                              thumbUrl={null}
-                              title={att.title || att.original_filename}
-                              removing={busy}
-                              onRemove={
-                                att.removable !== false
-                                  ? () =>
-                                      void deleteEventAttachment(
-                                        event.id,
-                                        att.id
-                                      )
-                                  : undefined
-                              }
-                            />
-                          ))}
-                          </div>
-                        </div>
-                      ) : null;
-
-                      return (
-                        <div className="space-y-3">
-                          {flightEnrichmentNotice ? (
-                            <div
-                              role="status"
-                              className="flex gap-2 rounded-md border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-sm text-amber-950 dark:text-amber-100"
-                            >
-                              <Info
-                                className="mt-0.5 size-4 shrink-0 text-amber-700 dark:text-amber-300"
-                                aria-hidden
-                              />
-                              <p className="leading-snug">
-                                {flightEnrichmentNotice}
-                              </p>
-                            </div>
-                          ) : null}
-
-                          {(hasFlightDetails ||
-                            (hasGenericDetails && type === "Flug")) && (
-                            <div
-                              className={cn(
-                                "space-y-1.5 rounded-md px-3 py-2",
-                                toneSurface(visual.tone).soft
-                              )}
-                            >
-                              <DetailRow label="Airline" value={event.airline} />
-                              <DetailRow
-                                label="Strecke"
-                                value={
-                                  event.departure_airport ||
-                                  event.arrival_airport
-                                    ? `${event.departure_airport || "—"} → ${
-                                        event.arrival_airport || "—"
-                                      }`
-                                    : null
-                                }
-                              />
-                              {/* Flugnr. / Klasse: nur rechts in Dense-Facts, nicht nochmals hier */}
-                              <DetailRow
-                                label="Dauer"
-                                value={
-                                  event.duration_minutes != null
-                                    ? `${event.duration_minutes} Min.`
-                                    : null
-                                }
-                              />
-                              <DetailRow
-                                label="Flugzeug"
-                                value={[event.aircraft_type, event.aircraft_reg]
-                                  .filter(Boolean)
-                                  .join(" · ")}
-                              />
-                              <DetailRow
-                                label="Abflug"
-                                value={[
-                                  event.departure_terminal
-                                    ? `Terminal ${event.departure_terminal}`
-                                    : null,
-                                  event.departure_gate
-                                    ? `Gate ${event.departure_gate}`
-                                    : null,
-                                  event.check_in_desk
-                                    ? `Check-in ${event.check_in_desk}`
-                                    : null,
-                                ]
-                                  .filter(Boolean)
-                                  .join(" · ")}
-                              />
-                              <DetailRow
-                                label="Ankunft"
-                                value={[
-                                  event.arrival_terminal
-                                    ? `Terminal ${event.arrival_terminal}`
-                                    : null,
-                                  event.arrival_gate
-                                    ? `Gate ${event.arrival_gate}`
-                                    : null,
-                                  event.baggage_belt
-                                    ? `Gepäck ${event.baggage_belt}`
-                                    : null,
-                                ]
-                                  .filter(Boolean)
-                                  .join(" · ")}
-                              />
-                              <DetailRow
-                                label="Buchung"
-                                value={event.booking_reference}
-                              />
-                              <DetailRow
-                                label="Anbieter"
-                                value={
-                                  event.provider &&
-                                  event.airline &&
-                                  event.provider.trim().toLowerCase() ===
-                                    event.airline.trim().toLowerCase()
-                                    ? null
-                                    : event.provider
-                                }
-                              />
-                            </div>
-                          )}
-
-                          {(hasDualPlaceDetails ||
-                            (hasGenericDetails && dual)) && (
-                            <div
-                              className={cn(
-                                "space-y-1.5 rounded-md px-3 py-2",
-                                toneSurface(visual.tone).soft
-                              )}
-                            >
-                              <DetailRow
-                                label={dualLabels.origin}
-                                value={routePlaces.origin || null}
-                              />
-                              <DetailRow
-                                label={dualLabels.destination}
-                                value={routePlaces.destination || null}
-                              />
-                              {type === "Zugreisen" &&
-                              !eventDenseFacts(event).includes(
-                                event.flight_number || ""
-                              ) ? (
-                                <DetailRow
-                                  label="Zugnr."
-                                  value={event.flight_number}
-                                />
-                              ) : null}
-                              <DetailRow
-                                label="Anbieter"
-                                value={event.provider}
-                              />
-                              <DetailRow
-                                label="Buchung"
-                                value={event.booking_reference}
-                              />
-                            </div>
-                          )}
-
-                          {(hasPlaceDetails ||
-                            (hasPlaceMap && !dual && !hasStraightRouteMap) ||
-                            (hasGenericDetails &&
-                              type !== "Flug" &&
-                              !dual)) && (
-                            <div
-                              className={cn(
-                                "grid gap-3",
-                                hasPlaceMap &&
-                                  !dual &&
-                                  !hasStraightRouteMap &&
-                                  (hasPlaceDetails ||
-                                    (hasGenericDetails &&
-                                      type !== "Flug" &&
-                                      !dual)) &&
-                                  "sm:grid-cols-[minmax(0,1fr)_minmax(11rem,15rem)] sm:items-start"
-                              )}
-                            >
-                              {hasPlaceDetails ||
-                              (hasGenericDetails &&
-                                type !== "Flug" &&
-                                !dual) ? (
-                              <div
-                                className={cn(
-                                  "space-y-1.5 rounded-md px-3 py-2",
-                                  toneSurface(visual.tone).soft
-                                )}
-                              >
-                                {showPlaceName ? (
-                                  <DetailRow
-                                    label="Name"
-                                    value={event.place_name}
-                                  />
-                                ) : null}
-                                <DetailRow label="Adresse" value={address} />
-                                <DetailRow
-                                  label="Telefon"
-                                  value={
-                                    event.phone ? (
-                                      <a
-                                        href={`tel:${event.phone}`}
-                                        className="underline-offset-2 hover:underline"
-                                      >
-                                        {event.phone}
-                                      </a>
-                                    ) : null
-                                  }
-                                />
-                                <DetailRow
-                                  label="Website"
-                                  value={
-                                    event.website ? (
-                                      <a
-                                        href={event.website}
-                                        className="break-all text-primary underline"
-                                        target="_blank"
-                                        rel="noreferrer"
-                                      >
-                                        {event.website.replace(
-                                          /^https?:\/\//,
-                                          ""
-                                        )}
-                                      </a>
-                                    ) : null
-                                  }
-                                />
-                                {type !== "Flug" && !dual ? (
-                                  <>
-                                    <DetailRow
-                                      label="Anbieter"
-                                      value={event.provider}
-                                    />
-                                    <DetailRow
-                                      label="Buchung"
-                                      value={event.booking_reference}
-                                    />
-                                  </>
-                                ) : null}
-                              </div>
-                              ) : null}
-                              {!dual &&
-                              !hasStraightRouteMap &&
-                              event.lat != null &&
-                              event.lon != null ? (
-                                <TripMap
-                                  points={[
-                                    {
-                                      lat: event.lat,
-                                      lon: event.lon,
-                                    },
-                                  ]}
-                                  heightClassName="h-36"
-                                />
-                              ) : !dual &&
-                                !hasStraightRouteMap &&
-                                event.map_image_url ? (
-                                <div className="overflow-hidden rounded-md border border-border/70 bg-muted/30">
-                                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                                  <img
-                                    src={event.map_image_url}
-                                    alt="Kartenausschnitt"
-                                    className="h-36 w-full object-cover"
-                                  />
-                                </div>
-                              ) : null}
-                            </div>
-                          )}
-
-                          {documentThumbs}
-
-                          {hasFlightRouteMap ? (
-                            <TripMap
-                              points={[
-                                {
-                                  lat: event.departure_lat!,
-                                  lon: event.departure_lon!,
-                                  label: event.departure_airport || "Von",
-                                },
-                                {
-                                  lat: event.arrival_lat!,
-                                  lon: event.arrival_lon!,
-                                  label: event.arrival_airport || "Nach",
-                                },
-                              ]}
-                              drawRoute
-                              routeStyle="greatCircle"
-                              heightClassName="h-44"
-                            />
-                          ) : null}
-
-                          {hasStraightRouteMap ? (
-                            <TripMap
-                              points={[
-                                {
-                                  lat: event.departure_lat!,
-                                  lon: event.departure_lon!,
-                                  label:
-                                    routePlaces.origin || dualLabels.origin,
-                                },
-                                {
-                                  lat: event.arrival_lat!,
-                                  lon: event.arrival_lon!,
-                                  label:
-                                    routePlaces.destination ||
-                                    dualLabels.destination,
-                                },
-                              ]}
-                              drawRoute
-                              routeStyle="straight"
-                              heightClassName="h-44"
-                            />
-                          ) : endpointPoint ? (
-                            <TripMap
-                              points={[endpointPoint]}
-                              heightClassName="h-36"
-                            />
-                          ) : null}
-
-                          {event.aircraft_image_url ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={event.aircraft_image_url}
-                              alt={event.aircraft_reg || "Flugzeug"}
-                              className="max-h-40 rounded-md object-cover"
-                            />
-                          ) : null}
-
-                          {event.notes ? (
-                            <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                              {event.notes}
-                            </p>
-                          ) : null}
-
-                          <BelegNotesBlock
-                            markdown={event.document_notes_md || ""}
-                            show={
-                              event.show_document_notes !== 0 &&
-                              event.show_document_notes !== false
-                            }
-                          />
-
-                          {editMode && event.document_notes_md?.trim() ? (
-                            <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                              <input
-                                type="checkbox"
-                                className="size-3.5 rounded border-border"
-                                checked={
-                                  event.show_document_notes !== 0 &&
-                                  event.show_document_notes !== false
-                                }
-                                disabled={busy}
-                                onChange={(e) =>
-                                  void toggleShowDocumentNotes(
-                                    event.id,
-                                    e.target.checked
-                                  )
-                                }
-                              />
-                              Beleg-Infos anzeigen
-                            </label>
-                          ) : null}
-                        </div>
-                      );
-                    })()}
-                    <EventDiaryPanel
-                      tripId={tripId}
-                      eventId={event.id}
-                      readOnly={readOnly}
-                      shareToken={shareToken || undefined}
-                      className="border-t border-border/40 pt-3"
-                      onCountChange={(count) => {
-                        setEvents((prev) =>
-                          prev.map((e) =>
-                            e.id === event.id
-                              ? { ...e, comment_count: count }
-                              : e
-                          )
-                        );
-                      }}
-                    />
-                  </CardContent>
-                </Card>
-              </div>
-              </div>
-              </div>
-            );
+                    </CardContent>
+                  </Card>
+                  </div>
+                  </div>
+                </div>
+              );
+            }
           })
           }
           </div>
         )}
       </div>
       ) : null}
+
+
+      <EventDetailOverlay
+        open={detailEventId != null}
+        onOpenChange={(open) => {
+          if (!open) setDetailEventId(null);
+        }}
+        event={
+          detailEventId != null
+            ? events.find((e) => e.id === detailEventId) || null
+            : null
+        }
+        tripId={tripId}
+        readOnly={readOnly}
+        shareToken={shareToken}
+        editMode={editMode}
+        busy={busy}
+        aiImageBusy={aiImageBusy || aiBatch != null}
+        onEdit={(ev) => {
+          setDetailEventId(null);
+          startEditEvent(ev as TripEvent);
+        }}
+        onLinkDocs={(id) => setLinkDocsEventId(id)}
+        onAiImage={(ev) => openAiImageDialog(ev as TripEvent)}
+        onDelete={(id) => void removeEvent(id)}
+        onUnlinkDoc={(eventId, documentId) =>
+          void unlinkEventDocument(eventId, documentId)
+        }
+        onDeleteAttachment={(eventId, attachmentId) =>
+          void deleteEventAttachment(eventId, attachmentId)
+        }
+        onToggleShowDocumentNotes={(eventId, show) =>
+          void toggleShowDocumentNotes(eventId, show)
+        }
+        onOpenAiZoom={(payload) => setAiZoom(payload)}
+        onCommentCountChange={(eventId, count) => {
+          setEvents((prev) =>
+            prev.map((e) =>
+              e.id === eventId ? { ...e, comment_count: count } : e
+            )
+          );
+        }}
+      />
 
       <Dialog open={diaryOpen} onOpenChange={setDiaryOpen}>
         <DialogContent className="max-w-md">

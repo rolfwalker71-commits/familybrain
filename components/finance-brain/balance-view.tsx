@@ -986,9 +986,9 @@ function ExpenseCard({
             className="h-12 w-12 shrink-0 sm:h-14 sm:w-14 [&_svg]:h-6 [&_svg]:w-6 sm:[&_svg]:h-7 sm:[&_svg]:w-7"
           />
 
-          <div className="min-w-0 flex-1">
-            <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-              <p className="min-w-0 truncate text-base font-black leading-snug tracking-tight text-foreground sm:text-xl">
+          <div className="min-w-0 flex-1 overflow-hidden">
+            <div className="flex min-w-0 items-center gap-1.5">
+              <p className="min-w-0 flex-1 truncate text-base font-black leading-snug tracking-tight text-foreground sm:text-xl">
                 {exp.description || (isIncome ? "Einnahme" : "Ausgabe")}
               </p>
               {Boolean(exp.pre_settled) ? (
@@ -999,7 +999,7 @@ function ExpenseCard({
                     <Badge
                       variant="secondary"
                       title={badge.title}
-                      className="h-5 gap-0.5 border border-[var(--brand-finance)]/25 bg-[var(--brand-finance-soft)] px-1.5 text-[10px] font-semibold text-[var(--brand-finance)]"
+                      className="h-5 shrink-0 gap-0.5 border border-[var(--brand-finance)]/25 bg-[var(--brand-finance-soft)] px-1.5 text-[10px] font-semibold text-[var(--brand-finance)]"
                     >
                       <Check className="size-3" strokeWidth={2.5} aria-hidden />
                       {badge.label}
@@ -1076,7 +1076,7 @@ function ExpenseCard({
           if (!open) setEditing(false);
         }}
       >
-        <DialogContent className="flex max-h-[90dvh] w-[min(96vw,26rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-md">
+        <DialogContent className="flex max-h-[92dvh] w-[min(96vw,26rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl md:max-w-3xl lg:max-w-4xl">
           <DialogHeader className="shrink-0 border-b border-border/50 px-4 py-3 pr-12 text-left">
             <DialogTitle className="truncate text-base">
               {editing
@@ -1299,14 +1299,14 @@ function ExpenseCard({
             <div className="min-h-0 flex-1 overflow-hidden px-3 pb-3 pt-2">
               <DetailCarousel
                 resetKey={exp.id}
-                className="h-full max-h-[min(70dvh,32rem)]"
+                className="h-full max-h-[min(78dvh,40rem)] sm:max-h-[min(80dvh,44rem)]"
               >
-                <div className="flex flex-col items-center gap-3 px-2 pb-2 pt-1 text-center">
+                <div className="flex flex-col items-center gap-3 px-2 pb-2 pt-1 text-center sm:gap-4 sm:px-4">
                   {exp.ai_image_url ? (
                     <AiImagePreview
                       src={exp.ai_image_url}
                       brand="finance"
-                      imageClassName="h-36 w-36 rounded-2xl object-cover sm:h-40 sm:w-40"
+                      imageClassName="h-36 w-36 rounded-2xl object-cover sm:h-48 sm:w-48 md:h-56 md:w-56"
                       onOpen={() => setZoomOpen(true)}
                     />
                   ) : (
@@ -1315,16 +1315,16 @@ function ExpenseCard({
                       tone="green"
                       shape="circle"
                       size="lg"
-                      className="h-20 w-20 [&_svg]:h-9 [&_svg]:w-9"
+                      className="h-20 w-20 sm:h-24 sm:w-24 [&_svg]:h-9 [&_svg]:w-9 sm:[&_svg]:h-11 sm:[&_svg]:w-11"
                     />
                   )}
                   <div className="min-w-0 space-y-1">
-                    <p className="text-lg font-black leading-snug tracking-tight text-foreground">
+                    <p className="text-lg font-black leading-snug tracking-tight text-foreground sm:text-2xl">
                       {exp.description || (isIncome ? "Einnahme" : "Ausgabe")}
                     </p>
                     <p
                       className={cn(
-                        "text-2xl font-bold tabular-nums",
+                        "text-2xl font-bold tabular-nums sm:text-3xl",
                         isIncome
                           ? "text-[var(--brand-finance)]"
                           : "text-foreground"
@@ -2191,14 +2191,6 @@ export function ExpenseList({
         >
           {filteredExpenses.length} von {expenses.length} · Filter anpassen
         </button>
-      ) : null}
-      {renderStickyChrome ? (
-        <DateTimelineStrip
-          dates={expenseDayDates}
-          anchorIdForDate={expenseDayAnchorId}
-          activeDate={activeExpenseDay}
-          accent="finance"
-        />
       ) : null}
     </div>
   );

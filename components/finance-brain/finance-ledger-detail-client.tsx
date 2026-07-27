@@ -1892,6 +1892,7 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
                   overflowItems={overflowItems}
                 />
                 {chrome}
+                {strip}
               </div>
             )
           }
