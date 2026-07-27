@@ -1070,19 +1070,34 @@ function ExpenseCard({
               ) : null}
             </div>
             {exp.trip_event ? (
-              <Link
-                href={`/trips/${exp.trip_event.trip_id}`}
-                onClick={(e) => e.stopPropagation()}
-                className="mt-1.5 inline-flex max-w-full items-center gap-1 rounded-full bg-[var(--brand-docs-soft)] px-2 py-0.5 text-[10px] font-semibold text-[var(--brand-docs)] hover:opacity-90"
-                title={
-                  exp.trip_event.trip_title
-                    ? `${exp.trip_event.title} · ${exp.trip_event.trip_title}`
-                    : exp.trip_event.title
-                }
-              >
-                <Luggage className="size-3 shrink-0" />
-                <span className="truncate">{exp.trip_event.title}</span>
-              </Link>
+              (() => {
+                const eventDate = formatDateDe(exp.trip_event.start_date);
+                return (
+                  <Link
+                    href={`/trips/${exp.trip_event.trip_id}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="mt-1.5 inline-flex max-w-full items-center gap-1 rounded-full bg-[var(--brand-docs-soft)] px-2 py-0.5 text-[10px] font-semibold text-[var(--brand-docs)] hover:opacity-90"
+                    title={
+                      [
+                        eventDate || null,
+                        exp.trip_event.start_time || null,
+                        exp.trip_event.title,
+                        exp.trip_event.trip_title
+                          ? `(${exp.trip_event.trip_title})`
+                          : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")
+                    }
+                  >
+                    <Luggage className="size-3 shrink-0" />
+                    <span className="truncate">
+                      {eventDate ? `${eventDate} · ` : ""}
+                      {exp.trip_event.title}
+                    </span>
+                  </Link>
+                );
+              })()
             ) : null}
           </div>
 

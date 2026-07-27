@@ -94,3 +94,26 @@ export function formatMoneyFxSummary(input: {
     hasFx: true,
   };
 }
+
+/** Parenthetical money for Travel↔Finance link rows: (CHF …) or (CHF … / FX … · rate). */
+export function formatLinkedExpenseMoneyParen(input: {
+  amount: number;
+  currency: string;
+  amountBase: number;
+  baseCurrency: string;
+  exchangeRate?: number | null;
+}): string {
+  const base = formatMoney(input.amountBase, input.baseCurrency);
+  if (!isForeignCurrency(input.currency, input.baseCurrency)) {
+    return `(${base})`;
+  }
+  const fx = formatMoney(input.amount, input.currency);
+  const rateLine = formatExchangeRateLine({
+    currency: input.currency,
+    baseCurrency: input.baseCurrency,
+    exchangeRate: input.exchangeRate,
+    amount: input.amount,
+    amountBase: input.amountBase,
+  });
+  return `(${base} / ${fx} · ${rateLine})`;
+}

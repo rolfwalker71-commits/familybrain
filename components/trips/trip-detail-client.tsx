@@ -42,7 +42,7 @@ import type { LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { formatDateDe, formatMoney } from "@/lib/finance-brain/format";
+import { formatDateDe, formatLinkedExpenseMoneyParen, formatMoney } from "@/lib/finance-brain/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -226,6 +226,7 @@ type TripEvent = {
     expense_date: string | null;
     amount: number;
     currency: string;
+    exchange_rate?: number | null;
     amount_base: number;
     base_currency: string;
     paid_by_name: string;
@@ -593,7 +594,7 @@ function formatCompactDetailLine(event: TripEvent): string | null {
 function EventLinkedExpenses({
   expenses,
   className,
-  /** When amount already shown in dense column — only ledger + payer. */
+  /** Prefer ledger title when amount already shown in dense column. */
   hideAmount = false,
 }: {
   expenses: NonNullable<TripEvent["linked_expenses"]>;
@@ -604,7 +605,19 @@ function EventLinkedExpenses({
   return (
     <div className={cn("space-y-1", className)}>
       {expenses.map((exp) => {
-        const money = formatMoney(exp.amount, exp.currency);
+        const label = hideAmount
+          ? exp.ledger_title || "Abrechnung"
+          : exp.description?.trim() ||
+            exp.category_label ||
+            exp.ledger_title ||
+            "Ausgabe";
+        const moneyParen = formatLinkedExpenseMoneyParen({
+          amount: exp.amount,
+          currency: exp.currency,
+          amountBase: exp.amount_base,
+          baseCurrency: exp.base_currency || "CHF",
+          exchangeRate: exp.exchange_rate,
+        });
         return (
           <p
             key={exp.id}
@@ -615,11 +628,12 @@ function EventLinkedExpenses({
               href={`/finance-brain/${exp.ledger_id}`}
               className="min-w-0 font-medium text-foreground underline-offset-2 hover:underline"
             >
-              {hideAmount
-                ? exp.ledger_title || "Abrechnung"
-                : `${exp.description?.trim() || exp.category_label || "Ausgabe"} · ${money}`}
+              {label}
             </Link>
-            <span className="text-muted-foreground">· {exp.paid_by_name}</span>
+            <span className="min-w-0 text-muted-foreground">
+              {moneyParen}
+              {exp.paid_by_name ? ` · ${exp.paid_by_name}` : ""}
+            </span>
           </p>
         );
       })}

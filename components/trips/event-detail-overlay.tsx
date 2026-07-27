@@ -31,7 +31,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { formatMoney } from "@/lib/finance-brain/format";
+import { formatLinkedExpenseMoneyParen, formatMoney } from "@/lib/finance-brain/format";
 import { toDateInputValue, toTimeInputValue } from "@/lib/utils/dates";
 import { coerceTripEventType } from "@/lib/trips/constants";
 import {
@@ -120,6 +120,7 @@ export type EventDetailEvent = {
     expense_date: string | null;
     amount: number;
     currency: string;
+    exchange_rate?: number | null;
     amount_base: number;
     base_currency: string;
     paid_by_name: string;
@@ -780,34 +781,42 @@ export function EventDetailOverlay({
                       FinanzBuddy
                     </p>
                     <ul className="space-y-1.5">
-                      {linkedExpenses.map((exp) => (
-                        <li key={exp.id}>
-                          <Link
-                            href={`/finance-brain/${exp.ledger_id}`}
-                            className="flex items-start gap-2 rounded-xl border border-border/60 bg-muted/20 px-3 py-2.5 text-sm text-foreground underline-offset-2 hover:underline"
-                          >
-                            <Wallet className="mt-0.5 size-4 shrink-0 text-[var(--brand-finance)]" />
-                            <span className="min-w-0">
-                              <span className="font-medium">
-                                {exp.description?.trim() ||
-                                  exp.category_label ||
-                                  "Ausgabe"}
+                      {linkedExpenses.map((exp) => {
+                        const moneyParen = formatLinkedExpenseMoneyParen({
+                          amount: exp.amount,
+                          currency: exp.currency,
+                          amountBase: exp.amount_base,
+                          baseCurrency: exp.base_currency || "CHF",
+                          exchangeRate: exp.exchange_rate,
+                        });
+                        return (
+                          <li key={exp.id}>
+                            <Link
+                              href={`/finance-brain/${exp.ledger_id}`}
+                              className="flex items-start gap-2 rounded-xl border border-border/60 bg-muted/20 px-3 py-2.5 text-sm text-foreground underline-offset-2 hover:underline"
+                            >
+                              <Wallet className="mt-0.5 size-4 shrink-0 text-[var(--brand-finance)]" />
+                              <span className="min-w-0">
+                                <span className="font-medium">
+                                  {exp.description?.trim() ||
+                                    exp.category_label ||
+                                    exp.ledger_title ||
+                                    "Ausgabe"}
+                                </span>{" "}
+                                <span className="tabular-nums text-muted-foreground">
+                                  {moneyParen}
+                                </span>
+                                <span className="block text-xs text-muted-foreground">
+                                  {exp.ledger_title}
+                                  {exp.paid_by_name
+                                    ? ` · ${exp.paid_by_name}`
+                                    : ""}
+                                </span>
                               </span>
-                              {" · "}
-                              {formatMoney(
-                                exp.amount_base || exp.amount,
-                                exp.base_currency || exp.currency
-                              )}
-                              <span className="block text-xs text-muted-foreground">
-                                {exp.ledger_title}
-                                {exp.paid_by_name
-                                  ? ` · ${exp.paid_by_name}`
-                                  : ""}
-                              </span>
-                            </span>
-                          </Link>
-                        </li>
-                      ))}
+                            </Link>
+                          </li>
+                        );
+                      })}
                     </ul>
                   </div>
                 ) : null}

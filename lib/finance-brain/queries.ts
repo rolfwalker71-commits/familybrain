@@ -643,6 +643,7 @@ export type TripEventLinkedExpense = {
   expense_date: string | null;
   amount: number;
   currency: string;
+  exchange_rate: number | null;
   amount_base: number;
   base_currency: string;
   paid_by_name: string;
@@ -667,6 +668,7 @@ export function listLinkedExpensesForTripEvents(
          e.expense_date,
          e.amount,
          e.currency,
+         e.exchange_rate,
          e.amount_base,
          e.category_label,
          l.title AS ledger_title,
@@ -687,6 +689,7 @@ export function listLinkedExpensesForTripEvents(
     expense_date: string | null;
     amount: number;
     currency: string;
+    exchange_rate: number | null;
     amount_base: number;
     category_label: string | null;
     ledger_title: string;
@@ -704,6 +707,7 @@ export function listLinkedExpensesForTripEvents(
       expense_date: row.expense_date,
       amount: row.amount,
       currency: row.currency,
+      exchange_rate: row.exchange_rate,
       amount_base: row.amount_base,
       base_currency: row.base_currency,
       paid_by_name: row.paid_by_name,
