@@ -715,6 +715,27 @@ function TripDetailInner({
     if (readOnly) setEditMode(false);
   }, [readOnly]);
 
+  const eventDayDates = useMemo(
+    () =>
+      uniqueSortedIsoDates(events.map((e) => parseEventIsoDate(e.start_date))),
+    [events]
+  );
+
+  const firstOfDayEventIds = useMemo(() => {
+    const seen = new Set<string>();
+    const ids = new Set<number>();
+    for (const event of events) {
+      const iso = parseEventIsoDate(event.start_date);
+      if (!iso || seen.has(iso)) continue;
+      seen.add(iso);
+      ids.add(event.id);
+    }
+    return ids;
+  }, [events]);
+
+  const stickyEnabled = !isPwa;
+  const stickyBelowHeader = !readOnly;
+
   useEffect(() => {
     setViewMode(readViewMode());
   }, []);
@@ -1636,27 +1657,6 @@ function TripDetailInner({
       eventTitle: event.title,
     })),
   ]);
-
-  const eventDayDates = useMemo(
-    () =>
-      uniqueSortedIsoDates(events.map((e) => parseEventIsoDate(e.start_date))),
-    [events]
-  );
-
-  const firstOfDayEventIds = useMemo(() => {
-    const seen = new Set<string>();
-    const ids = new Set<number>();
-    for (const event of events) {
-      const iso = parseEventIsoDate(event.start_date);
-      if (!iso || seen.has(iso)) continue;
-      seen.add(iso);
-      ids.add(event.id);
-    }
-    return ids;
-  }, [events]);
-
-  const stickyEnabled = !isPwa;
-  const stickyBelowHeader = !readOnly;
 
   return (
     <div className={cn("space-y-6 pb-24 md:pb-0", editMode && !readOnly && "pb-36 md:pb-0")}>
