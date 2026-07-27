@@ -98,6 +98,7 @@ import {
 import { cn } from "@/lib/utils";
 import { NameWithAvatar, UserAvatar } from "@/components/users/user-avatar";
 import { AiImagePreview } from "@/components/layout/ai-image-preview";
+import { DetailCarousel } from "@/components/layout/detail-carousel";
 import { SettlementAuditPanel } from "@/components/finance-brain/settlement-audit-panel";
 import { explainSimplifyDebts } from "@/lib/finance-brain/settlement";
 
@@ -799,8 +800,6 @@ function ExpenseCard({
   onSetDocument,
   trips,
   lockedTripId,
-  mobileFocused,
-  onMobileFocus,
   aiImageBusy,
   mailBusy,
   editBusy,
@@ -832,14 +831,13 @@ function ExpenseCard({
   ) => Promise<void>;
   trips?: TripPickerOption[];
   lockedTripId?: number | null;
-  mobileFocused?: boolean;
-  onMobileFocus?: (expenseId: number) => void;
   aiImageBusy?: boolean;
   mailBusy?: boolean;
   editBusy?: boolean;
   coupleSettleBusy?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
   const [zoomOpen, setZoomOpen] = useState(false);
   const [linkDocOpen, setLinkDocOpen] = useState(false);
   const [docBusy, setDocBusy] = useState(false);
@@ -908,6 +906,7 @@ function ExpenseCard({
       memberIds: exp.splits.map((s) => s.member_id),
     });
     setEditDirection(exp.direction === "income" ? "income" : "expense");
+    setDetailOpen(true);
     setEditing(true);
   }
 
@@ -962,34 +961,34 @@ function ExpenseCard({
     <div id={`expense-card-${exp.id}`} className="ml-3 pt-5">
       <div
         className={cn(
-          "relative",
-          mobileFocused && "rounded-xl ring-2 ring-[var(--brand-finance)]/30"
+          "relative overflow-hidden rounded-xl border border-border bg-card text-sm transition-shadow",
+          detailOpen && "ring-2 ring-[var(--brand-finance)]/30",
+          !editing && "cursor-pointer hover:bg-muted/20"
         )}
-      >
-        <div
-          className={cn(
-            "overflow-hidden rounded-xl border border-border bg-card text-sm",
-            onMobileFocus && !editing && "cursor-pointer md:cursor-default"
-          )}
-          onClick={
-            onMobileFocus && !editing
-              ? () => onMobileFocus(exp.id)
-              : undefined
+        onClick={() => {
+          if (!editing) setDetailOpen(true);
+        }}
+        onKeyDown={(e) => {
+          if (!editing && (e.key === "Enter" || e.key === " ")) {
+            e.preventDefault();
+            setDetailOpen(true);
           }
-        >
-        {/* Soft row: type icon · title/meta · AI thumb · amount */}
+        }}
+        role="button"
+        tabIndex={0}
+      >
         <div className="flex items-center gap-3 px-3 py-3 sm:gap-4">
           <IconCircle
             icon={visual.icon}
             tone="green"
             shape="circle"
             size="lg"
-            className="h-14 w-14 shrink-0 [&_svg]:h-7 [&_svg]:w-7"
+            className="h-12 w-12 shrink-0 sm:h-14 sm:w-14 [&_svg]:h-6 [&_svg]:w-6 sm:[&_svg]:h-7 sm:[&_svg]:w-7"
           />
 
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-              <p className="min-w-0 truncate text-base font-black leading-snug tracking-tight text-foreground sm:text-xl md:text-2xl">
+              <p className="min-w-0 truncate text-base font-black leading-snug tracking-tight text-foreground sm:text-xl">
                 {exp.description || (isIncome ? "Einnahme" : "Ausgabe")}
               </p>
               {Boolean(exp.pre_settled) ? (
@@ -1000,7 +999,7 @@ function ExpenseCard({
                     <Badge
                       variant="secondary"
                       title={badge.title}
-                      className="h-5 gap-0.5 border border-[var(--brand-finance)]/25 bg-[var(--brand-finance-soft)] px-1.5 text-[10px] font-semibold text-[var(--brand-finance)] sm:text-[11px]"
+                      className="h-5 gap-0.5 border border-[var(--brand-finance)]/25 bg-[var(--brand-finance-soft)] px-1.5 text-[10px] font-semibold text-[var(--brand-finance)]"
                     >
                       <Check className="size-3" strokeWidth={2.5} aria-hidden />
                       {badge.label}
@@ -1068,130 +1067,30 @@ function ExpenseCard({
             </div>
           ) : null}
         </div>
+      </div>
 
-        {!cashbookMode && !isIncome && exp.splits.length > 0 ? (
-          <div className="border-t border-border/40 px-3 py-2">
-            <p className="mb-1 text-[11px] font-medium text-muted-foreground">
-              Anteil pro Person
-            </p>
-            <ul className="grid gap-x-4 gap-y-0.5 sm:grid-cols-2">
-              {[...exp.splits]
-                .sort((a, b) =>
-                  memberName(a.member_id).localeCompare(
-                    memberName(b.member_id),
-                    "de"
-                  )
-                )
-                .map((sp) => {
-                  const isPayer = sp.member_id === exp.paid_by_member_id;
-                  return (
-                    <li
-                      key={sp.member_id}
-                      className="flex items-baseline justify-between gap-2 text-xs"
-                    >
-                      <span
-                        className={cn(
-                          "min-w-0 truncate",
-                          isPayer
-                            ? "font-medium text-foreground"
-                            : "text-muted-foreground"
-                        )}
-                      >
-                        {memberName(sp.member_id)}
-                        {isPayer ? (
-                          <span className="ml-1 font-normal text-muted-foreground">
-                            (gezahlt)
-                          </span>
-                        ) : null}
-                      </span>
-                      <span className="shrink-0 tabular-nums text-foreground">
-                        {formatMoney(sp.share_amount_base, baseCurrency)}
-                      </span>
-                    </li>
-                  );
-                })}
-            </ul>
-          </div>
-        ) : null}
+      <Dialog
+        open={detailOpen}
+        onOpenChange={(open) => {
+          setDetailOpen(open);
+          if (!open) setEditing(false);
+        }}
+      >
+        <DialogContent className="flex max-h-[90dvh] w-[min(96vw,26rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-md">
+          <DialogHeader className="shrink-0 border-b border-border/50 px-4 py-3 pr-12 text-left">
+            <DialogTitle className="truncate text-base">
+              {editing
+                ? "Bearbeiten"
+                : exp.description || (isIncome ? "Einnahme" : "Ausgabe")}
+            </DialogTitle>
+            <DialogDescription className="sr-only">
+              Details und Aktionen zur Ausgabe
+            </DialogDescription>
+          </DialogHeader>
 
-        {/* Desktop detail + place/note */}
-        <div className="hidden border-t border-border/40 px-3 py-2 md:block">
-          <div className="flex min-h-0 flex-col gap-1">
-            {fx.detail ? (
-              <div className="space-y-0.5 text-[11px] leading-snug text-muted-foreground">
-                <p>Währung: {exp.currency.toUpperCase()}</p>
-                <p>FW Betrag: {fx.primary}</p>
-                <p className="text-[12px] font-bold text-foreground">
-                  Betrag {baseCurrency}:{" "}
-                  {formatMoney(exp.amount_base, baseCurrency)}
-                </p>
-                <p>
-                  Kurs:{" "}
-                  {formatExchangeRateLine({
-                    currency: exp.currency,
-                    baseCurrency,
-                    exchangeRate: exp.exchange_rate,
-                    amount: exp.amount,
-                    amountBase: exp.amount_base,
-                  })}
-                </p>
-              </div>
-            ) : null}
-            {exp.place_name ? (
-              <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                <MapPin className="size-3 shrink-0" />
-                <span className="break-words">{exp.place_name}</span>
-              </p>
-            ) : null}
-            {exp.note?.trim() ? (
-              <p className="break-words text-xs text-muted-foreground">
-                Notiz: {exp.note.trim()}
-              </p>
-            ) : null}
-            {exp.document ? (
-              <p className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-                <Link2 className="size-3 shrink-0" />
-                <a
-                  href={`/documents/${exp.document.id}`}
-                  className="font-medium text-foreground underline-offset-2 hover:underline"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {exp.document.title?.trim() ||
-                    exp.document.original_file_name?.trim() ||
-                    `Dokument #${exp.document.id}`}
-                </a>
-                <span className="text-muted-foreground">· Paperless</span>
-              </p>
-            ) : null}
-            {exp.trip_event ? (
-              <p className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-                <Luggage className="size-3 shrink-0" />
-                <span>
-                  {formatDateDe(exp.trip_event.start_date) || "Ohne Datum"}
-                  {exp.trip_event.start_time
-                    ? `, ${exp.trip_event.start_time}`
-                    : ""}
-                  {" · "}
-                  <span className="font-medium text-foreground">
-                    {exp.trip_event.title}
-                  </span>
-                  {exp.trip_event.trip_title
-                    ? ` (${exp.trip_event.trip_title})`
-                    : ""}
-                </span>
-              </p>
-            ) : null}
-          </div>
-        </div>
-
-        {onMobileFocus && !editing ? (
-          <p className="border-t border-border/40 px-3 py-1.5 text-[11px] text-muted-foreground md:hidden">
-            Tippen für Aktionen
-          </p>
-        ) : null}
-
-            {editing && canEdit && onUpdate ? (
-              <div className="mx-3 mb-3 grid gap-2 rounded-xl border border-border/50 bg-background/60 p-2.5 sm:grid-cols-2">
+          {editing && canEdit && onUpdate ? (
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+              <div className="grid gap-2 sm:grid-cols-2">
                 <div className="space-y-1 sm:col-span-2">
                   <Label className="text-xs">Beschreibung</Label>
                   <Input
@@ -1395,213 +1294,324 @@ function ExpenseCard({
                   </Button>
                 </div>
               </div>
-            ) : null}
-
-        <div
-          className="flex flex-wrap items-center gap-1.5 border-t border-border/40 px-3 py-2"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {receiptUploadUrl ? (
-            <ExpenseReceiptControls
-              ref={receiptRef}
-              expenseId={exp.id}
-              receiptUrl={exp.receipt_url}
-              uploadUrl={receiptUploadUrl}
-              onChanged={onReceiptChanged}
-              compact
-              triggerOnly
-            />
-          ) : exp.receipt_url ? (
-            <a
-              href={exp.receipt_url}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-block"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={exp.receipt_url}
-                alt="Beleg"
-                className="h-8 w-8 rounded border border-border object-cover"
-              />
-            </a>
-          ) : null}
-
-          {canEdit && onUpdate && !editing ? (
-            <Button
-              type="button"
-              id={`expense-edit-${exp.id}`}
-              size="sm"
-              variant="ghost"
-              className="hidden h-7 px-2 text-xs md:inline-flex"
-              onClick={() => {
-                onMobileFocus?.(exp.id);
-                startEdit();
-              }}
-            >
-              <Pencil className="mr-1 size-3.5" />
-              Ändern
-            </Button>
-          ) : null}
-
-          {canEdit && onCoupleSettle && coupleSettle && !editing ? (
-            <Button
-              type="button"
-              id={`expense-couple-settle-${exp.id}`}
-              size="sm"
-              variant="ghost"
-              className="hidden h-7 px-2 text-xs text-[var(--brand-finance)] md:inline-flex"
-              disabled={coupleSettleBusy}
-              title={`${coupleSettle.fromName} → ${coupleSettle.toName}: ${formatMoney(coupleSettle.amountBase, baseCurrency)} als Paar-Ausgleich`}
-              onClick={() => {
-                const ok = window.confirm(
-                  `${coupleSettle.fromName} → ${coupleSettle.toName}: ${formatMoney(coupleSettle.amountBase, baseCurrency)} als Paar-Ausgleich buchen?\n\nStatus danach: «Manuell ausgeglichen».`
-                );
-                if (ok) void onCoupleSettle(exp.id);
-              }}
-            >
-              <Users className="mr-1 size-3.5" />
-              Paar-Ausgleich
-            </Button>
-          ) : null}
-
-          {/* Hidden triggers for mobile action bar */}
-          {canEdit && onSetDocument && !editing ? (
-            <button
-              type="button"
-              id={`expense-link-doc-${exp.id}`}
-              className="sr-only"
-              tabIndex={-1}
-              aria-hidden
-              onClick={() => setLinkDocOpen(true)}
-            />
-          ) : null}
-          {receiptUploadUrl ? (
-            <>
-              <button
-                type="button"
-                id={`expense-receipt-pick-${exp.id}`}
-                className="sr-only"
-                tabIndex={-1}
-                aria-hidden
-                onClick={() => receiptRef.current?.pickFile()}
-              />
-              <button
-                type="button"
-                id={`expense-receipt-preview-${exp.id}`}
-                className="sr-only"
-                tabIndex={-1}
-                aria-hidden
-                onClick={() => receiptRef.current?.openPreview()}
-              />
-              <button
-                type="button"
-                id={`expense-receipt-remove-${exp.id}`}
-                className="sr-only"
-                tabIndex={-1}
-                aria-hidden
-                onClick={() => void receiptRef.current?.remove()}
-              />
-            </>
-          ) : null}
-
-          {!editing &&
-          (receiptUploadUrl ||
-            onDuplicate ||
-            onGenerateAiImage ||
-            (exp.ai_image_url && onDeleteAiImage) ||
-            (canEdit && onSetDocument) ||
-            onResendMail ||
-            (canDelete && onDelete)) ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                render={
-                  <Button
-                    type="button"
-                    size="icon-xs"
-                    variant="ghost"
-                    className="ml-auto hidden md:inline-flex"
-                    aria-label="Mehr"
-                  />
-                }
+            </div>
+          ) : (
+            <div className="min-h-0 flex-1 overflow-hidden px-3 pb-3 pt-2">
+              <DetailCarousel
+                resetKey={exp.id}
+                className="h-full max-h-[min(70dvh,32rem)]"
               >
-                <MoreHorizontal className="size-4" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-auto min-w-48">
-                {receiptUploadUrl ? (
-                  <>
-                    {exp.receipt_url ? (
-                      <DropdownMenuItem
-                        onClick={() => receiptRef.current?.openPreview()}
-                      >
-                        <Camera className="size-3.5" />
-                        Foto anzeigen
-                      </DropdownMenuItem>
-                    ) : null}
-                    <DropdownMenuItem
-                      onClick={() => receiptRef.current?.pickFile()}
-                    >
-                      <Camera className="size-3.5" />
-                      {exp.receipt_url ? "Foto ersetzen" : "Foto"}
-                    </DropdownMenuItem>
-                    {exp.receipt_url ? (
-                      <DropdownMenuItem
-                        variant="destructive"
-                        onClick={() => void receiptRef.current?.remove()}
-                      >
-                        <Trash2 className="size-3.5" />
-                        Foto entfernen
-                      </DropdownMenuItem>
-                    ) : null}
-                    <DropdownMenuSeparator />
-                  </>
-                ) : null}
-
-                {onDuplicate ? (
-                  <DropdownMenuItem onClick={() => onDuplicate(exp)}>
-                    <Copy className="size-3.5" />
-                    Duplizieren
-                  </DropdownMenuItem>
-                ) : null}
-
-                {onGenerateAiImage ? (
-                  <DropdownMenuItem
-                    disabled={aiImageBusy}
-                    onClick={() => onGenerateAiImage(exp.id)}
-                  >
-                    <RefreshCw
-                      className={cn(
-                        "size-3.5",
-                        aiImageBusy && "animate-spin"
-                      )}
+                <div className="flex flex-col items-center gap-3 px-2 pb-2 pt-1 text-center">
+                  {exp.ai_image_url ? (
+                    <AiImagePreview
+                      src={exp.ai_image_url}
+                      brand="finance"
+                      imageClassName="h-36 w-36 rounded-2xl object-cover sm:h-40 sm:w-40"
+                      onOpen={() => setZoomOpen(true)}
                     />
-                    {exp.ai_image_url ? "KI-Bild neu" : "KI-Bild erzeugen"}
-                  </DropdownMenuItem>
-                ) : null}
-
-                {exp.ai_image_url && onDeleteAiImage ? (
-                  <DropdownMenuItem
-                    variant="destructive"
-                    disabled={aiImageBusy}
-                    onClick={() => onDeleteAiImage(exp.id)}
-                  >
-                    <Trash2 className="size-3.5" />
-                    KI-Bild löschen
-                  </DropdownMenuItem>
-                ) : null}
-
-                {canEdit && onSetDocument ? (
-                  <>
-                    <DropdownMenuItem
-                      disabled={docBusy || editBusy}
-                      onClick={() => setLinkDocOpen(true)}
+                  ) : (
+                    <IconCircle
+                      icon={visual.icon}
+                      tone="green"
+                      shape="circle"
+                      size="lg"
+                      className="h-20 w-20 [&_svg]:h-9 [&_svg]:w-9"
+                    />
+                  )}
+                  <div className="min-w-0 space-y-1">
+                    <p className="text-lg font-black leading-snug tracking-tight text-foreground">
+                      {exp.description || (isIncome ? "Einnahme" : "Ausgabe")}
+                    </p>
+                    <p
+                      className={cn(
+                        "text-2xl font-bold tabular-nums",
+                        isIncome
+                          ? "text-[var(--brand-finance)]"
+                          : "text-foreground"
+                      )}
                     >
-                      <Link2 className="size-3.5" />
-                      {exp.document ? "Beleg ändern" : "Beleg verknüpfen"}
-                    </DropdownMenuItem>
+                      {isIncome ? "+" : ""}
+                      {formatMoney(exp.amount_base, baseCurrency)}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {isoDate ? formatDateDe(isoDate) : "Ohne Datum"}
+                      {" · "}
+                      {isIncome ? "Einnahme" : visual.label}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-center gap-2">
+                    {Boolean(exp.pre_settled)
+                      ? (() => {
+                          const badge = expenseSettledBadge(exp.pre_settled);
+                          if (!badge) return null;
+                          return (
+                            <Badge
+                              variant="secondary"
+                              title={badge.title}
+                              className="h-6 gap-0.5 border border-[var(--brand-finance)]/25 bg-[var(--brand-finance-soft)] px-2 text-[11px] font-semibold text-[var(--brand-finance)]"
+                            >
+                              <Check
+                                className="size-3"
+                                strokeWidth={2.5}
+                                aria-hidden
+                              />
+                              {badge.label}
+                            </Badge>
+                          );
+                        })()
+                      : null}
+                    {exp.document || exp.document_id ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-[var(--brand-finance-soft)] px-2.5 py-1 text-[11px] font-semibold text-[var(--brand-finance)]">
+                        <FileText className="size-3.5" />
+                        1 Beleg
+                      </span>
+                    ) : null}
+                  </div>
+                  {!cashbookMode && participantIds.length > 0 ? (
+                    <div className="flex flex-col items-center gap-1.5">
+                      <p className="text-[11px] font-medium text-muted-foreground">
+                        {memberName(exp.paid_by_member_id)} → Teilnehmer
+                      </p>
+                      <div className="flex -space-x-2">
+                        {participantIds.slice(0, 6).map((id) => (
+                          <span key={id} title={memberName(id)}>
+                            <UserAvatar
+                              name={memberName(id)}
+                              src={memberAvatar(id)}
+                              size="sm"
+                              className={cn(
+                                "ring-2 ring-popover",
+                                id === exp.paid_by_member_id &&
+                                  "ring-[var(--brand-finance)]"
+                              )}
+                            />
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                  <p className="text-[11px] text-muted-foreground">
+                    Wischen für weitere Infos
+                  </p>
+                </div>
+
+                {!cashbookMode && !isIncome && exp.splits.length > 0 ? (
+                  <div className="space-y-3 px-2 py-1">
+                    <p className="text-sm font-semibold text-foreground">
+                      Anteil pro Person
+                    </p>
+                    <ul className="space-y-2">
+                      {[...exp.splits]
+                        .sort((a, b) =>
+                          memberName(a.member_id).localeCompare(
+                            memberName(b.member_id),
+                            "de"
+                          )
+                        )
+                        .map((sp) => {
+                          const isPayer =
+                            sp.member_id === exp.paid_by_member_id;
+                          return (
+                            <li
+                              key={sp.member_id}
+                              className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-muted/20 px-3 py-2.5"
+                            >
+                              <div className="flex min-w-0 items-center gap-2">
+                                <UserAvatar
+                                  name={memberName(sp.member_id)}
+                                  src={memberAvatar(sp.member_id)}
+                                  size="sm"
+                                />
+                                <span
+                                  className={cn(
+                                    "min-w-0 truncate text-sm",
+                                    isPayer
+                                      ? "font-medium text-foreground"
+                                      : "text-muted-foreground"
+                                  )}
+                                >
+                                  {memberName(sp.member_id)}
+                                  {isPayer ? (
+                                    <span className="ml-1 font-normal text-muted-foreground">
+                                      (gezahlt)
+                                    </span>
+                                  ) : null}
+                                </span>
+                              </div>
+                              <span className="shrink-0 text-sm font-semibold tabular-nums text-foreground">
+                                {formatMoney(
+                                  sp.share_amount_base,
+                                  baseCurrency
+                                )}
+                              </span>
+                            </li>
+                          );
+                        })}
+                    </ul>
+                  </div>
+                ) : null}
+
+                {fx.detail ||
+                exp.place_name ||
+                exp.note?.trim() ||
+                exp.document ||
+                exp.trip_event ||
+                exp.receipt_url ? (
+                  <div className="space-y-3 px-2 py-1">
+                    <p className="text-sm font-semibold text-foreground">
+                      Weitere Infos
+                    </p>
+                    {fx.detail ? (
+                      <div className="space-y-1 rounded-xl border border-border/60 bg-muted/20 px-3 py-2.5 text-xs leading-snug text-muted-foreground">
+                        <p>Währung: {exp.currency.toUpperCase()}</p>
+                        <p>FW Betrag: {fx.primary}</p>
+                        <p className="text-sm font-bold text-foreground">
+                          Betrag {baseCurrency}:{" "}
+                          {formatMoney(exp.amount_base, baseCurrency)}
+                        </p>
+                        <p>
+                          Kurs:{" "}
+                          {formatExchangeRateLine({
+                            currency: exp.currency,
+                            baseCurrency,
+                            exchangeRate: exp.exchange_rate,
+                            amount: exp.amount,
+                            amountBase: exp.amount_base,
+                          })}
+                        </p>
+                      </div>
+                    ) : null}
+                    {exp.place_name ? (
+                      <p className="flex items-start gap-2 text-sm text-foreground">
+                        <MapPin className="mt-0.5 size-4 shrink-0 text-[var(--brand-finance)]" />
+                        <span className="break-words">{exp.place_name}</span>
+                      </p>
+                    ) : null}
+                    {exp.note?.trim() ? (
+                      <p className="rounded-xl border border-border/60 bg-muted/20 px-3 py-2.5 text-sm text-foreground">
+                        {exp.note.trim()}
+                      </p>
+                    ) : null}
                     {exp.document ? (
-                      <DropdownMenuItem
-                        variant="destructive"
+                      <a
+                        href={`/documents/${exp.document.id}`}
+                        className="flex items-center gap-2 rounded-xl border border-border/60 bg-muted/20 px-3 py-2.5 text-sm font-medium text-foreground underline-offset-2 hover:underline"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Link2 className="size-4 shrink-0 text-[var(--brand-finance)]" />
+                        {exp.document.title?.trim() ||
+                          exp.document.original_file_name?.trim() ||
+                          `Dokument #${exp.document.id}`}
+                      </a>
+                    ) : null}
+                    {exp.trip_event ? (
+                      <p className="flex items-start gap-2 text-sm text-muted-foreground">
+                        <Luggage className="mt-0.5 size-4 shrink-0 text-[var(--brand-finance)]" />
+                        <span>
+                          {formatDateDe(exp.trip_event.start_date) ||
+                            "Ohne Datum"}
+                          {exp.trip_event.start_time
+                            ? `, ${exp.trip_event.start_time}`
+                            : ""}
+                          {" · "}
+                          <span className="font-medium text-foreground">
+                            {exp.trip_event.title}
+                          </span>
+                          {exp.trip_event.trip_title
+                            ? ` (${exp.trip_event.trip_title})`
+                            : ""}
+                        </span>
+                      </p>
+                    ) : null}
+                    {exp.receipt_url ? (
+                      <a
+                        href={exp.receipt_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-block"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={exp.receipt_url}
+                          alt="Beleg"
+                          className="h-28 w-28 rounded-xl border border-border object-cover"
+                        />
+                      </a>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                <div className="space-y-2 px-2 py-1">
+                  <p className="text-sm font-semibold text-foreground">
+                    Aktionen
+                  </p>
+                  <div className="grid gap-1.5">
+                    {canEdit && onUpdate ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="justify-start"
+                        onClick={() => startEdit()}
+                      >
+                        <Pencil className="mr-2 size-4" />
+                        Ändern
+                      </Button>
+                    ) : null}
+                    {onDuplicate ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="justify-start"
+                        onClick={() => onDuplicate(exp)}
+                      >
+                        <Copy className="mr-2 size-4" />
+                        Duplizieren
+                      </Button>
+                    ) : null}
+                    {canEdit && onCoupleSettle && coupleSettle ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="justify-start text-[var(--brand-finance)]"
+                        disabled={coupleSettleBusy}
+                        onClick={() => {
+                          const ok = window.confirm(
+                            `${coupleSettle.fromName} → ${coupleSettle.toName}: ${formatMoney(coupleSettle.amountBase, baseCurrency)} als Paar-Ausgleich buchen?\n\nStatus danach: «Manuell ausgeglichen».`
+                          );
+                          if (ok) void onCoupleSettle(exp.id);
+                        }}
+                      >
+                        <Users className="mr-2 size-4" />
+                        Paar-Ausgleich
+                      </Button>
+                    ) : null}
+                    {receiptUploadUrl ? (
+                      <ExpenseReceiptControls
+                        ref={receiptRef}
+                        expenseId={exp.id}
+                        receiptUrl={exp.receipt_url}
+                        uploadUrl={receiptUploadUrl}
+                        onChanged={onReceiptChanged}
+                        compact
+                      />
+                    ) : null}
+                    {canEdit && onSetDocument ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="justify-start"
+                        disabled={docBusy || editBusy}
+                        onClick={() => setLinkDocOpen(true)}
+                      >
+                        <Link2 className="mr-2 size-4" />
+                        {exp.document ? "Beleg ändern" : "Beleg verknüpfen"}
+                      </Button>
+                    ) : null}
+                    {exp.document && canEdit && onSetDocument ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="justify-start text-destructive"
                         disabled={docBusy || editBusy}
                         onClick={() => {
                           if (
@@ -1617,46 +1627,77 @@ function ExpenseCard({
                           );
                         }}
                       >
-                        <Unlink className="size-3.5" />
+                        <Unlink className="mr-2 size-4" />
                         Beleg lösen
-                      </DropdownMenuItem>
+                      </Button>
                     ) : null}
-                  </>
-                ) : null}
-
-                {onResendMail ? (
-                  <DropdownMenuItem
-                    disabled={mailBusy || aiImageBusy}
-                    onClick={() => onResendMail(exp.id)}
-                  >
-                    <Mail
-                      className={cn(
-                        "size-3.5",
-                        mailBusy && "animate-pulse"
-                      )}
-                    />
-                    {mailBusy ? "Sendet…" : "Mail erneut"}
-                  </DropdownMenuItem>
-                ) : null}
-
-                {canDelete && onDelete ? (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      variant="destructive"
-                      onClick={() => onDelete(exp.id)}
-                    >
-                      <Trash2 className="size-3.5" />
-                      Löschen
-                    </DropdownMenuItem>
-                  </>
-                ) : null}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : null}
-        </div>
-      </div>
-      </div>
+                    {onGenerateAiImage ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="justify-start"
+                        disabled={aiImageBusy}
+                        onClick={() => onGenerateAiImage(exp.id)}
+                      >
+                        <RefreshCw
+                          className={cn(
+                            "mr-2 size-4",
+                            aiImageBusy && "animate-spin"
+                          )}
+                        />
+                        {exp.ai_image_url ? "KI-Bild neu" : "KI-Bild erzeugen"}
+                      </Button>
+                    ) : null}
+                    {exp.ai_image_url && onDeleteAiImage ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="justify-start text-destructive"
+                        disabled={aiImageBusy}
+                        onClick={() => onDeleteAiImage(exp.id)}
+                      >
+                        <Trash2 className="mr-2 size-4" />
+                        KI-Bild löschen
+                      </Button>
+                    ) : null}
+                    {onResendMail ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="justify-start"
+                        disabled={mailBusy || aiImageBusy}
+                        onClick={() => onResendMail(exp.id)}
+                      >
+                        <Mail
+                          className={cn(
+                            "mr-2 size-4",
+                            mailBusy && "animate-pulse"
+                          )}
+                        />
+                        {mailBusy ? "Sendet…" : "Mail erneut"}
+                      </Button>
+                    ) : null}
+                    {canDelete && onDelete ? (
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        className="justify-start"
+                        onClick={() => {
+                          onDelete(exp.id);
+                          setDetailOpen(false);
+                        }}
+                      >
+                        <Trash2 className="mr-2 size-4" />
+                        Löschen
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+              </DetailCarousel>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={zoomOpen} onOpenChange={setZoomOpen}>
         <DialogContent className="max-h-[90dvh] w-[min(96vw,40rem)] overflow-y-auto sm:max-w-xl">
@@ -1797,7 +1838,6 @@ export function ExpenseList({
   renderStickyChrome?: (chrome: ReactNode, strip: ReactNode) => ReactNode;
 }) {
   const isPwa = useIsStandalonePwa();
-  const [mobileFocusId, setMobileFocusId] = useState<number | null>(null);
   const [query, setQuery] = useState("");
   const [toolsOpen, setToolsOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
@@ -1940,25 +1980,6 @@ export function ExpenseList({
   const activeExpenseDay = useActiveDateFromScroll(
     expenseDayDatesDom,
     expenseDayAnchorId
-  );
-
-  const focus =
-    filteredExpenses.find((e) => e.id === mobileFocusId) ||
-    (mobileFocusId != null ? filteredExpenses[0] : null);
-
-  const focusCoupleSettle =
-    focus && !cashbookMode
-      ? coupleSettlePreviewForExpense(focus, members, couples)
-      : null;
-
-  const focusHasMoreActions = Boolean(
-    focus &&
-      (receiptUploadUrl ||
-        onGenerateAiImage ||
-        (focus.ai_image_url && onDeleteAiImage) ||
-        (canEdit && onSetDocument) ||
-        onResendMail ||
-        (canDelete && onDelete))
   );
 
   const toolsPanel =
@@ -2206,12 +2227,7 @@ export function ExpenseList({
   let prevExpenseDay: string | null = null;
 
   return (
-    <div
-      className={cn(
-        "space-y-4",
-        mobileFocusId != null && "pb-36 md:pb-0"
-      )}
-    >
+    <div className="space-y-4">
       {chromeNode}
       {stripNode}
 
@@ -2256,8 +2272,6 @@ export function ExpenseList({
                 onDuplicate={onDuplicateExpense}
                 onCoupleSettle={onCoupleSettle}
                 onSetDocument={onSetDocument}
-                mobileFocused={mobileFocusId === exp.id}
-                onMobileFocus={setMobileFocusId}
                 aiImageBusy={aiImageBusyId === exp.id}
                 mailBusy={mailBusyId === exp.id}
                 editBusy={editBusyId === exp.id}
@@ -2268,208 +2282,7 @@ export function ExpenseList({
         })
       )}
 
-      {focus && (canEdit || canDelete || onDuplicateExpense || onCoupleSettle) ? (
-        <div className="pointer-events-none fixed inset-x-0 bottom-[4.25rem] z-40 md:hidden">
-          <div className="pointer-events-auto border-t border-border bg-background/95 px-2 py-2 backdrop-blur">
-            <p className="truncate px-1 text-[11px] text-muted-foreground">
-              {focus.description ||
-                (focus.direction === "income" ? "Einnahme" : "Ausgabe")}
-            </p>
-            <div className="mt-1 flex items-center gap-1 overflow-x-auto pb-0.5">
-              {canEdit && onUpdateExpense ? (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="shrink-0"
-                  onClick={() => {
-                    document.getElementById(`expense-edit-${focus.id}`)?.click();
-                  }}
-                >
-                  <Pencil className="mr-1 size-3.5" />
-                  Ändern
-                </Button>
-              ) : null}
-              {onDuplicateExpense ? (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="shrink-0"
-                  onClick={() => onDuplicateExpense(focus)}
-                >
-                  <Copy className="mr-1 size-3.5" />
-                  Duplizieren
-                </Button>
-              ) : null}
-              {canEdit && onCoupleSettle && focusCoupleSettle ? (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="shrink-0 text-[var(--brand-finance)]"
-                  disabled={coupleSettleBusyId === focus.id}
-                  onClick={() => {
-                    document
-                      .getElementById(`expense-couple-settle-${focus.id}`)
-                      ?.click();
-                  }}
-                >
-                  <Users className="mr-1 size-3.5" />
-                  Paar-Ausgleich
-                </Button>
-              ) : null}
-              {focusHasMoreActions ? (
-                <DropdownMenu>
-                  <DropdownMenuTrigger
-                    render={
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="shrink-0 px-2"
-                        aria-label="Mehr"
-                      />
-                    }
-                  >
-                    <MoreHorizontal className="size-4" />
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-auto min-w-48">
-                    {receiptUploadUrl ? (
-                      <>
-                        {focus.receipt_url ? (
-                          <DropdownMenuItem
-                            onClick={() => {
-                              document
-                                .getElementById(
-                                  `expense-receipt-preview-${focus.id}`
-                                )
-                                ?.click();
-                            }}
-                          >
-                            <Camera className="size-3.5" />
-                            Foto anzeigen
-                          </DropdownMenuItem>
-                        ) : null}
-                        <DropdownMenuItem
-                          onClick={() => {
-                            document
-                              .getElementById(
-                                `expense-receipt-pick-${focus.id}`
-                              )
-                              ?.click();
-                          }}
-                        >
-                          <Camera className="size-3.5" />
-                          {focus.receipt_url ? "Foto ersetzen" : "Foto"}
-                        </DropdownMenuItem>
-                        {focus.receipt_url ? (
-                          <DropdownMenuItem
-                            variant="destructive"
-                            onClick={() => {
-                              document
-                                .getElementById(
-                                  `expense-receipt-remove-${focus.id}`
-                                )
-                                ?.click();
-                            }}
-                          >
-                            <Trash2 className="size-3.5" />
-                            Foto entfernen
-                          </DropdownMenuItem>
-                        ) : null}
-                        <DropdownMenuSeparator />
-                      </>
-                    ) : null}
-                    {canEdit && onSetDocument ? (
-                      <>
-                        <DropdownMenuItem
-                          disabled={editBusyId === focus.id}
-                          onClick={() => {
-                            document
-                              .getElementById(`expense-link-doc-${focus.id}`)
-                              ?.click();
-                          }}
-                        >
-                          <Link2 className="size-3.5" />
-                          {focus.document
-                            ? "Beleg ändern"
-                            : "Beleg verknüpfen"}
-                        </DropdownMenuItem>
-                        {focus.document ? (
-                          <DropdownMenuItem
-                            variant="destructive"
-                            disabled={editBusyId === focus.id}
-                            onClick={() => {
-                              if (
-                                !window.confirm(
-                                  "Paperless-Verknüpfung wirklich entfernen?"
-                                )
-                              ) {
-                                return;
-                              }
-                              void onSetDocument(focus.id, null);
-                            }}
-                          >
-                            <Unlink className="size-3.5" />
-                            Beleg lösen
-                          </DropdownMenuItem>
-                        ) : null}
-                      </>
-                    ) : null}
-                    {onGenerateAiImage ? (
-                      <DropdownMenuItem
-                        disabled={aiImageBusyId === focus.id}
-                        onClick={() => onGenerateAiImage(focus.id)}
-                      >
-                        <RefreshCw className="size-3.5" />
-                        {focus.ai_image_url
-                          ? "KI-Bild neu"
-                          : "KI-Bild erzeugen"}
-                      </DropdownMenuItem>
-                    ) : null}
-                    {focus.ai_image_url && onDeleteAiImage ? (
-                      <DropdownMenuItem
-                        variant="destructive"
-                        disabled={aiImageBusyId === focus.id}
-                        onClick={() => onDeleteAiImage(focus.id)}
-                      >
-                        <Trash2 className="size-3.5" />
-                        KI-Bild löschen
-                      </DropdownMenuItem>
-                    ) : null}
-                    {onResendMail ? (
-                      <DropdownMenuItem
-                        disabled={mailBusyId === focus.id}
-                        onClick={() => onResendMail(focus.id)}
-                      >
-                        <Mail className="size-3.5" />
-                        Mail erneut
-                      </DropdownMenuItem>
-                    ) : null}
-                    {canDelete && onDelete ? (
-                      <>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          variant="destructive"
-                          onClick={() => onDelete(focus.id)}
-                        >
-                          <Trash2 className="size-3.5" />
-                          Löschen
-                        </DropdownMenuItem>
-                      </>
-                    ) : null}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              ) : null}
-              <Button
-                size="sm"
-                variant="ghost"
-                className="ml-auto shrink-0"
-                onClick={() => setMobileFocusId(null)}
-              >
-                Fertig
-              </Button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+
     </div>
   );
 }
