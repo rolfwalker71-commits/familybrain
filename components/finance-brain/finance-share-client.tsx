@@ -47,6 +47,8 @@ import {
   type FinanceLedgerTab,
   type FinanceTabItem,
 } from "@/components/finance-brain/finance-tab-nav";
+import { stickyDetailChromeClass } from "@/components/layout/date-timeline-strip";
+import { useIsStandalonePwa } from "@/hooks/use-standalone-pwa";
 import { COMMON_CURRENCIES } from "@/lib/finance-brain/constants";
 import { formatMoney } from "@/lib/finance-brain/format";
 import { confirmSettlementAmount } from "@/lib/finance-brain/settlement-confirm";
@@ -161,6 +163,7 @@ export function FinanceShareClient({ token }: { token: string }) {
 function FinanceShareInner({ token }: { token: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const isPwa = useIsStandalonePwa();
   const [data, setData] = useState<ShareData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -1012,32 +1015,42 @@ function FinanceShareInner({ token }: { token: string }) {
       ) : null}
 
       {activeTab === "expenses" ? (
-        <SectionCard title="Ausgaben" tone="green" icon={Receipt}>
-          <ExpenseList
-            expenses={expenses}
-            members={members}
-            couples={couples}
-            baseCurrency={ledger.base_currency}
-            canEdit
-            receiptUploadUrl={(expenseId) =>
-              `/api/share/f/${encodeURIComponent(token)}/expenses/${expenseId}/receipt`
-            }
-            onReceiptChanged={() => void load()}
-            onGenerateAiImage={(id) => void generateAiImage(id)}
-            onDeleteAiImage={(id) => void deleteAiImage(id)}
-            onResendMail={(id) => void resendExpenseMail(id)}
-            onUpdateExpense={(id, payload) => updateExpense(id, payload)}
-            onDuplicateExpense={duplicateExpense}
-            onCoupleSettle={(id) => void settleCoupleExpense(id)}
-            onSetDocument={(id, documentId) =>
-              setExpenseDocument(id, documentId)
-            }
-            aiImageBusyId={aiImageBusyId}
-            mailBusyId={mailBusyId}
-            editBusyId={editBusyId}
-            coupleSettleBusyId={coupleSettleBusyId}
-          />
-        </SectionCard>
+        <ExpenseList
+          expenses={expenses}
+          members={members}
+          couples={couples}
+          baseCurrency={ledger.base_currency}
+          canEdit
+          receiptUploadUrl={(expenseId) =>
+            `/api/share/f/${encodeURIComponent(token)}/expenses/${expenseId}/receipt`
+          }
+          onReceiptChanged={() => void load()}
+          onGenerateAiImage={(id) => void generateAiImage(id)}
+          onDeleteAiImage={(id) => void deleteAiImage(id)}
+          onResendMail={(id) => void resendExpenseMail(id)}
+          onUpdateExpense={(id, payload) => updateExpense(id, payload)}
+          onDuplicateExpense={duplicateExpense}
+          onCoupleSettle={(id) => void settleCoupleExpense(id)}
+          onSetDocument={(id, documentId) =>
+            setExpenseDocument(id, documentId)
+          }
+          aiImageBusyId={aiImageBusyId}
+          mailBusyId={mailBusyId}
+          editBusyId={editBusyId}
+          coupleSettleBusyId={coupleSettleBusyId}
+          renderStickyChrome={(chrome) => (
+            <div
+              className={cn(
+                stickyDetailChromeClass(!isPwa, {
+                  belowMobileHeader: false,
+                }),
+                "-mx-1 space-y-2 px-1 py-2"
+              )}
+            >
+              {chrome}
+            </div>
+          )}
+        />
       ) : null}
 
       {activeTab === "settle" ? (

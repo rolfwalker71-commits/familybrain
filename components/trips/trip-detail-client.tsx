@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -80,6 +80,12 @@ import {
   type IconTone,
 } from "@/components/layout/icon-circle";
 import { CalendarDateBadge } from "@/components/layout/calendar-date-badge";
+import {
+  DateTimelineStrip,
+  stickyDetailChromeClass,
+  uniqueSortedIsoDates,
+} from "@/components/layout/date-timeline-strip";
+import { useIsStandalonePwa } from "@/hooks/use-standalone-pwa";
 import { DocumentPdfThumb } from "@/components/documents/document-pdf-preview";
 import {
   CommentCountChip,
@@ -618,6 +624,7 @@ function TripDetailInner({
   const router = useRouter();
   const searchParams = useSearchParams();
   const readOnly = Boolean(shareToken);
+  const isPwa = useIsStandalonePwa();
   const [trip, setTrip] = useState<Trip | null>(null);
   const [events, setEvents] = useState<TripEvent[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -1630,6 +1637,27 @@ function TripDetailInner({
     })),
   ]);
 
+  const eventDayDates = useMemo(
+    () =>
+      uniqueSortedIsoDates(events.map((e) => parseEventIsoDate(e.start_date))),
+    [events]
+  );
+
+  const firstOfDayEventIds = useMemo(() => {
+    const seen = new Set<string>();
+    const ids = new Set<number>();
+    for (const event of events) {
+      const iso = parseEventIsoDate(event.start_date);
+      if (!iso || seen.has(iso)) continue;
+      seen.add(iso);
+      ids.add(event.id);
+    }
+    return ids;
+  }, [events]);
+
+  const stickyEnabled = !isPwa;
+  const stickyBelowHeader = !readOnly;
+
   return (
     <div className={cn("space-y-6 pb-24 md:pb-0", editMode && !readOnly && "pb-36 md:pb-0")}>
       {!readOnly ? (
@@ -1678,8 +1706,17 @@ function TripDetailInner({
         </div>
       </div>
 
-      {!readOnly ? (
-        <TripTabNav items={tabItems} active={activeTab} onChange={setTab} />
+      {!readOnly && activeTab !== "ablauf" ? (
+        <div
+          className={cn(
+            stickyDetailChromeClass(stickyEnabled, {
+              belowMobileHeader: stickyBelowHeader,
+            }),
+            "py-2"
+          )}
+        >
+          <TripTabNav items={tabItems} active={activeTab} onChange={setTab} />
+        </div>
       ) : null}
 
       {error ? (
@@ -2600,28 +2637,45 @@ function TripDetailInner({
 
 {activeTab === "ablauf" || readOnly ? (
       <div className="space-y-5">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-lg font-semibold">Timeline</h2>
-          <div className="flex items-center gap-1 rounded-lg border border-border/70 bg-muted/30 p-0.5">
-            <Button
-              type="button"
-              size="sm"
-              variant={viewMode === "cards" ? "default" : "ghost"}
-              className="h-7 px-2.5"
-              onClick={() => changeViewMode("cards")}
-            >
-              Karten
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant={viewMode === "compact" ? "default" : "ghost"}
-              className="h-7 px-2.5"
-              onClick={() => changeViewMode("compact")}
-            >
-              Kompakt
-            </Button>
+        <div
+          className={cn(
+            stickyDetailChromeClass(stickyEnabled, {
+              belowMobileHeader: stickyBelowHeader,
+            }),
+            "space-y-2 py-2"
+          )}
+        >
+          {!readOnly ? (
+            <TripTabNav items={tabItems} active={activeTab} onChange={setTab} />
+          ) : null}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-lg font-semibold">Timeline</h2>
+            <div className="flex items-center gap-1 rounded-lg border border-border/70 bg-muted/30 p-0.5">
+              <Button
+                type="button"
+                size="sm"
+                variant={viewMode === "cards" ? "default" : "ghost"}
+                className="h-7 px-2.5"
+                onClick={() => changeViewMode("cards")}
+              >
+                Karten
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={viewMode === "compact" ? "default" : "ghost"}
+                className="h-7 px-2.5"
+                onClick={() => changeViewMode("compact")}
+              >
+                Kompakt
+              </Button>
+            </div>
           </div>
+          <DateTimelineStrip
+            dates={eventDayDates}
+            anchorIdForDate={(iso) => `event-day-${iso}`}
+            accent="travel"
+          />
         </div>
         {editMode ? (
           <p className="text-xs text-muted-foreground">
@@ -2661,6 +2715,13 @@ function TripDetailInner({
           >
           {events.map((event) => {
             const visual = eventVisual(event.event_type);
+            const dayIso = parseEventIsoDate(event.start_date);
+            const isDayAnchor = firstOfDayEventIds.has(event.id);
+            const dayAnchorId =
+              isDayAnchor && dayIso ? `event-day-${dayIso}` : undefined;
+            const dayAnchorClass = isDayAnchor
+              ? "scroll-mt-36 lg:scroll-mt-48"
+              : undefined;
             if (viewMode === "compact") {
               const details = formatCompactDetailLine(event);
               const documents = event.documents || [];
@@ -2668,8 +2729,10 @@ function TripDetailInner({
               return (
                 <div
                   key={event.id}
+                  id={dayAnchorId}
                   className={cn(
                     "relative pt-3 pl-2",
+                    dayAnchorClass,
                     editMode &&
                       dragOverEventId === event.id &&
                       "opacity-80"
@@ -2921,8 +2984,10 @@ function TripDetailInner({
             return (
               <div
                 key={event.id}
+                id={dayAnchorId}
                 className={cn(
                   "relative pt-3 pl-2",
+                  dayAnchorClass,
                   editMode && dragOverEventId === event.id && "opacity-80"
                 )}
                 onDragOver={

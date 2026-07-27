@@ -48,7 +48,9 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { PageHeader } from "@/components/layout/page-primitives";
+import { stickyDetailChromeClass } from "@/components/layout/date-timeline-strip";
 import { pageVisuals } from "@/components/layout/icon-circle";
+import { useIsStandalonePwa } from "@/hooks/use-standalone-pwa";
 import {
   BalanceView,
   ExpenseList,
@@ -271,6 +273,7 @@ export function FinanceLedgerDetailClient({ ledgerId }: { ledgerId: number }) {
 function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const isPwa = useIsStandalonePwa();
   const [data, setData] = useState<LedgerDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -1421,7 +1424,16 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
         ) : null}
       </div>
 
-      <FinanceTabNav items={tabItems} active={activeTab} onChange={setTab} />
+      {activeTab === "expenses" ? null : (
+        <div
+          className={cn(
+            stickyDetailChromeClass(!isPwa),
+            "space-y-2 py-2"
+          )}
+        >
+          <FinanceTabNav items={tabItems} active={activeTab} onChange={setTab} />
+        </div>
+      )}
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
       {status ? <p className="text-sm text-muted-foreground">{status}</p> : null}
@@ -1743,54 +1755,63 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
       ) : null}
 
       {activeTab === "expenses" ? (
-        <SectionCard
-          title={isNormal ? "Buchungen" : "Ausgaben"}
-          tone="green"
-          icon={Receipt}
-        >
-          <ExpenseList
-            expenses={expenses}
-            members={members}
-            couples={couples}
-            baseCurrency={ledger.base_currency}
-            cashbookMode={isNormal}
-            canDelete
-            canEdit
-            trips={
-              ledger.trip_id != null &&
-              !trips.some((t) => t.id === ledger.trip_id)
-                ? [
-                    {
-                      id: ledger.trip_id,
-                      title: ledger.trip_title || `Reise #${ledger.trip_id}`,
-                    },
-                    ...trips,
-                  ]
-                : trips
-            }
-            lockedTripId={ledger.trip_id}
-            onDelete={(id) => void deleteExpense(id)}
-            receiptUploadUrl={(expenseId) =>
-              `/api/finance-ledgers/${ledgerId}/expenses/${expenseId}/receipt`
-            }
-            onReceiptChanged={() => void load()}
-            onGenerateAiImage={(id) => void generateAiImage(id)}
-            onDeleteAiImage={(id) => void deleteAiImage(id)}
-            onResendMail={
-              isNormal ? undefined : (id) => void resendExpenseMail(id)
-            }
-            onUpdateExpense={(id, payload) => updateExpense(id, payload)}
-            onDuplicateExpense={duplicateExpense}
-            onCoupleSettle={(id) => void settleCoupleExpense(id)}
-            onSetDocument={(id, documentId) =>
-              setExpenseDocument(id, documentId)
-            }
-            aiImageBusyId={aiImageBusyId}
-            mailBusyId={mailBusyId}
-            editBusyId={editBusyId}
-            coupleSettleBusyId={coupleSettleBusyId}
-          />
-        </SectionCard>
+        <ExpenseList
+          expenses={expenses}
+          members={members}
+          couples={couples}
+          baseCurrency={ledger.base_currency}
+          cashbookMode={isNormal}
+          canDelete
+          canEdit
+          trips={
+            ledger.trip_id != null &&
+            !trips.some((t) => t.id === ledger.trip_id)
+              ? [
+                  {
+                    id: ledger.trip_id,
+                    title: ledger.trip_title || `Reise #${ledger.trip_id}`,
+                  },
+                  ...trips,
+                ]
+              : trips
+          }
+          lockedTripId={ledger.trip_id}
+          onDelete={(id) => void deleteExpense(id)}
+          receiptUploadUrl={(expenseId) =>
+            `/api/finance-ledgers/${ledgerId}/expenses/${expenseId}/receipt`
+          }
+          onReceiptChanged={() => void load()}
+          onGenerateAiImage={(id) => void generateAiImage(id)}
+          onDeleteAiImage={(id) => void deleteAiImage(id)}
+          onResendMail={
+            isNormal ? undefined : (id) => void resendExpenseMail(id)
+          }
+          onUpdateExpense={(id, payload) => updateExpense(id, payload)}
+          onDuplicateExpense={duplicateExpense}
+          onCoupleSettle={(id) => void settleCoupleExpense(id)}
+          onSetDocument={(id, documentId) =>
+            setExpenseDocument(id, documentId)
+          }
+          aiImageBusyId={aiImageBusyId}
+          mailBusyId={mailBusyId}
+          editBusyId={editBusyId}
+          coupleSettleBusyId={coupleSettleBusyId}
+          renderStickyChrome={(chrome) => (
+            <div
+              className={cn(
+                stickyDetailChromeClass(!isPwa),
+                "-mx-1 space-y-2 px-1 py-2"
+              )}
+            >
+              <FinanceTabNav
+                items={tabItems}
+                active={activeTab}
+                onChange={setTab}
+              />
+              {chrome}
+            </div>
+          )}
+        />
       ) : null}
 
       {activeTab === "settle" && !isNormal ? (

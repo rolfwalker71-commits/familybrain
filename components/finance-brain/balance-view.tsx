@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   ArrowLeftRight,
@@ -82,6 +82,11 @@ import {
   CalendarDateBadge,
   toIsoDateOnly,
 } from "@/components/layout/calendar-date-badge";
+import {
+  DateTimelineStrip,
+  uniqueSortedIsoDates,
+} from "@/components/layout/date-timeline-strip";
+import { useIsStandalonePwa } from "@/hooks/use-standalone-pwa";
 import { LinkPaperlessDocumentDialog } from "@/components/finance-brain/link-paperless-document-dialog";
 import {
   ExpenseTripEventPicker,
@@ -1656,6 +1661,7 @@ export function ExpenseList({
   mailBusyId,
   editBusyId,
   coupleSettleBusyId,
+  renderStickyChrome,
 }: {
   expenses: ExpenseListItem[];
   members: Array<{ id: number; display_name: string }>;
@@ -1686,9 +1692,13 @@ export function ExpenseList({
   mailBusyId?: number | null;
   editBusyId?: number | null;
   coupleSettleBusyId?: number | null;
+  /** Wrap search/filter + date strip (e.g. with tab nav) in sticky chrome. */
+  renderStickyChrome?: (chrome: ReactNode) => ReactNode;
 }) {
+  const isPwa = useIsStandalonePwa();
   const [mobileFocusId, setMobileFocusId] = useState<number | null>(null);
   const [query, setQuery] = useState("");
+  const [toolsOpen, setToolsOpen] = useState(true);
   const [filterOpen, setFilterOpen] = useState(false);
   const [payerFilter, setPayerFilter] = useState<string>("__all__");
   const [categoryFilter, setCategoryFilter] = useState<string>("__all__");
@@ -1697,6 +1707,10 @@ export function ExpenseList({
   const [settledFilter, setSettledFilter] = useState<"__show__" | "__hide__">(
     "__show__"
   );
+
+  useEffect(() => {
+    if (isPwa) setToolsOpen(false);
+  }, [isPwa]);
 
   const categoryOptions = useMemo(() => {
     const labels = new Set<string>();
@@ -1800,6 +1814,11 @@ export function ExpenseList({
     (coupleFilter !== "__all__" ? 1 : 0) +
     (settledFilter !== "__show__" ? 1 : 0);
 
+  const expenseDayDates = useMemo(
+    () => uniqueSortedIsoDates(filteredExpenses.map((e) => e.expense_date)),
+    [filteredExpenses]
+  );
+
   const focus =
     filteredExpenses.find((e) => e.id === mobileFocusId) ||
     (mobileFocusId != null ? filteredExpenses[0] : null);
@@ -1819,6 +1838,230 @@ export function ExpenseList({
         (canDelete && onDelete))
   );
 
+  const toolsPanel =
+    expenses.length > 0 ? (
+      <div className="space-y-2 rounded-xl border border-border bg-muted/20 p-2.5">
+        <div className="flex items-center gap-2">
+          <div className="relative min-w-0 flex-1">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Text suchen…"
+              className="h-8 bg-background pl-8 pr-8 text-sm"
+              aria-label="Ausgaben durchsuchen"
+            />
+            {query ? (
+              <button
+                type="button"
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                title="Suche leeren"
+                onClick={() => setQuery("")}
+              >
+                <XIcon className="size-3.5" />
+              </button>
+            ) : null}
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="relative h-8 shrink-0 gap-1.5 bg-background px-2.5"
+            aria-expanded={filterOpen}
+            aria-controls="expense-list-filters"
+            onClick={() => setFilterOpen((o) => !o)}
+          >
+            <Filter className="size-3.5" />
+            Filter
+            {activeFilterCount > 0 ? (
+              <Badge
+                variant="secondary"
+                className="h-5 min-w-5 justify-center px-1 text-[10px] font-semibold"
+              >
+                {activeFilterCount}
+              </Badge>
+            ) : null}
+          </Button>
+        </div>
+        {filterOpen ? (
+          <div
+            id="expense-list-filters"
+            className="grid gap-2 rounded-lg border border-border bg-background p-2.5 sm:grid-cols-2"
+          >
+            {!cashbookMode ? (
+              <Select
+                value={payerFilter}
+                onValueChange={(v) => {
+                  if (v != null) setPayerFilter(v);
+                }}
+                items={{
+                  __all__: "Alle Zahler",
+                  ...Object.fromEntries(
+                    payerOptions.map((m) => [String(m.id), m.display_name])
+                  ),
+                }}
+              >
+                <SelectTrigger className="h-8 w-full min-w-0 text-sm">
+                  <SelectValue placeholder="Zahler" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">Alle Zahler</SelectItem>
+                  {payerOptions.map((m) => (
+                    <SelectItem key={m.id} value={String(m.id)}>
+                      {m.display_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : null}
+            <Select
+              value={categoryFilter}
+              onValueChange={(v) => {
+                if (v != null) setCategoryFilter(v);
+              }}
+              items={{
+                __all__: "Alle Kategorien",
+                ...Object.fromEntries(
+                  categoryOptions.map((label) => [label, label])
+                ),
+              }}
+            >
+              <SelectTrigger className="h-8 w-full min-w-0 text-sm">
+                <SelectValue placeholder="Kategorie" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">Alle Kategorien</SelectItem>
+                {categoryOptions.map((label) => (
+                  <SelectItem key={label} value={label}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {!cashbookMode && coupleOptions.length > 0 ? (
+              <Select
+                value={coupleFilter}
+                onValueChange={(v) => {
+                  if (v != null) setCoupleFilter(v);
+                }}
+                items={{
+                  __all__: "Alle Paare",
+                  ...Object.fromEntries(
+                    coupleOptions.map((c) => [String(c.id), c.name])
+                  ),
+                }}
+              >
+                <SelectTrigger className="h-8 w-full min-w-0 text-sm">
+                  <SelectValue placeholder="Paar" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">Alle Paare</SelectItem>
+                  {coupleOptions.map((c) => (
+                    <SelectItem key={c.id} value={String(c.id)}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : null}
+            <Select
+              value={settledFilter}
+              onValueChange={(v) => {
+                if (v === "__show__" || v === "__hide__") setSettledFilter(v);
+              }}
+              items={{
+                __show__: "Ausgeglichene: Ja",
+                __hide__: "Ausgeglichene: Nein",
+              }}
+            >
+              <SelectTrigger className="h-8 w-full min-w-0 text-sm">
+                <SelectValue placeholder="Ausgeglichene" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__show__">Ausgeglichene: Ja</SelectItem>
+                <SelectItem value="__hide__">Ausgeglichene: Nein</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        ) : null}
+        {filtersActive ? (
+          <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+            <span>
+              {filteredExpenses.length} von {expenses.length} angezeigt
+            </span>
+            <button
+              type="button"
+              className="font-medium text-[var(--brand-finance)] hover:underline"
+              onClick={() => {
+                setQuery("");
+                setPayerFilter("__all__");
+                setCategoryFilter("__all__");
+                setCoupleFilter("__all__");
+                setSettledFilter("__show__");
+              }}
+            >
+              Filter zurücksetzen
+            </button>
+          </div>
+        ) : null}
+      </div>
+    ) : null;
+
+  const chromeInner = (
+    <div className="space-y-2">
+      {isPwa && expenses.length > 0 ? (
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="h-8 w-full justify-between gap-2 bg-background"
+          aria-expanded={toolsOpen}
+          onClick={() => setToolsOpen((o) => !o)}
+        >
+          <span className="inline-flex items-center gap-1.5">
+            <Search className="size-3.5" />
+            Suche & Filter
+            {activeFilterCount > 0 || query.trim() ? (
+              <Badge
+                variant="secondary"
+                className="h-5 min-w-5 justify-center px-1 text-[10px] font-semibold"
+              >
+                {activeFilterCount + (query.trim() ? 1 : 0)}
+              </Badge>
+            ) : null}
+          </span>
+          <ChevronDown
+            className={cn(
+              "size-3.5 shrink-0 text-muted-foreground transition-transform",
+              toolsOpen && "rotate-180"
+            )}
+          />
+        </Button>
+      ) : null}
+      {!isPwa || toolsOpen ? toolsPanel : null}
+      {isPwa && !toolsOpen && filtersActive ? (
+        <button
+          type="button"
+          className="text-left text-[11px] font-medium text-[var(--brand-finance)] hover:underline"
+          onClick={() => setToolsOpen(true)}
+        >
+          {filteredExpenses.length} von {expenses.length} · Filter anpassen
+        </button>
+      ) : null}
+      <DateTimelineStrip
+        dates={expenseDayDates}
+        anchorIdForDate={(iso) => `expense-day-${iso}`}
+        accent="finance"
+      />
+    </div>
+  );
+
+  const chromeNode = renderStickyChrome
+    ? renderStickyChrome(chromeInner)
+    : chromeInner;
+
+  let prevExpenseDay: string | null = null;
+
   return (
     <div
       className={cn(
@@ -1826,173 +2069,7 @@ export function ExpenseList({
         mobileFocusId != null && "pb-36 md:pb-0"
       )}
     >
-      {expenses.length > 0 ? (
-        <div className="space-y-2 rounded-xl border border-border bg-muted/20 p-2.5">
-          <div className="flex items-center gap-2">
-            <div className="relative min-w-0 flex-1">
-              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Text suchen…"
-                className="h-8 bg-background pl-8 pr-8 text-sm"
-                aria-label="Ausgaben durchsuchen"
-              />
-              {query ? (
-                <button
-                  type="button"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-                  title="Suche leeren"
-                  onClick={() => setQuery("")}
-                >
-                  <XIcon className="size-3.5" />
-                </button>
-              ) : null}
-            </div>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="relative h-8 shrink-0 gap-1.5 bg-background px-2.5"
-              aria-expanded={filterOpen}
-              aria-controls="expense-list-filters"
-              onClick={() => setFilterOpen((o) => !o)}
-            >
-              <Filter className="size-3.5" />
-              Filter
-              {activeFilterCount > 0 ? (
-                <Badge
-                  variant="secondary"
-                  className="h-5 min-w-5 justify-center px-1 text-[10px] font-semibold"
-                >
-                  {activeFilterCount}
-                </Badge>
-              ) : null}
-            </Button>
-          </div>
-          {filterOpen ? (
-            <div
-              id="expense-list-filters"
-              className="grid gap-2 rounded-lg border border-border bg-background p-2.5 sm:grid-cols-2"
-            >
-              {!cashbookMode ? (
-                <Select
-                  value={payerFilter}
-                  onValueChange={(v) => {
-                    if (v != null) setPayerFilter(v);
-                  }}
-                  items={{
-                    __all__: "Alle Zahler",
-                    ...Object.fromEntries(
-                      payerOptions.map((m) => [String(m.id), m.display_name])
-                    ),
-                  }}
-                >
-                  <SelectTrigger className="h-8 w-full min-w-0 text-sm">
-                    <SelectValue placeholder="Zahler" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">Alle Zahler</SelectItem>
-                    {payerOptions.map((m) => (
-                      <SelectItem key={m.id} value={String(m.id)}>
-                        {m.display_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : null}
-              <Select
-                value={categoryFilter}
-                onValueChange={(v) => {
-                  if (v != null) setCategoryFilter(v);
-                }}
-                items={{
-                  __all__: "Alle Kategorien",
-                  ...Object.fromEntries(
-                    categoryOptions.map((label) => [label, label])
-                  ),
-                }}
-              >
-                <SelectTrigger className="h-8 w-full min-w-0 text-sm">
-                  <SelectValue placeholder="Kategorie" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">Alle Kategorien</SelectItem>
-                  {categoryOptions.map((label) => (
-                    <SelectItem key={label} value={label}>
-                      {label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {!cashbookMode && coupleOptions.length > 0 ? (
-                <Select
-                  value={coupleFilter}
-                  onValueChange={(v) => {
-                    if (v != null) setCoupleFilter(v);
-                  }}
-                  items={{
-                    __all__: "Alle Paare",
-                    ...Object.fromEntries(
-                      coupleOptions.map((c) => [String(c.id), c.name])
-                    ),
-                  }}
-                >
-                  <SelectTrigger className="h-8 w-full min-w-0 text-sm">
-                    <SelectValue placeholder="Paar" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">Alle Paare</SelectItem>
-                    {coupleOptions.map((c) => (
-                      <SelectItem key={c.id} value={String(c.id)}>
-                        {c.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : null}
-              <Select
-                value={settledFilter}
-                onValueChange={(v) => {
-                  if (v === "__show__" || v === "__hide__") setSettledFilter(v);
-                }}
-                items={{
-                  __show__: "Ausgeglichene: Ja",
-                  __hide__: "Ausgeglichene: Nein",
-                }}
-              >
-                <SelectTrigger className="h-8 w-full min-w-0 text-sm">
-                  <SelectValue placeholder="Ausgeglichene" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__show__">Ausgeglichene: Ja</SelectItem>
-                  <SelectItem value="__hide__">Ausgeglichene: Nein</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          ) : null}
-          {filtersActive ? (
-            <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
-              <span>
-                {filteredExpenses.length} von {expenses.length} angezeigt
-              </span>
-              <button
-                type="button"
-                className="font-medium text-[var(--brand-finance)] hover:underline"
-                onClick={() => {
-                  setQuery("");
-                  setPayerFilter("__all__");
-                  setCategoryFilter("__all__");
-                  setCoupleFilter("__all__");
-                  setSettledFilter("__show__");
-                }}
-              >
-                Filter zurücksetzen
-              </button>
-            </div>
-          ) : null}
-        </div>
-      ) : null}
+      {chromeNode}
 
       {expenses.length === 0 ? (
         <p className="text-sm text-muted-foreground">
@@ -2003,38 +2080,48 @@ export function ExpenseList({
           Keine Treffer für die aktuelle Suche/Filter.
         </p>
       ) : (
-        filteredExpenses.map((exp) => (
-          <ExpenseCard
-            key={exp.id}
-            exp={exp}
-            members={members}
-            couples={couples}
-            baseCurrency={baseCurrency}
-            cashbookMode={cashbookMode}
-            canDelete={canDelete}
-            canEdit={canEdit}
-            trips={trips}
-            lockedTripId={lockedTripId}
-            onDelete={onDelete}
-            receiptUploadUrl={
-              receiptUploadUrl ? receiptUploadUrl(exp.id) : undefined
-            }
-            onReceiptChanged={onReceiptChanged}
-            onGenerateAiImage={onGenerateAiImage}
-            onDeleteAiImage={onDeleteAiImage}
-            onResendMail={onResendMail}
-            onUpdate={onUpdateExpense}
-            onDuplicate={onDuplicateExpense}
-            onCoupleSettle={onCoupleSettle}
-            onSetDocument={onSetDocument}
-            mobileFocused={mobileFocusId === exp.id}
-            onMobileFocus={setMobileFocusId}
-            aiImageBusy={aiImageBusyId === exp.id}
-            mailBusy={mailBusyId === exp.id}
-            editBusy={editBusyId === exp.id}
-            coupleSettleBusy={coupleSettleBusyId === exp.id}
-          />
-        ))
+        filteredExpenses.map((exp) => {
+          const iso = toIsoDateOnly(exp.expense_date);
+          const firstOfDay = Boolean(iso && iso !== prevExpenseDay);
+          if (iso) prevExpenseDay = iso;
+          return (
+            <div
+              key={exp.id}
+              id={firstOfDay && iso ? `expense-day-${iso}` : undefined}
+              className={firstOfDay ? "scroll-mt-36 lg:scroll-mt-48" : undefined}
+            >
+              <ExpenseCard
+                exp={exp}
+                members={members}
+                couples={couples}
+                baseCurrency={baseCurrency}
+                cashbookMode={cashbookMode}
+                canDelete={canDelete}
+                canEdit={canEdit}
+                trips={trips}
+                lockedTripId={lockedTripId}
+                onDelete={onDelete}
+                receiptUploadUrl={
+                  receiptUploadUrl ? receiptUploadUrl(exp.id) : undefined
+                }
+                onReceiptChanged={onReceiptChanged}
+                onGenerateAiImage={onGenerateAiImage}
+                onDeleteAiImage={onDeleteAiImage}
+                onResendMail={onResendMail}
+                onUpdate={onUpdateExpense}
+                onDuplicate={onDuplicateExpense}
+                onCoupleSettle={onCoupleSettle}
+                onSetDocument={onSetDocument}
+                mobileFocused={mobileFocusId === exp.id}
+                onMobileFocus={setMobileFocusId}
+                aiImageBusy={aiImageBusyId === exp.id}
+                mailBusy={mailBusyId === exp.id}
+                editBusy={editBusyId === exp.id}
+                coupleSettleBusy={coupleSettleBusyId === exp.id}
+              />
+            </div>
+          );
+        })
       )}
 
       {focus && (canEdit || canDelete || onDuplicateExpense || onCoupleSettle) ? (
