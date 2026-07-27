@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   ArrowLeftRight,
@@ -87,6 +87,7 @@ import {
   uniqueSortedIsoDates,
 } from "@/components/layout/date-timeline-strip";
 import { useIsStandalonePwa } from "@/hooks/use-standalone-pwa";
+import { useActiveDateFromScroll } from "@/hooks/use-active-date-from-scroll";
 import { LinkPaperlessDocumentDialog } from "@/components/finance-brain/link-paperless-document-dialog";
 import {
   ExpenseTripEventPicker,
@@ -1818,9 +1819,31 @@ export function ExpenseList({
     () =>
       uniqueSortedIsoDates(
         filteredExpenses.map((e) => e.expense_date),
-        "desc"
+        "asc"
       ),
     [filteredExpenses]
+  );
+
+  /** Day anchors in DOM order (list is newest-first) for scroll highlighting. */
+  const expenseDayDatesDom = useMemo(() => {
+    const out: string[] = [];
+    const seen = new Set<string>();
+    for (const exp of filteredExpenses) {
+      const iso = toIsoDateOnly(exp.expense_date);
+      if (!iso || seen.has(iso)) continue;
+      seen.add(iso);
+      out.push(iso);
+    }
+    return out;
+  }, [filteredExpenses]);
+
+  const expenseDayAnchorId = useCallback(
+    (iso: string) => `expense-day-${iso}`,
+    []
+  );
+  const activeExpenseDay = useActiveDateFromScroll(
+    expenseDayDatesDom,
+    expenseDayAnchorId
   );
 
   const focus =
@@ -2054,7 +2077,8 @@ export function ExpenseList({
       ) : null}
       <DateTimelineStrip
         dates={expenseDayDates}
-        anchorIdForDate={(iso) => `expense-day-${iso}`}
+        anchorIdForDate={expenseDayAnchorId}
+        activeDate={activeExpenseDay}
         accent="finance"
       />
     </div>

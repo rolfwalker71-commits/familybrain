@@ -1426,6 +1426,7 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
 
       {activeTab === "expenses" ? null : (
         <div
+          data-sticky-detail-chrome
           className={cn(
             stickyDetailChromeClass(!isPwa),
             "space-y-2 py-2"
@@ -1798,6 +1799,7 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
           coupleSettleBusyId={coupleSettleBusyId}
           renderStickyChrome={(chrome) => (
             <div
+              data-sticky-detail-chrome
               className={cn(
                 stickyDetailChromeClass(!isPwa),
                 "-mx-1 space-y-2 px-1 py-2"

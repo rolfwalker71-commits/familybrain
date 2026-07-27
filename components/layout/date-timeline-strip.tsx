@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { cn } from "@/lib/utils";
 
 const MONTH_SHORT_DE = [
@@ -50,8 +50,8 @@ export function scrollToDateAnchor(anchorId: string) {
 
 const accentActive: Record<"finance" | "travel", string> = {
   finance:
-    "border-[var(--brand-finance)]/40 bg-[var(--brand-finance-soft)] text-[var(--brand-finance)]",
-  travel: "border-sky-500/40 bg-sky-50 text-sky-700",
+    "border-[var(--brand-finance)]/45 bg-[var(--brand-finance-soft)] text-[var(--brand-finance)] shadow-sm",
+  travel: "border-sky-500/45 bg-sky-50 text-sky-700 shadow-sm",
 };
 
 /**
@@ -72,15 +72,30 @@ export function DateTimelineStrip({
   activeDate?: string | null;
   accent?: "finance" | "travel";
 }) {
+  const scrollerRef = useRef<HTMLDivElement>(null);
   const items = useMemo(
     () => dates.map((iso) => ({ iso, ...dayLabel(iso) })),
     [dates]
   );
 
+  useEffect(() => {
+    if (!activeDate || !scrollerRef.current) return;
+    const btn = scrollerRef.current.querySelector<HTMLElement>(
+      `[data-date="${activeDate}"]`
+    );
+    if (!btn) return;
+    btn.scrollIntoView({
+      behavior: "smooth",
+      inline: "center",
+      block: "nearest",
+    });
+  }, [activeDate]);
+
   if (items.length === 0) return null;
 
   return (
     <div
+      ref={scrollerRef}
       className={cn(
         "-mx-1 flex gap-1 overflow-x-auto px-1 pb-0.5 pt-0.5 [scrollbar-width:thin]",
         className
@@ -94,6 +109,8 @@ export function DateTimelineStrip({
           <button
             key={item.iso}
             type="button"
+            data-date={item.iso}
+            aria-current={active ? "date" : undefined}
             title={`${item.weekday} ${item.day}. ${item.month}`}
             onClick={() => scrollToDateAnchor(anchorIdForDate(item.iso))}
             className={cn(
@@ -103,13 +120,23 @@ export function DateTimelineStrip({
                 : "border-border/70 bg-background text-foreground hover:bg-muted/60"
             )}
           >
-            <span className="text-[9px] font-bold uppercase leading-none tracking-wide text-muted-foreground">
+            <span
+              className={cn(
+                "text-[9px] font-bold uppercase leading-none tracking-wide",
+                active ? "opacity-80" : "text-muted-foreground"
+              )}
+            >
               {item.month}
             </span>
             <span className="mt-0.5 text-sm font-black tabular-nums leading-none">
               {item.day}
             </span>
-            <span className="mt-0.5 text-[9px] font-medium leading-none text-muted-foreground">
+            <span
+              className={cn(
+                "mt-0.5 text-[9px] font-medium leading-none",
+                active ? "opacity-80" : "text-muted-foreground"
+              )}
+            >
               {item.weekday}
             </span>
           </button>

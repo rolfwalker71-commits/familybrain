@@ -86,6 +86,7 @@ import {
   uniqueSortedIsoDates,
 } from "@/components/layout/date-timeline-strip";
 import { useIsStandalonePwa } from "@/hooks/use-standalone-pwa";
+import { useActiveDateFromScroll } from "@/hooks/use-active-date-from-scroll";
 import { DocumentPdfThumb } from "@/components/documents/document-pdf-preview";
 import {
   CommentCountChip,
@@ -719,6 +720,15 @@ function TripDetailInner({
     () =>
       uniqueSortedIsoDates(events.map((e) => parseEventIsoDate(e.start_date))),
     [events]
+  );
+
+  const eventDayAnchorId = useCallback(
+    (iso: string) => `event-day-${iso}`,
+    []
+  );
+  const activeEventDay = useActiveDateFromScroll(
+    eventDayDates,
+    eventDayAnchorId
   );
 
   const firstOfDayEventIds = useMemo(() => {
@@ -1708,6 +1718,7 @@ function TripDetailInner({
 
       {!readOnly && activeTab !== "ablauf" ? (
         <div
+          data-sticky-detail-chrome
           className={cn(
             stickyDetailChromeClass(stickyEnabled, {
               belowMobileHeader: stickyBelowHeader,
@@ -2638,6 +2649,7 @@ function TripDetailInner({
 {activeTab === "ablauf" || readOnly ? (
       <div className="space-y-5">
         <div
+          data-sticky-detail-chrome
           className={cn(
             stickyDetailChromeClass(stickyEnabled, {
               belowMobileHeader: stickyBelowHeader,
@@ -2673,7 +2685,8 @@ function TripDetailInner({
           </div>
           <DateTimelineStrip
             dates={eventDayDates}
-            anchorIdForDate={(iso) => `event-day-${iso}`}
+            anchorIdForDate={eventDayAnchorId}
+            activeDate={activeEventDay}
             accent="travel"
           />
         </div>

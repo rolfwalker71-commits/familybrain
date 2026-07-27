@@ -1040,6 +1040,7 @@ function FinanceShareInner({ token }: { token: string }) {
           coupleSettleBusyId={coupleSettleBusyId}
           renderStickyChrome={(chrome) => (
             <div
+              data-sticky-detail-chrome
               className={cn(
                 stickyDetailChromeClass(!isPwa, {
                   belowMobileHeader: false,
