@@ -320,9 +320,9 @@ export function BalanceView({
     return (
       <div
         key={key}
-        className="flex items-center justify-between gap-2 rounded-lg border border-amber-200/60 bg-white px-2.5 py-1.5 text-sm leading-snug"
+        className="flex items-center gap-3 rounded-lg border border-amber-200/60 bg-white px-2.5 py-1.5 text-sm leading-snug"
       >
-        <div className="flex min-w-0 flex-wrap items-center gap-x-1 gap-y-0.5">
+        <div className="flex min-w-0 flex-1 items-center gap-x-1 gap-y-0.5">
           <NameWithAvatar
             name={d.fromDisplayName}
             src={d.fromAvatarUrl}
@@ -338,10 +338,10 @@ export function BalanceView({
             size="xs"
             nameClassName="font-medium"
           />
-          <span className="font-semibold tabular-nums text-amber-900">
-            {formatMoney(d.amount, baseCurrency)}
-          </span>
         </div>
+        <span className="shrink-0 text-right font-semibold tabular-nums text-amber-900">
+          {formatMoney(d.amount, baseCurrency)}
+        </span>
         {showRecord ? (
           <Button
             type="button"
