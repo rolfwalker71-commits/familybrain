@@ -10,6 +10,7 @@ import {
   Copy,
   Download,
   Filter,
+  FileText,
   Link2,
   Luggage,
   Mail,
@@ -980,7 +981,8 @@ function ExpenseCard({
         <div className="flex items-center gap-3 px-3 py-3 sm:gap-4">
           <IconCircle
             icon={visual.icon}
-            tone={visual.tone}
+            tone="green"
+            shape="circle"
             size="lg"
             className="h-14 w-14 shrink-0 [&_svg]:h-7 [&_svg]:w-7"
           />
@@ -1034,6 +1036,24 @@ function ExpenseCard({
             </div>
           </div>
 
+          <div className="flex shrink-0 flex-col items-end gap-1">
+            <p
+              className={cn(
+                "text-right text-base font-bold tabular-nums sm:text-lg",
+                isIncome ? "text-[var(--brand-finance)]" : "text-foreground"
+              )}
+            >
+              {isIncome ? "+" : ""}
+              {formatMoney(exp.amount_base, baseCurrency)}
+            </p>
+            {exp.document || exp.document_id ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-[var(--brand-finance-soft)] px-2 py-0.5 text-[10px] font-semibold text-[var(--brand-finance)]">
+                <FileText className="size-3" />
+                1 Beleg
+              </span>
+            ) : null}
+          </div>
+
           {exp.ai_image_url ? (
             <AiImagePreview
               src={exp.ai_image_url}
@@ -1047,27 +1067,6 @@ function ExpenseCard({
               KI…
             </div>
           ) : null}
-
-          <div className="flex shrink-0 flex-col items-end gap-1">
-            <p
-              className={cn(
-                "text-right text-base font-bold tabular-nums sm:text-lg",
-                isIncome ? "text-[var(--brand-finance)]" : "text-foreground"
-              )}
-            >
-              {isIncome ? "+" : ""}
-              {formatMoney(exp.amount_base, baseCurrency)}
-            </p>
-            {exp.document || exp.document_id ? (
-              <Badge
-                variant="outline"
-                className="h-5 gap-1 px-1.5 text-[10px] font-semibold"
-              >
-                <Link2 className="size-3" />
-                1 Beleg
-              </Badge>
-            ) : null}
-          </div>
         </div>
 
         {!cashbookMode && !isIncome && exp.splits.length > 0 ? (

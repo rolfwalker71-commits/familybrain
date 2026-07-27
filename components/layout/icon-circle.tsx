@@ -130,6 +130,8 @@ type IconCircleProps = {
   size?: "sm" | "md" | "lg";
   /** soft = pastel (default); solid = saturated fill for dark nav */
   variant?: "soft" | "solid";
+  /** circle (default) or rounded square like Travel mockup tiles */
+  shape?: "circle" | "rounded";
   className?: string;
 };
 
@@ -144,13 +146,15 @@ export function IconCircle({
   tone = "blue",
   size = "md",
   variant = "soft",
+  shape = "circle",
   className,
 }: IconCircleProps) {
   const s = sizeClasses[size];
   return (
     <div
       className={cn(
-        "flex shrink-0 items-center justify-center rounded-full",
+        "flex shrink-0 items-center justify-center",
+        shape === "rounded" ? "rounded-2xl" : "rounded-full",
         s.wrap,
         variant === "solid" ? iconToneSolidClasses[tone] : iconToneClasses[tone],
         className

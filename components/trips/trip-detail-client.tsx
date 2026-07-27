@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type React
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
+  Armchair,
   ArrowLeft,
   BedDouble,
   BookOpen,
@@ -92,9 +93,11 @@ import {
 } from "@/components/layout/date-timeline-strip";
 import {
   StatusStrip,
-  daysUntilIso,
-  formatCountdownDe,
 } from "@/components/layout/status-strip";
+import {
+  TodayAgendaWidget,
+  pickAgendaDay,
+} from "@/components/trips/today-agenda-widget";
 import {
   SoftChip,
   SoftChipRow,
@@ -248,18 +251,18 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 const EVENT_VISUALS: Record<string, { icon: LucideIcon; tone: IconTone }> = {
-  Flug: { icon: Plane, tone: "sky" },
-  Zugreisen: { icon: TrainFront, tone: "slate" },
-  Bahn: { icon: TrainFront, tone: "slate" },
-  Mietauto: { icon: Car, tone: "teal" },
-  Mietwagen: { icon: Car, tone: "teal" },
-  Transfer: { icon: Bus, tone: "slate" },
-  Hotel: { icon: BedDouble, tone: "amber" },
-  Unterkunft: { icon: BedDouble, tone: "orange" },
-  Kreuzfahrt: { icon: Ship, tone: "indigo" },
+  Flug: { icon: Plane, tone: "green" },
+  Zugreisen: { icon: TrainFront, tone: "green" },
+  Bahn: { icon: TrainFront, tone: "green" },
+  Mietauto: { icon: Car, tone: "green" },
+  Mietwagen: { icon: Car, tone: "green" },
+  Transfer: { icon: Bus, tone: "green" },
+  Hotel: { icon: BedDouble, tone: "green" },
+  Unterkunft: { icon: BedDouble, tone: "green" },
+  Kreuzfahrt: { icon: Ship, tone: "green" },
   Ausflug: { icon: MapPin, tone: "green" },
   Aktivität: { icon: MapPin, tone: "green" },
-  Sonstiges: { icon: Ticket, tone: "slate" },
+  Sonstiges: { icon: Ticket, tone: "green" },
 };
 
 function eventVisual(type: string) {
@@ -373,11 +376,9 @@ function EventDayHeading({ iso }: { iso: string }) {
 /** Time · dot · dashed connector rail to the left of an event card. */
 function EventTimelineRail({
   event,
-  tone,
   showConnector,
 }: {
   event: TripEvent;
-  tone: IconTone;
   showConnector: boolean;
 }) {
   const time = toTimeInputValue(event.start_time);
@@ -387,10 +388,7 @@ function EventTimelineRail({
         {time || ""}
       </span>
       <span
-        className={cn(
-          "mt-1 size-2.5 shrink-0 rounded-full ring-4 ring-background",
-          toneSurface(tone).title
-        )}
+        className="mt-1 size-2.5 shrink-0 rounded-full bg-[var(--brand-finance)] ring-4 ring-background"
         aria-hidden
       />
       <span
@@ -477,7 +475,7 @@ function eventDenseFactItems(event: TripEvent): DenseFactItem[] {
     items.push({ key: "time", icon: Clock, label: et ? `${st}–${et}` : st });
   }
   if (event.cabin_class) {
-    items.push({ key: "cabin", icon: Tag, label: event.cabin_class });
+    items.push({ key: "cabin", icon: Armchair, label: event.cabin_class });
   }
   const linked = event.linked_expenses || [];
   if (linked.length > 0) {
@@ -487,7 +485,7 @@ function eventDenseFactItems(event: TripEvent): DenseFactItem[] {
     );
     items.push({
       key: "amount",
-      icon: Wallet,
+      icon: Tag,
       label: formatMoney(sum, linked[0].base_currency || "CHF"),
     });
   }
@@ -513,30 +511,30 @@ function EventDenseFactsColumn({
   return (
     <div
       className={cn(
-        "flex shrink-0 flex-col items-end gap-1",
-        size === "sm" ? "min-w-[6rem]" : "min-w-[7rem] sm:min-w-[8.5rem]"
+        "flex shrink-0 flex-col items-start gap-1.5",
+        size === "sm" ? "min-w-[6.5rem]" : "min-w-[7.5rem] sm:min-w-[9rem]"
       )}
     >
       {facts.map((f) => (
         <span
           key={f.key}
           className={cn(
-            "inline-flex items-center gap-1 font-semibold tabular-nums text-foreground/85",
+            "inline-flex items-center gap-1.5 font-semibold tabular-nums text-foreground/90",
             size === "sm" ? "text-[11px] leading-snug" : "text-xs sm:text-sm"
           )}
         >
+          <f.icon
+            className="size-3.5 shrink-0 text-[var(--brand-finance)]"
+            strokeWidth={2}
+          />
           {f.label}
-          <f.icon className="size-3 shrink-0 text-muted-foreground" />
         </span>
       ))}
       {docCount > 0 ? (
-        <Badge
-          variant="outline"
-          className="h-5 gap-1 px-1.5 text-[10px] font-semibold"
-        >
+        <span className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-[var(--brand-finance-soft)] px-2 py-0.5 text-[10px] font-semibold text-[var(--brand-finance)]">
           <FileText className="size-3" />
           {docCount} {docCount === 1 ? "Beleg" : "Belege"}
-        </Badge>
+        </span>
       ) : null}
     </div>
   );
@@ -987,93 +985,21 @@ function TripDetailInner({
     };
   }, [tripId, readOnly, events.length]);
 
-  const nextEventStatus = useMemo(() => {
-    const now = new Date();
-    const today = new Date(now);
-    today.setHours(0, 0, 0, 0);
-    const upcoming = events
-      .map((e) => ({
-        event: e,
-        iso: parseEventIsoDate(e.start_date),
-      }))
-      .filter((x): x is { event: TripEvent; iso: string } => Boolean(x.iso))
-      .sort((a, b) => {
-        const c = a.iso.localeCompare(b.iso);
-        if (c !== 0) return c;
-        return (toTimeInputValue(a.event.start_time) || "").localeCompare(
-          toTimeInputValue(b.event.start_time) || ""
-        );
-      });
+  const todayAgenda = useMemo(
+    () => pickAgendaDay(events, parseEventIsoDate),
+    [events]
+  );
 
-    const eventStartMs = (iso: string, e: TripEvent) => {
-      const [y, m, d] = iso.split("-").map(Number);
-      const t = toTimeInputValue(e.start_time);
-      const [hh, mm] = t ? t.split(":").map(Number) : [0, 0];
-      return new Date(y, m - 1, d, hh || 0, mm || 0).getTime();
-    };
-
-    // Prefer the soonest not-yet-finished event (same day: by time).
-    const next =
-      upcoming.find((x) => {
-        const start = eventStartMs(x.iso, x.event);
-        const endIso = parseEventIsoDate(x.event.end_date) || x.iso;
-        const endT = toTimeInputValue(x.event.end_time);
-        const [ey, em, ed] = endIso.split("-").map(Number);
-        const [eh, emin] = endT
-          ? endT.split(":").map(Number)
-          : [23, 59];
-        const end = new Date(ey, em - 1, ed, eh || 23, emin || 59).getTime();
-        return end >= now.getTime() || start >= today.getTime();
-      }) ?? upcoming[upcoming.length - 1];
-
-    if (!next) return null;
-    const days = daysUntilIso(next.iso);
-    let when = formatCountdownDe(days);
-    const startMs = eventStartMs(next.iso, next.event);
-    const minsUntil = Math.round((startMs - now.getTime()) / 60_000);
-    if (days === 0) {
-      if (minsUntil <= 0 && minsUntil > -180) when = "läuft jetzt";
-      else if (minsUntil > 0 && minsUntil < 60) when = `in ${minsUntil} Min.`;
-      else if (minsUntil >= 60 && minsUntil < 24 * 60) {
-        when = `heute · in ${Math.round(minsUntil / 60)} Std.`;
-      } else if (minsUntil <= -180) when = "heute";
+  function scrollToAgendaEvent(eventId: number, iso: string) {
+    const el = document.querySelector<HTMLElement>(
+      `[data-event-id="${eventId}"]`
+    );
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
     }
-
-    const type = coerceTripEventType(next.event.event_type);
-    const dual = isDualPlaceType(type);
-    const places = splitTransferPlaces(next.event);
-    const placeHint =
-      type === "Flug" &&
-      (next.event.departure_airport || next.event.arrival_airport)
-        ? `${next.event.departure_airport || "—"} → ${next.event.arrival_airport || "—"}`
-        : dual && (places.origin || places.destination)
-          ? [places.origin, places.destination].filter(Boolean).join(" → ")
-          : next.event.place_name ||
-            (next.event.location &&
-            !textsOverlap(next.event.location, next.event.title)
-              ? next.event.location
-              : null);
-
-    const facts = [
-      type,
-      next.event.flight_number || null,
-      placeHint,
-      toTimeInputValue(next.event.start_time) || null,
-      when,
-    ].filter(Boolean) as string[];
-
-    return {
-      eventId: next.event.id,
-      iso: next.iso,
-      title: next.event.title,
-      type,
-      facts,
-      when,
-      time: toTimeInputValue(next.event.start_time) || null,
-      placeHint,
-      flightNumber: next.event.flight_number || null,
-    };
-  }, [events]);
+    scrollToDateAnchor(`event-day-${iso}`);
+  }
 
   const weatherPoint = useMemo(() => {
     for (const e of events) {
@@ -2183,65 +2109,34 @@ function TripDetailInner({
         </div>
       </div>
 
-      {nextEventStatus || ledgerStrip ? (
-        <StatusStrip
-          accent="travel"
-          primary={
-            nextEventStatus ? (
-              <button
-                type="button"
-                className="w-full text-left"
-                onClick={() => {
-                  const el = document.querySelector<HTMLElement>(
-                    `[data-event-id="${nextEventStatus.eventId}"]`
-                  );
-                  if (el) {
-                    el.scrollIntoView({ behavior: "smooth", block: "start" });
-                    return;
-                  }
-                  scrollToDateAnchor(`event-day-${nextEventStatus.iso}`);
-                }}
-              >
-                <span className="font-semibold">
-                  {nextEventStatus.when === "läuft jetzt"
-                    ? "Jetzt: "
-                    : "Nächster Termin: "}
-                </span>
-                <span className="font-medium">{nextEventStatus.title}</span>
-                <span className="mt-0.5 block text-[11px] font-normal text-current/75 sm:mt-0 sm:inline sm:before:content-['_|_']">
-                  {[
-                    nextEventStatus.type,
-                    nextEventStatus.flightNumber,
-                    nextEventStatus.placeHint &&
-                    nextEventStatus.placeHint !== nextEventStatus.title
-                      ? nextEventStatus.placeHint
-                      : null,
-                    nextEventStatus.time,
-                    nextEventStatus.when,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </span>
-              </button>
-            ) : (
-              <span className="text-current/70">Noch keine Termine</span>
-            )
-          }
-          secondary={
-            ledgerStrip ? (
-              ledgerStrip.href && !readOnly ? (
-                <Link
-                  href={ledgerStrip.href}
-                  className="underline-offset-2 hover:underline"
-                >
-                  {ledgerStrip.label}
-                </Link>
-              ) : (
-                ledgerStrip.label
-              )
-            ) : undefined
-          }
-        />
+      {todayAgenda || ledgerStrip ? (
+        <div className="space-y-2">
+          {todayAgenda ? (
+            <TodayAgendaWidget
+              iso={todayAgenda.iso}
+              isToday={todayAgenda.isToday}
+              events={todayAgenda.events}
+              onSelectEvent={scrollToAgendaEvent}
+            />
+          ) : null}
+          {ledgerStrip ? (
+            <StatusStrip
+              accent="finance"
+              primary={
+                ledgerStrip.href && !readOnly ? (
+                  <Link
+                    href={ledgerStrip.href}
+                    className="underline-offset-2 hover:underline"
+                  >
+                    {ledgerStrip.label}
+                  </Link>
+                ) : (
+                  ledgerStrip.label
+                )
+              }
+            />
+          ) : null}
+        </div>
       ) : null}
 
       {(weather || missingChecklist.length > 0) &&
@@ -3381,14 +3276,12 @@ function TripDetailInner({
                   >
                   <EventTimelineRail
                     event={event}
-                    tone={visual.tone}
                     showConnector={!isLastOfDay}
                   />
                   <div className="min-w-0 flex-1 pb-2">
                   <Card
-                    tone={visual.tone}
                     className={cn(
-                      "relative gap-0 overflow-visible border border-border py-0 shadow-none",
+                      "relative gap-0 overflow-visible border border-border bg-card py-0 shadow-none",
                       editMode &&
                         dragOverEventId === event.id &&
                         "ring-2 ring-teal-400/50"
@@ -3398,7 +3291,8 @@ function TripDetailInner({
                       <div className="flex items-start gap-2.5">
                         <IconCircle
                           icon={visual.icon}
-                          tone={visual.tone}
+                          tone="green"
+                          shape="rounded"
                           size="md"
                           className="mt-0.5 shrink-0"
                         />
@@ -3451,6 +3345,14 @@ function TripDetailInner({
                           hideAmount={eventDenseFacts(event).length > 0}
                         />
                         </div>
+                        <div className="flex shrink-0 flex-col items-end gap-1">
+                          <EventStatusPill event={event} />
+                          <EventDenseFactsColumn event={event} size="sm" />
+                        </div>
+                        <div
+                          className="hidden self-stretch w-px bg-border sm:block"
+                          aria-hidden
+                        />
                         <EventCardAiImage
                           event={event}
                           onOpen={() =>
@@ -3461,14 +3363,6 @@ function TripDetailInner({
                             })
                           }
                         />
-                        <div
-                          className="hidden self-stretch w-px bg-border sm:block"
-                          aria-hidden
-                        />
-                        <div className="flex shrink-0 flex-col items-end gap-1">
-                          <EventStatusPill event={event} />
-                          <EventDenseFactsColumn event={event} size="sm" />
-                        </div>
                       </div>
 
                       {!readOnly || documents.length > 0 || attachments.length > 0 ? (
@@ -3656,14 +3550,12 @@ function TripDetailInner({
               >
               <EventTimelineRail
                 event={event}
-                tone={visual.tone}
                 showConnector={!isLastOfDay}
               />
               <div className="min-w-0 flex-1 pb-2">
                 <Card
-                  tone={visual.tone}
                   className={cn(
-                    "relative gap-0 overflow-visible border border-border py-0 shadow-none",
+                    "relative gap-0 overflow-visible border border-border bg-card py-0 shadow-none",
                     editingEventId === event.id && "ring-2 ring-foreground/15",
                     editMode &&
                       editFocusEventId === event.id &&
@@ -3677,7 +3569,8 @@ function TripDetailInner({
                     <div className="flex items-start gap-3">
                       <IconCircle
                         icon={visual.icon}
-                        tone={visual.tone}
+                        tone="green"
+                        shape="rounded"
                         size="lg"
                         className="mt-0.5 shrink-0"
                       />
@@ -3731,20 +3624,6 @@ function TripDetailInner({
                           hideAmount={eventDenseFacts(event).length > 0}
                         />
                       </div>
-                      <EventCardAiImage
-                        event={event}
-                        onOpen={() =>
-                          setAiZoom({
-                            url: event.ai_image_url!,
-                            title: event.title,
-                            eventId: event.id,
-                          })
-                        }
-                      />
-                      <div
-                        className="hidden self-stretch w-px bg-border sm:block"
-                        aria-hidden
-                      />
                       <div className="flex shrink-0 items-start gap-2">
                         <div className="flex flex-col items-end gap-1.5">
                           <EventStatusPill event={event} />
@@ -3821,6 +3700,20 @@ function TripDetailInner({
                         </div>
                       ) : null}
                       </div>
+                      <div
+                        className="hidden self-stretch w-px bg-border sm:block"
+                        aria-hidden
+                      />
+                      <EventCardAiImage
+                        event={event}
+                        onOpen={() =>
+                          setAiZoom({
+                            url: event.ai_image_url!,
+                            title: event.title,
+                            eventId: event.id,
+                          })
+                        }
+                      />
                     </div>
                     {editMode ? (
                       <button
