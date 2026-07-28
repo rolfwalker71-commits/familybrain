@@ -24,6 +24,10 @@ import {
   SoftText,
 } from "@/components/layout/data-list";
 import { PageHeader, TileTitleBar, MetricTile } from "@/components/layout/page-primitives";
+import {
+  ListSortControl,
+  useListSortDir,
+} from "@/components/layout/list-sort-control";
 import { IconCircle, pageVisuals, toneSurface, type IconTone } from "@/components/layout/icon-circle";
 import { AddToCalendarButton } from "@/components/calendar/add-to-calendar-button";
 import { AddToTripButton } from "@/components/trips/add-to-trip-button";
@@ -38,6 +42,7 @@ import { resolveItinerary } from "@/lib/extraction/itinerary";
 import { normalizeTravelType, TRAVEL_TYPES } from "@/lib/extraction/normalize-categories";
 import { TravelTypeReclassify } from "@/components/travel/travel-type-reclassify";
 import { formatCHF } from "@/lib/utils/format";
+import { compareNullableDate } from "@/lib/utils/list-sort";
 import { toSwissDate } from "@/lib/utils/dates";
 import { cn } from "@/lib/utils";
 import {
@@ -284,6 +289,7 @@ export function TravelOverviewClient(props: Parameters<typeof TravelOverviewClie
 function TravelOverviewClientInner({ items }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [sortDir, setSortDir] = useListSortDir("travel", "desc");
 
   const [dimension, setDimension] = useState<Dimension | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
@@ -329,9 +335,11 @@ function TravelOverviewClientInner({ items }: Props) {
     const today = new Date().toISOString().slice(0, 10);
     return items
       .filter((r) => r.start_date && r.start_date >= today)
-      .sort((a, b) => (a.start_date || "").localeCompare(b.start_date || ""))
+      .sort((a, b) =>
+        compareNullableDate(a.start_date, b.start_date, sortDir)
+      )
       .slice(0, 8);
-  }, [items]);
+  }, [items, sortDir]);
 
   const dimensionMeta = {
     year: {
@@ -369,16 +377,22 @@ function TravelOverviewClientInner({ items }: Props) {
 
   const detailRows = useMemo(() => {
     if (!dimension || !selected) return [];
-    return items.filter((row) => {
-      if (dimension === "year") {
-        return ((row.start_date || "").slice(0, 4) || "Ohne Datum") === selected;
-      }
-      if (dimension === "type") {
-        return typeLabel(row) === selected;
-      }
-      return (row.provider?.trim() || "Unbekannt") === selected;
-    });
-  }, [dimension, selected, items]);
+    return items
+      .filter((row) => {
+        if (dimension === "year") {
+          return (
+            ((row.start_date || "").slice(0, 4) || "Ohne Datum") === selected
+          );
+        }
+        if (dimension === "type") {
+          return typeLabel(row) === selected;
+        }
+        return (row.provider?.trim() || "Unbekannt") === selected;
+      })
+      .sort((a, b) =>
+        compareNullableDate(a.start_date, b.start_date, sortDir)
+      );
+  }, [dimension, selected, items, sortDir]);
 
   const openDetail = useMemo(
     () => items.find((r) => r.id === detailId) || null,
@@ -422,13 +436,22 @@ function TravelOverviewClientInner({ items }: Props) {
         icon={pageVisuals.travel.icon}
         tone={pageVisuals.travel.tone}
         actions={
-          upcomingEvents.length > 0 ? (
-            <AddToCalendarButton
-              events={upcomingEvents}
-              filename="familybrain-reisen-kommend"
-              label="Kommende exportieren"
+          <div className="flex flex-wrap gap-2">
+            <ListSortControl
+              storageKey="travel"
+              label="Startdatum"
+              defaultDir="desc"
+              dir={sortDir}
+              onDirChange={setSortDir}
             />
-          ) : null
+            {upcomingEvents.length > 0 ? (
+              <AddToCalendarButton
+                events={upcomingEvents}
+                filename="familybrain-reisen-kommend"
+                label="Kommende exportieren"
+              />
+            ) : null}
+          </div>
         }
       />
 

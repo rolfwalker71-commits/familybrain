@@ -22,6 +22,10 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { PageHeader } from "@/components/layout/page-primitives";
+import {
+  ListSortControl,
+  useListSortDir,
+} from "@/components/layout/list-sort-control";
 import { IconCircle, pageVisuals } from "@/components/layout/icon-circle";
 import { SoftFab } from "@/components/layout/soft-ui";
 import { useAuth } from "@/components/auth/auth-provider";
@@ -67,11 +71,12 @@ export function FinanceLedgersListClient() {
   const [createOpen, setCreateOpen] = useState(false);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
+  const [sortDir, setSortDir] = useListSortDir("finance-ledgers", "desc");
 
-  async function load() {
+  async function load(dir = sortDir) {
     setLoading(true);
     try {
-      const res = await fetch("/api/finance-ledgers");
+      const res = await fetch(`/api/finance-ledgers?sortDir=${dir}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Laden fehlgeschlagen");
       setLedgers(data.ledgers || []);
@@ -99,7 +104,8 @@ export function FinanceLedgersListClient() {
 
   useEffect(() => {
     void load();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sortDir]);
 
   useEffect(() => {
     void loadUsers();
@@ -322,6 +328,15 @@ export function FinanceLedgersListClient() {
         description="Abrechnungen einfach im Griff."
         icon={pageVisuals.financeBrain.icon}
         tone={pageVisuals.financeBrain.tone}
+        actions={
+          <ListSortControl
+            storageKey="finance-ledgers"
+            label="Aktualisiert"
+            defaultDir="desc"
+            dir={sortDir}
+            onDirChange={setSortDir}
+          />
+        }
       />
 
       {isAdmin ? (

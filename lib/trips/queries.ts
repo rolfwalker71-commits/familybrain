@@ -87,16 +87,17 @@ export type TripEventRow = {
   updated_at: string;
 };
 
-export function listTrips(): TripRow[] {
+export function listTrips(sortDir: "asc" | "desc" = "desc"): TripRow[] {
   const db = getDb();
+  const sortSql = sortDir === "asc" ? "ASC" : "DESC";
   return db
     .prepare(
       `SELECT t.*,
          (SELECT COUNT(*) FROM trip_events e WHERE e.trip_id = t.id) as event_count
        FROM trips t
        ORDER BY
-         COALESCE(t.start_date, t.created_at) DESC,
-         t.id DESC`
+         COALESCE(t.start_date, t.created_at) ${sortSql},
+         t.id ${sortSql}`
     )
     .all() as TripRow[];
 }

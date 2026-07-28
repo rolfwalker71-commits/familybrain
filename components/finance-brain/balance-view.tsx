@@ -28,6 +28,11 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  ListSortControl,
+  useListSortDir,
+} from "@/components/layout/list-sort-control";
+import { compareNullableDate } from "@/lib/utils/list-sort";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
@@ -1972,6 +1977,7 @@ export function ExpenseList({
   const [settledFilter, setSettledFilter] = useState<"__show__" | "__hide__">(
     "__show__"
   );
+  const [sortDir, setSortDir] = useListSortDir("finance-expenses", "desc");
 
   const categoryOptions = useMemo(() => {
     const labels = new Set<string>();
@@ -2011,7 +2017,7 @@ export function ExpenseList({
             couples.find((c) => String(c.id) === coupleFilter)?.memberIds ?? []
           )
         : null;
-    return expenses.filter((exp) => {
+    const filtered = expenses.filter((exp) => {
       if (settledFilter === "__hide__" && isExpenseSettled(exp.pre_settled)) {
         return false;
       }
@@ -2051,6 +2057,9 @@ export function ExpenseList({
         .toLowerCase();
       return hay.includes(q);
     });
+    return filtered.sort((a, b) =>
+      compareNullableDate(a.expense_date, b.expense_date, sortDir)
+    );
   }, [
     expenses,
     members,
@@ -2060,6 +2069,7 @@ export function ExpenseList({
     categoryFilter,
     coupleFilter,
     settledFilter,
+    sortDir,
   ]);
 
   const filtersActive =
@@ -2079,9 +2089,9 @@ export function ExpenseList({
     () =>
       uniqueSortedIsoDates(
         filteredExpenses.map((e) => e.expense_date),
-        "asc"
+        sortDir
       ),
-    [filteredExpenses]
+    [filteredExpenses, sortDir]
   );
 
   /** Day anchors in DOM order (list is newest-first) for scroll highlighting. */
@@ -2150,6 +2160,14 @@ export function ExpenseList({
               </Badge>
             ) : null}
           </Button>
+          <ListSortControl
+            storageKey="finance-expenses"
+            label="Datum"
+            defaultDir="desc"
+            dir={sortDir}
+            onDirChange={setSortDir}
+            className="h-8"
+          />
         </div>
         {filterOpen ? (
           <div

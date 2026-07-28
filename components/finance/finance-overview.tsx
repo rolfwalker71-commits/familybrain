@@ -27,6 +27,10 @@ import {
   VendorText,
 } from "@/components/layout/data-list";
 import { PageHeader, TileTitleBar, MetricTile } from "@/components/layout/page-primitives";
+import {
+  ListSortControl,
+  useListSortDir,
+} from "@/components/layout/list-sort-control";
 import { IconCircle, pageVisuals, toneSurface, type IconTone } from "@/components/layout/icon-circle";
 import { AddToCalendarButton } from "@/components/calendar/add-to-calendar-button";
 import {
@@ -36,6 +40,7 @@ import {
 import { FinanceStatsToggle } from "@/components/finance/finance-stats-toggle";
 import { formatCHF } from "@/lib/utils/format";
 import { daysAgo, toSwissDate } from "@/lib/utils/dates";
+import { compareNullableDate } from "@/lib/utils/list-sort";
 import { cn } from "@/lib/utils";
 import {
   OverviewTabNav,
@@ -253,15 +258,16 @@ function FinanceOverviewClientInner({
   const [selected, setSelected] = useState<string | null>(null);
   const [dueOpen, setDueOpen] = useState(true);
   const [olderDueOpen, setOlderDueOpen] = useState(false);
+  const [sortDir, setSortDir] = useListSortDir("finance-due", "desc");
 
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const dueCutoff = useMemo(() => daysAgo(DUE_VISIBILITY_DAYS), []);
 
   const sortedDueInvoices = useMemo(() => {
     return [...dueInvoices].sort((a, b) =>
-      (b.due_date || "").localeCompare(a.due_date || "")
+      compareNullableDate(a.due_date, b.due_date, sortDir)
     );
-  }, [dueInvoices]);
+  }, [dueInvoices, sortDir]);
 
   const recentDueInvoices = useMemo(
     () =>
@@ -443,13 +449,22 @@ function FinanceOverviewClientInner({
         icon={pageVisuals.finance.icon}
         tone={pageVisuals.finance.tone}
         actions={
-          dueEvents.length > 0 ? (
-            <AddToCalendarButton
-              events={dueEvents}
-              filename="familybrain-zahlungsfristen"
-              label="Zahlungsfristen exportieren"
+          <div className="flex flex-wrap gap-2">
+            <ListSortControl
+              storageKey="finance-due"
+              label="Fälligkeit"
+              defaultDir="desc"
+              dir={sortDir}
+              onDirChange={setSortDir}
             />
-          ) : null
+            {dueEvents.length > 0 ? (
+              <AddToCalendarButton
+                events={dueEvents}
+                filename="familybrain-zahlungsfristen"
+                label="Zahlungsfristen exportieren"
+              />
+            ) : null}
+          </div>
         }
       />
 

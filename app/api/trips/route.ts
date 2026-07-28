@@ -9,6 +9,7 @@ import { coverPublicUrl } from "@/lib/trips/cover";
 import { TRIP_STATUSES } from "@/lib/trips/constants";
 import { createTrip, listTrips } from "@/lib/trips/queries";
 import { listUserTripIds } from "@/lib/users/queries";
+import { parseSortDir } from "@/lib/utils/list-sort";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,11 +21,13 @@ function serializeTrip(trip: ReturnType<typeof listTrips>[number]) {
   };
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const auth = await requireAuth();
     if (isAuthError(auth)) return auth;
-    let trips = listTrips();
+    const { searchParams } = new URL(request.url);
+    const sortDir = parseSortDir(searchParams.get("sortDir"), "desc");
+    let trips = listTrips(sortDir);
     if (!auth.isAdmin && auth.userId) {
       const allowed = new Set(listUserTripIds(auth.userId));
       trips = trips.filter((t) => allowed.has(t.id));

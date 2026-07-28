@@ -24,6 +24,10 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { PageHeader } from "@/components/layout/page-primitives";
+import {
+  ListSortControl,
+  useListSortDir,
+} from "@/components/layout/list-sort-control";
 import { pageVisuals } from "@/components/layout/icon-circle";
 import { useAuth } from "@/components/auth/auth-provider";
 import { TodayHub } from "@/components/trips/today-hub";
@@ -64,11 +68,12 @@ export function TripsListClient() {
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const importRef = useRef<HTMLInputElement>(null);
+  const [sortDir, setSortDir] = useListSortDir("trips", "desc");
 
-  async function load() {
+  async function load(dir = sortDir) {
     setLoading(true);
     try {
-      const res = await fetch("/api/trips");
+      const res = await fetch(`/api/trips?sortDir=${dir}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Laden fehlgeschlagen");
       setTrips(data.trips || []);
@@ -82,7 +87,8 @@ export function TripsListClient() {
 
   useEffect(() => {
     void load();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sortDir]);
 
   async function createTrip() {
     if (!title.trim()) return;
@@ -222,6 +228,15 @@ export function TripsListClient() {
         description="Reisen planen, Ereignisse sammeln und Timeline verwalten"
         icon={pageVisuals.trips.icon}
         tone={pageVisuals.trips.tone}
+        actions={
+          <ListSortControl
+            storageKey="trips"
+            label="Startdatum"
+            defaultDir="desc"
+            dir={sortDir}
+            onDirChange={setSortDir}
+          />
+        }
       />
 
       {showTodayHub ? <TodayHub isAdmin={isAdmin} /> : null}

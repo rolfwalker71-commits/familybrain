@@ -37,6 +37,10 @@ import {
 import { FilterChip, SoftFab } from "@/components/layout/soft-ui";
 import { toSwissDate } from "@/lib/utils/dates";
 import {
+  ListSortControl,
+  useListSortDir,
+} from "@/components/layout/list-sort-control";
+import {
   DocumentInfoButton,
   DocumentTitleLink,
 } from "@/components/documents/document-link";
@@ -90,6 +94,7 @@ export function DocumentsClient() {
   const searchParams = useSearchParams();
   const { pendingCount, isRunning, refreshStats, startAnalysis, hasOpenAIKey } =
     useAnalysis();
+  const [sortDir, setSortDir] = useListSortDir("documents", "desc");
 
   const [docs, setDocs] = useState<DocRow[]>([]);
   const [total, setTotal] = useState(0);
@@ -175,6 +180,7 @@ export function DocumentsClient() {
     if (documentType !== "all") params.set("documentType", documentType);
     if (analysisStatus !== "all") params.set("analysisStatus", analysisStatus);
     params.set("limit", "250");
+    params.set("sortDir", sortDir);
 
     try {
       const res = await fetch(`/api/documents?${params.toString()}`);
@@ -201,6 +207,7 @@ export function DocumentsClient() {
     correspondent,
     documentType,
     analysisStatus,
+    sortDir,
     refreshStats,
   ]);
 
@@ -316,28 +323,39 @@ export function DocumentsClient() {
         icon={pageVisuals.documents.icon}
         tone={pageVisuals.documents.tone}
         actions={
-          pendingCount > 0 && hasOpenAIKey ? (
-            <div className="flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={isRunning}
-                onClick={() =>
-                  void startAnalysis({ mode: "batch", batchSize: 10 })
-                }
-              >
-                {isRunning ? "Läuft…" : "10 analysieren"}
-              </Button>
-              <Button
-                size="sm"
-                className="bg-[var(--brand-finance)] text-white hover:bg-[var(--brand-finance)]/90"
-                disabled={isRunning}
-                onClick={() => void startAnalysis({ mode: "all", batchSize: 10 })}
-              >
-                {isRunning ? "Läuft…" : "Alle ausstehend"}
-              </Button>
-            </div>
-          ) : null
+          <div className="flex flex-wrap gap-2">
+            <ListSortControl
+              storageKey="documents"
+              label="Dokumentdatum"
+              defaultDir="desc"
+              dir={sortDir}
+              onDirChange={setSortDir}
+            />
+            {pendingCount > 0 && hasOpenAIKey ? (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={isRunning}
+                  onClick={() =>
+                    void startAnalysis({ mode: "batch", batchSize: 10 })
+                  }
+                >
+                  {isRunning ? "Läuft…" : "10 analysieren"}
+                </Button>
+                <Button
+                  size="sm"
+                  className="bg-[var(--brand-finance)] text-white hover:bg-[var(--brand-finance)]/90"
+                  disabled={isRunning}
+                  onClick={() =>
+                    void startAnalysis({ mode: "all", batchSize: 10 })
+                  }
+                >
+                  {isRunning ? "Läuft…" : "Alle ausstehend"}
+                </Button>
+              </>
+            ) : null}
+          </div>
         }
       />
 

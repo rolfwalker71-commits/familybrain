@@ -237,3 +237,6 @@ export function daysAgo(days: number): string {
 export function currentYear(): number {
   return new Date().getFullYear();
 }
+
+export type { SortDir } from "@/lib/utils/list-sort";
+export { compareNullableDate } from "@/lib/utils/list-sort";

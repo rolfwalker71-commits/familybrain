@@ -53,6 +53,8 @@ export type DocumentFilters = {
   analysisStatus?: string;
   limit?: number;
   offset?: number;
+  /** Document date sort: newest first by default */
+  sortDir?: "asc" | "desc";
 };
 
 export function getPaperlessSettings() {
@@ -188,6 +190,7 @@ export function listDocuments(filters: DocumentFilters = {}) {
   const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
   const limit = filters.limit ?? 100;
   const offset = filters.offset ?? 0;
+  const sortSql = filters.sortDir === "asc" ? "ASC" : "DESC";
 
   const rows = db
     .prepare(
@@ -195,7 +198,7 @@ export function listDocuments(filters: DocumentFilters = {}) {
        FROM paperless_documents d
        LEFT JOIN document_summaries s ON s.document_id = d.id
        ${whereSql}
-       ORDER BY COALESCE(d.created_date, d.added_at, d.created_at) DESC
+       ORDER BY COALESCE(d.created_date, d.added_at, d.created_at) ${sortSql}
        LIMIT ? OFFSET ?`
     )
     .all(...params, limit, offset) as PaperlessDocumentRow[];
@@ -601,22 +604,29 @@ export function getDashboardStats() {
   };
 }
 
-export function listWarranties() {
+export function listWarranties(sortDir: "asc" | "desc" = "desc") {
   const db = getDb();
+  const sortSql = sortDir === "asc" ? "ASC" : "DESC";
+  const nullDate = sortDir === "asc" ? "9999-12-31" : "0000-01-01";
   return db
     .prepare(
       `SELECT w.*, d.title as document_title, d.id as document_local_id,
               d.correspondent_name
        FROM devices_and_warranties w
        JOIN paperless_documents d ON d.id = w.document_id
-       ORDER BY COALESCE(w.warranty_until, '0000-01-01') DESC`
+       ORDER BY COALESCE(w.warranty_until, '${nullDate}') ${sortSql}`
     )
     .all();
 }
 
-export function listDeadlines(status?: string) {
+export function listDeadlines(
+  status?: string,
+  sortDir: "asc" | "desc" = "asc"
+) {
   const db = getDb();
   const today = new Date().toISOString().slice(0, 10);
+  const sortSql = sortDir === "asc" ? "ASC" : "DESC";
+  const nullDate = sortDir === "asc" ? "9999-12-31" : "0000-01-01";
   const select = `SELECT dl.*, d.title as document_title, d.id as document_local_id,
                 d.correspondent_name
          FROM deadlines dl
@@ -630,7 +640,7 @@ export function listDeadlines(status?: string) {
            AND dl.deadline_date IS NOT NULL
            AND dl.deadline_date < ?
            AND (dl.snoozed_until IS NULL OR TRIM(dl.snoozed_until) = '' OR dl.snoozed_until < ?)
-         ORDER BY dl.deadline_date ASC`
+         ORDER BY dl.deadline_date ${sortSql}`
       )
       .all(today, today);
   }
@@ -642,7 +652,7 @@ export function listDeadlines(status?: string) {
            AND dl.snoozed_until IS NOT NULL
            AND TRIM(dl.snoozed_until) != ''
            AND dl.snoozed_until >= ?
-         ORDER BY dl.snoozed_until ASC`
+         ORDER BY dl.snoozed_until ${sortSql}`
       )
       .all(today);
   }
@@ -657,7 +667,7 @@ export function listDeadlines(status?: string) {
              WHEN dl.deadline_date IS NOT NULL AND dl.deadline_date < ? THEN 0
              ELSE 1
            END,
-           COALESCE(dl.deadline_date, '9999-12-31') ASC`
+           COALESCE(dl.deadline_date, '${nullDate}') ${sortSql}`
       )
       .all(today, today);
   }
@@ -666,14 +676,14 @@ export function listDeadlines(status?: string) {
       .prepare(
         `${select}
          WHERE dl.status = ?
-         ORDER BY COALESCE(dl.deadline_date, '0000-01-01') DESC`
+         ORDER BY COALESCE(dl.deadline_date, '${nullDate}') ${sortSql}`
       )
       .all(status);
   }
   return db
     .prepare(
       `${select}
-       ORDER BY COALESCE(dl.deadline_date, '0000-01-01') DESC`
+       ORDER BY COALESCE(dl.deadline_date, '${nullDate}') ${sortSql}`
     )
     .all();
 }
@@ -1301,28 +1311,31 @@ export function listFinancialItemsByDimension(input: {
     .slice(0, limit);
 }
 
-export function listTravelItems() {
+export function listTravelItems(sortDir: "asc" | "desc" = "desc") {
   const db = getDb();
+  const sortSql = sortDir === "asc" ? "ASC" : "DESC";
+  const nullDate = sortDir === "asc" ? "9999-12-31" : "0000-01-01";
   return db
     .prepare(
       `SELECT t.*, d.title as document_title, d.id as document_local_id,
               d.content as document_content, d.correspondent_name
        FROM travel_items t
        JOIN paperless_documents d ON d.id = t.document_id
-       ORDER BY COALESCE(t.start_date, '9999-12-31') ASC`
+       ORDER BY COALESCE(t.start_date, '${nullDate}') ${sortSql}`
     )
     .all();
 }
 
-export function listSummaries() {
+export function listSummaries(sortDir: "asc" | "desc" = "desc") {
   const db = getDb();
+  const sortSql = sortDir === "asc" ? "ASC" : "DESC";
   return db
     .prepare(
       `SELECT s.*, d.title, d.correspondent_name, d.created_date, d.paperless_id
        FROM document_summaries s
        JOIN paperless_documents d ON d.id = s.document_id
        WHERE s.analysis_status = 'completed'
-       ORDER BY s.analyzed_at DESC`
+       ORDER BY s.analyzed_at ${sortSql}`
     )
     .all();
 }
@@ -1633,10 +1646,13 @@ export type KnowledgeGuideRow = {
   updated_at: string;
 };
 
-export function listKnowledgeGuides(): Array<
+export function listKnowledgeGuides(
+  sortDir: "asc" | "desc" = "desc"
+): Array<
   Omit<KnowledgeGuideRow, "extracted_text"> & { extracted_chars: number }
 > {
   const db = getDb();
+  const sortSql = sortDir === "asc" ? "ASC" : "DESC";
   return db
     .prepare(
       `SELECT id, title, filename, file_path, file_hash, page_count,
@@ -1644,7 +1660,7 @@ export function listKnowledgeGuides(): Array<
               content_hash, embedding_status, embedding_error, last_indexed_at,
               created_at, updated_at
        FROM knowledge_guides
-       ORDER BY created_at DESC`
+       ORDER BY created_at ${sortSql}`
     )
     .all() as Array<
     Omit<KnowledgeGuideRow, "extracted_text"> & { extracted_chars: number }

@@ -150,14 +150,17 @@ export function ensureNormalSoloMember(
   });
 }
 
-export function listFinanceLedgers(): FinanceLedgerRow[] {
+export function listFinanceLedgers(
+  sortDir: "asc" | "desc" = "desc"
+): FinanceLedgerRow[] {
   const db = getDb();
+  const sortSql = sortDir === "asc" ? "ASC" : "DESC";
   return (
     db
       .prepare(
         `SELECT * FROM finance_ledgers
          WHERE archived_at IS NULL
-         ORDER BY updated_at DESC, id DESC`
+         ORDER BY updated_at ${sortSql}, id ${sortSql}`
       )
       .all() as FinanceLedgerRow[]
   ).map((row) => ({
@@ -618,14 +621,18 @@ function touchLedger(ledgerId: number) {
     .run(nowIso(), ledgerId);
 }
 
-export function listFinanceExpenses(ledgerId: number): FinanceExpenseRow[] {
+export function listFinanceExpenses(
+  ledgerId: number,
+  sortDir: "asc" | "desc" = "desc"
+): FinanceExpenseRow[] {
   const db = getDb();
+  const sortSql = sortDir === "asc" ? "ASC" : "DESC";
   return (
     db
       .prepare(
         `SELECT * FROM finance_expenses
          WHERE ledger_id = ?
-         ORDER BY COALESCE(expense_date, created_at) DESC, id DESC`
+         ORDER BY COALESCE(expense_date, created_at) ${sortSql}, id ${sortSql}`
       )
       .all(ledgerId) as FinanceExpenseRow[]
   ).map((row) => ({

@@ -22,6 +22,10 @@ import {
 } from "@/components/layout/data-list";
 import { toSwissDate } from "@/lib/utils/dates";
 import {
+  ListSortControl,
+  useListSortDir,
+} from "@/components/layout/list-sort-control";
+import {
   deadlineTypeLabel,
   resolveTemporalStatus,
   temporalStatusBadgeClass,
@@ -113,6 +117,7 @@ function DeadlinesPageInner() {
   const initial =
     searchParams.get("status") || "open";
   const [status, setStatus] = useState(initial);
+  const [sortDir, setSortDir] = useListSortDir("deadlines", "asc");
   const [rows, setRows] = useState<DeadlineRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -129,12 +134,14 @@ function DeadlinesPageInner() {
     all: "Alle",
   };
 
-  async function load(selected = status) {
+  async function load(selected = status, dir = sortDir) {
     setLoading(true);
     setError(null);
     try {
-      const params = selected === "all" ? "" : `?status=${selected}`;
-      const res = await fetch(`/api/deadlines${params}`);
+      const params = new URLSearchParams();
+      if (selected !== "all") params.set("status", selected);
+      params.set("sortDir", dir);
+      const res = await fetch(`/api/deadlines?${params.toString()}`);
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.error || "Fristen konnten nicht geladen werden");
@@ -157,7 +164,7 @@ function DeadlinesPageInner() {
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status]);
+  }, [status, sortDir]);
 
   async function patchDeadline(id: number, body: Record<string, unknown>) {
     setBusyId(id);
@@ -191,6 +198,13 @@ function DeadlinesPageInner() {
         tone={pageVisuals.deadlines.tone}
         actions={
           <div className="flex flex-wrap items-center gap-2">
+            <ListSortControl
+              storageKey="deadlines"
+              label={status === "snoozed" ? "Zurückgestellt" : "Fälligkeit"}
+              defaultDir="asc"
+              dir={sortDir}
+              onDirChange={setSortDir}
+            />
             {calendarEvents.length > 0 ? (
               <AddToCalendarButton
                 events={calendarEvents}

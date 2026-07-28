@@ -12,6 +12,7 @@ import {
 import { serializeLedger } from "@/lib/finance-brain/serialize";
 import { COMMON_CURRENCIES, LEDGER_KINDS } from "@/lib/finance-brain/constants";
 import { listUserLedgerIds } from "@/lib/users/queries";
+import { parseSortDir } from "@/lib/utils/list-sort";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,11 +26,13 @@ const CreateSchema = z.object({
   ledgerKind: z.enum(LEDGER_KINDS).optional(),
 });
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const auth = await requireAuth();
     if (isAuthError(auth)) return auth;
-    let ledgers = listFinanceLedgers();
+    const { searchParams } = new URL(request.url);
+    const sortDir = parseSortDir(searchParams.get("sortDir"), "desc");
+    let ledgers = listFinanceLedgers(sortDir);
     if (!auth.isAdmin && auth.userId) {
       const allowed = new Set(listUserLedgerIds(auth.userId));
       ledgers = ledgers.filter((l) => allowed.has(l.id));

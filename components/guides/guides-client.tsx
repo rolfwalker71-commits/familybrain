@@ -9,6 +9,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageHeader } from "@/components/layout/page-primitives";
+import {
+  ListSortControl,
+  useListSortDir,
+} from "@/components/layout/list-sort-control";
 import { IconCircle, pageVisuals } from "@/components/layout/icon-circle";
 
 type GuideRow = {
@@ -60,9 +64,10 @@ export function GuidesClient() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<"upload" | number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [sortDir, setSortDir] = useListSortDir("guides", "desc");
 
-  async function loadGuides() {
-    const res = await fetch("/api/guides");
+  async function loadGuides(dir = sortDir) {
+    const res = await fetch(`/api/guides?sortDir=${dir}`);
     const data = (await res.json()) as GuidesResponse;
     setGuides(data.guides || []);
     setIndexedGuides(data.indexedGuides || 0);
@@ -73,7 +78,8 @@ export function GuidesClient() {
 
   useEffect(() => {
     void loadGuides();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sortDir]);
 
   async function uploadGuide() {
     if (!file) {
@@ -276,6 +282,15 @@ export function GuidesClient() {
         description="PDF-Guides importieren und semantisch für den Chat indexieren"
         icon={pageVisuals.guides.icon}
         tone={pageVisuals.guides.tone}
+        actions={
+          <ListSortControl
+            storageKey="guides"
+            label="Erstellt"
+            defaultDir="desc"
+            dir={sortDir}
+            onDirChange={setSortDir}
+          />
+        }
       />
 
       <Card className="border-border/60 shadow-[0_4px_16px_rgba(20,32,28,0.05)]">

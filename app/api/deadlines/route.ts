@@ -9,6 +9,7 @@ import {
   updateDeadline,
   updateDeadlineStatus,
 } from "@/lib/db/queries";
+import { parseSortDir } from "@/lib/utils/list-sort";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,7 +19,11 @@ export async function GET(request: Request) {
   if (isAuthError(auth)) return auth;
   const { searchParams } = new URL(request.url);
   const status = searchParams.get("status") || undefined;
-  return NextResponse.json({ deadlines: listDeadlines(status) });
+  const sortDir = parseSortDir(
+    searchParams.get("sortDir"),
+    status === "completed" || status === "all" ? "desc" : "asc"
+  );
+  return NextResponse.json({ deadlines: listDeadlines(status, sortDir) });
 }
 
 const PatchSchema = z.object({

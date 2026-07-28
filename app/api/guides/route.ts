@@ -13,6 +13,7 @@ import {
 import { ensureGuidesDirectory } from "@/lib/guides/storage";
 import { checkQdrantConnection } from "@/lib/vectors/client";
 import { hasOpenAIKey } from "@/lib/ai/client";
+import { parseSortDir } from "@/lib/utils/list-sort";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -76,10 +77,12 @@ async function readUploadPayload(request: Request): Promise<UploadPayload> {
   };
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const sortDir = parseSortDir(searchParams.get("sortDir"), "desc");
   const qdrant = await checkQdrantConnection();
   return NextResponse.json({
-    guides: listKnowledgeGuides(),
+    guides: listKnowledgeGuides(sortDir),
     indexedGuides: countIndexedKnowledgeGuides(),
     qdrant,
     hasOpenAIKey: hasOpenAIKey(),

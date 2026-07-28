@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getFilterOptions, listDocuments } from "@/lib/db/queries";
+import { parseSortDir } from "@/lib/utils/list-sort";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,6 +15,7 @@ export async function GET(request: Request) {
     analysisStatus: searchParams.get("analysisStatus") || undefined,
     limit: Number(searchParams.get("limit") || 100),
     offset: Number(searchParams.get("offset") || 0),
+    sortDir: parseSortDir(searchParams.get("sortDir"), "desc"),
   });
 
   return NextResponse.json({

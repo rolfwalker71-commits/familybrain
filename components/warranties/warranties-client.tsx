@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -11,6 +12,10 @@ import {
   VendorText,
 } from "@/components/layout/data-list";
 import { PageHeader } from "@/components/layout/page-primitives";
+import {
+  ListSortControl,
+  useListSortDir,
+} from "@/components/layout/list-sort-control";
 import { pageVisuals } from "@/components/layout/icon-circle";
 import { AddToCalendarButton } from "@/components/calendar/add-to-calendar-button";
 import {
@@ -18,6 +23,7 @@ import {
   DocumentTitleLink,
 } from "@/components/documents/document-link";
 import { toSwissDate } from "@/lib/utils/dates";
+import { compareNullableDate } from "@/lib/utils/list-sort";
 import { formatCHF } from "@/lib/utils/format";
 import {
   resolveTemporalStatus,
@@ -86,7 +92,15 @@ function asTemporalStatus(status: string | null | undefined): TemporalStatus {
 }
 
 export function WarrantiesClient({ rows }: { rows: WarrantyRow[] }) {
-  const exportable = rows
+  const [sortDir, setSortDir] = useListSortDir("warranties", "desc");
+  const sorted = useMemo(
+    () =>
+      [...rows].sort((a, b) =>
+        compareNullableDate(a.warranty_until, b.warranty_until, sortDir)
+      ),
+    [rows, sortDir]
+  );
+  const exportable = sorted
     .map(warrantyToEvent)
     .filter((e): e is CalendarEvent => Boolean(e));
 
@@ -98,26 +112,35 @@ export function WarrantiesClient({ rows }: { rows: WarrantyRow[] }) {
         icon={pageVisuals.warranties.icon}
         tone={pageVisuals.warranties.tone}
         actions={
-          exportable.length > 0 ? (
-            <AddToCalendarButton
-              events={exportable}
-              filename="familybrain-garantien"
-              label="Garantien exportieren"
+          <div className="flex flex-wrap gap-2">
+            <ListSortControl
+              storageKey="warranties"
+              label="Garantie bis"
+              defaultDir="desc"
+              dir={sortDir}
+              onDirChange={setSortDir}
             />
-          ) : null
+            {exportable.length > 0 ? (
+              <AddToCalendarButton
+                events={exportable}
+                filename="familybrain-garantien"
+                label="Garantien exportieren"
+              />
+            ) : null}
+          </div>
         }
       />
 
       <Card className="min-w-0 gap-0 overflow-visible border-0 bg-transparent p-0 shadow-none md:overflow-hidden md:border md:border-border/60 md:bg-card md:shadow-[0_4px_16px_rgba(20,32,28,0.05)]">
         <CardContent className="p-0">
-          {rows.length === 0 ? (
+          {sorted.length === 0 ? (
             <div className="rounded-xl border border-border/60 bg-card p-8 text-sm text-muted-foreground shadow-[0_4px_16px_rgba(20,32,28,0.05)] md:rounded-none md:border-0 md:bg-transparent md:shadow-none">
               Noch keine Garantien erkannt. Analysiere Kaufbelege und
               Gerätedokumente.
             </div>
           ) : (
             <DataList>
-              {rows.map((row) => {
+              {sorted.map((row) => {
                 const event = warrantyToEvent(row);
                 const status: TemporalStatus =
                   row.status && row.status !== "unknown"
