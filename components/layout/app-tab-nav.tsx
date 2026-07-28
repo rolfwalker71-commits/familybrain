@@ -108,25 +108,19 @@ export function AppTabNav<T extends string>({
           }
         >
           {variant === "desktop" ? (
-            <>
-              <MoreHorizontal className="size-4 shrink-0" />
-              …
-            </>
+            <MoreHorizontal className="size-4 shrink-0" />
           ) : (
-            <>
-              <span
-                className={cn(
-                  "flex size-9 items-center justify-center rounded-lg transition-colors",
-                  overflowActive && "bg-foreground/8"
-                )}
-              >
-                <MoreHorizontal
-                  className="size-5 stroke-[2.75] text-foreground"
-                  absoluteStrokeWidth
-                />
-              </span>
-              <span className="truncate">…</span>
-            </>
+            <span
+              className={cn(
+                "flex size-9 items-center justify-center rounded-lg transition-colors",
+                overflowActive && "bg-foreground/8"
+              )}
+            >
+              <MoreHorizontal
+                className="size-5 stroke-[2.75] text-foreground"
+                absoluteStrokeWidth
+              />
+            </span>
           )}
         </DropdownMenuTrigger>
         <DropdownMenuContent
