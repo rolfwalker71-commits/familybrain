@@ -25,6 +25,7 @@ import { readNdjsonStream } from "@/lib/utils/stream";
 import { PageHeader } from "@/components/layout/page-primitives";
 import { IconCircle, pageVisuals } from "@/components/layout/icon-circle";
 import { AutomationPanel } from "@/components/sync/automation-panel";
+import { VectorIndexStatusPanel } from "@/components/sync/vector-index-status-panel";
 import {
   SyncTabNav,
   parseSyncTab,
@@ -484,6 +485,8 @@ function SyncClientInner() {
           ) : null}
         </CardContent>
       </Card>
+
+      <VectorIndexStatusPanel />
 
       <Card>
         <CardHeader>

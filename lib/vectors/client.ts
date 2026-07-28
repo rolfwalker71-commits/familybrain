@@ -166,10 +166,41 @@ export async function countVectorPoints(): Promise<number> {
   return info.points_count ?? 0;
 }
 
-export async function checkQdrantConnection(): Promise<{ ok: boolean; points: number }> {
+export async function countVectorPointsBySourceType(
+  sourceType: VectorChunkPayload["source_type"]
+): Promise<number> {
+  await ensureVectorCollection();
+  const qdrant = getQdrantClient();
+  const result = await qdrant.count(getQdrantCollection(), {
+    exact: true,
+    filter: {
+      must: [{ key: "source_type", match: { value: sourceType } }],
+    },
+  });
+  return result.count ?? 0;
+}
+
+export async function checkQdrantConnection(): Promise<{
+  ok: boolean;
+  points: number;
+  bySource?: {
+    paperless: number;
+    trilium: number;
+    guide: number;
+  };
+}> {
   try {
-    const points = await countVectorPoints();
-    return { ok: true, points };
+    const [points, paperless, trilium, guide] = await Promise.all([
+      countVectorPoints(),
+      countVectorPointsBySourceType("paperless"),
+      countVectorPointsBySourceType("trilium"),
+      countVectorPointsBySourceType("guide"),
+    ]);
+    return {
+      ok: true,
+      points,
+      bySource: { paperless, trilium, guide },
+    };
   } catch {
     return { ok: false, points: 0 };
   }
