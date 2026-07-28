@@ -40,6 +40,9 @@ function isLimitedUserAllowedPath(pathname: string): boolean {
   if (pathname === "/api/trips" || pathname.startsWith("/api/trips/")) {
     return true;
   }
+  if (pathname === "/api/home/agenda") {
+    return true;
+  }
   if (
     pathname === "/api/finance-ledgers" ||
     pathname.startsWith("/api/finance-ledgers/")
