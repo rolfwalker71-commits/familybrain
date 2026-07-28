@@ -70,12 +70,10 @@ function parseStopBlock(
   const lat = geo?.lat ?? coords?.lat;
   const lon = geo?.lon ?? coords?.lon;
   const arrival =
-    extractTextValue(block, "TimetabledTime") ||
     extractTextValue(
       extractFirstTag(block, "ServiceArrival") || "",
       "TimetabledTime"
-    ) ||
-    undefined;
+    ) || undefined;
   const departure =
     extractTextValue(
       extractFirstTag(block, "ServiceDeparture") || "",

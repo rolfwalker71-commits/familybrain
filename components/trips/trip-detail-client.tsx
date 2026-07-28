@@ -1525,37 +1525,89 @@ function TripDetailInner({
     }
   }
 
-  async function enrichTrain(eventId: number) {
+  async function enrichTrain(
+    eventId: number,
+    opts?: { departAfter?: string; append?: boolean }
+  ) {
     setError(null);
     try {
-      if (editingEventId === eventId) {
+      if (editingEventId === eventId && !opts?.append) {
         const saved = await saveEvent({ keepEditing: true });
         if (saved == null) return;
       }
       setBusy(true);
-      setTrainConnectionOptions((prev) => ({ ...prev, [eventId]: [] }));
+      if (!opts?.append) {
+        setTrainConnectionOptions((prev) => ({ ...prev, [eventId]: [] }));
+      }
+      const departAfter =
+        opts?.departAfter?.trim() ||
+        (editingEventId === eventId
+          ? toTimeInputValue(eventForm.startTime) || eventForm.startTime.trim()
+          : "") ||
+        undefined;
+      const date =
+        (editingEventId === eventId
+          ? toDateInputValue(eventForm.startDate)
+          : null) || undefined;
       const res = await fetch(
         `/api/trips/${tripId}/events/${eventId}/enrich-train`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "search" }),
+          body: JSON.stringify({
+            action: "search",
+            departAfter: departAfter || undefined,
+            date: date || undefined,
+            numberOfResults: 20,
+          }),
         }
       );
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Suche fehlgeschlagen");
       const options = (data.options || []) as TrainConnectionOption[];
-      setTrainConnectionOptions((prev) => ({ ...prev, [eventId]: options }));
+      setTrainConnectionOptions((prev) => {
+        if (!opts?.append) return { ...prev, [eventId]: options };
+        const existing = prev[eventId] || [];
+        const seen = new Set(existing.map((o) => o.id));
+        const merged = [...existing];
+        for (const option of options) {
+          if (seen.has(option.id)) continue;
+          seen.add(option.id);
+          merged.push(option);
+        }
+        return { ...prev, [eventId]: merged };
+      });
       if (options.length === 0) {
         setStatus("Keine Zugverbindungen gefunden.");
       } else {
-        setStatus(`${options.length} Verbindungen — bitte auswählen.`);
+        setStatus(
+          opts?.append
+            ? `${options.length} weitere Verbindungen geladen.`
+            : `${options.length} Verbindungen — bitte auswählen.`
+        );
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setBusy(false);
     }
+  }
+
+  function nextDepartAfterFromOptions(
+    eventId: number
+  ): string | null {
+    const options = trainConnectionOptions[eventId] || [];
+    const last = options[options.length - 1];
+    if (!last?.startTime) return null;
+    const start = new Date(last.startTime);
+    if (Number.isNaN(start.getTime())) return null;
+    start.setMinutes(start.getMinutes() + 1);
+    return new Intl.DateTimeFormat("de-CH", {
+      timeZone: "Europe/Zurich",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    }).format(start);
   }
 
   async function applyTrainConnection(
@@ -3037,16 +3089,43 @@ function TripDetailInner({
                   </Button>
                 ) : null}
                 {eventForm.eventType === "Zugreisen" ? (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={busy}
-                    onClick={() => void enrichTrain(editingEventId)}
-                    className="gap-1.5"
-                  >
-                    <TrainFront className="size-3.5" />
-                    {busy ? "Sucht…" : "Verbindungen suchen"}
-                  </Button>
+                  <div className="space-y-2 rounded-md border border-border/70 bg-background/80 p-2">
+                    <div className="grid grid-cols-[1fr_auto] items-end gap-2">
+                      <div className="space-y-1">
+                        <Label
+                          htmlFor={`train-depart-after-${editingEventId}`}
+                          className="text-xs"
+                        >
+                          Abfahrt ab
+                        </Label>
+                        <Input
+                          id={`train-depart-after-${editingEventId}`}
+                          type="time"
+                          value={toTimeInputValue(eventForm.startTime)}
+                          onChange={(e) =>
+                            setEventForm((f) => ({
+                              ...f,
+                              startTime: e.target.value,
+                            }))
+                          }
+                        />
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={busy}
+                        onClick={() => void enrichTrain(editingEventId)}
+                        className="gap-1.5"
+                      >
+                        <TrainFront className="size-3.5" />
+                        {busy ? "Sucht…" : "Verbindungen suchen"}
+                      </Button>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">
+                      Sucht Abfahrten ab dieser Zeit am gewählten Datum
+                      (Europe/Zurich).
+                    </p>
+                  </div>
                 ) : null}
                 {error && eventForm.eventType === "Zugreisen" ? (
                   <div className="rounded-md border border-destructive/30 bg-destructive/5 px-2 py-1.5 text-xs text-destructive">
@@ -3062,24 +3141,46 @@ function TripDetailInner({
                 ) : null}
                 {(trainConnectionOptions[editingEventId] || []).length > 0 ? (
                   <div className="space-y-2 rounded-md border border-border/70 bg-background p-2">
-                    <div className="text-xs font-medium">
-                      Verbindung wählen
-                    </div>
-                    {trainConnectionOptions[editingEventId].map((option) => (
-                      <button
-                        key={option.id}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-xs font-medium">
+                        Verbindung wählen (
+                        {trainConnectionOptions[editingEventId].length})
+                      </div>
+                      <Button
                         type="button"
-                        className="block w-full rounded-md px-2 py-1.5 text-left text-xs hover:bg-muted"
-                        onClick={() =>
-                          void applyTrainConnection(editingEventId, option)
-                        }
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 px-2 text-[11px]"
+                        disabled={busy}
+                        onClick={() => {
+                          const next = nextDepartAfterFromOptions(editingEventId);
+                          if (!next) return;
+                          void enrichTrain(editingEventId, {
+                            departAfter: next,
+                            append: true,
+                          });
+                        }}
                       >
-                        <div className="font-medium">{option.label}</div>
-                        <div className="text-muted-foreground">
-                          {option.summary}
-                        </div>
-                      </button>
-                    ))}
+                        Spätere laden
+                      </Button>
+                    </div>
+                    <div className="max-h-56 space-y-0.5 overflow-y-auto overscroll-contain pr-1">
+                      {trainConnectionOptions[editingEventId].map((option) => (
+                        <button
+                          key={option.id}
+                          type="button"
+                          className="block w-full rounded-md px-2 py-1.5 text-left text-xs hover:bg-muted"
+                          onClick={() =>
+                            void applyTrainConnection(editingEventId, option)
+                          }
+                        >
+                          <div className="font-medium">{option.label}</div>
+                          <div className="text-muted-foreground">
+                            {option.summary}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 ) : null}
                 {eventForm.eventType !== "Flug" ? (

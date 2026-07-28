@@ -222,3 +222,61 @@ describe("train enrichment helpers", () => {
     ]);
   });
 });
+
+describe("buildRouteStops", () => {
+  it("merges transfer stops and keeps An/Ab times", async () => {
+    const { buildRouteStops } = await import("@/lib/trips/enrich-train");
+    const stops = buildRouteStops({
+      id: "t1",
+      startTime: "2026-10-23T10:30:00Z",
+      endTime: "2026-10-23T12:20:00Z",
+      durationSeconds: 6600,
+      path: [],
+      legs: [
+        {
+          mode: "rail",
+          trainNumber: "IR70",
+          board: {
+            name: "Altdorf UR",
+            departure: "2026-10-23T10:30:00Z",
+          },
+          intermediateStops: [
+            {
+              name: "Erstfeld",
+              arrival: "2026-10-23T10:40:00Z",
+              departure: "2026-10-23T10:41:00Z",
+            },
+          ],
+          alight: {
+            name: "Zürich HB",
+            arrival: "2026-10-23T11:50:00Z",
+          },
+          path: [],
+        },
+        {
+          mode: "rail",
+          trainNumber: "S2",
+          board: {
+            name: "Zürich HB",
+            departure: "2026-10-23T12:05:00Z",
+          },
+          intermediateStops: [],
+          alight: {
+            name: "Zürich Flughafen",
+            arrival: "2026-10-23T12:20:00Z",
+          },
+          path: [],
+        },
+      ],
+    });
+    assert.equal(stops[0].kind, "origin");
+    assert.equal(stops[0].name, "Altdorf UR");
+    assert.ok(stops.some((s) => s.name === "Erstfeld" && s.arrival && s.departure));
+    const transfer = stops.find((s) => s.name === "Zürich HB");
+    assert.ok(transfer);
+    assert.equal(transfer.kind, "transfer");
+    assert.ok(transfer.arrival);
+    assert.ok(transfer.departure);
+    assert.equal(stops[stops.length - 1].kind, "destination");
+  });
+});

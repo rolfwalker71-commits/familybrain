@@ -26,6 +26,9 @@ const BodySchema = z.object({
   warning: z.string().optional(),
   query: z.string().optional(),
   target: z.enum(["origin", "destination"]).optional(),
+  departAfter: z.string().optional(),
+  date: z.string().optional(),
+  numberOfResults: z.number().int().min(1).max(40).optional(),
   station: z
     .object({
       stopRef: z.string(),
@@ -87,7 +90,11 @@ export async function POST(request: Request, context: Ctx) {
       });
     }
 
-    const result = await searchTrainConnections(eventId);
+    const result = await searchTrainConnections(eventId, {
+      departAfter: body.departAfter,
+      date: body.date,
+      numberOfResults: body.numberOfResults,
+    });
     return NextResponse.json({
       ok: true,
       options: result.options,

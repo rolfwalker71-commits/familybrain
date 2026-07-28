@@ -5,7 +5,8 @@ import { fetchOjpTrips, searchOjpStops } from "@/lib/trips/ojp/client";
 import type { OjpTrip } from "@/lib/trips/ojp/types";
 import type { OjpStopCandidate } from "@/lib/trips/ojp/location-request";
 import { formatOjpDepArrTime } from "@/lib/trips/ojp/trip-request";
-import type { TrainEnrichmentData } from "@/lib/trips/train-enrichment";
+import type { TrainEnrichmentData, TrainEnrichmentStop } from "@/lib/trips/train-enrichment";
+import { formatZurichClock } from "@/lib/trips/train-enrichment";
 import {
   getTripEventById,
   updateTripEvent,
@@ -207,22 +208,19 @@ async function buildTripSearchInput(event: TripEventRow) {
 }
 
 function formatLocalTime(iso: string | undefined): string | null {
-  if (!iso) return null;
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return null;
-  const hh = String(date.getHours()).padStart(2, "0");
-  const mm = String(date.getMinutes()).padStart(2, "0");
-  return `${hh}:${mm}`;
+  return formatZurichClock(iso);
 }
 
 function formatLocalDate(iso: string | undefined): string | null {
   if (!iso) return null;
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return null;
-  const yyyy = date.getFullYear();
-  const mo = String(date.getMonth() + 1).padStart(2, "0");
-  const dd = String(date.getDate()).padStart(2, "0");
-  return `${yyyy}-${mo}-${dd}`;
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Zurich",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
 }
 
 function formatDuration(seconds: number | undefined): string {
@@ -240,6 +238,66 @@ function summarizeTrip(trip: OjpTrip): string {
       return `${leg.board.name} → ${leg.alight.name}${line ? ` (${line})` : ""}`;
     })
     .join(" · ");
+}
+
+/** Build a full stop timeline with An/Ab times (incl. transfers). */
+export function buildRouteStops(trip: OjpTrip): TrainEnrichmentStop[] {
+  const raw: TrainEnrichmentStop[] = [];
+
+  for (let i = 0; i < trip.legs.length; i++) {
+    const leg = trip.legs[i];
+    const train = leg.trainNumber || leg.lineName || undefined;
+    const isFirst = i === 0;
+    const isLast = i === trip.legs.length - 1;
+
+    raw.push({
+      name: leg.board.name,
+      kind: isFirst ? "origin" : "transfer",
+      departure: leg.board.departure,
+      arrival: isFirst ? undefined : leg.board.arrival,
+      trainNumber: train,
+    });
+
+    for (const mid of leg.intermediateStops) {
+      if (!mid.name?.trim()) continue;
+      raw.push({
+        name: mid.name,
+        kind: "intermediate",
+        arrival: mid.arrival,
+        departure: mid.departure,
+        trainNumber: train,
+      });
+    }
+
+    raw.push({
+      name: leg.alight.name,
+      kind: isLast ? "destination" : "transfer",
+      arrival: leg.alight.arrival,
+      departure: isLast ? undefined : leg.alight.departure,
+      trainNumber: isLast ? undefined : train,
+    });
+  }
+
+  // Merge consecutive same-name stops (typical: alight + board at transfer).
+  const merged: TrainEnrichmentStop[] = [];
+  for (const stop of raw) {
+    const prev = merged[merged.length - 1];
+    if (
+      prev &&
+      prev.name.trim().toLowerCase() === stop.name.trim().toLowerCase()
+    ) {
+      prev.arrival = prev.arrival || stop.arrival;
+      prev.departure = stop.departure || prev.departure;
+      prev.trainNumber = stop.trainNumber || prev.trainNumber;
+      if (stop.kind === "destination") prev.kind = "destination";
+      else if (prev.kind !== "origin" && prev.kind !== "destination") {
+        prev.kind = "transfer";
+      }
+      continue;
+    }
+    merged.push({ ...stop });
+  }
+  return merged;
 }
 
 export function tripToConnectionOption(trip: OjpTrip): TrainConnectionOption {
@@ -274,12 +332,9 @@ function buildEnrichmentPayload(
 ): TrainEnrichmentData {
   const firstLeg = trip.legs[0];
   const lastLeg = trip.legs[trip.legs.length - 1];
-  const intermediateStops = trip.legs.flatMap((leg) =>
-    leg.intermediateStops.map((stop) => ({
-      name: stop.name,
-      arrival: stop.arrival,
-      departure: stop.departure,
-    }))
+  const routeStops = buildRouteStops(trip);
+  const intermediateStops = routeStops.filter(
+    (s) => s.kind === "intermediate" || s.kind === "transfer"
   );
   const trainNumber =
     event.flight_number?.trim() ||
@@ -309,6 +364,7 @@ function buildEnrichmentPayload(
           lon: lastLeg.alight.lon,
         }
       : undefined,
+    routeStops,
     intermediateStops,
     routePath: trip.path,
     legCount: trip.legs.length,
@@ -320,8 +376,17 @@ function buildEnrichmentPayload(
   };
 }
 
+export type SearchTrainConnectionsOptions = {
+  /** Override wall-clock time HH:mm (Europe/Zurich) for “ab wann”. */
+  departAfter?: string | null;
+  /** Override date yyyy-mm-dd. */
+  date?: string | null;
+  numberOfResults?: number;
+};
+
 export async function searchTrainConnections(
-  eventId: number
+  eventId: number,
+  options: SearchTrainConnectionsOptions = {}
 ): Promise<{ options: TrainConnectionOption[]; depArrTimeIso: string }> {
   const event = getTripEventById(eventId);
   if (!event) throw new Error("Ereignis nicht gefunden");
@@ -329,12 +394,31 @@ export async function searchTrainConnections(
     throw new Error("Anreicherung nur für Zugreisen.");
   }
 
-  const { origin, destination, depArrTimeIso } = await buildTripSearchInput(event);
+  const date = options.date?.trim() || event.start_date?.trim();
+  if (!date) {
+    throw new Error("Datum wird für die Streckenplanung benötigt.");
+  }
+  const time = normalizeEventTime(
+    options.departAfter?.trim() || event.start_time
+  );
+  let depArrTimeIso: string;
+  try {
+    depArrTimeIso = formatOjpDepArrTime(date, time);
+  } catch {
+    throw new Error("Ungültiges Datum oder Abfahrtszeit.");
+  }
+
+  const { origin, destination } = await buildTripSearchInput({
+    ...event,
+    start_date: date,
+    start_time: time,
+  });
+
   const trips = await fetchOjpTrips({
     origin,
     destination,
     depArrTimeIso,
-    numberOfResults: 6,
+    numberOfResults: options.numberOfResults ?? 20,
   });
   if (trips.length === 0) {
     throw new Error("Keine Zugverbindungen gefunden.");

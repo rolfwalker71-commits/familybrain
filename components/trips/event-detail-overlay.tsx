@@ -48,7 +48,11 @@ import {
   EventDiaryPanel,
 } from "@/components/trips/event-diary-panel";
 import { EventMapSnippet, getEventMapModel } from "@/components/trips/event-map-snippet";
-import { parseTrainEnrichment } from "@/lib/trips/train-enrichment";
+import {
+  formatZurichClock,
+  trainEnrichmentStops,
+  parseTrainEnrichment,
+} from "@/lib/trips/train-enrichment";
 
 /** Broad event shape covering every field used across the detail slides. */
 export type EventDetailEvent = {
@@ -730,19 +734,53 @@ export function EventDetailOverlay({
                   heightClassName="h-56 sm:h-72"
                   compact={false}
                 />
-                {trainEnrichment?.intermediateStops &&
-                trainEnrichment.intermediateStops.length > 0 ? (
-                  <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-                    <p className="mb-1 font-medium text-foreground">
-                      Zwischenhalte
-                    </p>
-                    <ul className="space-y-0.5">
-                      {trainEnrichment.intermediateStops.map((stop, index) => (
-                        <li key={`${stop.name}-${index}`}>{stop.name}</li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : null}
+                {(() => {
+                  const stops = trainEnrichmentStops(event.enrichment_json);
+                  if (stops.length === 0) return null;
+                  return (
+                    <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                      <p className="mb-2 font-medium text-foreground">
+                        Haltestellen
+                      </p>
+                      <ul className="max-h-64 space-y-1.5 overflow-y-auto">
+                        {stops.map((stop, index) => {
+                          const an = formatZurichClock(stop.arrival);
+                          const ab = formatZurichClock(stop.departure);
+                          const kindLabel =
+                            stop.kind === "origin"
+                              ? "Start"
+                              : stop.kind === "destination"
+                                ? "Ziel"
+                                : stop.kind === "transfer"
+                                  ? "Umstieg"
+                                  : null;
+                          return (
+                            <li
+                              key={`${stop.name}-${index}`}
+                              className="grid grid-cols-[4.5rem_minmax(0,1fr)] gap-x-2"
+                            >
+                              <div className="tabular-nums text-[11px] leading-snug text-foreground/80">
+                                {an ? <div>An {an}</div> : null}
+                                {ab ? <div>Ab {ab}</div> : null}
+                                {!an && !ab ? <div>—</div> : null}
+                              </div>
+                              <div className="min-w-0 leading-snug">
+                                <div className="truncate font-medium text-foreground">
+                                  {stop.name}
+                                </div>
+                                <div className="text-[10px] text-muted-foreground">
+                                  {[kindLabel, stop.trainNumber]
+                                    .filter(Boolean)
+                                    .join(" · ")}
+                                </div>
+                              </div>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  );
+                })()}
                 {trainEnrichment?.warning ? (
                   <p className="text-xs text-amber-800 dark:text-amber-200">
                     {trainEnrichment.warning}
