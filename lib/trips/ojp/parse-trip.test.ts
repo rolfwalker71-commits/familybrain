@@ -82,13 +82,20 @@ const SAMPLE_RESPONSE = `<?xml version="1.0" encoding="UTF-8"?>
           <LegBoard>
             <siri:StopPointRef>8503000</siri:StopPointRef>
             <StopPointName><Text>Zürich HB</Text></StopPointName>
+            <PlannedQuay><Text>7</Text></PlannedQuay>
+            <ServiceDeparture><TimetabledTime>2026-08-15T06:30:00Z</TimetabledTime></ServiceDeparture>
           </LegBoard>
           <LegIntermediate>
             <StopPointName><Text>Olten</Text></StopPointName>
+            <PlannedQuay><Text>3</Text></PlannedQuay>
+            <ServiceArrival><TimetabledTime>2026-08-15T06:45:00Z</TimetabledTime></ServiceArrival>
+            <ServiceDeparture><TimetabledTime>2026-08-15T06:46:00Z</TimetabledTime></ServiceDeparture>
           </LegIntermediate>
           <LegAlight>
             <siri:StopPointRef>8507000</siri:StopPointRef>
             <StopPointName><Text>Bern</Text></StopPointName>
+            <EstimatedQuay><Text>12</Text></EstimatedQuay>
+            <ServiceArrival><TimetabledTime>2026-08-15T07:00:00Z</TimetabledTime></ServiceArrival>
           </LegAlight>
           <Service>
             <Mode><PtMode>rail</PtMode></Mode>
@@ -152,6 +159,8 @@ describe("parseOjpTripResponse", () => {
     assert.equal(trips[0].legs[0].alight.name, "Bern");
     assert.equal(trips[0].path.length, 3);
     assert.equal(trips[0].legs[0].intermediateStops[0]?.name, "Olten");
+    assert.equal(trips[0].legs[0].board.quay, "7");
+    assert.equal(trips[0].legs[0].alight.quay, "12");
   });
 
   it("parses namespaced OJP 2.0 tags", () => {
@@ -239,17 +248,20 @@ describe("buildRouteStops", () => {
           board: {
             name: "Altdorf UR",
             departure: "2026-10-23T10:30:00Z",
+            quay: "3",
           },
           intermediateStops: [
             {
               name: "Erstfeld",
               arrival: "2026-10-23T10:40:00Z",
               departure: "2026-10-23T10:41:00Z",
+              quay: "1",
             },
           ],
           alight: {
             name: "Zürich HB",
             arrival: "2026-10-23T11:50:00Z",
+            quay: "12",
           },
           path: [],
         },
@@ -259,11 +271,13 @@ describe("buildRouteStops", () => {
           board: {
             name: "Zürich HB",
             departure: "2026-10-23T12:05:00Z",
+            quay: "8",
           },
           intermediateStops: [],
           alight: {
             name: "Zürich Flughafen",
             arrival: "2026-10-23T12:20:00Z",
+            quay: "2",
           },
           path: [],
         },
@@ -271,12 +285,16 @@ describe("buildRouteStops", () => {
     });
     assert.equal(stops[0].kind, "origin");
     assert.equal(stops[0].name, "Altdorf UR");
+    assert.equal(stops[0].departureQuay, "3");
     assert.ok(stops.some((s) => s.name === "Erstfeld" && s.arrival && s.departure));
     const transfer = stops.find((s) => s.name === "Zürich HB");
     assert.ok(transfer);
     assert.equal(transfer.kind, "transfer");
     assert.ok(transfer.arrival);
     assert.ok(transfer.departure);
+    assert.equal(transfer.arrivalQuay, "12");
+    assert.equal(transfer.departureQuay, "8");
     assert.equal(stops[stops.length - 1].kind, "destination");
+    assert.equal(stops[stops.length - 1].arrivalQuay, "2");
   });
 });

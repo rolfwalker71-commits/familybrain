@@ -746,33 +746,68 @@ export function EventDetailOverlay({
                         {stops.map((stop, index) => {
                           const an = formatZurichClock(stop.arrival);
                           const ab = formatZurichClock(stop.departure);
-                          const kindLabel =
+                          const isTransfer = stop.kind === "transfer";
+                          const gleisAn = stop.arrivalQuay
+                            ? `Gleis ${stop.arrivalQuay}`
+                            : null;
+                          const gleisAb = stop.departureQuay
+                            ? `Gleis ${stop.departureQuay}`
+                            : null;
+                          const meta = [
                             stop.kind === "origin"
                               ? "Start"
                               : stop.kind === "destination"
                                 ? "Ziel"
-                                : stop.kind === "transfer"
-                                  ? "Umstieg"
-                                  : null;
+                                : null,
+                            stop.trainNumber,
+                          ].filter(Boolean);
                           return (
                             <li
                               key={`${stop.name}-${index}`}
-                              className="grid grid-cols-[4.5rem_minmax(0,1fr)] gap-x-2"
+                              className={cn(
+                                "grid grid-cols-[4.5rem_minmax(0,1fr)] gap-x-2 rounded-md px-1 py-0.5",
+                                isTransfer && "bg-amber-500/10"
+                              )}
                             >
                               <div className="tabular-nums text-[11px] leading-snug text-foreground/80">
-                                {an ? <div>An {an}</div> : null}
-                                {ab ? <div>Ab {ab}</div> : null}
+                                {an ? (
+                                  <div>
+                                    An {an}
+                                    {gleisAn ? (
+                                      <span className="text-muted-foreground">
+                                        {" "}
+                                        · {gleisAn}
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                ) : null}
+                                {ab ? (
+                                  <div>
+                                    Ab {ab}
+                                    {gleisAb ? (
+                                      <span className="text-muted-foreground">
+                                        {" "}
+                                        · {gleisAb}
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                ) : null}
                                 {!an && !ab ? <div>—</div> : null}
                               </div>
                               <div className="min-w-0 leading-snug">
-                                <div className="truncate font-medium text-foreground">
-                                  {stop.name}
+                                <div className="font-medium text-foreground">
+                                  <span className="truncate">{stop.name}</span>
+                                  {isTransfer ? (
+                                    <span className="ml-1 whitespace-nowrap font-semibold text-amber-800 dark:text-amber-200">
+                                      (Umsteigen)
+                                    </span>
+                                  ) : null}
                                 </div>
-                                <div className="text-[10px] text-muted-foreground">
-                                  {[kindLabel, stop.trainNumber]
-                                    .filter(Boolean)
-                                    .join(" · ")}
-                                </div>
+                                {meta.length > 0 ? (
+                                  <div className="text-[10px] text-muted-foreground">
+                                    {meta.join(" · ")}
+                                  </div>
+                                ) : null}
                               </div>
                             </li>
                           );

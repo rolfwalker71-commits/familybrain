@@ -7,6 +7,8 @@ export type OjpStop = {
   lon?: number;
   arrival?: string;
   departure?: string;
+  /** Platform / Gleis (EstimatedQuay preferred over PlannedQuay). */
+  quay?: string;
 };
 
 export type OjpLeg = {

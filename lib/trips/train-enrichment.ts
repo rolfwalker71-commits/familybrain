@@ -13,6 +13,10 @@ export type TrainEnrichmentStop = {
   arrival?: string;
   /** ISO timestamp from OJP */
   departure?: string;
+  /** Arrival platform / Gleis */
+  arrivalQuay?: string;
+  /** Departure platform / Gleis */
+  departureQuay?: string;
   trainNumber?: string;
 };
 

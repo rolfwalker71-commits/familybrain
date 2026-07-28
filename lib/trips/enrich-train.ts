@@ -255,6 +255,8 @@ export function buildRouteStops(trip: OjpTrip): TrainEnrichmentStop[] {
       kind: isFirst ? "origin" : "transfer",
       departure: leg.board.departure,
       arrival: isFirst ? undefined : leg.board.arrival,
+      departureQuay: leg.board.quay,
+      arrivalQuay: isFirst ? undefined : leg.board.quay,
       trainNumber: train,
     });
 
@@ -265,6 +267,8 @@ export function buildRouteStops(trip: OjpTrip): TrainEnrichmentStop[] {
         kind: "intermediate",
         arrival: mid.arrival,
         departure: mid.departure,
+        arrivalQuay: mid.quay,
+        departureQuay: mid.quay,
         trainNumber: train,
       });
     }
@@ -274,6 +278,8 @@ export function buildRouteStops(trip: OjpTrip): TrainEnrichmentStop[] {
       kind: isLast ? "destination" : "transfer",
       arrival: leg.alight.arrival,
       departure: isLast ? undefined : leg.alight.departure,
+      arrivalQuay: leg.alight.quay,
+      departureQuay: isLast ? undefined : leg.alight.quay,
       trainNumber: isLast ? undefined : train,
     });
   }
@@ -288,6 +294,8 @@ export function buildRouteStops(trip: OjpTrip): TrainEnrichmentStop[] {
     ) {
       prev.arrival = prev.arrival || stop.arrival;
       prev.departure = stop.departure || prev.departure;
+      prev.arrivalQuay = prev.arrivalQuay || stop.arrivalQuay;
+      prev.departureQuay = stop.departureQuay || prev.departureQuay;
       prev.trainNumber = stop.trainNumber || prev.trainNumber;
       if (stop.kind === "destination") prev.kind = "destination";
       else if (prev.kind !== "origin" && prev.kind !== "destination") {

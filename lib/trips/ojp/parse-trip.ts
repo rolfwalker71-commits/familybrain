@@ -79,6 +79,10 @@ function parseStopBlock(
       extractFirstTag(block, "ServiceDeparture") || "",
       "TimetabledTime"
     ) || undefined;
+  const quay =
+    extractTextValue(block, "EstimatedQuay") ||
+    extractTextValue(block, "PlannedQuay") ||
+    undefined;
   return {
     name,
     stopRef,
@@ -86,6 +90,7 @@ function parseStopBlock(
     lon,
     arrival,
     departure,
+    quay,
   };
 }
 
