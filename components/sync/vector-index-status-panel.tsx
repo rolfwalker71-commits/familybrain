@@ -36,9 +36,9 @@ type VectorStatusResponse = {
   hasOpenAIKey: boolean;
 };
 
-function pct(indexed: number, eligible: number): number {
+function pct(done: number, eligible: number): number {
   if (eligible <= 0) return 0;
-  return Math.min(100, Math.round((indexed / eligible) * 100));
+  return Math.min(100, Math.round((done / eligible) * 100));
 }
 
 function StatusRow({
@@ -54,9 +54,9 @@ function StatusRow({
   buckets: EmbeddingBucketCounts;
   qdrantChunks: number;
 }) {
-  const percent = pct(buckets.indexed, buckets.eligible);
-  const backlog =
-    buckets.pending + buckets.error + buckets.stale + buckets.other;
+  const done = buckets.indexed + (buckets.skipped ?? 0);
+  const percent = pct(done, buckets.eligible);
+  const backlog = buckets.pending + buckets.error + buckets.stale + buckets.other;
 
   return (
     <div className="space-y-2 rounded-xl border border-border/60 bg-muted/20 p-3">
@@ -72,9 +72,14 @@ function StatusRow({
           >
             {buckets.indexed}/{buckets.eligible} indexiert
           </Badge>
+          {(buckets.skipped ?? 0) > 0 ? (
+            <Badge variant="secondary" className="text-[11px]">
+              {buckets.skipped} übersprungen
+            </Badge>
+          ) : null}
           {backlog > 0 ? (
             <Badge variant="outline" className="text-[11px]">
-              {backlog} offen
+              {backlog} in Warteschlange
             </Badge>
           ) : null}
           {buckets.error > 0 ? (
@@ -86,12 +91,13 @@ function StatusRow({
       </div>
       <ProgressBar
         value={percent}
-        label={`${percent}% in SQLite als indexiert markiert`}
+        label={`${percent}% erledigt (indexiert oder übersprungen)`}
         detail={`Qdrant-Chunks: ${qdrantChunks}`}
       />
-      <div className="grid grid-cols-2 gap-1 text-[11px] text-muted-foreground sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-1 text-[11px] text-muted-foreground sm:grid-cols-5">
         <span>Indexiert: {buckets.indexed}</span>
         <span>Wartend: {buckets.pending}</span>
+        <span>Übersprungen: {buckets.skipped ?? 0}</span>
         <span>Veraltet: {buckets.stale}</span>
         <span>Fehler: {buckets.error}</span>
       </div>

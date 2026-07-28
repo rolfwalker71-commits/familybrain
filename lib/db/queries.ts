@@ -1160,6 +1160,27 @@ export function updateDocumentEmbeddingStatus(
   );
 }
 
+/** Re-queue Paperless docs stuck in `indexing` (e.g. after crash/timeout). */
+export function resetStaleDocumentEmbeddingIndexing(
+  olderThanMinutes = 30
+): number {
+  const db = getDb();
+  const cutoff = new Date(
+    Date.now() - Math.max(1, olderThanMinutes) * 60_000
+  ).toISOString();
+  const result = db
+    .prepare(
+      `UPDATE document_summaries
+       SET embedding_status = 'pending',
+           embedding_error = NULL,
+           updated_at = ?
+       WHERE embedding_status = 'indexing'
+         AND (updated_at IS NULL OR updated_at < ?)`
+    )
+    .run(nowIso(), cutoff);
+  return Number(result.changes ?? 0);
+}
+
 export function listDocumentsNeedingEmbedding(limit = 20): number[] {
   const db = getDb();
   const rows = db
@@ -1171,7 +1192,7 @@ export function listDocumentsNeedingEmbedding(limit = 20): number[] {
          AND COALESCE(d.sync_status, 'synced') != 'missing'
          AND (
            s.embedding_status IS NULL
-           OR s.embedding_status IN ('pending', 'error', 'stale')
+           OR s.embedding_status IN ('pending', 'error', 'stale', 'indexing')
          )
          AND (
            NULLIF(TRIM(COALESCE(s.short_summary, '')), '') IS NOT NULL
@@ -1727,6 +1748,27 @@ export function updateTriliumNoteEmbedding(
     ts,
     noteId
   );
+}
+
+/** Re-queue Trilium notes stuck in `indexing`. */
+export function resetStaleTriliumEmbeddingIndexing(
+  olderThanMinutes = 30
+): number {
+  const db = getDb();
+  const cutoff = new Date(
+    Date.now() - Math.max(1, olderThanMinutes) * 60_000
+  ).toISOString();
+  const result = db
+    .prepare(
+      `UPDATE trilium_notes
+       SET embedding_status = 'pending',
+           embedding_error = NULL,
+           updated_at = ?
+       WHERE embedding_status = 'indexing'
+         AND (updated_at IS NULL OR updated_at < ?)`
+    )
+    .run(nowIso(), cutoff);
+  return Number(result.changes ?? 0);
 }
 
 export function listTriliumNotesNeedingEmbedding(limit = 80): TriliumNoteRow[] {

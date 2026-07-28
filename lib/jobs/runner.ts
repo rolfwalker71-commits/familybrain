@@ -2,18 +2,11 @@ import { analyzeDocument } from "@/lib/ai/analyze-document";
 import { hasOpenAIKey } from "@/lib/ai/client";
 import { syncPaperlessDocuments } from "@/lib/paperless/sync";
 import {
-  isTriliumConfigured,
-  listIndexedMissingTriliumNoteIds,
-} from "@/lib/db/queries";
-import { syncTriliumNotes } from "@/lib/trilium/sync";
-import {
-  indexPendingTriliumNotes,
-  removeTriliumNoteVectors,
-} from "@/lib/vectors/index-trilium";
-import { indexPendingPaperlessDocuments } from "@/lib/vectors/index-paperless";
-import {
   INITIAL_ANALYSIS_BATCH_SIZE,
   MAX_ANALYSIS_PER_RUN,
+  MAX_PAPERLESS_EMBED_PER_RUN,
+  MAX_TRILIUM_EMBED_PER_RUN,
+  PAPERLESS_EMBED_BATCH_SIZE,
 } from "./constants";
 import {
   addJobRunItem,
@@ -37,6 +30,18 @@ import {
   type JobRunSummary,
   type JobTrigger,
 } from "./queries";
+import {
+  isTriliumConfigured,
+  listIndexedMissingTriliumNoteIds,
+  resetStaleDocumentEmbeddingIndexing,
+  resetStaleTriliumEmbeddingIndexing,
+} from "@/lib/db/queries";
+import { syncTriliumNotes } from "@/lib/trilium/sync";
+import {
+  indexPendingTriliumNotes,
+  removeTriliumNoteVectors,
+} from "@/lib/vectors/index-trilium";
+import { indexPendingPaperlessDocuments } from "@/lib/vectors/index-paperless";
 
 export type RunJobResult =
   | {
@@ -204,6 +209,7 @@ export async function runSyncAnalyzeJob(
         });
 
         try {
+          resetStaleTriliumEmbeddingIndexing(30);
           const missingIds = listIndexedMissingTriliumNoteIds(200);
           let removed = 0;
           for (const noteId of missingIds) {
@@ -213,27 +219,41 @@ export async function runSyncAnalyzeJob(
           }
           summary.triliumVectorsRemoved = removed;
 
-          const indexResult = await indexPendingTriliumNotes({
-            limit: 80,
-            onProgress: (processed) => {
-              if (processed % 5 === 0) heartbeatJobRun(run.id);
-            },
-          });
-          heartbeatJobRun(run.id);
+          let indexed = 0;
+          let skipped = 0;
+          let errors = 0;
+          let processed = 0;
+          const errorMessages: string[] = [];
+          while (processed < MAX_TRILIUM_EMBED_PER_RUN) {
+            const remaining = MAX_TRILIUM_EMBED_PER_RUN - processed;
+            const indexResult = await indexPendingTriliumNotes({
+              limit: Math.min(80, remaining),
+              onProgress: (n) => {
+                if (n % 5 === 0) heartbeatJobRun(run.id);
+              },
+            });
+            if (indexResult.processed === 0) break;
+            indexed += indexResult.indexed;
+            skipped += indexResult.skipped;
+            errors += indexResult.errors;
+            processed += indexResult.processed;
+            errorMessages.push(...indexResult.errorMessages);
+            heartbeatJobRun(run.id);
+          }
 
-          summary.triliumIndexed = indexResult.indexed;
-          summary.triliumIndexSkipped = indexResult.skipped;
-          summary.triliumIndexErrors = indexResult.errors;
+          summary.triliumIndexed = indexed;
+          summary.triliumIndexSkipped = skipped;
+          summary.triliumIndexErrors = errors;
 
           addJobRunItem({
             runId: run.id,
             itemKind: "phase",
-            status: indexResult.errors ? "error" : "success",
+            status: errors ? "error" : "success",
             title: "Trilium-Vektorindex",
-            message: `${indexResult.indexed} indexiert, ${indexResult.skipped} übersprungen, ${removed} Vektoren entfernt, ${indexResult.errors} Fehler`,
+            message: `${indexed} indexiert, ${skipped} übersprungen, ${removed} Vektoren entfernt, ${errors} Fehler`,
             payload: {
-              processed: indexResult.processed,
-              errors: indexResult.errorMessages.slice(0, 20),
+              processed,
+              errors: errorMessages.slice(0, 20),
             },
           });
         } catch (error) {
@@ -248,49 +268,6 @@ export async function runSyncAnalyzeJob(
           });
         }
       }
-
-      if (hasOpenAIKey()) {
-        addJobRunItem({
-          runId: run.id,
-          itemKind: "phase",
-          status: "running",
-          title: "Paperless-Vektorindex",
-          message: "Indexiere analysierte Dokumente in Qdrant",
-        });
-        try {
-          const paperlessIndex = await indexPendingPaperlessDocuments({
-            limit: 50,
-            onProgress: (processed) => {
-              if (processed % 5 === 0) heartbeatJobRun(run.id);
-            },
-          });
-          heartbeatJobRun(run.id);
-          summary.paperlessIndexed = paperlessIndex.indexed;
-          summary.paperlessIndexSkipped = paperlessIndex.skipped;
-          summary.paperlessIndexErrors = paperlessIndex.errors;
-          addJobRunItem({
-            runId: run.id,
-            itemKind: "phase",
-            status: paperlessIndex.errors ? "error" : "success",
-            title: "Paperless-Vektorindex",
-            message: `${paperlessIndex.indexed} indexiert, ${paperlessIndex.skipped} übersprungen, ${paperlessIndex.errors} Fehler`,
-            payload: {
-              processed: paperlessIndex.processed,
-              errors: paperlessIndex.errorMessages.slice(0, 20),
-            },
-          });
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          summary.paperlessIndexErrors = 1;
-          addJobRunItem({
-            runId: run.id,
-            itemKind: "phase",
-            status: "error",
-            title: "Paperless-Vektorindex",
-            message,
-          });
-        }
-      }
     }
 
     if (!hasOpenAIKey()) {
@@ -298,6 +275,72 @@ export async function runSyncAnalyzeJob(
         "OpenAI API-Key fehlt. Die Hintergrundanalyse startet nach dem Speichern des Keys automatisch erneut."
       );
     }
+
+    const runPaperlessVectorPhase = async (phaseLabel: string) => {
+      addJobRunItem({
+        runId: run.id,
+        itemKind: "phase",
+        status: "running",
+        title: "Paperless-Vektorindex",
+        message: phaseLabel,
+      });
+      try {
+        resetStaleDocumentEmbeddingIndexing(30);
+        let indexed = 0;
+        let skipped = 0;
+        let errors = 0;
+        let processed = 0;
+        const errorMessages: string[] = [];
+        while (processed < MAX_PAPERLESS_EMBED_PER_RUN) {
+          const remaining = MAX_PAPERLESS_EMBED_PER_RUN - processed;
+          const batch = await indexPendingPaperlessDocuments({
+            limit: Math.min(PAPERLESS_EMBED_BATCH_SIZE, remaining),
+            onProgress: (n) => {
+              if (n % 5 === 0) heartbeatJobRun(run.id);
+            },
+          });
+          if (batch.processed === 0) break;
+          indexed += batch.indexed;
+          skipped += batch.skipped;
+          errors += batch.errors;
+          processed += batch.processed;
+          errorMessages.push(...batch.errorMessages);
+          heartbeatJobRun(run.id);
+        }
+        summary.paperlessIndexed =
+          (summary.paperlessIndexed ?? 0) + indexed;
+        summary.paperlessIndexSkipped =
+          (summary.paperlessIndexSkipped ?? 0) + skipped;
+        summary.paperlessIndexErrors =
+          (summary.paperlessIndexErrors ?? 0) + errors;
+        addJobRunItem({
+          runId: run.id,
+          itemKind: "phase",
+          status: errors ? "error" : "success",
+          title: "Paperless-Vektorindex",
+          message: `${indexed} indexiert, ${skipped} übersprungen, ${errors} Fehler`,
+          payload: {
+            processed,
+            errors: errorMessages.slice(0, 20),
+          },
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        summary.paperlessIndexErrors =
+          (summary.paperlessIndexErrors ?? 0) + 1;
+        addJobRunItem({
+          runId: run.id,
+          itemKind: "phase",
+          status: "error",
+          title: "Paperless-Vektorindex",
+          message,
+        });
+      }
+    };
+
+    await runPaperlessVectorPhase(
+      "Indexiere bereits analysierte Dokumente in Qdrant"
+    );
 
     addJobRunItem({
       runId: run.id,
@@ -431,6 +474,11 @@ export async function runSyncAnalyzeJob(
       title: "AI-Analyse",
       message: `${summary.analyzed ?? 0} analysiert, ${summary.analysisFailed ?? 0} fehlgeschlagen`,
     });
+
+    // Newly analyzed docs become embedding-eligible — drain again in this run.
+    await runPaperlessVectorPhase(
+      "Indexiere neu analysierte Dokumente in Qdrant"
+    );
 
     const incomplete = initialRun ? countIncompleteAnalyses() : 0;
     const hardFailure =

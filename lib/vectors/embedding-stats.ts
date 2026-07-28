@@ -5,6 +5,8 @@ export type EmbeddingBucketCounts = {
   pending: number;
   error: number;
   stale: number;
+  /** Empty/protected etc. — terminal, not a backlog item. */
+  skipped: number;
   other: number;
   /** Eligible entries that can/should be in the vector index */
   eligible: number;
@@ -16,6 +18,7 @@ function emptyBuckets(): EmbeddingBucketCounts {
     pending: 0,
     error: 0,
     stale: 0,
+    skipped: 0,
     other: 0,
     eligible: 0,
   };
@@ -32,6 +35,7 @@ function accumulateStatus(
     buckets.pending += count;
   else if (key === "error") buckets.error += count;
   else if (key === "stale") buckets.stale += count;
+  else if (key === "skipped") buckets.skipped += count;
   else buckets.other += count;
 }
 

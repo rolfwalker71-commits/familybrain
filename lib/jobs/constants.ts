@@ -25,6 +25,12 @@ export const ANALYSIS_CLAIM_LEASE_MS = 20 * 60 * 1000;
 export const MAX_ANALYSIS_ATTEMPTS = 3;
 export const MAX_ANALYSIS_PER_RUN = 50;
 export const INITIAL_ANALYSIS_BATCH_SIZE = 10;
+/** Per-batch size when draining Paperless → Qdrant embeddings. */
+export const PAPERLESS_EMBED_BATCH_SIZE = 50;
+/** Max Paperless docs to embed per job run (multiple batches). */
+export const MAX_PAPERLESS_EMBED_PER_RUN = 250;
+/** Max Trilium notes to embed per job run. */
+export const MAX_TRILIUM_EMBED_PER_RUN = 200;
 export const INITIAL_RETRY_INTERVAL_MS = 5 * 60 * 1000;
 export const ANALYSIS_RETRY_BASE_MS = 5 * 60 * 1000;
 
