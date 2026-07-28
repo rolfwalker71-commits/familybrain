@@ -884,7 +884,7 @@ export function EventDetailOverlay({
                 {linkedExpenses.length > 0 ? (
                   <div className="space-y-2">
                     <p className="text-xs font-semibold text-muted-foreground">
-                      FinanzBuddy
+                      Kosten (FinanzBuddy)
                     </p>
                     <ul className="space-y-1.5">
                       {linkedExpenses.map((exp) => {

@@ -26,6 +26,7 @@ import {
 import { PageHeader } from "@/components/layout/page-primitives";
 import { pageVisuals } from "@/components/layout/icon-circle";
 import { useAuth } from "@/components/auth/auth-provider";
+import { TodayHub } from "@/components/trips/today-hub";
 import { toSwissDate } from "@/lib/utils/dates";
 import { TRIP_STATUSES } from "@/lib/trips/constants";
 
@@ -220,6 +221,8 @@ export function TripsListClient() {
         icon={pageVisuals.trips.icon}
         tone={pageVisuals.trips.tone}
       />
+
+      <TodayHub isAdmin={isAdmin} />
 
       {isAdmin ? (
         <Card className="hidden border-border shadow-[0_2px_4px_rgba(20,32,28,0.06),0_10px_28px_rgba(20,32,28,0.1)] md:block">

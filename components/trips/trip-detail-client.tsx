@@ -953,6 +953,33 @@ function TripDetailInner({
     if (readOnly) setEditMode(false);
   }, [readOnly]);
 
+  /** Deep-link: /trips/[id]?event=123 opens the event overlay once. */
+  const openedEventQueryRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (events.length === 0) return;
+    const raw = searchParams.get("event");
+    if (!raw) return;
+    if (openedEventQueryRef.current === raw) return;
+    const eventId = Number(raw);
+    if (!Number.isInteger(eventId) || eventId <= 0) return;
+    if (!events.some((e) => e.id === eventId)) return;
+    openedEventQueryRef.current = raw;
+    setDetailEventId(eventId);
+    setDetailSlide("overview");
+    const iso = parseEventIsoDate(
+      events.find((e) => e.id === eventId)?.start_date
+    );
+    if (iso) {
+      requestAnimationFrame(() => {
+        const el = document.querySelector<HTMLElement>(
+          `[data-event-id="${eventId}"]`
+        );
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+        else scrollToDateAnchor(`event-day-${iso}`);
+      });
+    }
+  }, [events, searchParams]);
+
   const eventDayDates = useMemo(
     () =>
       uniqueSortedIsoDates(events.map((e) => parseEventIsoDate(e.start_date))),
