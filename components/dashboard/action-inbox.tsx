@@ -117,6 +117,25 @@ export function ActionInbox() {
           </p>
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
+            {openUnpaid.length > 0 ? (
+              <section className="space-y-2 md:col-span-2">
+                <div className="flex items-center gap-2 text-sm font-semibold">
+                  <Receipt className="size-4 text-[var(--brand-finance)]" />
+                  Offene Rechnungen
+                  <Badge variant="secondary" className="text-[10px]">
+                    Paperless
+                  </Badge>
+                  <Link
+                    href="/finance"
+                    className="ml-auto text-xs font-medium text-[var(--brand-finance)] underline-offset-2 hover:underline"
+                  >
+                    Finanzen
+                  </Link>
+                </div>
+                <OpenInvoiceCardGrid invoices={openUnpaid} />
+              </section>
+            ) : null}
+
             {data.overdueDeadlines.length > 0 ? (
               <section className="space-y-2">
                 <div className="flex items-center gap-2 text-sm font-semibold">
@@ -150,25 +169,6 @@ export function ActionInbox() {
                     </li>
                   ))}
                 </ul>
-              </section>
-            ) : null}
-
-            {openUnpaid.length > 0 ? (
-              <section className="space-y-2 md:col-span-2">
-                <div className="flex items-center gap-2 text-sm font-semibold">
-                  <Receipt className="size-4 text-[var(--brand-finance)]" />
-                  Offene Rechnungen
-                  <Badge variant="secondary" className="text-[10px]">
-                    Paperless
-                  </Badge>
-                  <Link
-                    href="/finance"
-                    className="ml-auto text-xs font-medium text-[var(--brand-finance)] underline-offset-2 hover:underline"
-                  >
-                    Finanzen
-                  </Link>
-                </div>
-                <OpenInvoiceCardGrid invoices={openUnpaid} />
               </section>
             ) : null}
 

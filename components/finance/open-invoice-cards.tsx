@@ -9,7 +9,6 @@ import {
   FileText,
   Square,
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { toSwissDate } from "@/lib/utils/dates";
 import { formatCHF } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
@@ -40,10 +39,10 @@ function FlagRow({
 }) {
   const Icon = checked ? CheckSquare : Square;
   return (
-    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
       <Icon
         className={cn(
-          "size-3.5 shrink-0",
+          "size-3 shrink-0",
           checked ? "text-[var(--brand-finance)]" : "text-muted-foreground/70"
         )}
       />
@@ -69,7 +68,7 @@ function CardThumb({
   if (error) {
     return (
       <div className="flex h-full w-full flex-col items-center justify-center gap-1 bg-muted/50 text-muted-foreground">
-        <FileText className="size-8 opacity-60" />
+        <FileText className="size-6 opacity-60" />
         <span className="text-[10px]">PDF</span>
       </div>
     );
@@ -89,32 +88,22 @@ export function OpenInvoiceCard({ invoice }: { invoice: OpenInvoiceCardModel }) 
   const title = invoice.title || "Rechnung";
   const correspondent =
     invoice.correspondent_name || invoice.vendor || null;
-  const tags = (invoice.tags || []).slice(0, 6);
 
   return (
-    <article className="overflow-hidden rounded-xl border border-border/70 bg-card shadow-[0_2px_10px_rgba(20,32,28,0.05)]">
-      <div className="relative aspect-[4/3] bg-muted/40">
+    <article
+      className={cn(
+        "overflow-hidden rounded-lg border-2 border-[color-mix(in_oklab,var(--brand-finance)_35%,var(--border))] bg-card",
+        "shadow-[0_1px_0_rgba(255,255,255,0.65)_inset,0_2px_3px_rgba(20,32,28,0.08),0_8px_18px_rgba(20,32,28,0.12),0_16px_32px_rgba(20,32,28,0.08)]"
+      )}
+    >
+      <div className="relative aspect-[5/3] bg-muted/40">
         <CardThumb paperlessId={invoice.paperless_id} title={title} />
-        {tags.length > 0 ? (
-          <div className="pointer-events-none absolute inset-x-2 top-2 flex flex-wrap justify-end gap-1">
-            {tags.map((tag) => (
-              <Badge
-                key={tag}
-                variant="secondary"
-                className="max-w-[9rem] truncate bg-background/90 text-[10px] shadow-sm backdrop-blur"
-                title={tag}
-              >
-                {tag}
-              </Badge>
-            ))}
-          </div>
-        ) : null}
       </div>
 
-      <div className="space-y-1 border-b border-border/60 px-3 py-2.5">
+      <div className="space-y-0.5 border-b border-border/70 px-2.5 py-2">
         <Link
           href={`/documents/${invoice.id}`}
-          className="block min-w-0 text-sm font-semibold leading-snug text-[var(--brand-docs)] hover:underline"
+          className="block min-w-0 text-xs font-semibold leading-snug text-[var(--brand-docs)] hover:underline sm:text-[13px]"
         >
           {correspondent ? (
             <>
@@ -126,35 +115,35 @@ export function OpenInvoiceCard({ invoice }: { invoice: OpenInvoiceCardModel }) 
           )}
         </Link>
         {invoice.amount != null ? (
-          <p className="text-xs font-semibold tabular-nums text-foreground">
+          <p className="text-[11px] font-semibold tabular-nums text-foreground">
             {formatCHF(invoice.amount, invoice.currency || "CHF")}
             {invoice.due_date
               ? ` · fällig ${toSwissDate(invoice.due_date)}`
               : ""}
           </p>
         ) : invoice.due_date ? (
-          <p className="text-xs text-muted-foreground">
+          <p className="text-[11px] text-muted-foreground">
             Fällig {toSwissDate(invoice.due_date)}
           </p>
         ) : null}
       </div>
 
-      <div className="space-y-1.5 bg-muted/25 px-3 py-2.5 text-xs text-muted-foreground">
-        <div className="flex items-center gap-2">
-          <FileText className="size-3.5 shrink-0" />
+      <div className="space-y-1 bg-muted/25 px-2.5 py-2 text-[11px] text-muted-foreground">
+        <div className="flex items-center gap-1.5">
+          <FileText className="size-3 shrink-0" />
           <span className="truncate">
             {invoice.document_type_name || "Dokument"}
           </span>
         </div>
         {invoice.created_date ? (
-          <div className="flex items-center gap-2">
-            <CalendarDays className="size-3.5 shrink-0" />
+          <div className="flex items-center gap-1.5">
+            <CalendarDays className="size-3 shrink-0" />
             <span>{toSwissDate(invoice.created_date)}</span>
           </div>
         ) : null}
         {invoice.due_date && invoice.due_date !== invoice.created_date ? (
-          <div className="flex items-center gap-2">
-            <CalendarDays className="size-3.5 shrink-0" />
+          <div className="flex items-center gap-1.5">
+            <CalendarDays className="size-3 shrink-0" />
             <span>Fällig {toSwissDate(invoice.due_date)}</span>
           </div>
         ) : null}
@@ -165,10 +154,10 @@ export function OpenInvoiceCard({ invoice }: { invoice: OpenInvoiceCardModel }) 
         <FlagRow label="Bezahlt" checked={Number(invoice.bezahlt) === 1} />
       </div>
 
-      <div className="flex items-center justify-end gap-1 border-t border-border/60 px-2 py-1.5">
+      <div className="flex items-center justify-end gap-1 border-t border-border/70 px-1.5 py-1">
         <Link
           href={`/documents/${invoice.id}`}
-          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-[var(--brand-finance)] hover:bg-muted"
+          className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium text-[var(--brand-finance)] hover:bg-muted"
         >
           Öffnen
           <ExternalLink className="size-3" />
@@ -190,7 +179,7 @@ export function OpenInvoiceCardGrid({
   }
 
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-5">
       {invoices.map((invoice) => (
         <OpenInvoiceCard key={invoice.id} invoice={invoice} />
       ))}
