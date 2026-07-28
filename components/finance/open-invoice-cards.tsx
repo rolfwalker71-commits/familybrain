@@ -2,13 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import {
-  CalendarDays,
-  CheckSquare,
-  ExternalLink,
-  FileText,
-  Square,
-} from "lucide-react";
+import { ExternalLink, FileText } from "lucide-react";
 import { toSwissDate } from "@/lib/utils/dates";
 import { formatCHF } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
@@ -29,32 +23,6 @@ export type OpenInvoiceCardModel = {
   zu_bezahlen?: number | null;
   bezahlt?: number | null;
 };
-
-function FlagRow({
-  label,
-  checked,
-}: {
-  label: string;
-  checked: boolean;
-}) {
-  const Icon = checked ? CheckSquare : Square;
-  return (
-    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-      <Icon
-        className={cn(
-          "size-3 shrink-0",
-          checked ? "text-[var(--brand-finance)]" : "text-muted-foreground/70"
-        )}
-      />
-      <span>
-        {label}:{" "}
-        <span className={checked ? "font-medium text-foreground" : undefined}>
-          {checked ? "ja" : "nein"}
-        </span>
-      </span>
-    </div>
-  );
-}
 
 function CardThumb({
   paperlessId,
@@ -88,6 +56,7 @@ export function OpenInvoiceCard({ invoice }: { invoice: OpenInvoiceCardModel }) 
   const title = invoice.title || "Rechnung";
   const correspondent =
     invoice.correspondent_name || invoice.vendor || null;
+  const toPay = Number(invoice.zu_bezahlen) === 1;
 
   return (
     <article
@@ -98,6 +67,16 @@ export function OpenInvoiceCard({ invoice }: { invoice: OpenInvoiceCardModel }) 
     >
       <div className="relative aspect-[5/3] bg-muted/40">
         <CardThumb paperlessId={invoice.paperless_id} title={title} />
+        <span
+          className={cn(
+            "absolute left-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-semibold shadow-sm backdrop-blur-sm",
+            toPay
+              ? "border border-[var(--brand-finance)]/25 bg-[var(--brand-finance-soft)] text-[var(--brand-finance)]"
+              : "border border-border/70 bg-background/90 text-muted-foreground"
+          )}
+        >
+          Zu bezahlen: {toPay ? "ja" : "nein"}
+        </span>
       </div>
 
       <div className="space-y-0.5 border-b border-border/70 px-2.5 py-2">
@@ -128,33 +107,7 @@ export function OpenInvoiceCard({ invoice }: { invoice: OpenInvoiceCardModel }) 
         ) : null}
       </div>
 
-      <div className="space-y-1 bg-muted/25 px-2.5 py-2 text-[11px] text-muted-foreground">
-        <div className="flex items-center gap-1.5">
-          <FileText className="size-3 shrink-0" />
-          <span className="truncate">
-            {invoice.document_type_name || "Dokument"}
-          </span>
-        </div>
-        {invoice.created_date ? (
-          <div className="flex items-center gap-1.5">
-            <CalendarDays className="size-3 shrink-0" />
-            <span>{toSwissDate(invoice.created_date)}</span>
-          </div>
-        ) : null}
-        {invoice.due_date && invoice.due_date !== invoice.created_date ? (
-          <div className="flex items-center gap-1.5">
-            <CalendarDays className="size-3 shrink-0" />
-            <span>Fällig {toSwissDate(invoice.due_date)}</span>
-          </div>
-        ) : null}
-        <FlagRow
-          label="Zu bezahlen"
-          checked={Number(invoice.zu_bezahlen) === 1}
-        />
-        <FlagRow label="Bezahlt" checked={Number(invoice.bezahlt) === 1} />
-      </div>
-
-      <div className="flex items-center justify-end gap-1 border-t border-border/70 px-1.5 py-1">
+      <div className="flex items-center justify-end gap-1 px-1.5 py-1">
         <Link
           href={`/documents/${invoice.id}`}
           className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium text-[var(--brand-finance)] hover:bg-muted"
