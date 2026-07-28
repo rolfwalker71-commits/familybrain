@@ -16,6 +16,11 @@ import {
 } from "@/lib/finance-brain/format";
 import { LEDGER_SUMMARY_AI_THUMB_PX, loadScaledJpeg } from "@/lib/finance-brain/image-scale";
 import { isWeatherCommentBody } from "@/lib/trips/map-context";
+import {
+  buildTravelDiaryStatsFromExpenses,
+  type DiaryStatBucket,
+  type TravelDiaryStats,
+} from "@/lib/trips/diary-stats";
 
 const PAGE_W = 595.28;
 const PAGE_H = 841.89;
@@ -2057,7 +2062,7 @@ export async function buildTravelDiaryPdfBuffer(model: {
     if (event.expenses.length) {
       ensureSpace(18);
       page.drawText(
-        toPdfSafeText(`Wallet · Ausgaben (${event.expenses.length})`),
+        toPdfSafeText(`Ausgaben (${event.expenses.length})`),
         {
           x: margin + 4,
           y: y - 11,
@@ -2079,7 +2084,7 @@ export async function buildTravelDiaryPdfBuffer(model: {
     ensureSpace(24);
     page.drawText(
       toPdfSafeText(
-        `Wallet · Weitere Ausgaben${model.ledgerTitle ? ` · ${model.ledgerTitle}` : ""}`
+        `Weitere Ausgaben${model.ledgerTitle ? ` · ${model.ledgerTitle}` : ""}`
       ),
       {
         x: margin,
@@ -2105,5 +2110,129 @@ export async function buildTravelDiaryPdfBuffer(model: {
     });
   }
 
+  const diaryStats = buildTravelDiaryStatsFromExpenses(
+    [
+      ...model.events.flatMap((e) => e.expenses),
+      ...model.orphanExpenses,
+    ],
+    model.orphanExpenses[0]?.baseCurrency ||
+      model.events.find((e) => e.expenses[0])?.expenses[0]?.baseCurrency ||
+      null
+  );
+
+  if (diaryStats) {
+    drawTravelDiaryStatsPage(pdf, font, bold, diaryStats);
+  }
+
   return Buffer.from(await pdf.save());
+}
+
+function drawTravelDiaryStatsPage(
+  pdf: PDFDocument,
+  font: PDFFont,
+  bold: PDFFont,
+  stats: TravelDiaryStats
+) {
+  const margin = OUTER;
+  const contentW = PAGE_W - margin * 2;
+  let page = pdf.addPage([PAGE_W, PAGE_H]);
+  let y = PAGE_H - margin;
+
+  function ensureSpace(need: number) {
+    if (y - need < margin + 24) {
+      page = pdf.addPage([PAGE_W, PAGE_H]);
+      y = PAGE_H - margin;
+    }
+  }
+
+  function drawBucketSection(title: string, buckets: DiaryStatBucket[]) {
+    if (buckets.length === 0) return;
+    ensureSpace(36 + buckets.length * 28);
+    page.drawText(toPdfSafeText(title), {
+      x: margin,
+      y: y - 14,
+      size: 13,
+      font: bold,
+      color: C.headerLabel,
+    });
+    y -= 22;
+    const maxAmt = Math.max(1, ...buckets.map((b) => b.amountBase));
+    const labelW = 118;
+    const valueW = 108;
+    const barTrackW = contentW - labelW - valueW - 8;
+    for (const b of buckets) {
+      ensureSpace(26);
+      const name = toPdfSafeText(b.label);
+      page.drawText(name.length > 20 ? `${name.slice(0, 19)}…` : name, {
+        x: margin,
+        y: y - 10,
+        size: 10,
+        font: bold,
+        color: C.ink,
+      });
+      const barW = Math.max(3, (b.amountBase / maxAmt) * barTrackW);
+      page.drawRectangle({
+        x: margin + labelW,
+        y: y - 12,
+        width: barTrackW,
+        height: 10,
+        color: C.soft,
+      });
+      page.drawRectangle({
+        x: margin + labelW,
+        y: y - 12,
+        width: barW,
+        height: 10,
+        color: C.headerLabel,
+      });
+      const value = toPdfSafeText(
+        `${formatMoney(b.amountBase, stats.baseCurrency)} · ${b.sharePct}%`
+      );
+      page.drawText(value, {
+        x: margin + contentW - valueW,
+        y: y - 10,
+        size: 8,
+        font,
+        color: C.muted,
+      });
+      y -= 22;
+    }
+    y -= 8;
+  }
+
+  page.drawText("STATISTIK", {
+    x: margin,
+    y: y - 14,
+    size: 11,
+    font: bold,
+    color: C.headerLabel,
+  });
+  y -= 22;
+  page.drawText("Kostenuebersicht", {
+    x: margin,
+    y: y - 16,
+    size: 18,
+    font: bold,
+    color: C.ink,
+  });
+  y -= 24;
+  page.drawText(
+    toPdfSafeText(
+      `${stats.expenseCount} Ausgaben · Summe ${formatMoney(stats.totalBase, stats.baseCurrency)}`
+    ),
+    {
+      x: margin,
+      y: y - 12,
+      size: 11,
+      font,
+      color: C.muted,
+    }
+  );
+  y -= 28;
+
+  drawBucketSection("Wer hat bezahlt", stats.byPayer);
+  drawBucketSection("Kosten nach Kategorie", stats.byCategory);
+  if (stats.byPersonShare.length > 0) {
+    drawBucketSection("Anteile je Person", stats.byPersonShare);
+  }
 }

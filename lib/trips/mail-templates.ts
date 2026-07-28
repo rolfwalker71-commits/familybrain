@@ -5,6 +5,11 @@ import {
 } from "@/lib/finance-brain/mail-templates";
 import { formatDateDe, formatMoney } from "@/lib/finance-brain/format";
 import { isWeatherCommentBody } from "@/lib/trips/map-context";
+import {
+  buildTravelDiaryStats,
+  type DiaryStatBucket,
+  type TravelDiaryStats,
+} from "@/lib/trips/diary-stats";
 import type { TravelDiaryModel } from "@/lib/trips/travel-diary";
 
 /** Soft-UI sage palette (matches TravelBuddy / FinanzBuddy). */
@@ -30,6 +35,70 @@ function walletExpensesHeading(
   const fontSize = opts?.fontSize ?? 12;
   const marginBottom = opts?.marginBottom ?? 8;
   return `<div style="font-size:${fontSize}px;font-weight:800;color:${BRAND.accent};letter-spacing:.04em;text-transform:uppercase;margin-bottom:${marginBottom}px;line-height:1.3;">${walletIconSvg(Math.round(fontSize * 1.35))}${escapeHtml(label)}</div>`;
+}
+
+/** Email-safe horizontal bar (nested table). */
+function diaryStatBarRow(
+  bucket: DiaryStatBucket,
+  currency: string
+): string {
+  const pct = Math.max(0, Math.min(100, bucket.sharePct));
+  const rest = Math.max(0, 100 - pct);
+  const money = formatMoney(bucket.amountBase, currency);
+  return `
+    <tr>
+      <td style="padding:6px 0 2px;font-size:13px;font-weight:700;color:${BRAND.ink};">${escapeHtml(bucket.label)}</td>
+      <td align="right" style="padding:6px 0 2px;font-size:12px;color:${BRAND.muted};white-space:nowrap;">${escapeHtml(money)} · ${pct}%</td>
+    </tr>
+    <tr>
+      <td colspan="2" style="padding:0 0 8px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+          <tr>
+            <td width="${pct || 1}%" style="background:${BRAND.accent};height:10px;border-radius:4px 0 0 4px;font-size:1px;line-height:10px;">&nbsp;</td>
+            <td width="${rest}%" style="background:${BRAND.page};height:10px;border-radius:0 4px 4px 0;font-size:1px;line-height:10px;">&nbsp;</td>
+          </tr>
+        </table>
+      </td>
+    </tr>`;
+}
+
+function diaryStatsSectionHtml(stats: TravelDiaryStats): string {
+  const section = (
+    title: string,
+    buckets: DiaryStatBucket[],
+    empty: string
+  ) => {
+    if (buckets.length === 0) {
+      return `<div style="margin-top:14px;"><div style="font-size:13px;font-weight:800;color:${BRAND.accent};margin-bottom:6px;">${escapeHtml(title)}</div><div style="font-size:12px;color:${BRAND.muted};">${escapeHtml(empty)}</div></div>`;
+    }
+    return `
+      <div style="margin-top:14px;">
+        <div style="font-size:13px;font-weight:800;color:${BRAND.accent};margin-bottom:4px;">${escapeHtml(title)}</div>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+          ${buckets.map((b) => diaryStatBarRow(b, stats.baseCurrency)).join("")}
+        </table>
+      </div>`;
+  };
+
+  return `
+    <div style="margin-top:24px;padding-top:16px;border-top:1px solid ${BRAND.border};">
+      <div style="font-size:11px;font-weight:800;color:${BRAND.accent};letter-spacing:.04em;text-transform:uppercase;">Statistik</div>
+      <div style="font-size:15px;font-weight:800;color:${BRAND.ink};margin-top:4px;">Kostenübersicht</div>
+      <div style="font-size:13px;color:${BRAND.muted};margin-top:4px;">
+        ${stats.expenseCount} Ausgaben · Summe ${escapeHtml(formatMoney(stats.totalBase, stats.baseCurrency))}
+      </div>
+      ${section("Wer hat bezahlt", stats.byPayer, "Keine Zahler-Daten.")}
+      ${section("Kosten nach Kategorie", stats.byCategory, "Keine Kategorien.")}
+      ${
+        stats.byPersonShare.length > 0
+          ? section(
+              "Anteile je Person",
+              stats.byPersonShare,
+              "Keine Anteils-Daten."
+            )
+          : ""
+      }
+    </div>`;
 }
 
 export type TripEventCommentMailInput = {
@@ -339,6 +408,9 @@ export function buildTravelDiaryMailHtml(
     expenseCount ? `${expenseCount} Ausgaben` : null,
   ].filter(Boolean);
 
+  const stats = buildTravelDiaryStats(model);
+  const statsHtml = stats ? diaryStatsSectionHtml(stats) : "";
+
   const html = `<!DOCTYPE html>
 <html><body style="margin:0;padding:24px;background:${BRAND.page};font-family:system-ui,-apple-system,sans-serif;color:${BRAND.ink};">
   <div style="max-width:640px;margin:0 auto;">
@@ -350,8 +422,9 @@ export function buildTravelDiaryMailHtml(
     <div style="border:1px solid ${BRAND.border};border-top:0;border-radius:0 0 12px 12px;overflow:hidden;background:${BRAND.card};padding:16px;">
       ${eventBlocks || `<div style="color:${BRAND.muted};font-size:14px;">Noch keine Aktivitäten.</div>`}
       ${orphanBlock}
-      <div style="padding-top:8px;font-size:12px;color:${BRAND.muted};border-top:1px solid ${BRAND.page};">
-        PDF im Anhang — Aktivitäten, Kommentare und Ausgaben.
+      ${statsHtml}
+      <div style="padding-top:12px;font-size:12px;color:${BRAND.muted};border-top:1px solid ${BRAND.page};margin-top:16px;">
+        PDF im Anhang — Aktivitäten, Kommentare, Ausgaben und Statistik.
       </div>
     </div>
   </div>
@@ -391,6 +464,34 @@ export function buildTravelDiaryMailHtml(
         `* ${e.description || "Ausgabe"} · ${e.paidByName} · ${money}`
       );
     }
+    textLines.push("");
+  }
+  if (stats) {
+    textLines.push("## Statistik");
+    textLines.push(
+      `Summe: ${formatMoney(stats.totalBase, stats.baseCurrency)} · ${stats.expenseCount} Ausgaben`
+    );
+    textLines.push("Wer hat bezahlt:");
+    for (const b of stats.byPayer) {
+      textLines.push(
+        `- ${b.label}: ${formatMoney(b.amountBase, stats.baseCurrency)} (${b.sharePct}%)`
+      );
+    }
+    textLines.push("Kosten nach Kategorie:");
+    for (const b of stats.byCategory) {
+      textLines.push(
+        `- ${b.label}: ${formatMoney(b.amountBase, stats.baseCurrency)} (${b.sharePct}%)`
+      );
+    }
+    if (stats.byPersonShare.length) {
+      textLines.push("Anteile je Person:");
+      for (const b of stats.byPersonShare) {
+        textLines.push(
+          `- ${b.label}: ${formatMoney(b.amountBase, stats.baseCurrency)} (${b.sharePct}%)`
+        );
+      }
+    }
+    textLines.push("");
   }
   textLines.push("PDF im Anhang.");
 
