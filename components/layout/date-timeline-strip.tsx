@@ -155,11 +155,9 @@ export function stickyDetailChromeClass(
   const belowHeader = opts?.belowMobileHeader !== false;
   return cn(
     "sticky z-20 border-b border-border/50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/90",
-    // Desktop: main is the scroll container → top-0
-    "lg:top-0",
-    // Mobile browser: sit below MobileHeader (min-h-14 + safe area)
+    // Keep top in one class string so lg: reliably overrides the mobile offset.
     belowHeader
-      ? "top-[calc(3.5rem+env(safe-area-inset-top,0px))]"
+      ? "top-[calc(3.5rem+env(safe-area-inset-top,0px))] lg:top-0"
       : "top-0"
   );
 }

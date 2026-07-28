@@ -92,9 +92,6 @@ import {
   uniqueSortedIsoDates,
 } from "@/components/layout/date-timeline-strip";
 import {
-  StatusStrip,
-} from "@/components/layout/status-strip";
-import {
   TodayAgendaWidget,
   pickAgendaDay,
 } from "@/components/trips/today-agenda-widget";
@@ -970,48 +967,6 @@ function TripDetailInner({
 
   const stickyEnabled = !isPwa;
   const stickyBelowHeader = !readOnly;
-
-  const [ledgerStrip, setLedgerStrip] = useState<{
-    label: string;
-    href?: string;
-  } | null>(null);
-
-  useEffect(() => {
-    if (readOnly) return;
-    let cancelled = false;
-    void (async () => {
-      try {
-        const res = await fetch(`/api/trips/${tripId}/finance-ledger`);
-        const data = await res.json();
-        if (cancelled || !res.ok || !data.ledger) {
-          if (!cancelled) setLedgerStrip(null);
-          return;
-        }
-        const currency = data.ledger.base_currency || "CHF";
-        if (data.cashbook) {
-          setLedgerStrip({
-            label: `Kasse ${formatMoney(data.cashbook.netBase, currency)}`,
-            href: `/finance-brain/${data.ledger.id}`,
-          });
-          return;
-        }
-        const bals = (data.balances || []) as Array<{ netBalance: number }>;
-        const open = bals.filter((b) => Math.abs(b.netBalance) > 0.009).length;
-        setLedgerStrip({
-          label:
-            open === 0
-              ? `Saldo ausgeglichen · ${currency}`
-              : `${open} offene Saldi · Ledger`,
-          href: `/finance-brain/${data.ledger.id}`,
-        });
-      } catch {
-        if (!cancelled) setLedgerStrip(null);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [tripId, readOnly, events.length]);
 
   const todayAgenda = useMemo(
     () => pickAgendaDay(events, parseEventIsoDate),
@@ -2124,34 +2079,13 @@ function TripDetailInner({
         </div>
       </div>
 
-      {todayAgenda || ledgerStrip ? (
-        <div className="space-y-2">
-          {todayAgenda ? (
-            <TodayAgendaWidget
-              iso={todayAgenda.iso}
-              isToday={todayAgenda.isToday}
-              events={todayAgenda.events}
-              onSelectEvent={scrollToAgendaEvent}
-            />
-          ) : null}
-          {ledgerStrip ? (
-            <StatusStrip
-              accent="finance"
-              primary={
-                ledgerStrip.href && !readOnly ? (
-                  <Link
-                    href={ledgerStrip.href}
-                    className="underline-offset-2 hover:underline"
-                  >
-                    {ledgerStrip.label}
-                  </Link>
-                ) : (
-                  ledgerStrip.label
-                )
-              }
-            />
-          ) : null}
-        </div>
+      {todayAgenda ? (
+        <TodayAgendaWidget
+          iso={todayAgenda.iso}
+          isToday={todayAgenda.isToday}
+          events={todayAgenda.events}
+          onSelectEvent={scrollToAgendaEvent}
+        />
       ) : null}
 
       {(weather || missingChecklist.length > 0) &&
@@ -3130,45 +3064,72 @@ function TripDetailInner({
 
 {activeTab === "ablauf" || readOnly ? (
       <div className="space-y-5">
-        <div
-          data-sticky-detail-chrome
-          className={cn(
-            stickyDetailChromeClass(stickyEnabled, {
-              belowMobileHeader: stickyBelowHeader,
-            }),
-            "space-y-2 py-2"
-          )}
-        >
-          {!readOnly ? (
-            <TripTabNav
-              items={tabItems}
-              active={activeTab}
-              onChange={setTab}
-              overflowItems={overflowItems}
-            />
-          ) : null}
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-lg font-semibold">Timeline</h2>
-          </div>
-        </div>
-        {eventDayDates.length > 0 ? (
+        {stickyEnabled ? (
           <div
+            data-sticky-detail-chrome
             className={cn(
-              stickyStripClass({
+              stickyDetailChromeClass(true, {
                 belowMobileHeader: stickyBelowHeader,
-                belowChrome: stickyEnabled,
               }),
-              "py-1"
+              // Bleed into page padding so the sticky bar spans the scroll area cleanly.
+              "-mx-4 space-y-2 px-4 py-2 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8"
             )}
           >
-            <DateTimelineStrip
-              dates={eventDayDates}
-              anchorIdForDate={eventDayAnchorId}
-              activeDate={activeEventDay}
-              accent="travel"
-            />
+            {!readOnly ? (
+              <TripTabNav
+                items={tabItems}
+                active={activeTab}
+                onChange={setTab}
+                overflowItems={overflowItems}
+              />
+            ) : null}
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-lg font-semibold">Timeline</h2>
+            </div>
+            {eventDayDates.length > 0 ? (
+              <DateTimelineStrip
+                dates={eventDayDates}
+                anchorIdForDate={eventDayAnchorId}
+                activeDate={activeEventDay}
+                accent="travel"
+              />
+            ) : null}
           </div>
-        ) : null}
+        ) : (
+          <>
+            <div className="space-y-2 py-2">
+              {!readOnly ? (
+                <TripTabNav
+                  items={tabItems}
+                  active={activeTab}
+                  onChange={setTab}
+                  overflowItems={overflowItems}
+                />
+              ) : null}
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-lg font-semibold">Timeline</h2>
+              </div>
+            </div>
+            {eventDayDates.length > 0 ? (
+              <div
+                className={cn(
+                  stickyStripClass({
+                    belowMobileHeader: stickyBelowHeader,
+                    belowChrome: false,
+                  }),
+                  "py-1"
+                )}
+              >
+                <DateTimelineStrip
+                  dates={eventDayDates}
+                  anchorIdForDate={eventDayAnchorId}
+                  activeDate={activeEventDay}
+                  accent="travel"
+                />
+              </div>
+            ) : null}
+          </>
+        )}
         {editMode ? (
           <p className="text-xs text-muted-foreground">
             Reihenfolge per ▲/▼ oder am Griff ziehen (Desktop).
