@@ -30,7 +30,6 @@ import {
 } from "@/lib/chat/sources";
 import type { TripEventDraft } from "@/lib/trips/constants";
 import { AddToTripButton } from "@/components/trips/add-to-trip-button";
-import { DocumentTravelTripButtons } from "@/components/trips/document-travel-trip-buttons";
 
 const CHAT_SOURCES_STORAGE_KEY = "familybrain.chat.sources";
 
@@ -557,43 +556,6 @@ export function ChatClient() {
                                 <ExternalLink className="size-3 shrink-0" />
                               </Badge>
                             </Link>
-                          ))}
-                        </div>
-                        <div className="space-y-2">
-                          {message.sources?.map((source) => (
-                            <DocumentTravelTripButtons
-                              key={`travel-add-${source.id}`}
-                              documentId={source.id}
-                              documentTitle={source.title}
-                              onDone={setStatus}
-                              onError={setError}
-                            />
-                          ))}
-                          {message.noteSources?.map((note) => (
-                            <AddToTripButton
-                              key={`note-trip-${note.noteId}`}
-                              draft={{
-                                type: "Notiz",
-                                title: note.title,
-                                note_id: note.noteId,
-                                source_excerpt: note.scopeLabel,
-                              }}
-                              onDone={setStatus}
-                              onError={setError}
-                            />
-                          ))}
-                          {message.guideSources?.map((guide) => (
-                            <AddToTripButton
-                              key={`guide-trip-${guide.id}`}
-                              draft={{
-                                type: "Sonstiges",
-                                title: guide.title,
-                                guide_id: guide.id,
-                                source_excerpt: guide.excerpt?.slice(0, 400),
-                              }}
-                              onDone={setStatus}
-                              onError={setError}
-                            />
                           ))}
                         </div>
                       </div>
