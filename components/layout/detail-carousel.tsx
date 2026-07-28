@@ -20,23 +20,33 @@ export function DetailCarousel({
   className,
   slideClassName,
   resetKey,
+  initialIndex = 0,
 }: {
   children: ReactNode;
   className?: string;
   slideClassName?: string;
-  /** Change to reset scroll to first slide (e.g. when opening another item). */
+  /** Change to reset scroll (e.g. when opening another item or target slide). */
   resetKey?: string | number;
+  /** Slide to show after reset (clamped to available slides). */
+  initialIndex?: number;
 }) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const slides = Children.toArray(children).filter(Boolean);
-  const [index, setIndex] = useState(0);
   const count = slides.length;
+  const startIndex = Math.max(0, Math.min(count - 1, initialIndex || 0));
+  const [index, setIndex] = useState(startIndex);
 
   useEffect(() => {
-    setIndex(0);
+    const target = Math.max(0, Math.min(count - 1, initialIndex || 0));
+    setIndex(target);
     const el = scrollerRef.current;
-    if (el) el.scrollTo({ left: 0 });
-  }, [resetKey]);
+    if (!el) return;
+    // Wait a frame so layout width is known after dialog open.
+    const id = requestAnimationFrame(() => {
+      el.scrollTo({ left: target * el.clientWidth });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [resetKey, initialIndex, count]);
 
   const syncIndex = useCallback(() => {
     const el = scrollerRef.current;

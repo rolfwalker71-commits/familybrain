@@ -502,15 +502,25 @@ function eventDenseFacts(event: TripEvent): string[] {
 function EventDenseFactsColumn({
   event,
   size = "md",
+  onOpenComments,
 }: {
   event: TripEvent;
   size?: "sm" | "md";
+  onOpenComments?: () => void;
 }) {
   const facts = eventDenseFactItems(event);
   const docCount =
     (event.documents?.length || 0) + (event.attachments?.length || 0);
   const financeCount = event.linked_expenses?.length || 0;
-  if (facts.length === 0 && docCount === 0 && financeCount === 0) return null;
+  const commentCount = event.comment_count || 0;
+  if (
+    facts.length === 0 &&
+    docCount === 0 &&
+    financeCount === 0 &&
+    !(commentCount > 0 || onOpenComments)
+  ) {
+    return null;
+  }
   return (
     <div
       className={cn(
@@ -544,6 +554,14 @@ function EventDenseFactsColumn({
           <Wallet className="size-3" />
           {financeCount === 1 ? "1 FinanzBuddy" : `${financeCount} FinanzBuddy`}
         </span>
+      ) : null}
+      {onOpenComments ? (
+        <CommentCountChip
+          count={commentCount}
+          showWhenEmpty
+          onClick={onOpenComments}
+          className="mt-0.5 border-[var(--brand-docs)]/25 bg-[var(--brand-docs-soft)] text-[var(--brand-docs)]"
+        />
       ) : null}
     </div>
   );
@@ -839,6 +857,9 @@ function TripDetailInner({
   /** Mobile edit toolbar focuses actions on one event. */
   const [editFocusEventId, setEditFocusEventId] = useState<number | null>(null);
   const [detailEventId, setDetailEventId] = useState<number | null>(null);
+  const [detailSlide, setDetailSlide] = useState<"overview" | "diary">(
+    "overview"
+  );
   const [aiBatch, setAiBatch] = useState<{
     current: number;
     total: number;
@@ -3262,7 +3283,10 @@ function TripDetailInner({
                       !editMode && "cursor-pointer hover:bg-muted/20"
                     )}
                     onClick={() => {
-                      if (!editMode) setDetailEventId(event.id);
+                      if (!editMode) {
+                        setDetailSlide("overview");
+                        setDetailEventId(event.id);
+                      }
                     }}
                   >
                     <CardContent className="space-y-2 p-2.5 sm:p-3">
@@ -3279,10 +3303,6 @@ function TripDetailInner({
                           <div className="min-w-0 flex-1 text-sm font-black leading-snug tracking-tight line-clamp-2 md:truncate sm:text-base">
                             {event.title}
                           </div>
-                          <CommentCountChip
-                            count={event.comment_count || 0}
-                            className="hidden shrink-0 md:inline-flex"
-                          />
                           {editMode ? (
                             <button
                               type="button"
@@ -3313,6 +3333,18 @@ function TripDetailInner({
                             <span className="truncate">{dateLine}</span>
                           </div>
                         ) : null}
+                        {/* PWA/mobile: comment pill under title/date */}
+                        <div className="mt-1.5 md:hidden">
+                          <CommentCountChip
+                            count={event.comment_count || 0}
+                            showWhenEmpty={!readOnly}
+                            onClick={() => {
+                              setDetailSlide("diary");
+                              setDetailEventId(event.id);
+                            }}
+                            className="border-[var(--brand-docs)]/25 bg-[var(--brand-docs-soft)] text-[var(--brand-docs)]"
+                          />
+                        </div>
                         {details ? (
                           <div className="mt-0.5 hidden line-clamp-2 text-xs text-muted-foreground md:block">
                             {details}
@@ -3332,7 +3364,14 @@ function TripDetailInner({
                         </div>
                         <div className="hidden shrink-0 flex-col items-end gap-1 md:flex">
                           <EventStatusPill event={event} />
-                          <EventDenseFactsColumn event={event} size="sm" />
+                          <EventDenseFactsColumn
+                            event={event}
+                            size="sm"
+                            onOpenComments={() => {
+                              setDetailSlide("diary");
+                              setDetailEventId(event.id);
+                            }}
+                          />
                         </div>
                         <div
                           className="hidden self-stretch w-px bg-border sm:block"
@@ -3414,7 +3453,10 @@ function TripDetailInner({
       <EventDetailOverlay
         open={detailEventId != null}
         onOpenChange={(open) => {
-          if (!open) setDetailEventId(null);
+          if (!open) {
+            setDetailEventId(null);
+            setDetailSlide("overview");
+          }
         }}
         event={
           detailEventId != null
@@ -3427,8 +3469,10 @@ function TripDetailInner({
         editMode={editMode}
         busy={busy}
         aiImageBusy={aiImageBusy || aiBatch != null}
+        initialSlide={detailSlide}
         onEdit={(ev) => {
           setDetailEventId(null);
+          setDetailSlide("overview");
           startEditEvent(ev as TripEvent);
         }}
         onLinkDocs={(id) => setLinkDocsEventId(id)}

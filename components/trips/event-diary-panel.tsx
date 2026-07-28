@@ -518,25 +518,54 @@ export function EventDiaryPanel({
   );
 }
 
-/** Compact count chip for timeline cards. */
+/** Compact count chip for timeline cards — clickable to open comments. */
 export function CommentCountChip({
   count,
   className,
+  onClick,
+  showWhenEmpty = false,
 }: {
   count: number;
   className?: string;
+  onClick?: () => void;
+  /** When true, show a capture affordance even with 0 comments. */
+  showWhenEmpty?: boolean;
 }) {
-  if (!(count > 0)) return null;
+  if (!(count > 0) && !showWhenEmpty) return null;
+  const label =
+    count > 0
+      ? `${count} Kommentar${count === 1 ? "" : "e"}`
+      : "Kommentar";
+  const sharedClass = cn(
+    "inline-flex items-center gap-1 rounded-full border border-border/60 bg-muted/50 px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground",
+    onClick &&
+      "cursor-pointer transition-colors hover:border-[var(--brand-docs)]/40 hover:bg-[var(--brand-docs-soft)] hover:text-[var(--brand-docs)]",
+    className
+  );
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        className={sharedClass}
+        title={
+          count > 0
+            ? `${label} — tippen zum Anzeigen/Erfassen`
+            : "Kommentar erfassen"
+        }
+        onClick={(e) => {
+          e.stopPropagation();
+          onClick();
+        }}
+      >
+        <MessageCircle className="size-3" />
+        {count > 0 ? count : "Kommentar"}
+      </button>
+    );
+  }
   return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1 rounded-full border border-border/60 bg-muted/50 px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground",
-        className
-      )}
-      title={`${count} Kommentar${count === 1 ? "" : "e"}`}
-    >
+    <span className={sharedClass} title={label}>
       <MessageCircle className="size-3" />
-      {count}
+      {count > 0 ? count : "Kommentar"}
     </span>
   );
 }

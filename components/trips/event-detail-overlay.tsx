@@ -351,6 +351,7 @@ export function EventDetailOverlay({
   editMode = false,
   busy = false,
   aiImageBusy = false,
+  initialSlide = "overview",
   onEdit,
   onLinkDocs,
   onAiImage,
@@ -370,6 +371,8 @@ export function EventDetailOverlay({
   editMode?: boolean;
   busy?: boolean;
   aiImageBusy?: boolean;
+  /** Open overlay on overview or jump straight to the diary/comments slide. */
+  initialSlide?: "overview" | "diary";
   onEdit?: (event: EventDetailEvent) => void;
   onLinkDocs?: (eventId: number) => void;
   onAiImage?: (event: EventDetailEvent) => void;
@@ -467,6 +470,14 @@ export function EventDetailOverlay({
 
   const canEdit = !readOnly;
 
+  // Slide order: overview → details? → map? → belege? → diary → actions?
+  let diarySlideIndex = 1;
+  if (hasDetailsSlide) diarySlideIndex += 1;
+  if (mapModel) diarySlideIndex += 1;
+  if (hasBelegSlide) diarySlideIndex += 1;
+  const carouselInitialIndex =
+    initialSlide === "diary" ? diarySlideIndex : 0;
+
   return (
     <Dialog
       open={open}
@@ -482,7 +493,8 @@ export function EventDetailOverlay({
 
         <div className="min-h-0 flex-1 overflow-hidden px-3 pb-3 pt-2">
           <DetailCarousel
-            resetKey={event.id}
+            resetKey={`${event.id}-${initialSlide}`}
+            initialIndex={carouselInitialIndex}
             className="h-full max-h-[min(78dvh,40rem)] sm:max-h-[min(80dvh,44rem)]"
           >
             {/* 1. Übersicht */}
