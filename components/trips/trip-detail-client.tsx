@@ -3883,7 +3883,7 @@ function TripDetailInner({
           if (!open) setAiZoom(null);
         }}
       >
-        <DialogContent className="max-h-[90dvh] w-[min(96vw,40rem)] overflow-y-auto sm:max-w-xl">
+        <DialogContent className="max-h-[95dvh] w-[min(98vw,72rem)] overflow-y-auto sm:max-w-5xl">
           <DialogHeader>
             <DialogTitle>{aiZoom?.title || "KI-Bild"}</DialogTitle>
             <DialogDescription>Vergrösserte Ansicht</DialogDescription>
@@ -3893,7 +3893,7 @@ function TripDetailInner({
             <img
               src={aiZoom.url}
               alt={aiZoom.title}
-              className="mx-auto max-h-[min(70dvh,36rem)] w-full rounded-md object-contain"
+              className="mx-auto max-h-[min(88dvh,52rem)] w-full rounded-md object-contain"
             />
           ) : null}
           {!readOnly && aiZoom?.eventId != null ? (
