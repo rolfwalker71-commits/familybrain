@@ -2239,6 +2239,13 @@ function TripDetailInner({
           destination={trip.destination}
           startDate={trip.start_date}
           endDate={trip.end_date}
+          events={events.map((e) => ({
+            id: e.id,
+            title: e.title,
+            event_type: e.event_type,
+            start_date: e.start_date,
+            start_time: e.start_time,
+          }))}
           onStatus={setStatus}
           onError={setError}
         />
@@ -3502,12 +3509,37 @@ function TripDetailInner({
           <DialogHeader>
             <DialogTitle>Reisetagebuch per Mail</DialogTitle>
             <DialogDescription>
-              {trip.title} — Aktivitäten, Kommentare und Ausgaben als HTML und
-              PDF.
+              {trip.title} — wähle die Reiseteilnehmer, die das Tagebuch
+              (Aktivitäten, Kommentare, Ausgaben) erhalten sollen.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-2 py-2">
-            <p className="text-sm font-medium">Wer soll die Mail bekommen?</p>
+          <div className="flex items-center gap-2 pb-1">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs"
+              onClick={() =>
+                setDiarySelected(diaryRecipients.map((r) => r.recipientKey))
+              }
+            >
+              Alle
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-7 text-xs"
+              onClick={() => setDiarySelected([])}
+            >
+              Keine
+            </Button>
+            <span className="ml-auto text-xs text-muted-foreground">
+              {diarySelected.length} / {diaryRecipients.length}
+            </span>
+          </div>
+          <div className="max-h-[min(50dvh,22rem)] space-y-2 overflow-y-auto py-1">
+            <p className="text-sm font-medium">Reiseteilnehmer</p>
             {diaryRecipients.map((r) => {
               const checked = diarySelected.includes(r.recipientKey);
               return (

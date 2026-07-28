@@ -39,11 +39,37 @@ export async function GET(request: Request, context: Ctx) {
   if (!trip) {
     return NextResponse.json({ error: "Reise nicht gefunden" }, { status: 404 });
   }
-  const calendarEvents = await tripEventsToCalendarEvents(
-    trip,
-    listTripEvents(id),
-    { absoluteOrigin: requestOrigin(request), embedAiImages: true }
-  );
+
+  const url = new URL(request.url);
+  const eventIdsRaw = url.searchParams.get("eventIds");
+  const allEvents = listTripEvents(id);
+  let events = allEvents;
+  if (eventIdsRaw?.trim()) {
+    const wanted = new Set(
+      eventIdsRaw
+        .split(",")
+        .map((s) => Number(s.trim()))
+        .filter((n) => Number.isInteger(n) && n > 0)
+    );
+    if (wanted.size === 0) {
+      return NextResponse.json(
+        { error: "Keine gültigen Ereignis-IDs." },
+        { status: 400 }
+      );
+    }
+    events = allEvents.filter((e) => wanted.has(e.id));
+    if (events.length === 0) {
+      return NextResponse.json(
+        { error: "Keine passenden Ereignisse für den Kalender-Export." },
+        { status: 400 }
+      );
+    }
+  }
+
+  const calendarEvents = await tripEventsToCalendarEvents(trip, events, {
+    absoluteOrigin: requestOrigin(request),
+    embedAiImages: true,
+  });
   if (calendarEvents.length === 0) {
     return NextResponse.json(
       { error: "Keine datierten Ereignisse für den Kalender-Export." },
@@ -56,7 +82,11 @@ export async function GET(request: Request, context: Ctx) {
     .replace(/[^a-z0-9äöü]+/gi, "-")
     .replace(/^-|-$/g, "")
     .slice(0, 40);
-  const filename = `tripbook-${id}${slug ? `-${slug}` : ""}.ics`;
+  const partial =
+    eventIdsRaw?.trim() && events.length < allEvents.length
+      ? `-auswahl-${events.length}`
+      : "";
+  const filename = `tripbook-${id}${slug ? `-${slug}` : ""}${partial}.ics`;
 
   return new NextResponse(buildIcsCalendar(calendarEvents), {
     headers: {
