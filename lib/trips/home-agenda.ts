@@ -145,7 +145,7 @@ function listUpcomingDueInvoices(today: string, horizonDays = 7): HomeDueInvoice
          AND f.due_date <= ?
          AND COALESCE(f.counts_in_stats, 1) = 1
          AND COALESCE(d.bezahlt, 0) = 0
-       ORDER BY f.due_date ASC
+       ORDER BY f.due_date DESC
        LIMIT 8`
     )
     .all(until) as Array<{

@@ -929,7 +929,7 @@ export function getDashboardInbox(limits = { each: 5 }) {
          AND dl.deadline_date IS NOT NULL
          AND dl.deadline_date < ?
          AND (dl.snoozed_until IS NULL OR TRIM(dl.snoozed_until) = '' OR dl.snoozed_until < ?)
-       ORDER BY dl.deadline_date ASC
+       ORDER BY dl.deadline_date DESC
        LIMIT ?`
     )
     .all(today, today, limit);
@@ -945,7 +945,7 @@ export function getDashboardInbox(limits = { each: 5 }) {
          AND f.due_date >= date(?, '-30 days')
          AND COALESCE(f.counts_in_stats, 1) = 1
          AND COALESCE(d.bezahlt, 0) = 0
-       ORDER BY f.due_date ASC
+       ORDER BY f.due_date DESC
        LIMIT ?`
     )
     .all(dueUntil, today, limit);
@@ -961,7 +961,7 @@ export function getDashboardInbox(limits = { each: 5 }) {
        WHERE w.warranty_until IS NOT NULL
          AND w.warranty_until >= ?
          AND w.warranty_until <= ?
-       ORDER BY w.warranty_until ASC
+       ORDER BY w.warranty_until DESC
        LIMIT ?`
     )
     .all(today, soon, limit);
@@ -1061,7 +1061,7 @@ export function listOpenUnpaidInvoices(limit = 12): OpenUnpaidInvoice[] {
        WHERE COALESCE(d.sync_status, 'synced') != 'missing'
          AND d.zu_bezahlen = 1
          AND COALESCE(d.bezahlt, 0) = 0
-       ORDER BY COALESCE(due_date, d.created_date, '9999-12-31') ASC
+       ORDER BY COALESCE(due_date, d.created_date, '0001-01-01') DESC
        LIMIT ?`
     )
     .all(limit) as Array<Omit<OpenUnpaidInvoice, "tags">>;
