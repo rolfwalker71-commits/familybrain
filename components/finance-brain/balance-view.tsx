@@ -1027,142 +1027,82 @@ function ExpenseCard({
             className="mt-0.5 h-12 w-12 shrink-0 sm:h-14 sm:w-14 [&_svg]:h-6 [&_svg]:w-6 sm:[&_svg]:h-7 sm:[&_svg]:w-7"
           />
 
-          <div className="min-w-0 flex-1 overflow-hidden">
-            <div className="flex min-w-0 items-start gap-2 sm:gap-3">
-              <div className="min-w-0 flex-1 overflow-hidden">
-                <p className="min-w-0 text-base font-black leading-snug tracking-tight text-foreground line-clamp-2 sm:text-xl md:truncate">
-                  {exp.description || (isIncome ? "Einnahme" : "Ausgabe")}
+          <div className="flex min-w-0 flex-1 items-start gap-2 overflow-hidden sm:gap-3">
+            <div className="min-w-0 flex-1 overflow-hidden">
+              <p className="min-w-0 text-base font-black leading-snug tracking-tight text-foreground line-clamp-2 sm:text-xl md:truncate">
+                {exp.description || (isIncome ? "Einnahme" : "Ausgabe")}
+              </p>
+              <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
+                <p className="truncate text-xs text-muted-foreground">
+                  {isoDate ? formatDateDe(isoDate) : "Ohne Datum"}
+                  {" · "}
+                  {isIncome ? "Einnahme" : visual.label}
                 </p>
-                <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
-                  <p className="truncate text-xs text-muted-foreground">
-                    {isoDate ? formatDateDe(isoDate) : "Ohne Datum"}
-                    {" · "}
-                    {isIncome ? "Einnahme" : visual.label}
-                  </p>
-                  {!cashbookMode && participantIds.length > 0 ? (
-                    <div className="flex -space-x-1.5">
-                      {participantIds.slice(0, 4).map((id) => (
-                        <span key={id} title={memberName(id)}>
-                          <UserAvatar
-                            name={memberName(id)}
-                            src={memberAvatar(id)}
-                            size="xs"
-                            className={cn(
-                              "ring-2 ring-card",
-                              id === exp.paid_by_member_id &&
-                                "ring-[var(--brand-finance)]"
-                            )}
-                          />
-                        </span>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-                {Boolean(exp.pre_settled) ? (
-                  (() => {
-                    const badge = expenseSettledBadge(exp.pre_settled);
-                    if (!badge) return null;
-                    return (
-                      <Badge
-                        variant="secondary"
-                        title={badge.title}
-                        className="mt-1.5 h-5 w-fit gap-0.5 border border-[var(--brand-finance)]/25 bg-[var(--brand-finance-soft)] px-1.5 text-[10px] font-semibold text-[var(--brand-finance)]"
-                      >
-                        <Check
-                          className="size-3"
-                          strokeWidth={2.5}
-                          aria-hidden
+                {!cashbookMode && participantIds.length > 0 ? (
+                  <div className="flex -space-x-1.5">
+                    {participantIds.slice(0, 4).map((id) => (
+                      <span key={id} title={memberName(id)}>
+                        <UserAvatar
+                          name={memberName(id)}
+                          src={memberAvatar(id)}
+                          size="xs"
+                          className={cn(
+                            "ring-2 ring-card",
+                            id === exp.paid_by_member_id &&
+                              "ring-[var(--brand-finance)]"
+                          )}
                         />
-                        {badge.label}
-                      </Badge>
-                    );
-                  })()
-                ) : null}
-                {exp.trip_event ? (
-                  (() => {
-                    const eventDate = formatDateDe(exp.trip_event.start_date);
-                    return (
-                      <Link
-                        href={`/trips/${exp.trip_event.trip_id}`}
-                        onClick={(e) => e.stopPropagation()}
-                        className="mt-1.5 inline-flex max-w-full items-center gap-1 rounded-full bg-[var(--brand-docs-soft)] px-2 py-0.5 text-[10px] font-semibold text-[var(--brand-docs)] hover:opacity-90"
-                        title={
-                          [
-                            eventDate || null,
-                            exp.trip_event.start_time || null,
-                            exp.trip_event.title,
-                            exp.trip_event.trip_title
-                              ? `(${exp.trip_event.trip_title})`
-                              : null,
-                          ]
-                            .filter(Boolean)
-                            .join(" · ")
-                        }
-                      >
-                        <Luggage className="size-3 shrink-0" />
-                        <span className="truncate">
-                          {eventDate ? `${eventDate} · ` : ""}
-                          {exp.trip_event.title}
-                        </span>
-                      </Link>
-                    );
-                  })()
-                ) : null}
-              </div>
-
-              <div className="flex shrink-0 flex-col items-end gap-0.5">
-                <p
-                  className={cn(
-                    "text-right text-base font-bold tabular-nums sm:text-lg",
-                    isIncome
-                      ? "text-[var(--brand-finance)]"
-                      : "text-foreground"
-                  )}
-                >
-                  {isIncome ? "+" : ""}
-                  {formatMoney(exp.amount_base, baseCurrency)}
-                </p>
-                {fx.hasFx ? (
-                  <div className="max-w-[9.5rem] text-right text-xs leading-snug text-muted-foreground sm:max-w-[11rem]">
-                    <p className="tabular-nums">{fx.primary}</p>
-                    <p className="text-[11px] tabular-nums">
-                      {formatExchangeRateLine({
-                        currency: exp.currency,
-                        baseCurrency,
-                        exchangeRate: exp.exchange_rate,
-                        amount: exp.amount,
-                        amountBase: exp.amount_base,
-                      })}
-                    </p>
+                      </span>
+                    ))}
                   </div>
                 ) : null}
-                {exp.document || exp.document_id ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-[var(--brand-finance-soft)] px-2 py-0.5 text-[10px] font-semibold text-[var(--brand-finance)]">
-                    <FileText className="size-3" />
-                    1 Beleg
-                  </span>
-                ) : null}
               </div>
-
-              {/* Desktop/tablet: AI thumb beside amount (TravelBuddy-style). */}
-              {exp.ai_image_url ? (
-                <AiImagePreview
-                  src={exp.ai_image_url}
-                  brand="finance"
-                  className="mt-0.5 hidden shrink-0 self-start sm:inline-flex"
-                  imageClassName="h-[4.5rem] w-[4.5rem] rounded-lg object-cover"
-                  onOpen={() => setZoomOpen(true)}
-                />
-              ) : aiImageBusy ? (
-                <div className="mt-0.5 hidden h-[4.5rem] w-[4.5rem] shrink-0 items-center justify-center self-start rounded-lg border border-dashed border-[var(--brand-finance)]/35 bg-[var(--brand-finance-soft)] text-[10px] font-medium text-[var(--brand-finance)] sm:flex">
-                  KI…
-                </div>
+              {Boolean(exp.pre_settled) ? (
+                (() => {
+                  const badge = expenseSettledBadge(exp.pre_settled);
+                  if (!badge) return null;
+                  return (
+                    <Badge
+                      variant="secondary"
+                      title={badge.title}
+                      className="mt-1.5 h-5 w-fit gap-0.5 border border-[var(--brand-finance)]/25 bg-[var(--brand-finance-soft)] px-1.5 text-[10px] font-semibold text-[var(--brand-finance)]"
+                    >
+                      <Check
+                        className="size-3"
+                        strokeWidth={2.5}
+                        aria-hidden
+                      />
+                      {badge.label}
+                    </Badge>
+                  );
+                })()
+              ) : null}
+              {exp.trip_event ? (
+                <Link
+                  href={`/trips/${exp.trip_event.trip_id}`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="mt-1.5 inline-flex w-fit max-w-full items-center gap-1 rounded-full bg-[var(--brand-docs-soft)] px-2 py-0.5 text-[10px] font-semibold text-[var(--brand-docs)] hover:opacity-90"
+                  title={
+                    [
+                      formatDateDe(exp.trip_event.start_date) || null,
+                      exp.trip_event.start_time || null,
+                      exp.trip_event.title,
+                      exp.trip_event.trip_title
+                        ? `(${exp.trip_event.trip_title})`
+                        : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")
+                  }
+                >
+                  <Luggage className="size-3 shrink-0" />
+                  <span>Travelbuddy: 1</span>
+                </Link>
               ) : null}
             </div>
 
-            {/* PWA/mobile: AI thumb below so the title can use full width. */}
-            {exp.ai_image_url ? (
-              <div className="mt-2 flex justify-end sm:hidden">
+            <div className="flex shrink-0 flex-col items-end gap-1">
+              {exp.ai_image_url ? (
                 <AiImagePreview
                   src={exp.ai_image_url}
                   brand="finance"
@@ -1170,14 +1110,44 @@ function ExpenseCard({
                   imageClassName="h-[4.5rem] w-[4.5rem] rounded-lg object-cover"
                   onOpen={() => setZoomOpen(true)}
                 />
-              </div>
-            ) : aiImageBusy ? (
-              <div className="mt-2 flex justify-end sm:hidden">
+              ) : aiImageBusy ? (
                 <div className="flex h-[4.5rem] w-[4.5rem] shrink-0 items-center justify-center rounded-lg border border-dashed border-[var(--brand-finance)]/35 bg-[var(--brand-finance-soft)] text-[10px] font-medium text-[var(--brand-finance)]">
                   KI…
                 </div>
-              </div>
-            ) : null}
+              ) : null}
+              <p
+                className={cn(
+                  "text-right text-sm font-bold tabular-nums sm:text-base",
+                  isIncome
+                    ? "text-[var(--brand-finance)]"
+                    : "text-foreground",
+                  !exp.ai_image_url && !aiImageBusy && "text-base sm:text-lg"
+                )}
+              >
+                {isIncome ? "+" : ""}
+                {formatMoney(exp.amount_base, baseCurrency)}
+              </p>
+              {fx.hasFx ? (
+                <div className="max-w-[9.5rem] text-right text-[10px] leading-snug text-muted-foreground sm:max-w-[11rem] sm:text-xs">
+                  <p className="tabular-nums">{fx.primary}</p>
+                  <p className="tabular-nums">
+                    {formatExchangeRateLine({
+                      currency: exp.currency,
+                      baseCurrency,
+                      exchangeRate: exp.exchange_rate,
+                      amount: exp.amount,
+                      amountBase: exp.amount_base,
+                    })}
+                  </p>
+                </div>
+              ) : null}
+              {exp.document || exp.document_id ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-[var(--brand-finance-soft)] px-2 py-0.5 text-[10px] font-semibold text-[var(--brand-finance)]">
+                  <FileText className="size-3" />
+                  1 Beleg
+                </span>
+              ) : null}
+            </div>
           </div>
         </div>
       </div>
