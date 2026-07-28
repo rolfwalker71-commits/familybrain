@@ -48,6 +48,7 @@ import {
   EventDiaryPanel,
 } from "@/components/trips/event-diary-panel";
 import { EventMapSnippet, getEventMapModel } from "@/components/trips/event-map-snippet";
+import { parseTrainEnrichment } from "@/lib/trips/train-enrichment";
 
 /** Broad event shape covering every field used across the detail slides. */
 export type EventDetailEvent = {
@@ -453,6 +454,8 @@ export function EventDetailOverlay({
   const hasDocuments = documents.length > 0 || attachments.length > 0;
   const flightEnrichmentNotice =
     type === "Flug" ? parseFlightEnrichmentNotice(event.enrichment_json) : null;
+  const trainEnrichment =
+    type === "Zugreisen" ? parseTrainEnrichment(event.enrichment_json) : null;
   const hasDocumentNotes = Boolean(
     event.document_notes_md?.trim() &&
       event.show_document_notes !== 0 &&
@@ -727,6 +730,24 @@ export function EventDetailOverlay({
                   heightClassName="h-56 sm:h-72"
                   compact={false}
                 />
+                {trainEnrichment?.intermediateStops &&
+                trainEnrichment.intermediateStops.length > 0 ? (
+                  <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                    <p className="mb-1 font-medium text-foreground">
+                      Zwischenhalte
+                    </p>
+                    <ul className="space-y-0.5">
+                      {trainEnrichment.intermediateStops.map((stop, index) => (
+                        <li key={`${stop.name}-${index}`}>{stop.name}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                {trainEnrichment?.warning ? (
+                  <p className="text-xs text-amber-800 dark:text-amber-200">
+                    {trainEnrichment.warning}
+                  </p>
+                ) : null}
               </div>
             ) : null}
 

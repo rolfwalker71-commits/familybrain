@@ -107,6 +107,12 @@ function SettingsPageInner() {
   const [aerodataboxProvider, setAerodataboxProvider] = useState<
     "apimarket" | "rapidapi"
   >("apimarket");
+  const [ojpApiToken, setOjpApiToken] = useState("");
+  const [ojpApiTokenMasked, setOjpApiTokenMasked] = useState<string | null>(null);
+  const [hasOjpApiToken, setHasOjpApiToken] = useState(false);
+  const [ojpTokenHash, setOjpTokenHash] = useState("");
+  const [ojpTokenHashMasked, setOjpTokenHashMasked] = useState<string | null>(null);
+  const [hasOjpTokenHash, setHasOjpTokenHash] = useState(false);
   const [nominatimBaseUrl, setNominatimBaseUrl] = useState(
     "https://nominatim.openstreetmap.org"
   );
@@ -206,6 +212,10 @@ function SettingsPageInner() {
       setAerodataboxProvider(
         data.aerodataboxProvider === "rapidapi" ? "rapidapi" : "apimarket"
       );
+      setOjpApiTokenMasked(data.ojpApiTokenMasked || null);
+      setHasOjpApiToken(Boolean(data.hasOjpApiToken));
+      setOjpTokenHashMasked(data.ojpTokenHashMasked || null);
+      setHasOjpTokenHash(Boolean(data.hasOjpTokenHash));
       setNominatimBaseUrl(
         data.nominatimBaseUrl || "https://nominatim.openstreetmap.org"
       );
@@ -433,6 +443,12 @@ function SettingsPageInner() {
       if (aerodataboxKey.trim()) {
         payload.aerodataboxApiKey = aerodataboxKey.trim();
       }
+      if (ojpApiToken.trim()) {
+        payload.ojpApiToken = ojpApiToken.trim();
+      }
+      if (ojpTokenHash.trim()) {
+        payload.ojpTokenHash = ojpTokenHash.trim();
+      }
       const res = await fetch("/api/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -446,6 +462,12 @@ function SettingsPageInner() {
         data.aerodataboxProvider === "rapidapi" ? "rapidapi" : "apimarket"
       );
       setAerodataboxKey("");
+      setOjpApiTokenMasked(data.ojpApiTokenMasked || null);
+      setHasOjpApiToken(Boolean(data.hasOjpApiToken));
+      setOjpTokenHashMasked(data.ojpTokenHashMasked || null);
+      setHasOjpTokenHash(Boolean(data.hasOjpTokenHash));
+      setOjpApiToken("");
+      setOjpTokenHash("");
       setNominatimBaseUrl(
         data.nominatimBaseUrl || "https://nominatim.openstreetmap.org"
       );
@@ -676,6 +698,32 @@ function SettingsPageInner() {
       setHasAerodataboxKey(Boolean(data.hasAerodataboxKey));
       setAerodataboxKey("");
       setMessage("AeroDataBox-Key entfernt.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  async function clearOjpCredentials() {
+    setSaving("travelbrain");
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clearOjpCredentials: true }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Löschen fehlgeschlagen");
+      setOjpApiTokenMasked(data.ojpApiTokenMasked || null);
+      setHasOjpApiToken(Boolean(data.hasOjpApiToken));
+      setOjpTokenHashMasked(data.ojpTokenHashMasked || null);
+      setHasOjpTokenHash(Boolean(data.hasOjpTokenHash));
+      setOjpApiToken("");
+      setOjpTokenHash("");
+      setMessage("ÖV-CH Zugangsdaten entfernt.");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -994,18 +1042,23 @@ function SettingsPageInner() {
             <IconCircle icon={Luggage} tone="teal" size="sm" />
             TravelBuddy
           </CardTitle>
-          {hasAerodataboxKey ? (
+          {hasAerodataboxKey || hasOjpApiToken ? (
             <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">
-              Flug-API ok
+              {hasAerodataboxKey && hasOjpApiToken
+                ? "Flug- & Zug-API ok"
+                : hasOjpApiToken
+                  ? "Zug-API ok"
+                  : "Flug-API ok"}
             </Badge>
           ) : (
-            <Badge variant="secondary">Flug-API optional</Badge>
+            <Badge variant="secondary">API optional</Badge>
           )}
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
             Optionaler AeroDataBox-Key für Flug-Anreicherung (API.Market oder
-            RapidAPI). Orts-Suche nutzt Photon (Komoot, fuzzy) und fällt auf
+            RapidAPI). ÖV-CH Token von opentransportdata.swiss für Zugstrecken
+            (OJP). Orts-Suche nutzt Photon (Komoot, fuzzy) und fällt auf
             OpenStreetMap/Nominatim zurück — ohne Key. Optional eigene
             Nominatim-Instanz.
           </p>
@@ -1047,6 +1100,52 @@ function SettingsPageInner() {
                     : "RapidAPI-Key"
               }
             />
+          </div>
+          <div className="space-y-2 rounded-lg border border-border/60 bg-muted/10 p-3">
+            <Label htmlFor="ojpToken">ÖV-CH Token (opentransportdata.swiss)</Label>
+            <Input
+              id="ojpToken"
+              type="password"
+              value={ojpApiToken}
+              onChange={(e) => setOjpApiToken(e.target.value)}
+              placeholder={
+                hasOjpApiToken
+                  ? `Gespeichert: ${ojpApiTokenMasked || "••••"}`
+                  : "Token aus dem API Manager"
+              }
+            />
+            <p className="text-xs text-muted-foreground">
+              Wird als Bearer-Token für OJP-Anfragen verwendet. Registrierung
+              unter api-manager.opentransportdata.swiss — API „OJP 2.0“
+              auswählen.
+            </p>
+            <Label htmlFor="ojpTokenHash">Token Hash (Referenz)</Label>
+            <Input
+              id="ojpTokenHash"
+              type="password"
+              value={ojpTokenHash}
+              onChange={(e) => setOjpTokenHash(e.target.value)}
+              placeholder={
+                hasOjpTokenHash
+                  ? `Gespeichert: ${ojpTokenHashMasked || "••••"}`
+                  : "Token Hash (optional, wird nicht an OJP gesendet)"
+              }
+            />
+            <p className="text-xs text-muted-foreground">
+              Nur zur sicheren Aufbewahrung nach der Registrierung. Für API-Aufrufe
+              wird ausschliesslich der Token oben benötigt.
+            </p>
+            {hasOjpApiToken || hasOjpTokenHash ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={saving === "travelbrain"}
+                onClick={() => void clearOjpCredentials()}
+              >
+                ÖV-CH Zugangsdaten entfernen
+              </Button>
+            ) : null}
           </div>
           <div className="space-y-2">
             <Label>Kartenstil</Label>

@@ -20,6 +20,8 @@ type Props = {
   drawRoute?: boolean;
   /** Flight routes use great-circle; transfers use a straight line */
   routeStyle?: "greatCircle" | "straight";
+  /** Precomputed path (e.g. OJP rail geometry) — overrides routeStyle */
+  routePath?: Array<[number, number]>;
   className?: string;
   heightClassName?: string;
   /** Override settings; otherwise loaded from /api/settings */
@@ -160,6 +162,7 @@ export function TripMap({
   points,
   drawRoute = false,
   routeStyle = "greatCircle",
+  routePath,
   className,
   heightClassName = "h-40",
   mapStyle: mapStyleProp,
@@ -175,9 +178,14 @@ export function TripMap({
   const valid = points.filter(
     (p) => Number.isFinite(p.lat) && Number.isFinite(p.lon)
   );
+  const validRoutePath = (routePath || []).filter(
+    ([lat, lon]) => Number.isFinite(lat) && Number.isFinite(lon)
+  );
+  const routePathKey = JSON.stringify(validRoutePath);
   const pointsKey = JSON.stringify(
     valid.map((p) => [p.lat, p.lon, p.label ?? ""])
   );
+  const mapStateKey = `${pointsKey}|${routePathKey}|${drawRoute}|${routeStyle}`;
 
   useEffect(() => {
     if (mapStyleProp) {
@@ -248,7 +256,14 @@ export function TripMap({
         }).addTo(map);
       });
 
-      if (drawRoute && current.length >= 2) {
+      if (drawRoute && validRoutePath.length >= 2) {
+        L.polyline(validRoutePath, {
+          color: "#15803d",
+          weight: 3,
+          opacity: 0.9,
+        }).addTo(map);
+        validRoutePath.forEach(([lat, lon]) => bounds.extend([lat, lon]));
+      } else if (drawRoute && current.length >= 2) {
         const a = current[0];
         const b = current[current.length - 1];
         const path: [number, number][] =
@@ -303,7 +318,7 @@ export function TripMap({
         mapRef.current = null;
       }
     };
-  }, [pointsKey, drawRoute, routeStyle, mapId, resolvedStyle]);
+  }, [mapStateKey, mapId, resolvedStyle]);
 
   if (valid.length === 0) return null;
 

@@ -7,6 +7,8 @@ import {
 
 export const AERODATABOX_KEY_SETTING = "aerodatabox_api_key";
 export const AERODATABOX_PROVIDER_SETTING = "aerodatabox_provider";
+export const OJP_TOKEN_SETTING = "ojp_api_token";
+export const OJP_TOKEN_HASH_SETTING = "ojp_token_hash";
 export const NOMINATIM_URL_SETTING = "nominatim_base_url";
 export const MAP_STYLE_SETTING = "trip_map_style";
 export const DEFAULT_NOMINATIM_BASE_URL =
@@ -92,4 +94,38 @@ export function getTripMapStyle(): MapStyleId {
 
 export function saveTripMapStyle(style: MapStyleId): void {
   setSetting(MAP_STYLE_SETTING, coerceMapStyle(style));
+}
+
+/** Bearer token for opentransportdata.swiss (OJP, GTFS-RT, …). */
+export function getOjpApiToken(): string | null {
+  return (
+    getSetting(OJP_TOKEN_SETTING) ||
+    process.env.OPENTRANSPORTDATA_TOKEN?.trim() ||
+    process.env.OJP_API_TOKEN?.trim() ||
+    null
+  );
+}
+
+export function saveOjpApiToken(token: string | null): void {
+  setSetting(OJP_TOKEN_SETTING, token?.trim() || null);
+}
+
+/**
+ * Stored for reference after API Manager registration; not sent to OJP APIs.
+ * @see https://api-manager.opentransportdata.swiss/
+ */
+export function getOjpTokenHash(): string | null {
+  return (
+    getSetting(OJP_TOKEN_HASH_SETTING) ||
+    process.env.OPENTRANSPORTDATA_TOKEN_HASH?.trim() ||
+    null
+  );
+}
+
+export function saveOjpTokenHash(hash: string | null): void {
+  setSetting(OJP_TOKEN_HASH_SETTING, hash?.trim() || null);
+}
+
+export function hasOjpCredentials(): boolean {
+  return Boolean(getOjpApiToken());
 }

@@ -2,6 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import { coerceTripEventType } from "@/lib/trips/constants";
+import { trainEnrichmentRoutePath } from "@/lib/trips/train-enrichment";
 import { TripMap, type TripMapPoint } from "@/components/trips/trip-map";
 
 /** Minimal geo/context fields needed to derive a map snippet for an event. */
@@ -20,6 +21,7 @@ export type EventMapGeoFields = {
   departure_lon?: number | null;
   arrival_lat?: number | null;
   arrival_lon?: number | null;
+  enrichment_json?: string | null;
 };
 
 function isDualPlaceType(type: string): boolean {
@@ -64,6 +66,7 @@ export type EventMapModel = {
   points: TripMapPoint[];
   drawRoute?: boolean;
   routeStyle?: "greatCircle" | "straight";
+  routePath?: Array<[number, number]>;
   /** Static fallback image (e.g. no lat/lon but a saved map snapshot exists). */
   mapImageUrl?: string;
 };
@@ -115,6 +118,8 @@ export function getEventMapModel(
   }
 
   if (hasStraightRouteMap) {
+    const routePath =
+      type === "Zugreisen" ? trainEnrichmentRoutePath(event.enrichment_json) : null;
     return {
       kind: "route",
       points: [
@@ -131,6 +136,7 @@ export function getEventMapModel(
       ],
       drawRoute: true,
       routeStyle: "straight",
+      routePath: routePath || undefined,
     };
   }
 
@@ -211,6 +217,7 @@ export function EventMapSnippet({
       points={model.points}
       drawRoute={model.drawRoute}
       routeStyle={model.routeStyle}
+      routePath={model.routePath}
       heightClassName={heightClassName}
       className={className}
       compact={compact}

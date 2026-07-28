@@ -1510,6 +1510,36 @@ function TripDetailInner({
     }
   }
 
+  async function enrichTrain(eventId: number) {
+    setError(null);
+    try {
+      if (editingEventId === eventId) {
+        const saved = await saveEvent({ keepEditing: true });
+        if (saved == null) return;
+      }
+      setBusy(true);
+      const res = await fetch(
+        `/api/trips/${tripId}/events/${eventId}/enrich-train`,
+        { method: "POST" }
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Anreicherung fehlgeschlagen");
+      await load();
+      if (data.event && editingEventId === eventId) {
+        setEventForm(eventToForm(data.event as TripEvent));
+      }
+      setStatus(
+        typeof data.warning === "string" && data.warning.trim()
+          ? data.warning
+          : "Zugstrecke geladen."
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function searchPlace(eventId: number) {
     setError(null);
     try {
@@ -2893,6 +2923,18 @@ function TripDetailInner({
                   >
                     <Plane className="size-3.5" />
                     Mit Fluginfos anreichern
+                  </Button>
+                ) : null}
+                {eventForm.eventType === "Zugreisen" ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={busy}
+                    onClick={() => void enrichTrain(editingEventId)}
+                    className="gap-1.5"
+                  >
+                    <TrainFront className="size-3.5" />
+                    Zugstrecke laden
                   </Button>
                 ) : null}
                 {eventForm.eventType !== "Flug" ? (

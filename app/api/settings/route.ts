@@ -24,10 +24,15 @@ import {
   getAeroDataBoxApiKey,
   getAeroDataBoxProvider,
   getNominatimBaseUrl,
+  getOjpApiToken,
+  getOjpTokenHash,
   getTripMapStyle,
+  hasOjpCredentials,
   saveAeroDataBoxApiKey,
   saveAeroDataBoxProvider,
   saveNominatimBaseUrl,
+  saveOjpApiToken,
+  saveOjpTokenHash,
   saveTripMapStyle,
   AERODATABOX_PROVIDERS,
   MAP_STYLES,
@@ -78,6 +83,8 @@ export async function GET() {
   const openai = getOpenAISettings();
   const trilium = getTriliumSettings();
   const aeroKey = getAeroDataBoxApiKey();
+  const ojpToken = getOjpApiToken();
+  const ojpTokenHash = getOjpTokenHash();
   const nominatimBaseUrl = getNominatimBaseUrl();
   return NextResponse.json({
     paperlessBaseUrl: paperless.baseUrl,
@@ -101,6 +108,11 @@ export async function GET() {
     aerodataboxApiKeyMasked: maskToken(aeroKey),
     hasAerodataboxKey: Boolean(aeroKey),
     aerodataboxProvider: getAeroDataBoxProvider(),
+    ojpApiTokenMasked: maskToken(ojpToken),
+    hasOjpApiToken: Boolean(ojpToken),
+    ojpTokenHashMasked: maskToken(ojpTokenHash),
+    hasOjpTokenHash: Boolean(ojpTokenHash),
+    hasOjpCredentials: hasOjpCredentials(),
     nominatimBaseUrl,
     tripMapStyle: getTripMapStyle(),
     eventAiImagePrompt: getEventAiImagePromptTemplate(),
@@ -133,6 +145,9 @@ const PutSchema = z.object({
   aerodataboxApiKey: z.string().optional(),
   clearAerodataboxApiKey: z.boolean().optional(),
   aerodataboxProvider: z.enum(AERODATABOX_PROVIDERS).optional(),
+  ojpApiToken: z.string().optional(),
+  ojpTokenHash: z.string().optional(),
+  clearOjpCredentials: z.boolean().optional(),
   nominatimBaseUrl: z.string().optional(),
   tripMapStyle: z.enum(MAP_STYLES).optional(),
   eventAiImagePrompt: z.string().max(4000).optional(),
@@ -232,6 +247,18 @@ export async function PUT(request: Request) {
     saveAeroDataBoxProvider(parsed.data.aerodataboxProvider);
   }
 
+  if (parsed.data.clearOjpCredentials) {
+    saveOjpApiToken(null);
+    saveOjpTokenHash(null);
+  } else {
+    if (parsed.data.ojpApiToken !== undefined) {
+      saveOjpApiToken(parsed.data.ojpApiToken || null);
+    }
+    if (parsed.data.ojpTokenHash !== undefined) {
+      saveOjpTokenHash(parsed.data.ojpTokenHash || null);
+    }
+  }
+
   if (parsed.data.nominatimBaseUrl !== undefined) {
     const raw = parsed.data.nominatimBaseUrl.trim();
     if (raw) {
@@ -306,6 +333,8 @@ export async function PUT(request: Request) {
   const openai = getOpenAISettings();
   const trilium = getTriliumSettings();
   const aeroKey = getAeroDataBoxApiKey();
+  const ojpToken = getOjpApiToken();
+  const ojpTokenHash = getOjpTokenHash();
   const nominatimBaseUrl = getNominatimBaseUrl();
 
   return NextResponse.json({
@@ -331,6 +360,11 @@ export async function PUT(request: Request) {
     aerodataboxApiKeyMasked: maskToken(aeroKey),
     hasAerodataboxKey: Boolean(aeroKey),
     aerodataboxProvider: getAeroDataBoxProvider(),
+    ojpApiTokenMasked: maskToken(ojpToken),
+    hasOjpApiToken: Boolean(ojpToken),
+    ojpTokenHashMasked: maskToken(ojpTokenHash),
+    hasOjpTokenHash: Boolean(ojpTokenHash),
+    hasOjpCredentials: hasOjpCredentials(),
     nominatimBaseUrl,
     tripMapStyle: getTripMapStyle(),
     eventAiImagePrompt,
