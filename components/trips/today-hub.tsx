@@ -61,32 +61,41 @@ const STATUS_LABEL: Record<string, string> = {
 export function TodayHub({ isAdmin }: { isAdmin: boolean }) {
   const [data, setData] = useState<AgendaPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    void (async () => {
+  async function load() {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/home/agenda");
+      const text = await res.text();
+      let json: { error?: string } & Partial<AgendaPayload> = {};
       try {
-        const res = await fetch("/api/home/agenda");
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error || "Laden fehlgeschlagen");
-        setData(json);
-        setError(null);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : String(err));
+        json = text ? (JSON.parse(text) as typeof json) : {};
+      } catch {
+        throw new Error(
+          res.ok
+            ? "Ungültige Antwort der Heute-API"
+            : `Heute-API nicht erreichbar (${res.status}). App neu starten/deployen?`
+        );
       }
-    })();
-  }, []);
-
-  if (error) {
-    return (
-      <Card className="border-border/70">
-        <CardContent className="p-4 text-sm text-muted-foreground">
-          Heute-Übersicht konnte nicht geladen werden.
-        </CardContent>
-      </Card>
-    );
+      if (!res.ok) {
+        throw new Error(json.error || `Laden fehlgeschlagen (${res.status})`);
+      }
+      setData(json as AgendaPayload);
+    } catch (err) {
+      setData(null);
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoading(false);
+    }
   }
 
-  if (!data) {
+  useEffect(() => {
+    void load();
+  }, []);
+
+  if (loading && !data) {
     return (
       <Card className="border-border/70">
         <CardContent className="p-4 text-sm text-muted-foreground">
@@ -95,6 +104,28 @@ export function TodayHub({ isAdmin }: { isAdmin: boolean }) {
       </Card>
     );
   }
+
+  if (error && !data) {
+    return (
+      <Card className="border-border/70">
+        <CardContent className="space-y-2 p-4 text-sm">
+          <p className="font-medium text-foreground">
+            Heute-Übersicht konnte nicht geladen werden.
+          </p>
+          <p className="text-muted-foreground">{error}</p>
+          <button
+            type="button"
+            className="text-xs font-medium text-[var(--brand-finance)] underline-offset-2 hover:underline"
+            onClick={() => void load()}
+          >
+            Erneut versuchen
+          </button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!data) return null;
 
   const hasAgenda = data.days.some((d) => d.events.length > 0);
   const hasDue = isAdmin && data.dueInvoices.length > 0;
