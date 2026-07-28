@@ -38,40 +38,62 @@ export function buildOjpLocationRequestXml(query: string): string {
 </OJP>`;
 }
 
+function parsePlaceCandidate(block: string): OjpStopCandidate | null {
+  const place =
+    extractFirstTag(block, "Place") ||
+    extractFirstTag(block, "Location") ||
+    block;
+  const stopPlace =
+    extractFirstTag(place, "StopPlace") ||
+    extractFirstTag(place, "StopPoint") ||
+    place;
+  const stopRef =
+    extractTextValue(stopPlace, "StopPlaceRef") ||
+    extractTextValue(stopPlace, "siri:StopPointRef") ||
+    extractTextValue(stopPlace, "StopPointRef") ||
+    extractTextValue(place, "StopPlaceRef") ||
+    extractTextValue(place, "siri:StopPointRef") ||
+    "";
+  const name =
+    extractTextValue(stopPlace, "StopPlaceName") ||
+    extractTextValue(stopPlace, "StopPointName") ||
+    extractTextValue(place, "Name") ||
+    extractTextValue(place, "LocationName") ||
+    extractTextValue(block, "Name") ||
+    "";
+  const geo =
+    extractGeoPositions(place)[0] ||
+    extractGeoPositions(stopPlace)[0] ||
+    extractGeoPositions(block)[0];
+  if (!name.trim() || !geo) return null;
+  return {
+    stopRef: stopRef || `${name.trim()}|${geo.lat}|${geo.lon}`,
+    name: name.trim(),
+    lat: geo.lat,
+    lon: geo.lon,
+  };
+}
+
+/**
+ * OJP 2.0 returns `<PlaceResult><Place>…`, older docs mention `<Location>`.
+ * Accept both.
+ */
 export function parseOjpLocationResponse(xml: string): OjpStopCandidate[] {
   const results: OjpStopCandidate[] = [];
   const seen = new Set<string>();
 
-  for (const locationBlock of extractBlocks(xml, "Location")) {
-    const place =
-      extractFirstTag(locationBlock, "StopPlace") ||
-      extractFirstTag(locationBlock, "StopPoint") ||
-      locationBlock;
-    const stopRef =
-      extractTextValue(place, "StopPlaceRef") ||
-      extractTextValue(place, "siri:StopPointRef") ||
-      extractTextValue(place, "StopPointRef") ||
-      extractTextValue(locationBlock, "StopPlaceRef") ||
-      extractTextValue(locationBlock, "siri:StopPointRef") ||
-      "";
-    const name =
-      extractTextValue(place, "StopPlaceName") ||
-      extractTextValue(place, "StopPointName") ||
-      extractTextValue(locationBlock, "LocationName") ||
-      extractTextValue(locationBlock, "Name") ||
-      "";
-    const geo =
-      extractGeoPositions(locationBlock)[0] || extractGeoPositions(place)[0];
-    if (!name.trim() || !geo) continue;
-    const key = stopRef || `${name}|${geo.lat}|${geo.lon}`;
+  const blocks = [
+    ...extractBlocks(xml, "PlaceResult"),
+    ...extractBlocks(xml, "Location"),
+  ];
+
+  for (const block of blocks) {
+    const candidate = parsePlaceCandidate(block);
+    if (!candidate) continue;
+    const key = candidate.stopRef || `${candidate.name}|${candidate.lat}|${candidate.lon}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    results.push({
-      stopRef: stopRef || key,
-      name: name.trim(),
-      lat: geo.lat,
-      lon: geo.lon,
-    });
+    results.push(candidate);
   }
 
   return results;

@@ -7,7 +7,10 @@ import {
   parseOjpLocationResponse,
 } from "@/lib/trips/ojp/location-request";
 import { parseOjpTripResponse } from "@/lib/trips/ojp/parse-trip";
-import { buildOjpTripRequestXml } from "@/lib/trips/ojp/trip-request";
+import {
+  buildOjpTripRequestXml,
+  formatOjpDepArrTime,
+} from "@/lib/trips/ojp/trip-request";
 import { extractOjpErrorMessage } from "@/lib/trips/ojp/xml-utils";
 import { getOjpApiToken, hasOjpCredentials } from "@/lib/trips/settings";
 
@@ -36,12 +39,31 @@ function normalizeTime(raw: string | undefined): string {
   return "08:00";
 }
 
-function toDepArrIso(date: string, time: string): string {
-  const local = new Date(`${date}T${normalizeTime(time)}:00`);
-  if (Number.isNaN(local.getTime())) {
-    throw new Error("Ungültiges Datum oder Zeit.");
+function scoreStop(query: string, name: string): number {
+  const q = query.trim().toLowerCase();
+  const n = name.toLowerCase();
+  if (n === q) return 100;
+  if (n.startsWith(q)) return 80;
+  if (n.includes(q)) return 60;
+  return 10;
+}
+
+async function resolveStopRef(query: string) {
+  const requestXml = buildOjpLocationRequestXml(query);
+  const raw = await postOjpXmlRaw(requestXml);
+  if (!raw.ok) {
+    throw new Error(
+      `Bahnhofssuche für «${query}» fehlgeschlagen (HTTP ${raw.status}).`
+    );
   }
-  return local.toISOString().replace(/\.\d{3}Z$/, "Z");
+  const candidates = parseOjpLocationResponse(raw.body);
+  if (candidates.length === 0) {
+    throw new Error(`Kein Bahnhof gefunden für «${query}».`);
+  }
+  const best = [...candidates].sort(
+    (a, b) => scoreStop(query, b.name) - scoreStop(query, a.name)
+  )[0];
+  return { best, candidates, raw };
 }
 
 export async function POST(request: Request) {
@@ -119,10 +141,30 @@ export async function POST(request: Request) {
       );
     }
 
-    const depArrTimeIso = toDepArrIso(date, parsed.data.time || "08:00");
+    const depArrTimeIso = formatOjpDepArrTime(
+      date,
+      normalizeTime(parsed.data.time)
+    );
+
+    // Resolve names → StopPlaceRef first (Name-only trip requests often fail).
+    const [originResolved, destinationResolved] = await Promise.all([
+      resolveStopRef(origin),
+      resolveStopRef(destination),
+    ]);
+
     const requestXml = buildOjpTripRequestXml({
-      origin: { name: origin },
-      destination: { name: destination },
+      origin: {
+        stopRef: originResolved.best.stopRef,
+        name: originResolved.best.name,
+        lat: originResolved.best.lat,
+        lon: originResolved.best.lon,
+      },
+      destination: {
+        stopRef: destinationResolved.best.stopRef,
+        name: destinationResolved.best.name,
+        lat: destinationResolved.best.lat,
+        lon: destinationResolved.best.lon,
+      },
       depArrTimeIso,
       numberOfResults: 5,
     });
@@ -143,6 +185,10 @@ export async function POST(request: Request) {
       pathPoints: trip.path.length,
     }));
 
+    const unavailable =
+      !raw.ok &&
+      (/service unavailable/i.test(raw.body) || raw.status >= 500);
+
     return NextResponse.json({
       ok: raw.ok && options.length > 0,
       endpoint: OJP_API_URL,
@@ -151,6 +197,8 @@ export async function POST(request: Request) {
         method: "POST",
         origin,
         destination,
+        resolvedOrigin: originResolved.best,
+        resolvedDestination: destinationResolved.best,
         date,
         time: normalizeTime(parsed.data.time),
         depArrTimeIso,
@@ -167,11 +215,13 @@ export async function POST(request: Request) {
         options,
         rawPreview: raw.body.slice(0, 2500),
       },
-      hint: !raw.ok
-        ? "HTTP-Fehler — Token und Plan «OJP 2.0» im API Manager prüfen."
-        : options.length === 0
-          ? "Antwort ok, aber keine Verbindungen geparst — XML / Haltestellennamen prüfen."
-          : null,
+      hint: unavailable
+        ? "OJP-Server meldet vorübergehend «Service Unavailable» (HTTP 5xx). Später erneut versuchen — Token ist ok, wenn die Bahnhofssuche funktioniert."
+        : !raw.ok
+          ? "HTTP-Fehler — Token und Plan «OJP 2.0» im API Manager prüfen."
+          : options.length === 0
+            ? "Antwort ok, aber keine Verbindungen geparst — XML / Haltestellennamen prüfen."
+            : null,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

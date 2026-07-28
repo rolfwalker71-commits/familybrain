@@ -5,10 +5,49 @@ import {
   parseOjpTripResponse,
   pickBestTrip,
 } from "@/lib/trips/ojp/parse-trip";
+import { parseOjpLocationResponse } from "@/lib/trips/ojp/location-request";
 import {
   parseTrainEnrichment,
   trainEnrichmentRoutePath,
 } from "@/lib/trips/train-enrichment";
+
+const SAMPLE_LOCATION = `<?xml version="1.0" encoding="utf-8"?>
+<OJP xmlns:siri="http://www.siri.org.uk/siri" version="2.0" xmlns="http://www.vdv.de/ojp">
+  <OJPResponse>
+    <siri:ServiceDelivery>
+      <OJPLocationInformationDelivery>
+        <PlaceResult>
+          <Place>
+            <StopPlace>
+              <StopPlaceRef>ch:1:sloid:3016</StopPlaceRef>
+              <StopPlaceName><Text xml:lang="de">Zürich Flughafen</Text></StopPlaceName>
+            </StopPlace>
+            <Name><Text xml:lang="de">Zürich Flughafen (Kloten)</Text></Name>
+            <GeoPosition>
+              <siri:Longitude>8.5624</siri:Longitude>
+              <siri:Latitude>47.45039</siri:Latitude>
+            </GeoPosition>
+          </Place>
+          <Complete>true</Complete>
+          <Probability>0.8</Probability>
+        </PlaceResult>
+        <PlaceResult>
+          <Place>
+            <StopPlace>
+              <StopPlaceRef>ch:1:sloid:80301</StopPlaceRef>
+              <StopPlaceName><Text xml:lang="de">Zürich Flughafen, OPC</Text></StopPlaceName>
+            </StopPlace>
+            <Name><Text xml:lang="de">Zürich Flughafen, OPC (Kloten)</Text></Name>
+            <GeoPosition>
+              <siri:Longitude>8.56566</siri:Longitude>
+              <siri:Latitude>47.45265</siri:Latitude>
+            </GeoPosition>
+          </Place>
+        </PlaceResult>
+      </OJPLocationInformationDelivery>
+    </siri:ServiceDelivery>
+  </OJPResponse>
+</OJP>`;
 
 const SAMPLE_RESPONSE = `<?xml version="1.0" encoding="UTF-8"?>
 <OJPResponse>
@@ -65,6 +104,17 @@ const SAMPLE_RESPONSE = `<?xml version="1.0" encoding="UTF-8"?>
     </Trip>
   </TripResult>
 </OJPResponse>`;
+
+describe("parseOjpLocationResponse", () => {
+  it("parses PlaceResult stops from OJP 2.0", () => {
+    const stops = parseOjpLocationResponse(SAMPLE_LOCATION);
+    assert.equal(stops.length, 2);
+    assert.equal(stops[0].stopRef, "ch:1:sloid:3016");
+    assert.equal(stops[0].name, "Zürich Flughafen");
+    assert.equal(stops[0].lat, 47.45039);
+    assert.equal(stops[0].lon, 8.5624);
+  });
+});
 
 describe("buildCompleteTripPath", () => {
   it("connects multi-leg trips including transfer gaps", () => {

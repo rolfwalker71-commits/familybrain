@@ -11,14 +11,9 @@ function renderPlaceRef(place: {
 }): string {
   if (place.stopRef?.trim()) {
     const ref = escapeXml(place.stopRef.trim());
-    // OJP 2.0: prefer StopPointRef; also emit StopPlaceRef for DIDOK codes.
-    const isDidok = /^\d{7}$/.test(place.stopRef.trim());
+    // LocationInformation returns StopPlaceRef (DIDOK / SLOID).
     return `<PlaceRef>
-        ${
-          isDidok
-            ? `<StopPlaceRef>${ref}</StopPlaceRef>`
-            : `<siri:StopPointRef>${ref}</siri:StopPointRef>`
-        }
+        <StopPlaceRef>${ref}</StopPlaceRef>
         ${
           place.name?.trim()
             ? `<Name><Text>${escapeXml(place.name.trim())}</Text></Name>`
@@ -53,6 +48,37 @@ function renderPlaceRef(place: {
       </PlaceRef>`;
   }
   throw new Error("Start oder Ziel fehlt (Ort oder Koordinaten).");
+}
+
+/** Format a Zurich-local wall clock as OJP DepArrTime with offset. */
+export function formatOjpDepArrTime(dateYmd: string, timeHm: string): string {
+  const hhmm = timeHm.match(/^(\d{1,2}):(\d{2})/);
+  if (!hhmm) throw new Error("Ungültige Abfahrtszeit.");
+  const time = `${hhmm[1].padStart(2, "0")}:${hhmm[2]}:00`;
+
+  const offsetName = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Europe/Zurich",
+    timeZoneName: "longOffset",
+    hour: "2-digit",
+  })
+    .formatToParts(new Date(`${dateYmd}T12:00:00Z`))
+    .find((p) => p.type === "timeZoneName")?.value;
+
+  let offset = "+01:00";
+  if (offsetName) {
+    const m = offsetName.match(/GMT([+-])(\d{1,2})(?::?(\d{2}))?/i);
+    if (m) {
+      offset = `${m[1]}${m[2].padStart(2, "0")}:${(m[3] || "00").padStart(2, "0")}`;
+    } else if (/GMT/i.test(offsetName) && !/[+-]/.test(offsetName)) {
+      offset = "+00:00";
+    }
+  }
+
+  const iso = `${dateYmd}T${time}${offset}`;
+  if (Number.isNaN(Date.parse(iso))) {
+    throw new Error("Ungültiges Datum oder Abfahrtszeit.");
+  }
+  return iso;
 }
 
 /** OJP 2.0 trip request — default xmlns is VDV OJP, SIRI elements use siri: */

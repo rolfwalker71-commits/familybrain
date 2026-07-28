@@ -1,9 +1,10 @@
 import { createHash } from "crypto";
 import { nowIso } from "@/lib/utils/dates";
-import { getNominatimBaseUrl, hasOjpCredentials } from "@/lib/trips/settings";
+import { hasOjpCredentials } from "@/lib/trips/settings";
 import { fetchOjpTrips, searchOjpStops } from "@/lib/trips/ojp/client";
 import type { OjpTrip } from "@/lib/trips/ojp/types";
 import type { OjpStopCandidate } from "@/lib/trips/ojp/location-request";
+import { formatOjpDepArrTime } from "@/lib/trips/ojp/trip-request";
 import type { TrainEnrichmentData } from "@/lib/trips/train-enrichment";
 import {
   getTripEventById,
@@ -74,10 +75,11 @@ function normalizeEventTime(raw: string | null | undefined): string {
 function isoTimeFromEvent(event: TripEventRow): string | null {
   const date = event.start_date?.trim();
   if (!date) return null;
-  const time = normalizeEventTime(event.start_time);
-  const local = new Date(`${date}T${time}:00`);
-  if (Number.isNaN(local.getTime())) return null;
-  return local.toISOString().replace(/\.\d{3}Z$/, "Z");
+  try {
+    return formatOjpDepArrTime(date, normalizeEventTime(event.start_time));
+  } catch {
+    return null;
+  }
 }
 
 export function hashTrainInput(event: TripEventRow): string {
@@ -97,36 +99,28 @@ export function hashTrainInput(event: TripEventRow): string {
   return createHash("sha256").update(payload).digest("hex").slice(0, 16);
 }
 
-let lastGeocodeAt = 0;
+function scoreStopMatch(query: string, candidate: OjpStopCandidate): number {
+  const q = query.trim().toLowerCase();
+  const name = candidate.name.toLowerCase();
+  if (name === q) return 100;
+  if (name.startsWith(q)) return 80;
+  if (name.includes(q)) return 60;
+  // Prefer main rail stations over bus stops when query is generic.
+  if (/flughafen|bahnhof|\bhb\b/i.test(q) && /flughafen|\bhb\b|bahnhof/i.test(name)) {
+    return 50;
+  }
+  return 10;
+}
 
-async function geocodePlace(query: string): Promise<{ lat: number; lon: number } | null> {
-  const q = query.trim();
+async function resolveStopByName(name: string): Promise<OjpStopCandidate | null> {
+  const q = name.trim();
   if (!q) return null;
-  const wait = 1100 - (Date.now() - lastGeocodeAt);
-  if (wait > 0) await new Promise((r) => setTimeout(r, wait));
-  lastGeocodeAt = Date.now();
-  const base = getNominatimBaseUrl();
-  const url = `${base}/search?${new URLSearchParams({
-    q,
-    format: "json",
-    limit: "1",
-    countrycodes: "ch,de,fr,it,at,li",
-  })}`;
   try {
-    const response = await fetch(url, {
-      headers: {
-        "User-Agent": "FamilyBrain/1.0 (travel planner)",
-        Accept: "application/json",
-      },
-    });
-    if (!response.ok) return null;
-    const data = (await response.json()) as Array<{ lat?: string; lon?: string }>;
-    const hit = data[0];
-    if (!hit?.lat || !hit?.lon) return null;
-    const lat = Number(hit.lat);
-    const lon = Number(hit.lon);
-    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
-    return { lat, lon };
+    const stops = await searchOjpStops(q);
+    if (stops.length === 0) return null;
+    return [...stops].sort(
+      (a, b) => scoreStopMatch(q, b) - scoreStopMatch(q, a)
+    )[0];
   } catch {
     return null;
   }
@@ -145,14 +139,21 @@ async function resolvePlace(
       lon: coords.lon ?? undefined,
     };
   }
+  if (name.trim()) {
+    const stop = await resolveStopByName(name);
+    if (stop) {
+      return {
+        stopRef: stop.stopRef,
+        name: stop.name,
+        lat: stop.lat,
+        lon: stop.lon,
+      };
+    }
+  }
   if (coords.lat != null && coords.lon != null) {
     return { lat: coords.lat, lon: coords.lon, name: name || undefined };
   }
   if (name.trim()) {
-    const geocoded = await geocodePlace(name);
-    if (geocoded) {
-      return { ...geocoded, name: name.trim() };
-    }
     return { name: name.trim() };
   }
   throw new Error("Start- und Zielort fehlen (Name oder Koordinaten).");
