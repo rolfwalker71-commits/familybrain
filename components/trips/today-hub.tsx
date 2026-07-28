@@ -13,6 +13,8 @@ import {
 import { cn } from "@/lib/utils";
 import { formatCHF } from "@/lib/utils/format";
 import { toSwissDate } from "@/lib/utils/dates";
+import { OpenInvoiceCardGrid } from "@/components/finance/open-invoice-cards";
+import type { OpenInvoiceCardModel } from "@/components/finance/open-invoice-cards";
 
 type AgendaDay = {
   iso: string;
@@ -49,6 +51,7 @@ type AgendaPayload = {
   } | null;
   days: AgendaDay[];
   dueInvoices: DueInvoice[];
+  openUnpaidInvoices?: OpenInvoiceCardModel[];
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -128,9 +131,11 @@ export function TodayHub({ isAdmin }: { isAdmin: boolean }) {
   if (!data) return null;
 
   const hasAgenda = data.days.some((d) => d.events.length > 0);
+  const openUnpaid = data.openUnpaidInvoices || [];
+  const hasOpenUnpaid = isAdmin && openUnpaid.length > 0;
   const hasDue = isAdmin && data.dueInvoices.length > 0;
 
-  if (!data.activeTrip && !hasAgenda && !hasDue) {
+  if (!data.activeTrip && !hasAgenda && !hasDue && !hasOpenUnpaid) {
     return (
       <Card className="border-border/70 bg-muted/20">
         <CardContent className="flex flex-wrap items-center gap-3 p-4">
@@ -206,13 +211,36 @@ export function TodayHub({ isAdmin }: { isAdmin: boolean }) {
         />
       ))}
 
+      {hasOpenUnpaid ? (
+        <Card className="border-border/70">
+          <CardContent className="space-y-3 p-4">
+            <div className="flex items-center gap-2">
+              <Receipt className="size-4 text-[var(--brand-finance)]" />
+              <p className="text-sm font-semibold text-foreground">
+                Offene Rechnungen
+              </p>
+              <Badge variant="secondary" className="text-[10px]">
+                Paperless
+              </Badge>
+              <Link
+                href="/finance"
+                className="ml-auto text-xs font-medium text-[var(--brand-finance)] underline-offset-2 hover:underline"
+              >
+                Finanzen
+              </Link>
+            </div>
+            <OpenInvoiceCardGrid invoices={openUnpaid} />
+          </CardContent>
+        </Card>
+      ) : null}
+
       {hasDue ? (
         <Card className="border-border/70">
           <CardContent className="space-y-3 p-4">
             <div className="flex items-center gap-2">
               <Receipt className="size-4 text-[var(--brand-finance)]" />
               <p className="text-sm font-semibold text-foreground">
-                Fällige Rechnungen
+                Bald fällig (Extrakt)
               </p>
               <Link
                 href="/finance"

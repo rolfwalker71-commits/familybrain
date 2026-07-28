@@ -24,6 +24,8 @@ CREATE TABLE IF NOT EXISTS paperless_documents (
   archived_file_name TEXT,
   paperless_url TEXT,
   raw_metadata TEXT,
+  zu_bezahlen INTEGER,
+  bezahlt INTEGER,
   sync_status TEXT DEFAULT 'synced',
   last_synced_at TEXT,
   created_at TEXT NOT NULL,
@@ -196,6 +198,8 @@ CREATE TABLE IF NOT EXISTS classification_rules (
 CREATE INDEX IF NOT EXISTS idx_docs_paperless_id ON paperless_documents(paperless_id);
 CREATE INDEX IF NOT EXISTS idx_docs_created_date ON paperless_documents(created_date);
 CREATE INDEX IF NOT EXISTS idx_docs_modified_at ON paperless_documents(modified_at);
+CREATE INDEX IF NOT EXISTS idx_docs_payment_flags
+  ON paperless_documents(zu_bezahlen, bezahlt);
 CREATE INDEX IF NOT EXISTS idx_summaries_category ON document_summaries(category);
 CREATE INDEX IF NOT EXISTS idx_summaries_status ON document_summaries(analysis_status);
 CREATE INDEX IF NOT EXISTS idx_deadlines_date ON deadlines(deadline_date);

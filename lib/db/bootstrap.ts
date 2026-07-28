@@ -86,6 +86,7 @@ export function bootstrapDatabase(db: Database.Database): void {
   );
 
   ensureExtractOverrideColumns(db);
+  ensurePaymentCustomFieldColumns(db);
 
   const insertArea = db.prepare(
     `INSERT OR IGNORE INTO knowledge_areas (name, description) VALUES (?, ?)`
@@ -139,6 +140,23 @@ function ensureExtractOverrideColumns(db: Database.Database): void {
       `ALTER TABLE financial_items ADD COLUMN manual_override INTEGER NOT NULL DEFAULT 0`
     );
   }
+}
+
+function ensurePaymentCustomFieldColumns(db: Database.Database): void {
+  const cols = db
+    .prepare(`PRAGMA table_info(paperless_documents)`)
+    .all() as Array<{ name: string }>;
+  const names = new Set(cols.map((c) => c.name));
+  if (!names.has("zu_bezahlen")) {
+    db.exec(`ALTER TABLE paperless_documents ADD COLUMN zu_bezahlen INTEGER`);
+  }
+  if (!names.has("bezahlt")) {
+    db.exec(`ALTER TABLE paperless_documents ADD COLUMN bezahlt INTEGER`);
+  }
+  db.exec(
+    `CREATE INDEX IF NOT EXISTS idx_docs_payment_flags
+     ON paperless_documents(zu_bezahlen, bezahlt)`
+  );
 }
 
 function ensureTripsTables(db: Database.Database): void {

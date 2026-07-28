@@ -14,6 +14,17 @@ export type PaperlessCorrespondent = {
   name: string;
 };
 
+export type PaperlessCustomField = {
+  id: number;
+  name: string;
+  data_type: string;
+};
+
+export type PaperlessCustomFieldInstance = {
+  field: number;
+  value: unknown;
+};
+
 export type PaperlessDocument = {
   id: number;
   title: string;
@@ -27,6 +38,7 @@ export type PaperlessDocument = {
   added: string | null;
   original_file_name: string | null;
   archived_file_name: string | null;
+  custom_fields?: PaperlessCustomFieldInstance[];
   [key: string]: unknown;
 };
 

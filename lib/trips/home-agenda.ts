@@ -1,4 +1,8 @@
 import { getDb } from "@/lib/db/client";
+import {
+  listOpenUnpaidInvoices,
+  type OpenUnpaidInvoice,
+} from "@/lib/db/queries";
 import { listTrips, type TripEventRow, type TripRow } from "@/lib/trips/queries";
 import { listUserTripIds } from "@/lib/users/queries";
 import { toTimeInputValue } from "@/lib/utils/dates";
@@ -34,6 +38,13 @@ export type HomeDueInvoice = {
   document_local_id: number;
   document_title: string | null;
   overdue: boolean;
+  paperless_id?: number;
+  correspondent_name?: string | null;
+  document_type_name?: string | null;
+  created_date?: string | null;
+  zu_bezahlen?: number | null;
+  bezahlt?: number | null;
+  tags?: string[];
 };
 
 export type HomeAgendaPayload = {
@@ -42,6 +53,7 @@ export type HomeAgendaPayload = {
   upcomingTrips: TripRow[];
   days: HomeAgendaDay[];
   dueInvoices: HomeDueInvoice[];
+  openUnpaidInvoices: OpenUnpaidInvoice[];
 };
 
 function todayIsoLocal(): string {
@@ -132,6 +144,7 @@ function listUpcomingDueInvoices(today: string, horizonDays = 7): HomeDueInvoice
        WHERE f.due_date IS NOT NULL AND TRIM(f.due_date) != ''
          AND f.due_date <= ?
          AND COALESCE(f.counts_in_stats, 1) = 1
+         AND COALESCE(d.bezahlt, 0) = 0
        ORDER BY f.due_date ASC
        LIMIT 8`
     )
@@ -232,6 +245,9 @@ export function getHomeAgenda(input: {
     days,
     dueInvoices: input.includeDueInvoices
       ? listUpcomingDueInvoices(today)
+      : [],
+    openUnpaidInvoices: input.includeDueInvoices
+      ? listOpenUnpaidInvoices(8)
       : [],
   };
 }

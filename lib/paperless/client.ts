@@ -1,5 +1,6 @@
 import type {
   PaperlessCorrespondent,
+  PaperlessCustomField,
   PaperlessDocument,
   PaperlessDocumentType,
   PaperlessPaginatedResponse,
@@ -202,6 +203,25 @@ export class PaperlessClient {
     } catch {
       return null;
     }
+  }
+
+  async listCustomFields(): Promise<PaperlessCustomField[]> {
+    const results: PaperlessCustomField[] = [];
+    let nextUrl: string | undefined;
+    let first = true;
+    while (first || nextUrl) {
+      first = false;
+      const page = nextUrl
+        ? await this.request<PaperlessPaginatedResponse<PaperlessCustomField>>(
+            nextUrl
+          )
+        : await this.request<PaperlessPaginatedResponse<PaperlessCustomField>>(
+            "/api/custom_fields/?page_size=100"
+          );
+      results.push(...(page.results || []));
+      nextUrl = page.next ?? undefined;
+    }
+    return results;
   }
 
   async downloadDocument(

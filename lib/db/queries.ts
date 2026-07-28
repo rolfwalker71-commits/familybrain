@@ -36,6 +36,8 @@ export type PaperlessDocumentRow = {
   archived_file_name: string | null;
   paperless_url: string | null;
   raw_metadata: string | null;
+  zu_bezahlen?: number | null;
+  bezahlt?: number | null;
   sync_status: string | null;
   last_synced_at: string | null;
   created_at: string;
@@ -269,11 +271,15 @@ export function upsertDocument(input: {
   archived_file_name: string | null;
   paperless_url: string | null;
   raw_metadata: string;
+  zu_bezahlen?: number | null;
+  bezahlt?: number | null;
   tags: { id: number | null; name: string | null }[];
 }): { id: number; changed: boolean; isNew: boolean } {
   const db = getDb();
   const existing = getDocumentByPaperlessId(input.paperless_id);
   const ts = nowIso();
+  const zuBezahlen = input.zu_bezahlen ?? null;
+  const bezahlt = input.bezahlt ?? null;
 
   return db.transaction(() => {
     if (!existing) {
@@ -283,8 +289,9 @@ export function upsertDocument(input: {
             paperless_id, title, content, content_hash, created_date, modified_at, added_at,
             document_type_id, document_type_name, correspondent_id, correspondent_name,
             original_file_name, archived_file_name, paperless_url, raw_metadata,
+            zu_bezahlen, bezahlt,
             sync_status, last_synced_at, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced', ?, ?, ?)`
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced', ?, ?, ?)`
         )
         .run(
           input.paperless_id,
@@ -302,6 +309,8 @@ export function upsertDocument(input: {
           input.archived_file_name,
           input.paperless_url,
           input.raw_metadata,
+          zuBezahlen,
+          bezahlt,
           ts,
           ts,
           ts
@@ -313,12 +322,16 @@ export function upsertDocument(input: {
     }
 
     const contentChanged = existing.content_hash !== input.content_hash;
+    const paymentChanged =
+      (existing.zu_bezahlen ?? null) !== zuBezahlen ||
+      (existing.bezahlt ?? null) !== bezahlt;
     const metadataChanged =
       existing.modified_at !== input.modified_at ||
       existing.title !== input.title ||
       existing.document_type_name !== input.document_type_name ||
       existing.correspondent_name !== input.correspondent_name ||
-      existing.sync_status === "missing";
+      existing.sync_status === "missing" ||
+      paymentChanged;
 
     if (contentChanged || metadataChanged) {
       db.prepare(
@@ -326,6 +339,7 @@ export function upsertDocument(input: {
           title = ?, content = ?, content_hash = ?, created_date = ?, modified_at = ?, added_at = ?,
           document_type_id = ?, document_type_name = ?, correspondent_id = ?, correspondent_name = ?,
           original_file_name = ?, archived_file_name = ?, paperless_url = ?, raw_metadata = ?,
+          zu_bezahlen = ?, bezahlt = ?,
           sync_status = 'synced', last_synced_at = ?, updated_at = ?
          WHERE id = ?`
       ).run(
@@ -343,12 +357,16 @@ export function upsertDocument(input: {
         input.archived_file_name,
         input.paperless_url,
         input.raw_metadata,
+        zuBezahlen,
+        bezahlt,
         ts,
         ts,
         existing.id
       );
       replaceTags(existing.id, input.tags);
-      if (contentChanged || metadataChanged) {
+      if (contentChanged) {
+        markSummaryStale(existing.id);
+      } else if (metadataChanged && !paymentChanged) {
         markSummaryStale(existing.id);
       }
       return { id: existing.id, changed: true, isNew: false };
@@ -922,10 +940,13 @@ export function getDashboardInbox(limits = { each: 5 }) {
          AND f.due_date <= ?
          AND f.due_date >= date(?, '-30 days')
          AND COALESCE(f.counts_in_stats, 1) = 1
+         AND COALESCE(d.bezahlt, 0) = 0
        ORDER BY f.due_date ASC
        LIMIT ?`
     )
     .all(dueUntil, today, limit);
+
+  const openUnpaidInvoices = listOpenUnpaidInvoices(Math.max(limit, 8));
 
   const warrantiesExpiring = db
     .prepare(
@@ -975,6 +996,7 @@ export function getDashboardInbox(limits = { each: 5 }) {
   return {
     overdueDeadlines,
     dueInvoices,
+    openUnpaidInvoices,
     warrantiesExpiring,
     analysisIssues: {
       pending: analysisPending,
@@ -982,6 +1004,78 @@ export function getDashboardInbox(limits = { each: 5 }) {
       stale: analysisStale,
     },
   };
+}
+
+export type OpenUnpaidInvoice = {
+  id: number;
+  paperless_id: number;
+  title: string | null;
+  correspondent_name: string | null;
+  document_type_name: string | null;
+  created_date: string | null;
+  modified_at: string | null;
+  zu_bezahlen: number | null;
+  bezahlt: number | null;
+  paperless_url: string | null;
+  amount: number | null;
+  currency: string | null;
+  due_date: string | null;
+  vendor: string | null;
+  tags: string[];
+};
+
+/** Paperless UDF: «Zu bezahlen» = true and «Bezahlt» ≠ true. */
+export function listOpenUnpaidInvoices(limit = 12): OpenUnpaidInvoice[] {
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `SELECT d.id, d.paperless_id, d.title, d.correspondent_name,
+              d.document_type_name, d.created_date, d.modified_at,
+              d.zu_bezahlen, d.bezahlt, d.paperless_url,
+              (
+                SELECT f.amount FROM financial_items f
+                WHERE f.document_id = d.id
+                ORDER BY f.id ASC LIMIT 1
+              ) AS amount,
+              (
+                SELECT f.currency FROM financial_items f
+                WHERE f.document_id = d.id
+                ORDER BY f.id ASC LIMIT 1
+              ) AS currency,
+              (
+                SELECT f.due_date FROM financial_items f
+                WHERE f.document_id = d.id
+                  AND f.due_date IS NOT NULL AND TRIM(f.due_date) != ''
+                ORDER BY f.due_date ASC LIMIT 1
+              ) AS due_date,
+              (
+                SELECT f.vendor FROM financial_items f
+                WHERE f.document_id = d.id
+                ORDER BY f.id ASC LIMIT 1
+              ) AS vendor
+       FROM paperless_documents d
+       WHERE COALESCE(d.sync_status, 'synced') != 'missing'
+         AND d.zu_bezahlen = 1
+         AND COALESCE(d.bezahlt, 0) = 0
+       ORDER BY COALESCE(due_date, d.created_date, '9999-12-31') ASC
+       LIMIT ?`
+    )
+    .all(limit) as Array<Omit<OpenUnpaidInvoice, "tags">>;
+
+  const tagStmt = db.prepare(
+    `SELECT tag_name FROM document_tags
+     WHERE document_id = ? AND tag_name IS NOT NULL
+     ORDER BY id ASC`
+  );
+
+  return rows.map((row) => ({
+    ...row,
+    tags: (
+      tagStmt.all(row.id) as Array<{ tag_name: string | null }>
+    )
+      .map((t) => t.tag_name)
+      .filter((name): name is string => Boolean(name)),
+  }));
 }
 
 export function updateDocumentEmbeddingStatus(

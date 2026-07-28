@@ -1,5 +1,9 @@
 import { PaperlessClient } from "./client";
 import type { PaperlessDocument, PaperlessTag } from "./types";
+import {
+  boolToSql,
+  extractPaymentCustomFlags,
+} from "./custom-fields";
 import { getPaperlessSettings, upsertDocument } from "@/lib/db/queries";
 import { hashContent } from "@/lib/utils/hash";
 import {
@@ -171,6 +175,7 @@ async function upsertRemoteDocument(
     tagCache: NameCache;
     typeCache: NameCache;
     correspondentCache: NameCache;
+    customFieldNames: Map<number, string>;
   }
 ): Promise<{ isNew: boolean; changed: boolean; localId: number }> {
   const resolved = await resolveNames(
@@ -180,6 +185,7 @@ async function upsertRemoteDocument(
     caches.typeCache,
     caches.correspondentCache
   );
+  const payment = extractPaymentCustomFlags(doc, caches.customFieldNames);
   const content = doc.content ?? "";
   const upserted = upsertDocument({
     paperless_id: doc.id,
@@ -197,6 +203,8 @@ async function upsertRemoteDocument(
     archived_file_name: doc.archived_file_name ?? null,
     paperless_url: client.documentUiUrl(doc.id),
     raw_metadata: JSON.stringify(doc),
+    zu_bezahlen: boolToSql(payment.zuBezahlen),
+    bezahlt: boolToSql(payment.bezahlt),
     tags: resolved.tags,
   });
   return { ...upserted, localId: upserted.id };
@@ -208,10 +216,15 @@ export async function ingestPaperlessDocumentById(
 ): Promise<{ localId: number; paperlessId: number }> {
   const client = createClient();
   const doc = await client.getDocument(paperlessId);
+  const customFields = await client.listCustomFields().catch(() => []);
+  const customFieldNames = new Map(
+    customFields.map((f) => [f.id, f.name] as const)
+  );
   const upserted = await upsertRemoteDocument(client, doc, {
     tagCache: new Map(),
     typeCache: new Map(),
     correspondentCache: new Map(),
+    customFieldNames,
   });
   return { localId: upserted.localId, paperlessId };
 }
@@ -239,7 +252,19 @@ async function syncDocumentPages(
     tagCache: new Map<number, string>(),
     typeCache: new Map<number, string>(),
     correspondentCache: new Map<number, string>(),
+    customFieldNames: new Map<number, string>(),
   };
+
+  try {
+    const customFields = await client.listCustomFields();
+    for (const field of customFields) {
+      caches.customFieldNames.set(field.id, field.name);
+    }
+  } catch (error) {
+    result.errors.push(
+      `Custom Fields: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
 
   let nextUrl: string | undefined;
   let first = true;

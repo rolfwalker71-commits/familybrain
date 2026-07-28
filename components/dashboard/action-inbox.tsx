@@ -11,6 +11,10 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  OpenInvoiceCardGrid,
+  type OpenInvoiceCardModel,
+} from "@/components/finance/open-invoice-cards";
 import { formatCHF } from "@/lib/utils/format";
 import { toSwissDate } from "@/lib/utils/dates";
 
@@ -31,6 +35,7 @@ type InboxPayload = {
     document_local_id: number;
     document_title: string | null;
   }>;
+  openUnpaidInvoices?: OpenInvoiceCardModel[];
   warrantiesExpiring: Array<{
     id: number;
     product_name: string | null;
@@ -86,9 +91,11 @@ export function ActionInbox() {
     data.analysisIssues.pending +
     data.analysisIssues.error +
     data.analysisIssues.stale;
+  const openUnpaid = data.openUnpaidInvoices || [];
   const empty =
     data.overdueDeadlines.length === 0 &&
     data.dueInvoices.length === 0 &&
+    openUnpaid.length === 0 &&
     data.warrantiesExpiring.length === 0 &&
     analysisTotal === 0;
 
@@ -146,16 +153,35 @@ export function ActionInbox() {
               </section>
             ) : null}
 
-            {data.dueInvoices.length > 0 ? (
-              <section className="space-y-2">
+            {openUnpaid.length > 0 ? (
+              <section className="space-y-2 md:col-span-2">
                 <div className="flex items-center gap-2 text-sm font-semibold">
                   <Receipt className="size-4 text-[var(--brand-finance)]" />
-                  Fällige Rechnungen
+                  Offene Rechnungen
+                  <Badge variant="secondary" className="text-[10px]">
+                    Paperless
+                  </Badge>
                   <Link
                     href="/finance"
                     className="ml-auto text-xs font-medium text-[var(--brand-finance)] underline-offset-2 hover:underline"
                   >
                     Finanzen
+                  </Link>
+                </div>
+                <OpenInvoiceCardGrid invoices={openUnpaid} />
+              </section>
+            ) : null}
+
+            {data.dueInvoices.length > 0 ? (
+              <section className="space-y-2">
+                <div className="flex items-center gap-2 text-sm font-semibold">
+                  <Receipt className="size-4 text-[var(--brand-finance)]" />
+                  Bald fällig (Extrakt)
+                  <Link
+                    href="/finance"
+                    className="ml-auto text-xs font-medium text-[var(--brand-finance)] underline-offset-2 hover:underline"
+                  >
+                    Alle
                   </Link>
                 </div>
                 <ul className="space-y-1.5">
