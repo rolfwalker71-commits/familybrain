@@ -23,6 +23,7 @@ const PatchSchema = z.object({
   password: z.string().min(6).max(200).optional(),
   active: z.boolean().optional(),
   gender: z.enum(["male", "female"]).nullable().optional(),
+  showTodayHub: z.boolean().optional(),
 });
 
 export async function GET(_request: Request, context: Ctx) {
@@ -63,6 +64,7 @@ export async function PATCH(request: Request, context: Ctx) {
       passwordHash,
       active: parsed.data.active,
       gender: parsed.data.gender,
+      showTodayHub: parsed.data.showTodayHub,
     });
     return NextResponse.json({ ok: true, user: getAppUserPublic(id) });
   } catch (error) {

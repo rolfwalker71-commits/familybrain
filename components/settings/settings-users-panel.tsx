@@ -24,6 +24,7 @@ type AppUser = {
   display_name: string;
   gender: "male" | "female" | null;
   active: number;
+  show_today_hub: number;
   avatar_url: string | null;
   trip_ids: number[];
   ledger_ids: number[];
@@ -52,6 +53,7 @@ export function SettingsUsersPanel() {
   const [editDisplayName, setEditDisplayName] = useState("");
   const [editEmail, setEditEmail] = useState("");
   const [editGender, setEditGender] = useState<"male" | "female" | "">("");
+  const [editShowTodayHub, setEditShowTodayHub] = useState(false);
   const [editTripIds, setEditTripIds] = useState<number[]>([]);
   const [editLedgerIds, setEditLedgerIds] = useState<number[]>([]);
   const [avatarBusy, setAvatarBusy] = useState(false);
@@ -128,6 +130,7 @@ export function SettingsUsersPanel() {
         setEditDisplayName(data.user.display_name || "");
         setEditEmail(data.user.email || "");
         setEditGender(data.user.gender || "");
+        setEditShowTodayHub(Boolean(data.user.show_today_hub));
         setEditTripIds(data.user.trip_ids || []);
         setEditLedgerIds(data.user.ledger_ids || []);
         setEditPassword("");
@@ -147,6 +150,7 @@ export function SettingsUsersPanel() {
     setEditDisplayName(user.display_name);
     setEditEmail(user.email);
     setEditGender(user.gender || "");
+    setEditShowTodayHub(Boolean(user.show_today_hub));
     setStatus(null);
   }
 
@@ -162,6 +166,7 @@ export function SettingsUsersPanel() {
           displayName: editDisplayName.trim() || user.display_name,
           gender: editGender || null,
           active: Boolean(user.active),
+          showTodayHub: editShowTodayHub,
           ...(editPassword ? { password: editPassword } : {}),
         }),
       });
@@ -392,6 +397,9 @@ export function SettingsUsersPanel() {
                         <Badge variant={user.active ? "secondary" : "outline"}>
                           {user.active ? "Aktiv" : "Inaktiv"}
                         </Badge>
+                        {user.show_today_hub ? (
+                          <Badge variant="secondary">Heute-Hub</Badge>
+                        ) : null}
                         {user.gender ? (
                           <Badge variant="outline">
                             {user.gender === "female" ? "Frau" : "Mann"}
@@ -523,6 +531,26 @@ export function SettingsUsersPanel() {
                             onChange={(e) => setEditPassword(e.target.value)}
                             autoComplete="new-password"
                           />
+                        </div>
+                        <div className="sm:col-span-2">
+                          <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-border/70 px-3 py-2.5 text-sm">
+                            <input
+                              type="checkbox"
+                              className="mt-1 size-4 shrink-0 rounded border-border"
+                              checked={editShowTodayHub}
+                              onChange={(e) =>
+                                setEditShowTodayHub(e.target.checked)
+                              }
+                            />
+                            <span className="min-w-0">
+                              <span className="font-medium">Heute-Hub</span>
+                              <span className="mt-0.5 block text-xs text-muted-foreground">
+                                Zeigt auf TravelBuddy die Übersicht «Heute &amp;
+                                demnächst» (aktive Reise, Termine). Ohne Flag
+                                erscheint der Hub gar nicht.
+                              </span>
+                            </span>
+                          </label>
                         </div>
                         <div className="flex items-end sm:col-span-2">
                           <Button

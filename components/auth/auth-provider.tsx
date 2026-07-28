@@ -16,6 +16,7 @@ export type AuthMe = {
   isAdmin: boolean;
   userId?: number;
   avatarUrl?: string | null;
+  showTodayHub?: boolean;
 };
 
 type AuthContextValue = {
@@ -45,6 +46,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isAdmin: Boolean(data.isAdmin),
         userId: data.userId,
         avatarUrl: data.avatarUrl ?? null,
+        showTodayHub:
+          data.kind === "admin" ? true : Boolean(data.showTodayHub),
       });
     } catch {
       setMe(null);

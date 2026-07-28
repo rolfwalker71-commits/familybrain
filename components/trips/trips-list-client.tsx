@@ -52,6 +52,8 @@ const STATUS_LABEL: Record<string, string> = {
 export function TripsListClient() {
   const { me, loading: authLoading } = useAuth();
   const isAdmin = !authLoading && me?.kind !== "user";
+  const showTodayHub =
+    isAdmin || Boolean(me?.showTodayHub);
   const [trips, setTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -222,7 +224,7 @@ export function TripsListClient() {
         tone={pageVisuals.trips.tone}
       />
 
-      <TodayHub isAdmin={isAdmin} />
+      {showTodayHub ? <TodayHub isAdmin={isAdmin} /> : null}
 
       {isAdmin ? (
         <Card className="hidden border-border shadow-[0_2px_4px_rgba(20,32,28,0.06),0_10px_28px_rgba(20,32,28,0.1)] md:block">

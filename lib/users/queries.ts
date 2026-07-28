@@ -14,6 +14,7 @@ export type AppUserRow = {
   avatar_path: string | null;
   avatar_prompt: string | null;
   active: number;
+  show_today_hub: number;
   created_at: string;
   updated_at: string;
 };
@@ -61,6 +62,7 @@ function coerceUserRow(row: AppUserRow): AppUserRow {
     gender: normalizeGender(row.gender),
     avatar_path: row.avatar_path ?? null,
     avatar_prompt: row.avatar_prompt ?? null,
+    show_today_hub: row.show_today_hub ? 1 : 0,
   };
 }
 
@@ -109,6 +111,7 @@ export function createAppUser(input: {
   passwordHash: string;
   active?: boolean;
   gender?: UserGender;
+  showTodayHub?: boolean;
 }): AppUserRow {
   const db = getDb();
   const ts = nowIso();
@@ -122,8 +125,8 @@ export function createAppUser(input: {
     const result = db
       .prepare(
         `INSERT INTO users
-           (username, email, password_hash, display_name, gender, avatar_path, avatar_prompt, active, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?)`
+           (username, email, password_hash, display_name, gender, avatar_path, avatar_prompt, active, show_today_hub, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?, ?)`
       )
       .run(
         username,
@@ -132,6 +135,7 @@ export function createAppUser(input: {
         displayName,
         input.gender ?? null,
         input.active === false ? 0 : 1,
+        input.showTodayHub ? 1 : 0,
         ts,
         ts
       );
@@ -154,6 +158,7 @@ export function updateAppUser(
     passwordHash?: string;
     active?: boolean;
     gender?: UserGender;
+    showTodayHub?: boolean;
   }
 ): AppUserRow {
   const existing = getAppUserById(id);
@@ -168,6 +173,7 @@ export function updateAppUser(
          display_name = ?,
          gender = ?,
          active = ?,
+         show_today_hub = ?,
          updated_at = ?
        WHERE id = ?`
     ).run(
@@ -185,6 +191,11 @@ export function updateAppUser(
           ? 1
           : 0
         : existing.active,
+      input.showTodayHub !== undefined
+        ? input.showTodayHub
+          ? 1
+          : 0
+        : existing.show_today_hub,
       nowIso(),
       id
     );

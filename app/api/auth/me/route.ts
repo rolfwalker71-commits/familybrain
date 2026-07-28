@@ -24,6 +24,7 @@ export async function GET() {
       username: ctx.username,
       displayName: ctx.username,
       isAdmin: true,
+      showTodayHub: true,
       avatarUrl: null,
     });
   }
@@ -43,6 +44,7 @@ export async function GET() {
     gender: user.gender,
     avatarUrl: userAvatarPublicUrl(user.avatar_path),
     isAdmin: false,
+    showTodayHub: Boolean(user.show_today_hub),
     tripIds: listUserTripIds(user.id),
     ledgerIds: listUserLedgerIds(user.id),
   });
