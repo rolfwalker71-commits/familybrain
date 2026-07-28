@@ -1,7 +1,12 @@
 import { embedQuery } from "@/lib/vectors/embeddings";
 import { searchVectorPoints } from "@/lib/vectors/client";
 import { VECTOR_MIN_SCORE, VECTOR_SEARCH_LIMIT } from "@/lib/vectors/constants";
-import type { GuideSource, TriliumNoteSource, VectorSearchHit } from "@/lib/vectors/types";
+import type {
+  GuideSource,
+  PaperlessVectorSource,
+  TriliumNoteSource,
+  VectorSearchHit,
+} from "@/lib/vectors/types";
 
 function toGuideSource(hit: VectorSearchHit): GuideSource | null {
   if (hit.payload.source_type !== "guide") return null;
@@ -35,6 +40,21 @@ function toTriliumSource(hit: VectorSearchHit): TriliumNoteSource | null {
   };
 }
 
+function toPaperlessSource(hit: VectorSearchHit): PaperlessVectorSource | null {
+  if (hit.payload.source_type !== "paperless") return null;
+  const id = Number(hit.payload.source_id);
+  if (!Number.isInteger(id) || id <= 0) return null;
+  return {
+    kind: "paperless",
+    id,
+    title: hit.payload.title || "Ohne Titel",
+    excerpt: hit.payload.text,
+    category: hit.payload.category ?? null,
+    score: hit.score,
+    url: hit.payload.url || `/documents/${id}`,
+  };
+}
+
 export async function retrieveVectorForChat(
   question: string,
   options?: {
@@ -46,6 +66,7 @@ export async function retrieveVectorForChat(
   hits: VectorSearchHit[];
   guideSources: GuideSource[];
   triliumSources: TriliumNoteSource[];
+  paperlessSources: PaperlessVectorSource[];
 }> {
   const limit = options?.limit ?? VECTOR_SEARCH_LIMIT;
   const minScore = options?.minScore ?? VECTOR_MIN_SCORE;
@@ -63,10 +84,18 @@ export async function retrieveVectorForChat(
     const triliumSources = hits
       .map(toTriliumSource)
       .filter((source): source is TriliumNoteSource => Boolean(source));
+    const paperlessSources = hits
+      .map(toPaperlessSource)
+      .filter((source): source is PaperlessVectorSource => Boolean(source));
 
-    return { hits, guideSources, triliumSources };
+    return { hits, guideSources, triliumSources, paperlessSources };
   } catch {
-    return { hits: [], guideSources: [], triliumSources: [] };
+    return {
+      hits: [],
+      guideSources: [],
+      triliumSources: [],
+      paperlessSources: [],
+    };
   }
 }
 
@@ -78,7 +107,6 @@ export async function retrieveGuidesForChat(
     limit,
     sourceType: "guide",
   });
-  // One hit per guide (best chunk)
   const byId = new Map<number, GuideSource>();
   for (const source of guideSources) {
     const existing = byId.get(source.id);
@@ -104,6 +132,27 @@ export async function retrieveTriliumNotesForChat(
     const existing = byId.get(source.noteId);
     if (!existing || existing.score < source.score) {
       byId.set(source.noteId, source);
+    }
+  }
+  return [...byId.values()]
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit);
+}
+
+export async function retrievePaperlessVectorsForChat(
+  question: string,
+  limit = 8
+): Promise<PaperlessVectorSource[]> {
+  const { paperlessSources } = await retrieveVectorForChat(question, {
+    limit: Math.max(limit * 2, 12),
+    sourceType: "paperless",
+    minScore: Math.min(VECTOR_MIN_SCORE, 0.35),
+  });
+  const byId = new Map<number, PaperlessVectorSource>();
+  for (const source of paperlessSources) {
+    const existing = byId.get(source.id);
+    if (!existing || existing.score < source.score) {
+      byId.set(source.id, source);
     }
   }
   return [...byId.values()]

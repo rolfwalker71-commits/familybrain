@@ -88,7 +88,8 @@ function toItemsRecord(
 export function DocumentsClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { pendingCount, isRunning, refreshStats } = useAnalysis();
+  const { pendingCount, isRunning, refreshStats, startAnalysis, hasOpenAIKey } =
+    useAnalysis();
 
   const [docs, setDocs] = useState<DocRow[]>([]);
   const [total, setTotal] = useState(0);
@@ -314,6 +315,30 @@ export function DocumentsClient() {
         }
         icon={pageVisuals.documents.icon}
         tone={pageVisuals.documents.tone}
+        actions={
+          pendingCount > 0 && hasOpenAIKey ? (
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={isRunning}
+                onClick={() =>
+                  void startAnalysis({ mode: "batch", batchSize: 10 })
+                }
+              >
+                {isRunning ? "Läuft…" : "10 analysieren"}
+              </Button>
+              <Button
+                size="sm"
+                className="bg-[var(--brand-finance)] text-white hover:bg-[var(--brand-finance)]/90"
+                disabled={isRunning}
+                onClick={() => void startAnalysis({ mode: "all", batchSize: 10 })}
+              >
+                {isRunning ? "Läuft…" : "Alle ausstehend"}
+              </Button>
+            </div>
+          ) : null
+        }
       />
 
       {/* Mobile: search + filter trigger + category chips */}

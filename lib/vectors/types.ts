@@ -47,3 +47,13 @@ export type TriliumNoteSource = {
   url: string;
   score: number;
 };
+
+export type PaperlessVectorSource = {
+  kind: "paperless";
+  id: number;
+  title: string;
+  excerpt: string;
+  category: string | null;
+  score: number;
+  url: string;
+};

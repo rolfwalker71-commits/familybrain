@@ -46,6 +46,11 @@ import {
 } from "@/components/layout/icon-circle";
 import { ItineraryCard } from "@/components/travel/itinerary-list";
 import { resolveItinerary } from "@/lib/extraction/itinerary";
+import {
+  ExtractDeadlinesEditor,
+  ExtractFinanceEditor,
+  ExtractWarrantyEditor,
+} from "@/components/documents/extract-editors";
 
 type DetailProps = {
   detail: {
@@ -505,15 +510,27 @@ function DocumentDetailInner({ detail }: DetailProps) {
                   Beträge
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2 text-sm">
+              <CardContent className="space-y-3 text-sm">
                 {amounts.length === 0
-                  ? "Keine Beträge erkannt."
+                  ? null
                   : amounts.map((a, i) => (
                       <div key={i}>
                         {formatCHF(a.amount ?? null, a.currency || "CHF")}
                         {a.label ? ` – ${a.label}` : ""}
                       </div>
                     ))}
+                <ExtractFinanceEditor
+                  rows={detail.financialItems as Array<{
+                    id: number;
+                    vendor?: string | null;
+                    amount?: number | null;
+                    currency?: string | null;
+                    due_date?: string | null;
+                    invoice_date?: string | null;
+                    manual_override?: number | null;
+                  }>}
+                  onSaved={() => router.refresh()}
+                />
               </CardContent>
             </Card>
 
@@ -545,22 +562,16 @@ function DocumentDetailInner({ detail }: DetailProps) {
                   Fristen
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2 text-sm">
-                {detail.deadlines.length === 0
-                  ? "Keine Fristen."
-                  : detail.deadlines.map((raw) => {
-                      const d = raw as {
-                        id: number;
-                        deadline_date?: string | null;
-                        title?: string | null;
-                      };
-                      return (
-                        <div key={String(d.id)}>
-                          {toSwissDate(String(d.deadline_date || ""))} –{" "}
-                          {String(d.title || "")}
-                        </div>
-                      );
-                    })}
+              <CardContent>
+                <ExtractDeadlinesEditor
+                  rows={detail.deadlines as Array<{
+                    id: number;
+                    title?: string | null;
+                    deadline_date?: string | null;
+                    manual_override?: number | null;
+                  }>}
+                  onSaved={() => router.refresh()}
+                />
               </CardContent>
             </Card>
 
@@ -592,28 +603,39 @@ function DocumentDetailInner({ detail }: DetailProps) {
                   Garantieinfos
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-1 text-sm">
-                {warrantyInfo?.has_warranty ? (
-                  <>
-                    <div>
-                      Produkt: {String(warrantyInfo.product_name || "–")}
-                    </div>
-                    <div>Händler: {String(warrantyInfo.vendor || "–")}</div>
-                    <div>
-                      Kaufdatum:{" "}
-                      {toSwissDate(String(warrantyInfo.purchase_date || ""))}
-                    </div>
-                    <div>
-                      Garantie bis:{" "}
-                      {toSwissDate(String(warrantyInfo.warranty_until || ""))}
-                    </div>
-                    <div>
-                      Seriennr.: {String(warrantyInfo.serial_number || "–")}
-                    </div>
-                  </>
-                ) : (
-                  "Keine Garantie erkannt."
-                )}
+              <CardContent>
+                <ExtractWarrantyEditor
+                  rows={detail.warranties as Array<{
+                    id: number;
+                    product_name?: string | null;
+                    vendor?: string | null;
+                    manufacturer?: string | null;
+                    warranty_until?: string | null;
+                    manual_override?: number | null;
+                  }>}
+                  onSaved={() => router.refresh()}
+                  summaryFallback={
+                    warrantyInfo?.has_warranty ? (
+                      <div className="space-y-1 text-sm">
+                        <div>
+                          Produkt: {String(warrantyInfo.product_name || "–")}
+                        </div>
+                        <div>Händler: {String(warrantyInfo.vendor || "–")}</div>
+                        <div>
+                          Kaufdatum:{" "}
+                          {toSwissDate(String(warrantyInfo.purchase_date || ""))}
+                        </div>
+                        <div>
+                          Garantie bis:{" "}
+                          {toSwissDate(String(warrantyInfo.warranty_until || ""))}
+                        </div>
+                        <div>
+                          Seriennr.: {String(warrantyInfo.serial_number || "–")}
+                        </div>
+                      </div>
+                    ) : undefined
+                  }
+                />
               </CardContent>
             </Card>
 

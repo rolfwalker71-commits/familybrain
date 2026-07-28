@@ -11,6 +11,7 @@ import {
   normalizeKnowledgeCategory,
 } from "@/lib/extraction/normalize-categories";
 import { resolveTravelType, findTravelTypeRule } from "@/lib/extraction/classification-rules";
+import { updateDocumentEmbeddingStatus } from "@/lib/db/queries";
 
 function warrantyStatus(warrantyUntil: string | null): string {
   if (!warrantyUntil) return "unknown";
@@ -181,8 +182,14 @@ export function saveAnalysis(
       ts
     );
 
-    db.prepare(`DELETE FROM devices_and_warranties WHERE document_id = ?`).run(documentId);
-    db.prepare(`DELETE FROM deadlines WHERE document_id = ?`).run(documentId);
+    db.prepare(
+      `DELETE FROM devices_and_warranties
+       WHERE document_id = ? AND COALESCE(manual_override, 0) = 0`
+    ).run(documentId);
+    db.prepare(
+      `DELETE FROM deadlines
+       WHERE document_id = ? AND COALESCE(manual_override, 0) = 0`
+    ).run(documentId);
 
     const previousFinance = db
       .prepare(
@@ -199,7 +206,10 @@ export function saveAnalysis(
       counts_in_stats: number | null;
     }>;
 
-    db.prepare(`DELETE FROM financial_items WHERE document_id = ?`).run(documentId);
+    db.prepare(
+      `DELETE FROM financial_items
+       WHERE document_id = ? AND COALESCE(manual_override, 0) = 0`
+    ).run(documentId);
 
     const previousTravel = db
       .prepare(
@@ -277,12 +287,25 @@ export function saveAnalysis(
     }
 
     const wi = enriched.warranty_info;
-    if (wi?.has_warranty && (wi.product_name || wi.vendor || wi.warranty_until)) {
+    const hasManualWarranty = (
+      db
+        .prepare(
+          `SELECT COUNT(*) as c FROM devices_and_warranties
+           WHERE document_id = ? AND COALESCE(manual_override, 0) = 1`
+        )
+        .get(documentId) as { c: number }
+    ).c;
+    if (
+      !hasManualWarranty &&
+      wi?.has_warranty &&
+      (wi.product_name || wi.vendor || wi.warranty_until)
+    ) {
       db.prepare(
         `INSERT INTO devices_and_warranties (
           document_id, product_name, manufacturer, vendor, purchase_date, price, currency,
-          serial_number, warranty_months, warranty_until, status, confidence, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          serial_number, warranty_months, warranty_until, status, confidence,
+          manual_override, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`
       ).run(
         documentId,
         wi.product_name,
@@ -301,13 +324,27 @@ export function saveAnalysis(
       );
     }
 
+    const manualDeadlineTitles = new Set(
+      (
+        db
+          .prepare(
+            `SELECT lower(title) as t FROM deadlines
+             WHERE document_id = ? AND COALESCE(manual_override, 0) = 1`
+          )
+          .all(documentId) as Array<{ t: string }>
+      ).map((r) => r.t)
+    );
+
     const insertDeadline = db.prepare(
       `INSERT INTO deadlines (
         document_id, title, description, deadline_date, deadline_type, source_text,
-        status, confidence, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, 'open', ?, ?, ?)`
+        status, confidence, manual_override, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, 'open', ?, 0, ?, ?)`
     );
     for (const d of enriched.deadlines) {
+      if (manualDeadlineTitles.has(String(d.title || "").toLowerCase())) {
+        continue;
+      }
       insertDeadline.run(
         documentId,
         d.title,
@@ -323,7 +360,8 @@ export function saveAnalysis(
 
     if (
       enriched.cancellation_terms?.has_cancellation_terms &&
-      enriched.cancellation_terms.latest_cancellation_date
+      enriched.cancellation_terms.latest_cancellation_date &&
+      !manualDeadlineTitles.has("kündigung")
     ) {
       insertDeadline.run(
         documentId,
@@ -343,8 +381,9 @@ export function saveAnalysis(
     const insertFinance = db.prepare(
       `INSERT INTO financial_items (
         document_id, vendor, amount, currency, invoice_date, due_date, category,
-        description, is_recurring, counts_in_stats, confidence, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        description, is_recurring, counts_in_stats, confidence, manual_override,
+        created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`
     );
     for (const f of enriched.financial_items) {
       insertFinance.run(
@@ -450,6 +489,15 @@ export function saveAnalysis(
   });
 
   tx();
+
+  try {
+    updateDocumentEmbeddingStatus(documentId, {
+      embeddingStatus: "pending",
+      embeddingError: null,
+    });
+  } catch {
+    /* optional — summary row may be missing in edge cases */
+  }
 }
 
 export function markAnalysisError(documentId: number, message: string): void {

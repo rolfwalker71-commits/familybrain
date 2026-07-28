@@ -65,10 +65,27 @@ export function bootstrapDatabase(db: Database.Database): void {
   if (!summaryColNames.has("analysis_last_error")) {
     db.exec(`ALTER TABLE document_summaries ADD COLUMN analysis_last_error TEXT`);
   }
+  if (!summaryColNames.has("embedding_status")) {
+    db.exec(
+      `ALTER TABLE document_summaries ADD COLUMN embedding_status TEXT DEFAULT 'pending'`
+    );
+  }
+  if (!summaryColNames.has("embedding_error")) {
+    db.exec(`ALTER TABLE document_summaries ADD COLUMN embedding_error TEXT`);
+  }
+  if (!summaryColNames.has("last_indexed_at")) {
+    db.exec(`ALTER TABLE document_summaries ADD COLUMN last_indexed_at TEXT`);
+  }
   db.exec(
     `CREATE INDEX IF NOT EXISTS idx_summaries_retry
      ON document_summaries(analysis_status, analysis_next_retry_at)`
   );
+  db.exec(
+    `CREATE INDEX IF NOT EXISTS idx_summaries_embedding
+     ON document_summaries(embedding_status)`
+  );
+
+  ensureExtractOverrideColumns(db);
 
   const insertArea = db.prepare(
     `INSERT OR IGNORE INTO knowledge_areas (name, description) VALUES (?, ?)`
@@ -87,6 +104,41 @@ export function bootstrapDatabase(db: Database.Database): void {
   ensureTripTravelersTable(db);
   ensureFinanceBrainTables(db);
   ensureUserAccessTables(db);
+}
+
+function ensureExtractOverrideColumns(db: Database.Database): void {
+  const deadlineCols = db
+    .prepare(`PRAGMA table_info(deadlines)`)
+    .all() as Array<{ name: string }>;
+  const deadlineNames = new Set(deadlineCols.map((c) => c.name));
+  if (!deadlineNames.has("snoozed_until")) {
+    db.exec(`ALTER TABLE deadlines ADD COLUMN snoozed_until TEXT`);
+  }
+  if (!deadlineNames.has("manual_override")) {
+    db.exec(
+      `ALTER TABLE deadlines ADD COLUMN manual_override INTEGER NOT NULL DEFAULT 0`
+    );
+  }
+
+  const warrantyCols = db
+    .prepare(`PRAGMA table_info(devices_and_warranties)`)
+    .all() as Array<{ name: string }>;
+  const warrantyNames = new Set(warrantyCols.map((c) => c.name));
+  if (!warrantyNames.has("manual_override")) {
+    db.exec(
+      `ALTER TABLE devices_and_warranties ADD COLUMN manual_override INTEGER NOT NULL DEFAULT 0`
+    );
+  }
+
+  const financeCols = db
+    .prepare(`PRAGMA table_info(financial_items)`)
+    .all() as Array<{ name: string }>;
+  const financeNames = new Set(financeCols.map((c) => c.name));
+  if (!financeNames.has("manual_override")) {
+    db.exec(
+      `ALTER TABLE financial_items ADD COLUMN manual_override INTEGER NOT NULL DEFAULT 0`
+    );
+  }
 }
 
 function ensureTripsTables(db: Database.Database): void {

@@ -10,6 +10,7 @@ import {
   indexPendingTriliumNotes,
   removeTriliumNoteVectors,
 } from "@/lib/vectors/index-trilium";
+import { indexPendingPaperlessDocuments } from "@/lib/vectors/index-paperless";
 import {
   INITIAL_ANALYSIS_BATCH_SIZE,
   MAX_ANALYSIS_PER_RUN,
@@ -243,6 +244,49 @@ export async function runSyncAnalyzeJob(
             itemKind: "phase",
             status: "error",
             title: "Trilium-Vektorindex",
+            message,
+          });
+        }
+      }
+
+      if (hasOpenAIKey()) {
+        addJobRunItem({
+          runId: run.id,
+          itemKind: "phase",
+          status: "running",
+          title: "Paperless-Vektorindex",
+          message: "Indexiere analysierte Dokumente in Qdrant",
+        });
+        try {
+          const paperlessIndex = await indexPendingPaperlessDocuments({
+            limit: 50,
+            onProgress: (processed) => {
+              if (processed % 5 === 0) heartbeatJobRun(run.id);
+            },
+          });
+          heartbeatJobRun(run.id);
+          summary.paperlessIndexed = paperlessIndex.indexed;
+          summary.paperlessIndexSkipped = paperlessIndex.skipped;
+          summary.paperlessIndexErrors = paperlessIndex.errors;
+          addJobRunItem({
+            runId: run.id,
+            itemKind: "phase",
+            status: paperlessIndex.errors ? "error" : "success",
+            title: "Paperless-Vektorindex",
+            message: `${paperlessIndex.indexed} indexiert, ${paperlessIndex.skipped} übersprungen, ${paperlessIndex.errors} Fehler`,
+            payload: {
+              processed: paperlessIndex.processed,
+              errors: paperlessIndex.errorMessages.slice(0, 20),
+            },
+          });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          summary.paperlessIndexErrors = 1;
+          addJobRunItem({
+            runId: run.id,
+            itemKind: "phase",
+            status: "error",
+            title: "Paperless-Vektorindex",
             message,
           });
         }

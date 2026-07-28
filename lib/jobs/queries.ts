@@ -81,6 +81,9 @@ export type JobRunSummary = {
   triliumIndexSkipped?: number;
   triliumIndexErrors?: number;
   triliumVectorsRemoved?: number;
+  paperlessIndexed?: number;
+  paperlessIndexSkipped?: number;
+  paperlessIndexErrors?: number;
 };
 
 function newLeaseOwner(): string {

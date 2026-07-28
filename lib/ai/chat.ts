@@ -6,7 +6,7 @@ import {
   countIndexedTriliumNotes,
   countSyncedTriliumNotes,
 } from "@/lib/db/queries";
-import { retrieveGuidesForChat } from "@/lib/vectors/retrieve";
+import { retrieveGuidesForChat, retrievePaperlessVectorsForChat } from "@/lib/vectors/retrieve";
 import type { GuideSource } from "@/lib/vectors/types";
 import {
   formatCorrectionsForPrompt,
@@ -29,6 +29,74 @@ import {
   type ChatRetrieval,
   type ChatSource,
 } from "./chat-retrieve";
+import { getDb } from "@/lib/db/client";
+
+async function retrievePaperlessHybrid(
+  question: string,
+  limit = 12
+): Promise<ChatRetrieval> {
+  const keyword = retrieveForChat(question, limit);
+  let vectorSources: ChatSource[] = [];
+  try {
+    const hits = await retrievePaperlessVectorsForChat(question, limit);
+    if (hits.length > 0) {
+      const db = getDb();
+      vectorSources = hits.map((hit) => {
+        const row = db
+          .prepare(
+            `SELECT d.id, d.paperless_id, d.title, d.correspondent_name, d.created_date,
+                    s.category, s.short_summary
+             FROM paperless_documents d
+             LEFT JOIN document_summaries s ON s.document_id = d.id
+             WHERE d.id = ?`
+          )
+          .get(hit.id) as
+          | {
+              id: number;
+              paperless_id: number;
+              title: string | null;
+              correspondent_name: string | null;
+              created_date: string | null;
+              category: string | null;
+              short_summary: string | null;
+            }
+          | undefined;
+        return {
+          id: hit.id,
+          paperlessId: row?.paperless_id ?? 0,
+          title: row?.title ?? hit.title,
+          category: row?.category ?? hit.category,
+          shortSummary: row?.short_summary ?? null,
+          correspondent: row?.correspondent_name ?? null,
+          createdDate: row?.created_date ?? null,
+          excerpt: hit.excerpt.slice(0, 1800),
+          // Scale vector score (0–1) into keyword-ish range and boost slightly
+          score: 40 + hit.score * 80,
+        } satisfies ChatSource;
+      });
+    }
+  } catch {
+    /* fall back to keyword only */
+  }
+
+  const byId = new Map<number, ChatSource>();
+  for (const source of [...vectorSources, ...keyword.sources]) {
+    const existing = byId.get(source.id);
+    if (!existing || existing.score < source.score) {
+      byId.set(source.id, source);
+    } else if (existing && source.excerpt && source.excerpt.length > existing.excerpt.length) {
+      byId.set(source.id, { ...existing, excerpt: source.excerpt });
+    }
+  }
+
+  return {
+    sources: [...byId.values()]
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit),
+    facts: keyword.facts,
+    corpus: keyword.corpus,
+  };
+}
 
 export type ChatMessage = {
   role: "user" | "assistant";
@@ -207,7 +275,7 @@ export async function answerDocumentChat(
   const todayIso = new Date().toISOString().slice(0, 10);
   const year = currentYear();
   const retrieval = sourcesEnabled.paperless
-    ? retrieveForChat(question, 12)
+    ? await retrievePaperlessHybrid(question, 12)
     : EMPTY_RETRIEVAL;
   const triliumNotes = sourcesEnabled.trilium
     ? await retrieveTriliumForChat(question, 5)

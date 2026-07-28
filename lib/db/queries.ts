@@ -616,13 +616,55 @@ export function listWarranties() {
 
 export function listDeadlines(status?: string) {
   const db = getDb();
-  if (status) {
-    return db
-      .prepare(
-        `SELECT dl.*, d.title as document_title, d.id as document_local_id,
+  const today = new Date().toISOString().slice(0, 10);
+  const select = `SELECT dl.*, d.title as document_title, d.id as document_local_id,
                 d.correspondent_name
          FROM deadlines dl
-         JOIN paperless_documents d ON d.id = dl.document_id
+         JOIN paperless_documents d ON d.id = dl.document_id`;
+
+  if (status === "overdue") {
+    return db
+      .prepare(
+        `${select}
+         WHERE dl.status = 'open'
+           AND dl.deadline_date IS NOT NULL
+           AND dl.deadline_date < ?
+           AND (dl.snoozed_until IS NULL OR TRIM(dl.snoozed_until) = '' OR dl.snoozed_until < ?)
+         ORDER BY dl.deadline_date ASC`
+      )
+      .all(today, today);
+  }
+  if (status === "snoozed") {
+    return db
+      .prepare(
+        `${select}
+         WHERE dl.status = 'open'
+           AND dl.snoozed_until IS NOT NULL
+           AND TRIM(dl.snoozed_until) != ''
+           AND dl.snoozed_until >= ?
+         ORDER BY dl.snoozed_until ASC`
+      )
+      .all(today);
+  }
+  if (status === "open") {
+    return db
+      .prepare(
+        `${select}
+         WHERE dl.status = 'open'
+           AND (dl.snoozed_until IS NULL OR TRIM(dl.snoozed_until) = '' OR dl.snoozed_until < ?)
+         ORDER BY
+           CASE
+             WHEN dl.deadline_date IS NOT NULL AND dl.deadline_date < ? THEN 0
+             ELSE 1
+           END,
+           COALESCE(dl.deadline_date, '9999-12-31') ASC`
+      )
+      .all(today, today);
+  }
+  if (status && status !== "all") {
+    return db
+      .prepare(
+        `${select}
          WHERE dl.status = ?
          ORDER BY COALESCE(dl.deadline_date, '0000-01-01') DESC`
       )
@@ -630,10 +672,7 @@ export function listDeadlines(status?: string) {
   }
   return db
     .prepare(
-      `SELECT dl.*, d.title as document_title, d.id as document_local_id,
-              d.correspondent_name
-       FROM deadlines dl
-       JOIN paperless_documents d ON d.id = dl.document_id
+      `${select}
        ORDER BY COALESCE(dl.deadline_date, '0000-01-01') DESC`
     )
     .all();
@@ -641,8 +680,70 @@ export function listDeadlines(status?: string) {
 
 export function updateDeadlineStatus(id: number, status: string) {
   const db = getDb();
-  db.prepare(`UPDATE deadlines SET status = ?, updated_at = ? WHERE id = ?`).run(
-    status,
+  db.prepare(
+    `UPDATE deadlines SET status = ?, snoozed_until = NULL, updated_at = ? WHERE id = ?`
+  ).run(status, nowIso(), id);
+}
+
+export function updateDeadline(
+  id: number,
+  input: {
+    title?: string;
+    description?: string | null;
+    deadlineDate?: string | null;
+    deadlineType?: string | null;
+    status?: string;
+    snoozedUntil?: string | null;
+    manualOverride?: boolean;
+  }
+) {
+  const db = getDb();
+  const existing = db
+    .prepare(`SELECT * FROM deadlines WHERE id = ?`)
+    .get(id) as Record<string, unknown> | undefined;
+  if (!existing) throw new Error("Frist nicht gefunden");
+
+  const title =
+    input.title !== undefined ? input.title.trim() : String(existing.title);
+  if (!title) throw new Error("Titel fehlt");
+
+  db.prepare(
+    `UPDATE deadlines SET
+       title = ?,
+       description = ?,
+       deadline_date = ?,
+       deadline_type = ?,
+       status = ?,
+       snoozed_until = ?,
+       manual_override = ?,
+       updated_at = ?
+     WHERE id = ?`
+  ).run(
+    title,
+    input.description !== undefined
+      ? input.description?.trim() || null
+      : existing.description ?? null,
+    input.deadlineDate !== undefined
+      ? input.deadlineDate || null
+      : existing.deadline_date ?? null,
+    input.deadlineType !== undefined
+      ? input.deadlineType || null
+      : existing.deadline_type ?? null,
+    input.status !== undefined ? input.status : existing.status ?? "open",
+    input.snoozedUntil !== undefined
+      ? input.snoozedUntil || null
+      : existing.snoozed_until ?? null,
+    input.manualOverride === false
+      ? 0
+      : input.manualOverride === true ||
+          input.title !== undefined ||
+          input.deadlineDate !== undefined ||
+          input.description !== undefined ||
+          input.deadlineType !== undefined
+        ? 1
+        : existing.manual_override
+          ? 1
+          : 0,
     nowIso(),
     id
   );
@@ -656,6 +757,270 @@ export function updateFinancialItemCountsInStats(
   db.prepare(
     `UPDATE financial_items SET counts_in_stats = ?, updated_at = ? WHERE id = ?`
   ).run(countsInStats ? 1 : 0, nowIso(), id);
+}
+
+export function updateFinancialItem(
+  id: number,
+  input: {
+    vendor?: string | null;
+    amount?: number | null;
+    currency?: string | null;
+    invoiceDate?: string | null;
+    dueDate?: string | null;
+    category?: string | null;
+    description?: string | null;
+    countsInStats?: boolean;
+    manualOverride?: boolean;
+  }
+) {
+  const db = getDb();
+  const existing = db
+    .prepare(`SELECT * FROM financial_items WHERE id = ?`)
+    .get(id) as Record<string, unknown> | undefined;
+  if (!existing) throw new Error("Finanzposition nicht gefunden");
+
+  db.prepare(
+    `UPDATE financial_items SET
+       vendor = ?,
+       amount = ?,
+       currency = ?,
+       invoice_date = ?,
+       due_date = ?,
+       category = ?,
+       description = ?,
+       counts_in_stats = ?,
+       manual_override = ?,
+       updated_at = ?
+     WHERE id = ?`
+  ).run(
+    input.vendor !== undefined
+      ? input.vendor?.trim() || null
+      : existing.vendor ?? null,
+    input.amount !== undefined ? input.amount : existing.amount ?? null,
+    input.currency !== undefined
+      ? input.currency?.trim().toUpperCase() || null
+      : existing.currency ?? null,
+    input.invoiceDate !== undefined
+      ? input.invoiceDate || null
+      : existing.invoice_date ?? null,
+    input.dueDate !== undefined
+      ? input.dueDate || null
+      : existing.due_date ?? null,
+    input.category !== undefined
+      ? input.category?.trim() || null
+      : existing.category ?? null,
+    input.description !== undefined
+      ? input.description?.trim() || null
+      : existing.description ?? null,
+    input.countsInStats !== undefined
+      ? input.countsInStats
+        ? 1
+        : 0
+      : existing.counts_in_stats
+        ? 1
+        : 0,
+    input.manualOverride === false
+      ? 0
+      : 1,
+    nowIso(),
+    id
+  );
+}
+
+export function updateWarranty(
+  id: number,
+  input: {
+    productName?: string | null;
+    manufacturer?: string | null;
+    vendor?: string | null;
+    warrantyUntil?: string | null;
+    manualOverride?: boolean;
+  }
+) {
+  const db = getDb();
+  const existing = db
+    .prepare(`SELECT * FROM devices_and_warranties WHERE id = ?`)
+    .get(id) as Record<string, unknown> | undefined;
+  if (!existing) throw new Error("Garantie nicht gefunden");
+
+  const warrantyUntil =
+    input.warrantyUntil !== undefined
+      ? input.warrantyUntil || null
+      : (existing.warranty_until as string | null);
+
+  db.prepare(
+    `UPDATE devices_and_warranties SET
+       product_name = ?,
+       manufacturer = ?,
+       vendor = ?,
+       warranty_until = ?,
+       status = ?,
+       manual_override = ?,
+       updated_at = ?
+     WHERE id = ?`
+  ).run(
+    input.productName !== undefined
+      ? input.productName?.trim() || null
+      : existing.product_name ?? null,
+    input.manufacturer !== undefined
+      ? input.manufacturer?.trim() || null
+      : existing.manufacturer ?? null,
+    input.vendor !== undefined
+      ? input.vendor?.trim() || null
+      : existing.vendor ?? null,
+    warrantyUntil,
+    warrantyUntil
+      ? warrantyUntil < new Date().toISOString().slice(0, 10)
+        ? "expired"
+        : "active"
+      : existing.status ?? null,
+    input.manualOverride === false ? 0 : 1,
+    nowIso(),
+    id
+  );
+}
+
+export function getDashboardInbox(limits = { each: 5 }) {
+  const db = getDb();
+  const today = new Date().toISOString().slice(0, 10);
+  const soon = daysFromNow(90);
+  const dueUntil = daysFromNow(7);
+  const limit = limits.each;
+
+  const overdueDeadlines = db
+    .prepare(
+      `SELECT dl.id, dl.title, dl.deadline_date, dl.deadline_type,
+              d.id AS document_local_id, d.title AS document_title
+       FROM deadlines dl
+       JOIN paperless_documents d ON d.id = dl.document_id
+       WHERE dl.status = 'open'
+         AND dl.deadline_date IS NOT NULL
+         AND dl.deadline_date < ?
+         AND (dl.snoozed_until IS NULL OR TRIM(dl.snoozed_until) = '' OR dl.snoozed_until < ?)
+       ORDER BY dl.deadline_date ASC
+       LIMIT ?`
+    )
+    .all(today, today, limit);
+
+  const dueInvoices = db
+    .prepare(
+      `SELECT f.id, f.vendor, f.amount, f.currency, f.due_date, f.description,
+              d.id AS document_local_id, d.title AS document_title
+       FROM financial_items f
+       JOIN paperless_documents d ON d.id = f.document_id
+       WHERE f.due_date IS NOT NULL AND TRIM(f.due_date) != ''
+         AND f.due_date <= ?
+         AND f.due_date >= date(?, '-30 days')
+         AND COALESCE(f.counts_in_stats, 1) = 1
+       ORDER BY f.due_date ASC
+       LIMIT ?`
+    )
+    .all(dueUntil, today, limit);
+
+  const warrantiesExpiring = db
+    .prepare(
+      `SELECT w.id, w.product_name, w.vendor, w.warranty_until,
+              d.id AS document_local_id, d.title AS document_title
+       FROM devices_and_warranties w
+       JOIN paperless_documents d ON d.id = w.document_id
+       WHERE w.warranty_until IS NOT NULL
+         AND w.warranty_until >= ?
+         AND w.warranty_until <= ?
+       ORDER BY w.warranty_until ASC
+       LIMIT ?`
+    )
+    .all(today, soon, limit);
+
+  const analysisPending = (
+    db
+      .prepare(
+        `SELECT COUNT(*) as c
+         FROM paperless_documents d
+         LEFT JOIN document_summaries s ON s.document_id = d.id
+         WHERE COALESCE(d.sync_status, 'synced') != 'missing'
+           AND (
+             s.analysis_status IS NULL
+             OR s.analysis_status IN ('pending', 'stale')
+           )`
+      )
+      .get() as { c: number }
+  ).c;
+
+  const analysisError = (
+    db
+      .prepare(
+        `SELECT COUNT(*) as c FROM document_summaries WHERE analysis_status = 'error'`
+      )
+      .get() as { c: number }
+  ).c;
+
+  const analysisStale = (
+    db
+      .prepare(
+        `SELECT COUNT(*) as c FROM document_summaries WHERE analysis_status = 'stale'`
+      )
+      .get() as { c: number }
+  ).c;
+
+  return {
+    overdueDeadlines,
+    dueInvoices,
+    warrantiesExpiring,
+    analysisIssues: {
+      pending: analysisPending,
+      error: analysisError,
+      stale: analysisStale,
+    },
+  };
+}
+
+export function updateDocumentEmbeddingStatus(
+  documentId: number,
+  input: {
+    embeddingStatus: string;
+    embeddingError?: string | null;
+    lastIndexedAt?: string | null;
+  }
+) {
+  const db = getDb();
+  db.prepare(
+    `UPDATE document_summaries SET
+       embedding_status = ?,
+       embedding_error = ?,
+       last_indexed_at = COALESCE(?, last_indexed_at),
+       updated_at = ?
+     WHERE document_id = ?`
+  ).run(
+    input.embeddingStatus,
+    input.embeddingError ?? null,
+    input.lastIndexedAt ?? null,
+    nowIso(),
+    documentId
+  );
+}
+
+export function listDocumentsNeedingEmbedding(limit = 20): number[] {
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `SELECT d.id
+       FROM paperless_documents d
+       JOIN document_summaries s ON s.document_id = d.id
+       WHERE s.analysis_status = 'completed'
+         AND COALESCE(d.sync_status, 'synced') != 'missing'
+         AND (
+           s.embedding_status IS NULL
+           OR s.embedding_status IN ('pending', 'error', 'stale')
+         )
+         AND (
+           NULLIF(TRIM(COALESCE(s.short_summary, '')), '') IS NOT NULL
+           OR NULLIF(TRIM(COALESCE(d.content, '')), '') IS NOT NULL
+         )
+       ORDER BY COALESCE(s.analyzed_at, s.updated_at) DESC
+       LIMIT ?`
+    )
+    .all(limit) as Array<{ id: number }>;
+  return rows.map((r) => r.id);
 }
 
 export function getTravelItemById(id: number) {

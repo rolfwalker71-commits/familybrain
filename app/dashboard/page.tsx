@@ -28,6 +28,7 @@ import {
 } from "@/components/layout/icon-circle";
 import { DocumentInfoButton } from "@/components/documents/document-link";
 import type { LucideIcon } from "lucide-react";
+import { ActionInbox } from "@/components/dashboard/action-inbox";
 
 export const dynamic = "force-dynamic";
 
@@ -98,6 +99,8 @@ export default async function DashboardPage() {
         icon={pageVisuals.dashboard.icon}
         tone={pageVisuals.dashboard.tone}
       />
+
+      <ActionInbox />
 
       <MetricGrid>
         <StatCard

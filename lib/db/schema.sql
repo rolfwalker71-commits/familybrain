@@ -61,6 +61,9 @@ CREATE TABLE IF NOT EXISTS document_summaries (
   analysis_next_retry_at TEXT,
   analysis_last_error TEXT,
   analyzed_at TEXT,
+  embedding_status TEXT DEFAULT 'pending',
+  embedding_error TEXT,
+  last_indexed_at TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   FOREIGN KEY(document_id) REFERENCES paperless_documents(id) ON DELETE CASCADE
@@ -112,6 +115,7 @@ CREATE TABLE IF NOT EXISTS devices_and_warranties (
   warranty_until TEXT,
   status TEXT,
   confidence REAL,
+  manual_override INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   FOREIGN KEY(document_id) REFERENCES paperless_documents(id) ON DELETE CASCADE
@@ -126,7 +130,9 @@ CREATE TABLE IF NOT EXISTS deadlines (
   deadline_type TEXT,
   source_text TEXT,
   status TEXT DEFAULT 'open',
+  snoozed_until TEXT,
   confidence REAL,
+  manual_override INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   FOREIGN KEY(document_id) REFERENCES paperless_documents(id) ON DELETE CASCADE
@@ -145,6 +151,7 @@ CREATE TABLE IF NOT EXISTS financial_items (
   is_recurring INTEGER DEFAULT 0,
   counts_in_stats INTEGER NOT NULL DEFAULT 1,
   confidence REAL,
+  manual_override INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   FOREIGN KEY(document_id) REFERENCES paperless_documents(id) ON DELETE CASCADE

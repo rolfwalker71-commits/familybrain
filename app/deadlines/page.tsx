@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -41,6 +43,8 @@ type DeadlineRow = {
   deadline_date: string | null;
   deadline_type: string | null;
   status: string | null;
+  snoozed_until?: string | null;
+  manual_override?: number | null;
   confidence: number | null;
   document_title: string | null;
   document_local_id: number;
@@ -69,14 +73,58 @@ function deadlineToEvent(row: DeadlineRow): CalendarEvent | null {
   };
 }
 
+function todayIso(): string {
+  const d = new Date();
+  return [
+    d.getFullYear(),
+    String(d.getMonth() + 1).padStart(2, "0"),
+    String(d.getDate()).padStart(2, "0"),
+  ].join("-");
+}
+
+function deadlineBadgeLabel(row: DeadlineRow): string {
+  if (row.status === "completed") return "Erledigt";
+  const today = todayIso();
+  if (
+    row.snoozed_until &&
+    row.snoozed_until >= today
+  ) {
+    return `Zurückgestellt bis ${toSwissDate(row.snoozed_until)}`;
+  }
+  const temporal = resolveTemporalStatus(row.deadline_date);
+  if (temporal === "expired") return "Überfällig";
+  return temporalStatusLabel(temporal);
+}
+
 export default function DeadlinesPage() {
-  const [status, setStatus] = useState("open");
+  return (
+    <Suspense
+      fallback={
+        <p className="p-6 text-sm text-muted-foreground">Lade Fristen…</p>
+      }
+    >
+      <DeadlinesPageInner />
+    </Suspense>
+  );
+}
+
+function DeadlinesPageInner() {
+  const searchParams = useSearchParams();
+  const initial =
+    searchParams.get("status") || "open";
+  const [status, setStatus] = useState(initial);
   const [rows, setRows] = useState<DeadlineRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDate, setEditDate] = useState("");
+  const [busyId, setBusyId] = useState<number | null>(null);
 
   const statusItems = {
     open: "Offen",
+    overdue: "Überfällig",
+    snoozed: "Zurückgestellt",
     completed: "Erledigt",
     all: "Alle",
   };
@@ -101,17 +149,33 @@ export default function DeadlinesPage() {
   }
 
   useEffect(() => {
+    const fromUrl = searchParams.get("status");
+    if (fromUrl && fromUrl !== status) setStatus(fromUrl);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
 
-  async function markCompleted(id: number) {
-    await fetch("/api/deadlines", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, status: "completed" }),
-    });
-    await load();
+  async function patchDeadline(id: number, body: Record<string, unknown>) {
+    setBusyId(id);
+    try {
+      const res = await fetch("/api/deadlines", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, ...body }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Speichern fehlgeschlagen");
+      setEditingId(null);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusyId(null);
+    }
   }
 
   const calendarEvents = rows
@@ -141,7 +205,7 @@ export default function DeadlinesPage() {
               }}
               items={statusItems}
             >
-              <SelectTrigger className="w-40">
+              <SelectTrigger className="w-44">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -181,6 +245,7 @@ export default function DeadlinesPage() {
                   row.status === "completed"
                     ? "unknown"
                     : resolveTemporalStatus(row.deadline_date);
+                const isEditing = editingId === row.id;
 
                 return (
                   <DataListRow key={row.id}>
@@ -198,6 +263,41 @@ export default function DeadlinesPage() {
                               {row.description}
                             </SoftText>
                           ) : null}
+                          {isEditing ? (
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              <Input
+                                className="h-8 max-w-xs text-sm"
+                                value={editTitle}
+                                onChange={(e) => setEditTitle(e.target.value)}
+                                placeholder="Titel"
+                              />
+                              <Input
+                                type="date"
+                                className="h-8 w-40 text-sm"
+                                value={editDate}
+                                onChange={(e) => setEditDate(e.target.value)}
+                              />
+                              <Button
+                                size="sm"
+                                disabled={busyId === row.id || !editTitle.trim()}
+                                onClick={() =>
+                                  void patchDeadline(row.id, {
+                                    title: editTitle.trim(),
+                                    deadlineDate: editDate || null,
+                                  })
+                                }
+                              >
+                                Speichern
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setEditingId(null)}
+                              >
+                                Abbrechen
+                              </Button>
+                            </div>
+                          ) : null}
                         </div>
                       }
                       meta={
@@ -213,13 +313,16 @@ export default function DeadlinesPage() {
                             className={
                               row.status === "completed"
                                 ? "border-transparent bg-muted text-muted-foreground hover:bg-muted"
-                                : temporalStatusBadgeClass(temporalStatus)
+                                : temporalStatus === "expired"
+                                  ? "border-transparent bg-red-100 text-red-700"
+                                  : temporalStatusBadgeClass(temporalStatus)
                             }
                           >
-                            {row.status === "completed"
-                              ? "Erledigt"
-                              : temporalStatusLabel(temporalStatus)}
+                            {deadlineBadgeLabel(row)}
                           </Badge>
+                          {row.manual_override ? (
+                            <Badge variant="outline">Manuell</Badge>
+                          ) : null}
                           <span className="tabular-nums">
                             {row.confidence != null
                               ? `${Math.round(row.confidence * 100)}%`
@@ -243,13 +346,76 @@ export default function DeadlinesPage() {
                             />
                           ) : null}
                           {row.status === "open" ? (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => void markCompleted(row.id)}
-                            >
-                              Erledigt
-                            </Button>
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={busyId === row.id}
+                                onClick={() => {
+                                  setEditingId(row.id);
+                                  setEditTitle(row.title);
+                                  setEditDate(row.deadline_date || "");
+                                }}
+                              >
+                                Korrigieren
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={busyId === row.id}
+                                onClick={() =>
+                                  void patchDeadline(row.id, { snoozeDays: 7 })
+                                }
+                              >
+                                +7 Tage
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={busyId === row.id}
+                                onClick={() =>
+                                  void patchDeadline(row.id, { snoozeDays: 14 })
+                                }
+                              >
+                                +14
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={busyId === row.id}
+                                onClick={() =>
+                                  void patchDeadline(row.id, { snoozeDays: 30 })
+                                }
+                              >
+                                +30
+                              </Button>
+                              {row.snoozed_until ? (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  disabled={busyId === row.id}
+                                  onClick={() =>
+                                    void patchDeadline(row.id, {
+                                      snoozedUntil: null,
+                                    })
+                                  }
+                                >
+                                  Snooze aufheben
+                                </Button>
+                              ) : null}
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={busyId === row.id}
+                                onClick={() =>
+                                  void patchDeadline(row.id, {
+                                    status: "completed",
+                                  })
+                                }
+                              >
+                                Erledigt
+                              </Button>
+                            </>
                           ) : (
                             <Badge>Erledigt</Badge>
                           )}
