@@ -53,7 +53,7 @@ type AppUserOption = {
 
 export function FinanceLedgersListClient() {
   const { me, loading: authLoading } = useAuth();
-  const isAdmin = !authLoading && me?.kind !== "user";
+  const isAdmin = !authLoading && Boolean(me?.isAdmin);
   const [ledgers, setLedgers] = useState<Ledger[]>([]);
   const [users, setUsers] = useState<AppUserOption[]>([]);
   const [loading, setLoading] = useState(true);

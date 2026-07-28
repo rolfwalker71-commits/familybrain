@@ -24,6 +24,7 @@ const PatchSchema = z.object({
   active: z.boolean().optional(),
   gender: z.enum(["male", "female"]).nullable().optional(),
   showTodayHub: z.boolean().optional(),
+  isAdmin: z.boolean().optional(),
 });
 
 export async function GET(_request: Request, context: Ctx) {
@@ -65,6 +66,7 @@ export async function PATCH(request: Request, context: Ctx) {
       active: parsed.data.active,
       gender: parsed.data.gender,
       showTodayHub: parsed.data.showTodayHub,
+      isAdmin: parsed.data.isAdmin,
     });
     return NextResponse.json({ ok: true, user: getAppUserPublic(id) });
   } catch (error) {

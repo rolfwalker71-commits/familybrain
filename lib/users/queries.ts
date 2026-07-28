@@ -15,6 +15,7 @@ export type AppUserRow = {
   avatar_prompt: string | null;
   active: number;
   show_today_hub: number;
+  is_admin: number;
   created_at: string;
   updated_at: string;
 };
@@ -63,6 +64,7 @@ function coerceUserRow(row: AppUserRow): AppUserRow {
     avatar_path: row.avatar_path ?? null,
     avatar_prompt: row.avatar_prompt ?? null,
     show_today_hub: row.show_today_hub ? 1 : 0,
+    is_admin: row.is_admin ? 1 : 0,
   };
 }
 
@@ -112,6 +114,7 @@ export function createAppUser(input: {
   active?: boolean;
   gender?: UserGender;
   showTodayHub?: boolean;
+  isAdmin?: boolean;
 }): AppUserRow {
   const db = getDb();
   const ts = nowIso();
@@ -125,8 +128,8 @@ export function createAppUser(input: {
     const result = db
       .prepare(
         `INSERT INTO users
-           (username, email, password_hash, display_name, gender, avatar_path, avatar_prompt, active, show_today_hub, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?, ?)`
+           (username, email, password_hash, display_name, gender, avatar_path, avatar_prompt, active, show_today_hub, is_admin, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?, ?, ?)`
       )
       .run(
         username,
@@ -136,6 +139,7 @@ export function createAppUser(input: {
         input.gender ?? null,
         input.active === false ? 0 : 1,
         input.showTodayHub ? 1 : 0,
+        input.isAdmin ? 1 : 0,
         ts,
         ts
       );
@@ -159,6 +163,7 @@ export function updateAppUser(
     active?: boolean;
     gender?: UserGender;
     showTodayHub?: boolean;
+    isAdmin?: boolean;
   }
 ): AppUserRow {
   const existing = getAppUserById(id);
@@ -174,6 +179,7 @@ export function updateAppUser(
          gender = ?,
          active = ?,
          show_today_hub = ?,
+         is_admin = ?,
          updated_at = ?
        WHERE id = ?`
     ).run(
@@ -196,6 +202,11 @@ export function updateAppUser(
           ? 1
           : 0
         : existing.show_today_hub,
+      input.isAdmin !== undefined
+        ? input.isAdmin
+          ? 1
+          : 0
+        : existing.is_admin,
       nowIso(),
       id
     );

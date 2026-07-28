@@ -27,7 +27,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
     isLogin ||
     (pathname.startsWith("/trips/") && pathname.endsWith("/print")) ||
     pathname.startsWith("/share/");
-  const isLimitedUser = !loading && me?.kind === "user";
+  const isLimitedUser = !loading && me != null && !me.isAdmin;
 
   useEffect(() => {
     if (!isChat) return;

@@ -43,8 +43,8 @@ export async function GET() {
     userId: user.id,
     gender: user.gender,
     avatarUrl: userAvatarPublicUrl(user.avatar_path),
-    isAdmin: false,
-    showTodayHub: Boolean(user.show_today_hub),
+    isAdmin: Boolean(user.is_admin),
+    showTodayHub: user.is_admin ? true : Boolean(user.show_today_hub),
     tripIds: listUserTripIds(user.id),
     ledgerIds: listUserLedgerIds(user.id),
   });

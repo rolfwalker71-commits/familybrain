@@ -54,7 +54,7 @@ export async function getAuthContext(): Promise<AuthContext | null> {
     kind: "user",
     username: user.username,
     userId: user.id,
-    isAdmin: false,
+    isAdmin: Boolean(user.is_admin),
   };
 }
 

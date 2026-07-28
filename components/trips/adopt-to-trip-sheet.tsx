@@ -109,7 +109,7 @@ async function maybeEnrichEvents(
 export function AdoptToTripSheet({ draft, drafts, onDone, onError }: Props) {
   const router = useRouter();
   const { me, loading: authLoading } = useAuth();
-  const isAdmin = !authLoading && me?.kind !== "user";
+  const isAdmin = !authLoading && Boolean(me?.isAdmin);
 
   const allDrafts = useMemo(() => {
     if (drafts && drafts.length > 0) return drafts;

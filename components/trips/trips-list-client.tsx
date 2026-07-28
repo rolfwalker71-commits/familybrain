@@ -51,7 +51,7 @@ const STATUS_LABEL: Record<string, string> = {
 
 export function TripsListClient() {
   const { me, loading: authLoading } = useAuth();
-  const isAdmin = !authLoading && me?.kind !== "user";
+  const isAdmin = !authLoading && Boolean(me?.isAdmin);
   const showTodayHub =
     isAdmin || Boolean(me?.showTodayHub);
   const [trips, setTrips] = useState<Trip[]>([]);

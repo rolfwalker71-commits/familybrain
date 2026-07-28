@@ -100,7 +100,7 @@ export async function POST(request: Request) {
         },
         config.sessionSecret
       );
-      home = "/trips";
+      home = user.is_admin ? "/dashboard" : "/trips";
     }
   }
 

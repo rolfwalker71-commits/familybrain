@@ -127,7 +127,7 @@ export function Sidebar({
   const analysis = useAnalysis();
   const { me } = useAuth();
   const { isRunning } = analysis;
-  const isLimitedUser = me?.kind === "user";
+  const isLimitedUser = me != null && !me.isAdmin;
   const visibleNav = isLimitedUser
     ? navItems.filter(
         (item) => item.href === "/trips" || item.href === "/finance-brain"

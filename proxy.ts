@@ -4,6 +4,7 @@ import {
   SESSION_COOKIE_NAME,
 } from "@/lib/auth/config";
 import { verifySessionToken } from "@/lib/auth/session";
+import { getAppUserById } from "@/lib/users/queries";
 
 const PUBLIC_PATHS = new Set([
   "/login",
@@ -93,6 +94,16 @@ function requestOrigin(request: NextRequest): string {
   return `${proto}://${host}`;
 }
 
+function isLimitedAppUser(session: {
+  kind: string;
+  userId?: number;
+}): boolean {
+  if (session.kind !== "user") return false;
+  if (!session.userId) return true;
+  const user = getAppUserById(session.userId);
+  return !user?.active || !user.is_admin;
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
   const origin = requestOrigin(request);
@@ -138,10 +149,14 @@ export async function proxy(request: NextRequest) {
 
   if (session) {
     if (pathname === "/login") {
-      const home = session.kind === "user" ? "/trips" : "/dashboard";
+      let home = "/dashboard";
+      if (session.kind === "user" && session.userId) {
+        const user = getAppUserById(session.userId);
+        home = user?.is_admin ? "/dashboard" : "/trips";
+      }
       return NextResponse.redirect(new URL(home, origin));
     }
-    if (session.kind === "user" && !isLimitedUserAllowedPath(pathname)) {
+    if (isLimitedAppUser(session) && !isLimitedUserAllowedPath(pathname)) {
       if (pathname.startsWith("/api/")) {
         return NextResponse.json(
           { error: "Keine Berechtigung." },

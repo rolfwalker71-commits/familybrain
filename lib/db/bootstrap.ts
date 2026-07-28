@@ -585,6 +585,7 @@ function ensureUsersTable(db: Database.Database): void {
       avatar_prompt TEXT,
       active INTEGER NOT NULL DEFAULT 1,
       show_today_hub INTEGER NOT NULL DEFAULT 0,
+      is_admin INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -608,6 +609,9 @@ function ensureUsersTable(db: Database.Database): void {
     db.exec(
       `ALTER TABLE users ADD COLUMN show_today_hub INTEGER NOT NULL DEFAULT 0`
     );
+  }
+  if (!names.has("is_admin")) {
+    db.exec(`ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0`);
   }
 }
 
