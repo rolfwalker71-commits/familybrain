@@ -240,6 +240,18 @@ type PlaceCandidate = {
   website: string | null;
   lat: number;
   lon: number;
+  source?: string;
+  stopRef?: string;
+};
+
+type TrainConnectionOption = {
+  id: string;
+  label: string;
+  summary: string;
+  startTime?: string;
+  endTime?: string;
+  changes: number;
+  trip: Record<string, unknown>;
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -886,6 +898,9 @@ function TripDetailInner({
   const [placeCandidates, setPlaceCandidates] = useState<
     Record<number, PlaceCandidate[]>
   >({});
+  const [trainConnectionOptions, setTrainConnectionOptions] = useState<
+    Record<number, TrainConnectionOption[]>
+  >({});
   const [placeQueries, setPlaceQueries] = useState<Record<number, string>>(
     {}
   );
@@ -1518,12 +1533,52 @@ function TripDetailInner({
         if (saved == null) return;
       }
       setBusy(true);
+      setTrainConnectionOptions((prev) => ({ ...prev, [eventId]: [] }));
       const res = await fetch(
         `/api/trips/${tripId}/events/${eventId}/enrich-train`,
-        { method: "POST" }
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "search" }),
+        }
       );
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Anreicherung fehlgeschlagen");
+      if (!res.ok) throw new Error(data.error || "Suche fehlgeschlagen");
+      const options = (data.options || []) as TrainConnectionOption[];
+      setTrainConnectionOptions((prev) => ({ ...prev, [eventId]: options }));
+      if (options.length === 0) {
+        setStatus("Keine Zugverbindungen gefunden.");
+      } else {
+        setStatus(`${options.length} Verbindungen — bitte auswählen.`);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function applyTrainConnection(
+    eventId: number,
+    option: TrainConnectionOption
+  ) {
+    setError(null);
+    try {
+      setBusy(true);
+      const res = await fetch(
+        `/api/trips/${tripId}/events/${eventId}/enrich-train`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "apply",
+            trip: option.trip,
+          }),
+        }
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Übernehmen fehlgeschlagen");
+      setTrainConnectionOptions((prev) => ({ ...prev, [eventId]: [] }));
       await load();
       if (data.event && editingEventId === eventId) {
         setEventForm(eventToForm(data.event as TripEvent));
@@ -1531,7 +1586,7 @@ function TripDetailInner({
       setStatus(
         typeof data.warning === "string" && data.warning.trim()
           ? data.warning
-          : "Zugstrecke geladen."
+          : "Zugverbindung übernommen."
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -1577,15 +1632,28 @@ function TripDetailInner({
         .filter(Boolean)
         .join(", ");
       const query = (placeQueries[eventId] ?? defaultQuery).trim();
+      const isTrain =
+        (editingEventId === eventId
+          ? eventForm.eventType
+          : coerceTripEventType(event?.event_type || "")) === "Zugreisen";
       const res = await fetch(
-        `/api/trips/${tripId}/events/${eventId}/enrich-place`,
+        isTrain
+          ? `/api/trips/${tripId}/events/${eventId}/enrich-train`
+          : `/api/trips/${tripId}/events/${eventId}/enrich-place`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            query: query || undefined,
-            target,
-          }),
+          body: JSON.stringify(
+            isTrain
+              ? {
+                  action: "search-station",
+                  query: query || undefined,
+                }
+              : {
+                  query: query || undefined,
+                  target,
+                }
+          ),
         }
       );
       const data = await res.json();
@@ -1593,12 +1661,31 @@ function TripDetailInner({
       const candidates = (data.candidates || []) as PlaceCandidate[];
       setPlaceCandidates((prev) => ({
         ...prev,
-        [eventId]: candidates,
+        [eventId]: candidates.map((c) =>
+          isTrain
+            ? {
+                osmId: c.stopRef || c.osmId,
+                name: c.name,
+                displayName: c.displayName || c.name,
+                address: null,
+                phone: null,
+                website: null,
+                lat: c.lat,
+                lon: c.lon,
+                source: "ojp",
+                stopRef: c.stopRef,
+              }
+            : c
+        ),
       }));
       if (candidates.length === 0) {
-        setStatus("Keine OSM-Treffer gefunden.");
+        setStatus(isTrain ? "Keine Bahnhofstreffer gefunden." : "Keine OSM-Treffer gefunden.");
       } else {
-        setStatus(`${candidates.length} OSM-Treffer — bitte auswählen.`);
+        setStatus(
+          isTrain
+            ? `${candidates.length} Bahnhöfe — bitte auswählen.`
+            : `${candidates.length} OSM-Treffer — bitte auswählen.`
+        );
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -1619,12 +1706,32 @@ function TripDetailInner({
             : coerceTripEventType(event?.event_type || "")
         );
       const target = isDual ? placeEnrichTarget : "place";
+      const isTrain =
+        (editingEventId === eventId
+          ? eventForm.eventType
+          : coerceTripEventType(event?.event_type || "")) === "Zugreisen";
       const res = await fetch(
-        `/api/trips/${tripId}/events/${eventId}/enrich-place`,
+        isTrain && candidate.stopRef
+          ? `/api/trips/${tripId}/events/${eventId}/enrich-train`
+          : `/api/trips/${tripId}/events/${eventId}/enrich-place`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ candidate, target }),
+          body: JSON.stringify(
+            isTrain && candidate.stopRef
+              ? {
+                  action: "apply-station",
+                  target,
+                  station: {
+                    stopRef: candidate.stopRef,
+                    name: candidate.name,
+                    displayName: candidate.displayName,
+                    lat: candidate.lat,
+                    lon: candidate.lon,
+                  },
+                }
+              : { candidate, target }
+          ),
         }
       );
       const data = await res.json();
@@ -1635,11 +1742,15 @@ function TripDetailInner({
         setEventForm(eventToForm(data.event as TripEvent));
       }
       setStatus(
-        target === "origin"
-          ? "Abfahrtsort angereichert."
-          : target === "destination"
-            ? "Zielort angereichert."
-            : "Ort angereichert."
+        isTrain && candidate.stopRef
+          ? target === "origin"
+            ? "Abfahrtsbahnhof gesetzt."
+            : "Zielbahnhof gesetzt."
+          : target === "origin"
+            ? "Abfahrtsort angereichert."
+            : target === "destination"
+              ? "Zielort angereichert."
+              : "Ort angereichert."
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -2934,8 +3045,30 @@ function TripDetailInner({
                     className="gap-1.5"
                   >
                     <TrainFront className="size-3.5" />
-                    Zugstrecke laden
+                    Verbindungen suchen
                   </Button>
+                ) : null}
+                {(trainConnectionOptions[editingEventId] || []).length > 0 ? (
+                  <div className="space-y-2 rounded-md border border-border/70 bg-background p-2">
+                    <div className="text-xs font-medium">
+                      Verbindung wählen
+                    </div>
+                    {trainConnectionOptions[editingEventId].map((option) => (
+                      <button
+                        key={option.id}
+                        type="button"
+                        className="block w-full rounded-md px-2 py-1.5 text-left text-xs hover:bg-muted"
+                        onClick={() =>
+                          void applyTrainConnection(editingEventId, option)
+                        }
+                      >
+                        <div className="font-medium">{option.label}</div>
+                        <div className="text-muted-foreground">
+                          {option.summary}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
                 ) : null}
                 {eventForm.eventType !== "Flug" ? (
                   <div className="space-y-2">
@@ -2975,7 +3108,9 @@ function TripDetailInner({
                           htmlFor={`place-query-edit-${editingEventId}`}
                           className="text-xs"
                         >
-                          OSM-Suche
+                          {eventForm.eventType === "Zugreisen"
+                            ? "Bahnhofssuche (ÖV-CH)"
+                            : "OSM-Suche"}
                           {isDualPlaceType(eventForm.eventType)
                             ? placeEnrichTarget === "destination"
                               ? ` (${dualPlaceLabels(eventForm.eventType).destination})`
@@ -3010,7 +3145,11 @@ function TripDetailInner({
                               [editingEventId]: e.target.value,
                             }))
                           }
-                          placeholder="Name + Stadt reicht oft (fuzzy Suche)"
+                          placeholder={
+                            eventForm.eventType === "Zugreisen"
+                              ? "z. B. Zürich Flughafen, Altdorf"
+                              : "Name + Stadt reicht oft (fuzzy Suche)"
+                          }
                           className="h-8 text-xs"
                         />
                       </div>
@@ -3022,14 +3161,20 @@ function TripDetailInner({
                         className="gap-1.5 shrink-0"
                       >
                         <MapPin className="size-3.5" />
-                        Ort suchen
+                        {eventForm.eventType === "Zugreisen"
+                          ? "Bahnhof suchen"
+                          : "Ort suchen"}
                       </Button>
                     </div>
                   </div>
                 ) : null}
                 {(placeCandidates[editingEventId] || []).length > 0 ? (
                   <div className="space-y-2 rounded-md border border-border/70 bg-background p-2">
-                    <div className="text-xs font-medium">OSM-Treffer wählen</div>
+                    <div className="text-xs font-medium">
+                      {eventForm.eventType === "Zugreisen"
+                        ? "Bahnhof wählen"
+                        : "OSM-Treffer wählen"}
+                    </div>
                     {placeCandidates[editingEventId].map((c) => (
                       <button
                         key={c.osmId}

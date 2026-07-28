@@ -7,7 +7,18 @@ function renderPlaceRef(place: {
   lat?: number;
   lon?: number;
   name?: string;
+  stopRef?: string;
 }): string {
+  if (place.stopRef?.trim()) {
+    return `<PlaceRef>
+        <StopPlaceRef>${escapeXml(place.stopRef.trim())}</StopPlaceRef>
+        ${
+          place.name?.trim()
+            ? `<Name><Text>${escapeXml(place.name.trim())}</Text></Name>`
+            : ""
+        }
+      </PlaceRef>`;
+  }
   if (
     place.lat != null &&
     place.lon != null &&

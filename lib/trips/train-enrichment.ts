@@ -19,6 +19,8 @@ export type TrainEnrichmentData = {
   routePath?: LatLng[];
   legCount?: number;
   warning?: string;
+  originStopRef?: string;
+  destinationStopRef?: string;
 };
 
 export function parseTrainEnrichment(

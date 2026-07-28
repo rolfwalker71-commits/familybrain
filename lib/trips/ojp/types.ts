@@ -33,11 +33,13 @@ export type OjpTripRequestInput = {
     lat?: number;
     lon?: number;
     name?: string;
+    stopRef?: string;
   };
   destination: {
     lat?: number;
     lon?: number;
     name?: string;
+    stopRef?: string;
   };
   depArrTimeIso: string;
   numberOfResults?: number;

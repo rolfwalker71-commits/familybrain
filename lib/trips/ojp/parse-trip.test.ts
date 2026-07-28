@@ -1,6 +1,10 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { parseOjpTripResponse, pickBestTrip } from "@/lib/trips/ojp/parse-trip";
+import {
+  buildCompleteTripPath,
+  parseOjpTripResponse,
+  pickBestTrip,
+} from "@/lib/trips/ojp/parse-trip";
 import {
   parseTrainEnrichment,
   trainEnrichmentRoutePath,
@@ -61,6 +65,33 @@ const SAMPLE_RESPONSE = `<?xml version="1.0" encoding="UTF-8"?>
     </Trip>
   </TripResult>
 </OJPResponse>`;
+
+describe("buildCompleteTripPath", () => {
+  it("connects multi-leg trips including transfer gaps", () => {
+    const path = buildCompleteTripPath([
+      {
+        mode: "rail",
+        board: { name: "Altdorf", lat: 46.88, lon: 8.64 },
+        alight: { name: "Zürich HB", lat: 47.37, lon: 8.54 },
+        intermediateStops: [],
+        path: [
+          [46.88, 8.64],
+          [47.37, 8.54],
+        ],
+      },
+      {
+        mode: "rail",
+        board: { name: "Zürich HB", lat: 47.37, lon: 8.54 },
+        alight: { name: "Flughafen", lat: 47.45, lon: 8.56 },
+        intermediateStops: [],
+        path: [],
+      },
+    ]);
+    assert.equal(path.length, 3);
+    assert.deepEqual(path[0], [46.88, 8.64]);
+    assert.deepEqual(path[path.length - 1], [47.45, 8.56]);
+  });
+});
 
 describe("parseOjpTripResponse", () => {
   it("extracts trip path and stops", () => {

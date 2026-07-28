@@ -1,8 +1,9 @@
 import { createHash } from "crypto";
 import { nowIso } from "@/lib/utils/dates";
-import { getNominatimBaseUrl } from "@/lib/trips/settings";
-import { planOjpTrip } from "@/lib/trips/ojp/client";
+import { getNominatimBaseUrl, hasOjpCredentials } from "@/lib/trips/settings";
+import { fetchOjpTrips, searchOjpStops } from "@/lib/trips/ojp/client";
 import type { OjpTrip } from "@/lib/trips/ojp/types";
+import type { OjpStopCandidate } from "@/lib/trips/ojp/location-request";
 import type { TrainEnrichmentData } from "@/lib/trips/train-enrichment";
 import {
   getTripEventById,
@@ -15,7 +16,30 @@ export type TrainEnrichResult = {
   warning?: string;
 };
 
-type PlaceInput = { lat?: number; lon?: number; name?: string };
+export type TrainConnectionOption = {
+  id: string;
+  label: string;
+  summary: string;
+  startTime?: string;
+  endTime?: string;
+  changes: number;
+  trip: OjpTrip;
+};
+
+export type TrainStationCandidate = {
+  stopRef: string;
+  name: string;
+  displayName: string;
+  lat: number;
+  lon: number;
+};
+
+type PlaceInput = {
+  lat?: number;
+  lon?: number;
+  name?: string;
+  stopRef?: string;
+};
 
 function splitRoutePlaces(event: TripEventRow): { origin: string; destination: string } {
   if (event.origin_place || event.destination_place) {
@@ -35,21 +59,32 @@ function splitRoutePlaces(event: TripEventRow): { origin: string; destination: s
   return { origin: loc, destination: "" };
 }
 
+function normalizeEventTime(raw: string | null | undefined): string {
+  const value = (raw || "").trim();
+  if (!value) return "08:00";
+  const colon = value.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+  if (colon) return `${colon[1].padStart(2, "0")}:${colon[2]}`;
+  const spaced = value.match(/^(\d{1,2})\s+(\d{2})$/);
+  if (spaced) return `${spaced[1].padStart(2, "0")}:${spaced[2]}`;
+  const compact = value.match(/^(\d{1,2})(\d{2})$/);
+  if (compact) return `${compact[1].padStart(2, "0")}:${compact[2]}`;
+  return value;
+}
+
 function isoTimeFromEvent(event: TripEventRow): string | null {
   const date = event.start_date?.trim();
   if (!date) return null;
-  const time = event.start_time?.trim() || "08:00";
-  const normalizedTime = /^\d{1,2}:\d{2}$/.test(time) ? `${time}:00` : time;
-  const local = new Date(`${date}T${normalizedTime}`);
+  const time = normalizeEventTime(event.start_time);
+  const local = new Date(`${date}T${time}:00`);
   if (Number.isNaN(local.getTime())) return null;
   return local.toISOString().replace(/\.\d{3}Z$/, "Z");
 }
 
-function hashTrainInput(event: TripEventRow): string {
+export function hashTrainInput(event: TripEventRow): string {
   const places = splitRoutePlaces(event);
   const payload = [
     event.start_date,
-    event.start_time,
+    normalizeEventTime(event.start_time),
     event.end_time,
     event.flight_number,
     places.origin,
@@ -99,8 +134,17 @@ async function geocodePlace(query: string): Promise<{ lat: number; lon: number }
 
 async function resolvePlace(
   coords: { lat: number | null; lon: number | null },
-  name: string
+  name: string,
+  stopRef?: string | null
 ): Promise<PlaceInput> {
+  if (stopRef?.trim()) {
+    return {
+      stopRef: stopRef.trim(),
+      name: name.trim() || undefined,
+      lat: coords.lat ?? undefined,
+      lon: coords.lon ?? undefined,
+    };
+  }
   if (coords.lat != null && coords.lon != null) {
     return { lat: coords.lat, lon: coords.lon, name: name || undefined };
   }
@@ -112,6 +156,53 @@ async function resolvePlace(
     return { name: name.trim() };
   }
   throw new Error("Start- und Zielort fehlen (Name oder Koordinaten).");
+}
+
+function readStopRefs(event: TripEventRow): {
+  originStopRef?: string;
+  destinationStopRef?: string;
+} {
+  if (!event.enrichment_json?.trim()) return {};
+  try {
+    const parsed = JSON.parse(event.enrichment_json) as {
+      originStopRef?: string;
+      destinationStopRef?: string;
+    };
+    return {
+      originStopRef: parsed.originStopRef,
+      destinationStopRef: parsed.destinationStopRef,
+    };
+  } catch {
+    return {};
+  }
+}
+
+async function buildTripSearchInput(event: TripEventRow) {
+  const places = splitRoutePlaces(event);
+  if (!places.origin.trim() && !places.destination.trim()) {
+    throw new Error("Von/Nach oder Standort mit Route wird benötigt.");
+  }
+  if (!event.start_date?.trim()) {
+    throw new Error("Datum wird für die Streckenplanung benötigt.");
+  }
+  const depArrTimeIso = isoTimeFromEvent(event);
+  if (!depArrTimeIso) {
+    throw new Error("Ungültiges Datum oder Abfahrtszeit.");
+  }
+  const stopRefs = readStopRefs(event);
+  const [origin, destination] = await Promise.all([
+    resolvePlace(
+      { lat: event.departure_lat, lon: event.departure_lon },
+      places.origin,
+      stopRefs.originStopRef
+    ),
+    resolvePlace(
+      { lat: event.arrival_lat, lon: event.arrival_lon },
+      places.destination,
+      stopRefs.destinationStopRef
+    ),
+  ]);
+  return { origin, destination, depArrTimeIso, places };
 }
 
 function formatLocalTime(iso: string | undefined): string | null {
@@ -133,10 +224,51 @@ function formatLocalDate(iso: string | undefined): string | null {
   return `${yyyy}-${mo}-${dd}`;
 }
 
+function formatDuration(seconds: number | undefined): string {
+  if (seconds == null || !Number.isFinite(seconds)) return "";
+  const h = Math.floor(seconds / 3600);
+  const m = Math.round((seconds % 3600) / 60);
+  if (h > 0) return `${h}h ${m}min`;
+  return `${m} min`;
+}
+
+function summarizeTrip(trip: OjpTrip): string {
+  return trip.legs
+    .map((leg) => {
+      const line = leg.trainNumber || leg.lineName || leg.mode;
+      return `${leg.board.name} → ${leg.alight.name}${line ? ` (${line})` : ""}`;
+    })
+    .join(" · ");
+}
+
+export function tripToConnectionOption(trip: OjpTrip): TrainConnectionOption {
+  const changes = Math.max(0, trip.legs.length - 1);
+  const start = formatLocalTime(trip.startTime);
+  const end = formatLocalTime(trip.endTime);
+  const duration = formatDuration(trip.durationSeconds);
+  const label = [
+    start && end ? `${start} → ${end}` : null,
+    duration || null,
+    changes === 0 ? "direkt" : `${changes} Umstieg${changes === 1 ? "" : "e"}`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  return {
+    id: trip.id,
+    label,
+    summary: summarizeTrip(trip),
+    startTime: trip.startTime,
+    endTime: trip.endTime,
+    changes,
+    trip,
+  };
+}
+
 function buildEnrichmentPayload(
   event: TripEventRow,
   trip: OjpTrip,
   inputHash: string,
+  stopRefs: { originStopRef?: string; destinationStopRef?: string },
   warning?: string
 ): TrainEnrichmentData {
   const firstLeg = trip.legs[0];
@@ -180,10 +312,43 @@ function buildEnrichmentPayload(
     routePath: trip.path,
     legCount: trip.legs.length,
     warning,
+    ...(stopRefs.originStopRef ? { originStopRef: stopRefs.originStopRef } : {}),
+    ...(stopRefs.destinationStopRef
+      ? { destinationStopRef: stopRefs.destinationStopRef }
+      : {}),
   };
 }
 
-export async function enrichTrainEvent(eventId: number): Promise<TrainEnrichResult> {
+export async function searchTrainConnections(
+  eventId: number
+): Promise<{ options: TrainConnectionOption[]; depArrTimeIso: string }> {
+  const event = getTripEventById(eventId);
+  if (!event) throw new Error("Ereignis nicht gefunden");
+  if (event.event_type !== "Zugreisen") {
+    throw new Error("Anreicherung nur für Zugreisen.");
+  }
+
+  const { origin, destination, depArrTimeIso } = await buildTripSearchInput(event);
+  const trips = await fetchOjpTrips({
+    origin,
+    destination,
+    depArrTimeIso,
+    numberOfResults: 6,
+  });
+  if (trips.length === 0) {
+    throw new Error("Keine Zugverbindungen gefunden.");
+  }
+  return {
+    options: trips.map(tripToConnectionOption),
+    depArrTimeIso,
+  };
+}
+
+export async function applyTrainConnection(
+  eventId: number,
+  trip: OjpTrip,
+  warning?: string
+): Promise<TrainEnrichResult> {
   const event = getTripEventById(eventId);
   if (!event) throw new Error("Ereignis nicht gefunden");
   if (event.event_type !== "Zugreisen") {
@@ -191,44 +356,15 @@ export async function enrichTrainEvent(eventId: number): Promise<TrainEnrichResu
   }
 
   const places = splitRoutePlaces(event);
-  if (!places.origin.trim() && !places.destination.trim()) {
-    throw new Error("Von/Nach oder Standort mit Route wird benötigt.");
-  }
-  if (!event.start_date?.trim()) {
-    throw new Error("Datum wird für die Streckenplanung benötigt.");
-  }
-
-  const depArrTimeIso = isoTimeFromEvent(event);
-  if (!depArrTimeIso) {
-    throw new Error("Ungültiges Datum oder Abfahrtszeit.");
-  }
-
-  const [origin, destination] = await Promise.all([
-    resolvePlace(
-      { lat: event.departure_lat, lon: event.departure_lon },
-      places.origin
-    ),
-    resolvePlace(
-      { lat: event.arrival_lat, lon: event.arrival_lon },
-      places.destination
-    ),
-  ]);
-
-  const { trip, warning } = await planOjpTrip(
-    {
-      origin,
-      destination,
-      depArrTimeIso,
-      numberOfResults: 3,
-    },
-    {
-      trainNumber: event.flight_number,
-      startTimeIso: depArrTimeIso,
-    }
-  );
-
   const inputHash = hashTrainInput(event);
-  const enrichment = buildEnrichmentPayload(event, trip, inputHash, warning);
+  const stopRefs = readStopRefs(event);
+  const enrichment = buildEnrichmentPayload(
+    event,
+    trip,
+    inputHash,
+    stopRefs,
+    warning
+  );
 
   const firstLeg = trip.legs[0];
   const lastLeg = trip.legs[trip.legs.length - 1];
@@ -264,4 +400,71 @@ export async function enrichTrainEvent(eventId: number): Promise<TrainEnrichResu
       ? "Strecke ohne detaillierte Geometrie — Haltestellen verwendet."
       : undefined),
   };
+}
+
+/** @deprecated Use searchTrainConnections + applyTrainConnection */
+export async function enrichTrainEvent(eventId: number): Promise<TrainEnrichResult> {
+  const { options } = await searchTrainConnections(eventId);
+  const event = getTripEventById(eventId);
+  const picked = options[0];
+  if (!picked) throw new Error("Keine Zugverbindung gefunden.");
+  return applyTrainConnection(eventId, picked.trip, "Erste gefundene Verbindung übernommen.");
+}
+
+export async function searchTrainStations(
+  query: string
+): Promise<TrainStationCandidate[]> {
+  if (!hasOjpCredentials()) {
+    throw new Error("ÖV-CH Token fehlt für die Bahnhofssuche.");
+  }
+  const stops = await searchOjpStops(query);
+  return stops.map((stop: OjpStopCandidate) => ({
+    stopRef: stop.stopRef,
+    name: stop.name,
+    displayName: stop.stopRef ? `DiDok ${stop.stopRef}` : stop.name,
+    lat: stop.lat,
+    lon: stop.lon,
+  }));
+}
+
+export async function applyTrainStation(
+  eventId: number,
+  target: "origin" | "destination",
+  station: TrainStationCandidate
+): Promise<TripEventRow> {
+  const event = getTripEventById(eventId);
+  if (!event) throw new Error("Ereignis nicht gefunden");
+  if (event.event_type !== "Zugreisen") {
+    throw new Error("Bahnhofssuche nur für Zugreisen.");
+  }
+
+  const stopRefs = readStopRefs(event);
+  if (target === "origin") {
+    stopRefs.originStopRef = station.stopRef;
+  } else {
+    stopRefs.destinationStopRef = station.stopRef;
+  }
+
+  let enrichmentJson = event.enrichment_json;
+  try {
+    const base = enrichmentJson ? JSON.parse(enrichmentJson) : {};
+    enrichmentJson = JSON.stringify({
+      ...base,
+      ...stopRefs,
+      source: base.source || "ojp",
+    });
+  } catch {
+    enrichmentJson = JSON.stringify({ source: "ojp", ...stopRefs });
+  }
+
+  return updateTripEvent(eventId, {
+    originPlace: target === "origin" ? station.name : event.origin_place,
+    destinationPlace:
+      target === "destination" ? station.name : event.destination_place,
+    departureLat: target === "origin" ? station.lat : event.departure_lat,
+    departureLon: target === "origin" ? station.lon : event.departure_lon,
+    arrivalLat: target === "destination" ? station.lat : event.arrival_lat,
+    arrivalLon: target === "destination" ? station.lon : event.arrival_lon,
+    enrichmentJson,
+  });
 }

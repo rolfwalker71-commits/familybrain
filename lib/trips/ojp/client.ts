@@ -1,4 +1,9 @@
 import { getOjpApiToken } from "@/lib/trips/settings";
+import {
+  buildOjpLocationRequestXml,
+  parseOjpLocationResponse,
+  type OjpStopCandidate,
+} from "@/lib/trips/ojp/location-request";
 import { buildOjpTripRequestXml } from "@/lib/trips/ojp/trip-request";
 import { parseOjpTripResponse, pickBestTrip } from "@/lib/trips/ojp/parse-trip";
 import type { OjpTrip, OjpTripRequestInput } from "@/lib/trips/ojp/types";
@@ -15,9 +20,7 @@ export class OjpApiError extends Error {
   }
 }
 
-export async function fetchOjpTrips(
-  input: OjpTripRequestInput
-): Promise<OjpTrip[]> {
+async function postOjpXml(body: string): Promise<string> {
   const token = getOjpApiToken();
   if (!token) {
     throw new OjpApiError(
@@ -25,7 +28,6 @@ export async function fetchOjpTrips(
     );
   }
 
-  const body = buildOjpTripRequestXml(input);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15000);
   try {
@@ -52,15 +54,7 @@ export async function fetchOjpTrips(
     if (!text.trim()) {
       throw new OjpApiError("OJP lieferte eine leere Antwort.");
     }
-    if (/faultstring|ErrorMessage/i.test(text) && !/TripResult|<Trip>/i.test(text)) {
-      const fault =
-        text.match(/<faultstring[^>]*>([\s\S]*?)<\/faultstring>/i)?.[1] ||
-        text.match(/<Text[^>]*>([\s\S]*?)<\/Text>/i)?.[1];
-      throw new OjpApiError(
-        fault?.trim() || "OJP meldete einen Fehler ohne Verbindungen."
-      );
-    }
-    return parseOjpTripResponse(text);
+    return text;
   } catch (error) {
     if (error instanceof OjpApiError) throw error;
     if (error instanceof Error && error.name === "AbortError") {
@@ -72,6 +66,31 @@ export async function fetchOjpTrips(
   } finally {
     clearTimeout(timeout);
   }
+}
+
+export async function searchOjpStops(query: string): Promise<OjpStopCandidate[]> {
+  const text = await postOjpXml(buildOjpLocationRequestXml(query));
+  const stops = parseOjpLocationResponse(text);
+  if (stops.length === 0) {
+    throw new OjpApiError("Keine Bahnhöfe/Haltestellen gefunden.");
+  }
+  return stops;
+}
+
+export async function fetchOjpTrips(
+  input: OjpTripRequestInput
+): Promise<OjpTrip[]> {
+  const body = buildOjpTripRequestXml(input);
+  const text = await postOjpXml(body);
+  if (/faultstring|ErrorMessage/i.test(text) && !/TripResult|<Trip>/i.test(text)) {
+    const fault =
+      text.match(/<faultstring[^>]*>([\s\S]*?)<\/faultstring>/i)?.[1] ||
+      text.match(/<Text[^>]*>([\s\S]*?)<\/Text>/i)?.[1];
+    throw new OjpApiError(
+      fault?.trim() || "OJP meldete einen Fehler ohne Verbindungen."
+    );
+  }
+  return parseOjpTripResponse(text);
 }
 
 export async function planOjpTrip(

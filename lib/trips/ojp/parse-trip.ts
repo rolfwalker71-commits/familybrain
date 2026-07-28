@@ -7,6 +7,40 @@ import {
 } from "@/lib/trips/ojp/xml-utils";
 import type { LatLng, OjpLeg, OjpStop, OjpTrip } from "@/lib/trips/ojp/types";
 
+export function buildCompleteTripPath(legs: OjpLeg[]): LatLng[] {
+  const segments: LatLng[][] = [];
+  for (let i = 0; i < legs.length; i++) {
+    const leg = legs[i];
+    if (leg.path.length >= 2) {
+      segments.push(leg.path);
+    } else if (
+      leg.board.lat != null &&
+      leg.board.lon != null &&
+      leg.alight.lat != null &&
+      leg.alight.lon != null
+    ) {
+      segments.push([
+        [leg.board.lat, leg.board.lon],
+        [leg.alight.lat, leg.alight.lon],
+      ]);
+    }
+    const next = legs[i + 1];
+    if (
+      next &&
+      leg.alight.lat != null &&
+      leg.alight.lon != null &&
+      next.board.lat != null &&
+      next.board.lon != null
+    ) {
+      segments.push([
+        [leg.alight.lat, leg.alight.lon],
+        [next.board.lat, next.board.lon],
+      ]);
+    }
+  }
+  return mergePaths(segments);
+}
+
 function parseDurationSeconds(raw: string | null): number | undefined {
   if (!raw?.trim()) return undefined;
   const match = raw.trim().match(/^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?$/i);
@@ -146,7 +180,7 @@ function parseTripBlock(
     if (leg) legs.push(leg);
   }
 
-  const path = mergePaths(legs.map((leg) => leg.path));
+  const path = buildCompleteTripPath(legs);
   return { id, startTime, endTime, durationSeconds, legs, path };
 }
 
