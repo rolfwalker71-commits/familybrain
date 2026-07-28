@@ -1,6 +1,6 @@
 import { getAuthContext } from "@/lib/auth/current-user";
 import { userAvatarPublicUrl } from "@/lib/users/avatar";
-import { getAppUserById } from "@/lib/users/queries";
+import { getAppUserById, getAppUserByUsername } from "@/lib/users/queries";
 import { UserAvatar } from "@/components/users/user-avatar";
 import Link from "next/link";
 import {
@@ -61,9 +61,10 @@ function StatCard({
 export default async function DashboardPage() {
   const stats = getDashboardStats();
   const auth = await getAuthContext();
-  const user =
-    auth && !auth.isAdmin && auth.userId
-      ? getAppUserById(auth.userId)
+  const user = auth?.userId
+    ? getAppUserById(auth.userId)
+    : auth?.kind === "admin"
+      ? getAppUserByUsername(auth.username)
       : null;
   const welcomeName = user?.display_name || auth?.username || null;
   const welcomeAvatar = userAvatarPublicUrl(user?.avatar_path);

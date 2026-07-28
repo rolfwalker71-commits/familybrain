@@ -3,6 +3,7 @@ import { getAuthContext } from "@/lib/auth/current-user";
 import { userAvatarPublicUrl } from "@/lib/users/avatar";
 import {
   getAppUserById,
+  getAppUserByUsername,
   listUserLedgerIds,
   listUserTripIds,
 } from "@/lib/users/queries";
@@ -18,15 +19,17 @@ export async function GET() {
       { status: 401 }
     );
   }
-  // Env-Admin (Session ohne userId) — nicht App-User mit Admin-Flag.
+  // Env-Admin (Session ohne userId) — Avatar vom gleichnamigen App-User, falls vorhanden.
   if (ctx.kind === "admin") {
+    const linked = getAppUserByUsername(ctx.username);
     return NextResponse.json({
       kind: "admin",
       username: ctx.username,
-      displayName: ctx.username,
+      displayName: linked?.display_name || ctx.username,
       isAdmin: true,
       showTodayHub: true,
-      avatarUrl: null,
+      avatarUrl: linked ? userAvatarPublicUrl(linked.avatar_path) : null,
+      userId: linked?.id ?? null,
     });
   }
   const user = ctx.userId ? getAppUserById(ctx.userId) : null;

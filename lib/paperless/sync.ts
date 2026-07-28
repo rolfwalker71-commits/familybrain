@@ -4,7 +4,7 @@ import {
   boolToSql,
   extractPaymentCustomFlags,
 } from "./custom-fields";
-import { getPaperlessSettings, upsertDocument } from "@/lib/db/queries";
+import { getPaperlessSettings, upsertDocument, backfillPaymentFlagsFromRawMetadata } from "@/lib/db/queries";
 import { hashContent } from "@/lib/utils/hash";
 import {
   DELTA_OVERLAP_MS,
@@ -327,6 +327,21 @@ async function syncDocumentPages(
     }
 
     nextUrl = page.next ?? undefined;
+  }
+
+  if (caches.customFieldNames.size > 0) {
+    try {
+      const filled = backfillPaymentFlagsFromRawMetadata(caches.customFieldNames);
+      if (filled > 0) {
+        result.updated += filled;
+      }
+    } catch (error) {
+      result.errors.push(
+        `Payment-Flags Backfill: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    }
   }
 }
 

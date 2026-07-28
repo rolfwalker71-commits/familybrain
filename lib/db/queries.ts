@@ -18,6 +18,10 @@ import {
   TRILIUM_SCOPE_PRIVAT_TITLE,
 } from "@/lib/trilium/constants";
 import { hashContent } from "@/lib/utils/hash";
+import {
+  boolToSql,
+  extractPaymentCustomFlags,
+} from "@/lib/paperless/custom-fields";
 
 export type PaperlessDocumentRow = {
   id: number;
@@ -1076,6 +1080,59 @@ export function listOpenUnpaidInvoices(limit = 12): OpenUnpaidInvoice[] {
       .map((t) => t.tag_name)
       .filter((name): name is string => Boolean(name)),
   }));
+}
+
+/**
+ * Fill zu_bezahlen / bezahlt from already-stored Paperless raw_metadata.
+ * Call after sync once custom-field id→name map is known.
+ */
+export function backfillPaymentFlagsFromRawMetadata(
+  fieldIdToName: Map<number, string>
+): number {
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `SELECT id, raw_metadata, zu_bezahlen, bezahlt
+       FROM paperless_documents
+       WHERE raw_metadata IS NOT NULL AND TRIM(raw_metadata) != ''`
+    )
+    .all() as Array<{
+    id: number;
+    raw_metadata: string;
+    zu_bezahlen: number | null;
+    bezahlt: number | null;
+  }>;
+
+  const update = db.prepare(
+    `UPDATE paperless_documents
+     SET zu_bezahlen = ?, bezahlt = ?, updated_at = ?
+     WHERE id = ?`
+  );
+
+  let updated = 0;
+  const tx = db.transaction(() => {
+    for (const row of rows) {
+      try {
+        const parsed = JSON.parse(row.raw_metadata) as Record<string, unknown>;
+        const flags = extractPaymentCustomFlags(parsed, fieldIdToName);
+        const zu = boolToSql(flags.zuBezahlen);
+        const be = boolToSql(flags.bezahlt);
+        if (zu == null && be == null) continue;
+        if (
+          (row.zu_bezahlen ?? null) === zu &&
+          (row.bezahlt ?? null) === be
+        ) {
+          continue;
+        }
+        update.run(zu, be, nowIso(), row.id);
+        updated += 1;
+      } catch {
+        /* ignore bad JSON */
+      }
+    }
+  });
+  tx();
+  return updated;
 }
 
 export function updateDocumentEmbeddingStatus(

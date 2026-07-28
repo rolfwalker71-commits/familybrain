@@ -143,6 +143,7 @@ export class PaperlessClient {
       ordering?: string;
       modifiedGte?: string;
       fields?: string;
+      customFieldQuery?: string;
     }
   ): Promise<PaperlessPaginatedResponse<PaperlessDocument>> {
     if (pageUrl) {
@@ -156,6 +157,9 @@ export class PaperlessClient {
     }
     if (options?.fields) {
       params.set("fields", options.fields);
+    }
+    if (options?.customFieldQuery) {
+      params.set("custom_field_query", options.customFieldQuery);
     }
     return this.request(`/api/documents/?${params.toString()}`);
   }

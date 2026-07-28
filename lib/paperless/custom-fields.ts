@@ -8,6 +8,7 @@ export type PaperlessCustomFieldDef = {
 
 export type PaperlessCustomFieldValue = {
   field: number;
+  name?: string | null;
   value: unknown;
 };
 
@@ -19,19 +20,37 @@ export type PaymentCustomFlags = {
   bezahlt: boolean | null;
 };
 
-const TO_PAY_NAMES = new Set(["zu bezahlen", "zubezahlen", "to pay", "payable"]);
-const PAID_NAMES = new Set(["bezahlt", "paid", "bezahlt?"]);
+const TO_PAY_NAMES = new Set([
+  "zu bezahlen",
+  "zubezahlen",
+  "to pay",
+  "payable",
+  "offen",
+  "unbezahlt",
+]);
+const PAID_NAMES = new Set(["bezahlt", "paid", "bezahlt?", "bezahlt ja"]);
 
 function normalizeFieldName(name: string): string {
-  return name.trim().toLowerCase().replace(/\s+/g, " ");
+  return name
+    .trim()
+    .toLowerCase()
+    .replace(/\u00a0/g, " ")
+    .replace(/\s+/g, " ");
 }
 
 export function isToPayFieldName(name: string): boolean {
-  return TO_PAY_NAMES.has(normalizeFieldName(name));
+  const n = normalizeFieldName(name);
+  if (TO_PAY_NAMES.has(n)) return true;
+  // «zu bezahlen» / «zubezahlen» variants
+  return n.includes("zu bezahl") || n === "zahlbar";
 }
 
 export function isPaidFieldName(name: string): boolean {
-  return PAID_NAMES.has(normalizeFieldName(name));
+  const n = normalizeFieldName(name);
+  if (PAID_NAMES.has(n)) return true;
+  // Exact-ish: name is just «bezahlt» / «paid», not «zu bezahlen»
+  if (n.includes("zu bezahl")) return false;
+  return n === "bezahlt" || n.startsWith("bezahlt ") || n === "paid";
 }
 
 function asBoolean(value: unknown): boolean | null {
@@ -45,6 +64,28 @@ function asBoolean(value: unknown): boolean | null {
   return null;
 }
 
+function fieldIdAndName(rawField: unknown): {
+  id: number | null;
+  name: string | null;
+} {
+  if (typeof rawField === "number" && Number.isFinite(rawField)) {
+    return { id: rawField, name: null };
+  }
+  if (typeof rawField === "string" && /^\d+$/.test(rawField.trim())) {
+    return { id: Number(rawField.trim()), name: null };
+  }
+  if (rawField && typeof rawField === "object") {
+    const obj = rawField as { id?: unknown; name?: unknown };
+    const id = Number(obj.id);
+    const name = typeof obj.name === "string" ? obj.name : null;
+    return {
+      id: Number.isFinite(id) ? id : null,
+      name,
+    };
+  }
+  return { id: null, name: null };
+}
+
 function extractCustomFieldEntries(
   doc: PaperlessDocument | Record<string, unknown>
 ): PaperlessCustomFieldValue[] {
@@ -53,11 +94,21 @@ function extractCustomFieldEntries(
   const out: PaperlessCustomFieldValue[] = [];
   for (const entry of raw) {
     if (!entry || typeof entry !== "object") continue;
-    const field = Number((entry as { field?: unknown }).field);
-    if (!Number.isFinite(field)) continue;
+    const row = entry as {
+      field?: unknown;
+      value?: unknown;
+      name?: unknown;
+    };
+    const parsed = fieldIdAndName(row.field);
+    const nameFromEntry =
+      typeof row.name === "string"
+        ? row.name
+        : parsed.name;
+    if (parsed.id == null && !nameFromEntry) continue;
     out.push({
-      field,
-      value: (entry as { value?: unknown }).value,
+      field: parsed.id ?? -1,
+      name: nameFromEntry,
+      value: row.value,
     });
   }
   return out;
@@ -74,7 +125,9 @@ export function extractPaymentCustomFlags(
   let bezahlt: boolean | null = null;
 
   for (const entry of extractCustomFieldEntries(doc)) {
-    const name = fieldIdToName.get(entry.field);
+    const name =
+      entry.name ||
+      (entry.field > 0 ? fieldIdToName.get(entry.field) : undefined);
     if (!name) continue;
     const bool = asBoolean(entry.value);
     if (isToPayFieldName(name)) zuBezahlen = bool;
