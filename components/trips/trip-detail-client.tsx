@@ -42,7 +42,7 @@ import type { LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { formatDateDe, formatMoney } from "@/lib/finance-brain/format";
+import { formatDateDe, formatLinkedExpenseMoneyParen, formatMoney } from "@/lib/finance-brain/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -589,6 +589,56 @@ function formatCompactDetailLine(event: TripEvent): string | null {
   if (!route || dense.has(route)) return null;
   // Skip if flight_number alone was the only meta (already in dense).
   return route;
+}
+
+/** Desktop timeline only — PWA/mobile cards stay compact; details live in the overlay. */
+function EventLinkedExpenses({
+  expenses,
+  className,
+  hideAmount = false,
+}: {
+  expenses: NonNullable<TripEvent["linked_expenses"]>;
+  className?: string;
+  hideAmount?: boolean;
+}) {
+  if (!expenses.length) return null;
+  return (
+    <div className={cn("space-y-1", className)}>
+      {expenses.map((exp) => {
+        const label = hideAmount
+          ? exp.ledger_title || "Abrechnung"
+          : exp.description?.trim() ||
+            exp.category_label ||
+            exp.ledger_title ||
+            "Ausgabe";
+        const moneyParen = formatLinkedExpenseMoneyParen({
+          amount: exp.amount,
+          currency: exp.currency,
+          amountBase: exp.amount_base,
+          baseCurrency: exp.base_currency || "CHF",
+          exchangeRate: exp.exchange_rate,
+        });
+        return (
+          <p
+            key={exp.id}
+            className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground"
+          >
+            <Wallet className="size-3 shrink-0 text-[var(--brand-finance)]" />
+            <Link
+              href={`/finance-brain/${exp.ledger_id}`}
+              className="min-w-0 font-medium text-foreground underline-offset-2 hover:underline"
+            >
+              {label}
+            </Link>
+            <span className="min-w-0 text-muted-foreground">
+              {moneyParen}
+              {exp.paid_by_name ? ` · ${exp.paid_by_name}` : ""}
+            </span>
+          </p>
+        );
+      })}
+    </div>
+  );
 }
 
 function EventActionsMenu({
@@ -3268,9 +3318,23 @@ function TripDetailInner({
                             {details}
                           </div>
                         ) : null}
+                        {(event.linked_expenses?.length || 0) > 0 ? (
+                          <div
+                            className="mt-1.5 hidden md:block"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <EventLinkedExpenses
+                              expenses={event.linked_expenses || []}
+                              hideAmount={eventDenseFacts(event).length > 0}
+                            />
+                          </div>
+                        ) : null}
                         </div>
                         <div className="flex shrink-0 flex-col items-end gap-1">
-                          <EventStatusPill event={event} />
+                          <EventStatusPill
+                            event={event}
+                            className="hidden md:inline-flex"
+                          />
                           <EventDenseFactsColumn event={event} size="sm" />
                         </div>
                         <div
