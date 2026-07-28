@@ -16,9 +16,25 @@ function decodeXml(value: string): string {
     .replace(/&amp;/g, "&");
 }
 
+/** Match tags with optional XML namespace prefix (`ojp:Trip`, `siri:Latitude`, …). */
+function tagOpenClose(tag: string): { open: string; close: string } {
+  if (tag.includes(":")) {
+    const escaped = tag.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return {
+      open: `<${escaped}(?:\\s[^>]*)?>`,
+      close: `</${escaped}>`,
+    };
+  }
+  return {
+    open: `<(?:[\\w.-]+:)?${tag}(?:\\s[^>]*)?>`,
+    close: `</(?:[\\w.-]+:)?${tag}>`,
+  };
+}
+
 export function extractBlocks(xml: string, tag: string): string[] {
   const results: string[] = [];
-  const re = new RegExp(`<${tag}(?:\\s[^>]*)?>([\\s\\S]*?)</${tag}>`, "gi");
+  const { open, close } = tagOpenClose(tag);
+  const re = new RegExp(`${open}([\\s\\S]*?)${close}`, "gi");
   let match: RegExpExecArray | null;
   while ((match = re.exec(xml)) !== null) {
     results.push(match[1]);
@@ -27,7 +43,8 @@ export function extractBlocks(xml: string, tag: string): string[] {
 }
 
 export function extractFirstTag(xml: string, tag: string): string | null {
-  const re = new RegExp(`<${tag}(?:\\s[^>]*)?>([\\s\\S]*?)</${tag}>`, "i");
+  const { open, close } = tagOpenClose(tag);
+  const re = new RegExp(`${open}([\\s\\S]*?)${close}`, "i");
   const match = xml.match(re);
   if (!match) return null;
   return match[1];
@@ -36,7 +53,9 @@ export function extractFirstTag(xml: string, tag: string): string | null {
 export function extractTextValue(xml: string, tag: string): string | null {
   const inner = extractFirstTag(xml, tag);
   if (!inner) return null;
-  const textMatch = inner.match(/<Text[^>]*>([\s\S]*?)<\/Text>/i);
+  const textMatch = inner.match(
+    /<(?:[\w.-]+:)?Text(?:\s[^>]*)?>([\s\S]*?)<\/(?:[\w.-]+:)?Text>/i
+  );
   const raw = textMatch ? textMatch[1] : inner.replace(/<[^>]+>/g, "");
   const trimmed = decodeXml(raw.trim());
   return trimmed || null;
@@ -51,8 +70,16 @@ export function extractGeoPositions(xml: string): LatLngPair[] {
   }
   if (pairs.length > 0) return pairs;
 
-  const latTags = [...xml.matchAll(/<(?:siri:)?Latitude>([\s\S]*?)<\/(?:siri:)?Latitude>/gi)];
-  const lonTags = [...xml.matchAll(/<(?:siri:)?Longitude>([\s\S]*?)<\/(?:siri:)?Longitude>/gi)];
+  const latTags = [
+    ...xml.matchAll(
+      /<(?:[\w.-]+:)?Latitude(?:\s[^>]*)?>([\s\S]*?)<\/(?:[\w.-]+:)?Latitude>/gi
+    ),
+  ];
+  const lonTags = [
+    ...xml.matchAll(
+      /<(?:[\w.-]+:)?Longitude(?:\s[^>]*)?>([\s\S]*?)<\/(?:[\w.-]+:)?Longitude>/gi
+    ),
+  ];
   const count = Math.min(latTags.length, lonTags.length);
   for (let i = 0; i < count; i++) {
     const lat = Number(latTags[i][1].trim());
@@ -81,7 +108,9 @@ function parseLatLon(block: string): LatLngPair | null {
   return { lat, lon };
 }
 
-export function mergePaths(paths: Array<Array<[number, number]>>): Array<[number, number]> {
+export function mergePaths(
+  paths: Array<Array<[number, number]>>
+): Array<[number, number]> {
   const out: Array<[number, number]> = [];
   for (const path of paths) {
     for (const point of path) {
@@ -97,4 +126,19 @@ export function mergePaths(paths: Array<Array<[number, number]>>): Array<[number
     }
   }
   return out;
+}
+
+/** Extract a short OJP error message from a response body, if present. */
+export function extractOjpErrorMessage(xml: string): string | null {
+  const candidates = [
+    extractTextValue(xml, "ErrorText"),
+    extractTextValue(xml, "ErrorDescription"),
+    extractTextValue(xml, "Description"),
+    extractFirstTag(xml, "faultstring"),
+  ];
+  for (const value of candidates) {
+    const trimmed = value?.replace(/<[^>]+>/g, "").trim();
+    if (trimmed) return trimmed;
+  }
+  return null;
 }

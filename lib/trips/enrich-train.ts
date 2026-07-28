@@ -421,7 +421,9 @@ export async function searchTrainStations(
   return stops.map((stop: OjpStopCandidate) => ({
     stopRef: stop.stopRef,
     name: stop.name,
-    displayName: stop.stopRef ? `DiDok ${stop.stopRef}` : stop.name,
+    displayName: stop.stopRef
+      ? `${stop.name} (${stop.stopRef})`
+      : stop.name,
     lat: stop.lat,
     lon: stop.lon,
   }));

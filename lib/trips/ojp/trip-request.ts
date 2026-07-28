@@ -10,8 +10,15 @@ function renderPlaceRef(place: {
   stopRef?: string;
 }): string {
   if (place.stopRef?.trim()) {
+    const ref = escapeXml(place.stopRef.trim());
+    // OJP 2.0: prefer StopPointRef; also emit StopPlaceRef for DIDOK codes.
+    const isDidok = /^\d{7}$/.test(place.stopRef.trim());
     return `<PlaceRef>
-        <StopPlaceRef>${escapeXml(place.stopRef.trim())}</StopPlaceRef>
+        ${
+          isDidok
+            ? `<StopPlaceRef>${ref}</StopPlaceRef>`
+            : `<siri:StopPointRef>${ref}</siri:StopPointRef>`
+        }
         ${
           place.name?.trim()
             ? `<Name><Text>${escapeXml(place.name.trim())}</Text></Name>`
@@ -30,6 +37,11 @@ function renderPlaceRef(place: {
           <siri:Longitude>${place.lon}</siri:Longitude>
           <siri:Latitude>${place.lat}</siri:Latitude>
         </GeoPosition>
+        ${
+          place.name?.trim()
+            ? `<Name><Text>${escapeXml(place.name.trim())}</Text></Name>`
+            : ""
+        }
       </PlaceRef>`;
   }
   const name = place.name?.trim();
@@ -43,32 +55,34 @@ function renderPlaceRef(place: {
   throw new Error("Start oder Ziel fehlt (Ort oder Koordinaten).");
 }
 
+/** OJP 2.0 trip request — default xmlns is VDV OJP, SIRI elements use siri: */
 export function buildOjpTripRequestXml(input: OjpTripRequestInput): string {
   const ts = new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
   const results = input.numberOfResults ?? 3;
   return `<?xml version="1.0" encoding="UTF-8"?>
-<OJPRequest xmlns="http://www.siri.org.uk/siri" xmlns:ojp="http://www.vdv.de/ojp">
-  <siri:ServiceRequest>
-    <siri:RequestTimestamp>${ts}</siri:RequestTimestamp>
-    <siri:RequestorRef>${REQUESTOR_REF}</siri:RequestorRef>
-    <OJPTripRequest>
+<OJP xmlns="http://www.vdv.de/ojp" xmlns:siri="http://www.siri.org.uk/siri" version="2.0">
+  <OJPRequest>
+    <siri:ServiceRequest>
       <siri:RequestTimestamp>${ts}</siri:RequestTimestamp>
-      <Origin>
-        ${renderPlaceRef(input.origin)}
-        <DepArrTime>${input.depArrTimeIso}</DepArrTime>
-      </Origin>
-      <Destination>
-        ${renderPlaceRef(input.destination)}
-      </Destination>
-      <Params>
-        <NumberOfResults>${results}</NumberOfResults>
-        <IncludeTrackSections>true</IncludeTrackSections>
-        <IncludeLegProjection>true</IncludeLegProjection>
-        <IncludeIntermediateStops>true</IncludeIntermediateStops>
-        <UseRealtimeData>none</UseRealtimeData>
-        <OptimisationMethod>fastest</OptimisationMethod>
-      </Params>
-    </OJPTripRequest>
-  </siri:ServiceRequest>
-</OJPRequest>`;
+      <siri:RequestorRef>${REQUESTOR_REF}</siri:RequestorRef>
+      <OJPTripRequest>
+        <siri:RequestTimestamp>${ts}</siri:RequestTimestamp>
+        <Origin>
+          ${renderPlaceRef(input.origin)}
+          <DepArrTime>${input.depArrTimeIso}</DepArrTime>
+        </Origin>
+        <Destination>
+          ${renderPlaceRef(input.destination)}
+        </Destination>
+        <Params>
+          <NumberOfResults>${results}</NumberOfResults>
+          <IncludeTrackSections>true</IncludeTrackSections>
+          <IncludeLegProjection>true</IncludeLegProjection>
+          <IncludeIntermediateStops>true</IncludeIntermediateStops>
+          <UseRealtimeData>none</UseRealtimeData>
+        </Params>
+      </OJPTripRequest>
+    </siri:ServiceRequest>
+  </OJPRequest>
+</OJP>`;
 }

@@ -103,6 +103,44 @@ describe("parseOjpTripResponse", () => {
     assert.equal(trips[0].path.length, 3);
     assert.equal(trips[0].legs[0].intermediateStops[0]?.name, "Olten");
   });
+
+  it("parses namespaced OJP 2.0 tags", () => {
+    const namespaced = `<?xml version="1.0"?>
+<ojp:OJP xmlns:ojp="http://www.vdv.de/ojp" xmlns:siri="http://www.siri.org.uk/siri">
+  <ojp:TripResult>
+    <ojp:Trip>
+      <ojp:Id>ns-1</ojp:Id>
+      <ojp:StartTime>2026-08-15T06:30:00Z</ojp:StartTime>
+      <ojp:EndTime>2026-08-15T07:00:00Z</ojp:EndTime>
+      <ojp:Duration>PT30M</ojp:Duration>
+      <ojp:Leg>
+        <ojp:TimedLeg>
+          <ojp:LegBoard>
+            <siri:StopPointRef>8503000</siri:StopPointRef>
+            <ojp:StopPointName><ojp:Text>Zürich HB</ojp:Text></ojp:StopPointName>
+          </ojp:LegBoard>
+          <ojp:LegAlight>
+            <siri:StopPointRef>8507000</siri:StopPointRef>
+            <ojp:StopPointName><ojp:Text>Bern</ojp:Text></ojp:StopPointName>
+          </ojp:LegAlight>
+          <ojp:Service>
+            <ojp:Mode><ojp:PtMode>rail</ojp:PtMode></ojp:Mode>
+            <ojp:TrainNumber>IC8</ojp:TrainNumber>
+          </ojp:Service>
+        </ojp:TimedLeg>
+        <ojp:LegProjection>
+          <ojp:GeoPosition><siri:Latitude>47.378</siri:Latitude><siri:Longitude>8.540</siri:Longitude></ojp:GeoPosition>
+          <ojp:GeoPosition><siri:Latitude>46.949</siri:Latitude><siri:Longitude>7.439</siri:Longitude></ojp:GeoPosition>
+        </ojp:LegProjection>
+      </ojp:Leg>
+    </ojp:Trip>
+  </ojp:TripResult>
+</ojp:OJP>`;
+    const trips = parseOjpTripResponse(namespaced);
+    assert.equal(trips.length, 1);
+    assert.equal(trips[0].id, "ns-1");
+    assert.equal(trips[0].path.length, 2);
+  });
 });
 
 describe("pickBestTrip", () => {

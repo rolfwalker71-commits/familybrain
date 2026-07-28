@@ -145,6 +145,24 @@ export function toSwissTime(raw: string | null | undefined): string {
     }
   }
 
+  const spaced = trimmed.match(/^(\d{1,2})\s+(\d{2})$/);
+  if (spaced) {
+    const h = Number(spaced[1]);
+    const m = Number(spaced[2]);
+    if (h >= 0 && h <= 23 && m >= 0 && m <= 59) {
+      return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+    }
+  }
+
+  const compact = trimmed.match(/^(\d{1,2})(\d{2})$/);
+  if (compact && trimmed.length <= 4) {
+    const h = Number(compact[1]);
+    const m = Number(compact[2]);
+    if (h >= 0 && h <= 23 && m >= 0 && m <= 59) {
+      return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+    }
+  }
+
   return trimmed;
 }
 

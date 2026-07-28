@@ -3045,8 +3045,20 @@ function TripDetailInner({
                     className="gap-1.5"
                   >
                     <TrainFront className="size-3.5" />
-                    Verbindungen suchen
+                    {busy ? "Sucht…" : "Verbindungen suchen"}
                   </Button>
+                ) : null}
+                {error && eventForm.eventType === "Zugreisen" ? (
+                  <div className="rounded-md border border-destructive/30 bg-destructive/5 px-2 py-1.5 text-xs text-destructive">
+                    {error}
+                  </div>
+                ) : null}
+                {status &&
+                eventForm.eventType === "Zugreisen" &&
+                /Verbindung/i.test(status) ? (
+                  <div className="rounded-md border border-border/70 bg-muted/30 px-2 py-1.5 text-xs text-muted-foreground">
+                    {status}
+                  </div>
                 ) : null}
                 {(trainConnectionOptions[editingEventId] || []).length > 0 ? (
                   <div className="space-y-2 rounded-md border border-border/70 bg-background p-2">

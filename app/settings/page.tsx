@@ -174,6 +174,15 @@ function SettingsPageInner() {
   const [flightTestDate, setFlightTestDate] = useState("2026-10-23");
   const [flightTestBusy, setFlightTestBusy] = useState(false);
   const [flightTestResult, setFlightTestResult] = useState<string | null>(null);
+  const [ojpTestOrigin, setOjpTestOrigin] = useState("Altdorf UR");
+  const [ojpTestDestination, setOjpTestDestination] = useState(
+    "Zürich Flughafen"
+  );
+  const [ojpTestDate, setOjpTestDate] = useState("2026-10-23");
+  const [ojpTestTime, setOjpTestTime] = useState("12:30");
+  const [ojpTestQuery, setOjpTestQuery] = useState("Zürich Flughafen");
+  const [ojpTestBusy, setOjpTestBusy] = useState(false);
+  const [ojpTestResult, setOjpTestResult] = useState<string | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -767,6 +776,54 @@ function SettingsPageInner() {
     }
   }
 
+  async function testOjpApi(mode: "trip" | "location") {
+    setOjpTestBusy(true);
+    setOjpTestResult(null);
+    setError(null);
+    setMessage(null);
+    try {
+      const payload =
+        mode === "location"
+          ? { mode, query: ojpTestQuery.trim() }
+          : {
+              mode,
+              origin: ojpTestOrigin.trim(),
+              destination: ojpTestDestination.trim(),
+              date: ojpTestDate.trim(),
+              time: ojpTestTime.trim(),
+            };
+      const res = await fetch("/api/trips/test-ojp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      setOjpTestResult(JSON.stringify(data, null, 2));
+      if (!res.ok || data.ok === false) {
+        setError(
+          data.error ||
+            data.hint ||
+            data.response?.errorText ||
+            `ÖV-CH-Test: HTTP ${data.response?.status ?? res.status}`
+        );
+      } else if (mode === "location") {
+        setMessage(
+          `Bahnhofssuche ok — ${data.response?.candidates?.length ?? 0} Treffer (HTTP ${data.response?.status}).`
+        );
+      } else {
+        setMessage(
+          `Verbindungssuche ok — ${data.response?.tripCount ?? 0} Verbindungen (HTTP ${data.response?.status}).`
+        );
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message);
+      setOjpTestResult(JSON.stringify({ ok: false, error: message }, null, 2));
+    } finally {
+      setOjpTestBusy(false);
+    }
+  }
+
   async function resolveTriliumScopes() {
     setResolvingScopes(true);
     setError(null);
@@ -1293,6 +1350,95 @@ function SettingsPageInner() {
             {flightTestResult ? (
               <pre className="max-h-80 overflow-auto rounded-md border border-border/70 bg-background p-3 text-[11px] leading-relaxed whitespace-pre-wrap break-all">
                 {flightTestResult}
+              </pre>
+            ) : null}
+          </div>
+
+          <div className="space-y-3 rounded-xl border border-border/60 bg-emerald-50/50 p-3 dark:bg-emerald-950/20">
+            <div className="text-sm font-medium">ÖV-CH / OJP testen</div>
+            <p className="text-xs text-muted-foreground">
+              Prüft Token und OJP-2.0-Zugriff (Verbindungssuche oder
+              Bahnhofssuche). Zeigt Status, geparste Treffer und Roh-XML.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="ojpTestOrigin">Von</Label>
+                <Input
+                  id="ojpTestOrigin"
+                  value={ojpTestOrigin}
+                  onChange={(e) => setOjpTestOrigin(e.target.value)}
+                  placeholder="Altdorf UR"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="ojpTestDestination">Nach</Label>
+                <Input
+                  id="ojpTestDestination"
+                  value={ojpTestDestination}
+                  onChange={(e) => setOjpTestDestination(e.target.value)}
+                  placeholder="Zürich Flughafen"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="ojpTestDate">Datum</Label>
+                <Input
+                  id="ojpTestDate"
+                  type="date"
+                  value={ojpTestDate}
+                  onChange={(e) => setOjpTestDate(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="ojpTestTime">Zeit</Label>
+                <Input
+                  id="ojpTestTime"
+                  value={ojpTestTime}
+                  onChange={(e) => setOjpTestTime(e.target.value)}
+                  placeholder="12:30"
+                />
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={
+                  ojpTestBusy ||
+                  saving !== null ||
+                  !ojpTestOrigin.trim() ||
+                  !ojpTestDestination.trim() ||
+                  !ojpTestDate
+                }
+                onClick={() => void testOjpApi("trip")}
+              >
+                {ojpTestBusy ? "Fragt OJP…" : "Verbindungen testen"}
+              </Button>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="ojpTestQuery">Bahnhofssuche</Label>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                <Input
+                  id="ojpTestQuery"
+                  value={ojpTestQuery}
+                  onChange={(e) => setOjpTestQuery(e.target.value)}
+                  placeholder="z. B. Zürich Flughafen"
+                  className="min-w-0 flex-1"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={
+                    ojpTestBusy || saving !== null || !ojpTestQuery.trim()
+                  }
+                  onClick={() => void testOjpApi("location")}
+                >
+                  Bahnhof suchen
+                </Button>
+              </div>
+            </div>
+            {ojpTestResult ? (
+              <pre className="max-h-80 overflow-auto rounded-md border border-border/70 bg-background p-3 text-[11px] leading-relaxed whitespace-pre-wrap break-all">
+                {ojpTestResult}
               </pre>
             ) : null}
           </div>
