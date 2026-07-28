@@ -1412,14 +1412,14 @@ function ExpenseCard({
             <div className="min-h-0 flex-1 overflow-hidden px-3 pb-3 pt-2">
               <DetailCarousel
                 resetKey={exp.id}
-                className="h-full max-h-[min(78dvh,40rem)] sm:max-h-[min(80dvh,44rem)]"
+                className="h-full max-h-[min(84dvh,52rem)] sm:max-h-[min(86dvh,56rem)]"
               >
                 <div className="flex flex-col items-center gap-3 px-2 pb-2 pt-1 text-center sm:gap-4 sm:px-4">
                   {exp.ai_image_url ? (
                     <AiImagePreview
                       src={exp.ai_image_url}
                       brand="finance"
-                      imageClassName="h-36 w-36 rounded-2xl object-cover sm:h-48 sm:w-48 md:h-56 md:w-56"
+                      imageClassName="h-56 w-56 rounded-2xl object-cover sm:h-72 sm:w-72 md:h-80 md:w-80 lg:h-96 lg:w-96"
                       onOpen={() => setZoomOpen(true)}
                     />
                   ) : (
