@@ -1690,10 +1690,8 @@ export async function buildTravelDiaryPdfBuffer(model: {
     const badgeH = 64;
     const padX = 12;
     const padY = 10;
-    const accentW = 5;
-    const indent = 8;
-    const cardX = margin + indent;
-    const cardW = contentW - indent;
+    const cardX = margin;
+    const cardW = contentW;
     const thumb = await loadScaledJpeg(exp.aiImagePath);
     let img: PDFImage | null = null;
     let imgW = 0;
@@ -1703,9 +1701,9 @@ export async function buildTravelDiaryPdfBuffer(model: {
       imgW = 56;
       imgH = 56;
     }
-    const textX = cardX + padX + accentW + badgeW + 10;
+    const textX = cardX + padX + badgeW + 10;
     const textW =
-      cardW - padX * 2 - accentW - badgeW - 10 - (img ? imgW + 8 : 0);
+      cardW - padX * 2 - badgeW - 10 - (img ? imgW + 8 : 0);
     const title = exp.description?.trim() || "Ausgabe";
     const titleLinesExp = wrapText(title, bold, 11, textW);
     const moneyLabel = formatMoney(exp.amountBase, exp.baseCurrency);
@@ -1754,15 +1752,7 @@ export async function buildTravelDiaryPdfBuffer(model: {
       C.diaryExpenseBorder,
       1
     );
-    // Left accent bar
-    page.drawRectangle({
-      x: cardX,
-      y: cardBottom + 4,
-      width: accentW,
-      height: cardH - 8,
-      color: C.diaryExpenseAccent,
-    });
-    const innerX = cardX + padX + accentW;
+    const innerX = cardX + padX;
     const innerTop = y - padY;
     drawDateBadge(page, bold, exp.expenseDate, innerX, innerTop, badgeW, badgeH);
     let ty = innerTop - 2;

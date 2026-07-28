@@ -23,9 +23,9 @@ const BRAND = {
   card: "#ffffff",
 } as const;
 
-/** Inline Lucide-style wallet icon for HTML mail (email-safe SVG). */
-function walletIconSvg(size = 16): string {
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${BRAND.accent}" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle;margin-right:7px;"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>`;
+/** Wallet marker for HTML mail — emoji is more reliable than SVG in many clients. */
+function walletIconHtml(sizePx = 16): string {
+  return `<span style="display:inline-block;font-size:${sizePx}px;line-height:1;vertical-align:middle;margin-right:7px;" aria-hidden="true">💰</span>`;
 }
 
 function walletExpensesHeading(
@@ -34,7 +34,8 @@ function walletExpensesHeading(
 ): string {
   const fontSize = opts?.fontSize ?? 12;
   const marginBottom = opts?.marginBottom ?? 8;
-  return `<div style="font-size:${fontSize}px;font-weight:800;color:${BRAND.accent};letter-spacing:.04em;text-transform:uppercase;margin-bottom:${marginBottom}px;line-height:1.3;">${walletIconSvg(Math.round(fontSize * 1.35))}${escapeHtml(label)}</div>`;
+  const iconSize = Math.max(16, Math.round(fontSize * 1.45));
+  return `<div style="font-size:${fontSize}px;font-weight:800;color:${BRAND.accent};letter-spacing:.04em;text-transform:uppercase;margin-bottom:${marginBottom}px;line-height:1.35;">${walletIconHtml(iconSize)}<span style="vertical-align:middle;">${escapeHtml(label)}</span></div>`;
 }
 
 /** Email-safe horizontal bar (nested table). */
