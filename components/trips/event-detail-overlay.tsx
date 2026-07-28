@@ -550,51 +550,6 @@ export function EventDetailOverlay({
                   ))}
                 </div>
               ) : null}
-              {linkedExpenses.length > 0 ? (
-                <div className="w-full max-w-md space-y-1.5 text-left">
-                  <p className="text-center text-xs font-semibold text-muted-foreground">
-                    FinanzBuddy
-                  </p>
-                  <ul className="space-y-1.5">
-                    {linkedExpenses.map((exp) => {
-                      const moneyParen = formatLinkedExpenseMoneyParen({
-                        amount: exp.amount,
-                        currency: exp.currency,
-                        amountBase: exp.amount_base,
-                        baseCurrency: exp.base_currency || "CHF",
-                        exchangeRate: exp.exchange_rate,
-                      });
-                      return (
-                        <li key={exp.id}>
-                          <Link
-                            href={`/finance-brain/${exp.ledger_id}`}
-                            className="flex items-start gap-2 rounded-xl border border-border/60 bg-muted/20 px-3 py-2 text-sm text-foreground underline-offset-2 hover:underline"
-                          >
-                            <Wallet className="mt-0.5 size-4 shrink-0 text-[var(--brand-finance)]" />
-                            <span className="min-w-0">
-                              <span className="font-medium">
-                                {exp.description?.trim() ||
-                                  exp.category_label ||
-                                  exp.ledger_title ||
-                                  "Ausgabe"}
-                              </span>{" "}
-                              <span className="tabular-nums text-muted-foreground">
-                                {moneyParen}
-                              </span>
-                              <span className="block text-xs text-muted-foreground">
-                                {exp.ledger_title}
-                                {exp.paid_by_name
-                                  ? ` · ${exp.paid_by_name}`
-                                  : ""}
-                              </span>
-                            </span>
-                          </Link>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              ) : null}
               <p className="text-[11px] text-muted-foreground">
                 Wischen für weitere Infos
               </p>

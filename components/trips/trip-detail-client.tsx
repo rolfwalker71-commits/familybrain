@@ -3276,12 +3276,12 @@ function TripDetailInner({
                         />
                         <div className="min-w-0 flex-1 overflow-hidden">
                         <div className="flex min-w-0 items-center gap-1.5">
-                          <div className="min-w-0 flex-1 truncate text-sm font-black leading-snug tracking-tight sm:text-base">
+                          <div className="min-w-0 flex-1 text-sm font-black leading-snug tracking-tight line-clamp-2 md:truncate sm:text-base">
                             {event.title}
                           </div>
                           <CommentCountChip
                             count={event.comment_count || 0}
-                            className="shrink-0"
+                            className="hidden shrink-0 md:inline-flex"
                           />
                           {editMode ? (
                             <button
@@ -3314,7 +3314,7 @@ function TripDetailInner({
                           </div>
                         ) : null}
                         {details ? (
-                          <div className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
+                          <div className="mt-0.5 hidden line-clamp-2 text-xs text-muted-foreground md:block">
                             {details}
                           </div>
                         ) : null}
@@ -3330,11 +3330,8 @@ function TripDetailInner({
                           </div>
                         ) : null}
                         </div>
-                        <div className="flex shrink-0 flex-col items-end gap-1">
-                          <EventStatusPill
-                            event={event}
-                            className="hidden md:inline-flex"
-                          />
+                        <div className="hidden shrink-0 flex-col items-end gap-1 md:flex">
+                          <EventStatusPill event={event} />
                           <EventDenseFactsColumn event={event} size="sm" />
                         </div>
                         <div
