@@ -18,7 +18,8 @@ export async function GET() {
       { status: 401 }
     );
   }
-  if (ctx.isAdmin) {
+  // Env-Admin (Session ohne userId) — nicht App-User mit Admin-Flag.
+  if (ctx.kind === "admin") {
     return NextResponse.json({
       kind: "admin",
       username: ctx.username,
