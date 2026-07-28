@@ -200,10 +200,6 @@ export function expenseCardHtml(
 
   const cardBg = diary ? BRAND.diaryExpenseBg : BRAND.card;
   const cardBorder = diary ? BRAND.diaryExpenseBorder : BRAND.border;
-  const leftBar = diary
-    ? `border-left:5px solid ${BRAND.diaryExpenseAccent};`
-    : "";
-  const indent = diary ? "margin-left:10px;" : "";
   const ausgabeChip = diary
     ? `<span style="display:inline-block;background:${BRAND.diaryExpenseAccent};color:#ffffff;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;margin-right:6px;">Ausgabe</span>`
     : "";
@@ -215,7 +211,7 @@ export function expenseCardHtml(
         : ` · <strong style="color:${BRAND.ink};">${escapeHtml(money)}</strong>`;
 
   return `
-    <div style="background:${cardBg};border-radius:12px;overflow:hidden;border:1px solid ${cardBorder};${leftBar}${indent}margin-bottom:12px;">
+    <div style="background:${cardBg};border-radius:12px;overflow:hidden;border:1px solid ${cardBorder};margin-bottom:12px;">
       <div style="padding:14px 16px;display:flex;gap:14px;align-items:flex-start;">
         ${dateBadgeHtml(input.expenseDate)}
         <div style="flex:1;min-width:0;">

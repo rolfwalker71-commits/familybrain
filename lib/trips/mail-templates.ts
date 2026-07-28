@@ -18,6 +18,20 @@ const BRAND = {
   card: "#ffffff",
 } as const;
 
+/** Inline Lucide-style wallet icon for HTML mail (email-safe SVG). */
+function walletIconSvg(size = 16): string {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${BRAND.accent}" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle;margin-right:7px;"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>`;
+}
+
+function walletExpensesHeading(
+  label: string,
+  opts?: { fontSize?: number; marginBottom?: number }
+): string {
+  const fontSize = opts?.fontSize ?? 12;
+  const marginBottom = opts?.marginBottom ?? 8;
+  return `<div style="font-size:${fontSize}px;font-weight:800;color:${BRAND.accent};letter-spacing:.04em;text-transform:uppercase;margin-bottom:${marginBottom}px;line-height:1.3;">${walletIconSvg(Math.round(fontSize * 1.35))}${escapeHtml(label)}</div>`;
+}
+
 export type TripEventCommentMailInput = {
   tripTitle: string;
   eventTitle: string;
@@ -290,7 +304,10 @@ export function buildTravelDiaryMailHtml(
       const expenses =
         event.expenses.length > 0
           ? `<div style="margin-top:12px;padding:10px 10px 2px;background:${BRAND.page};border-radius:12px;border:1px dashed ${BRAND.border};">
-              <div style="font-size:10px;font-weight:800;color:${BRAND.accent};letter-spacing:.04em;text-transform:uppercase;margin-bottom:8px;">Wallet · Ausgaben · ${event.expenses.length}</div>
+              ${walletExpensesHeading(`Ausgaben · ${event.expenses.length}`, {
+                fontSize: 12,
+                marginBottom: 8,
+              })}
               ${event.expenses.map((e) => expenseCardHtml({ ...e, variant: "diary" })).join("")}
             </div>`
           : "";
@@ -306,7 +323,10 @@ export function buildTravelDiaryMailHtml(
   const orphanBlock =
     model.orphanExpenses.length > 0
       ? `<div style="margin-top:8px;margin-bottom:16px;padding:10px 10px 2px;background:${BRAND.page};border-radius:12px;border:1px dashed ${BRAND.border};">
-          <div style="font-size:11px;font-weight:800;color:${BRAND.accent};letter-spacing:.04em;text-transform:uppercase;margin-bottom:10px;">Wallet · Weitere Ausgaben${model.ledgerTitle ? ` · ${escapeHtml(model.ledgerTitle)}` : ""}</div>
+          ${walletExpensesHeading(
+            `Weitere Ausgaben${model.ledgerTitle ? ` · ${model.ledgerTitle}` : ""}`,
+            { fontSize: 13, marginBottom: 10 }
+          )}
           ${model.orphanExpenses.map((e) => expenseCardHtml({ ...e, variant: "diary" })).join("")}
         </div>`
       : "";
