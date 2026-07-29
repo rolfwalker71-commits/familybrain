@@ -98,7 +98,8 @@ export function buildDocumentAiIconPrompt(input: {
     "Style: cheerful colorful flat illustration, bright varied hues matching the subject,",
     "solid pure white background (#FFFFFF) filling the entire square — never black, never dark, never gray.",
     "Centered recognizable symbol with soft shading, generous padding,",
-    "no text, no letters, no numbers, no logos, no watermarks, no receipt UI, no photorealism.",
+    "If the subject clearly identifies a well-known provider, company, or brand (from vendor, correspondent, title, or context), prefer their official logo as the main symbol when you can render it accurately; otherwise use a generic subject-matched icon.",
+    "no text, no letters, no numbers, no watermarks, no receipt UI, no photorealism.",
     "Suitable as a 48px list thumbnail.",
   ].join(" ");
 }
