@@ -321,7 +321,7 @@ export function DocumentsClient() {
     setError(null);
     try {
       const res = await fetch("/api/settings", {
-        method: "POST",
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ documentAiIconsEnabled: true }),
       });
@@ -329,7 +329,11 @@ export function DocumentsClient() {
       if (!res.ok) {
         throw new Error(data.error || "Einstellung speichern fehlgeschlagen");
       }
-      setDocumentAiIconsEnabled(true);
+      setDocumentAiIconsEnabled(
+        data.documentAiIconsEnabled !== undefined
+          ? Boolean(data.documentAiIconsEnabled)
+          : true
+      );
       setIconProgress(
         "KI-Icons aktiv. Dokumente auswählen → «Icons neu», oder pro Zeile «Icon»."
       );
