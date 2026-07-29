@@ -112,7 +112,13 @@ export async function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
   const origin = requestOrigin(request);
 
-  if (pathname.startsWith("/api/") && !hasValidOrigin(request)) {
+  // CSRF check only for authenticated browser APIs — not for public
+  // server-to-server endpoints (e.g. Paperless webhook has no Origin).
+  if (
+    pathname.startsWith("/api/") &&
+    !isPublicPath(pathname) &&
+    !hasValidOrigin(request)
+  ) {
     return NextResponse.json(
       { error: "Ungültige Request-Herkunft." },
       { status: 403 }
