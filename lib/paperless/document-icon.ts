@@ -75,19 +75,29 @@ export function buildDocumentAiIconPrompt(input: {
 }): string {
   const category = clip(input.category, 40) || "Dokument";
   const title = clip(input.title, 80) || "Dokument";
-  const who =
-    clip(input.vendor, 40) ||
-    clip(input.correspondent, 40) ||
-    "unbekannt";
+  const correspondent = clip(input.correspondent, 60);
+  const vendor = clip(input.vendor, 60);
   const docType = clip(input.documentType, 40);
   const product = clip(input.product, 40);
   const hint = clip(input.shortSummary, 100);
 
+  // Prefer named organization for logo cues — title/summary often omit the firm.
+  const brandParts: string[] = [];
+  if (correspondent) brandParts.push(correspondent);
+  if (vendor && vendor.toLowerCase() !== correspondent.toLowerCase()) {
+    brandParts.push(vendor);
+  }
+  const brand = brandParts.join(" / ");
+
   const subjectParts = [
     `category «${category}»`,
     `title «${title}»`,
-    `from «${who}»`,
   ];
+  if (brand) {
+    subjectParts.push(
+      `organization/brand «${brand}» (Paperless correspondent/vendor — primary logo cue)`
+    );
+  }
   if (docType) subjectParts.push(`type «${docType}»`);
   if (product) subjectParts.push(`product «${product}»`);
   if (hint) subjectParts.push(`context: ${hint}`);
@@ -98,7 +108,9 @@ export function buildDocumentAiIconPrompt(input: {
     "Style: cheerful colorful flat illustration, bright varied hues matching the subject,",
     "solid pure white background (#FFFFFF) filling the entire square — never black, never dark, never gray.",
     "Centered recognizable symbol with soft shading, generous padding,",
-    "If the subject clearly identifies a well-known provider, company, or brand (from vendor, correspondent, title, or context), prefer their official logo as the main symbol when you can render it accurately; otherwise use a generic subject-matched icon.",
+    brand
+      ? `Primary visual: if «${brand}» is a well-known company or brand, use their official logo as the main symbol when you can render it accurately; otherwise a generic subject-matched icon.`
+      : "If the subject clearly identifies a well-known provider or brand (from title or context), prefer their official logo as the main symbol when accurate; otherwise a generic subject-matched icon.",
     "no text, no letters, no numbers, no watermarks, no receipt UI, no photorealism.",
     "Suitable as a 48px list thumbnail.",
   ].join(" ");
