@@ -83,6 +83,7 @@ function SyncClientInner() {
   const {
     pendingCount,
     analyzedCount,
+    errorCount,
     hasOpenAIKey,
     isRunning: analysisRunning,
     lastError: analysisError,
@@ -151,7 +152,8 @@ function SyncClientInner() {
       | "analyze_pending"
       | "paperless_writeback"
       | "ai_icons_missing"
-      | "sync_analyze"
+      | "sync_analyze",
+    options?: { resetErrors?: boolean }
   ) {
     setBusy("job");
     setError(null);
@@ -160,7 +162,10 @@ function SyncClientInner() {
       const res = await fetch("/api/jobs/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jobType }),
+        body: JSON.stringify({
+          jobType,
+          resetErrors: options?.resetErrors === true,
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -172,7 +177,9 @@ function SyncClientInner() {
         );
       }
       setMessage(
-        `${data.label || "Job"} gestartet — läuft auf dem Server weiter, auch wenn du die Seite verlässt.`
+        options?.resetErrors
+          ? "Fehlerhafte zurückgesetzt — Analyse läuft im Hintergrund weiter."
+          : `${data.label || "Job"} gestartet — läuft auf dem Server weiter, auch wenn du die Seite verlässt.`
       );
       await refreshBackgroundJob();
       await refreshStats();
@@ -789,6 +796,12 @@ function SyncClientInner() {
             Ausstehend: <strong>{pendingCount}</strong>
             <span className="mx-2 text-muted-foreground">·</span>
             Analysiert: <strong>{analyzedCount}</strong>
+            {errorCount > 0 ? (
+              <>
+                <span className="mx-2 text-muted-foreground">·</span>
+                Fehler: <strong className="text-destructive">{errorCount}</strong>
+              </>
+            ) : null}
             {!hasOpenAIKey ? (
               <span className="ml-2 text-destructive">
                 · OpenAI-Key fehlt (
@@ -874,6 +887,25 @@ function SyncClientInner() {
                   onClick={() => void startBackgroundJob("analyze_pending")}
                 >
                   Alle im Hintergrund analysieren
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  disabled={
+                    errorCount === 0 ||
+                    !hasOpenAIKey ||
+                    busy !== null ||
+                    bgJob != null ||
+                    analysisRunning
+                  }
+                  onClick={() =>
+                    void startBackgroundJob("analyze_pending", {
+                      resetErrors: true,
+                    })
+                  }
+                >
+                  Fehlerhafte erneut analysieren
+                  {errorCount > 0 ? ` (${errorCount})` : ""}
                 </Button>
                 <Button
                   variant="outline"

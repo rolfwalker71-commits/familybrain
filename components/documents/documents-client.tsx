@@ -95,9 +95,10 @@ function toItemsRecord(
 export function DocumentsClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { pendingCount, isRunning, refreshStats, startAnalysis, hasOpenAIKey, stopAnalysis } =
+  const { pendingCount, errorCount, isRunning, refreshStats, startAnalysis, hasOpenAIKey, stopAnalysis } =
     useAnalysis();
   const [sortDir, setSortDir] = useListSortDir("documents", "desc");
+  const [retryingErrors, setRetryingErrors] = useState(false);
 
   const [docs, setDocs] = useState<DocRow[]>([]);
   const [total, setTotal] = useState(0);
@@ -282,6 +283,32 @@ export function DocumentsClient() {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setAnalyzingId(null);
+    }
+  }
+
+  async function retryAllErrors() {
+    if (isRunning || retryingErrors) return;
+    setRetryingErrors(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/jobs/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jobType: "analyze_pending",
+          resetErrors: true,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || "Fehlerhafte erneut starten fehlgeschlagen");
+      }
+      await refreshStats();
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRetryingErrors(false);
     }
   }
 
@@ -642,30 +669,46 @@ export function DocumentsClient() {
               >
                 Analyse stoppen
               </Button>
-            ) : pendingCount > 0 && hasOpenAIKey ? (
+            ) : (
               <>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={iconBusy}
-                  onClick={() =>
-                    void startAnalysis({ mode: "batch", batchSize: 10 })
-                  }
-                >
-                  10 analysieren
-                </Button>
-                <Button
-                  size="sm"
-                  className="bg-[var(--brand-finance)] text-white hover:bg-[var(--brand-finance)]/90"
-                  disabled={iconBusy}
-                  onClick={() =>
-                    void startAnalysis({ mode: "all", batchSize: 10 })
-                  }
-                >
-                  Alle ausstehend
-                </Button>
+                {errorCount > 0 && hasOpenAIKey ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={iconBusy || retryingErrors}
+                    onClick={() => void retryAllErrors()}
+                  >
+                    {retryingErrors
+                      ? "Starte…"
+                      : `Fehlerhafte erneut (${errorCount})`}
+                  </Button>
+                ) : null}
+                {pendingCount > 0 && hasOpenAIKey ? (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={iconBusy}
+                      onClick={() =>
+                        void startAnalysis({ mode: "batch", batchSize: 10 })
+                      }
+                    >
+                      10 analysieren
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="bg-[var(--brand-finance)] text-white hover:bg-[var(--brand-finance)]/90"
+                      disabled={iconBusy}
+                      onClick={() =>
+                        void startAnalysis({ mode: "all", batchSize: 10 })
+                      }
+                    >
+                      Alle ausstehend
+                    </Button>
+                  </>
+                ) : null}
               </>
-            ) : null}
+            )}
             {hasOpenAIKey && documentAiIconsEnabled ? (
               <>
                 <Button

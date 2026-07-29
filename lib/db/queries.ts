@@ -597,6 +597,14 @@ export function getDashboardStats() {
       .get() as { c: number }
   ).c;
 
+  const analysisErrors = (
+    db
+      .prepare(
+        `SELECT COUNT(*) as c FROM document_summaries WHERE analysis_status = 'error'`
+      )
+      .get() as { c: number }
+  ).c;
+
   const upcomingDeadlines = (
     db
       .prepare(
@@ -750,6 +758,7 @@ export function getDashboardStats() {
     totalDocuments,
     pendingAnalysis,
     analyzed,
+    analysisErrors,
     upcomingDeadlines,
     warrantiesExpiringSoon,
     financialItemsThisYear: financialThisYear.c,

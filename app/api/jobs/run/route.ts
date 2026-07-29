@@ -30,11 +30,13 @@ export const maxDuration = 300;
       ])
       .optional()
       .default(JOB_TYPE_SYNC_ANALYZE),
+    /** With analyze_pending: re-queue all analysis_status=error first. */
+    resetErrors: z.boolean().optional().default(false),
   });
 
 /**
  * Fire-and-forget durable background job. Continues after the HTTP response.
- * Body: { jobType?: "sync_analyze" | "analyze_pending" | "ai_icons_missing" | "paperless_writeback" }
+ * Body: { jobType?, resetErrors? }
  */
 export async function POST(request: Request) {
   const auth = await requireAdmin();
@@ -47,6 +49,7 @@ export async function POST(request: Request) {
   }
 
   const jobType = parsed.data.jobType;
+  const resetErrors = parsed.data.resetErrors;
   const active = getActiveJobRun();
   if (active) {
     return NextResponse.json(
@@ -61,7 +64,7 @@ export async function POST(request: Request) {
   if (jobType === JOB_TYPE_SYNC_ANALYZE) {
     void runSyncAnalyzeJob("manual");
   } else if (jobType === JOB_TYPE_ANALYZE_PENDING) {
-    void runAnalyzePendingJob("manual");
+    void runAnalyzePendingJob("manual", { resetErrors });
   } else if (jobType === JOB_TYPE_AI_ICONS_MISSING) {
     void runAiIconsMissingJob("manual");
   } else if (jobType === JOB_TYPE_PAPERLESS_WRITEBACK) {
@@ -73,6 +76,7 @@ export async function POST(request: Request) {
       ok: true,
       accepted: true,
       jobType,
+      resetErrors: jobType === JOB_TYPE_ANALYZE_PENDING ? resetErrors : false,
       label: jobTypeLabel(jobType),
     },
     { status: 202 }

@@ -22,6 +22,7 @@ import {
   recoverExpiredAnalysisClaims,
   recoverExpiredJobLeases,
   releaseAnalysisClaimAsPending,
+  resetAllAnalysisErrors,
   tryAcquireJobRun,
   updateJobRunSummary,
   type JobRunSummary,
@@ -54,7 +55,8 @@ async function assertNotCancelled(runId: number): Promise<boolean> {
 }
 
 export async function runAnalyzePendingJob(
-  trigger: JobTrigger = "manual"
+  trigger: JobTrigger = "manual",
+  options?: { resetErrors?: boolean }
 ): Promise<BackgroundRunResult> {
   recoverExpiredJobLeases();
   recoverExpiredAnalysisClaims();
@@ -85,12 +87,20 @@ export async function runAnalyzePendingJob(
   };
 
   try {
+    let resetCount = 0;
+    if (options?.resetErrors) {
+      resetCount = resetAllAnalysisErrors();
+      summary.errorsReset = resetCount;
+    }
+
     addJobRunItem({
       runId: run.id,
       itemKind: "phase",
       status: "running",
       title: "AI-Analyse",
-      message: "Starte Hintergrund-Analyse ausstehender Dokumente",
+      message: options?.resetErrors
+        ? `Fehlerhafte zurückgesetzt (${resetCount}), starte Analyse`
+        : "Starte Hintergrund-Analyse ausstehender Dokumente",
     });
 
     while (await assertNotCancelled(run.id)) {

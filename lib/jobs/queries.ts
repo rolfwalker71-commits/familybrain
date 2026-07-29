@@ -90,6 +90,7 @@ export type JobRunSummary = {
   failed?: number;
   remaining?: number;
   afterId?: number;
+  errorsReset?: number;
 };
 
 function newLeaseOwner(): string {
@@ -603,6 +604,37 @@ export function resetTerminalAnalysisErrorsForInitial(): number {
     )
     .run(ts, MAX_ANALYSIS_ATTEMPTS);
   return result.changes;
+}
+
+/** Re-queue every failed analysis (manual «Fehlerhafte erneut»). */
+export function resetAllAnalysisErrors(): number {
+  const db = getDb();
+  const ts = nowIso();
+  const result = db
+    .prepare(
+      `UPDATE document_summaries
+       SET analysis_status = 'pending',
+           analysis_attempts = 0,
+           analysis_claimed_at = NULL,
+           analysis_claim_hash = NULL,
+           analysis_next_retry_at = NULL,
+           analysis_last_error = NULL,
+           updated_at = ?
+       WHERE analysis_status = 'error'`
+    )
+    .run(ts);
+  return result.changes;
+}
+
+export function countAnalysisErrors(): number {
+  const db = getDb();
+  return (
+    db
+      .prepare(
+        `SELECT COUNT(*) as c FROM document_summaries WHERE analysis_status = 'error'`
+      )
+      .get() as { c: number }
+  ).c;
 }
 
 export function getDocumentContentHash(documentId: number): string | null {

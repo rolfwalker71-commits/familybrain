@@ -16,6 +16,7 @@ export type AnalysisMode = "batch" | "all";
 type AnalysisStatus = {
   pendingCount: number;
   analyzedCount: number;
+  errorCount: number;
   totalDocuments: number;
   warrantiesTotal: number;
   warrantiesExpiringSoon: number;
@@ -57,6 +58,7 @@ const AnalysisContext = createContext<AnalysisContextValue | null>(null);
 const defaultStatus: AnalysisStatus = {
   pendingCount: 0,
   analyzedCount: 0,
+  errorCount: 0,
   totalDocuments: 0,
   warrantiesTotal: 0,
   warrantiesExpiringSoon: 0,
@@ -97,6 +99,7 @@ export function AnalysisProvider({ children }: { children: React.ReactNode }) {
         ...prev,
         pendingCount: Number(dash.pendingAnalysis ?? prev.pendingCount),
         analyzedCount: Number(dash.analyzed ?? prev.analyzedCount),
+        errorCount: Number(dash.analysisErrors ?? prev.errorCount),
         totalDocuments: Number(dash.totalDocuments ?? prev.totalDocuments),
         warrantiesTotal: Number(dash.warrantiesTotal ?? prev.warrantiesTotal),
         warrantiesExpiringSoon: Number(
