@@ -100,4 +100,16 @@ test("extractPaperlessWebhookDocumentId parses common shapes", () => {
   assert.equal(extractPaperlessWebhookDocumentId({ data: { id: 3 } }), 3);
   assert.equal(extractPaperlessWebhookDocumentId({}), null);
   assert.equal(extractPaperlessWebhookDocumentId(null), null);
+  assert.equal(
+    extractPaperlessWebhookDocumentId({
+      doc_url: "https://paperless.example/documents/1126/details",
+    }),
+    1126
+  );
+  assert.equal(
+    extractPaperlessWebhookDocumentId(
+      "http://192.168.5.1/documents/77/"
+    ),
+    77
+  );
 });

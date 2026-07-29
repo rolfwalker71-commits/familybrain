@@ -7,6 +7,57 @@ import { getPaperlessWebhookSecret } from "@/lib/paperless/writeback";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+async function parseWebhookBody(request: Request): Promise<unknown> {
+  const ct = request.headers.get("content-type") || "";
+
+  if (ct.includes("application/json")) {
+    return await request.json();
+  }
+
+  // Paperless often posts form fields (and optionally a file as multipart).
+  if (
+    ct.includes("application/x-www-form-urlencoded") ||
+    ct.includes("multipart/form-data")
+  ) {
+    const form = await request.formData();
+    const obj: Record<string, string> = {};
+    for (const [key, value] of form.entries()) {
+      if (typeof value === "string") obj[key] = value;
+    }
+    return obj;
+  }
+
+  const text = await request.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
+
+function bodyDebug(body: unknown): Record<string, unknown> {
+  if (body == null) return { bodyType: "null" };
+  if (typeof body === "string") {
+    return {
+      bodyType: "string",
+      preview: body.slice(0, 200),
+    };
+  }
+  if (typeof body === "number") return { bodyType: "number", value: body };
+  if (typeof body === "object" && !Array.isArray(body)) {
+    const obj = body as Record<string, unknown>;
+    const keys = Object.keys(obj);
+    const sample: Record<string, string> = {};
+    for (const key of keys.slice(0, 8)) {
+      const v = obj[key];
+      sample[key] =
+        typeof v === "string" ? v.slice(0, 160) : typeof v;
+    }
+    return { bodyType: "object", keys, sample };
+  }
+  return { bodyType: Array.isArray(body) ? "array" : typeof body };
+}
+
 export async function POST(request: Request) {
   ensureInitialized();
   const expected = getPaperlessWebhookSecret();
@@ -25,26 +76,26 @@ export async function POST(request: Request) {
   }
 
   let body: unknown = null;
-  const ct = request.headers.get("content-type") || "";
   try {
-    if (ct.includes("application/json")) {
-      body = await request.json();
-    } else {
-      const text = await request.text();
-      try {
-        body = JSON.parse(text);
-      } catch {
-        body = text;
-      }
-    }
-  } catch {
+    body = await parseWebhookBody(request);
+  } catch (err) {
+    console.error(
+      "[paperless webhook] body parse",
+      err instanceof Error ? err.message : err
+    );
     body = null;
   }
 
   const paperlessId = extractPaperlessWebhookDocumentId(body);
   if (!paperlessId) {
+    const debug = bodyDebug(body);
+    console.error("[paperless webhook] no document id", debug);
     return NextResponse.json(
-      { error: "Keine Document-ID im Payload." },
+      {
+        error:
+          "Keine Document-ID im Payload. Parameter doc_url={{doc_url}} setzen (Trigger «hinzugefügt/aktualisiert»). PAPERLESS_URL in Paperless muss gesetzt sein. Dokument einbeziehen: aus.",
+        debug,
+      },
       { status: 400 }
     );
   }

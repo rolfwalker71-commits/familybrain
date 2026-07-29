@@ -1160,7 +1160,11 @@ function SettingsPageInner() {
             <p className="text-xs text-muted-foreground">
               In Paperless Post-Consumption / Webhook hinterlegen. Header:{" "}
               <code className="rounded bg-muted px-1">X-Buddy-Webhook-Secret</code>
-              . Bei Docker auf demselben Host die interne Buddy-URL verwenden.
+              . Parameter verwenden: an, Key{" "}
+              <code className="rounded bg-muted px-1">doc_url</code>, Value{" "}
+              <code className="rounded bg-muted px-1">{"{{doc_url}}"}</code>{" "}
+              (Trigger «Dokument hinzugefügt» oder «aktualisiert»). Dokument
+              einbeziehen: aus. Bei Docker die interne Buddy-URL verwenden.
             </p>
             <div className="space-y-1">
               <Label htmlFor="webhookUrl" className="text-xs text-muted-foreground">
