@@ -44,7 +44,6 @@ import {
   IconCircle,
   knowledgeVisual,
 } from "@/components/layout/icon-circle";
-import { AiImagePreview } from "@/components/layout/ai-image-preview";
 import { AiImageZoom } from "@/components/layout/ai-image-zoom";
 import { ItineraryCard } from "@/components/travel/itinerary-list";
 import { resolveItinerary } from "@/lib/extraction/itinerary";
@@ -334,40 +333,6 @@ function DocumentDetailInner({ detail }: DetailProps) {
     }
   }
 
-  function DocIcon({ size = "sm" }: { size?: "sm" | "lg" }) {
-    return (
-      <span className="relative shrink-0">
-        {aiIconUrl ? (
-          <AiImagePreview
-            src={aiIconUrl}
-            brand="docs"
-            alt=""
-            imageClassName={
-              size === "lg"
-                ? "h-14 w-14 object-cover"
-                : "h-10 w-10 object-cover"
-            }
-            onOpen={() => {
-              if (!iconBusy) setZoomUrl(aiIconUrl);
-            }}
-          />
-        ) : (
-          <IconCircle
-            icon={categoryVisual.icon}
-            tone={size === "lg" ? categoryVisual.tone : "teal"}
-            size={size}
-            className={size === "sm" ? "rounded-xl" : undefined}
-          />
-        )}
-        {iconBusy ? (
-          <span className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/65 px-1 text-center text-[9px] font-semibold leading-tight text-white">
-            Generierung…
-          </span>
-        ) : null}
-      </span>
-    );
-  }
-
   return (
     <div className="space-y-4 pb-28 md:space-y-6 md:pb-0">
       {/* Mobile soft header */}
@@ -381,7 +346,6 @@ function DocumentDetailInner({ detail }: DetailProps) {
           <ChevronLeft className="size-5" />
         </button>
         <div className="flex min-w-0 flex-1 items-center gap-2.5">
-          <DocIcon size="sm" />
           <h1 className="truncate text-base font-semibold tracking-tight">
             {document.title || `Dokument #${document.id}`}
           </h1>
@@ -439,18 +403,15 @@ function DocumentDetailInner({ detail }: DetailProps) {
           >
             ← Zurück
           </button>
-          <div className="flex items-start gap-3">
-            <DocIcon size="lg" />
-            <div className="min-w-0">
-              <h1 className="break-words text-2xl font-semibold tracking-tight">
-                {document.title || `Dokument #${document.id}`}
-              </h1>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Paperless-ID {document.paperless_id} ·{" "}
-                {document.correspondent_name || "–"} ·{" "}
-                {toSwissDate(document.created_date)}
-              </p>
-            </div>
+          <div className="min-w-0">
+            <h1 className="break-words text-2xl font-semibold tracking-tight">
+              {document.title || `Dokument #${document.id}`}
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Paperless-ID {document.paperless_id} ·{" "}
+              {document.correspondent_name || "–"} ·{" "}
+              {toSwissDate(document.created_date)}
+            </p>
           </div>
         </div>
         <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto">
@@ -507,8 +468,40 @@ function DocumentDetailInner({ detail }: DetailProps) {
 
       {activeTab === "overview" ? (
         <div className="space-y-4">
-          {statusLoaded ? (
-            <Card className="border-border/50">
+          <div className="grid grid-cols-[minmax(7.5rem,10rem)_1fr] items-stretch gap-3 sm:grid-cols-[minmax(9rem,12rem)_1fr] sm:gap-4">
+            <div className="relative h-full min-h-[7.5rem] overflow-hidden rounded-xl border border-border/50 bg-muted/30 shadow-sm">
+              {aiIconUrl ? (
+                <button
+                  type="button"
+                  title="Tippen zum Vergrössern"
+                  className="absolute inset-0 block h-full w-full cursor-zoom-in"
+                  onClick={() => {
+                    if (!iconBusy) setZoomUrl(aiIconUrl);
+                  }}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={aiIconUrl}
+                    alt=""
+                    className="h-full w-full object-cover"
+                  />
+                </button>
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <IconCircle
+                    icon={categoryVisual.icon}
+                    tone={categoryVisual.tone}
+                    size="lg"
+                  />
+                </div>
+              )}
+              {iconBusy ? (
+                <span className="absolute inset-0 z-10 flex items-center justify-center bg-black/65 px-2 text-center text-xs font-semibold text-white">
+                  Generierung…
+                </span>
+              ) : null}
+            </div>
+            <Card className="h-full border-border/50">
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-3 text-base">
                   <IconCircle icon={Shield} tone="teal" size="sm" />
@@ -521,7 +514,7 @@ function DocumentDetailInner({ detail }: DetailProps) {
                     type="checkbox"
                     className="mt-0.5 size-4 accent-[var(--brand-docs)]"
                     checked={buddyReviewed}
-                    disabled={statusBusy}
+                    disabled={!statusLoaded || statusBusy}
                     onChange={(e) =>
                       void patchStatus({ buddyReviewed: e.target.checked })
                     }
@@ -538,7 +531,7 @@ function DocumentDetailInner({ detail }: DetailProps) {
                     type="checkbox"
                     className="mt-0.5 size-4 accent-[var(--brand-docs)]"
                     checked={taxRelevant}
-                    disabled={statusBusy}
+                    disabled={!statusLoaded || statusBusy}
                     onChange={(e) =>
                       void patchStatus({ taxRelevant: e.target.checked })
                     }
@@ -552,7 +545,7 @@ function DocumentDetailInner({ detail }: DetailProps) {
                 </label>
               </CardContent>
             </Card>
-          ) : null}
+          </div>
 
           {/* Soft UI hero card (mobile-first, also on desktop) */}
           <Card className="overflow-hidden border-border/50 shadow-[0_8px_28px_rgba(20,32,28,0.07)]">
