@@ -47,9 +47,9 @@ function rememberWritebackError(message: string | null): void {
 }
 
 function createClientOrNull(): PaperlessClient | null {
-  const { baseUrl, apiToken } = getPaperlessSettings();
+  const { baseUrl, apiToken, publicUrl } = getPaperlessSettings();
   if (!baseUrl || !apiToken) return null;
-  return new PaperlessClient(baseUrl, apiToken);
+  return new PaperlessClient(baseUrl, apiToken, publicUrl);
 }
 
 function docTitle(localDocumentId: number): string | null {

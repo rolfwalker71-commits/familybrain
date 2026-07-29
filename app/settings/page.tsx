@@ -58,6 +58,7 @@ function SettingsPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [baseUrl, setBaseUrl] = useState("");
+  const [publicUrl, setPublicUrl] = useState("");
   const [apiToken, setApiToken] = useState("");
   const [tokenMasked, setTokenMasked] = useState<string | null>(null);
   const [hasToken, setHasToken] = useState(false);
@@ -208,6 +209,7 @@ function SettingsPageInner() {
           );
         }
       setBaseUrl(data.paperlessBaseUrl || "");
+      setPublicUrl(data.paperlessPublicUrl || "");
       setTokenMasked(data.paperlessApiTokenMasked);
       setHasToken(Boolean(data.hasPaperlessToken));
       setPaperlessWritebackEnabled(
@@ -322,12 +324,13 @@ function SettingsPageInner() {
     setError(null);
     setMessage(null);
     try {
-      if (!baseUrl) throw new Error("Paperless Basis-URL ist erforderlich.");
+      if (!baseUrl) throw new Error("Paperless API-URL ist erforderlich.");
       const res = await fetch("/api/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           paperlessBaseUrl: baseUrl,
+          paperlessPublicUrl: publicUrl.trim(),
           paperlessApiToken: apiToken || undefined,
           paperlessWritebackEnabled,
           documentAiIconsEnabled,
@@ -336,6 +339,8 @@ function SettingsPageInner() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Speichern fehlgeschlagen");
+      setBaseUrl(data.paperlessBaseUrl || baseUrl);
+      setPublicUrl(data.paperlessPublicUrl || "");
       setTokenMasked(data.paperlessApiTokenMasked);
       setHasToken(data.hasPaperlessToken);
       setApiToken("");
@@ -1059,14 +1064,31 @@ function SettingsPageInner() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="url">Basis-URL</Label>
+            <Label htmlFor="url">API-URL (Server / intern)</Label>
             <Input
               id="url"
               className="rounded-xl"
               value={baseUrl}
               onChange={(e) => setBaseUrl(e.target.value)}
+              placeholder="http://paperless:8000"
+            />
+            <p className="text-xs text-muted-foreground">
+              Für Sync, Writeback und Dateiabruf. Bei Docker auf demselben Host
+              die interne Adresse verwenden (schnell).
+            </p>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="publicUrl">Öffentliche URL (Browser)</Label>
+            <Input
+              id="publicUrl"
+              className="rounded-xl"
+              value={publicUrl}
+              onChange={(e) => setPublicUrl(e.target.value)}
               placeholder="https://paperless.example.com"
             />
+            <p className="text-xs text-muted-foreground">
+              Für «In Paperless öffnen». Leer = gleiche Adresse wie API-URL.
+            </p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="token">API-Token</Label>

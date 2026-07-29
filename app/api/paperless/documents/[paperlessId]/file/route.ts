@@ -12,14 +12,14 @@ export const runtime = "nodejs";
 type Params = { params: Promise<{ paperlessId: string }> };
 
 function createClient() {
-  const { baseUrl, apiToken } = getPaperlessSettings();
+  const { baseUrl, apiToken, publicUrl } = getPaperlessSettings();
   if (!baseUrl || !apiToken) {
     throw new PaperlessError(
       "Paperless URL und Token müssen konfiguriert sein.",
       400
     );
   }
-  return new PaperlessClient(baseUrl, apiToken);
+  return new PaperlessClient(baseUrl, apiToken, publicUrl);
 }
 
 export async function GET(request: Request, { params }: Params) {

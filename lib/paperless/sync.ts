@@ -168,13 +168,13 @@ function shouldRunInterval(
 }
 
 function createClient(): PaperlessClient {
-  const { baseUrl, apiToken } = getPaperlessSettings();
+  const { baseUrl, apiToken, publicUrl } = getPaperlessSettings();
   if (!baseUrl || !apiToken) {
     throw new Error(
       "Paperless URL und API-Token müssen in den Einstellungen hinterlegt sein."
     );
   }
-  return new PaperlessClient(baseUrl, apiToken);
+  return new PaperlessClient(baseUrl, apiToken, publicUrl);
 }
 
 async function upsertRemoteDocument(

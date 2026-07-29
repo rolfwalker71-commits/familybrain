@@ -30,11 +30,27 @@ function normalizeBaseUrl(baseUrl: string): string {
 
 export class PaperlessClient {
   private baseUrl: string;
+  private publicUrl: string;
   private token: string;
 
-  constructor(baseUrl: string, token: string) {
+  constructor(
+    baseUrl: string,
+    token: string,
+    publicUrl?: string | null
+  ) {
     this.baseUrl = normalizeBaseUrl(baseUrl);
+    this.publicUrl = normalizeBaseUrl(publicUrl || baseUrl);
     this.token = normalizeToken(token);
+  }
+
+  /** API base used for server-side requests. */
+  get apiBaseUrl(): string {
+    return this.baseUrl;
+  }
+
+  /** Public UI base for browser links. */
+  get uiBaseUrl(): string {
+    return this.publicUrl;
   }
 
   private headers(accept = "application/json"): HeadersInit {
@@ -432,7 +448,7 @@ export class PaperlessClient {
   }
 
   documentUiUrl(paperlessId: number): string {
-    return `${this.baseUrl}/documents/${paperlessId}/`;
+    return `${this.publicUrl}/documents/${paperlessId}/`;
   }
 
   async getDocument(paperlessId: number): Promise<PaperlessDocument> {

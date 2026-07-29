@@ -79,8 +79,18 @@ export type DocumentFilters = {
 };
 
 export function getPaperlessSettings() {
+  const baseUrl = getSetting("paperless_base_url");
+  const publicUrlStored = getSetting("paperless_public_url");
   return {
-    baseUrl: getSetting("paperless_base_url"),
+    /** Server-side API base (prefer Docker-internal URL). */
+    baseUrl,
+    /**
+     * Browser-facing Paperless URL for «In Paperless öffnen» links.
+     * Falls back to baseUrl when unset.
+     */
+    publicUrl: publicUrlStored || baseUrl,
+    /** Raw public URL setting (may be null). */
+    publicUrlSetting: publicUrlStored,
     apiToken: getSetting("paperless_api_token"),
   };
 }
@@ -112,9 +122,17 @@ export function isTriliumConfigured(): boolean {
   );
 }
 
-export function savePaperlessSettings(baseUrl: string, apiToken: string | null) {
+export function savePaperlessSettings(
+  baseUrl: string,
+  apiToken: string | null,
+  publicUrl?: string | null
+) {
   const normalizedUrl = baseUrl.trim().replace(/\/$/, "");
   setSetting("paperless_base_url", normalizedUrl);
+  if (publicUrl !== undefined) {
+    const normalizedPublic = publicUrl?.trim().replace(/\/$/, "") || null;
+    setSetting("paperless_public_url", normalizedPublic);
+  }
   if (apiToken !== null && apiToken.trim() !== "") {
     const normalizedToken = apiToken
       .trim()

@@ -118,6 +118,7 @@ export async function GET(request: Request) {
   const nominatimBaseUrl = getNominatimBaseUrl();
   return NextResponse.json({
     paperlessBaseUrl: paperless.baseUrl,
+    paperlessPublicUrl: paperless.publicUrlSetting || "",
     paperlessApiTokenMasked: maskToken(paperless.apiToken),
     hasPaperlessToken: Boolean(paperless.apiToken),
     ...paperlessIntegrationPayload(request),
@@ -166,6 +167,7 @@ export async function GET(request: Request) {
 
 const PutSchema = z.object({
   paperlessBaseUrl: z.string().url().optional(),
+  paperlessPublicUrl: z.union([z.string().url(), z.literal("")]).optional(),
   paperlessApiToken: z.string().optional(),
   paperlessWritebackEnabled: z.boolean().optional(),
   paperlessWebhookSecret: z.string().max(200).nullable().optional(),
@@ -224,13 +226,29 @@ export async function PUT(request: Request) {
   if (parsed.data.paperlessBaseUrl) {
     savePaperlessSettings(
       parsed.data.paperlessBaseUrl,
-      parsed.data.paperlessApiToken ?? null
+      parsed.data.paperlessApiToken ?? null,
+      parsed.data.paperlessPublicUrl !== undefined
+        ? parsed.data.paperlessPublicUrl
+        : undefined
+    );
+  } else if (parsed.data.paperlessPublicUrl !== undefined) {
+    const current = getPaperlessSettings();
+    if (!current.baseUrl) {
+      return NextResponse.json(
+        { error: "Paperless API-URL fehlt." },
+        { status: 400 }
+      );
+    }
+    savePaperlessSettings(
+      current.baseUrl,
+      parsed.data.paperlessApiToken ?? null,
+      parsed.data.paperlessPublicUrl
     );
   } else if (parsed.data.paperlessApiToken) {
     const current = getPaperlessSettings();
     if (!current.baseUrl) {
       return NextResponse.json(
-        { error: "Paperless Basis-URL fehlt." },
+        { error: "Paperless API-URL fehlt." },
         { status: 400 }
       );
     }
@@ -387,6 +405,7 @@ export async function PUT(request: Request) {
   return NextResponse.json({
     ok: true,
     paperlessBaseUrl: paperless.baseUrl,
+    paperlessPublicUrl: paperless.publicUrlSetting || "",
     paperlessApiTokenMasked: maskToken(paperless.apiToken),
     hasPaperlessToken: Boolean(paperless.apiToken),
     ...paperlessIntegrationPayload(request),

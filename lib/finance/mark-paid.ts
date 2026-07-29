@@ -55,7 +55,11 @@ export async function markDocumentsPaid(
     };
   }
 
-  const client = new PaperlessClient(settings.baseUrl, settings.apiToken);
+  const client = new PaperlessClient(
+    settings.baseUrl,
+    settings.apiToken,
+    settings.publicUrl
+  );
   let fieldDefs: Awaited<ReturnType<typeof client.listCustomFields>> = [];
   try {
     fieldDefs = await client.listCustomFields();

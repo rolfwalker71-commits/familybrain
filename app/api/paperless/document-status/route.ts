@@ -29,10 +29,10 @@ async function resolveStatusFromRaw(
   buddyStatus: string | null;
 }> {
   const fieldIdToName = new Map<number, string>();
-  const { baseUrl, apiToken } = getPaperlessSettings();
+  const { baseUrl, apiToken, publicUrl } = getPaperlessSettings();
   if (baseUrl && apiToken) {
     try {
-      const client = new PaperlessClient(baseUrl, apiToken);
+      const client = new PaperlessClient(baseUrl, apiToken, publicUrl);
       const defs = await client.listCustomFields();
       for (const def of defs) fieldIdToName.set(def.id, def.name);
     } catch {

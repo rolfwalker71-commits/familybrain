@@ -93,6 +93,7 @@ function SyncClientInner() {
   } = useAnalysis();
 
   const [baseUrl, setBaseUrl] = useState("");
+  const [publicUrl, setPublicUrl] = useState("");
   const [apiToken, setApiToken] = useState("");
   const [tokenMasked, setTokenMasked] = useState<string | null>(null);
   const [hasToken, setHasToken] = useState(false);
@@ -209,6 +210,7 @@ function SyncClientInner() {
       const res = await fetch("/api/settings");
       const data = await res.json();
       setBaseUrl(data.paperlessBaseUrl || "");
+      setPublicUrl(data.paperlessPublicUrl || "");
       setTokenMasked(data.paperlessApiTokenMasked);
       setHasToken(Boolean(data.hasPaperlessToken));
       setTriliumConfigured(Boolean(data.triliumConfigured));
@@ -266,11 +268,14 @@ function SyncClientInner() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           paperlessBaseUrl: baseUrl,
+          paperlessPublicUrl: publicUrl.trim(),
           paperlessApiToken: apiToken || undefined,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Speichern fehlgeschlagen");
+      setBaseUrl(data.paperlessBaseUrl || baseUrl);
+      setPublicUrl(data.paperlessPublicUrl || "");
       setTokenMasked(data.paperlessApiTokenMasked);
       setHasToken(data.hasPaperlessToken);
       setApiToken("");
@@ -296,6 +301,7 @@ function SyncClientInner() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             paperlessBaseUrl: baseUrl,
+            paperlessPublicUrl: publicUrl.trim(),
             paperlessApiToken: apiToken || undefined,
           }),
         });
@@ -610,14 +616,30 @@ function SyncClientInner() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="baseUrl">Paperless Basis-URL</Label>
+            <Label htmlFor="baseUrl">API-URL (Server / intern)</Label>
             <Input
               id="baseUrl"
               className="rounded-xl"
-              placeholder="https://paperless.example.com"
+              placeholder="http://paperless:8000"
               value={baseUrl}
               onChange={(e) => setBaseUrl(e.target.value)}
             />
+            <p className="text-xs text-muted-foreground">
+              Sync/Writeback: bei Docker die interne Adresse (z.B. Service-Name).
+            </p>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="publicUrl">Öffentliche URL (Browser)</Label>
+            <Input
+              id="publicUrl"
+              className="rounded-xl"
+              placeholder="https://paperless.example.com"
+              value={publicUrl}
+              onChange={(e) => setPublicUrl(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Für Links «In Paperless öffnen». Leer = wie API-URL.
+            </p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="token">API-Token</Label>

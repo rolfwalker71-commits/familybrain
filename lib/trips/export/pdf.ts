@@ -361,9 +361,9 @@ export async function buildTripPdfBuffer(
   }
 
   // Append unique Paperless PDFs
-  const { baseUrl, apiToken } = getPaperlessSettings();
+  const { baseUrl, apiToken, publicUrl } = getPaperlessSettings();
   if (model.documents.length > 0 && baseUrl && apiToken) {
-    const client = new PaperlessClient(baseUrl, apiToken);
+    const client = new PaperlessClient(baseUrl, apiToken, publicUrl);
     for (const doc of model.documents) {
       try {
         const { buffer, contentType } = await client.downloadDocument(

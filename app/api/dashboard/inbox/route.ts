@@ -24,7 +24,11 @@ async function ensurePaymentFlagsPopulated() {
   if (!settings.baseUrl || !settings.apiToken) return;
 
   try {
-    const client = new PaperlessClient(settings.baseUrl, settings.apiToken);
+    const client = new PaperlessClient(
+      settings.baseUrl,
+      settings.apiToken,
+      settings.publicUrl
+    );
     const fields = await client.listCustomFields();
     if (fields.length === 0) return;
     const map = new Map(fields.map((f) => [f.id, f.name] as const));

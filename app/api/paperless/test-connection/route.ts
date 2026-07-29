@@ -29,7 +29,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const client = new PaperlessClient(baseUrl, apiToken);
+    const client = new PaperlessClient(baseUrl, apiToken, stored.publicUrl);
     const result = await client.testConnection();
     return NextResponse.json({ ok: true, count: result.count });
   } catch (error) {
