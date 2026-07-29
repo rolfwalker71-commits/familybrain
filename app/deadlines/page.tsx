@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -101,7 +102,7 @@ function deadlineBadgeLabel(row: DeadlineRow): string {
     return `Zurückgestellt bis ${toSwissDate(row.snoozed_until)}`;
   }
   const temporal = resolveTemporalStatus(row.deadline_date);
-  if (temporal === "expired") return "Überfällig";
+  if (temporal === "expired") return "Verfallen";
   return temporalStatusLabel(temporal);
 }
 
@@ -130,10 +131,11 @@ function DeadlinesPageInner() {
   const [editTitle, setEditTitle] = useState("");
   const [editDate, setEditDate] = useState("");
   const [busyId, setBusyId] = useState<number | null>(null);
+  const [search, setSearch] = useState("");
 
   const statusItems = {
     open: "Offen",
-    overdue: "Überfällig",
+    overdue: "Verfallen",
     snoozed: "Zurückgestellt",
     completed: "Erledigt",
     all: "Alle",
@@ -195,9 +197,34 @@ function DeadlinesPageInner() {
     .filter((e): e is CalendarEvent => Boolean(e));
 
   const today = todayIso();
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((row) => {
+      const hay = [
+        row.title,
+        row.description,
+        row.correspondent_name,
+        row.document_title,
+        row.deadline_type,
+        deadlineTypeLabel(row.deadline_type),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return hay.includes(q);
+    });
+  }, [rows, search]);
+  const searching = search.trim().length > 0;
   const buckets = useMemo(
-    () => groupByTimeBucket(rows, (r) => r.deadline_date, today),
-    [rows, today]
+    () =>
+      groupByTimeBucket(
+        filtered,
+        (r) => r.deadline_date,
+        today,
+        "deadlines"
+      ).map((b) => (searching ? { ...b, defaultOpen: true } : b)),
+    [filtered, today, searching]
   );
 
   function renderDeadlineRow(row: DeadlineRow) {
@@ -437,6 +464,17 @@ function DeadlinesPageInner() {
         }
       />
 
+      <div className="relative max-w-md">
+        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Titel, Korrespondent, Dokument …"
+          className="pl-9"
+          aria-label="Fristen durchsuchen"
+        />
+      </div>
+
       <Card className="min-w-0 gap-0 overflow-visible border-0 bg-transparent p-0 shadow-none md:overflow-hidden md:border md:border-border/60 md:bg-card md:shadow-[0_4px_16px_rgba(20,32,28,0.05)]">
         <CardContent className="p-0">
           {loading ? (
@@ -454,11 +492,15 @@ function DeadlinesPageInner() {
             <div className="rounded-xl border border-border/60 bg-card p-8 text-sm text-muted-foreground shadow-[0_4px_16px_rgba(20,32,28,0.05)] md:rounded-none md:border-0 md:bg-transparent md:shadow-none">
               Keine Fristen gefunden.
             </div>
+          ) : filtered.length === 0 ? (
+            <div className="rounded-xl border border-border/60 bg-card p-8 text-sm text-muted-foreground shadow-[0_4px_16px_rgba(20,32,28,0.05)] md:rounded-none md:border-0 md:bg-transparent md:shadow-none">
+              Keine Treffer für «{search.trim()}».
+            </div>
           ) : (
             <div className="md:divide-y-0">
               {buckets.map((bucket) => (
                 <TimeBucketSection
-                  key={bucket.id}
+                  key={`${bucket.id}-${searching ? "s" : "n"}`}
                   title={bucket.title}
                   accent={bucket.accent}
                   defaultOpen={bucket.defaultOpen}

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { AiImagePreview } from "@/components/layout/ai-image-preview";
+import { AiImageZoom } from "@/components/layout/ai-image-zoom";
 import {
   IconCircle,
   knowledgeVisual,
@@ -36,34 +37,9 @@ const SIZE: Record<
   },
 };
 
-function ZoomLightbox({
-  src,
-  onClose,
-}: {
-  src: string;
-  onClose: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/70 p-4"
-      onClick={onClose}
-      aria-label="Schliessen"
-    >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={src}
-        alt=""
-        className="max-h-[90vh] max-w-[95vw] rounded-lg object-contain shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      />
-    </button>
-  );
-}
-
 /**
  * Shared document visual: generated AI icon, or category/fallback circle.
- * AI icons open a zoom lightbox on tap.
+ * AI icons open a zoom lightbox on tap (closes on click or Escape).
  */
 export function DocumentAiIcon({
   aiIconUrl,
@@ -100,7 +76,7 @@ export function DocumentAiIcon({
           />
         </span>
         {zoom ? (
-          <ZoomLightbox src={aiIconUrl} onClose={() => setZoom(false)} />
+          <AiImageZoom src={aiIconUrl} onClose={() => setZoom(false)} />
         ) : null}
       </>
     );

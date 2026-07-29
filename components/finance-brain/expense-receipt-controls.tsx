@@ -6,8 +6,9 @@ import {
   useRef,
   useState,
 } from "react";
-import { Camera, Image as ImageIcon, Trash2, X } from "lucide-react";
+import { Camera, Image as ImageIcon, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { AiImageZoom } from "@/components/layout/ai-image-zoom";
 import { cn } from "@/lib/utils";
 
 export type ExpenseReceiptControlsHandle = {
@@ -177,27 +178,11 @@ export const ExpenseReceiptControls = forwardRef<
       ) : null}
 
       {previewOpen && receiptUrl ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
-          onClick={() => setPreviewOpen(false)}
-          role="dialog"
-        >
-          <button
-            type="button"
-            className="absolute right-4 top-4 rounded bg-black/50 p-2 text-white"
-            onClick={() => setPreviewOpen(false)}
-            aria-label="Schliessen"
-          >
-            <X className="size-5" />
-          </button>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={receiptUrl}
-            alt={`Beleg ${expenseId}`}
-            className="max-h-[90vh] max-w-full rounded object-contain"
-            onClick={(e) => e.stopPropagation()}
-          />
-        </div>
+        <AiImageZoom
+          src={receiptUrl}
+          alt={`Beleg ${expenseId}`}
+          onClose={() => setPreviewOpen(false)}
+        />
       ) : null}
     </div>
   );

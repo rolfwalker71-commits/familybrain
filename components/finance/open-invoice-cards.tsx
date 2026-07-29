@@ -75,7 +75,7 @@ export function OpenInvoiceCard({ invoice }: { invoice: OpenInvoiceCardModel }) 
     >
       <div className="relative aspect-[5/3] bg-muted/40">
         <CardThumb paperlessId={invoice.paperless_id} title={title} />
-        <span className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-xl shadow-md ring-2 ring-white/80">
+        <span className="absolute left-1/2 top-2 -translate-x-1/2 rounded-xl shadow-md ring-2 ring-white/80">
           <DocumentAiIcon
             aiIconUrl={invoice.ai_icon_url}
             category={invoice.category}
@@ -84,7 +84,7 @@ export function OpenInvoiceCard({ invoice }: { invoice: OpenInvoiceCardModel }) 
         </span>
       </div>
 
-      <div className="space-y-0.5 border-b border-border/70 px-2.5 pb-1.5 pt-7">
+      <div className="space-y-0.5 border-b border-border/70 px-2.5 py-1.5">
         <Link
           href={`/documents/${invoice.id}`}
           className="block min-w-0 text-[10px] font-semibold leading-snug text-[var(--brand-docs)] hover:underline sm:text-[11px]"

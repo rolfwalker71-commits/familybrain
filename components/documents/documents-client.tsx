@@ -35,6 +35,7 @@ import {
   pageVisuals,
 } from "@/components/layout/icon-circle";
 import { AiImagePreview } from "@/components/layout/ai-image-preview";
+import { AiImageZoom } from "@/components/layout/ai-image-zoom";
 import { FilterChip, SoftFab } from "@/components/layout/soft-ui";
 import { toSwissDate } from "@/lib/utils/dates";
 import { readNdjsonStream } from "@/lib/utils/stream";
@@ -1286,18 +1287,7 @@ export function DocumentsClient() {
       </SoftFab>
 
       {zoomUrl ? (
-        <button
-          type="button"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
-          onClick={() => setZoomUrl(null)}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={zoomUrl}
-            alt=""
-            className="max-h-[90vh] max-w-[95vw] rounded-lg object-contain"
-          />
-        </button>
+        <AiImageZoom src={zoomUrl} onClose={() => setZoomUrl(null)} />
       ) : null}
     </div>
   );

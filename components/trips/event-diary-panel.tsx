@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { UserAvatar } from "@/components/users/user-avatar";
+import { AiImageZoom } from "@/components/layout/ai-image-zoom";
 import { formatDateDe } from "@/lib/finance-brain/format";
 import { isWeatherCommentBody } from "@/lib/trips/map-context";
 import { cn } from "@/lib/utils";
@@ -501,18 +502,7 @@ export function EventDiaryPanel({
       ) : null}
 
       {zoomUrl ? (
-        <button
-          type="button"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
-          onClick={() => setZoomUrl(null)}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={zoomUrl}
-            alt=""
-            className="max-h-[90vh] max-w-[95vw] rounded-lg object-contain"
-          />
-        </button>
+        <AiImageZoom src={zoomUrl} onClose={() => setZoomUrl(null)} />
       ) : null}
     </div>
   );

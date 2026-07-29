@@ -1,8 +1,10 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import {
   DataList,
   DataListRow,
@@ -105,8 +107,26 @@ function todayIso(): string {
   ].join("-");
 }
 
+function matchesWarranty(row: WarrantyRow, q: string): boolean {
+  if (!q) return true;
+  const hay = [
+    row.product_name,
+    row.manufacturer,
+    row.vendor,
+    row.correspondent_name,
+    row.serial_number,
+    row.document_title,
+    row.category,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  return hay.includes(q);
+}
+
 export function WarrantiesClient({ rows }: { rows: WarrantyRow[] }) {
   const [sortDir, setSortDir] = useListSortDir("warranties", "desc");
+  const [search, setSearch] = useState("");
   const sorted = useMemo(
     () =>
       [...rows].sort((a, b) =>
@@ -114,12 +134,24 @@ export function WarrantiesClient({ rows }: { rows: WarrantyRow[] }) {
       ),
     [rows, sortDir]
   );
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return sorted;
+    return sorted.filter((row) => matchesWarranty(row, q));
+  }, [sorted, search]);
   const today = todayIso();
+  const searching = search.trim().length > 0;
   const buckets = useMemo(
-    () => groupByTimeBucket(sorted, (r) => r.warranty_until, today),
-    [sorted, today]
+    () =>
+      groupByTimeBucket(
+        filtered,
+        (r) => r.warranty_until,
+        today,
+        "warranties"
+      ).map((b) => (searching ? { ...b, defaultOpen: true } : b)),
+    [filtered, today, searching]
   );
-  const exportable = sorted
+  const exportable = filtered
     .map(warrantyToEvent)
     .filter((e): e is CalendarEvent => Boolean(e));
 
@@ -150,6 +182,17 @@ export function WarrantiesClient({ rows }: { rows: WarrantyRow[] }) {
         }
       />
 
+      <div className="relative max-w-md">
+        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Gerät, Hersteller, Händler, Seriennr. …"
+          className="pl-9"
+          aria-label="Garantien durchsuchen"
+        />
+      </div>
+
       <Card className="min-w-0 gap-0 overflow-visible border-0 bg-transparent p-0 shadow-none md:overflow-hidden md:border md:border-border/60 md:bg-card md:shadow-[0_4px_16px_rgba(20,32,28,0.05)]">
         <CardContent className="p-0">
           {sorted.length === 0 ? (
@@ -157,11 +200,15 @@ export function WarrantiesClient({ rows }: { rows: WarrantyRow[] }) {
               Noch keine Garantien erkannt. Analysiere Kaufbelege und
               Gerätedokumente.
             </div>
+          ) : filtered.length === 0 ? (
+            <div className="rounded-xl border border-border/60 bg-card p-8 text-sm text-muted-foreground shadow-[0_4px_16px_rgba(20,32,28,0.05)] md:rounded-none md:border-0 md:bg-transparent md:shadow-none">
+              Keine Treffer für «{search.trim()}».
+            </div>
           ) : (
             <div>
               {buckets.map((bucket) => (
                 <TimeBucketSection
-                  key={bucket.id}
+                  key={`${bucket.id}-${searching ? "s" : "n"}`}
                   title={bucket.title}
                   accent={bucket.accent}
                   defaultOpen={bucket.defaultOpen}
