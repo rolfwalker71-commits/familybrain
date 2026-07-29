@@ -401,6 +401,9 @@ export function upsertDocument(input: {
         existing.id
       );
       replaceTags(existing.id, input.tags);
+      // Only OCR/content changes invalidate AI analysis. Metadata/writeback
+      // updates (modified_at, tags, custom fields) must NOT re-queue analysis —
+      // otherwise analyze → writeback → sync → stale loops forever.
       if (contentChanged) {
         markSummaryStale(existing.id);
         const oldIcon = existing.ai_icon_path;
@@ -416,8 +419,6 @@ export function upsertDocument(input: {
             /* ignore */
           }
         }
-      } else if (metadataChanged && !paymentChanged) {
-        markSummaryStale(existing.id);
       }
       return { id: existing.id, changed: true, isNew: false };
     }
