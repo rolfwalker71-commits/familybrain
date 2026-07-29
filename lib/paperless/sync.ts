@@ -185,8 +185,10 @@ async function upsertRemoteDocument(
     typeCache: NameCache;
     correspondentCache: NameCache;
     customFieldNames: Map<number, string>;
-  }
+  },
+  options?: { source?: "sync" | "webhook" }
 ): Promise<{ isNew: boolean; changed: boolean; localId: number }> {
+  const source = options?.source ?? "sync";
   const resolved = await resolveNames(
     client,
     doc,
@@ -222,7 +224,7 @@ async function upsertRemoteDocument(
     const logs: Parameters<typeof appendPaperlessFieldSyncLogs>[0] = [];
     const base = {
       direction: "pull" as const,
-      source: "sync" as const,
+      source,
       documentLocalId: upserted.id,
       paperlessId: doc.id,
       documentTitle: doc.title ?? null,
@@ -250,8 +252,8 @@ async function upsertRemoteDocument(
       });
     }
 
-    // Known Buddy UDFs: log on first ingest only (avoid full-sync flood)
-    if (upserted.isNew) {
+    // Known Buddy UDFs: log on first ingest, and on webhook pulls (debugging)
+    if (upserted.isNew || source === "webhook") {
       const buddyReviewed = extractNamedBooleanField(
         doc,
         caches.customFieldNames,
@@ -285,7 +287,10 @@ async function upsertRemoteDocument(
           kind: "custom_field",
           fieldName: name,
           fieldValue: value,
-          message: "aus Paperless gelesen",
+          message:
+            source === "webhook"
+              ? "via Webhook aus Paperless"
+              : "aus Paperless gelesen",
         });
       }
     }
@@ -298,21 +303,32 @@ async function upsertRemoteDocument(
 
 /** Fetch a remote Paperless document and upsert into the local index. */
 export async function ingestPaperlessDocumentById(
-  paperlessId: number
-): Promise<{ localId: number; paperlessId: number }> {
+  paperlessId: number,
+  options?: { source?: "sync" | "webhook" }
+): Promise<{ localId: number; paperlessId: number; changed: boolean; isNew: boolean }> {
   const client = createClient();
   const doc = await client.getDocument(paperlessId);
   const customFields = await client.listCustomFields().catch(() => []);
   const customFieldNames = new Map(
     customFields.map((f) => [f.id, f.name] as const)
   );
-  const upserted = await upsertRemoteDocument(client, doc, {
-    tagCache: new Map(),
-    typeCache: new Map(),
-    correspondentCache: new Map(),
-    customFieldNames,
-  });
-  return { localId: upserted.localId, paperlessId };
+  const upserted = await upsertRemoteDocument(
+    client,
+    doc,
+    {
+      tagCache: new Map(),
+      typeCache: new Map(),
+      correspondentCache: new Map(),
+      customFieldNames,
+    },
+    { source: options?.source ?? "sync" }
+  );
+  return {
+    localId: upserted.localId,
+    paperlessId,
+    changed: upserted.changed,
+    isNew: upserted.isNew,
+  };
 }
 
 /** Upload a PDF to Paperless, wait for consumption, upsert locally. */

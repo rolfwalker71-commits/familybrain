@@ -60,14 +60,13 @@ function bodyDebug(body: unknown): Record<string, unknown> {
   return { bodyType: Array.isArray(body) ? "array" : typeof body };
 }
 
-async function ingestAndMaybeAnalyze(paperlessId: number): Promise<void> {
-  const ingested = await ingestPaperlessDocumentById(paperlessId);
+async function analyzeIfPending(localId: number, paperlessId: number): Promise<void> {
   try {
     const { listPendingDocumentIds } = await import("@/lib/db/queries");
     const pending = listPendingDocumentIds(50);
-    if (!pending.includes(ingested.localId)) return;
+    if (!pending.includes(localId)) return;
     const { analyzeDocument } = await import("@/lib/ai/analyze-document");
-    await analyzeDocument(ingested.localId, {
+    await analyzeDocument(localId, {
       manageErrorStatus: true,
     });
   } catch (analyzeErr) {
@@ -121,14 +120,47 @@ export async function POST(request: Request) {
     );
   }
 
-  // Answer immediately — Paperless webhook timeout is short; analysis is slow.
+  // Ingest synchronously so F5 shows Paperless changes. Only AI stays async
+  // (analysis can exceed Paperless webhook timeouts).
+  let localId: number;
+  let changed = false;
+  let isNew = false;
+  try {
+    const ingested = await ingestPaperlessDocumentById(paperlessId, {
+      source: "webhook",
+    });
+    localId = ingested.localId;
+    changed = ingested.changed;
+    isNew = ingested.isNew;
+    console.info("[paperless webhook] ingested", {
+      paperlessId,
+      localId,
+      changed,
+      isNew,
+    });
+  } catch (err) {
+    console.error(
+      "[paperless webhook] ingest",
+      paperlessId,
+      err instanceof Error ? err.message : err
+    );
+    return NextResponse.json(
+      {
+        error: "Dokument konnte nicht von Paperless geladen werden.",
+        paperlessId,
+        detail: err instanceof Error ? err.message : String(err),
+      },
+      { status: 502 }
+    );
+  }
+
   after(async () => {
     try {
-      await ingestAndMaybeAnalyze(paperlessId);
-      console.info("[paperless webhook] done", { paperlessId });
+      await analyzeIfPending(localId, paperlessId);
+      console.info("[paperless webhook] analyze done", { paperlessId, localId });
     } catch (err) {
       console.error(
-        "[paperless webhook] background",
+        "[paperless webhook] background analyze",
         paperlessId,
         err instanceof Error ? err.message : err
       );
@@ -136,7 +168,7 @@ export async function POST(request: Request) {
   });
 
   return NextResponse.json(
-    { ok: true, accepted: true, paperlessId },
+    { ok: true, accepted: true, paperlessId, localId, changed, isNew },
     { status: 202 }
   );
 }

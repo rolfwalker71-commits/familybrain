@@ -362,13 +362,17 @@ export function upsertDocument(input: {
     const paymentChanged =
       (existing.zu_bezahlen ?? null) !== zuBezahlen ||
       (existing.bezahlt ?? null) !== bezahlt;
+    // Custom-field-only edits live in raw_metadata; always apply when it differs.
+    const rawMetadataChanged =
+      (existing.raw_metadata ?? null) !== input.raw_metadata;
     const metadataChanged =
       existing.modified_at !== input.modified_at ||
       existing.title !== input.title ||
       existing.document_type_name !== input.document_type_name ||
       existing.correspondent_name !== input.correspondent_name ||
       existing.sync_status === "missing" ||
-      paymentChanged;
+      paymentChanged ||
+      rawMetadataChanged;
 
     if (contentChanged || metadataChanged) {
       db.prepare(
