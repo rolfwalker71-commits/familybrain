@@ -257,6 +257,12 @@ export function DocumentsClient() {
   }, [isRunning, load]);
 
   async function analyzeOne(id: number) {
+    if (isRunning) {
+      setError(
+        "Batch-Analyse läuft noch. Oben «Analyse stoppen», dann erneut «Analysieren»."
+      );
+      return;
+    }
     setAnalyzingId(id);
     setError(null);
     try {
@@ -311,10 +317,81 @@ export function DocumentsClient() {
     await load();
   }
 
+  async function enableDocumentAiIcons() {
+    setError(null);
+    try {
+      const res = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ documentAiIconsEnabled: true }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || "Einstellung speichern fehlgeschlagen");
+      }
+      setDocumentAiIconsEnabled(true);
+      setIconProgress(
+        "KI-Icons aktiv. Dokumente auswählen → «Icons neu», oder pro Zeile «Icon»."
+      );
+      window.setTimeout(() => setIconProgress(null), 5000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function generateOneIcon(documentId: number) {
+    if (!documentAiIconsEnabled) {
+      setError(
+        "KI-Icons sind noch aus. Oben «KI-Icons einschalten» tippen."
+      );
+      return;
+    }
+    if (!hasOpenAIKey) {
+      setError("OpenAI-Key fehlt.");
+      return;
+    }
+    if (iconBusy) return;
+    setIconBusy(true);
+    setError(null);
+    setGeneratingIconId(documentId);
+    setIconProgress(`Generierung… Dokument #${documentId}`);
+    try {
+      const res = await fetch(`/api/documents/${documentId}/ai-icon`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ force: true }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || "Icon-Generierung fehlgeschlagen");
+      }
+      const url =
+        typeof data.aiIconUrl === "string"
+          ? `${data.aiIconUrl}?t=${Date.now()}`
+          : null;
+      setDocs((prev) =>
+        prev.map((d) =>
+          d.id === documentId ? { ...d, ai_icon_url: url } : d
+        )
+      );
+      if (url) {
+        setMissingAiIcons((n) => Math.max(0, n - 1));
+      }
+      setIconProgress("Icon fertig.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setIconProgress(null);
+    } finally {
+      setIconBusy(false);
+      setGeneratingIconId(null);
+      window.setTimeout(() => setIconProgress(null), 2500);
+    }
+  }
+
   async function runAiIconBatch(mode: "selected" | "all-missing") {
     if (!documentAiIconsEnabled) {
       setError(
-        "KI-Icons sind deaktiviert. Unter Einstellungen → Paperless einschalten."
+        "KI-Icons sind noch aus. Oben «KI-Icons einschalten» tippen."
       );
       return;
     }
@@ -334,7 +411,7 @@ export function DocumentsClient() {
     setError(null);
     setIconProgress(
       force
-        ? `Generierung… (${documentIds!.length} ausgewählt)`
+        ? `Generierung… (${documentIds!.length} ausgewählt, ersetzt bestehende)`
         : "Generierung fehlender Icons…"
     );
     setGeneratingIconId(documentIds?.[0] ?? null);
@@ -444,7 +521,7 @@ export function DocumentsClient() {
           })()
         )}
         {generating ? (
-          <span className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/65 px-1 text-center text-[9px] font-semibold leading-tight text-white">
+          <span className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-black/70 px-1 text-center text-[9px] font-semibold leading-tight text-white">
             Generierung…
           </span>
         ) : null}
@@ -561,34 +638,77 @@ export function DocumentsClient() {
                 <Button
                   size="sm"
                   variant="outline"
-                  disabled={iconBusy || selectedIds.size === 0 || isRunning}
+                  disabled={iconBusy || selectedIds.size === 0}
                   onClick={() => void runAiIconBatch("selected")}
                 >
                   <Sparkles className="size-3.5" />
                   {iconBusy
-                    ? "Icons…"
-                    : `Icons Auswahl (${selectedIds.size})`}
+                    ? "Generierung…"
+                    : `Icons neu (${selectedIds.size})`}
                 </Button>
                 <Button
                   size="sm"
                   variant="outline"
-                  disabled={iconBusy || missingAiIcons === 0 || isRunning}
+                  disabled={iconBusy || missingAiIcons === 0}
                   onClick={() => void runAiIconBatch("all-missing")}
                 >
                   <Sparkles className="size-3.5" />
                   {iconBusy
-                    ? "Icons…"
-                    : `Alle fehlenden Icons (${missingAiIcons})`}
+                    ? "Generierung…"
+                    : `Nur fehlende (${missingAiIcons})`}
                 </Button>
               </>
             ) : hasOpenAIKey ? (
-              <Button size="sm" variant="outline" disabled>
-                KI-Icons aus (Einstellungen)
+              <Button
+                size="sm"
+                className="bg-[var(--brand-docs)] text-white hover:bg-[var(--brand-docs)]/90"
+                onClick={() => void enableDocumentAiIcons()}
+              >
+                <Sparkles className="size-3.5" />
+                KI-Icons einschalten
               </Button>
             ) : null}
           </div>
         }
       />
+
+      {isRunning ? (
+        <div
+          className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-950 dark:text-amber-100"
+          role="status"
+        >
+          Analyse läuft — «Analysieren» pro Zeile ist gesperrt.{" "}
+          <button
+            type="button"
+            className="font-semibold underline underline-offset-2"
+            onClick={() => void stopRunningWork()}
+          >
+            Analyse stoppen
+          </button>
+          , dann erneut tippen. KI-Icons sind davon unabhängig.
+        </div>
+      ) : null}
+
+      {hasOpenAIKey && !documentAiIconsEnabled ? (
+        <div
+          className="rounded-xl border border-[var(--brand-docs)]/40 bg-[var(--brand-docs-soft)] px-4 py-3 text-sm text-[var(--brand-docs)]"
+          role="status"
+        >
+          <p className="font-medium">KI-Icons sind aus — deshalb keine Generierung.</p>
+          <p className="mt-1 text-[var(--brand-docs)]/90">
+            Dunkle Icons bleiben, bis du einschaltest und neu erzeugst: Auswahl
+            anhaken → «Icons neu», oder in der Zeile «Icon».
+          </p>
+          <Button
+            size="sm"
+            className="mt-2 bg-[var(--brand-docs)] text-white hover:bg-[var(--brand-docs)]/90"
+            onClick={() => void enableDocumentAiIcons()}
+          >
+            <Sparkles className="size-3.5" />
+            Jetzt einschalten
+          </Button>
+        </div>
+      ) : null}
 
       {iconProgress ? (
         <div
@@ -608,6 +728,19 @@ export function DocumentsClient() {
           ) : (
             iconProgress
           )}
+        </div>
+      ) : null}
+
+      {iconBusy ? (
+        <div
+          className="fixed inset-x-3 bottom-20 z-40 rounded-2xl border border-[var(--brand-docs)]/50 bg-[var(--brand-docs)] px-4 py-3 text-center text-sm font-semibold text-white shadow-lg md:inset-x-auto md:bottom-6 md:right-6 md:min-w-[280px]"
+          role="status"
+          aria-live="assertive"
+        >
+          <span className="inline-flex items-center justify-center gap-2">
+            <Sparkles className="size-4 animate-pulse" />
+            {iconProgress || "Generierung…"}
+          </span>
         </div>
       ) : null}
       {/* Mobile: search + filter trigger + category chips */}
@@ -986,6 +1119,18 @@ export function DocumentsClient() {
                     onChange={() => toggleSelected(doc.id)}
                     aria-label="Auswählen"
                   />
+                  {documentAiIconsEnabled ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="shrink-0 px-2"
+                      disabled={iconBusy}
+                      title="AI-Icon erzeugen"
+                      onClick={() => void generateOneIcon(doc.id)}
+                    >
+                      <Sparkles className="size-3.5" />
+                    </Button>
+                  ) : null}
                   <Link
                     href={`/documents/${doc.id}`}
                     className="flex min-w-0 flex-1 items-center gap-3 transition-colors active:opacity-80"
@@ -1055,10 +1200,33 @@ export function DocumentsClient() {
                       actions={
                         <>
                           <DocumentInfoButton documentId={doc.id} />
+                          {documentAiIconsEnabled ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={iconBusy}
+                              title={
+                                doc.ai_icon_url
+                                  ? "AI-Icon neu erzeugen"
+                                  : "AI-Icon erzeugen"
+                              }
+                              onClick={() => void generateOneIcon(doc.id)}
+                            >
+                              <Sparkles className="size-3.5" />
+                              {generatingIconId === doc.id
+                                ? "…"
+                                : "Icon"}
+                            </Button>
+                          ) : null}
                           <Button
                             size="sm"
                             variant="outline"
                             disabled={analyzingId === doc.id || isRunning}
+                            title={
+                              isRunning
+                                ? "Erst Analyse stoppen"
+                                : "Dokument analysieren"
+                            }
                             onClick={() => void analyzeOne(doc.id)}
                           >
                             {analyzingId === doc.id ? "…" : "Analysieren"}
