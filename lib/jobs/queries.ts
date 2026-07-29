@@ -299,6 +299,16 @@ export function finishJobRun(
   );
 }
 
+/** Force-stop the active Sync/Analyse job lease (if any). */
+export function cancelActiveJobRun(
+  reason = "Manuell gestoppt"
+): JobRunRow | null {
+  const active = getActiveJobRun();
+  if (!active) return null;
+  finishJobRun(active.id, "error", null, reason);
+  return getJobRunById(active.id);
+}
+
 export function addJobRunItem(input: {
   runId: number;
   itemKind: string;

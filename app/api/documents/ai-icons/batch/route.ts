@@ -23,6 +23,19 @@ export async function POST(request: Request) {
     return Response.json({ error: "OpenAI API-Key fehlt." }, { status: 400 });
   }
 
+  const { isDocumentAiIconsEnabled } = await import(
+    "@/lib/paperless/document-icon"
+  );
+  if (!isDocumentAiIconsEnabled()) {
+    return Response.json(
+      {
+        error:
+          "Dokument-AI-Icons sind deaktiviert (Einstellungen → Paperless).",
+      },
+      { status: 403 }
+    );
+  }
+
   const body = await request.json().catch(() => ({}));
   const limit = Math.min(Math.max(Number(body.limit) || 10, 1), 25);
   const afterId = Math.max(Number(body.afterId) || 0, 0);

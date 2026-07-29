@@ -78,6 +78,10 @@ import {
   setPaperlessWebhookSecret,
   setPaperlessWritebackEnabled,
 } from "@/lib/paperless/writeback";
+import {
+  isDocumentAiIconsEnabled,
+  setDocumentAiIconsEnabled,
+} from "@/lib/paperless/document-icon";
 import { randomBytes } from "crypto";
 import {
   isAuthError,
@@ -97,6 +101,7 @@ function paperlessIntegrationPayload(request?: Request) {
     paperlessWebhookUrl: absoluteAppUrl("/api/paperless/webhook", request),
     paperlessWritebackLastError: getLastWritebackError(),
     paperlessCustomFieldChecklist: BUDDY_WRITEBACK_FIELD_CHECKLIST,
+    documentAiIconsEnabled: isDocumentAiIconsEnabled(),
   };
 }
 
@@ -165,6 +170,7 @@ const PutSchema = z.object({
   paperlessWritebackEnabled: z.boolean().optional(),
   paperlessWebhookSecret: z.string().max(200).nullable().optional(),
   generatePaperlessWebhookSecret: z.boolean().optional(),
+  documentAiIconsEnabled: z.boolean().optional(),
   openaiApiKey: z.string().optional(),
   openaiModel: z.string().min(1).optional(),
   triliumBaseUrl: z.string().url().optional(),
@@ -238,6 +244,9 @@ export async function PUT(request: Request) {
     setPaperlessWebhookSecret(randomBytes(24).toString("hex"));
   } else if (parsed.data.paperlessWebhookSecret !== undefined) {
     setPaperlessWebhookSecret(parsed.data.paperlessWebhookSecret);
+  }
+  if (parsed.data.documentAiIconsEnabled !== undefined) {
+    setDocumentAiIconsEnabled(parsed.data.documentAiIconsEnabled);
   }
 
   if (parsed.data.openaiApiKey !== undefined || parsed.data.openaiModel) {

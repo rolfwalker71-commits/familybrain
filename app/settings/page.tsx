@@ -63,6 +63,7 @@ function SettingsPageInner() {
   const [hasToken, setHasToken] = useState(false);
   const [paperlessWritebackEnabled, setPaperlessWritebackEnabled] =
     useState(true);
+  const [documentAiIconsEnabled, setDocumentAiIconsEnabled] = useState(false);
   const [paperlessWebhookSecret, setPaperlessWebhookSecret] = useState("");
   const [paperlessWebhookUrl, setPaperlessWebhookUrl] = useState("");
   const [hasPaperlessWebhookSecret, setHasPaperlessWebhookSecret] =
@@ -212,6 +213,7 @@ function SettingsPageInner() {
       setPaperlessWritebackEnabled(
         data.paperlessWritebackEnabled !== false
       );
+      setDocumentAiIconsEnabled(Boolean(data.documentAiIconsEnabled));
       setPaperlessWebhookUrl(data.paperlessWebhookUrl || "");
       setHasPaperlessWebhookSecret(Boolean(data.hasPaperlessWebhookSecret));
       setPaperlessWebhookSecretMasked(
@@ -328,6 +330,7 @@ function SettingsPageInner() {
           paperlessBaseUrl: baseUrl,
           paperlessApiToken: apiToken || undefined,
           paperlessWritebackEnabled,
+          documentAiIconsEnabled,
           paperlessWebhookSecret: paperlessWebhookSecret || undefined,
         }),
       });
@@ -337,6 +340,7 @@ function SettingsPageInner() {
       setHasToken(data.hasPaperlessToken);
       setApiToken("");
       setPaperlessWritebackEnabled(data.paperlessWritebackEnabled !== false);
+      setDocumentAiIconsEnabled(Boolean(data.documentAiIconsEnabled));
       setPaperlessWebhookUrl(data.paperlessWebhookUrl || "");
       setHasPaperlessWebhookSecret(Boolean(data.hasPaperlessWebhookSecret));
       setPaperlessWebhookSecretMasked(
@@ -1095,6 +1099,26 @@ function SettingsPageInner() {
               <p className="text-xs text-muted-foreground">
                 Schreibt Custom Fields, Tags und Status nach erfolgreicher
                 Analyse bzw. beim Verknüpfen mit Reise/Ausgabe zurück.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-3 rounded-xl border border-border/60 bg-muted/30 px-3 py-3">
+            <input
+              id="documentAiIcons"
+              type="checkbox"
+              className="mt-1 size-4 accent-[var(--brand-docs)]"
+              checked={documentAiIconsEnabled}
+              onChange={(e) => setDocumentAiIconsEnabled(e.target.checked)}
+            />
+            <div className="min-w-0 space-y-1">
+              <Label htmlFor="documentAiIcons" className="cursor-pointer">
+                KI-Icons für Dokumente
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Wenn aus: keine Icon-Generierung (auch nicht nach Analyse). Zum
+                Testen einschalten und unter Dokumente gezielt einzelne Icons
+                erzeugen — «Alle fehlenden» erst danach nutzen.
               </p>
             </div>
           </div>

@@ -4,6 +4,7 @@ import { randomUUID } from "crypto";
 import sharp from "sharp";
 import { getOpenAIClient, hasOpenAIKey } from "@/lib/ai/client";
 import { getDb } from "@/lib/db/client";
+import { getSetting, setSetting } from "@/lib/db/migrations";
 import { getDocumentById, type PaperlessDocumentRow } from "@/lib/db/queries";
 import { getTripsDataRoot } from "@/lib/trips/paths";
 import { nowIso } from "@/lib/utils/dates";
@@ -11,6 +12,18 @@ import { nowIso } from "@/lib/utils/dates";
 /** Document list thumbnails — gpt-image-1.5 for reliable color + prompt adherence. */
 export const DOCUMENT_AI_ICON_MODEL = "gpt-image-1.5";
 
+const DOCUMENT_AI_ICONS_ENABLED_KEY = "document_ai_icons_enabled";
+
+/** Default off — enable in settings after sampling a few icons. */
+export function isDocumentAiIconsEnabled(): boolean {
+  const stored = getSetting(DOCUMENT_AI_ICONS_ENABLED_KEY);
+  if (stored == null || stored === "") return false;
+  return stored === "1" || stored.toLowerCase() === "true";
+}
+
+export function setDocumentAiIconsEnabled(enabled: boolean): void {
+  setSetting(DOCUMENT_AI_ICONS_ENABLED_KEY, enabled ? "1" : "0");
+}
 export function getDocumentAiIconDir(): string {
   return path.join(getTripsDataRoot(), "document-ai-icons");
 }
@@ -198,6 +211,11 @@ export async function generateDocumentAiIcon(
   documentId: number,
   options?: { force?: boolean }
 ): Promise<PaperlessDocumentRow> {
+  if (!isDocumentAiIconsEnabled()) {
+    throw new Error(
+      "Dokument-AI-Icons sind deaktiviert (Einstellungen → Paperless)."
+    );
+  }
   if (!hasOpenAIKey()) {
     throw new Error("OpenAI API-Key fehlt.");
   }
@@ -254,6 +272,7 @@ export async function generateDocumentAiIcon(
 export async function ensureDocumentAiIconIfMissing(
   documentId: number
 ): Promise<void> {
+  if (!isDocumentAiIconsEnabled()) return;
   const detail = getDocumentById(documentId);
   if (!detail?.document) return;
   if (detail.document.ai_icon_path) return;

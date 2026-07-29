@@ -94,12 +94,13 @@ function toItemsRecord(
 export function DocumentsClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { pendingCount, isRunning, refreshStats, startAnalysis, hasOpenAIKey } =
+  const { pendingCount, isRunning, refreshStats, startAnalysis, hasOpenAIKey, stopAnalysis } =
     useAnalysis();
   const [sortDir, setSortDir] = useListSortDir("documents", "desc");
 
   const [docs, setDocs] = useState<DocRow[]>([]);
   const [total, setTotal] = useState(0);
+  const [documentAiIconsEnabled, setDocumentAiIconsEnabled] = useState(false);
   const [filters, setFilters] = useState<Filters>({
     correspondents: [],
     documentTypes: [],
@@ -202,6 +203,15 @@ export function DocumentsClient() {
         documentTypes: data.filters?.documentTypes || [],
         categories: data.filters?.categories || [],
       });
+      try {
+        const settingsRes = await fetch("/api/settings", { cache: "no-store" });
+        if (settingsRes.ok) {
+          const settings = await settingsRes.json();
+          setDocumentAiIconsEnabled(Boolean(settings.documentAiIconsEnabled));
+        }
+      } catch {
+        /* ignore */
+      }
       await refreshStats();
     } catch (err) {
       if (requestId !== requestIdRef.current) return;
@@ -286,7 +296,26 @@ export function DocumentsClient() {
     setSelectedIds(new Set(ids));
   }
 
+  async function stopRunningWork() {
+    stopAnalysis();
+    setIconBusy(false);
+    setIconProgress(null);
+    try {
+      await fetch("/api/jobs/cancel", { method: "POST" });
+    } catch {
+      /* ignore */
+    }
+    setError(null);
+    await load();
+  }
+
   async function runAiIconBatch(mode: "selected" | "all-missing") {
+    if (!documentAiIconsEnabled) {
+      setError(
+        "KI-Icons sind deaktiviert. Unter Einstellungen → Paperless einschalten."
+      );
+      return;
+    }
     if (!hasOpenAIKey) {
       setError("OpenAI-Key fehlt.");
       return;
@@ -464,36 +493,44 @@ export function DocumentsClient() {
               dir={sortDir}
               onDirChange={setSortDir}
             />
-            {pendingCount > 0 && hasOpenAIKey ? (
+            {isRunning ? (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => void stopRunningWork()}
+              >
+                Analyse stoppen
+              </Button>
+            ) : pendingCount > 0 && hasOpenAIKey ? (
               <>
                 <Button
                   size="sm"
                   variant="outline"
-                  disabled={isRunning || iconBusy}
+                  disabled={iconBusy}
                   onClick={() =>
                     void startAnalysis({ mode: "batch", batchSize: 10 })
                   }
                 >
-                  {isRunning ? "Läuft…" : "10 analysieren"}
+                  10 analysieren
                 </Button>
                 <Button
                   size="sm"
                   className="bg-[var(--brand-finance)] text-white hover:bg-[var(--brand-finance)]/90"
-                  disabled={isRunning || iconBusy}
+                  disabled={iconBusy}
                   onClick={() =>
                     void startAnalysis({ mode: "all", batchSize: 10 })
                   }
                 >
-                  {isRunning ? "Läuft…" : "Alle ausstehend"}
+                  Alle ausstehend
                 </Button>
               </>
             ) : null}
-            {hasOpenAIKey ? (
+            {hasOpenAIKey && documentAiIconsEnabled ? (
               <>
                 <Button
                   size="sm"
                   variant="outline"
-                  disabled={iconBusy || selectedIds.size === 0}
+                  disabled={iconBusy || selectedIds.size === 0 || isRunning}
                   onClick={() => void runAiIconBatch("selected")}
                 >
                   <Sparkles className="size-3.5" />
@@ -504,7 +541,7 @@ export function DocumentsClient() {
                 <Button
                   size="sm"
                   variant="outline"
-                  disabled={iconBusy || missingAiIcons === 0}
+                  disabled={iconBusy || missingAiIcons === 0 || isRunning}
                   onClick={() => void runAiIconBatch("all-missing")}
                 >
                   <Sparkles className="size-3.5" />
@@ -513,6 +550,10 @@ export function DocumentsClient() {
                     : `Alle fehlenden Icons (${missingAiIcons})`}
                 </Button>
               </>
+            ) : hasOpenAIKey ? (
+              <Button size="sm" variant="outline" disabled>
+                KI-Icons aus (Einstellungen)
+              </Button>
             ) : null}
           </div>
         }
