@@ -420,7 +420,7 @@ export function DocumentsClient() {
     }
   }
 
-  async function runAiIconBatch(mode: "selected" | "all-missing") {
+  async function runAiIconBatch(mode: "selected" | "all-missing" | "all-force") {
     if (!documentAiIconsEnabled) {
       setError(
         "KI-Icons sind noch aus. Oben «KI-Icons einschalten» tippen."
@@ -432,17 +432,21 @@ export function DocumentsClient() {
       return;
     }
 
-    if (mode === "all-missing") {
+    if (mode === "all-missing" || mode === "all-force") {
+      const jobType =
+        mode === "all-force" ? "ai_icons_regenerate" : "ai_icons_missing";
       setIconBusy(true);
       setError(null);
       setIconProgress(
-        "Starte Server-Job «Nur fehlende Icons» — läuft weiter, wenn du die Seite verlässt…"
+        mode === "all-force"
+          ? "Starte Server-Job «Alle Icons neu» — läuft weiter, wenn du die Seite verlässt…"
+          : "Starte Server-Job «Nur fehlende Icons» — läuft weiter, wenn du die Seite verlässt…"
       );
       try {
         const res = await fetch("/api/jobs/run", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ jobType: "ai_icons_missing" }),
+          body: JSON.stringify({ jobType }),
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
@@ -732,6 +736,24 @@ export function DocumentsClient() {
                   {iconBusy
                     ? "Generierung…"
                     : `Nur fehlende (${missingAiIcons})`}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={iconBusy}
+                  onClick={() => {
+                    if (
+                      !window.confirm(
+                        "Alle KI-Icons neu generieren? Bestehende Icons werden ersetzt. Der Job läuft im Hintergrund."
+                      )
+                    ) {
+                      return;
+                    }
+                    void runAiIconBatch("all-force");
+                  }}
+                >
+                  <Sparkles className="size-3.5" />
+                  Alle Icons neu
                 </Button>
               </>
             ) : hasOpenAIKey ? (

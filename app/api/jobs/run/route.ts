@@ -3,6 +3,7 @@ import { z } from "zod";
 import { isAuthError, requireAdmin } from "@/lib/auth/current-user";
 import {
   JOB_TYPE_AI_ICONS_MISSING,
+  JOB_TYPE_AI_ICONS_REGENERATE,
   JOB_TYPE_ANALYZE_PENDING,
   JOB_TYPE_PAPERLESS_WRITEBACK,
   JOB_TYPE_SYNC_ANALYZE,
@@ -10,6 +11,7 @@ import {
 } from "@/lib/jobs/constants";
 import {
   runAiIconsMissingJob,
+  runAiIconsRegenerateJob,
   runAnalyzePendingJob,
   runPaperlessWritebackJob,
 } from "@/lib/jobs/background-runners";
@@ -26,6 +28,7 @@ export const maxDuration = 300;
         JOB_TYPE_SYNC_ANALYZE,
         JOB_TYPE_ANALYZE_PENDING,
         JOB_TYPE_AI_ICONS_MISSING,
+        JOB_TYPE_AI_ICONS_REGENERATE,
         JOB_TYPE_PAPERLESS_WRITEBACK,
       ])
       .optional()
@@ -67,6 +70,8 @@ export async function POST(request: Request) {
     void runAnalyzePendingJob("manual", { resetErrors });
   } else if (jobType === JOB_TYPE_AI_ICONS_MISSING) {
     void runAiIconsMissingJob("manual");
+  } else if (jobType === JOB_TYPE_AI_ICONS_REGENERATE) {
+    void runAiIconsRegenerateJob("manual");
   } else if (jobType === JOB_TYPE_PAPERLESS_WRITEBACK) {
     void runPaperlessWritebackJob("manual");
   }

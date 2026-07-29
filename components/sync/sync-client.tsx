@@ -152,6 +152,7 @@ function SyncClientInner() {
       | "analyze_pending"
       | "paperless_writeback"
       | "ai_icons_missing"
+      | "ai_icons_regenerate"
       | "sync_analyze",
     options?: { resetErrors?: boolean }
   ) {
@@ -925,6 +926,70 @@ function SyncClientInner() {
                 </Button>
               </>
             )}
+          </div>
+
+          <div className="border-t border-border/60 pt-4 space-y-3">
+            <p className="text-sm text-muted-foreground">
+              KI-Icons laufen nur manuell. „Nur fehlende“ füllt Lücken; „Alle
+              neu“ ersetzt bestehende Icons (u. a. nach Prompt-Änderungen).
+            </p>
+            {(bgJob?.jobType === "ai_icons_missing" ||
+              bgJob?.jobType === "ai_icons_regenerate") &&
+            bgJob.summary ? (
+              <div className="rounded-xl border border-border/60 p-3 text-sm">
+                Icons: {Number(bgJob.summary.succeeded || 0)} ok
+                {Number(bgJob.summary.failed || 0) > 0
+                  ? `, ${Number(bgJob.summary.failed)} Fehler`
+                  : ""}{" "}
+                ({Number(bgJob.summary.processed || 0)} verarbeitet
+                {bgJob.summary.remaining != null
+                  ? `, noch ${Number(bgJob.summary.remaining)}`
+                  : ""}
+                )
+              </div>
+            ) : null}
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <Button
+                variant="outline"
+                className="w-full"
+                disabled={
+                  !hasOpenAIKey ||
+                  busy !== null ||
+                  analysisRunning ||
+                  bgJob != null
+                }
+                onClick={() => void startBackgroundJob("ai_icons_missing")}
+              >
+                Nur fehlende Icons
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full"
+                disabled={
+                  !hasOpenAIKey ||
+                  busy !== null ||
+                  analysisRunning ||
+                  bgJob != null
+                }
+                onClick={() => {
+                  if (
+                    !window.confirm(
+                      "Alle KI-Icons neu generieren? Bestehende werden ersetzt."
+                    )
+                  ) {
+                    return;
+                  }
+                  void startBackgroundJob("ai_icons_regenerate");
+                }}
+              >
+                Alle Icons neu
+              </Button>
+            </div>
+            {!hasOpenAIKey ? (
+              <p className="text-xs text-destructive">
+                OpenAI-Key fehlt — zuerst unter Einstellungen hinterlegen.
+              </p>
+            ) : null}
           </div>
 
           <div className="border-t border-border/60 pt-4 space-y-3">

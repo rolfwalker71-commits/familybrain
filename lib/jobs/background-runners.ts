@@ -5,6 +5,7 @@ import {
   AI_ICONS_MISSING_BATCH_SIZE,
   ANALYZE_PENDING_BATCH_SIZE,
   JOB_TYPE_AI_ICONS_MISSING,
+  JOB_TYPE_AI_ICONS_REGENERATE,
   JOB_TYPE_ANALYZE_PENDING,
   JOB_TYPE_PAPERLESS_WRITEBACK,
   PAPERLESS_WRITEBACK_BATCH_SIZE,
@@ -29,6 +30,7 @@ import {
   type JobTrigger,
 } from "@/lib/jobs/queries";
 import {
+  countDocumentsEligibleForAiIcon,
   countDocumentsMissingAiIcon,
   generateDocumentAiIcon,
   isDocumentAiIconsEnabled,
@@ -191,6 +193,20 @@ export async function runAnalyzePendingJob(
 export async function runAiIconsMissingJob(
   trigger: JobTrigger = "manual"
 ): Promise<BackgroundRunResult> {
+  return runAiIconsJob(trigger, { forceAll: false });
+}
+
+/** Explicit job: regenerate icons for every analyzed document (force). */
+export async function runAiIconsRegenerateJob(
+  trigger: JobTrigger = "manual"
+): Promise<BackgroundRunResult> {
+  return runAiIconsJob(trigger, { forceAll: true });
+}
+
+async function runAiIconsJob(
+  trigger: JobTrigger,
+  options: { forceAll: boolean }
+): Promise<BackgroundRunResult> {
   recoverExpiredJobLeases();
 
   if (!isDocumentAiIconsEnabled()) {
@@ -208,7 +224,10 @@ export async function runAiIconsMissingJob(
     };
   }
 
-  const run = tryAcquireJobRun(trigger, JOB_TYPE_AI_ICONS_MISSING);
+  const jobType = options.forceAll
+    ? JOB_TYPE_AI_ICONS_REGENERATE
+    : JOB_TYPE_AI_ICONS_MISSING;
+  const run = tryAcquireJobRun(trigger, jobType);
   if (!run) {
     return {
       ok: false,
@@ -217,21 +236,32 @@ export async function runAiIconsMissingJob(
     };
   }
 
+  const remainingCount = () =>
+    options.forceAll
+      ? countDocumentsEligibleForAiIcon(0)
+      : countDocumentsMissingAiIcon();
+
   const summary: JobRunSummary = {
     processed: 0,
     succeeded: 0,
     failed: 0,
-    remaining: countDocumentsMissingAiIcon(),
+    remaining: remainingCount(),
     afterId: 0,
   };
+
+  const phaseTitle = options.forceAll
+    ? "KI-Icons (alle neu)"
+    : "KI-Icons (fehlend)";
 
   try {
     addJobRunItem({
       runId: run.id,
       itemKind: "phase",
       status: "running",
-      title: "KI-Icons",
-      message: `${summary.remaining ?? 0} fehlende Icons in der Queue`,
+      title: phaseTitle,
+      message: options.forceAll
+        ? `${summary.remaining ?? 0} Dokumente · ersetzt bestehende Icons`
+        : `${summary.remaining ?? 0} fehlende Icons in der Queue`,
     });
 
     let afterId = 0;
@@ -239,7 +269,7 @@ export async function runAiIconsMissingJob(
       const ids = listDocumentIdsForAiIcon({
         limit: AI_ICONS_MISSING_BATCH_SIZE,
         afterId,
-        onlyMissing: true,
+        onlyMissing: !options.forceAll,
       });
       if (ids.length === 0) break;
 
@@ -247,7 +277,7 @@ export async function runAiIconsMissingJob(
         if (!(await assertNotCancelled(run.id))) break;
         heartbeatJobRun(run.id);
         try {
-          await generateDocumentAiIcon(id, { force: false });
+          await generateDocumentAiIcon(id, { force: options.forceAll });
           summary.succeeded = (summary.succeeded ?? 0) + 1;
         } catch (error) {
           summary.failed = (summary.failed ?? 0) + 1;
@@ -263,7 +293,9 @@ export async function runAiIconsMissingJob(
         summary.processed = (summary.processed ?? 0) + 1;
         afterId = id;
         summary.afterId = afterId;
-        summary.remaining = countDocumentsMissingAiIcon();
+        summary.remaining = options.forceAll
+          ? countDocumentsEligibleForAiIcon(afterId)
+          : countDocumentsMissingAiIcon();
         updateJobRunSummary(run.id, summary);
       }
 
@@ -285,8 +317,10 @@ export async function runAiIconsMissingJob(
       runId: run.id,
       itemKind: "phase",
       status: "success",
-      title: "KI-Icons",
-      message: `${summary.succeeded ?? 0} ok, ${summary.failed ?? 0} Fehler · noch ${summary.remaining ?? 0} fehlend`,
+      title: phaseTitle,
+      message: options.forceAll
+        ? `${summary.succeeded ?? 0} neu, ${summary.failed ?? 0} Fehler`
+        : `${summary.succeeded ?? 0} ok, ${summary.failed ?? 0} Fehler · noch ${summary.remaining ?? 0} fehlend`,
     });
     finishJobRun(run.id, "success", summary);
     return { ok: true, runId: run.id, status: "success", summary };

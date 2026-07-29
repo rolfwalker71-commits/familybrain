@@ -39,6 +39,8 @@ export const JOB_TYPE_SYNC_ANALYZE = "sync_analyze";
 export const JOB_TYPE_ANALYZE_PENDING = "analyze_pending";
 /** Generate AI icons for documents that still miss one. */
 export const JOB_TYPE_AI_ICONS_MISSING = "ai_icons_missing";
+/** Force-regenerate AI icons for all analyzed documents. */
+export const JOB_TYPE_AI_ICONS_REGENERATE = "ai_icons_regenerate";
 /** Re-push completed analyses to Paperless custom fields/tags. */
 export const JOB_TYPE_PAPERLESS_WRITEBACK = "paperless_writeback";
 
@@ -46,6 +48,7 @@ export const BACKGROUND_JOB_TYPES = [
   JOB_TYPE_SYNC_ANALYZE,
   JOB_TYPE_ANALYZE_PENDING,
   JOB_TYPE_AI_ICONS_MISSING,
+  JOB_TYPE_AI_ICONS_REGENERATE,
   JOB_TYPE_PAPERLESS_WRITEBACK,
 ] as const;
 
@@ -65,7 +68,9 @@ export function jobTypeLabel(jobType: string): string {
     case JOB_TYPE_ANALYZE_PENDING:
       return "AI-Analyse";
     case JOB_TYPE_AI_ICONS_MISSING:
-      return "KI-Icons";
+      return "KI-Icons (fehlend)";
+    case JOB_TYPE_AI_ICONS_REGENERATE:
+      return "KI-Icons (alle neu)";
     case JOB_TYPE_PAPERLESS_WRITEBACK:
       return "Paperless-Writeback";
     default:

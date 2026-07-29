@@ -228,6 +228,23 @@ export function countDocumentsMissingAiIcon(): number {
   ).c;
 }
 
+/** Analyzed docs eligible for icon generation (including those that already have one). */
+export function countDocumentsEligibleForAiIcon(afterId = 0): number {
+  const db = getDb();
+  return (
+    db
+      .prepare(
+        `SELECT COUNT(*) as c
+         FROM paperless_documents d
+         INNER JOIN document_summaries s ON s.document_id = d.id
+         WHERE COALESCE(d.sync_status, 'synced') != 'missing'
+           AND s.analysis_status = 'completed'
+           AND d.id > ?`
+      )
+      .get(afterId) as { c: number }
+  ).c;
+}
+
 async function writeIconJpeg(
   documentId: number,
   source: Buffer
