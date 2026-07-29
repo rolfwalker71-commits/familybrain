@@ -23,6 +23,10 @@ import {
 import { buildDashboardBriefing } from "@/lib/dashboard/briefing";
 import { formatCHF } from "@/lib/utils/format";
 import { toSwissDate } from "@/lib/utils/dates";
+import {
+  ACTION_DEADLINE_AHEAD_DAYS,
+  ACTION_WARRANTY_AHEAD_DAYS,
+} from "@/lib/utils/due-urgency";
 import { MetricGrid, PageHeader, MetricTile } from "@/components/layout/page-primitives";
 import {
   IconCircle,
@@ -208,14 +212,14 @@ export default async function DashboardPage() {
           href="/finance"
         />
         <StatCard
-          title="Fristen (30 Tage)"
+          title={`Fristen (${ACTION_DEADLINE_AHEAD_DAYS} Tage)`}
           value={deadlineKpi}
           icon={CalendarDays}
           tone="teal"
           href="/deadlines"
         />
         <StatCard
-          title="Garantien bald ab"
+          title={`Garantien (${ACTION_WARRANTY_AHEAD_DAYS} Tage)`}
           value={stats.warrantiesExpiringSoon}
           icon={Shield}
           tone="teal"

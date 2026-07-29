@@ -1,6 +1,11 @@
 import { getDb } from "./client";
 import { getSetting, setSetting } from "./migrations";
-import { daysFromNow, currentYear, nowIso } from "@/lib/utils/dates";
+import { daysFromNow, daysAgo, currentYear, nowIso } from "@/lib/utils/dates";
+import {
+  ACTION_DEADLINE_AHEAD_DAYS,
+  ACTION_OVERDUE_LOOKBACK_DAYS,
+  ACTION_WARRANTY_AHEAD_DAYS,
+} from "@/lib/utils/due-urgency";
 import {
   aggregateByMappedLabel,
   financeBucket,
@@ -534,7 +539,7 @@ export function getDashboardStats() {
            AND deadline_date >= date('now')
            AND deadline_date <= ?`
       )
-      .get(daysFromNow(90)) as { c: number }
+      .get(daysFromNow(ACTION_DEADLINE_AHEAD_DAYS)) as { c: number }
   ).c;
 
   const warrantiesExpiringSoon = (
@@ -545,7 +550,7 @@ export function getDashboardStats() {
            AND warranty_until >= date('now')
            AND warranty_until <= ?`
       )
-      .get(daysFromNow(90)) as { c: number }
+      .get(daysFromNow(ACTION_WARRANTY_AHEAD_DAYS)) as { c: number }
   ).c;
 
   const financialThisYear = (
@@ -597,6 +602,7 @@ export function getDashboardStats() {
       .get() as { c: number }
   ).c;
 
+  /** Overdue only if still within lookback — older open rows are treated as stale noise. */
   const urgentDeadlinesCount = (
     db
       .prepare(
@@ -604,9 +610,12 @@ export function getDashboardStats() {
          WHERE status = 'open'
            AND deadline_date IS NOT NULL
            AND deadline_date <= ?
+           AND deadline_date >= ?
            AND (snoozed_until IS NULL OR TRIM(snoozed_until) = '' OR snoozed_until < date('now'))`
       )
-      .get(daysFromNow(7)) as { c: number }
+      .get(daysFromNow(7), daysAgo(ACTION_OVERDUE_LOOKBACK_DAYS)) as {
+      c: number;
+    }
   ).c;
 
   const deadlinesNext30Days = (
@@ -618,7 +627,7 @@ export function getDashboardStats() {
            AND deadline_date >= date('now')
            AND deadline_date <= ?`
       )
-      .get(daysFromNow(30)) as { c: number }
+      .get(daysFromNow(ACTION_DEADLINE_AHEAD_DAYS)) as { c: number }
   ).c;
 
   const overdueDeadlinesCount = (
@@ -628,9 +637,10 @@ export function getDashboardStats() {
          WHERE status = 'open'
            AND deadline_date IS NOT NULL
            AND deadline_date < date('now')
+           AND deadline_date >= ?
            AND (snoozed_until IS NULL OR TRIM(snoozed_until) = '' OR snoozed_until < date('now'))`
       )
-      .get() as { c: number }
+      .get(daysAgo(ACTION_OVERDUE_LOOKBACK_DAYS)) as { c: number }
   ).c;
 
   /** Same source as Action-Inbox «Offene Rechnungen»: Paperless Zu bezahlen & not Bezahlt. */
@@ -980,8 +990,9 @@ export function updateWarranty(
 export function getDashboardInbox(limits = { each: 5 }) {
   const db = getDb();
   const today = new Date().toISOString().slice(0, 10);
-  const soon = daysFromNow(90);
+  const soon = daysFromNow(ACTION_WARRANTY_AHEAD_DAYS);
   const dueUntil = daysFromNow(7);
+  const overdueSince = daysAgo(ACTION_OVERDUE_LOOKBACK_DAYS);
   const limit = limits.each;
 
   const overdueDeadlines = db
@@ -993,11 +1004,12 @@ export function getDashboardInbox(limits = { each: 5 }) {
        WHERE dl.status = 'open'
          AND dl.deadline_date IS NOT NULL
          AND dl.deadline_date < ?
+         AND dl.deadline_date >= ?
          AND (dl.snoozed_until IS NULL OR TRIM(dl.snoozed_until) = '' OR dl.snoozed_until < ?)
        ORDER BY dl.deadline_date DESC
        LIMIT ?`
     )
-    .all(today, today, limit);
+    .all(today, overdueSince, today, limit);
 
   const dueInvoices = db
     .prepare(
@@ -1007,13 +1019,13 @@ export function getDashboardInbox(limits = { each: 5 }) {
        JOIN paperless_documents d ON d.id = f.document_id
        WHERE f.due_date IS NOT NULL AND TRIM(f.due_date) != ''
          AND f.due_date <= ?
-         AND f.due_date >= date(?, '-30 days')
+         AND f.due_date >= ?
          AND COALESCE(f.counts_in_stats, 1) = 1
          AND COALESCE(d.bezahlt, 0) = 0
        ORDER BY f.due_date DESC
        LIMIT ?`
     )
-    .all(dueUntil, today, limit);
+    .all(dueUntil, overdueSince, limit);
 
   const openUnpaidInvoices = listOpenUnpaidInvoices(Math.max(limit, 8));
 
@@ -1026,7 +1038,7 @@ export function getDashboardInbox(limits = { each: 5 }) {
        WHERE w.warranty_until IS NOT NULL
          AND w.warranty_until >= ?
          AND w.warranty_until <= ?
-       ORDER BY w.warranty_until DESC
+       ORDER BY w.warranty_until ASC
        LIMIT ?`
     )
     .all(today, soon, limit);

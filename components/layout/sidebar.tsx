@@ -214,9 +214,9 @@ export function Sidebar({
                     item.countKey === "pendingCount"
                       ? "Ausstehende Analysen"
                       : item.countKey === "urgentDeadlinesCount"
-                        ? "Dringende Fristen"
+                        ? "Dringende Fristen (überfällig ≤30 Tage oder in ≤7 Tagen)"
                         : item.countKey === "warrantiesExpiringSoon"
-                          ? "Garantien bald ab"
+                          ? "Garantien in den nächsten 90 Tagen"
                           : item.countKey === "openDueFinanceCount"
                             ? "Offene Rechnungen (Paperless Zu bezahlen)"
                             : undefined
