@@ -3,11 +3,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ExternalLink, FileText } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { formatCHF } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
 import {
   dueUrgency,
-  dueUrgencyTextClass,
+  dueUrgencyBadgeClass,
   formatDueRelative,
 } from "@/lib/utils/due-urgency";
 import { DocumentAiIcon } from "@/components/documents/document-ai-icon";
@@ -63,6 +64,7 @@ export function OpenInvoiceCard({ invoice }: { invoice: OpenInvoiceCardModel }) 
   const title = invoice.title || "Rechnung";
   const correspondent =
     invoice.correspondent_name || invoice.vendor || null;
+  const urgency = invoice.due_date ? dueUrgency(invoice.due_date) : null;
 
   return (
     <article
@@ -73,7 +75,7 @@ export function OpenInvoiceCard({ invoice }: { invoice: OpenInvoiceCardModel }) 
     >
       <div className="relative aspect-[5/3] bg-muted/40">
         <CardThumb paperlessId={invoice.paperless_id} title={title} />
-        <span className="absolute bottom-2 left-2 rounded-xl shadow-md ring-2 ring-white/80">
+        <span className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-xl shadow-md ring-2 ring-white/80">
           <DocumentAiIcon
             aiIconUrl={invoice.ai_icon_url}
             category={invoice.category}
@@ -82,10 +84,10 @@ export function OpenInvoiceCard({ invoice }: { invoice: OpenInvoiceCardModel }) 
         </span>
       </div>
 
-      <div className="space-y-0.5 border-b border-border/70 px-2.5 py-2">
+      <div className="space-y-0.5 border-b border-border/70 px-2.5 pb-1.5 pt-7">
         <Link
           href={`/documents/${invoice.id}`}
-          className="block min-w-0 text-xs font-semibold leading-snug text-[var(--brand-docs)] hover:underline sm:text-[13px]"
+          className="block min-w-0 text-[10px] font-semibold leading-snug text-[var(--brand-docs)] hover:underline sm:text-[11px]"
         >
           {correspondent ? (
             <>
@@ -97,26 +99,29 @@ export function OpenInvoiceCard({ invoice }: { invoice: OpenInvoiceCardModel }) 
           )}
         </Link>
         {invoice.amount != null ? (
-          <p className="text-[11px] font-semibold tabular-nums text-foreground">
+          <p className="text-[10px] font-semibold tabular-nums text-foreground">
             {formatCHF(invoice.amount, invoice.currency || "CHF")}
-          </p>
-        ) : null}
-        {invoice.due_date ? (
-          <p
-            className={cn(
-              "text-[11px] font-medium",
-              dueUrgencyTextClass(dueUrgency(invoice.due_date))
-            )}
-          >
-            {formatDueRelative(invoice.due_date)}
           </p>
         ) : null}
       </div>
 
-      <div className="flex items-center justify-end gap-1 px-1.5 py-1">
+      <div className="flex items-center justify-between gap-1 px-1.5 py-1">
+        {invoice.due_date && urgency ? (
+          <Badge
+            variant="secondary"
+            className={cn(
+              "max-w-[65%] truncate text-[10px] font-semibold",
+              dueUrgencyBadgeClass(urgency)
+            )}
+          >
+            {formatDueRelative(invoice.due_date)}
+          </Badge>
+        ) : (
+          <span />
+        )}
         <Link
           href={`/documents/${invoice.id}`}
-          className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium text-[var(--brand-finance)] hover:bg-muted"
+          className="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium text-[var(--brand-finance)] hover:bg-muted"
         >
           Öffnen
           <ExternalLink className="size-3" />

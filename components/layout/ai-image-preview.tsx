@@ -1,39 +1,26 @@
 "use client";
 
-import { Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type BrandTone = "finance" | "travel" | "docs";
 
-const BRAND = {
-  finance: {
-    soft: "bg-[var(--brand-finance)]/90",
-  },
-  travel: {
-    soft: "bg-[var(--brand-docs)]/90",
-  },
-  docs: {
-    soft: "bg-[var(--brand-docs)]/90",
-  },
-} as const;
-
-/** Thumbnail only — «Neu generieren» gehört in die Grossansicht. */
+/** Thumbnail only — tippen öffnet die Grossansicht (ohne AI-Badge). */
 export function AiImagePreview({
   src,
   alt = "",
   onOpen,
-  brand = "finance",
+  brand: _brand = "finance",
   imageClassName = "h-12 w-12 object-cover sm:h-14 sm:w-14",
   className,
 }: {
   src: string;
   alt?: string;
   onOpen: () => void;
+  /** Kept for call-site compatibility; badge removed. */
   brand?: BrandTone;
   imageClassName?: string;
   className?: string;
 }) {
-  const tone = BRAND[brand];
   return (
     <button
       type="button"
@@ -49,15 +36,6 @@ export function AiImagePreview({
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={src} alt={alt} className={imageClassName} />
-      <span
-        className={cn(
-          "absolute right-0.5 top-0.5 inline-flex items-center gap-0.5 rounded px-1 py-px text-[8px] font-bold uppercase tracking-wide text-white",
-          tone.soft
-        )}
-      >
-        <Sparkles className="size-2.5" />
-        AI
-      </span>
     </button>
   );
 }
