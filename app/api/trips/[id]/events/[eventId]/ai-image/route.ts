@@ -93,6 +93,21 @@ export async function POST(request: Request, context: Ctx) {
         buffer,
         file.type || "image/jpeg"
       );
+      try {
+        const { getTripById } = await import("@/lib/trips/queries");
+        const trip = getTripById(tripId);
+        const { notifyTripEventAiImage } = await import(
+          "@/lib/realtime/notify"
+        );
+        notifyTripEventAiImage({
+          tripId,
+          eventId,
+          tripTitle: trip?.title ?? null,
+          eventTitle: updated.title ?? null,
+        });
+      } catch {
+        /* ignore */
+      }
       return NextResponse.json({ ok: true, event: serializeTripEvent(updated) });
     }
 
@@ -116,6 +131,19 @@ export async function POST(request: Request, context: Ctx) {
       eventId,
       useCustom ? body.prompt : undefined
     );
+    try {
+      const { getTripById } = await import("@/lib/trips/queries");
+      const trip = getTripById(tripId);
+      const { notifyTripEventAiImage } = await import("@/lib/realtime/notify");
+      notifyTripEventAiImage({
+        tripId,
+        eventId,
+        tripTitle: trip?.title ?? null,
+        eventTitle: updated.title ?? null,
+      });
+    } catch {
+      /* ignore */
+    }
     return NextResponse.json({ ok: true, event: serializeTripEvent(updated) });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

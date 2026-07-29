@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { KeyRound, Server, BookOpen, MessageSquareText, Luggage, HandCoins, Mail, MoreHorizontal, Users } from "lucide-react";
+import { KeyRound, Server, BookOpen, MessageSquareText, Luggage, HandCoins, Mail, MoreHorizontal, Users, Bell } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,6 +26,7 @@ import {
   type SettingsTabItem,
 } from "@/components/settings/settings-tab-nav";
 import { SettingsUsersPanel } from "@/components/settings/settings-users-panel";
+import { NotificationPrefsPanel } from "@/components/settings/notification-prefs-panel";
 
 
 const ICLOUD_SMTP = {
@@ -65,10 +66,6 @@ function SettingsPageInner() {
   const [paperlessWritebackEnabled, setPaperlessWritebackEnabled] =
     useState(true);
   const [documentAiIconsEnabled, setDocumentAiIconsEnabled] = useState(false);
-  const [liveNotificationsEnabled, setLiveNotificationsEnabled] =
-    useState(true);
-  const [liveNotificationsDurationSec, setLiveNotificationsDurationSec] =
-    useState(9);
   const [paperlessWebhookSecret, setPaperlessWebhookSecret] = useState("");
   const [paperlessWebhookUrl, setPaperlessWebhookUrl] = useState("");
   const [hasPaperlessWebhookSecret, setHasPaperlessWebhookSecret] =
@@ -220,12 +217,6 @@ function SettingsPageInner() {
         data.paperlessWritebackEnabled !== false
       );
       setDocumentAiIconsEnabled(Boolean(data.documentAiIconsEnabled));
-      setLiveNotificationsEnabled(data.liveNotificationsEnabled !== false);
-      setLiveNotificationsDurationSec(
-        Number.isFinite(Number(data.liveNotificationsDurationSec))
-          ? Number(data.liveNotificationsDurationSec)
-          : 9
-      );
       setPaperlessWebhookUrl(data.paperlessWebhookUrl || "");
       setHasPaperlessWebhookSecret(Boolean(data.hasPaperlessWebhookSecret));
       setPaperlessWebhookSecretMasked(
@@ -344,8 +335,6 @@ function SettingsPageInner() {
           paperlessApiToken: apiToken || undefined,
           paperlessWritebackEnabled,
           documentAiIconsEnabled,
-          liveNotificationsEnabled,
-          liveNotificationsDurationSec,
           paperlessWebhookUrl: paperlessWebhookUrl.trim(),
           paperlessWebhookSecret: paperlessWebhookSecret || undefined,
         }),
@@ -359,12 +348,6 @@ function SettingsPageInner() {
       setApiToken("");
       setPaperlessWritebackEnabled(data.paperlessWritebackEnabled !== false);
       setDocumentAiIconsEnabled(Boolean(data.documentAiIconsEnabled));
-      setLiveNotificationsEnabled(data.liveNotificationsEnabled !== false);
-      setLiveNotificationsDurationSec(
-        Number.isFinite(Number(data.liveNotificationsDurationSec))
-          ? Number(data.liveNotificationsDurationSec)
-          : liveNotificationsDurationSec
-      );
       setPaperlessWebhookUrl(data.paperlessWebhookUrl || "");
       setHasPaperlessWebhookSecret(Boolean(data.hasPaperlessWebhookSecret));
       setPaperlessWebhookSecretMasked(
@@ -976,6 +959,7 @@ function SettingsPageInner() {
     { id: "paperless", label: "Paperless", icon: Server },
     { id: "travel", label: "Travel", icon: Luggage },
     { id: "mail", label: "Mail", icon: Mail },
+    { id: "notify", label: "Hinweise", icon: Bell },
     { id: "users", label: "User", icon: Users },
     { id: "more", label: "Mehr", icon: MoreHorizontal },
   ];
@@ -1164,51 +1148,17 @@ function SettingsPageInner() {
             </div>
           </div>
 
-          <div className="flex items-start gap-3 rounded-xl border border-border/60 bg-muted/30 px-3 py-3">
-            <input
-              id="liveNotifications"
-              type="checkbox"
-              className="mt-1 size-4 accent-[var(--brand-docs)]"
-              checked={liveNotificationsEnabled}
-              onChange={(e) => setLiveNotificationsEnabled(e.target.checked)}
-            />
-            <div className="min-w-0 flex-1 space-y-2">
-              <Label htmlFor="liveNotifications" className="cursor-pointer">
-                Live-Benachrichtigungen
-              </Label>
-              <p className="text-xs text-muted-foreground">
-                Zeigt Toasts bei Paperless-Webhooks und Buddy-Änderungen
-                (Analyse, AI-Icon, Status). Action-Inbox aktualisiert sich
-                weiterhin auch wenn ausgeschaltet. Wegklicken, Escape oder X
-                schliesst den Toast.
-              </p>
-              <div className="flex flex-wrap items-center gap-2 pt-1">
-                <Label
-                  htmlFor="liveNotificationsDuration"
-                  className="text-xs text-muted-foreground"
-                >
-                  Anzeigedauer
-                </Label>
-                <Input
-                  id="liveNotificationsDuration"
-                  type="number"
-                  min={3}
-                  max={60}
-                  step={1}
-                  disabled={!liveNotificationsEnabled}
-                  className="h-8 w-20 rounded-lg text-sm"
-                  value={liveNotificationsDurationSec}
-                  onChange={(e) => {
-                    const n = Number.parseInt(e.target.value, 10);
-                    if (!Number.isFinite(n)) return;
-                    setLiveNotificationsDurationSec(n);
-                  }}
-                />
-                <span className="text-xs text-muted-foreground">
-                  Sekunden (3–60)
-                </span>
-              </div>
-            </div>
+          <div className="rounded-xl border border-border/60 bg-muted/30 px-3 py-3 text-xs text-muted-foreground">
+            Live-Toasts (Dokumente, Reisen, Finanzen), Ton und Anzeigedauer
+            stellst du unter{" "}
+            <button
+              type="button"
+              className="font-medium text-foreground underline-offset-2 hover:underline"
+              onClick={() => setTab("notify")}
+            >
+              Hinweise
+            </button>{" "}
+            ein.
           </div>
 
           {paperlessWritebackLastError ? (
@@ -1922,6 +1872,20 @@ function SettingsPageInner() {
       ) : null}
 
       {activeTab === "users" ? <SettingsUsersPanel /> : null}
+
+      {activeTab === "notify" ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-3">
+              <IconCircle icon={Bell} tone="teal" size="sm" />
+              Live-Benachrichtigungen
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <NotificationPrefsPanel />
+          </CardContent>
+        </Card>
+      ) : null}
 
       {activeTab === "more" ? (
         <div className="space-y-4">

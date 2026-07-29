@@ -58,6 +58,17 @@ export async function POST(request: Request, context: Ctx) {
       settledAt: parsed.data.settledAt ?? null,
       createdByMemberId: parsed.data.createdByMemberId ?? null,
     });
+    try {
+      const { notifyFinanceSettlement } = await import("@/lib/realtime/notify");
+      notifyFinanceSettlement({
+        ledgerId: id,
+        settlementId: settlement.id,
+        ledgerTitle: ledger.title ?? null,
+        amountLabel: `${settlement.amount} ${settlement.currency}`,
+      });
+    } catch {
+      /* ignore */
+    }
     const { notifyFailed, notifyLedgerSettlement } = await import(
       "@/lib/finance-brain/notify"
     );

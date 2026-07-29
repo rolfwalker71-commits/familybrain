@@ -721,6 +721,9 @@ function ensureUsersTable(db: Database.Database): void {
   if (!names.has("is_admin")) {
     db.exec(`ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0`);
   }
+  if (!names.has("notification_prefs")) {
+    db.exec(`ALTER TABLE users ADD COLUMN notification_prefs TEXT`);
+  }
 }
 
 function ensureTripTravelersTable(db: Database.Database): void {

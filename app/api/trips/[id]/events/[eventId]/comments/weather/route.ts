@@ -116,6 +116,21 @@ export async function POST(request: Request, context: Ctx) {
     } catch {
       // ignore mail transport errors
     }
+    try {
+      const { getTripById } = await import("@/lib/trips/queries");
+      const trip = getTripById(tripId);
+      const { notifyTripComment } = await import("@/lib/realtime/notify");
+      notifyTripComment({
+        tripId,
+        eventId,
+        tripTitle: trip?.title ?? null,
+        eventTitle: event.title ?? null,
+        authorName: comment.author_name,
+        bodyPreview: body,
+      });
+    } catch {
+      /* ignore */
+    }
 
     return NextResponse.json({
       ok: true,

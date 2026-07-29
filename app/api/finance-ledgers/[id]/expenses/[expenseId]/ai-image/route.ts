@@ -109,6 +109,20 @@ export async function POST(request: Request, context: Ctx) {
       userPrompt: prompt,
       place: body.place,
     });
+    try {
+      const ledger = getFinanceLedgerById(ledgerId);
+      const { notifyFinanceExpenseAiImage } = await import(
+        "@/lib/realtime/notify"
+      );
+      notifyFinanceExpenseAiImage({
+        ledgerId,
+        expenseId,
+        ledgerTitle: ledger?.title ?? null,
+        description: expense.description,
+      });
+    } catch {
+      /* ignore */
+    }
     const notification = await notifyLedgerExpense(expenseId);
     if (notifyFailed(notification)) {
       console.error(

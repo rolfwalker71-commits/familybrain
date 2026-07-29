@@ -71,7 +71,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
       >
         <MobileHeader />
         {!isLimitedUser ? <AnalysisStatusBar /> : null}
-        {!isLimitedUser ? <RealtimeToasts /> : null}
+        {me ? <RealtimeToasts /> : null}
         <div
           className={
             isChat

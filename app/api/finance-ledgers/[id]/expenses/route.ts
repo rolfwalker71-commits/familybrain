@@ -173,6 +173,20 @@ export async function POST(request: Request, context: Ctx) {
         );
       }
     }
+    try {
+      const ledger = getFinanceLedgerById(id);
+      const { notifyFinanceExpense } = await import("@/lib/realtime/notify");
+      notifyFinanceExpense({
+        ledgerId: id,
+        expenseId: expense.id,
+        ledgerTitle: ledger?.title ?? null,
+        description: expense.description,
+        amountLabel: `${expense.amount} ${expense.currency}`,
+        reason: "finance_expense_created",
+      });
+    } catch {
+      /* ignore */
+    }
     return NextResponse.json({
       ok: true,
       expense: serializeExpense(expense, listFinanceExpenseSplits(expense.id)),

@@ -74,6 +74,19 @@ export async function PATCH(request: Request, context: Ctx) {
       return NextResponse.json({ error: "Ungültige Eingabe" }, { status: 400 });
     }
     const event = updateTripEvent(eventId, parsed.data);
+    try {
+      const { getTripById } = await import("@/lib/trips/queries");
+      const trip = getTripById(tripId);
+      const { notifyTripEventUpdated } = await import("@/lib/realtime/notify");
+      notifyTripEventUpdated({
+        tripId,
+        eventId,
+        tripTitle: trip?.title ?? null,
+        eventTitle: event.title ?? null,
+      });
+    } catch {
+      /* ignore */
+    }
     return NextResponse.json({ ok: true, event: serializeTripEvent(event) });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

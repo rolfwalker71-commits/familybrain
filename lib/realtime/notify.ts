@@ -1,65 +1,69 @@
 import { getDb } from "@/lib/db/client";
 import { publicAiIconUrl } from "@/lib/db/queries";
-import { getSetting, setSetting } from "@/lib/db/migrations";
 import {
   publishInboxRefresh,
   publishRealtime,
-  type DocumentNotifyPayload,
-  type DocumentNotifyReason,
+  type AppNotifyPayload,
+  type NotifyReason,
 } from "@/lib/realtime/hub";
-
-const LIVE_NOTIFICATIONS_KEY = "live_notifications_enabled";
-const LIVE_NOTIFICATIONS_DURATION_KEY = "live_notifications_duration_sec";
-
-const DEFAULT_DURATION_SEC = 9;
-const MIN_DURATION_SEC = 3;
-const MAX_DURATION_SEC = 60;
-
-/** Default on — toast popups for document changes. */
-export function isLiveNotificationsEnabled(): boolean {
-  const stored = getSetting(LIVE_NOTIFICATIONS_KEY);
-  if (stored == null || stored === "") return true;
-  return stored === "1" || stored.toLowerCase() === "true";
-}
-
-export function setLiveNotificationsEnabled(enabled: boolean): void {
-  setSetting(LIVE_NOTIFICATIONS_KEY, enabled ? "1" : "0");
-}
-
-/** How long a toast stays visible (seconds). */
-export function getLiveNotificationsDurationSec(): number {
-  const stored = getSetting(LIVE_NOTIFICATIONS_DURATION_KEY);
-  const n = stored != null && stored !== "" ? Number.parseInt(stored, 10) : NaN;
-  if (!Number.isFinite(n)) return DEFAULT_DURATION_SEC;
-  return Math.min(MAX_DURATION_SEC, Math.max(MIN_DURATION_SEC, Math.round(n)));
-}
-
-export function setLiveNotificationsDurationSec(seconds: number): void {
-  const n = Math.min(
-    MAX_DURATION_SEC,
-    Math.max(MIN_DURATION_SEC, Math.round(seconds))
-  );
-  setSetting(LIVE_NOTIFICATIONS_DURATION_KEY, String(n));
-}
+import { isLiveNotificationsEnabled } from "@/lib/realtime/prefs";
 
 export {
-  DEFAULT_DURATION_SEC as LIVE_NOTIFICATIONS_DEFAULT_DURATION_SEC,
-  MIN_DURATION_SEC as LIVE_NOTIFICATIONS_MIN_DURATION_SEC,
-  MAX_DURATION_SEC as LIVE_NOTIFICATIONS_MAX_DURATION_SEC,
-};
+  isLiveNotificationsEnabled,
+  setLiveNotificationsEnabled,
+  getLiveNotificationsDurationSec,
+  setLiveNotificationsDurationSec,
+  isLiveNotificationsSoundEnabled,
+  setLiveNotificationsSoundEnabled,
+  LIVE_NOTIFICATIONS_DEFAULT_DURATION_SEC,
+  LIVE_NOTIFICATIONS_MIN_DURATION_SEC,
+  LIVE_NOTIFICATIONS_MAX_DURATION_SEC,
+} from "@/lib/realtime/prefs";
 
-export function getDocumentRealtimeSnapshot(
-  localId: number
-): Omit<
-  DocumentNotifyPayload,
-  "reason" | "headline" | "detail" | "source"
-> | null {
+function clip(raw: string | null | undefined, max: number): string | null {
+  const t = (raw || "").replace(/\s+/g, " ").trim();
+  if (!t) return null;
+  return t.length > max ? `${t.slice(0, max - 1)}…` : t;
+}
+
+/** Publish a live toast notification (clients filter by their prefs). */
+export function notifyAppChange(
+  input: Omit<AppNotifyPayload, "detail"> & { detail?: string | null }
+): void {
+  // Global master switch (per-user prefs refine further on the client).
+  if (!isLiveNotificationsEnabled()) return;
+
+  const at = new Date().toISOString();
+  const notification: AppNotifyPayload = {
+    ...input,
+    detail: clip(input.detail ?? null, 160),
+    title: input.title ?? null,
+    href: input.href ?? null,
+    aiIconUrl: input.aiIconUrl ?? null,
+    category: input.category ?? null,
+    meta: input.meta ?? null,
+  };
+
+  publishRealtime({ topic: "notify", at, notification });
+  publishRealtime({ topic: "document", at, document: notification });
+}
+
+export function getDocumentRealtimeSnapshot(localId: number): {
+  localId: number;
+  paperlessId: number;
+  title: string | null;
+  correspondentName: string | null;
+  documentTypeName: string | null;
+  createdDate: string | null;
+  category: string | null;
+  aiIconUrl: string | null;
+} | null {
   const db = getDb();
   const row = db
     .prepare(
       `SELECT d.id, d.paperless_id, d.title, d.correspondent_name,
               d.document_type_name, d.created_date, d.ai_icon_path,
-              s.category, s.short_summary
+              s.category
        FROM paperless_documents d
        LEFT JOIN document_summaries s ON s.document_id = d.id
        WHERE d.id = ?`
@@ -74,12 +78,10 @@ export function getDocumentRealtimeSnapshot(
         created_date: string | null;
         ai_icon_path: string | null;
         category: string | null;
-        short_summary: string | null;
       }
     | undefined;
 
   if (!row) return null;
-
   return {
     localId: row.id,
     paperlessId: row.paperless_id,
@@ -92,53 +94,44 @@ export function getDocumentRealtimeSnapshot(
   };
 }
 
-function clip(raw: string | null | undefined, max: number): string | null {
-  const t = (raw || "").replace(/\s+/g, " ").trim();
-  if (!t) return null;
-  return t.length > max ? `${t.slice(0, max - 1)}…` : t;
-}
-
-/**
- * Notify open UIs about a document change.
- * Always refreshes Action-Inbox. Toasts only when live notifications are enabled.
- */
 export function notifyDocumentChange(input: {
   localId: number;
-  reason: DocumentNotifyReason;
+  reason: NotifyReason;
   headline: string;
   detail?: string | null;
   source: "paperless" | "buddy";
-  /** Force toast even if setting is off (unused; kept for symmetry). */
-  forceToast?: boolean;
 }): void {
-  const at = new Date().toISOString();
-  publishRealtime({ topic: "inbox", at });
-
-  const showToast = input.forceToast || isLiveNotificationsEnabled();
-  if (!showToast) return;
+  publishInboxRefresh();
 
   const snap = getDocumentRealtimeSnapshot(input.localId);
   if (!snap) return;
 
-  let detail = input.detail ?? null;
-  if (!detail && snap.category) {
-    detail = `Kategorie: ${snap.category}`;
-  }
+  const meta = [
+    snap.correspondentName,
+    snap.documentTypeName,
+    snap.createdDate,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
-  publishRealtime({
-    topic: "document",
-    at,
-    document: {
-      ...snap,
-      reason: input.reason,
-      headline: input.headline,
-      detail: clip(detail, 160),
-      source: input.source,
-    },
+  notifyAppChange({
+    domain: "documents",
+    reason: input.reason,
+    headline: input.headline,
+    detail:
+      input.detail ??
+      (snap.category ? `Kategorie: ${snap.category}` : null),
+    title: snap.title,
+    href: `/documents/${snap.localId}`,
+    aiIconUrl: snap.aiIconUrl,
+    category: snap.category,
+    meta: meta || `Paperless-ID ${snap.paperlessId}`,
+    source: input.source,
+    localId: snap.localId,
+    paperlessId: snap.paperlessId,
   });
 }
 
-/** Paperless webhook ingest → toast + inbox. */
 export function notifyWebhookDocument(input: {
   localId: number;
   isNew: boolean;
@@ -226,5 +219,142 @@ export function notifyMarkedPaid(localId: number): void {
   });
 }
 
-/** Inbox-only refresh without toast (e.g. when notifications disabled). */
+export function notifyTripComment(input: {
+  tripId: number;
+  eventId: number;
+  tripTitle: string | null;
+  eventTitle: string | null;
+  authorName: string | null;
+  bodyPreview: string | null;
+}): void {
+  notifyAppChange({
+    domain: "travel",
+    reason: "trip_comment",
+    headline: "Neuer Reise-Kommentar",
+    detail: clip(
+      [input.authorName, input.bodyPreview].filter(Boolean).join(": "),
+      160
+    ),
+    title: input.eventTitle || input.tripTitle || `Reise #${input.tripId}`,
+    href: `/trips/${input.tripId}`,
+    aiIconUrl: null,
+    category: null,
+    meta: input.tripTitle,
+    source: "travel",
+    tripId: input.tripId,
+  });
+}
+
+export function notifyTripEventUpdated(input: {
+  tripId: number;
+  eventId: number;
+  tripTitle: string | null;
+  eventTitle: string | null;
+}): void {
+  notifyAppChange({
+    domain: "travel",
+    reason: "trip_event_updated",
+    headline: "Reise-Ereignis aktualisiert",
+    detail: "Eintrag geändert.",
+    title: input.eventTitle || `Ereignis #${input.eventId}`,
+    href: `/trips/${input.tripId}`,
+    aiIconUrl: null,
+    category: null,
+    meta: input.tripTitle,
+    source: "travel",
+    tripId: input.tripId,
+  });
+}
+
+export function notifyTripEventAiImage(input: {
+  tripId: number;
+  eventId: number;
+  tripTitle: string | null;
+  eventTitle: string | null;
+  imageUrl?: string | null;
+}): void {
+  notifyAppChange({
+    domain: "travel",
+    reason: "trip_event_ai_image",
+    headline: "KI-Bild für Ereignis",
+    detail: "Neues Bild erzeugt oder hochgeladen.",
+    title: input.eventTitle || `Ereignis #${input.eventId}`,
+    href: `/trips/${input.tripId}`,
+    aiIconUrl: input.imageUrl ?? null,
+    category: null,
+    meta: input.tripTitle,
+    source: "travel",
+    tripId: input.tripId,
+  });
+}
+
+export function notifyFinanceExpense(input: {
+  ledgerId: number;
+  expenseId: number;
+  ledgerTitle: string | null;
+  description: string | null;
+  amountLabel: string | null;
+  reason: "finance_expense_created" | "finance_expense_updated";
+}): void {
+  notifyAppChange({
+    domain: "finance",
+    reason: input.reason,
+    headline:
+      input.reason === "finance_expense_created"
+        ? "Neue Ausgabe"
+        : "Ausgabe aktualisiert",
+    detail: input.amountLabel,
+    title: input.description || `Ausgabe #${input.expenseId}`,
+    href: `/finance-brain/${input.ledgerId}`,
+    aiIconUrl: null,
+    category: null,
+    meta: input.ledgerTitle,
+    source: "finance",
+    ledgerId: input.ledgerId,
+  });
+}
+
+export function notifyFinanceExpenseAiImage(input: {
+  ledgerId: number;
+  expenseId: number;
+  ledgerTitle: string | null;
+  description: string | null;
+  imageUrl?: string | null;
+}): void {
+  notifyAppChange({
+    domain: "finance",
+    reason: "finance_expense_ai_image",
+    headline: "KI-Belegbild erzeugt",
+    detail: "Ausgabenbild aktualisiert.",
+    title: input.description || `Ausgabe #${input.expenseId}`,
+    href: `/finance-brain/${input.ledgerId}`,
+    aiIconUrl: input.imageUrl ?? null,
+    category: null,
+    meta: input.ledgerTitle,
+    source: "finance",
+    ledgerId: input.ledgerId,
+  });
+}
+
+export function notifyFinanceSettlement(input: {
+  ledgerId: number;
+  settlementId: number;
+  ledgerTitle: string | null;
+  amountLabel: string | null;
+}): void {
+  notifyAppChange({
+    domain: "finance",
+    reason: "finance_settlement",
+    headline: "Rückzahlung erfasst",
+    detail: input.amountLabel,
+    title: input.ledgerTitle || `Abrechnung #${input.ledgerId}`,
+    href: `/finance-brain/${input.ledgerId}`,
+    aiIconUrl: null,
+    category: null,
+    meta: null,
+    source: "finance",
+    ledgerId: input.ledgerId,
+  });
+}
+
 export { publishInboxRefresh };

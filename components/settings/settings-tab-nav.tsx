@@ -8,6 +8,7 @@ export type SettingsTab =
   | "travel"
   | "mail"
   | "users"
+  | "notify"
   | "more";
 
 export type SettingsTabItem = AppTabItem<SettingsTab>;
@@ -21,6 +22,7 @@ export function parseSettingsTab(
     raw === "travel" ||
     raw === "mail" ||
     raw === "users" ||
+    raw === "notify" ||
     raw === "more"
   ) {
     return raw;

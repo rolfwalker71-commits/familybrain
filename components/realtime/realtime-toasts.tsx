@@ -4,40 +4,73 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { BellOff, X } from "lucide-react";
 import { DocumentAiIcon } from "@/components/documents/document-ai-icon";
-import { toSwissDate } from "@/lib/utils/dates";
-import type { DocumentNotifyPayload } from "@/lib/realtime/hub";
+import type { AppNotifyPayload, NotifyReason } from "@/lib/realtime/hub";
+import {
+  isReasonEnabled,
+  mergeNotificationPrefs,
+  passesScopeFilter,
+  type UserNotificationPrefs,
+} from "@/lib/realtime/prefs-client";
 import { cn } from "@/lib/utils";
 
 type ToastItem = {
   id: string;
-  document: DocumentNotifyPayload;
+  notification: AppNotifyPayload;
   at: string;
 };
 
-function metaLine(doc: DocumentNotifyPayload): string {
-  const parts = [
-    doc.correspondentName,
-    doc.documentTypeName,
-    doc.createdDate ? toSwissDate(doc.createdDate) : null,
-  ].filter(Boolean);
-  return parts.length > 0
-    ? parts.join(" · ")
-    : `Paperless-ID ${doc.paperlessId}`;
+function playBling() {
+  if (typeof window === "undefined") return;
+  if (document.visibilityState !== "visible") return;
+  try {
+    const Ctx =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext?: typeof AudioContext })
+        .webkitAudioContext;
+    if (!Ctx) return;
+    const ctx = new Ctx();
+    const now = ctx.currentTime;
+    const gain = ctx.createGain();
+    gain.connect(ctx.destination);
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.12, now + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.28);
+
+    const osc = ctx.createOscillator();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(880, now);
+    osc.frequency.exponentialRampToValueAtTime(1320, now + 0.12);
+    osc.connect(gain);
+    osc.start(now);
+    osc.stop(now + 0.3);
+    void ctx.resume().catch(() => undefined);
+    window.setTimeout(() => {
+      void ctx.close().catch(() => undefined);
+    }, 400);
+  } catch {
+    /* autoplay / unsupported */
+  }
 }
 
-function sourceLabel(doc: DocumentNotifyPayload): string {
-  return doc.source === "paperless" ? "Paperless" : "Buddy";
+function sourceLabel(n: AppNotifyPayload): string {
+  if (n.source === "paperless") return "Paperless";
+  if (n.source === "travel") return "TravelBuddy";
+  if (n.source === "finance") return "FinanzBuddy";
+  return "Buddy";
 }
 
 /**
- * Global toasts for document changes (SSE).
- * Dismiss: X, click outside, Escape. Duration from Settings.
+ * Global toasts for app events (SSE).
+ * Dismiss: X, click outside, Escape. Prefs from /api/me/notification-prefs.
  */
 export function RealtimeToasts() {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
-  const [enabled, setEnabled] = useState(true);
-  const [durationSec, setDurationSec] = useState(9);
+  const [prefs, setPrefs] = useState<UserNotificationPrefs>(() =>
+    mergeNotificationPrefs(null)
+  );
   const timersRef = useRef<Map<string, number>>(new Map());
+  const prefsRef = useRef(prefs);
+  prefsRef.current = prefs;
 
   const dismiss = useCallback((id: string) => {
     const t = timersRef.current.get(id);
@@ -55,29 +88,39 @@ export function RealtimeToasts() {
   }, []);
 
   const pushToast = useCallback(
-    (document: DocumentNotifyPayload, at: string) => {
-      const id = `${document.localId}-${document.reason}-${at}-${Math.random().toString(36).slice(2, 7)}`;
-      setToasts((prev) => [{ id, document, at }, ...prev].slice(0, 4));
-      const ms = Math.max(3, durationSec) * 1000;
+    (notification: AppNotifyPayload, at: string) => {
+      const p = prefsRef.current;
+      if (!isReasonEnabled(p, notification.reason as NotifyReason)) return;
+      if (
+        !passesScopeFilter(p, {
+          tripId: notification.tripId,
+          ledgerId: notification.ledgerId,
+        })
+      ) {
+        return;
+      }
+
+      const id = `${notification.reason}-${at}-${Math.random().toString(36).slice(2, 7)}`;
+      setToasts((prev) => [{ id, notification, at }, ...prev].slice(0, 4));
+      if (p.soundEnabled) playBling();
+      const ms = Math.max(3, p.durationSec) * 1000;
       const timer = window.setTimeout(() => dismiss(id), ms);
       timersRef.current.set(id, timer);
     },
-    [dismiss, durationSec]
+    [dismiss]
   );
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       try {
-        const res = await fetch("/api/settings");
+        const res = await fetch("/api/me/notification-prefs");
         if (!res.ok || cancelled) return;
         const data = await res.json();
-        if (cancelled) return;
-        setEnabled(data.liveNotificationsEnabled !== false);
-        const d = Number(data.liveNotificationsDurationSec);
-        if (Number.isFinite(d) && d >= 3) setDurationSec(d);
+        if (cancelled || !data.prefs) return;
+        setPrefs(mergeNotificationPrefs(data.prefs));
       } catch {
-        /* keep defaults */
+        /* defaults */
       }
     })();
     return () => {
@@ -92,30 +135,32 @@ export function RealtimeToasts() {
       window.dispatchEvent(new CustomEvent("buddy:inbox"));
     };
 
-    const onDocument = (ev: MessageEvent) => {
+    const onNotify = (ev: MessageEvent) => {
       try {
         const data = JSON.parse(String(ev.data)) as {
           at?: string;
-          document?: DocumentNotifyPayload;
+          notification?: AppNotifyPayload;
+          document?: AppNotifyPayload;
         };
-        if (data.document && enabled) {
-          pushToast(data.document, data.at || new Date().toISOString());
-        }
-        onInbox();
+        const n = data.notification || data.document;
+        if (n) pushToast(n, data.at || new Date().toISOString());
+        if (n?.domain === "documents") onInbox();
       } catch {
         /* ignore */
       }
     };
 
     es.addEventListener("inbox", onInbox);
-    es.addEventListener("document", onDocument);
+    es.addEventListener("notify", onNotify);
+    es.addEventListener("document", onNotify);
 
     return () => {
       es.removeEventListener("inbox", onInbox);
-      es.removeEventListener("document", onDocument);
+      es.removeEventListener("notify", onNotify);
+      es.removeEventListener("document", onNotify);
       es.close();
     };
-  }, [enabled, pushToast]);
+  }, [pushToast]);
 
   useEffect(() => {
     if (toasts.length === 0) return;
@@ -138,24 +183,23 @@ export function RealtimeToasts() {
   }, []);
 
   async function disableNotifications() {
-    setEnabled(false);
+    setPrefs((prev) => ({ ...prev, enabled: false }));
     dismissAll();
     try {
-      await fetch("/api/settings", {
+      await fetch("/api/me/notification-prefs", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ liveNotificationsEnabled: false }),
+        body: JSON.stringify({ enabled: false }),
       });
     } catch {
-      /* local mute still active */
+      /* local mute */
     }
   }
 
-  if (!enabled || toasts.length === 0) return null;
+  if (!prefs.enabled || toasts.length === 0) return null;
 
   return (
     <>
-      {/* Click outside → alle Toasts weg */}
       <button
         type="button"
         aria-label="Benachrichtigungen schliessen"
@@ -167,7 +211,7 @@ export function RealtimeToasts() {
         aria-live="polite"
       >
         {toasts.map((toast) => {
-          const doc = toast.document;
+          const n = toast.notification;
           return (
             <div
               key={toast.id}
@@ -180,36 +224,40 @@ export function RealtimeToasts() {
             >
               <div className="flex gap-3 p-3 pr-11">
                 <DocumentAiIcon
-                  aiIconUrl={doc.aiIconUrl}
-                  category={doc.category}
+                  aiIconUrl={n.aiIconUrl}
+                  category={n.category}
                   size="md"
                   zoomable={false}
                 />
                 <div className="min-w-0 flex-1">
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--brand-docs)]">
-                    {doc.headline}
+                    {n.headline}
                     <span className="ml-1.5 font-normal normal-case tracking-normal text-muted-foreground">
-                      · {sourceLabel(doc)}
+                      · {sourceLabel(n)}
                     </span>
                   </p>
                   <p className="mt-0.5 truncate text-sm font-semibold leading-snug">
-                    {doc.title || `Dokument #${doc.localId}`}
+                    {n.title || "Aktualisierung"}
                   </p>
-                  <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                    {metaLine(doc)}
-                  </p>
-                  {doc.detail ? (
-                    <p className="mt-1 line-clamp-2 text-[11px] leading-snug text-muted-foreground">
-                      {doc.detail}
+                  {n.meta ? (
+                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                      {n.meta}
                     </p>
                   ) : null}
-                  <Link
-                    href={`/documents/${doc.localId}`}
-                    className="mt-2 inline-block text-xs font-medium text-[var(--brand-docs)] underline-offset-2 hover:underline"
-                    onClick={() => dismiss(toast.id)}
-                  >
-                    Dokument öffnen
-                  </Link>
+                  {n.detail ? (
+                    <p className="mt-1 line-clamp-2 text-[11px] leading-snug text-muted-foreground">
+                      {n.detail}
+                    </p>
+                  ) : null}
+                  {n.href ? (
+                    <Link
+                      href={n.href}
+                      className="mt-2 inline-block text-xs font-medium text-[var(--brand-docs)] underline-offset-2 hover:underline"
+                      onClick={() => dismiss(toast.id)}
+                    >
+                      Öffnen
+                    </Link>
+                  ) : null}
                 </div>
               </div>
               <button
@@ -235,7 +283,7 @@ export function RealtimeToasts() {
             type="button"
             className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-background/90 px-3 py-1.5 text-[11px] text-muted-foreground shadow-sm backdrop-blur hover:bg-muted hover:text-foreground"
             onClick={() => void disableNotifications()}
-            title="Live-Benachrichtigungen ausschalten (auch unter Einstellungen)"
+            title="Live-Benachrichtigungen ausschalten"
           >
             <BellOff className="size-3" />
             Benachrichtigungen aus

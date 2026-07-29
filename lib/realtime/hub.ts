@@ -1,39 +1,61 @@
 /**
  * In-process pub/sub for live UI (single Node instance / Docker).
- * Publishers: webhooks, analysis, icons, status writes.
- * Subscribers: SSE → Action-Inbox refresh + optional toast notifications.
  */
 
-export type DocumentNotifyReason =
+export type NotifyDomain = "documents" | "travel" | "finance";
+
+export type NotifyReason =
   | "paperless_new"
   | "paperless_updated"
   | "paperless_sync"
   | "analysis_completed"
   | "ai_icon"
   | "buddy_status"
-  | "mark_paid";
+  | "mark_paid"
+  | "trip_comment"
+  | "trip_event_updated"
+  | "trip_event_ai_image"
+  | "finance_expense_created"
+  | "finance_expense_updated"
+  | "finance_expense_ai_image"
+  | "finance_settlement";
 
-export type DocumentNotifyPayload = {
+/** @deprecated use NotifyReason */
+export type DocumentNotifyReason = NotifyReason;
+
+export type AppNotifyPayload = {
+  domain: NotifyDomain;
+  reason: NotifyReason;
+  headline: string;
+  detail: string | null;
+  title: string | null;
+  href: string | null;
+  aiIconUrl: string | null;
+  category: string | null;
+  meta: string | null;
+  source: "paperless" | "buddy" | "travel" | "finance";
+  /** Scope filters for per-user prefs */
+  tripId?: number | null;
+  ledgerId?: number | null;
+  /** Legacy document fields (optional) */
+  localId?: number | null;
+  paperlessId?: number | null;
+};
+
+/** @deprecated use AppNotifyPayload */
+export type DocumentNotifyPayload = AppNotifyPayload & {
   localId: number;
   paperlessId: number;
-  title: string | null;
   correspondentName: string | null;
   documentTypeName: string | null;
   createdDate: string | null;
-  category: string | null;
-  aiIconUrl: string | null;
-  /** Machine reason key */
-  reason: DocumentNotifyReason;
-  /** Short German headline shown in the toast */
-  headline: string;
-  /** Extra detail line (category, summary snippet, …) */
-  detail: string | null;
-  source: "paperless" | "buddy";
 };
 
 export type RealtimeEvent =
   | { topic: "inbox"; at: string }
-  | { topic: "document"; at: string; document: DocumentNotifyPayload };
+  | { topic: "notify"; at: string; notification: AppNotifyPayload }
+  /** @deprecated kept for older clients during deploy */
+  | { topic: "document"; at: string; document: AppNotifyPayload };
 
 type Listener = (event: RealtimeEvent) => void;
 

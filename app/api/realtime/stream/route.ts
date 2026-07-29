@@ -1,12 +1,12 @@
-import { isAuthError, requireAdmin } from "@/lib/auth/current-user";
+import { isAuthError, requireAuth } from "@/lib/auth/current-user";
 import { subscribeRealtime } from "@/lib/realtime/hub";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** SSE: `inbox` refresh + `document` notifications for live UI. */
+/** SSE: `inbox` + `notify` (and legacy `document`) for live UI. */
 export async function GET() {
-  const auth = await requireAdmin();
+  const auth = await requireAuth();
   if (isAuthError(auth)) return auth;
 
   const encoder = new TextEncoder();
