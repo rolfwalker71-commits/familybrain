@@ -137,6 +137,7 @@ export default async function DashboardPage() {
     }
   );
 
+  const todayIso = new Date().toISOString().slice(0, 10);
   const upcoming = (
     listDeadlines("open") as unknown as {
       id: number;
@@ -147,7 +148,14 @@ export default async function DashboardPage() {
       correspondent_name: string | null;
     }[]
   )
-    .filter((d) => d.deadline_date)
+    .filter(
+      (d) =>
+        Boolean(d.deadline_date) &&
+        (d.deadline_date as string) >= todayIso
+    )
+    .sort((a, b) =>
+      String(a.deadline_date).localeCompare(String(b.deadline_date))
+    )
     .slice(0, 5);
 
   const deadlineKpi =
