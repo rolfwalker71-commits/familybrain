@@ -147,17 +147,6 @@ function percent(part: number, whole: number) {
   return Math.min(100, Math.round((part / whole) * 1000) / 10);
 }
 
-function ShareBar({ value }: { value: number }) {
-  return (
-    <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-muted">
-      <div
-        className="h-full rounded-full bg-primary transition-[width]"
-        style={{ width: `${Math.max(2, value)}%` }}
-      />
-    </div>
-  );
-}
-
 function InvoiceListRow({
   row,
   today,
