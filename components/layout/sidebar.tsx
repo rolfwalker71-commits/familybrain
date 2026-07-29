@@ -218,7 +218,7 @@ export function Sidebar({
                         : item.countKey === "warrantiesExpiringSoon"
                           ? "Garantien bald ab"
                           : item.countKey === "openDueFinanceCount"
-                            ? "Offene / fällige Rechnungen"
+                            ? "Offene Rechnungen (Paperless Zu bezahlen)"
                             : undefined
                   }
                 >

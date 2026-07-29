@@ -633,49 +633,29 @@ export function getDashboardStats() {
       .get() as { c: number }
   ).c;
 
-  /** Unpaid Paperless «Zu bezahlen» docs + unpaid extracts due within 30 days. */
+  /** Same source as Action-Inbox «Offene Rechnungen»: Paperless Zu bezahlen & not Bezahlt. */
   const openDueFinance = db
     .prepare(
       `SELECT
-         (
-           SELECT COUNT(*) FROM paperless_documents d
-           WHERE COALESCE(d.sync_status, 'synced') != 'missing'
-             AND d.zu_bezahlen = 1
-             AND COALESCE(d.bezahlt, 0) = 0
-         ) AS open_unpaid_count,
-         (
-           SELECT COALESCE(SUM(f.amount), 0)
-           FROM financial_items f
-           JOIN paperless_documents d ON d.id = f.document_id
-           WHERE COALESCE(f.counts_in_stats, 1) = 1
-             AND COALESCE(d.bezahlt, 0) = 0
-             AND (
-               (d.zu_bezahlen = 1)
-               OR (
-                 f.due_date IS NOT NULL AND TRIM(f.due_date) != ''
-                 AND f.due_date <= ?
-               )
-             )
-         ) AS open_amount,
-         (
-           SELECT COUNT(*) FROM financial_items f
-           JOIN paperless_documents d ON d.id = f.document_id
-           WHERE COALESCE(f.counts_in_stats, 1) = 1
-             AND COALESCE(d.bezahlt, 0) = 0
-             AND f.due_date IS NOT NULL AND TRIM(f.due_date) != ''
-             AND f.due_date <= ?
-         ) AS due_extract_count`
+         COUNT(*) AS open_unpaid_count,
+         COALESCE(SUM(
+           (
+             SELECT f.amount FROM financial_items f
+             WHERE f.document_id = d.id
+             ORDER BY f.id ASC LIMIT 1
+           )
+         ), 0) AS open_amount
+       FROM paperless_documents d
+       WHERE COALESCE(d.sync_status, 'synced') != 'missing'
+         AND d.zu_bezahlen = 1
+         AND COALESCE(d.bezahlt, 0) = 0`
     )
-    .get(daysFromNow(30), daysFromNow(30)) as {
+    .get() as {
     open_unpaid_count: number;
     open_amount: number;
-    due_extract_count: number;
   };
 
-  const openDueFinanceCount = Math.max(
-    openDueFinance.open_unpaid_count,
-    openDueFinance.due_extract_count
-  );
+  const openDueFinanceCount = openDueFinance.open_unpaid_count;
 
   const recentAnalyses = db
     .prepare(

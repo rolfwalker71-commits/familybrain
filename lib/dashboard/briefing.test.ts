@@ -29,7 +29,7 @@ test("buildDashboardBriefing prioritizes overdue and open finance", () => {
   );
 
   assert.ok(lines.some((l) => l.includes("überfällig")));
-  assert.ok(lines.some((l) => l.includes("Rechnungen offen")));
+  assert.ok(lines.some((l) => l.includes("offene Rechnungen")));
   assert.ok(lines.some((l) => l.includes("Gemeinde Altdorf")));
   assert.ok(lines.some((l) => l.includes("TP-Link")));
   assert.ok(lines.length <= 5);

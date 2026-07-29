@@ -47,8 +47,8 @@ export function buildDashboardBriefing(
         : "";
     lines.push(
       stats.openDueFinanceCount === 1
-        ? `1 Rechnung offen / bald fällig${amount}`
-        : `${stats.openDueFinanceCount} Rechnungen offen / bald fällig${amount}`
+        ? `1 offene Rechnung${amount}`
+        : `${stats.openDueFinanceCount} offene Rechnungen${amount}`
     );
   }
 
