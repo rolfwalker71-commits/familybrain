@@ -133,6 +133,28 @@ export async function PATCH(request: Request, context: Ctx) {
         expense.place_name
       );
     }
+    if (
+      parsed.data.documentId != null &&
+      parsed.data.documentId > 0
+    ) {
+      try {
+        const ledger = getFinanceLedgerById(ledgerId);
+        const { writebackLinkTagsToPaperless } = await import(
+          "@/lib/paperless/writeback"
+        );
+        await writebackLinkTagsToPaperless({
+          localDocumentId: parsed.data.documentId,
+          ledgerId,
+          ledgerTitle: ledger?.title ?? null,
+          buddyStatus: "reisebeleg",
+        });
+      } catch (wbErr) {
+        console.error(
+          "[finance] paperless link writeback",
+          wbErr instanceof Error ? wbErr.message : wbErr
+        );
+      }
+    }
     return NextResponse.json({
       ok: true,
       expense: serializeExpense(expense, listFinanceExpenseSplits(expenseId)),

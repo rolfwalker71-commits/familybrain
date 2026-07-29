@@ -13,6 +13,7 @@ import {
   Sparkles,
   CloudCheck,
   Info,
+  ScrollText,
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,7 @@ import { readNdjsonStream } from "@/lib/utils/stream";
 import { PageHeader } from "@/components/layout/page-primitives";
 import { IconCircle, pageVisuals } from "@/components/layout/icon-circle";
 import { AutomationPanel } from "@/components/sync/automation-panel";
+import { SyncLogPanel } from "@/components/sync/sync-log-panel";
 import { VectorIndexStatusPanel } from "@/components/sync/vector-index-status-panel";
 import {
   SyncTabNav,
@@ -80,6 +82,7 @@ function SyncClientInner() {
   const searchParams = useSearchParams();
   const {
     pendingCount,
+    analyzedCount,
     hasOpenAIKey,
     isRunning: analysisRunning,
     startAnalysis,
@@ -102,8 +105,13 @@ function SyncClientInner() {
   const [triliumSyncProgress, setTriliumSyncProgress] =
     useState<SyncProgress | null>(null);
   const [busy, setBusy] = useState<
-    "save" | "test" | "sync" | "trilium-sync" | null
+    "save" | "test" | "sync" | "trilium-sync" | "writeback" | null
   >(null);
+  const [writebackProgress, setWritebackProgress] = useState<{
+    processed: number;
+    succeeded: number;
+    failed: number;
+  } | null>(null);
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
 
   useEffect(() => {
@@ -366,6 +374,76 @@ function SyncClientInner() {
     }
   }
 
+  async function runPaperlessWriteback() {
+    setBusy("writeback");
+    setError(null);
+    setMessage(null);
+    setWritebackProgress({ processed: 0, succeeded: 0, failed: 0 });
+    try {
+      let afterId = 0;
+      let totalProcessed = 0;
+      let totalSucceeded = 0;
+      let totalFailed = 0;
+      let done = false;
+
+      while (!done) {
+        const res = await fetch("/api/paperless/writeback-batch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ limit: 25, afterId }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || "Writeback fehlgeschlagen");
+        }
+
+        let batchDone = true;
+        let nextAfterId = afterId;
+        let streamError: string | null = null;
+
+        await readNdjsonStream(res, (event) => {
+          if (event.type === "progress") {
+            setWritebackProgress({
+              processed: totalProcessed + Number(event.processed || 0),
+              succeeded: totalSucceeded + Number(event.succeeded || 0),
+              failed: totalFailed + Number(event.failed || 0),
+            });
+          } else if (event.type === "done") {
+            const processed = Number(event.processed || 0);
+            const succeeded = Number(event.succeeded || 0);
+            const failedList = Array.isArray(event.failed) ? event.failed : [];
+            totalProcessed += processed;
+            totalSucceeded += succeeded;
+            totalFailed += failedList.length;
+            nextAfterId = Number(event.nextAfterId ?? afterId);
+            batchDone = Boolean(event.done);
+            setWritebackProgress({
+              processed: totalProcessed,
+              succeeded: totalSucceeded,
+              failed: totalFailed,
+            });
+          } else if (event.type === "error") {
+            streamError = String(event.error || "Writeback fehlgeschlagen");
+          }
+        });
+
+        if (streamError) throw new Error(streamError);
+        afterId = nextAfterId;
+        done = batchDone;
+      }
+
+      setMessage(
+        `Paperless-Writeback fertig: ${totalSucceeded} ok` +
+          (totalFailed > 0 ? `, ${totalFailed} Fehler` : "") +
+          ` (${totalProcessed} Dokumente).`
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(null);
+    }
+  }
+
   const syncLabel =
     syncProgress?.phase === "connecting"
       ? "Verbinde mit Paperless…"
@@ -388,6 +466,7 @@ function SyncClientInner() {
     { id: "status", label: "Status", icon: Activity },
     { id: "automation", label: "Automation", icon: Bot },
     { id: "analyse", label: "Analyse", icon: Sparkles },
+    { id: "log", label: "Protokoll", icon: ScrollText },
   ];
 
   function setTab(tab: SyncTab) {
@@ -634,6 +713,8 @@ function SyncClientInner() {
 
       {activeTab === "automation" ? <AutomationPanel /> : null}
 
+      {activeTab === "log" ? <SyncLogPanel /> : null}
+
       {activeTab === "analyse" ? (
       <Card>
         <CardHeader>
@@ -651,6 +732,8 @@ function SyncClientInner() {
           </p>
           <div className="rounded-xl border border-border/60 bg-[var(--brand-docs-soft)]/50 p-4 text-sm">
             Ausstehend: <strong>{pendingCount}</strong>
+            <span className="mx-2 text-muted-foreground">·</span>
+            Analysiert: <strong>{analyzedCount}</strong>
             {!hasOpenAIKey ? (
               <span className="ml-2 text-destructive">
                 · OpenAI-Key fehlt (
@@ -689,6 +772,43 @@ function SyncClientInner() {
                 </Button>
               </>
             )}
+          </div>
+
+          <div className="border-t border-border/60 pt-4 space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Bereits analysierte Dokumente müssen nicht nochmals durch die KI.
+              „Writeback erneut“ schreibt die vorhandenen Extrakte (Betrag,
+              Tags, Status, …) nach Paperless — ohne OpenAI-Kosten.
+            </p>
+            {writebackProgress && busy === "writeback" ? (
+              <div className="rounded-xl border border-border/60 p-3 text-sm">
+                Writeback: {writebackProgress.succeeded} ok
+                {writebackProgress.failed > 0
+                  ? `, ${writebackProgress.failed} Fehler`
+                  : ""}{" "}
+                ({writebackProgress.processed} verarbeitet)
+              </div>
+            ) : null}
+            <Button
+              variant="outline"
+              className="w-full"
+              disabled={
+                analyzedCount === 0 ||
+                !hasToken ||
+                busy !== null ||
+                analysisRunning
+              }
+              onClick={() => void runPaperlessWriteback()}
+            >
+              {busy === "writeback"
+                ? "Writeback läuft…"
+                : `Paperless-Writeback erneut (${analyzedCount})`}
+            </Button>
+            {!hasToken ? (
+              <p className="text-xs text-destructive">
+                Paperless-Token fehlt — zuerst unter Einstellungen hinterlegen.
+              </p>
+            ) : null}
           </div>
         </CardContent>
       </Card>

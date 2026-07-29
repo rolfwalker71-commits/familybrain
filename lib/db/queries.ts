@@ -462,6 +462,27 @@ export function listPendingDocumentIds(limit = 10): number[] {
   return rows.map((r) => r.id);
 }
 
+/** Completed analyses eligible for Paperless writeback (cursor by id). */
+export function listCompletedAnalysisDocumentIds(
+  limit = 25,
+  afterId = 0
+): number[] {
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `SELECT d.id
+       FROM paperless_documents d
+       INNER JOIN document_summaries s ON s.document_id = d.id
+       WHERE COALESCE(d.sync_status, 'synced') != 'missing'
+         AND s.analysis_status = 'completed'
+         AND d.id > ?
+       ORDER BY d.id
+       LIMIT ?`
+    )
+    .all(afterId, limit) as { id: number }[];
+  return rows.map((r) => r.id);
+}
+
 export function getFilterOptions() {
   const db = getDb();
   const correspondents = db

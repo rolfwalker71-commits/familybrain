@@ -247,22 +247,157 @@ export class PaperlessClient {
   }
 
   async listCustomFields(): Promise<PaperlessCustomField[]> {
-    const results: PaperlessCustomField[] = [];
+    return this.listAllPages<PaperlessCustomField>("/api/custom_fields/");
+  }
+
+  private async listAllPages<T>(basePath: string): Promise<T[]> {
+    const results: T[] = [];
     let nextUrl: string | undefined;
     let first = true;
+    const sep = basePath.includes("?") ? "&" : "?";
     while (first || nextUrl) {
       first = false;
       const page = nextUrl
-        ? await this.request<PaperlessPaginatedResponse<PaperlessCustomField>>(
-            nextUrl
-          )
-        : await this.request<PaperlessPaginatedResponse<PaperlessCustomField>>(
-            "/api/custom_fields/?page_size=100"
+        ? await this.request<PaperlessPaginatedResponse<T>>(nextUrl)
+        : await this.request<PaperlessPaginatedResponse<T>>(
+            `${basePath}${sep}page_size=100`
           );
       results.push(...(page.results || []));
       nextUrl = page.next ?? undefined;
     }
     return results;
+  }
+
+  async listTags(): Promise<PaperlessTag[]> {
+    return this.listAllPages<PaperlessTag>("/api/tags/");
+  }
+
+  async createTag(name: string): Promise<PaperlessTag> {
+    return this.requestJson<PaperlessTag>("/api/tags/", {
+      method: "POST",
+      body: { name },
+    });
+  }
+
+  async ensureTag(
+    name: string,
+    cache?: Map<string, number>
+  ): Promise<number> {
+    const key = name.trim().toLowerCase();
+    if (cache?.has(key)) return cache.get(key)!;
+    const tags = await this.listTags();
+    const existing = tags.find(
+      (t) => t.name.trim().toLowerCase() === key
+    );
+    if (existing) {
+      cache?.set(key, existing.id);
+      return existing.id;
+    }
+    const created = await this.createTag(name.trim());
+    cache?.set(key, created.id);
+    return created.id;
+  }
+
+  async listCorrespondents(): Promise<PaperlessCorrespondent[]> {
+    return this.listAllPages<PaperlessCorrespondent>("/api/correspondents/");
+  }
+
+  async createCorrespondent(name: string): Promise<PaperlessCorrespondent> {
+    return this.requestJson<PaperlessCorrespondent>("/api/correspondents/", {
+      method: "POST",
+      body: { name },
+    });
+  }
+
+  async ensureCorrespondent(
+    name: string,
+    cache?: Map<string, number>
+  ): Promise<number> {
+    const key = name.trim().toLowerCase();
+    if (cache?.has(key)) return cache.get(key)!;
+    const rows = await this.listCorrespondents();
+    const existing = rows.find(
+      (t) => t.name.trim().toLowerCase() === key
+    );
+    if (existing) {
+      cache?.set(key, existing.id);
+      return existing.id;
+    }
+    const created = await this.createCorrespondent(name.trim());
+    cache?.set(key, created.id);
+    return created.id;
+  }
+
+  async listDocumentTypes(): Promise<PaperlessDocumentType[]> {
+    return this.listAllPages<PaperlessDocumentType>("/api/document_types/");
+  }
+
+  async findDocumentTypeIdByName(name: string): Promise<number | null> {
+    const want = name.trim().toLowerCase();
+    const types = await this.listDocumentTypes();
+    const hit = types.find((t) => t.name.trim().toLowerCase() === want);
+    return hit?.id ?? null;
+  }
+
+  /**
+   * Merge-patch document: tags (union), custom_fields (by field id),
+   * optional document_type / correspondent.
+   */
+  async setDocumentMetadata(
+    paperlessId: number,
+    input: {
+      addTagIds?: number[];
+      documentTypeId?: number | null;
+      correspondentId?: number | null;
+      customFields?: Array<{ field: number; value: unknown }>;
+    }
+  ): Promise<PaperlessDocument> {
+    const doc = await this.getDocument(paperlessId);
+    const body: Record<string, unknown> = {};
+
+    if (input.addTagIds && input.addTagIds.length > 0) {
+      const existingTags = Array.isArray(doc.tags)
+        ? doc.tags.map((t) =>
+            typeof t === "number" ? t : Number((t as PaperlessTag).id)
+          )
+        : [];
+      const tagSet = new Set<number>(
+        [...existingTags, ...input.addTagIds].filter(
+          (id) => Number.isFinite(id) && id > 0
+        )
+      );
+      body.tags = [...tagSet];
+    }
+
+    if (input.documentTypeId !== undefined) {
+      body.document_type = input.documentTypeId;
+    }
+    if (input.correspondentId !== undefined) {
+      body.correspondent = input.correspondentId;
+    }
+
+    if (input.customFields && input.customFields.length > 0) {
+      const existing = Array.isArray(doc.custom_fields)
+        ? [...doc.custom_fields]
+        : [];
+      const byField = new Map<number, { field: number; value: unknown }>();
+      for (const entry of existing) {
+        if (entry && typeof entry.field === "number") {
+          byField.set(entry.field, {
+            field: entry.field,
+            value: entry.value,
+          });
+        }
+      }
+      for (const cf of input.customFields) {
+        if (cf.value === undefined) continue;
+        byField.set(cf.field, { field: cf.field, value: cf.value });
+      }
+      body.custom_fields = [...byField.values()];
+    }
+
+    if (Object.keys(body).length === 0) return doc;
+    return this.patchDocument(paperlessId, body);
   }
 
   async downloadDocument(

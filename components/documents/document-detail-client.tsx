@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -122,6 +122,10 @@ function DocumentDetailInner({ detail }: DetailProps) {
   const [analyzing, setAnalyzing] = useState(false);
   const [showOcr, setShowOcr] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [buddyReviewed, setBuddyReviewed] = useState(false);
+  const [taxRelevant, setTaxRelevant] = useState(false);
+  const [statusBusy, setStatusBusy] = useState(false);
+  const [statusLoaded, setStatusLoaded] = useState(false);
   const { document, tags, summary } = detail;
 
   const activeTab = parseDocumentDetailTab(searchParams.get("tab"));
@@ -232,6 +236,60 @@ function DocumentDetailInner({ detail }: DetailProps) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setAnalyzing(false);
+    }
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/paperless/document-status?documentLocalId=${document.id}`
+        );
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || cancelled) return;
+        setBuddyReviewed(data.buddyReviewed === true);
+        setTaxRelevant(data.taxRelevant === true);
+      } catch {
+        /* ignore */
+      } finally {
+        if (!cancelled) setStatusLoaded(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [document.id]);
+
+  async function patchStatus(next: {
+    buddyReviewed?: boolean;
+    taxRelevant?: boolean;
+  }) {
+    setStatusBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/paperless/document-status", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          documentLocalId: document.id,
+          ...next,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || "Status speichern fehlgeschlagen");
+      }
+      if (next.buddyReviewed !== undefined) {
+        setBuddyReviewed(next.buddyReviewed);
+      }
+      if (next.taxRelevant !== undefined) {
+        setTaxRelevant(next.taxRelevant);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setStatusBusy(false);
     }
   }
 
@@ -361,6 +419,53 @@ function DocumentDetailInner({ detail }: DetailProps) {
 
       {activeTab === "overview" ? (
         <div className="space-y-4">
+          {statusLoaded ? (
+            <Card className="border-border/50">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-3 text-base">
+                  <IconCircle icon={Shield} tone="teal" size="sm" />
+                  Buddy-Status
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <label className="flex cursor-pointer items-start gap-3 text-sm">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 size-4 accent-[var(--brand-docs)]"
+                    checked={buddyReviewed}
+                    disabled={statusBusy}
+                    onChange={(e) =>
+                      void patchStatus({ buddyReviewed: e.target.checked })
+                    }
+                  />
+                  <span>
+                    <span className="font-medium">Geprüft</span>
+                    <span className="mt-0.5 block text-xs text-muted-foreground">
+                      Schreibt «Buddy geprüft» nach Paperless.
+                    </span>
+                  </span>
+                </label>
+                <label className="flex cursor-pointer items-start gap-3 text-sm">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 size-4 accent-[var(--brand-docs)]"
+                    checked={taxRelevant}
+                    disabled={statusBusy}
+                    onChange={(e) =>
+                      void patchStatus({ taxRelevant: e.target.checked })
+                    }
+                  />
+                  <span>
+                    <span className="font-medium">Steuer relevant</span>
+                    <span className="mt-0.5 block text-xs text-muted-foreground">
+                      Für Jahres-/Steuerfilter in Paperless.
+                    </span>
+                  </span>
+                </label>
+              </CardContent>
+            </Card>
+          ) : null}
+
           {/* Soft UI hero card (mobile-first, also on desktop) */}
           <Card className="overflow-hidden border-border/50 shadow-[0_8px_28px_rgba(20,32,28,0.07)]">
             <CardContent className="space-y-5 p-5">

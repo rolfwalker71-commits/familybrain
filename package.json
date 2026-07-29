@@ -11,7 +11,7 @@
     "sync:paperless": "tsx scripts/sync-paperless.ts",
     "analyze:pending": "tsx scripts/analyze-pending.ts",
     "jobs:run": "tsx scripts/run-jobs.ts",
-    "test": "node --import tsx --test lib/jobs/constants.test.ts lib/auth/auth.test.ts lib/finance-brain/settlement.test.ts lib/finance-brain/settlement-audit.test.ts lib/finance-brain/expense-category.test.ts lib/finance-brain/ledger-kind.test.ts lib/trips/ics.test.ts lib/trips/ojp/parse-trip.test.ts lib/utils/due-urgency.test.ts lib/dashboard/briefing.test.ts lib/navigation/admin-nav.test.ts",
+    "test": "node --import tsx --test lib/jobs/constants.test.ts lib/auth/auth.test.ts lib/finance-brain/settlement.test.ts lib/finance-brain/settlement-audit.test.ts lib/finance-brain/expense-category.test.ts lib/finance-brain/ledger-kind.test.ts lib/trips/ics.test.ts lib/trips/ojp/parse-trip.test.ts lib/utils/due-urgency.test.ts lib/dashboard/briefing.test.ts lib/navigation/admin-nav.test.ts lib/paperless/custom-fields.test.ts",
     "auth:secrets": "node scripts/generate-auth-secrets.mjs",
     "version:bump": "node scripts/bump-version.js",
     "hooks:install": "git config core.hooksPath scripts/git-hooks && chmod +x scripts/git-hooks/pre-commit"

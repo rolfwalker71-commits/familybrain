@@ -61,6 +61,18 @@ function SettingsPageInner() {
   const [apiToken, setApiToken] = useState("");
   const [tokenMasked, setTokenMasked] = useState<string | null>(null);
   const [hasToken, setHasToken] = useState(false);
+  const [paperlessWritebackEnabled, setPaperlessWritebackEnabled] =
+    useState(true);
+  const [paperlessWebhookSecret, setPaperlessWebhookSecret] = useState("");
+  const [paperlessWebhookUrl, setPaperlessWebhookUrl] = useState("");
+  const [hasPaperlessWebhookSecret, setHasPaperlessWebhookSecret] =
+    useState(false);
+  const [paperlessWebhookSecretMasked, setPaperlessWebhookSecretMasked] =
+    useState<string | null>(null);
+  const [paperlessWritebackLastError, setPaperlessWritebackLastError] =
+    useState<string | null>(null);
+  const [paperlessCustomFieldChecklist, setPaperlessCustomFieldChecklist] =
+    useState<Array<{ name: string; dataTypeHint: string }>>([]);
   const [openaiKey, setOpenaiKey] = useState("");
   const [openaiKeyMasked, setOpenaiKeyMasked] = useState<string | null>(null);
   const [hasOpenAIKey, setHasOpenAIKey] = useState(false);
@@ -197,6 +209,34 @@ function SettingsPageInner() {
       setBaseUrl(data.paperlessBaseUrl || "");
       setTokenMasked(data.paperlessApiTokenMasked);
       setHasToken(Boolean(data.hasPaperlessToken));
+      setPaperlessWritebackEnabled(
+        data.paperlessWritebackEnabled !== false
+      );
+      setPaperlessWebhookUrl(data.paperlessWebhookUrl || "");
+      setHasPaperlessWebhookSecret(Boolean(data.hasPaperlessWebhookSecret));
+      setPaperlessWebhookSecretMasked(
+        data.paperlessWebhookSecretMasked || null
+      );
+      setPaperlessWebhookSecret(
+        typeof data.paperlessWebhookSecret === "string"
+          ? data.paperlessWebhookSecret
+          : ""
+      );
+      setPaperlessWritebackLastError(
+        data.paperlessWritebackLastError || null
+      );
+      setPaperlessCustomFieldChecklist(
+        Array.isArray(data.paperlessCustomFieldChecklist)
+          ? data.paperlessCustomFieldChecklist.filter(
+              (row: unknown): row is { name: string; dataTypeHint: string } =>
+                !!row &&
+                typeof row === "object" &&
+                typeof (row as { name?: unknown }).name === "string" &&
+                typeof (row as { dataTypeHint?: unknown }).dataTypeHint ===
+                  "string"
+            )
+          : []
+      );
       setOpenaiKeyMasked(data.openaiApiKeyMasked);
       setHasOpenAIKey(Boolean(data.hasOpenAIKey));
       const model = data.openaiModel || "gpt-4o-mini";
@@ -287,6 +327,8 @@ function SettingsPageInner() {
         body: JSON.stringify({
           paperlessBaseUrl: baseUrl,
           paperlessApiToken: apiToken || undefined,
+          paperlessWritebackEnabled,
+          paperlessWebhookSecret: paperlessWebhookSecret || undefined,
         }),
       });
       const data = await res.json();
@@ -294,7 +336,51 @@ function SettingsPageInner() {
       setTokenMasked(data.paperlessApiTokenMasked);
       setHasToken(data.hasPaperlessToken);
       setApiToken("");
+      setPaperlessWritebackEnabled(data.paperlessWritebackEnabled !== false);
+      setPaperlessWebhookUrl(data.paperlessWebhookUrl || "");
+      setHasPaperlessWebhookSecret(Boolean(data.hasPaperlessWebhookSecret));
+      setPaperlessWebhookSecretMasked(
+        data.paperlessWebhookSecretMasked || null
+      );
+      setPaperlessWebhookSecret(
+        typeof data.paperlessWebhookSecret === "string"
+          ? data.paperlessWebhookSecret
+          : ""
+      );
+      setPaperlessWritebackLastError(
+        data.paperlessWritebackLastError || null
+      );
       setMessage("Paperless-Einstellungen gespeichert.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  async function generateWebhookSecret() {
+    setSaving("paperless");
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ generatePaperlessWebhookSecret: true }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Secret erzeugen fehlgeschlagen");
+      setPaperlessWebhookSecret(
+        typeof data.paperlessWebhookSecret === "string"
+          ? data.paperlessWebhookSecret
+          : ""
+      );
+      setHasPaperlessWebhookSecret(Boolean(data.hasPaperlessWebhookSecret));
+      setPaperlessWebhookSecretMasked(
+        data.paperlessWebhookSecretMasked || null
+      );
+      setPaperlessWebhookUrl(data.paperlessWebhookUrl || "");
+      setMessage("Webhook-Secret erzeugt. Bitte in Paperless hinterlegen.");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -993,6 +1079,100 @@ function SettingsPageInner() {
               }
             />
           </div>
+
+          <div className="flex items-start gap-3 rounded-xl border border-border/60 bg-muted/30 px-3 py-3">
+            <input
+              id="paperlessWriteback"
+              type="checkbox"
+              className="mt-1 size-4 accent-[var(--brand-docs)]"
+              checked={paperlessWritebackEnabled}
+              onChange={(e) => setPaperlessWritebackEnabled(e.target.checked)}
+            />
+            <div className="min-w-0 space-y-1">
+              <Label htmlFor="paperlessWriteback" className="cursor-pointer">
+                Analyse-Writeback nach Paperless
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Schreibt Custom Fields, Tags und Status nach erfolgreicher
+                Analyse bzw. beim Verknüpfen mit Reise/Ausgabe zurück.
+              </p>
+            </div>
+          </div>
+
+          {paperlessWritebackLastError ? (
+            <Alert variant="destructive">
+              <AlertTitle>Letzter Writeback-Fehler</AlertTitle>
+              <AlertDescription className="break-words text-xs">
+                {paperlessWritebackLastError}
+              </AlertDescription>
+            </Alert>
+          ) : null}
+
+          <div className="space-y-2 rounded-xl border border-border/60 p-3">
+            <Label>Webhook (Near-Realtime)</Label>
+            <p className="text-xs text-muted-foreground">
+              In Paperless Post-Consumption / Webhook hinterlegen. Header:{" "}
+              <code className="rounded bg-muted px-1">X-Buddy-Webhook-Secret</code>
+            </p>
+            <div className="space-y-1">
+              <Label htmlFor="webhookUrl" className="text-xs text-muted-foreground">
+                URL
+              </Label>
+              <Input
+                id="webhookUrl"
+                className="rounded-xl font-mono text-xs"
+                readOnly
+                value={paperlessWebhookUrl}
+                onFocus={(e) => e.target.select()}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="webhookSecret" className="text-xs text-muted-foreground">
+                Shared Secret
+              </Label>
+              <Input
+                id="webhookSecret"
+                className="rounded-xl font-mono text-xs"
+                value={paperlessWebhookSecret}
+                onChange={(e) => setPaperlessWebhookSecret(e.target.value)}
+                placeholder={
+                  hasPaperlessWebhookSecret && !paperlessWebhookSecret
+                    ? `Gespeichert: ${paperlessWebhookSecretMasked || "••••"}`
+                    : "Secret eingeben oder erzeugen"
+                }
+              />
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={saving !== null}
+              onClick={() => void generateWebhookSecret()}
+            >
+              Secret erzeugen
+            </Button>
+          </div>
+
+          {paperlessCustomFieldChecklist.length > 0 ? (
+            <div className="space-y-2 rounded-xl border border-border/60 p-3">
+              <Label>Custom Fields in Paperless anlegen</Label>
+              <p className="text-xs text-muted-foreground">
+                Namen exakt so belassen (inkl. «Zu bezahlen» / «Bezahlt»). Tags
+                legt Buddy bei Bedarf selbst an.
+              </p>
+              <ul className="max-h-48 space-y-1 overflow-y-auto text-xs">
+                {paperlessCustomFieldChecklist.map((row) => (
+                  <li key={row.name} className="flex justify-between gap-2">
+                    <span className="font-medium">{row.name}</span>
+                    <span className="text-muted-foreground">
+                      {row.dataTypeHint}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
           <Button
             onClick={() => void savePaperless()}
             disabled={saving !== null}

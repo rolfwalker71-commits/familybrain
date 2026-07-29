@@ -47,6 +47,24 @@ export async function POST(request: Request, context: Ctx) {
       return NextResponse.json({ error: "Ungültige Eingabe" }, { status: 400 });
     }
     const event = linkTripEventDocument(eventId, parsed.data.documentId);
+    try {
+      const { getTripById } = await import("@/lib/trips/queries");
+      const trip = getTripById(tripId);
+      const { writebackLinkTagsToPaperless } = await import(
+        "@/lib/paperless/writeback"
+      );
+      await writebackLinkTagsToPaperless({
+        localDocumentId: parsed.data.documentId,
+        tripId,
+        tripTitle: trip?.title ?? null,
+        buddyStatus: "reisebeleg",
+      });
+    } catch (wbErr) {
+      console.error(
+        "[trips] paperless link writeback",
+        wbErr instanceof Error ? wbErr.message : wbErr
+      );
+    }
     return NextResponse.json({ ok: true, event: serializeTripEvent(event) });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

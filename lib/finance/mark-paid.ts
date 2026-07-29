@@ -91,6 +91,17 @@ export async function markDocumentsPaid(
         { bezahlt: true, zuBezahlen: false },
         fieldDefs
       );
+      try {
+        const { writebackStatusFlagsToPaperless } = await import(
+          "@/lib/paperless/writeback"
+        );
+        await writebackStatusFlagsToPaperless({
+          localDocumentId: doc.id,
+          buddyStatus: "bezahlt",
+        });
+      } catch {
+        /* optional status field */
+      }
       succeededLocalIds.push(doc.id);
       writtenPaperless += 1;
     } catch (err) {

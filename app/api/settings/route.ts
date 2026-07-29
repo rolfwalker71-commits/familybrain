@@ -64,9 +64,21 @@ import {
 import {
   APP_PUBLIC_URL_KEY,
   getAppPublicUrlSetting,
+  absoluteAppUrl,
   normalizeAppPublicUrl,
 } from "@/lib/app-url";
 import { setSetting } from "@/lib/db/migrations";
+import {
+  BUDDY_WRITEBACK_FIELD_CHECKLIST,
+} from "@/lib/paperless/custom-fields";
+import {
+  getLastWritebackError,
+  getPaperlessWebhookSecret,
+  isPaperlessWritebackEnabled,
+  setPaperlessWebhookSecret,
+  setPaperlessWritebackEnabled,
+} from "@/lib/paperless/writeback";
+import { randomBytes } from "crypto";
 import {
   isAuthError,
   requireAdmin,
@@ -75,7 +87,20 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+function paperlessIntegrationPayload(request?: Request) {
+  const secret = getPaperlessWebhookSecret();
+  return {
+    paperlessWritebackEnabled: isPaperlessWritebackEnabled(),
+    paperlessWebhookSecret: secret,
+    paperlessWebhookSecretMasked: maskToken(secret),
+    hasPaperlessWebhookSecret: Boolean(secret),
+    paperlessWebhookUrl: absoluteAppUrl("/api/paperless/webhook", request),
+    paperlessWritebackLastError: getLastWritebackError(),
+    paperlessCustomFieldChecklist: BUDDY_WRITEBACK_FIELD_CHECKLIST,
+  };
+}
+
+export async function GET(request: Request) {
   try {
     const auth = await requireAdmin();
     if (isAuthError(auth)) return auth;
@@ -90,6 +115,7 @@ export async function GET() {
     paperlessBaseUrl: paperless.baseUrl,
     paperlessApiTokenMasked: maskToken(paperless.apiToken),
     hasPaperlessToken: Boolean(paperless.apiToken),
+    ...paperlessIntegrationPayload(request),
     openaiApiKeyMasked: maskToken(openai.apiKey),
     hasOpenAIKey: hasOpenAIKey(),
     openaiModel: openai.model,
@@ -136,6 +162,9 @@ export async function GET() {
 const PutSchema = z.object({
   paperlessBaseUrl: z.string().url().optional(),
   paperlessApiToken: z.string().optional(),
+  paperlessWritebackEnabled: z.boolean().optional(),
+  paperlessWebhookSecret: z.string().max(200).nullable().optional(),
+  generatePaperlessWebhookSecret: z.boolean().optional(),
   openaiApiKey: z.string().optional(),
   openaiModel: z.string().min(1).optional(),
   triliumBaseUrl: z.string().url().optional(),
@@ -200,6 +229,15 @@ export async function PUT(request: Request) {
       );
     }
     savePaperlessSettings(current.baseUrl, parsed.data.paperlessApiToken);
+  }
+
+  if (parsed.data.paperlessWritebackEnabled !== undefined) {
+    setPaperlessWritebackEnabled(parsed.data.paperlessWritebackEnabled);
+  }
+  if (parsed.data.generatePaperlessWebhookSecret) {
+    setPaperlessWebhookSecret(randomBytes(24).toString("hex"));
+  } else if (parsed.data.paperlessWebhookSecret !== undefined) {
+    setPaperlessWebhookSecret(parsed.data.paperlessWebhookSecret);
   }
 
   if (parsed.data.openaiApiKey !== undefined || parsed.data.openaiModel) {
@@ -342,6 +380,7 @@ export async function PUT(request: Request) {
     paperlessBaseUrl: paperless.baseUrl,
     paperlessApiTokenMasked: maskToken(paperless.apiToken),
     hasPaperlessToken: Boolean(paperless.apiToken),
+    ...paperlessIntegrationPayload(request),
     openaiApiKeyMasked: maskToken(openai.apiKey),
     hasOpenAIKey: hasOpenAIKey(),
     openaiModel: openai.model,

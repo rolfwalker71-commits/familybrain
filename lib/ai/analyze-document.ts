@@ -82,6 +82,18 @@ export async function analyzeDocument(
       model,
       options?.expectedContentHash
     );
+    try {
+      const { writebackAnalysisToPaperless } = await import(
+        "@/lib/paperless/writeback"
+      );
+      await writebackAnalysisToPaperless(documentId);
+    } catch (wbErr) {
+      console.error(
+        "[analyze] paperless writeback failed",
+        documentId,
+        wbErr instanceof Error ? wbErr.message : wbErr
+      );
+    }
     return { documentId, analysis: parsed.data, model };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

@@ -66,20 +66,17 @@ function parseSummary(value: string | null): Record<string, unknown> {
 export function AutomationPanel() {
   const [status, setStatus] = useState<StatusResponse | null>(null);
   const [runs, setRuns] = useState<JobRun[]>([]);
-  const [totalRuns, setTotalRuns] = useState(0);
-  const [offset, setOffset] = useState(0);
   const [enabled, setEnabled] = useState(true);
   const [intervalMinutes, setIntervalMinutes] = useState(30);
   const [selectedRun, setSelectedRun] = useState<number | null>(null);
   const [items, setItems] = useState<JobItem[]>([]);
   const [busy, setBusy] = useState<"save" | "run" | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const pageSize = 10;
 
   const refresh = useCallback(async () => {
     const [statusRes, runsRes] = await Promise.all([
       fetch("/api/jobs/status", { cache: "no-store" }),
-      fetch(`/api/jobs/runs?limit=${pageSize}&offset=${offset}`, {
+      fetch(`/api/jobs/runs?limit=3&offset=0`, {
         cache: "no-store",
       }),
     ]);
@@ -93,10 +90,9 @@ export function AutomationPanel() {
     };
     setStatus(nextStatus);
     setRuns(nextRuns.runs);
-    setTotalRuns(nextRuns.total);
     setEnabled(nextStatus.settings.enabled);
     setIntervalMinutes(nextStatus.settings.intervalMinutes);
-  }, [offset]);
+  }, []);
 
   useEffect(() => {
     const initialTimer = window.setTimeout(() => {
@@ -257,13 +253,17 @@ export function AutomationPanel() {
 
         <div className="space-y-3">
           <h3 className="font-medium">Laufhistorie</h3>
+          <p className="text-sm text-muted-foreground">
+            Die ausführliche Liste (letzte 100 Läufe, OK/Probleme) findest du
+            unter dem Tab <strong>Protokoll</strong>.
+          </p>
           {runs.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               Noch keine Läufe protokolliert.
             </p>
           ) : (
             <div className="space-y-2">
-              {runs.map((run) => {
+              {runs.slice(0, 3).map((run) => {
                 const summary = parseSummary(run.summary_json);
                 return (
                   <button
@@ -304,29 +304,6 @@ export function AutomationPanel() {
               })}
             </div>
           )}
-
-          <div className="flex items-center justify-between">
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={offset === 0}
-              onClick={() => setOffset(Math.max(0, offset - pageSize))}
-            >
-              Zurück
-            </Button>
-            <span className="text-xs text-muted-foreground">
-              {totalRuns === 0 ? 0 : offset + 1}–
-              {Math.min(offset + pageSize, totalRuns)} von {totalRuns}
-            </span>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={offset + pageSize >= totalRuns}
-              onClick={() => setOffset(offset + pageSize)}
-            >
-              Weiter
-            </Button>
-          </div>
         </div>
 
         {selectedRun ? (
