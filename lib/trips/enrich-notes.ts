@@ -13,6 +13,7 @@ import {
   type TripEventRow,
 } from "@/lib/trips/queries";
 import { itineraryFromExtractedData } from "@/lib/extraction/itinerary";
+import { displayImportantDateLabel } from "@/lib/extraction/itinerary-labels";
 
 function norm(raw: string | null | undefined): string {
   return (raw || "").trim().toLowerCase().replace(/\s+/g, " ");
@@ -297,7 +298,10 @@ function buildDocMarkdown(
     }>(summary.important_dates);
     const dateRows = dates
       .map((d) => {
-        const label = asString(d.label) || asString(d.description) || "Datum";
+        const label =
+          displayImportantDateLabel(asString(d.label)) ||
+          asString(d.description) ||
+          "Datum";
         const date = asString(d.date);
         if (!date && !asString(d.description)) return null;
         if (date && overlapsKnown(event, date) && overlapsKnown(event, label)) {

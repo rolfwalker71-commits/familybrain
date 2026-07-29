@@ -75,6 +75,7 @@ type InvoiceRow = {
   document_title: string | null;
   document_local_id: number;
   paperless_id?: number | null;
+  ai_icon_url?: string | null;
 };
 
 type Dimension = "year" | "vendor" | "category";
@@ -208,6 +209,10 @@ function InvoiceListRow({
             <DocumentTitleLink
               documentId={row.document_local_id}
               title={row.document_title}
+              aiIconUrl={row.ai_icon_url}
+              category={row.category}
+              showIcon
+              iconSize="xs"
             />
           </MetaLine>
         }

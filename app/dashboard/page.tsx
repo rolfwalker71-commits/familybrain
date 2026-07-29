@@ -92,7 +92,7 @@ export default async function DashboardPage() {
         currency: string | null;
       }
     | undefined;
-  const topDueExtract = inbox.dueInvoices[0] as
+  const topDueExtract = inbox.dueInvoices[0] as unknown as
     | {
         vendor: string | null;
         document_title: string | null;
@@ -100,7 +100,7 @@ export default async function DashboardPage() {
         currency: string | null;
       }
     | undefined;
-  const topWarranty = inbox.warrantiesExpiring[0] as
+  const topWarranty = inbox.warrantiesExpiring[0] as unknown as
     | {
         product_name: string | null;
         vendor: string | null;
@@ -138,7 +138,7 @@ export default async function DashboardPage() {
   );
 
   const upcoming = (
-    listDeadlines("open") as {
+    listDeadlines("open") as unknown as {
       id: number;
       title: string;
       deadline_date: string | null;

@@ -29,6 +29,13 @@ import {
   extractPaymentCustomFlags,
 } from "@/lib/paperless/custom-fields";
 
+function aiIconPublicUrl(aiIconPath: string | null | undefined): string | null {
+  if (!aiIconPath) return null;
+  const base = aiIconPath.replace(/^.*[/\\]/, "").trim();
+  if (!base || base.includes("..")) return null;
+  return `/api/documents/media/ai-icon/${encodeURIComponent(base)}`;
+}
+
 export type PaperlessDocumentRow = {
   id: number;
   paperless_id: number;
@@ -742,15 +749,21 @@ export function listWarranties(sortDir: "asc" | "desc" = "desc") {
   const db = getDb();
   const sortSql = sortDir === "asc" ? "ASC" : "DESC";
   const nullDate = sortDir === "asc" ? "9999-12-31" : "0000-01-01";
-  return db
-    .prepare(
-      `SELECT w.*, d.title as document_title, d.id as document_local_id,
-              d.correspondent_name
-       FROM devices_and_warranties w
-       JOIN paperless_documents d ON d.id = w.document_id
-       ORDER BY COALESCE(w.warranty_until, '${nullDate}') ${sortSql}`
-    )
-    .all();
+  return (
+    db
+      .prepare(
+        `SELECT w.*, d.title as document_title, d.id as document_local_id,
+                d.correspondent_name, d.ai_icon_path,
+                (SELECT s.category FROM document_summaries s WHERE s.document_id = d.id LIMIT 1) AS category
+         FROM devices_and_warranties w
+         JOIN paperless_documents d ON d.id = w.document_id
+         ORDER BY COALESCE(w.warranty_until, '${nullDate}') ${sortSql}`
+      )
+      .all() as Array<{ ai_icon_path?: string | null }>
+  ).map((row) => ({
+    ...row,
+    ai_icon_url: aiIconPublicUrl(row.ai_icon_path),
+  }));
 }
 
 export function listDeadlines(
@@ -762,38 +775,50 @@ export function listDeadlines(
   const sortSql = sortDir === "asc" ? "ASC" : "DESC";
   const nullDate = sortDir === "asc" ? "9999-12-31" : "0000-01-01";
   const select = `SELECT dl.*, d.title as document_title, d.id as document_local_id,
-                d.correspondent_name
+                d.correspondent_name, d.ai_icon_path,
+                (SELECT s.category FROM document_summaries s WHERE s.document_id = d.id LIMIT 1) AS category
          FROM deadlines dl
          JOIN paperless_documents d ON d.id = dl.document_id`;
 
+  const withIcons = (rows: unknown[]) =>
+    (rows as Array<{ ai_icon_path?: string | null }>).map((row) => ({
+      ...row,
+      ai_icon_url: aiIconPublicUrl(row.ai_icon_path),
+    }));
+
   if (status === "overdue") {
-    return db
-      .prepare(
-        `${select}
+    return withIcons(
+      db
+        .prepare(
+          `${select}
          WHERE dl.status = 'open'
            AND dl.deadline_date IS NOT NULL
            AND dl.deadline_date < ?
            AND (dl.snoozed_until IS NULL OR TRIM(dl.snoozed_until) = '' OR dl.snoozed_until < ?)
          ORDER BY dl.deadline_date ${sortSql}`
-      )
-      .all(today, today);
+        )
+        .all(today, today)
+    );
   }
   if (status === "snoozed") {
-    return db
-      .prepare(
-        `${select}
+    return withIcons(
+      db
+        .prepare(
+          `${select}
          WHERE dl.status = 'open'
            AND dl.snoozed_until IS NOT NULL
            AND TRIM(dl.snoozed_until) != ''
            AND dl.snoozed_until >= ?
          ORDER BY dl.snoozed_until ${sortSql}`
-      )
-      .all(today);
+        )
+        .all(today)
+    );
   }
   if (status === "open") {
-    return db
-      .prepare(
-        `${select}
+    return withIcons(
+      db
+        .prepare(
+          `${select}
          WHERE dl.status = 'open'
            AND (dl.snoozed_until IS NULL OR TRIM(dl.snoozed_until) = '' OR dl.snoozed_until < ?)
          ORDER BY
@@ -802,24 +827,29 @@ export function listDeadlines(
              ELSE 1
            END,
            COALESCE(dl.deadline_date, '${nullDate}') ${sortSql}`
-      )
-      .all(today, today);
+        )
+        .all(today, today)
+    );
   }
   if (status && status !== "all") {
-    return db
-      .prepare(
-        `${select}
+    return withIcons(
+      db
+        .prepare(
+          `${select}
          WHERE dl.status = ?
          ORDER BY COALESCE(dl.deadline_date, '${nullDate}') ${sortSql}`
-      )
-      .all(status);
+        )
+        .all(status)
+    );
   }
-  return db
-    .prepare(
-      `${select}
+  return withIcons(
+    db
+      .prepare(
+        `${select}
        ORDER BY COALESCE(dl.deadline_date, '${nullDate}') ${sortSql}`
-    )
-    .all();
+      )
+      .all()
+  );
 }
 
 export function updateDeadlineStatus(id: number, status: string) {
@@ -1035,7 +1065,9 @@ export function getDashboardInbox(limits = { each: 5 }) {
   const overdueDeadlines = db
     .prepare(
       `SELECT dl.id, dl.title, dl.deadline_date, dl.deadline_type,
-              d.id AS document_local_id, d.title AS document_title
+              d.id AS document_local_id, d.title AS document_title,
+              d.ai_icon_path,
+              (SELECT s.category FROM document_summaries s WHERE s.document_id = d.id LIMIT 1) AS category
        FROM deadlines dl
        JOIN paperless_documents d ON d.id = dl.document_id
        WHERE dl.status = 'open'
@@ -1051,7 +1083,9 @@ export function getDashboardInbox(limits = { each: 5 }) {
   const dueInvoices = db
     .prepare(
       `SELECT f.id, f.vendor, f.amount, f.currency, f.due_date, f.description,
-              d.id AS document_local_id, d.title AS document_title
+              d.id AS document_local_id, d.title AS document_title,
+              d.ai_icon_path,
+              (SELECT s.category FROM document_summaries s WHERE s.document_id = d.id LIMIT 1) AS category
        FROM financial_items f
        JOIN paperless_documents d ON d.id = f.document_id
        WHERE f.due_date IS NOT NULL AND TRIM(f.due_date) != ''
@@ -1070,7 +1104,9 @@ export function getDashboardInbox(limits = { each: 5 }) {
   const warrantiesExpiring = db
     .prepare(
       `SELECT w.id, w.product_name, w.vendor, w.warranty_until,
-              d.id AS document_local_id, d.title AS document_title
+              d.id AS document_local_id, d.title AS document_title,
+              d.ai_icon_path,
+              (SELECT s.category FROM document_summaries s WHERE s.document_id = d.id LIMIT 1) AS category
        FROM devices_and_warranties w
        JOIN paperless_documents d ON d.id = w.document_id
        WHERE w.warranty_until IS NOT NULL
@@ -1112,11 +1148,21 @@ export function getDashboardInbox(limits = { each: 5 }) {
       .get() as { c: number }
   ).c;
 
+  const withIcons = <T extends Record<string, unknown>>(rows: T[]) =>
+    rows.map((row) => ({
+      ...row,
+      ai_icon_url: aiIconPublicUrl(
+        typeof row.ai_icon_path === "string" ? row.ai_icon_path : null
+      ),
+    }));
+
   return {
-    overdueDeadlines,
-    dueInvoices,
+    overdueDeadlines: withIcons(overdueDeadlines as Array<Record<string, unknown>>),
+    dueInvoices: withIcons(dueInvoices as Array<Record<string, unknown>>),
     openUnpaidInvoices,
-    warrantiesExpiring,
+    warrantiesExpiring: withIcons(
+      warrantiesExpiring as Array<Record<string, unknown>>
+    ),
     analysisIssues: {
       pending: analysisPending,
       error: analysisError,
@@ -1141,6 +1187,9 @@ export type OpenUnpaidInvoice = {
   due_date: string | null;
   vendor: string | null;
   tags: string[];
+  ai_icon_path?: string | null;
+  ai_icon_url?: string | null;
+  category?: string | null;
 };
 
 /** Paperless UDF: «Zu bezahlen» = true and «Bezahlt» ≠ true. */
@@ -1150,7 +1199,11 @@ export function listOpenUnpaidInvoices(limit = 12): OpenUnpaidInvoice[] {
     .prepare(
       `SELECT d.id, d.paperless_id, d.title, d.correspondent_name,
               d.document_type_name, d.created_date, d.modified_at,
-              d.zu_bezahlen, d.bezahlt, d.paperless_url,
+              d.zu_bezahlen, d.bezahlt, d.paperless_url, d.ai_icon_path,
+              (
+                SELECT s.category FROM document_summaries s
+                WHERE s.document_id = d.id LIMIT 1
+              ) AS category,
               (
                 SELECT f.amount FROM financial_items f
                 WHERE f.document_id = d.id
@@ -1179,7 +1232,7 @@ export function listOpenUnpaidInvoices(limit = 12): OpenUnpaidInvoice[] {
        ORDER BY COALESCE(due_date, d.created_date, '0001-01-01') DESC
        LIMIT ?`
     )
-    .all(limit) as Array<Omit<OpenUnpaidInvoice, "tags">>;
+    .all(limit) as Array<Omit<OpenUnpaidInvoice, "tags" | "ai_icon_url">>;
 
   const tagStmt = db.prepare(
     `SELECT tag_name FROM document_tags
@@ -1189,6 +1242,7 @@ export function listOpenUnpaidInvoices(limit = 12): OpenUnpaidInvoice[] {
 
   return rows.map((row) => ({
     ...row,
+    ai_icon_url: aiIconPublicUrl(row.ai_icon_path),
     tags: (
       tagStmt.all(row.id) as Array<{ tag_name: string | null }>
     )
@@ -1534,7 +1588,9 @@ export function getFinanceOverview() {
 
   const recurring = db
     .prepare(
-      `SELECT f.*, d.title as document_title, d.id as document_local_id
+      `SELECT f.*, d.title as document_title, d.id as document_local_id,
+              d.ai_icon_path,
+              (SELECT s.category FROM document_summaries s WHERE s.document_id = d.id LIMIT 1) AS category
        FROM financial_items f
        JOIN paperless_documents d ON d.id = f.document_id
        WHERE f.is_recurring = 1
@@ -1546,7 +1602,9 @@ export function getFinanceOverview() {
 
   const topInvoices = db
     .prepare(
-      `SELECT f.*, d.title as document_title, d.id as document_local_id
+      `SELECT f.*, d.title as document_title, d.id as document_local_id,
+              d.ai_icon_path,
+              (SELECT s.category FROM document_summaries s WHERE s.document_id = d.id LIMIT 1) AS category
        FROM financial_items f
        JOIN paperless_documents d ON d.id = f.document_id
        ORDER BY COALESCE(f.counts_in_stats, 1) DESC, COALESCE(f.amount, 0) DESC
@@ -1557,7 +1615,8 @@ export function getFinanceOverview() {
   const dueInvoices = db
     .prepare(
       `SELECT f.*, d.title as document_title, d.id as document_local_id,
-              d.paperless_id, d.zu_bezahlen, d.bezahlt
+              d.paperless_id, d.zu_bezahlen, d.bezahlt, d.ai_icon_path,
+              (SELECT s.category FROM document_summaries s WHERE s.document_id = d.id LIMIT 1) AS category
        FROM financial_items f
        JOIN paperless_documents d ON d.id = f.document_id
        WHERE f.due_date IS NOT NULL AND TRIM(f.due_date) != ''
@@ -1572,7 +1631,9 @@ export function getFinanceOverview() {
   // (vendor → by year, year → by vendor). Kept client-side; ~hundreds of rows.
   const detailInvoices = db
     .prepare(
-      `SELECT f.*, d.title as document_title, d.id as document_local_id
+      `SELECT f.*, d.title as document_title, d.id as document_local_id,
+              d.ai_icon_path,
+              (SELECT s.category FROM document_summaries s WHERE s.document_id = d.id LIMIT 1) AS category
        FROM financial_items f
        JOIN paperless_documents d ON d.id = f.document_id
        WHERE ${FINANCE_STATS_FILTER}
@@ -1580,14 +1641,20 @@ export function getFinanceOverview() {
     )
     .all();
 
+  const withIcons = (rows: unknown[]) =>
+    (rows as Array<{ ai_icon_path?: string | null }>).map((row) => ({
+      ...row,
+      ai_icon_url: aiIconPublicUrl(row.ai_icon_path),
+    }));
+
   return {
     byYear,
     byVendor,
     byCategory,
-    recurring,
-    topInvoices,
-    dueInvoices,
-    detailInvoices,
+    recurring: withIcons(recurring),
+    topInvoices: withIcons(topInvoices),
+    dueInvoices: withIcons(dueInvoices),
+    detailInvoices: withIcons(detailInvoices),
     totals,
     excludedCount,
     unknownVendor,
@@ -1654,29 +1721,41 @@ export function listTravelItems(sortDir: "asc" | "desc" = "desc") {
   const db = getDb();
   const sortSql = sortDir === "asc" ? "ASC" : "DESC";
   const nullDate = sortDir === "asc" ? "9999-12-31" : "0000-01-01";
-  return db
-    .prepare(
-      `SELECT t.*, d.title as document_title, d.id as document_local_id,
-              d.content as document_content, d.correspondent_name
-       FROM travel_items t
-       JOIN paperless_documents d ON d.id = t.document_id
-       ORDER BY COALESCE(t.start_date, '${nullDate}') ${sortSql}`
-    )
-    .all();
+  return (
+    db
+      .prepare(
+        `SELECT t.*, d.title as document_title, d.id as document_local_id,
+                d.content as document_content, d.correspondent_name, d.ai_icon_path,
+                (SELECT s.category FROM document_summaries s WHERE s.document_id = d.id LIMIT 1) AS category
+         FROM travel_items t
+         JOIN paperless_documents d ON d.id = t.document_id
+         ORDER BY COALESCE(t.start_date, '${nullDate}') ${sortSql}`
+      )
+      .all() as Array<{ ai_icon_path?: string | null }>
+  ).map((row) => ({
+    ...row,
+    ai_icon_url: aiIconPublicUrl(row.ai_icon_path),
+  }));
 }
 
 export function listSummaries(sortDir: "asc" | "desc" = "desc") {
   const db = getDb();
   const sortSql = sortDir === "asc" ? "ASC" : "DESC";
-  return db
-    .prepare(
-      `SELECT s.*, d.title, d.correspondent_name, d.created_date, d.paperless_id
-       FROM document_summaries s
-       JOIN paperless_documents d ON d.id = s.document_id
-       WHERE s.analysis_status = 'completed'
-       ORDER BY s.analyzed_at ${sortSql}`
-    )
-    .all();
+  return (
+    db
+      .prepare(
+        `SELECT s.*, d.title, d.correspondent_name, d.created_date, d.paperless_id,
+                d.ai_icon_path
+         FROM document_summaries s
+         JOIN paperless_documents d ON d.id = s.document_id
+         WHERE s.analysis_status = 'completed'
+         ORDER BY s.analyzed_at ${sortSql}`
+      )
+      .all() as Array<{ ai_icon_path?: string | null }>
+  ).map((row) => ({
+    ...row,
+    ai_icon_url: aiIconPublicUrl(row.ai_icon_path),
+  }));
 }
 
 export function getKnowledgeAreaCounts() {

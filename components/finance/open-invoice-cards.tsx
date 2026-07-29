@@ -10,6 +10,7 @@ import {
   dueUrgencyTextClass,
   formatDueRelative,
 } from "@/lib/utils/due-urgency";
+import { DocumentAiIcon } from "@/components/documents/document-ai-icon";
 
 export type OpenInvoiceCardModel = {
   id: number;
@@ -26,6 +27,8 @@ export type OpenInvoiceCardModel = {
   tags?: string[];
   zu_bezahlen?: number | null;
   bezahlt?: number | null;
+  ai_icon_url?: string | null;
+  category?: string | null;
 };
 
 function CardThumb({
@@ -60,7 +63,6 @@ export function OpenInvoiceCard({ invoice }: { invoice: OpenInvoiceCardModel }) 
   const title = invoice.title || "Rechnung";
   const correspondent =
     invoice.correspondent_name || invoice.vendor || null;
-  const toPay = Number(invoice.zu_bezahlen) === 1;
 
   return (
     <article
@@ -71,15 +73,12 @@ export function OpenInvoiceCard({ invoice }: { invoice: OpenInvoiceCardModel }) 
     >
       <div className="relative aspect-[5/3] bg-muted/40">
         <CardThumb paperlessId={invoice.paperless_id} title={title} />
-        <span
-          className={cn(
-            "absolute left-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-semibold shadow-sm backdrop-blur-sm",
-            toPay
-              ? "border border-[var(--brand-finance)]/25 bg-[var(--brand-finance-soft)] text-[var(--brand-finance)]"
-              : "border border-border/70 bg-background/90 text-muted-foreground"
-          )}
-        >
-          Zu bezahlen: {toPay ? "ja" : "nein"}
+        <span className="absolute bottom-2 left-2 rounded-lg shadow-sm">
+          <DocumentAiIcon
+            aiIconUrl={invoice.ai_icon_url}
+            category={invoice.category}
+            size="xs"
+          />
         </span>
       </div>
 

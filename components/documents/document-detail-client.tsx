@@ -48,6 +48,11 @@ import { AiImagePreview } from "@/components/layout/ai-image-preview";
 import { ItineraryCard } from "@/components/travel/itinerary-list";
 import { resolveItinerary } from "@/lib/extraction/itinerary";
 import {
+  displayImportantDateLabel,
+  importantDateKey,
+  itineraryStopLabel,
+} from "@/lib/extraction/itinerary-labels";
+import {
   ExtractDeadlinesEditor,
   ExtractFinanceEditor,
   ExtractWarrantyEditor,
@@ -153,11 +158,16 @@ function DocumentDetailInner({ detail }: DetailProps) {
   }
 
   const importantPoints = parseJsonArray(summary?.important_points) as string[];
-  const importantDates = parseJsonArray(summary?.important_dates) as {
-    date?: string;
-    label?: string;
-    description?: string;
-  }[];
+  const importantDates = (
+    parseJsonArray(summary?.important_dates) as {
+      date?: string;
+      label?: string;
+      description?: string;
+    }[]
+  ).map((d) => ({
+    ...d,
+    label: displayImportantDateLabel(d.label) || d.label,
+  }));
   const amounts = parseJsonArray(summary?.amounts) as {
     amount?: number;
     currency?: string;
@@ -194,15 +204,13 @@ function DocumentDetailInner({ detail }: DetailProps) {
   }>;
 
   const dateKeys = new Set(
-    importantDates.map(
-      (d) => `${d.date || ""}|${(d.label || "").toLowerCase()}`
-    )
+    importantDates.map((d) => importantDateKey(d.date, d.label))
   );
   const mergedDates = [...importantDates];
   for (const stop of itinerary) {
     if (!stop.date) continue;
-    const label = `Anlaufhafen: ${stop.location}`;
-    const key = `${stop.date}|${label.toLowerCase()}`;
+    const label = itineraryStopLabel(stop.location);
+    const key = importantDateKey(stop.date, label);
     if (dateKeys.has(key)) continue;
     dateKeys.add(key);
     mergedDates.push({

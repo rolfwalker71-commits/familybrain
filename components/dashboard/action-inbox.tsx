@@ -15,6 +15,7 @@ import {
   OpenInvoiceCardGrid,
   type OpenInvoiceCardModel,
 } from "@/components/finance/open-invoice-cards";
+import { DocumentAiIcon } from "@/components/documents/document-ai-icon";
 import { formatCHF } from "@/lib/utils/format";
 import {
   dueUrgency,
@@ -30,6 +31,8 @@ type InboxPayload = {
     deadline_date: string | null;
     document_local_id: number;
     document_title: string | null;
+    ai_icon_url?: string | null;
+    category?: string | null;
   }>;
   dueInvoices: Array<{
     id: number;
@@ -39,6 +42,8 @@ type InboxPayload = {
     due_date: string;
     document_local_id: number;
     document_title: string | null;
+    ai_icon_url?: string | null;
+    category?: string | null;
   }>;
   openUnpaidInvoices?: OpenInvoiceCardModel[];
   warrantiesExpiring: Array<{
@@ -47,6 +52,8 @@ type InboxPayload = {
     vendor: string | null;
     warranty_until: string | null;
     document_local_id: number;
+    ai_icon_url?: string | null;
+    category?: string | null;
   }>;
   analysisIssues: {
     pending: number;
@@ -158,23 +165,30 @@ export function ActionInbox() {
                     <li key={row.id}>
                       <Link
                         href={`/documents/${row.document_local_id}`}
-                        className="block rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-sm hover:bg-muted/40"
+                        className="flex items-start gap-2.5 rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-sm hover:bg-muted/40"
                       >
-                        <span className="font-medium">{row.title}</span>
-                        <span className="mt-0.5 block text-xs text-muted-foreground">
-                          <span
-                            className={dueUrgencyTextClass(
-                              dueUrgency(row.deadline_date)
-                            )}
-                          >
-                            {formatDueRelative(row.deadline_date)}
+                        <DocumentAiIcon
+                          aiIconUrl={row.ai_icon_url}
+                          category={row.category}
+                          size="xs"
+                        />
+                        <span className="min-w-0">
+                          <span className="font-medium">{row.title}</span>
+                          <span className="mt-0.5 block text-xs text-muted-foreground">
+                            <span
+                              className={dueUrgencyTextClass(
+                                dueUrgency(row.deadline_date)
+                              )}
+                            >
+                              {formatDueRelative(row.deadline_date)}
+                            </span>
+                            <Badge
+                              variant="secondary"
+                              className="ml-2 bg-red-100 text-[10px] text-red-800"
+                            >
+                              Überfällig
+                            </Badge>
                           </span>
-                          <Badge
-                            variant="secondary"
-                            className="ml-2 bg-red-100 text-[10px] text-red-800"
-                          >
-                            Überfällig
-                          </Badge>
                         </span>
                       </Link>
                     </li>
@@ -202,17 +216,24 @@ export function ActionInbox() {
                         href={`/documents/${row.document_local_id}`}
                         className="flex items-start justify-between gap-2 rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-sm hover:bg-muted/40"
                       >
-                        <span className="min-w-0">
-                          <span className="font-medium">
-                            {row.vendor || row.document_title || "Rechnung"}
-                          </span>
-                          <span className="mt-0.5 block text-xs">
-                            <span
-                              className={dueUrgencyTextClass(
-                                dueUrgency(row.due_date)
-                              )}
-                            >
-                              {formatDueRelative(row.due_date)}
+                        <span className="flex min-w-0 items-start gap-2.5">
+                          <DocumentAiIcon
+                            aiIconUrl={row.ai_icon_url}
+                            category={row.category}
+                            size="xs"
+                          />
+                          <span className="min-w-0">
+                            <span className="font-medium">
+                              {row.vendor || row.document_title || "Rechnung"}
+                            </span>
+                            <span className="mt-0.5 block text-xs">
+                              <span
+                                className={dueUrgencyTextClass(
+                                  dueUrgency(row.due_date)
+                                )}
+                              >
+                                {formatDueRelative(row.due_date)}
+                              </span>
                             </span>
                           </span>
                         </span>
@@ -245,18 +266,25 @@ export function ActionInbox() {
                     <li key={row.id}>
                       <Link
                         href={`/documents/${row.document_local_id}`}
-                        className="block rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-sm hover:bg-muted/40"
+                        className="flex items-start gap-2.5 rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-sm hover:bg-muted/40"
                       >
-                        <span className="font-medium">
-                          {row.product_name || row.vendor || "Garantie"}
-                        </span>
-                        <span className="mt-0.5 block text-xs text-muted-foreground">
-                          <span
-                            className={dueUrgencyTextClass(
-                              dueUrgency(row.warranty_until)
-                            )}
-                          >
-                            {formatExpiryRelative(row.warranty_until)}
+                        <DocumentAiIcon
+                          aiIconUrl={row.ai_icon_url}
+                          category={row.category}
+                          size="xs"
+                        />
+                        <span className="min-w-0">
+                          <span className="font-medium">
+                            {row.product_name || row.vendor || "Garantie"}
+                          </span>
+                          <span className="mt-0.5 block text-xs text-muted-foreground">
+                            <span
+                              className={dueUrgencyTextClass(
+                                dueUrgency(row.warranty_until)
+                              )}
+                            >
+                              {formatExpiryRelative(row.warranty_until)}
+                            </span>
                           </span>
                         </span>
                       </Link>

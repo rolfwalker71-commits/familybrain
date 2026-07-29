@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Info } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { DocumentAiIcon } from "@/components/documents/document-ai-icon";
 
 type DocumentInfoButtonProps = {
   documentId: number;
@@ -43,6 +44,11 @@ type DocumentTitleLinkProps = {
   title?: string | null;
   className?: string;
   fallback?: string;
+  /** When set (incl. null), shows AI icon or category fallback beside the title. */
+  aiIconUrl?: string | null;
+  category?: string | null;
+  showIcon?: boolean;
+  iconSize?: "xs" | "sm" | "md";
 };
 
 /** Clickable document title → same detail page as under Dokumente. */
@@ -51,18 +57,37 @@ export function DocumentTitleLink({
   title,
   className,
   fallback,
+  aiIconUrl,
+  category,
+  showIcon = false,
+  iconSize = "xs",
 }: DocumentTitleLinkProps) {
   const text = title?.trim() || fallback || `Dokument #${documentId}`;
-  return (
+  const link = (
     <Link
       href={`/documents/${documentId}`}
       className={cn(
-        "block break-words font-medium text-foreground underline-offset-2 hover:underline",
+        "block min-w-0 break-words font-medium text-foreground underline-offset-2 hover:underline",
         className
       )}
       title={text}
     >
       {text}
     </Link>
+  );
+
+  if (!showIcon && aiIconUrl === undefined) {
+    return link;
+  }
+
+  return (
+    <span className="flex min-w-0 items-start gap-2.5">
+      <DocumentAiIcon
+        aiIconUrl={aiIconUrl}
+        category={category}
+        size={iconSize}
+      />
+      {link}
+    </span>
   );
 }

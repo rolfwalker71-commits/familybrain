@@ -4,6 +4,7 @@ import {
   resolveItinerary,
   type ItineraryStop,
 } from "@/lib/extraction/itinerary";
+import { itineraryStopLabel } from "@/lib/extraction/itinerary-labels";
 import {
   coerceTripEventType,
   type TripEventDraft,
@@ -208,7 +209,7 @@ export function travelItemToEventDrafts(item: TravelItemLike): TripEventDraft[] 
         notes: portNote(stop),
         document_id: documentId,
         travel_item_id: travelItemId,
-        source_excerpt: `Anlaufhafen: ${stopTitle}`,
+        source_excerpt: itineraryStopLabel(stopTitle),
       });
     }
   }

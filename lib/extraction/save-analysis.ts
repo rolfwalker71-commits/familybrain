@@ -11,6 +11,11 @@ import {
   normalizeKnowledgeCategory,
 } from "@/lib/extraction/normalize-categories";
 import { resolveTravelType, findTravelTypeRule } from "@/lib/extraction/classification-rules";
+import {
+  displayImportantDateLabel,
+  importantDateKey,
+  itineraryStopLabel,
+} from "@/lib/extraction/itinerary-labels";
 import { updateDocumentEmbeddingStatus } from "@/lib/db/queries";
 
 function warrantyStatus(warrantyUntil: string | null): string {
@@ -65,11 +70,12 @@ function enrichTravelWithItinerary(
     }
   }
 
-  const importantDates = [...(analysis.important_dates || [])];
+  const importantDates = (analysis.important_dates || []).map((d) => ({
+    ...d,
+    label: displayImportantDateLabel(d.label) || d.label,
+  }));
   const existingKeys = new Set(
-    importantDates.map(
-      (d) => `${d.date || ""}|${(d.label || "").toLowerCase()}`
-    )
+    importantDates.map((d) => importantDateKey(d.date, d.label))
   );
 
   const stopsForDates: ItineraryStop[] = [];
@@ -89,8 +95,8 @@ function enrichTravelWithItinerary(
 
   for (const stop of stopsForDates) {
     if (!stop.date) continue;
-    const label = `Anlaufhafen: ${stop.location}`;
-    const key = `${stop.date}|${label.toLowerCase()}`;
+    const label = itineraryStopLabel(stop.location);
+    const key = importantDateKey(stop.date, label);
     if (existingKeys.has(key)) continue;
     existingKeys.add(key);
     const times = [stop.arrive && `Ankunft ${stop.arrive}`, stop.depart && `Abfahrt ${stop.depart}`]

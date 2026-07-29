@@ -302,7 +302,7 @@ export function resequenceAllTripEventsByDate(): void {
   }
 }
 
-/** Ports of call were previously stored as Aktivität — promote to Kreuzfahrt. */
+/** Cruise itinerary stops were previously stored as Aktivität — promote to Kreuzfahrt. */
 export function migrateCruisePortEventTypes(): number {
   const db = getDb();
   const result = db
@@ -310,7 +310,10 @@ export function migrateCruisePortEventTypes(): number {
       `UPDATE trip_events
        SET event_type = 'Kreuzfahrt', updated_at = ?
        WHERE event_type = 'Aktivität'
-         AND source_excerpt LIKE 'Anlaufhafen:%'`
+         AND (
+           source_excerpt LIKE 'Anlaufhafen:%'
+           OR source_excerpt LIKE 'Port of Call:%'
+         )`
     )
     .run(nowIso());
   return result.changes;

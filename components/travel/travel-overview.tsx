@@ -72,6 +72,8 @@ export type TravelRow = {
   document_title: string | null;
   document_local_id: number;
   correspondent_name?: string | null;
+  ai_icon_url?: string | null;
+  category?: string | null;
 };
 
 type AggRow = { label: string; count: number; total: number };
@@ -226,6 +228,10 @@ function TravelListRow({
               <DocumentTitleLink
                 documentId={row.document_local_id}
                 title={row.document_title}
+                aiIconUrl={row.ai_icon_url}
+                category={row.category}
+                showIcon
+                iconSize="xs"
               />
             </span>
           </MetaLine>
@@ -729,6 +735,10 @@ function TravelOverviewClientInner({ items }: Props) {
                           <DocumentTitleLink
                             documentId={openDetail.document_local_id}
                             title={openDetail.document_title}
+                            aiIconUrl={openDetail.ai_icon_url}
+                            category={openDetail.category}
+                            showIcon
+                            iconSize="xs"
                           />
                           <DocumentInfoButton
                             documentId={openDetail.document_local_id}
@@ -869,6 +879,10 @@ function TravelOverviewClientInner({ items }: Props) {
                       <DocumentTitleLink
                         documentId={openDetail.document_local_id}
                         title={openDetail.document_title}
+                        aiIconUrl={openDetail.ai_icon_url}
+                        category={openDetail.category}
+                        showIcon
+                        iconSize="xs"
                       />
                       <DocumentInfoButton
                         documentId={openDetail.document_local_id}

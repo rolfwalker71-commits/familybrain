@@ -510,7 +510,7 @@ function enrichExcerpt(row: DocRow, tokens: string[] = []): string {
   });
   if (itinerary.length > 0) {
     parts.push(
-      "Reiseverlauf / Ports of Call:",
+      "Reiseverlauf:",
       ...itinerary.map((s) => {
         const when = s.date ? toSwissDate(s.date) : s.day_label || "?";
         const times = [

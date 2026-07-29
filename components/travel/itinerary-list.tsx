@@ -120,7 +120,7 @@ export function ItineraryCard({
       <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3">
         <CardTitle className="flex items-center gap-3 text-base">
           <IconCircle icon={MapPin} tone="teal" size="sm" />
-          Reiseverlauf / Ports of Call
+          Reiseverlauf
         </CardTitle>
         {allEvents.length > 0 ? (
           <AddToCalendarButton

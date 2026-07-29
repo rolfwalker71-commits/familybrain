@@ -19,7 +19,7 @@ Rules:
 - Prefer ISO dates yyyy-mm-dd for all date fields.
 - Extract CHF amounts carefully.
 - Identify whether the document is Rechnung, Vertrag, Versicherung, Garantie, Reiseunterlage, Arztbericht, Steuerdokument or Sonstiges.
-- For travel/cruise documents, extract the full itinerary (ports of call / Kreuzfahrtverlauf / daily stops) into travel_items[].itinerary AND also list each stop date in important_dates.
+- For travel/cruise documents, extract the full itinerary (daily stops / Kreuzfahrtverlauf / stations) into travel_items[].itinerary AND also list each stop date in important_dates.
 - For flights, always extract flight_number (e.g. LX80, LH400) and booking_reference when present in the OCR.
 - For hotels, extract the street address into travel_items[].address when present; also capture check-in/out times as start_time/end_time when known.
 - Always extract booking_reference / confirmation / PNR / reservation code into booking_reference when present.
@@ -123,7 +123,7 @@ Required JSON shape:
 Travel/cruise specifics:
 - If OCR contains "Kreuzfahrtverlauf", "PORTS-OF-CALL", "Cruise Itinerary" or similar day-by-day stops, fill travel_items[0].itinerary completely (one object per day/port).
 - Put cruising/sea days as location "Cruising" with note "Seetag".
-- Mirror each itinerary stop with a date into important_dates (label like "Anlaufhafen: Barcelona").
+- Mirror each itinerary stop with a date into important_dates (label = location name only, e.g. "Barcelona" or "Zürich HB" — never "Anlaufhafen" or "Port of Call").
 - Also put payment due dates, cancellation deadlines, boarding/sailing times into important_dates.
 - For Flug items: set flight_number (IATA+digits), cabin_class when visible (Economy / Premium Economy / Business / First), and booking_reference/PNR when visible; set start_time/end_time from scheduled departure/arrival when known.
 - For Hotel items: set address to the full street address when present; destination can be the city.

@@ -25,6 +25,7 @@ export type SummaryCardRow = {
   created_date: string | null;
   analyzed_at: string | null;
   confidence: number | null;
+  ai_icon_url?: string | null;
 };
 
 export function SummariesClient({ rows }: { rows: SummaryCardRow[] }) {
@@ -75,6 +76,10 @@ export function SummariesClient({ rows }: { rows: SummaryCardRow[] }) {
                     documentId={row.document_id}
                     title={row.title}
                     className="min-w-0 flex-1"
+                    aiIconUrl={row.ai_icon_url}
+                    category={row.category}
+                    showIcon
+                    iconSize="sm"
                   />
                   <div className="flex shrink-0 items-center gap-2">
                     {row.category ? (

@@ -47,6 +47,8 @@ export type WarrantyRow = {
   document_title: string | null;
   document_local_id: number;
   correspondent_name: string | null;
+  ai_icon_url?: string | null;
+  category?: string | null;
 };
 
 function warrantyToEvent(row: WarrantyRow): CalendarEvent | null {
@@ -194,6 +196,10 @@ export function WarrantiesClient({ rows }: { rows: WarrantyRow[] }) {
                           <DocumentTitleLink
                             documentId={row.document_local_id}
                             title={row.document_title}
+                            aiIconUrl={row.ai_icon_url}
+                            category={row.category}
+                            showIcon
+                            iconSize="xs"
                           />
                         </MetaLine>
                       }

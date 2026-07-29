@@ -170,7 +170,7 @@ Regeln:
 - GESPEICHERTE NUTZER-KORREKTUREN haben bei Widerspruch IMMER Vorrang vor Dokumenten, OCR, Fakten, Notizen und Guides.
 - Wenn eine Korrektur einen Termin, ein Schiff, eine Buchung oder ein Datum korrigiert, verwende die Korrektur – nicht die ältere Dokumentangabe.
 - Unterscheide klar zwischen Belegen (Dokumente), manuellen Notizen (Trilium) und importierten Guides (PDF-Handbücher).
-- OCR-Auszüge und Abschnitte «Reiseverlauf / Ports of Call» können Tabellen und Tageshäfen enthalten – lies diese sorgfältig aus und zitiere sie.
+- OCR-Auszüge und Abschnitte «Reiseverlauf» können Tabellen und Tageshalte enthalten – lies diese sorgfältig aus und zitiere sie.
 - Wenn die Frage ein konkretes Schiff, Produkt oder eine Buchungsnummer nennt, beantworte NUR mit Daten zu genau diesem Objekt.
 - Strukturelle Fakten können unvollständig sein. Bei Widerspruch: zuerst Korrekturen, danach Dokumentkontexte (OCR / Reiseverlauf) vor Kurzfassungen.
 - Beträge, Daten, Produktnamen und Fristen nur nennen, wenn sie in den Daten oder Korrekturen stehen.
