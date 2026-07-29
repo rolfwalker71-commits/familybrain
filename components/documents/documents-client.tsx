@@ -131,6 +131,7 @@ export function DocumentsClient() {
   const [missingAiIcons, setMissingAiIcons] = useState(0);
   const [iconBusy, setIconBusy] = useState(false);
   const [iconProgress, setIconProgress] = useState<string | null>(null);
+  const [generatingIconId, setGeneratingIconId] = useState<number | null>(null);
   const [zoomUrl, setZoomUrl] = useState<string | null>(null);
   const requestIdRef = useRef(0);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -300,6 +301,7 @@ export function DocumentsClient() {
     stopAnalysis();
     setIconBusy(false);
     setIconProgress(null);
+    setGeneratingIconId(null);
     try {
       await fetch("/api/jobs/cancel", { method: "POST" });
     } catch {
@@ -327,9 +329,15 @@ export function DocumentsClient() {
       return;
     }
 
+    const force = mode === "selected";
     setIconBusy(true);
     setError(null);
-    setIconProgress("Starte AI-Icons…");
+    setIconProgress(
+      force
+        ? `Generierung… (${documentIds!.length} ausgewählt)`
+        : "Generierung fehlender Icons…"
+    );
+    setGeneratingIconId(documentIds?.[0] ?? null);
     try {
       let afterId = 0;
       let totalSucceeded = 0;
@@ -341,8 +349,9 @@ export function DocumentsClient() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            limit: 10,
+            limit: force ? Math.min(documentIds!.length, 10) : 10,
             afterId,
+            force,
             ...(documentIds ? { documentIds } : {}),
           }),
         });
@@ -357,11 +366,19 @@ export function DocumentsClient() {
 
         await readNdjsonStream(res, (event) => {
           if (event.type === "progress") {
+            const currentId =
+              typeof event.currentDocumentId === "number"
+                ? event.currentDocumentId
+                : null;
+            if (currentId != null) setGeneratingIconId(currentId);
+            const phase =
+              event.phase === "generating" ? "Generierung" : "Icons";
             setIconProgress(
-              `Icons: ${Number(event.succeeded || 0) + totalSucceeded} ok` +
+              `${phase}… ${Number(event.succeeded || 0) + totalSucceeded} ok` +
                 (Number(event.failed || 0) + totalFailed > 0
                   ? `, ${Number(event.failed || 0) + totalFailed} Fehler`
-                  : "")
+                  : "") +
+                (currentId != null ? ` · Dokument #${currentId}` : "")
             );
           } else if (event.type === "done") {
             const processed = Number(event.processed || 0);
@@ -375,7 +392,7 @@ export function DocumentsClient() {
               setMissingAiIcons(Number(event.missingRemaining));
             }
             setIconProgress(
-              `Icons: ${totalSucceeded} ok` +
+              `Fertig: ${totalSucceeded} ok` +
                 (totalFailed > 0 ? `, ${totalFailed} Fehler` : "")
             );
           } else if (event.type === "error") {
@@ -394,30 +411,44 @@ export function DocumentsClient() {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setIconBusy(false);
-      setIconProgress(null);
+      setGeneratingIconId(null);
+      window.setTimeout(() => setIconProgress(null), 2500);
     }
   }
 
   function DocListIcon({ doc }: { doc: DocRow }) {
-    if (doc.ai_icon_url) {
-      return (
-        <AiImagePreview
-          src={doc.ai_icon_url}
-          brand="docs"
-          alt=""
-          imageClassName="h-11 w-11 object-cover sm:h-12 sm:w-12"
-          onOpen={() => setZoomUrl(doc.ai_icon_url!)}
-        />
-      );
-    }
-    const visual = knowledgeVisual(doc.category || "Sonstiges");
+    const generating = generatingIconId === doc.id;
     return (
-      <IconCircle
-        icon={visual.icon}
-        tone="teal"
-        size="lg"
-        className="rounded-xl"
-      />
+      <span className="relative shrink-0">
+        {doc.ai_icon_url ? (
+          <AiImagePreview
+            src={doc.ai_icon_url}
+            brand="docs"
+            alt=""
+            imageClassName="h-11 w-11 object-cover sm:h-12 sm:w-12"
+            onOpen={() => {
+              if (!generating) setZoomUrl(doc.ai_icon_url!);
+            }}
+          />
+        ) : (
+          (() => {
+            const visual = knowledgeVisual(doc.category || "Sonstiges");
+            return (
+              <IconCircle
+                icon={visual.icon}
+                tone="teal"
+                size="lg"
+                className="rounded-xl"
+              />
+            );
+          })()
+        )}
+        {generating ? (
+          <span className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/65 px-1 text-center text-[9px] font-semibold leading-tight text-white">
+            Generierung…
+          </span>
+        ) : null}
+      </span>
     );
   }
 
@@ -560,7 +591,24 @@ export function DocumentsClient() {
       />
 
       {iconProgress ? (
-        <p className="text-sm text-muted-foreground">{iconProgress}</p>
+        <div
+          className={`rounded-xl border px-4 py-3 text-sm ${
+            iconBusy
+              ? "border-[var(--brand-docs)]/40 bg-[var(--brand-docs-soft)] text-[var(--brand-docs)]"
+              : "border-border/60 bg-muted/40 text-muted-foreground"
+          }`}
+          role="status"
+          aria-live="polite"
+        >
+          {iconBusy ? (
+            <span className="inline-flex items-center gap-2 font-medium">
+              <Sparkles className="size-4 animate-pulse" />
+              {iconProgress}
+            </span>
+          ) : (
+            iconProgress
+          )}
+        </div>
       ) : null}
       {/* Mobile: search + filter trigger + category chips */}
       <div className="space-y-3 md:hidden">

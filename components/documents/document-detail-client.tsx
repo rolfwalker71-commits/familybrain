@@ -301,22 +301,23 @@ function DocumentDetailInner({ detail }: DetailProps) {
     }
   }
 
-  async function generateIcon(force = false) {
+  async function generateIcon() {
     setIconBusy(true);
     setError(null);
     try {
       const res = await fetch(`/api/documents/${document.id}/ai-icon`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ force }),
+        body: JSON.stringify({ force: true }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         throw new Error(data.error || "Icon-Generierung fehlgeschlagen");
       }
-      setAiIconUrl(
-        typeof data.aiIconUrl === "string" ? data.aiIconUrl : null
-      );
+      const url =
+        typeof data.aiIconUrl === "string" ? data.aiIconUrl : null;
+      // Bust cache so the new image shows immediately
+      setAiIconUrl(url ? `${url}?t=${Date.now()}` : null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -325,28 +326,36 @@ function DocumentDetailInner({ detail }: DetailProps) {
   }
 
   function DocIcon({ size = "sm" }: { size?: "sm" | "lg" }) {
-    if (aiIconUrl) {
-      return (
-        <AiImagePreview
-          src={aiIconUrl}
-          brand="docs"
-          alt=""
-          imageClassName={
-            size === "lg"
-              ? "h-14 w-14 object-cover"
-              : "h-10 w-10 object-cover"
-          }
-          onOpen={() => setZoomUrl(aiIconUrl)}
-        />
-      );
-    }
     return (
-      <IconCircle
-        icon={categoryVisual.icon}
-        tone={size === "lg" ? categoryVisual.tone : "teal"}
-        size={size}
-        className={size === "sm" ? "rounded-xl" : undefined}
-      />
+      <span className="relative shrink-0">
+        {aiIconUrl ? (
+          <AiImagePreview
+            src={aiIconUrl}
+            brand="docs"
+            alt=""
+            imageClassName={
+              size === "lg"
+                ? "h-14 w-14 object-cover"
+                : "h-10 w-10 object-cover"
+            }
+            onOpen={() => {
+              if (!iconBusy) setZoomUrl(aiIconUrl);
+            }}
+          />
+        ) : (
+          <IconCircle
+            icon={categoryVisual.icon}
+            tone={size === "lg" ? categoryVisual.tone : "teal"}
+            size={size}
+            className={size === "sm" ? "rounded-xl" : undefined}
+          />
+        )}
+        {iconBusy ? (
+          <span className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/65 px-1 text-center text-[9px] font-semibold leading-tight text-white">
+            Generierung…
+          </span>
+        ) : null}
+      </span>
     );
   }
 
@@ -398,11 +407,11 @@ function DocumentDetailInner({ detail }: DetailProps) {
               {analyzing ? "Analysiert…" : "Neu analysieren"}
             </DropdownMenuItem>
             <DropdownMenuItem
-              onClick={() => void generateIcon(Boolean(aiIconUrl))}
+              onClick={() => void generateIcon()}
               disabled={iconBusy}
             >
               {iconBusy
-                ? "Icon…"
+                ? "Generierung…"
                 : aiIconUrl
                   ? "AI-Icon neu erzeugen"
                   : "AI-Icon erzeugen"}
@@ -450,11 +459,11 @@ function DocumentDetailInner({ detail }: DetailProps) {
           <Button
             variant="outline"
             disabled={iconBusy}
-            onClick={() => void generateIcon(Boolean(aiIconUrl))}
+            onClick={() => void generateIcon()}
           >
             <Sparkles className="h-4 w-4" />
             {iconBusy
-              ? "Icon…"
+              ? "Generierung…"
               : aiIconUrl
                 ? "AI-Icon neu"
                 : "AI-Icon"}
@@ -897,10 +906,10 @@ function DocumentDetailInner({ detail }: DetailProps) {
               <Button
                 variant="outline"
                 disabled={iconBusy}
-                onClick={() => void generateIcon(Boolean(aiIconUrl))}
+                onClick={() => void generateIcon()}
               >
                 {iconBusy
-                  ? "Icon…"
+                  ? "Generierung…"
                   : aiIconUrl
                     ? "AI-Icon neu erzeugen"
                     : "AI-Icon erzeugen"}

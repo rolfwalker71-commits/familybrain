@@ -2,7 +2,7 @@ import { isAuthError, requireAdmin } from "@/lib/auth/current-user";
 import {
   countDocumentsMissingAiIcon,
   generateDocumentAiIcon,
-  listDocumentIdsMissingAiIcon,
+  listDocumentIdsForAiIcon,
 } from "@/lib/paperless/document-icon";
 import { hasOpenAIKey } from "@/lib/ai/client";
 
@@ -11,8 +11,9 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 /**
- * Batch-generate missing document AI icons.
- * Body: { limit?, afterId?, documentIds?: number[] }
+ * Batch-generate document AI icons.
+ * Body: { limit?, afterId?, documentIds?: number[], force?: boolean }
+ * force=true regenerates even when an icon already exists (used for Auswahl).
  * Streams NDJSON; client loops with nextAfterId until done.
  */
 export async function POST(request: Request) {
@@ -39,6 +40,7 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
   const limit = Math.min(Math.max(Number(body.limit) || 10, 1), 25);
   const afterId = Math.max(Number(body.afterId) || 0, 0);
+  const force = body.force === true;
   const onlyIds = Array.isArray(body.documentIds)
     ? body.documentIds
         .map((n: unknown) => Number(n))
@@ -53,19 +55,26 @@ export async function POST(request: Request) {
       };
 
       try {
-        const ids = listDocumentIdsMissingAiIcon(limit, afterId, onlyIds);
+        const ids = listDocumentIdsForAiIcon({
+          limit,
+          afterId,
+          onlyIds,
+          onlyMissing: !force,
+        });
         const failed: { documentId: number; error: string }[] = [];
         let succeeded = 0;
-        const missingTotal =
+        const queueTotal =
           onlyIds && onlyIds.length > 0
-            ? ids.length
-            : countDocumentsMissingAiIcon();
+            ? onlyIds.filter((id: number) => id > afterId).length
+            : force
+              ? ids.length
+              : countDocumentsMissingAiIcon();
 
         send({
           type: "progress",
           phase: "starting",
           total: ids.length,
-          missingTotal,
+          queueTotal,
           processed: 0,
           succeeded: 0,
           failed: 0,
@@ -74,8 +83,19 @@ export async function POST(request: Request) {
 
         for (let i = 0; i < ids.length; i++) {
           const id = ids[i]!;
+          send({
+            type: "progress",
+            phase: "generating",
+            total: ids.length,
+            processed: i,
+            succeeded,
+            failed: failed.length,
+            currentDocumentId: id,
+            percent:
+              ids.length === 0 ? 100 : Math.round((i / ids.length) * 100),
+          });
           try {
-            await generateDocumentAiIcon(id, { force: false });
+            await generateDocumentAiIcon(id, { force });
             succeeded += 1;
           } catch (error) {
             failed.push({

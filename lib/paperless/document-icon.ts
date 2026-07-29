@@ -140,15 +140,38 @@ export function listDocumentIdsMissingAiIcon(
   afterId = 0,
   onlyIds?: number[] | null
 ): number[] {
+  return listDocumentIdsForAiIcon({
+    limit,
+    afterId,
+    onlyIds,
+    onlyMissing: true,
+  });
+}
+
+/** Document ids for icon batch — optionally only missing, or force all selected. */
+export function listDocumentIdsForAiIcon(input: {
+  limit?: number;
+  afterId?: number;
+  onlyIds?: number[] | null;
+  onlyMissing?: boolean;
+}): number[] {
   const db = getDb();
+  const limit = input.limit ?? 25;
+  const afterId = input.afterId ?? 0;
+  const onlyMissing = input.onlyMissing !== false;
+  const onlyIds = input.onlyIds;
+
   if (onlyIds && onlyIds.length > 0) {
     const placeholders = onlyIds.map(() => "?").join(",");
+    const missingSql = onlyMissing
+      ? `AND (ai_icon_path IS NULL OR TRIM(ai_icon_path) = '')`
+      : "";
     const rows = db
       .prepare(
         `SELECT id FROM paperless_documents
          WHERE id IN (${placeholders})
            AND COALESCE(sync_status, 'synced') != 'missing'
-           AND (ai_icon_path IS NULL OR TRIM(ai_icon_path) = '')
+           ${missingSql}
            AND id > ?
          ORDER BY id
          LIMIT ?`
@@ -156,6 +179,10 @@ export function listDocumentIdsMissingAiIcon(
       .all(...onlyIds, afterId, limit) as { id: number }[];
     return rows.map((r) => r.id);
   }
+
+  const missingSql = onlyMissing
+    ? `AND (d.ai_icon_path IS NULL OR TRIM(d.ai_icon_path) = '')`
+    : "";
   const rows = db
     .prepare(
       `SELECT d.id
@@ -163,7 +190,7 @@ export function listDocumentIdsMissingAiIcon(
        INNER JOIN document_summaries s ON s.document_id = d.id
        WHERE COALESCE(d.sync_status, 'synced') != 'missing'
          AND s.analysis_status = 'completed'
-         AND (d.ai_icon_path IS NULL OR TRIM(d.ai_icon_path) = '')
+         ${missingSql}
          AND d.id > ?
        ORDER BY d.id
        LIMIT ?`
