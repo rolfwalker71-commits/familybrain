@@ -156,6 +156,14 @@ export async function markDocumentsPaid(
   }
 
   const markedLocal = setDocumentsPaidLocally(succeededLocalIds);
+  try {
+    const { notifyMarkedPaid } = await import("@/lib/realtime/notify");
+    for (const id of succeededLocalIds) {
+      notifyMarkedPaid(id);
+    }
+  } catch {
+    /* ignore */
+  }
   return {
     ok: errors.length === 0,
     markedLocal,

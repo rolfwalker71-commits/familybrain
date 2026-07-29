@@ -67,16 +67,46 @@ export function ActionInbox() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    void (async () => {
+    let cancelled = false;
+
+    async function load() {
       try {
         const res = await fetch("/api/dashboard/inbox");
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || "Laden fehlgeschlagen");
-        setData(json);
+        if (!cancelled) {
+          setData(json);
+          setError(null);
+        }
       } catch (err) {
-        setError(err instanceof Error ? err.message : String(err));
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : String(err));
+        }
       }
-    })();
+    }
+
+    void load();
+
+    const onInbox = () => {
+      void load();
+    };
+    window.addEventListener("buddy:inbox", onInbox);
+
+    // Fallback: rare poll + refresh when tab becomes visible again
+    const poll = window.setInterval(() => {
+      if (document.visibilityState === "visible") void load();
+    }, 45000);
+    const onVis = () => {
+      if (document.visibilityState === "visible") void load();
+    };
+    document.addEventListener("visibilitychange", onVis);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("buddy:inbox", onInbox);
+      window.clearInterval(poll);
+      document.removeEventListener("visibilitychange", onVis);
+    };
   }, []);
 
   if (error) {

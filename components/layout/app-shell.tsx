@@ -6,6 +6,7 @@ import { AnalysisProvider } from "@/components/analysis/analysis-provider";
 import { AnalysisStatusBar } from "@/components/analysis/analysis-status-bar";
 import { AuthProvider, useAuth } from "@/components/auth/auth-provider";
 import { AdminNavProvider } from "@/components/layout/admin-nav-provider";
+import { RealtimeToasts } from "@/components/realtime/realtime-toasts";
 import { MobileHeader } from "./mobile-header";
 import { Sidebar } from "./sidebar";
 
@@ -70,6 +71,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
       >
         <MobileHeader />
         {!isLimitedUser ? <AnalysisStatusBar /> : null}
+        {!isLimitedUser ? <RealtimeToasts /> : null}
         <div
           className={
             isChat

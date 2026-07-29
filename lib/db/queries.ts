@@ -36,6 +36,13 @@ function aiIconPublicUrl(aiIconPath: string | null | undefined): string | null {
   return `/api/documents/media/ai-icon/${encodeURIComponent(base)}`;
 }
 
+/** Public URL for a stored AI icon path (media route). */
+export function publicAiIconUrl(
+  aiIconPath: string | null | undefined
+): string | null {
+  return aiIconPublicUrl(aiIconPath);
+}
+
 export type PaperlessDocumentRow = {
   id: number;
   paperless_id: number;

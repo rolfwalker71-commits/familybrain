@@ -536,6 +536,28 @@ export async function writebackStatusFlagsToPaperless(input: {
 
     appendPaperlessFieldSyncLogs(logs);
     rememberWritebackError(null);
+    try {
+      if (
+        input.buddyReviewed !== undefined ||
+        input.taxRelevant !== undefined
+      ) {
+        const bits: string[] = [];
+        if (input.buddyReviewed !== undefined) {
+          bits.push(input.buddyReviewed ? "Geprüft: ja" : "Geprüft: nein");
+        }
+        if (input.taxRelevant !== undefined) {
+          bits.push(
+            input.taxRelevant ? "Steuer relevant: ja" : "Steuer relevant: nein"
+          );
+        }
+        const { notifyBuddyStatusChanged } = await import(
+          "@/lib/realtime/notify"
+        );
+        notifyBuddyStatusChanged(input.localDocumentId, bits.join(" · "));
+      }
+    } catch {
+      /* ignore */
+    }
     return { ok: true };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

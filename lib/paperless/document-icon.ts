@@ -292,7 +292,14 @@ export async function generateDocumentAiIcon(
     Buffer.from(b64, "base64")
   );
   deleteIconFile(existingPath);
-  return setDocumentAiIcon(documentId, fullPath, prompt);
+  const updated = setDocumentAiIcon(documentId, fullPath, prompt);
+  try {
+    const { notifyAiIconGenerated } = await import("@/lib/realtime/notify");
+    notifyAiIconGenerated(documentId, { forced: Boolean(options?.force) });
+  } catch {
+    /* ignore */
+  }
+  return updated;
 }
 
 /** Best-effort: create icon only when missing (used after analysis). */

@@ -60,21 +60,23 @@ function bodyDebug(body: unknown): Record<string, unknown> {
   return { bodyType: Array.isArray(body) ? "array" : typeof body };
 }
 
-async function analyzeIfPending(localId: number, paperlessId: number): Promise<void> {
+async function analyzeIfPending(localId: number, paperlessId: number): Promise<boolean> {
   try {
     const { listPendingDocumentIds } = await import("@/lib/db/queries");
     const pending = listPendingDocumentIds(50);
-    if (!pending.includes(localId)) return;
+    if (!pending.includes(localId)) return false;
     const { analyzeDocument } = await import("@/lib/ai/analyze-document");
     await analyzeDocument(localId, {
       manageErrorStatus: true,
     });
+    return true;
   } catch (analyzeErr) {
     console.error(
       "[paperless webhook] analyze",
       paperlessId,
       analyzeErr instanceof Error ? analyzeErr.message : analyzeErr
     );
+    return false;
   }
 }
 
@@ -138,6 +140,12 @@ export async function POST(request: Request) {
       changed,
       isNew,
     });
+    const { notifyWebhookDocument } = await import("@/lib/realtime/notify");
+    notifyWebhookDocument({
+      localId,
+      isNew,
+      changed,
+    });
   } catch (err) {
     console.error(
       "[paperless webhook] ingest",
@@ -156,8 +164,13 @@ export async function POST(request: Request) {
 
   after(async () => {
     try {
-      await analyzeIfPending(localId, paperlessId);
-      console.info("[paperless webhook] analyze done", { paperlessId, localId });
+      const analyzed = await analyzeIfPending(localId, paperlessId);
+      console.info("[paperless webhook] analyze done", {
+        paperlessId,
+        localId,
+        analyzed,
+      });
+      // Analyse-Toast kommt aus analyzeDocument → notifyAnalysisCompleted
     } catch (err) {
       console.error(
         "[paperless webhook] background analyze",

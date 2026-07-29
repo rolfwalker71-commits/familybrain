@@ -83,6 +83,15 @@ export async function analyzeDocument(
       options?.expectedContentHash
     );
     try {
+      const { notifyAnalysisCompleted } = await import("@/lib/realtime/notify");
+      notifyAnalysisCompleted(documentId, {
+        category: parsed.data.category,
+        short_summary: parsed.data.short_summary,
+      });
+    } catch {
+      /* ignore notify failures */
+    }
+    try {
       const { writebackAnalysisToPaperless } = await import(
         "@/lib/paperless/writeback"
       );

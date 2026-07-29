@@ -84,6 +84,12 @@ import {
   isDocumentAiIconsEnabled,
   setDocumentAiIconsEnabled,
 } from "@/lib/paperless/document-icon";
+import {
+  isLiveNotificationsEnabled,
+  setLiveNotificationsEnabled,
+  getLiveNotificationsDurationSec,
+  setLiveNotificationsDurationSec,
+} from "@/lib/realtime/notify";
 import { randomBytes } from "crypto";
 import {
   isAuthError,
@@ -107,6 +113,8 @@ function paperlessIntegrationPayload(request?: Request) {
     paperlessWritebackLastError: getLastWritebackError(),
     paperlessCustomFieldChecklist: BUDDY_WRITEBACK_FIELD_CHECKLIST,
     documentAiIconsEnabled: isDocumentAiIconsEnabled(),
+    liveNotificationsEnabled: isLiveNotificationsEnabled(),
+    liveNotificationsDurationSec: getLiveNotificationsDurationSec(),
   };
 }
 
@@ -179,6 +187,8 @@ const PutSchema = z.object({
   paperlessWebhookSecret: z.string().max(200).nullable().optional(),
   generatePaperlessWebhookSecret: z.boolean().optional(),
   documentAiIconsEnabled: z.boolean().optional(),
+  liveNotificationsEnabled: z.boolean().optional(),
+  liveNotificationsDurationSec: z.number().int().min(3).max(60).optional(),
   openaiApiKey: z.string().optional(),
   openaiModel: z.string().min(1).optional(),
   triliumBaseUrl: z.string().url().optional(),
@@ -274,6 +284,12 @@ export async function PUT(request: Request) {
   }
   if (parsed.data.documentAiIconsEnabled !== undefined) {
     setDocumentAiIconsEnabled(parsed.data.documentAiIconsEnabled);
+  }
+  if (parsed.data.liveNotificationsEnabled !== undefined) {
+    setLiveNotificationsEnabled(parsed.data.liveNotificationsEnabled);
+  }
+  if (parsed.data.liveNotificationsDurationSec !== undefined) {
+    setLiveNotificationsDurationSec(parsed.data.liveNotificationsDurationSec);
   }
 
   if (parsed.data.openaiApiKey !== undefined || parsed.data.openaiModel) {
