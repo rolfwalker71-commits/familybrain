@@ -11,6 +11,7 @@ import { IconCircle } from "@/components/layout/icon-circle";
 
 type JobRun = {
   id: number;
+  job_type?: string;
   trigger: string;
   status: string;
   started_at: string;
@@ -37,6 +38,7 @@ type StatusResponse = {
   };
   initialization: { syncComplete: boolean; complete: boolean };
   activeRun: JobRun | null;
+  activeRunLabel?: string | null;
 };
 
 function formatDate(value: string | null): string {
@@ -145,7 +147,11 @@ export function AutomationPanel() {
     setBusy("run");
     setError(null);
     try {
-      const res = await fetch("/api/jobs/run", { method: "POST" });
+      const res = await fetch("/api/jobs/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobType: "sync_analyze" }),
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Start fehlgeschlagen");
       await new Promise((resolve) => window.setTimeout(resolve, 500));
@@ -244,6 +250,37 @@ export function AutomationPanel() {
             ? "Startet…"
             : "Jetzt synchronisieren und analysieren"}
         </Button>
+
+        {active ? (
+          <div className="rounded-xl border border-border/60 p-3 text-sm">
+            <p>
+              Aktiv:{" "}
+              <strong>
+                {status?.activeRunLabel || active.job_type || "Job"}
+              </strong>{" "}
+              · {statusLabel(active.status)}
+            </p>
+            <Button
+              size="sm"
+              variant="outline"
+              className="mt-2"
+              disabled={busy !== null}
+              onClick={() => {
+                void (async () => {
+                  setBusy("run");
+                  try {
+                    await fetch("/api/jobs/cancel", { method: "POST" });
+                    await refresh();
+                  } finally {
+                    setBusy(null);
+                  }
+                })();
+              }}
+            >
+              Job stoppen
+            </Button>
+          </div>
+        ) : null}
 
         {error ? (
           <Alert variant="destructive">

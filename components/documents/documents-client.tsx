@@ -403,22 +403,50 @@ export function DocumentsClient() {
       setError("OpenAI-Key fehlt.");
       return;
     }
-    const documentIds =
-      mode === "selected" ? Array.from(selectedIds) : undefined;
-    if (mode === "selected" && (!documentIds || documentIds.length === 0)) {
+
+    if (mode === "all-missing") {
+      setIconBusy(true);
+      setError(null);
+      setIconProgress(
+        "Starte Server-Job «Nur fehlende Icons» — läuft weiter, wenn du die Seite verlässt…"
+      );
+      try {
+        const res = await fetch("/api/jobs/run", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ jobType: "ai_icons_missing" }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(
+            data.error || "Icon-Job starten fehlgeschlagen"
+          );
+        }
+        setIconProgress(
+          "KI-Icons-Job läuft im Hintergrund. Fortschritt unter Sync → Automation."
+        );
+        window.setTimeout(() => setIconProgress(null), 6000);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+        setIconProgress(null);
+      } finally {
+        setIconBusy(false);
+      }
+      return;
+    }
+
+    const documentIds = Array.from(selectedIds);
+    if (documentIds.length === 0) {
       setError("Bitte zuerst Dokumente auswählen.");
       return;
     }
 
-    const force = mode === "selected";
     setIconBusy(true);
     setError(null);
     setIconProgress(
-      force
-        ? `Generierung… (${documentIds!.length} ausgewählt, ersetzt bestehende)`
-        : "Generierung fehlender Icons…"
+      `Generierung… (${documentIds.length} ausgewählt, ersetzt bestehende)`
     );
-    setGeneratingIconId(documentIds?.[0] ?? null);
+    setGeneratingIconId(documentIds[0] ?? null);
     try {
       let afterId = 0;
       let totalSucceeded = 0;
@@ -430,10 +458,10 @@ export function DocumentsClient() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            limit: force ? Math.min(documentIds!.length, 10) : 10,
+            limit: Math.min(documentIds.length, 10),
             afterId,
-            force,
-            ...(documentIds ? { documentIds } : {}),
+            force: true,
+            documentIds,
           }),
         });
         if (!res.ok) {

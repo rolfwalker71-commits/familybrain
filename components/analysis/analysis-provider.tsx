@@ -145,7 +145,14 @@ export function AnalysisProvider({ children }: { children: React.ReactNode }) {
 
   const startAnalysis = useCallback(
     async (options?: { mode?: AnalysisMode; batchSize?: number }) => {
-      if (runningRef.current) return;
+      if (runningRef.current) {
+        setStatus((prev) => ({
+          ...prev,
+          lastError:
+            "Analyse läuft bereits. Stoppen und erneut starten, oder unter Sync → Automation den Hintergrund-Job prüfen.",
+        }));
+        return;
+      }
 
       const mode: AnalysisMode = options?.mode ?? "batch";
       const batchSize = options?.batchSize ?? 10;
@@ -226,6 +233,15 @@ export function AnalysisProvider({ children }: { children: React.ReactNode }) {
             body: JSON.stringify({ limit: batchSize }),
             signal: controller.signal,
           });
+
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            throw new Error(
+              typeof data.error === "string"
+                ? data.error
+                : `Analyse fehlgeschlagen (HTTP ${res.status})`
+            );
+          }
 
           let batchSucceeded = 0;
           let batchFailed = 0;

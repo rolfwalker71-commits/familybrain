@@ -7,6 +7,7 @@ import {
   getSchedulerSettings,
   saveSchedulerSettings,
 } from "@/lib/jobs/queries";
+import { jobTypeLabel } from "@/lib/jobs/constants";
 import {
   getSchedulerRuntimeStatus,
   rescheduleFromNow,
@@ -16,6 +17,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  const activeRun = getActiveJobRun();
   return NextResponse.json({
     scheduler: getSchedulerRuntimeStatus(),
     settings: getSchedulerSettings(),
@@ -23,7 +25,8 @@ export async function GET() {
       syncComplete: getInitialSyncComplete(),
       complete: getInitialIngestionComplete(),
     },
-    activeRun: getActiveJobRun(),
+    activeRun,
+    activeRunLabel: activeRun ? jobTypeLabel(activeRun.job_type) : null,
   });
 }
 

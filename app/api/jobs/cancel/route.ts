@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { isAuthError, requireAdmin } from "@/lib/auth/current-user";
+import { jobTypeLabel } from "@/lib/jobs/constants";
 import { cancelActiveJobRun, getActiveJobRun } from "@/lib/jobs/queries";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** Cancel the currently running Sync/Analyse job (if any). */
+/** Cancel the currently running background job (if any). */
 export async function POST() {
   const auth = await requireAdmin();
   if (isAuthError(auth)) return auth;
@@ -22,5 +23,7 @@ export async function POST() {
     ok: true,
     cancelled: true,
     runId: cancelled?.id ?? before.id,
+    jobType: before.job_type,
+    label: jobTypeLabel(before.job_type),
   });
 }

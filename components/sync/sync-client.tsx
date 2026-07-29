@@ -85,6 +85,8 @@ function SyncClientInner() {
     analyzedCount,
     hasOpenAIKey,
     isRunning: analysisRunning,
+    lastError: analysisError,
+    lastMessage: analysisMessage,
     startAnalysis,
     stopAnalysis,
     refreshStats,
@@ -105,14 +107,102 @@ function SyncClientInner() {
   const [triliumSyncProgress, setTriliumSyncProgress] =
     useState<SyncProgress | null>(null);
   const [busy, setBusy] = useState<
-    "save" | "test" | "sync" | "trilium-sync" | "writeback" | null
+    "save" | "test" | "sync" | "trilium-sync" | "writeback" | "job" | null
   >(null);
-  const [writebackProgress, setWritebackProgress] = useState<{
-    processed: number;
-    succeeded: number;
-    failed: number;
-  } | null>(null);
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
+  const [bgJob, setBgJob] = useState<{
+    id: number;
+    jobType: string;
+    label: string;
+    summary: Record<string, unknown> | null;
+  } | null>(null);
+
+  async function refreshBackgroundJob() {
+    try {
+      const res = await fetch("/api/jobs/status", { cache: "no-store" });
+      const data = await res.json().catch(() => null);
+      const active = data?.activeRun;
+      if (active && active.status === "running") {
+        let summary: Record<string, unknown> | null = null;
+        if (typeof active.summary_json === "string" && active.summary_json) {
+          try {
+            summary = JSON.parse(active.summary_json) as Record<string, unknown>;
+          } catch {
+            summary = null;
+          }
+        }
+        setBgJob({
+          id: Number(active.id),
+          jobType: String(active.job_type || ""),
+          label: String(data.activeRunLabel || active.job_type || "Job"),
+          summary,
+        });
+      } else {
+        setBgJob(null);
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  async function startBackgroundJob(
+    jobType:
+      | "analyze_pending"
+      | "paperless_writeback"
+      | "ai_icons_missing"
+      | "sync_analyze"
+  ) {
+    setBusy("job");
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/jobs/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobType }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          data.error ||
+            (data.activeRun
+              ? "Ein anderer Hintergrund-Job läuft bereits."
+              : "Job starten fehlgeschlagen")
+        );
+      }
+      setMessage(
+        `${data.label || "Job"} gestartet — läuft auf dem Server weiter, auch wenn du die Seite verlässt.`
+      );
+      await refreshBackgroundJob();
+      await refreshStats();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function stopBackgroundJob() {
+    setBusy("job");
+    setError(null);
+    try {
+      stopAnalysis();
+      const res = await fetch("/api/jobs/cancel", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Stoppen fehlgeschlagen");
+      setMessage(
+        data.cancelled
+          ? `${data.label || "Job"} gestoppt.`
+          : data.message || "Kein aktiver Job."
+      );
+      setBgJob(null);
+      await refreshStats();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(null);
+    }
+  }
 
   useEffect(() => {
     void (async () => {
@@ -155,6 +245,16 @@ function SyncClientInner() {
       }
     })();
   }, []);
+
+  useEffect(() => {
+    void refreshBackgroundJob();
+    const id = window.setInterval(() => {
+      void refreshBackgroundJob();
+      if (bgJob) void refreshStats();
+    }, 4000);
+    return () => window.clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- poll independently of bgJob identity
+  }, [bgJob?.id, refreshStats]);
 
   async function saveSettings() {
     setBusy("save");
@@ -375,73 +475,7 @@ function SyncClientInner() {
   }
 
   async function runPaperlessWriteback() {
-    setBusy("writeback");
-    setError(null);
-    setMessage(null);
-    setWritebackProgress({ processed: 0, succeeded: 0, failed: 0 });
-    try {
-      let afterId = 0;
-      let totalProcessed = 0;
-      let totalSucceeded = 0;
-      let totalFailed = 0;
-      let done = false;
-
-      while (!done) {
-        const res = await fetch("/api/paperless/writeback-batch", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ limit: 25, afterId }),
-        });
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          throw new Error(data.error || "Writeback fehlgeschlagen");
-        }
-
-        let batchDone = true;
-        let nextAfterId = afterId;
-        let streamError: string | null = null;
-
-        await readNdjsonStream(res, (event) => {
-          if (event.type === "progress") {
-            setWritebackProgress({
-              processed: totalProcessed + Number(event.processed || 0),
-              succeeded: totalSucceeded + Number(event.succeeded || 0),
-              failed: totalFailed + Number(event.failed || 0),
-            });
-          } else if (event.type === "done") {
-            const processed = Number(event.processed || 0);
-            const succeeded = Number(event.succeeded || 0);
-            const failedList = Array.isArray(event.failed) ? event.failed : [];
-            totalProcessed += processed;
-            totalSucceeded += succeeded;
-            totalFailed += failedList.length;
-            nextAfterId = Number(event.nextAfterId ?? afterId);
-            batchDone = Boolean(event.done);
-            setWritebackProgress({
-              processed: totalProcessed,
-              succeeded: totalSucceeded,
-              failed: totalFailed,
-            });
-          } else if (event.type === "error") {
-            streamError = String(event.error || "Writeback fehlgeschlagen");
-          }
-        });
-
-        if (streamError) throw new Error(streamError);
-        afterId = nextAfterId;
-        done = batchDone;
-      }
-
-      setMessage(
-        `Paperless-Writeback fertig: ${totalSucceeded} ok` +
-          (totalFailed > 0 ? `, ${totalFailed} Fehler` : "") +
-          ` (${totalProcessed} Dokumente).`
-      );
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setBusy(null);
-    }
+    await startBackgroundJob("paperless_writeback");
   }
 
   const syncLabel =
@@ -725,10 +759,9 @@ function SyncClientInner() {
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            <strong>Wichtig:</strong> „10 analysieren“ macht nur einen Batch und
-            stoppt danach. „Alle im Hintergrund“ läuft weiter, bis alle
-            ausstehenden Dokumente fertig sind (Tab muss offen bleiben). Status
-            und Fortschritt siehst du oben auf jeder Seite.
+            <strong>Wichtig:</strong> „10 analysieren“ ist ein kurzer Browser-Batch.
+            „Alle im Hintergrund“ und Writeback laufen als Server-Job weiter — der
+            Tab darf geschlossen werden.
           </p>
           <div className="rounded-xl border border-border/60 bg-[var(--brand-docs-soft)]/50 p-4 text-sm">
             Ausstehend: <strong>{pendingCount}</strong>
@@ -744,26 +777,92 @@ function SyncClientInner() {
               </span>
             ) : null}
           </div>
+
+          {bgJob ? (
+            <div className="rounded-xl border border-[var(--brand-docs)]/40 bg-[var(--brand-docs-soft)] px-4 py-3 text-sm text-[var(--brand-docs)]">
+              <p className="font-medium">Server-Job läuft: {bgJob.label}</p>
+              <p className="mt-1 text-[var(--brand-docs)]/90">
+                {bgJob.summary
+                  ? `Fortschritt: ${Number(bgJob.summary.succeeded ?? bgJob.summary.analyzed ?? 0)} ok` +
+                    (Number(
+                      bgJob.summary.failed ?? bgJob.summary.analysisFailed ?? 0
+                    ) > 0
+                      ? `, ${Number(bgJob.summary.failed ?? bgJob.summary.analysisFailed ?? 0)} Fehler`
+                      : "") +
+                    (bgJob.summary.remaining != null
+                      ? ` · noch ${Number(bgJob.summary.remaining)}`
+                      : "") +
+                    (bgJob.summary.processed != null
+                      ? ` · ${Number(bgJob.summary.processed)} verarbeitet`
+                      : "")
+                  : "Gestartet — Status wird aktualisiert…"}
+              </p>
+              <Button
+                size="sm"
+                variant="outline"
+                className="mt-2"
+                disabled={busy !== null}
+                onClick={() => void stopBackgroundJob()}
+              >
+                Job stoppen
+              </Button>
+            </div>
+          ) : null}
+
+          {(error || analysisError) && activeTab === "analyse" ? (
+            <Alert variant="destructive">
+              <AlertTitle>Analyse / Job</AlertTitle>
+              <AlertDescription className="space-y-2">
+                <p>{error || analysisError}</p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void stopBackgroundJob()}
+                >
+                  Aktiven Job stoppen und freigeben
+                </Button>
+              </AlertDescription>
+            </Alert>
+          ) : null}
+
+          {analysisMessage && !analysisRunning ? (
+            <p className="text-sm text-muted-foreground">{analysisMessage}</p>
+          ) : null}
+
           <div className="grid grid-cols-1 gap-2">
-            {analysisRunning ? (
-              <Button variant="outline" className="w-full" onClick={stopAnalysis}>
+            {analysisRunning || bgJob?.jobType === "analyze_pending" ? (
+              <Button
+                variant="outline"
+                className="w-full"
+                disabled={busy !== null}
+                onClick={() => void stopBackgroundJob()}
+              >
                 Analyse stoppen
               </Button>
             ) : (
               <>
                 <Button
                   className={syncPrimaryBtn}
-                  disabled={pendingCount === 0 || !hasOpenAIKey || busy !== null}
-                  onClick={() =>
-                    void startAnalysis({ mode: "all", batchSize: 10 })
+                  disabled={
+                    pendingCount === 0 ||
+                    !hasOpenAIKey ||
+                    busy !== null ||
+                    bgJob != null
                   }
+                  onClick={() => void startBackgroundJob("analyze_pending")}
                 >
                   Alle im Hintergrund analysieren
                 </Button>
                 <Button
                   variant="outline"
                   className="w-full"
-                  disabled={pendingCount === 0 || !hasOpenAIKey || busy !== null}
+                  disabled={
+                    pendingCount === 0 ||
+                    !hasOpenAIKey ||
+                    busy !== null ||
+                    bgJob != null ||
+                    analysisRunning
+                  }
                   onClick={() =>
                     void startAnalysis({ mode: "batch", batchSize: 10 })
                   }
@@ -777,16 +876,16 @@ function SyncClientInner() {
           <div className="border-t border-border/60 pt-4 space-y-3">
             <p className="text-sm text-muted-foreground">
               Bereits analysierte Dokumente müssen nicht nochmals durch die KI.
-              „Writeback erneut“ schreibt die vorhandenen Extrakte (Betrag,
-              Tags, Status, …) nach Paperless — ohne OpenAI-Kosten.
+              „Writeback erneut“ schreibt die vorhandenen Extrakte nach Paperless
+              — ohne OpenAI-Kosten. Läuft als Server-Job im Hintergrund.
             </p>
-            {writebackProgress && busy === "writeback" ? (
+            {bgJob?.jobType === "paperless_writeback" && bgJob.summary ? (
               <div className="rounded-xl border border-border/60 p-3 text-sm">
-                Writeback: {writebackProgress.succeeded} ok
-                {writebackProgress.failed > 0
-                  ? `, ${writebackProgress.failed} Fehler`
+                Writeback: {Number(bgJob.summary.succeeded || 0)} ok
+                {Number(bgJob.summary.failed || 0) > 0
+                  ? `, ${Number(bgJob.summary.failed)} Fehler`
                   : ""}{" "}
-                ({writebackProgress.processed} verarbeitet)
+                ({Number(bgJob.summary.processed || 0)} verarbeitet)
               </div>
             ) : null}
             <Button
@@ -796,12 +895,13 @@ function SyncClientInner() {
                 analyzedCount === 0 ||
                 !hasToken ||
                 busy !== null ||
-                analysisRunning
+                analysisRunning ||
+                bgJob != null
               }
               onClick={() => void runPaperlessWriteback()}
             >
-              {busy === "writeback"
-                ? "Writeback läuft…"
+              {busy === "job"
+                ? "Starte…"
                 : `Paperless-Writeback erneut (${analyzedCount})`}
             </Button>
             {!hasToken ? (

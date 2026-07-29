@@ -35,6 +35,48 @@ export const INITIAL_RETRY_INTERVAL_MS = 5 * 60 * 1000;
 export const ANALYSIS_RETRY_BASE_MS = 5 * 60 * 1000;
 
 export const JOB_TYPE_SYNC_ANALYZE = "sync_analyze";
+/** Drain pending document AI analysis only (no Paperless sync). */
+export const JOB_TYPE_ANALYZE_PENDING = "analyze_pending";
+/** Generate AI icons for documents that still miss one. */
+export const JOB_TYPE_AI_ICONS_MISSING = "ai_icons_missing";
+/** Re-push completed analyses to Paperless custom fields/tags. */
+export const JOB_TYPE_PAPERLESS_WRITEBACK = "paperless_writeback";
+
+export const BACKGROUND_JOB_TYPES = [
+  JOB_TYPE_SYNC_ANALYZE,
+  JOB_TYPE_ANALYZE_PENDING,
+  JOB_TYPE_AI_ICONS_MISSING,
+  JOB_TYPE_PAPERLESS_WRITEBACK,
+] as const;
+
+export type BackgroundJobType = (typeof BACKGROUND_JOB_TYPES)[number];
+
+export function isBackgroundJobType(value: unknown): value is BackgroundJobType {
+  return (
+    typeof value === "string" &&
+    (BACKGROUND_JOB_TYPES as readonly string[]).includes(value)
+  );
+}
+
+export function jobTypeLabel(jobType: string): string {
+  switch (jobType) {
+    case JOB_TYPE_SYNC_ANALYZE:
+      return "Sync & Analyse";
+    case JOB_TYPE_ANALYZE_PENDING:
+      return "AI-Analyse";
+    case JOB_TYPE_AI_ICONS_MISSING:
+      return "KI-Icons";
+    case JOB_TYPE_PAPERLESS_WRITEBACK:
+      return "Paperless-Writeback";
+    default:
+      return jobType;
+  }
+}
+
+/** Per-document batch sizes inside durable background runners. */
+export const ANALYZE_PENDING_BATCH_SIZE = 10;
+export const AI_ICONS_MISSING_BATCH_SIZE = 5;
+export const PAPERLESS_WRITEBACK_BATCH_SIZE = 25;
 
 export function clampSchedulerIntervalMinutes(value: unknown): number {
   const n =

@@ -20,6 +20,7 @@ import {
   TRILIUM_SYNC_MODIFIED_CURSOR_KEY,
   clampSchedulerIntervalMinutes,
   parseSchedulerEnabled,
+  type BackgroundJobType,
 } from "./constants";
 
 export type JobTrigger = "schedule" | "manual";
@@ -84,6 +85,11 @@ export type JobRunSummary = {
   paperlessIndexed?: number;
   paperlessIndexSkipped?: number;
   paperlessIndexErrors?: number;
+  /** Generic counters for analyze/icons/writeback background jobs. */
+  succeeded?: number;
+  failed?: number;
+  remaining?: number;
+  afterId?: number;
 };
 
 function newLeaseOwner(): string {
@@ -230,9 +236,13 @@ export function recoverExpiredAnalysisClaims(now = new Date()): number {
 }
 
 /**
- * Atomically claim a global job lease. Returns null if another run holds it.
+ * Atomically claim the global job lease (one background job at a time).
+ * Returns null if another run holds it.
  */
-export function tryAcquireJobRun(trigger: JobTrigger): JobRunRow | null {
+export function tryAcquireJobRun(
+  trigger: JobTrigger,
+  jobType: BackgroundJobType = JOB_TYPE_SYNC_ANALYZE
+): JobRunRow | null {
   const db = getDb();
   const ts = nowIso();
   const expires = new Date(Date.now() + JOB_LEASE_MS).toISOString();
@@ -257,7 +267,7 @@ export function tryAcquireJobRun(trigger: JobTrigger): JobRunRow | null {
            job_type, trigger, status, started_at, lease_owner, lease_expires_at
          ) VALUES (?, ?, 'running', ?, ?, ?)`
       )
-      .run(JOB_TYPE_SYNC_ANALYZE, trigger, ts, owner, expires);
+      .run(jobType, trigger, ts, owner, expires);
 
     return db
       .prepare(`SELECT * FROM job_runs WHERE id = ?`)
@@ -265,6 +275,12 @@ export function tryAcquireJobRun(trigger: JobTrigger): JobRunRow | null {
   })();
 
   return acquired;
+}
+
+/** True while this run is still marked running (cooperative cancel check). */
+export function isJobRunStillActive(runId: number): boolean {
+  const row = getJobRunById(runId);
+  return row?.status === "running";
 }
 
 export function heartbeatJobRun(runId: number): void {
@@ -299,7 +315,7 @@ export function finishJobRun(
   );
 }
 
-/** Force-stop the active Sync/Analyse job lease (if any). */
+/** Force-stop the active background job lease (if any). */
 export function cancelActiveJobRun(
   reason = "Manuell gestoppt"
 ): JobRunRow | null {
@@ -307,6 +323,17 @@ export function cancelActiveJobRun(
   if (!active) return null;
   finishJobRun(active.id, "error", null, reason);
   return getJobRunById(active.id);
+}
+
+/** Persist progress mid-run without finishing the lease. */
+export function updateJobRunSummary(
+  runId: number,
+  summary: JobRunSummary
+): void {
+  const db = getDb();
+  db.prepare(
+    `UPDATE job_runs SET summary_json = ? WHERE id = ? AND status = 'running'`
+  ).run(JSON.stringify(summary), runId);
 }
 
 export function addJobRunItem(input: {
