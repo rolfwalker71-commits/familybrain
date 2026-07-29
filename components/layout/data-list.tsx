@@ -123,33 +123,41 @@ export function DataListMain({
   subtitle,
   meta,
   actions,
+  leading,
   className,
 }: {
   title: ReactNode;
   subtitle?: ReactNode;
   meta?: ReactNode;
   actions?: ReactNode;
+  /** Optional left visual (e.g. document AI icon). */
+  leading?: ReactNode;
   className?: string;
 }) {
   return (
     <div
       className={cn(
-        "flex flex-col gap-3 md:flex-row md:items-start md:justify-between",
+        "flex gap-3",
         className
       )}
     >
-      <div className="min-w-0 flex-1 space-y-1.5">
-        <div className="font-semibold text-foreground break-words">{title}</div>
-        {subtitle ? (
-          <div className="text-sm text-foreground/90 break-words">{subtitle}</div>
-        ) : null}
-        {meta ? <div className="pt-0.5">{meta}</div> : null}
-      </div>
-      {actions ? (
-        <div className="shrink-0 md:pl-4">
-          <ActionCluster>{actions}</ActionCluster>
-        </div>
+      {leading ? (
+        <div className="shrink-0 self-start pt-0.5">{leading}</div>
       ) : null}
+      <div className="flex min-w-0 flex-1 flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div className="min-w-0 flex-1 space-y-1.5">
+          <div className="font-semibold text-foreground break-words">{title}</div>
+          {subtitle ? (
+            <div className="text-sm text-foreground/90 break-words">{subtitle}</div>
+          ) : null}
+          {meta ? <div className="pt-0.5">{meta}</div> : null}
+        </div>
+        {actions ? (
+          <div className="shrink-0 md:pl-4">
+            <ActionCluster>{actions}</ActionCluster>
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }

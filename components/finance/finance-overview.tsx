@@ -48,7 +48,7 @@ import {
 } from "@/components/documents/document-link";
 import { FinanceStatsToggle } from "@/components/finance/finance-stats-toggle";
 import { formatCHF } from "@/lib/utils/format";
-import { daysAgo, daysFromNow, toSwissDate } from "@/lib/utils/dates";
+import { daysAgo, toSwissDate } from "@/lib/utils/dates";
 import {
   dueUrgency,
   dueUrgencyTextClass,
@@ -56,7 +56,9 @@ import {
 } from "@/lib/utils/due-urgency";
 import { compareNullableDate } from "@/lib/utils/list-sort";
 import { cn } from "@/lib/utils";
+import { groupByTimeBucket } from "@/lib/utils/time-buckets";
 import Link from "next/link";
+import { DocumentAiIcon } from "@/components/documents/document-ai-icon";
 import {
   OverviewTabNav,
   parseOverviewTab,
@@ -304,23 +306,13 @@ function FinanceOverviewClientInner({
     [sortedDueInvoices, dueCutoff]
   );
 
-  const weekEnd = useMemo(() => daysFromNow(7), []);
-  const monthEnd = useMemo(() => daysFromNow(30), []);
-
-  const dueBuckets = useMemo(() => {
-    const overdue: InvoiceRow[] = [];
-    const week: InvoiceRow[] = [];
-    const month: InvoiceRow[] = [];
-    const later: InvoiceRow[] = [];
-    for (const row of recentDueInvoices) {
-      if (!row.due_date) continue;
-      if (row.due_date < today) overdue.push(row);
-      else if (row.due_date <= weekEnd) week.push(row);
-      else if (row.due_date <= monthEnd) month.push(row);
-      else later.push(row);
-    }
-    return { overdue, week, month, later };
-  }, [recentDueInvoices, today, weekEnd, monthEnd]);
+  const dueBuckets = useMemo(
+    () =>
+      groupByTimeBucket(recentDueInvoices, (r) => r.due_date, today).filter(
+        (b) => b.id !== "none"
+      ),
+    [recentDueInvoices, today]
+  );
 
   const sumAmount = (rows: InvoiceRow[]) =>
     rows.reduce((sum, r) => sum + (r.amount || 0), 0);
@@ -701,48 +693,19 @@ function FinanceOverviewClientInner({
                 </div>
               ) : (
                 <div className="space-y-4 p-4">
-                  <DueBucketSection
-                    title="Überfällig"
-                    rows={dueBuckets.overdue}
-                    total={sumAmount(dueBuckets.overdue)}
-                    today={today}
-                    accent="red"
-                    defaultOpen
-                    selectedDocIds={selectedDocIds}
-                    onToggleDoc={toggleDocSelected}
-                  />
-                  <DueBucketSection
-                    title="Nächste 7 Tage"
-                    rows={dueBuckets.week}
-                    total={sumAmount(dueBuckets.week)}
-                    today={today}
-                    accent="orange"
-                    defaultOpen
-                    selectedDocIds={selectedDocIds}
-                    onToggleDoc={toggleDocSelected}
-                  />
-                  <DueBucketSection
-                    title="Nächste 30 Tage"
-                    rows={dueBuckets.month}
-                    total={sumAmount(dueBuckets.month)}
-                    today={today}
-                    accent="amber"
-                    defaultOpen
-                    selectedDocIds={selectedDocIds}
-                    onToggleDoc={toggleDocSelected}
-                  />
-                  {dueBuckets.later.length > 0 ? (
+                  {dueBuckets.map((bucket) => (
                     <DueBucketSection
-                      title="Später"
-                      rows={dueBuckets.later}
-                      total={sumAmount(dueBuckets.later)}
+                      key={bucket.id}
+                      title={bucket.title}
+                      rows={bucket.rows}
+                      total={sumAmount(bucket.rows)}
                       today={today}
-                      accent="muted"
-                      defaultOpen={false}
+                      accent={bucket.accent}
+                      defaultOpen={bucket.defaultOpen}
                       selectedDocIds={selectedDocIds}
                       onToggleDoc={toggleDocSelected}
                     />
-                  ) : null}
+                  ))}
                 </div>
               )}
 
@@ -1249,7 +1212,12 @@ function DueInvoiceCard({
       {subtitle ? (
         <p className="line-clamp-2 text-xs text-muted-foreground">{subtitle}</p>
       ) : null}
-      <div className="mt-auto flex items-center justify-end pt-1">
+      <div className="mt-auto flex items-end justify-between gap-2 pt-1">
+        <DocumentAiIcon
+          aiIconUrl={row.ai_icon_url}
+          category={row.category}
+          size="md"
+        />
         <FinanceStatsToggle
           key={`${row.id}-${isCountedInStats(row) ? 1 : 0}`}
           itemId={row.id}

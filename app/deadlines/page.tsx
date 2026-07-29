@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,9 @@ import {
   MetaLine,
   SoftText,
 } from "@/components/layout/data-list";
+import { TimeBucketSection } from "@/components/layout/time-bucket-section";
 import { toSwissDate } from "@/lib/utils/dates";
+import { groupByTimeBucket } from "@/lib/utils/time-buckets";
 import {
   ListSortControl,
   useListSortDir,
@@ -38,6 +40,7 @@ import {
   DocumentInfoButton,
   DocumentTitleLink,
 } from "@/components/documents/document-link";
+import { DocumentAiIcon } from "@/components/documents/document-ai-icon";
 import type { CalendarEvent } from "@/lib/utils/ics";
 
 type DeadlineRow = {
@@ -53,6 +56,8 @@ type DeadlineRow = {
   document_title: string | null;
   document_local_id: number;
   correspondent_name: string | null;
+  ai_icon_url?: string | null;
+  category?: string | null;
 };
 
 function deadlineToEvent(row: DeadlineRow): CalendarEvent | null {
@@ -189,6 +194,204 @@ function DeadlinesPageInner() {
     .map(deadlineToEvent)
     .filter((e): e is CalendarEvent => Boolean(e));
 
+  const today = todayIso();
+  const buckets = useMemo(
+    () => groupByTimeBucket(rows, (r) => r.deadline_date, today),
+    [rows, today]
+  );
+
+  function renderDeadlineRow(row: DeadlineRow) {
+    const event = deadlineToEvent(row);
+    const temporalStatus =
+      row.status === "completed"
+        ? "unknown"
+        : resolveTemporalStatus(row.deadline_date);
+    const isEditing = editingId === row.id;
+
+    return (
+      <DataListRow key={row.id}>
+        <DataListMain
+          leading={
+            <DocumentAiIcon
+              aiIconUrl={row.ai_icon_url}
+              category={row.category}
+              size="md"
+            />
+          }
+          title={row.title}
+          subtitle={
+            <div className="space-y-1">
+              {row.correspondent_name ? (
+                <SoftText className="mt-0 font-medium text-foreground/80">
+                  {row.correspondent_name}
+                </SoftText>
+              ) : null}
+              {row.description ? (
+                <SoftText className="mt-0 text-sm">
+                  {row.description}
+                </SoftText>
+              ) : null}
+              {isEditing ? (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <Input
+                    className="h-8 max-w-xs text-sm"
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    placeholder="Titel"
+                  />
+                  <Input
+                    type="date"
+                    className="h-8 w-40 text-sm"
+                    value={editDate}
+                    onChange={(e) => setEditDate(e.target.value)}
+                  />
+                  <Button
+                    size="sm"
+                    disabled={busyId === row.id || !editTitle.trim()}
+                    onClick={() =>
+                      void patchDeadline(row.id, {
+                        title: editTitle.trim(),
+                        deadlineDate: editDate || null,
+                      })
+                    }
+                  >
+                    Speichern
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setEditingId(null)}
+                  >
+                    Abbrechen
+                  </Button>
+                </div>
+              ) : null}
+            </div>
+          }
+          meta={
+            <MetaLine>
+              <span className="font-semibold tabular-nums">
+                {toSwissDate(row.deadline_date)}
+              </span>
+              <Badge variant="secondary">
+                {deadlineTypeLabel(row.deadline_type)}
+              </Badge>
+              <Badge
+                variant="secondary"
+                className={
+                  row.status === "completed"
+                    ? "border-transparent bg-muted text-muted-foreground hover:bg-muted"
+                    : temporalStatus === "expired"
+                      ? "border-transparent bg-red-100 text-red-700"
+                      : temporalStatusBadgeClass(temporalStatus)
+                }
+              >
+                {deadlineBadgeLabel(row)}
+              </Badge>
+              {row.manual_override ? (
+                <Badge variant="outline">Manuell</Badge>
+              ) : null}
+              <span className="tabular-nums">
+                {row.confidence != null
+                  ? `${Math.round(row.confidence * 100)}%`
+                  : "–"}
+              </span>
+              <DocumentTitleLink
+                documentId={row.document_local_id}
+                title={row.document_title}
+              />
+            </MetaLine>
+          }
+          actions={
+            <>
+              <DocumentInfoButton documentId={row.document_local_id} />
+              {event ? (
+                <AddToCalendarButton
+                  events={[event]}
+                  filename={`familybrain-frist-${row.id}`}
+                />
+              ) : null}
+              {row.status === "open" ? (
+                <>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={busyId === row.id}
+                    onClick={() => {
+                      setEditingId(row.id);
+                      setEditTitle(row.title);
+                      setEditDate(row.deadline_date || "");
+                    }}
+                  >
+                    Korrigieren
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={busyId === row.id}
+                    onClick={() =>
+                      void patchDeadline(row.id, { snoozeDays: 7 })
+                    }
+                  >
+                    +7 Tage
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={busyId === row.id}
+                    onClick={() =>
+                      void patchDeadline(row.id, { snoozeDays: 14 })
+                    }
+                  >
+                    +14
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={busyId === row.id}
+                    onClick={() =>
+                      void patchDeadline(row.id, { snoozeDays: 30 })
+                    }
+                  >
+                    +30
+                  </Button>
+                  {row.snoozed_until ? (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={busyId === row.id}
+                      onClick={() =>
+                        void patchDeadline(row.id, {
+                          snoozedUntil: null,
+                        })
+                      }
+                    >
+                      Snooze aufheben
+                    </Button>
+                  ) : null}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={busyId === row.id}
+                    onClick={() =>
+                      void patchDeadline(row.id, {
+                        status: "completed",
+                      })
+                    }
+                  >
+                    Erledigt
+                  </Button>
+                </>
+              ) : (
+                <Badge>Erledigt</Badge>
+              )}
+            </>
+          }
+        />
+      </DataListRow>
+    );
+  }
+
   return (
     <div className="min-w-0 space-y-4 pb-6 md:space-y-6">
       <PageHeader
@@ -252,194 +455,23 @@ function DeadlinesPageInner() {
               Keine Fristen gefunden.
             </div>
           ) : (
-            <DataList>
-              {rows.map((row) => {
-                const event = deadlineToEvent(row);
-                const temporalStatus =
-                  row.status === "completed"
-                    ? "unknown"
-                    : resolveTemporalStatus(row.deadline_date);
-                const isEditing = editingId === row.id;
-
-                return (
-                  <DataListRow key={row.id}>
-                    <DataListMain
-                      title={row.title}
-                      subtitle={
-                        <div className="space-y-1">
-                          {row.correspondent_name ? (
-                            <SoftText className="mt-0 font-medium text-foreground/80">
-                              {row.correspondent_name}
-                            </SoftText>
-                          ) : null}
-                          {row.description ? (
-                            <SoftText className="mt-0 text-sm">
-                              {row.description}
-                            </SoftText>
-                          ) : null}
-                          {isEditing ? (
-                            <div className="mt-2 flex flex-wrap gap-2">
-                              <Input
-                                className="h-8 max-w-xs text-sm"
-                                value={editTitle}
-                                onChange={(e) => setEditTitle(e.target.value)}
-                                placeholder="Titel"
-                              />
-                              <Input
-                                type="date"
-                                className="h-8 w-40 text-sm"
-                                value={editDate}
-                                onChange={(e) => setEditDate(e.target.value)}
-                              />
-                              <Button
-                                size="sm"
-                                disabled={busyId === row.id || !editTitle.trim()}
-                                onClick={() =>
-                                  void patchDeadline(row.id, {
-                                    title: editTitle.trim(),
-                                    deadlineDate: editDate || null,
-                                  })
-                                }
-                              >
-                                Speichern
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => setEditingId(null)}
-                              >
-                                Abbrechen
-                              </Button>
-                            </div>
-                          ) : null}
-                        </div>
-                      }
-                      meta={
-                        <MetaLine>
-                          <span className="font-semibold tabular-nums">
-                            {toSwissDate(row.deadline_date)}
-                          </span>
-                          <Badge variant="secondary">
-                            {deadlineTypeLabel(row.deadline_type)}
-                          </Badge>
-                          <Badge
-                            variant="secondary"
-                            className={
-                              row.status === "completed"
-                                ? "border-transparent bg-muted text-muted-foreground hover:bg-muted"
-                                : temporalStatus === "expired"
-                                  ? "border-transparent bg-red-100 text-red-700"
-                                  : temporalStatusBadgeClass(temporalStatus)
-                            }
-                          >
-                            {deadlineBadgeLabel(row)}
-                          </Badge>
-                          {row.manual_override ? (
-                            <Badge variant="outline">Manuell</Badge>
-                          ) : null}
-                          <span className="tabular-nums">
-                            {row.confidence != null
-                              ? `${Math.round(row.confidence * 100)}%`
-                              : "–"}
-                          </span>
-                          <DocumentTitleLink
-                            documentId={row.document_local_id}
-                            title={row.document_title}
-                          />
-                        </MetaLine>
-                      }
-                      actions={
-                        <>
-                          <DocumentInfoButton
-                            documentId={row.document_local_id}
-                          />
-                          {event ? (
-                            <AddToCalendarButton
-                              events={[event]}
-                              filename={`familybrain-frist-${row.id}`}
-                            />
-                          ) : null}
-                          {row.status === "open" ? (
-                            <>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                disabled={busyId === row.id}
-                                onClick={() => {
-                                  setEditingId(row.id);
-                                  setEditTitle(row.title);
-                                  setEditDate(row.deadline_date || "");
-                                }}
-                              >
-                                Korrigieren
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                disabled={busyId === row.id}
-                                onClick={() =>
-                                  void patchDeadline(row.id, { snoozeDays: 7 })
-                                }
-                              >
-                                +7 Tage
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                disabled={busyId === row.id}
-                                onClick={() =>
-                                  void patchDeadline(row.id, { snoozeDays: 14 })
-                                }
-                              >
-                                +14
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                disabled={busyId === row.id}
-                                onClick={() =>
-                                  void patchDeadline(row.id, { snoozeDays: 30 })
-                                }
-                              >
-                                +30
-                              </Button>
-                              {row.snoozed_until ? (
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  disabled={busyId === row.id}
-                                  onClick={() =>
-                                    void patchDeadline(row.id, {
-                                      snoozedUntil: null,
-                                    })
-                                  }
-                                >
-                                  Snooze aufheben
-                                </Button>
-                              ) : null}
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                disabled={busyId === row.id}
-                                onClick={() =>
-                                  void patchDeadline(row.id, {
-                                    status: "completed",
-                                  })
-                                }
-                              >
-                                Erledigt
-                              </Button>
-                            </>
-                          ) : (
-                            <Badge>Erledigt</Badge>
-                          )}
-                        </>
-                      }
-                    />
-                  </DataListRow>
-                );
-              })}
-            </DataList>
+            <div className="md:divide-y-0">
+              {buckets.map((bucket) => (
+                <TimeBucketSection
+                  key={bucket.id}
+                  title={bucket.title}
+                  accent={bucket.accent}
+                  defaultOpen={bucket.defaultOpen}
+                  countLabel={`${bucket.rows.length} ${
+                    bucket.rows.length === 1 ? "Frist" : "Fristen"
+                  }`}
+                >
+                  <DataList>
+                    {bucket.rows.map((row) => renderDeadlineRow(row))}
+                  </DataList>
+                </TimeBucketSection>
+              ))}
+            </div>
           )}
         </CardContent>
       </Card>

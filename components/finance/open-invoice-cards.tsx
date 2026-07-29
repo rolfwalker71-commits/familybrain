@@ -73,11 +73,11 @@ export function OpenInvoiceCard({ invoice }: { invoice: OpenInvoiceCardModel }) 
     >
       <div className="relative aspect-[5/3] bg-muted/40">
         <CardThumb paperlessId={invoice.paperless_id} title={title} />
-        <span className="absolute bottom-2 left-2 rounded-lg shadow-sm">
+        <span className="absolute bottom-2 left-2 rounded-xl shadow-md ring-2 ring-white/80">
           <DocumentAiIcon
             aiIconUrl={invoice.ai_icon_url}
             category={invoice.category}
-            size="xs"
+            size="md"
           />
         </span>
       </div>

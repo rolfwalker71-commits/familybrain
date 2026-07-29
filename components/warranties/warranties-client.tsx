@@ -11,6 +11,7 @@ import {
   SoftText,
   VendorText,
 } from "@/components/layout/data-list";
+import { TimeBucketSection } from "@/components/layout/time-bucket-section";
 import { PageHeader } from "@/components/layout/page-primitives";
 import {
   ListSortControl,
@@ -22,9 +23,11 @@ import {
   DocumentInfoButton,
   DocumentTitleLink,
 } from "@/components/documents/document-link";
+import { DocumentAiIcon } from "@/components/documents/document-ai-icon";
 import { toSwissDate } from "@/lib/utils/dates";
 import { compareNullableDate } from "@/lib/utils/list-sort";
 import { formatCHF } from "@/lib/utils/format";
+import { groupByTimeBucket } from "@/lib/utils/time-buckets";
 import {
   resolveTemporalStatus,
   temporalStatusBadgeClass,
@@ -93,6 +96,15 @@ function asTemporalStatus(status: string | null | undefined): TemporalStatus {
   return "unknown";
 }
 
+function todayIso(): string {
+  const d = new Date();
+  return [
+    d.getFullYear(),
+    String(d.getMonth() + 1).padStart(2, "0"),
+    String(d.getDate()).padStart(2, "0"),
+  ].join("-");
+}
+
 export function WarrantiesClient({ rows }: { rows: WarrantyRow[] }) {
   const [sortDir, setSortDir] = useListSortDir("warranties", "desc");
   const sorted = useMemo(
@@ -101,6 +113,11 @@ export function WarrantiesClient({ rows }: { rows: WarrantyRow[] }) {
         compareNullableDate(a.warranty_until, b.warranty_until, sortDir)
       ),
     [rows, sortDir]
+  );
+  const today = todayIso();
+  const buckets = useMemo(
+    () => groupByTimeBucket(sorted, (r) => r.warranty_until, today),
+    [sorted, today]
   );
   const exportable = sorted
     .map(warrantyToEvent)
@@ -141,86 +158,111 @@ export function WarrantiesClient({ rows }: { rows: WarrantyRow[] }) {
               Gerätedokumente.
             </div>
           ) : (
-            <DataList>
-              {sorted.map((row) => {
-                const event = warrantyToEvent(row);
-                const status: TemporalStatus =
-                  row.status && row.status !== "unknown"
-                    ? asTemporalStatus(row.status)
-                    : resolveTemporalStatus(row.warranty_until);
-                const manufacturerLine = [
-                  row.manufacturer || null,
-                  row.serial_number ? `SN ${row.serial_number}` : null,
-                ]
-                  .filter(Boolean)
-                  .join(" · ");
+            <div>
+              {buckets.map((bucket) => (
+                <TimeBucketSection
+                  key={bucket.id}
+                  title={bucket.title}
+                  accent={bucket.accent}
+                  defaultOpen={bucket.defaultOpen}
+                  countLabel={`${bucket.rows.length} ${
+                    bucket.rows.length === 1 ? "Gerät" : "Geräte"
+                  }`}
+                >
+                  <DataList>
+                    {bucket.rows.map((row) => {
+                      const event = warrantyToEvent(row);
+                      const status: TemporalStatus =
+                        row.status && row.status !== "unknown"
+                          ? asTemporalStatus(row.status)
+                          : resolveTemporalStatus(row.warranty_until);
+                      const manufacturerLine = [
+                        row.manufacturer || null,
+                        row.serial_number ? `SN ${row.serial_number}` : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ");
 
-                return (
-                  <DataListRow key={row.id}>
-                    <DataListMain
-                      title={row.product_name || "–"}
-                      subtitle={
-                        <div className="space-y-1">
-                          {manufacturerLine ? (
-                            <SoftText className="mt-0">{manufacturerLine}</SoftText>
-                          ) : null}
-                          <VendorText className="text-sm">
-                            {row.vendor || row.correspondent_name || "–"}
-                          </VendorText>
-                          {row.correspondent_name &&
-                          row.vendor &&
-                          row.correspondent_name !== row.vendor ? (
-                            <SoftText className="mt-0">
-                              Korrespondent: {row.correspondent_name}
-                            </SoftText>
-                          ) : null}
-                        </div>
-                      }
-                      meta={
-                        <MetaLine>
-                          <span>
-                            Kauf {toSwissDate(row.purchase_date)}
-                          </span>
-                          <span className="font-semibold">
-                            Garantie bis {toSwissDate(row.warranty_until)}
-                          </span>
-                          <span className="tabular-nums">
-                            {formatCHF(row.price, row.currency || "CHF")}
-                          </span>
-                          <Badge
-                            variant="secondary"
-                            className={temporalStatusBadgeClass(status)}
-                          >
-                            {warrantyStatusLabel(status)}
-                          </Badge>
-                          <DocumentTitleLink
-                            documentId={row.document_local_id}
-                            title={row.document_title}
-                            aiIconUrl={row.ai_icon_url}
-                            category={row.category}
-                            showIcon
-                            iconSize="xs"
+                      return (
+                        <DataListRow key={row.id}>
+                          <DataListMain
+                            leading={
+                              <DocumentAiIcon
+                                aiIconUrl={row.ai_icon_url}
+                                category={row.category}
+                                size="md"
+                              />
+                            }
+                            title={row.product_name || "–"}
+                            subtitle={
+                              <div className="space-y-1">
+                                {manufacturerLine ? (
+                                  <SoftText className="mt-0">
+                                    {manufacturerLine}
+                                  </SoftText>
+                                ) : null}
+                                <VendorText className="text-sm">
+                                  {row.vendor ||
+                                    row.correspondent_name ||
+                                    "–"}
+                                </VendorText>
+                                {row.correspondent_name &&
+                                row.vendor &&
+                                row.correspondent_name !== row.vendor ? (
+                                  <SoftText className="mt-0">
+                                    Korrespondent: {row.correspondent_name}
+                                  </SoftText>
+                                ) : null}
+                              </div>
+                            }
+                            meta={
+                              <MetaLine>
+                                <span>
+                                  Kauf {toSwissDate(row.purchase_date)}
+                                </span>
+                                <span className="font-semibold">
+                                  Garantie bis{" "}
+                                  {toSwissDate(row.warranty_until)}
+                                </span>
+                                <span className="tabular-nums">
+                                  {formatCHF(
+                                    row.price,
+                                    row.currency || "CHF"
+                                  )}
+                                </span>
+                                <Badge
+                                  variant="secondary"
+                                  className={temporalStatusBadgeClass(status)}
+                                >
+                                  {warrantyStatusLabel(status)}
+                                </Badge>
+                                <DocumentTitleLink
+                                  documentId={row.document_local_id}
+                                  title={row.document_title}
+                                />
+                              </MetaLine>
+                            }
+                            actions={
+                              <>
+                                {event ? (
+                                  <AddToCalendarButton
+                                    events={[event]}
+                                    filename={`familybrain-garantie-${row.id}`}
+                                  />
+                                ) : null}
+                                <DocumentInfoButton
+                                  documentId={row.document_local_id}
+                                />
+                              </>
+                            }
                           />
-                        </MetaLine>
-                      }
-                      actions={
-                        <>
-                          {event ? (
-                            <AddToCalendarButton
-                              events={[event]}
-                              filename={`familybrain-garantie-${row.id}`}
-                            />
-                          ) : null}
-                          <DocumentInfoButton
-                            documentId={row.document_local_id}
-                          />
-                        </>
-                      }
-                    />
-                  </DataListRow>
-                );
-              })}
-            </DataList>
+                        </DataListRow>
+                      );
+                    })}
+                  </DataList>
+                </TimeBucketSection>
+              ))}
+            </div>
           )}
         </CardContent>
       </Card>

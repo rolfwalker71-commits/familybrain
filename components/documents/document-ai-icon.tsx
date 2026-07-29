@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { AiImagePreview } from "@/components/layout/ai-image-preview";
 import {
   IconCircle,
@@ -7,7 +8,7 @@ import {
 } from "@/components/layout/icon-circle";
 import { cn } from "@/lib/utils";
 
-type Size = "xs" | "sm" | "md";
+type Size = "xs" | "sm" | "md" | "lg";
 
 const SIZE: Record<
   Size,
@@ -24,15 +25,45 @@ const SIZE: Record<
     wrap: "size-10",
   },
   md: {
-    image: "h-11 w-11 object-cover sm:h-12 sm:w-12",
+    image: "h-12 w-12 object-cover sm:h-14 sm:w-14",
     circle: "lg",
-    wrap: "size-11 sm:size-12",
+    wrap: "size-12 sm:size-14",
+  },
+  lg: {
+    image: "h-16 w-16 object-cover sm:h-[4.5rem] sm:w-[4.5rem]",
+    circle: "lg",
+    wrap: "size-16 sm:size-[4.5rem]",
   },
 };
 
+function ZoomLightbox({
+  src,
+  onClose,
+}: {
+  src: string;
+  onClose: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/70 p-4"
+      onClick={onClose}
+      aria-label="Schliessen"
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt=""
+        className="max-h-[90vh] max-w-[95vw] rounded-lg object-contain shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      />
+    </button>
+  );
+}
+
 /**
- * Shared document visual: generated AI icon, or category/fallback circle
- * (same idea as on the documents list).
+ * Shared document visual: generated AI icon, or category/fallback circle.
+ * AI icons open a zoom lightbox on tap.
  */
 export function DocumentAiIcon({
   aiIconUrl,
@@ -40,27 +71,41 @@ export function DocumentAiIcon({
   size = "sm",
   className,
   onOpen,
+  zoomable = true,
 }: {
   aiIconUrl?: string | null;
   category?: string | null;
   size?: Size;
   className?: string;
   onOpen?: (url: string) => void;
+  /** When true (default), tapping an AI icon opens a fullscreen zoom. */
+  zoomable?: boolean;
 }) {
+  const [zoom, setZoom] = useState(false);
   const dim = SIZE[size];
+
   if (aiIconUrl) {
     return (
-      <span className={cn("relative shrink-0", dim.wrap, className)}>
-        <AiImagePreview
-          src={aiIconUrl}
-          brand="docs"
-          alt=""
-          imageClassName={dim.image}
-          onOpen={() => onOpen?.(aiIconUrl)}
-        />
-      </span>
+      <>
+        <span className={cn("relative shrink-0", dim.wrap, className)}>
+          <AiImagePreview
+            src={aiIconUrl}
+            brand="docs"
+            alt=""
+            imageClassName={dim.image}
+            onOpen={() => {
+              if (onOpen) onOpen(aiIconUrl);
+              else if (zoomable) setZoom(true);
+            }}
+          />
+        </span>
+        {zoom ? (
+          <ZoomLightbox src={aiIconUrl} onClose={() => setZoom(false)} />
+        ) : null}
+      </>
     );
   }
+
   const visual = knowledgeVisual(category || "Sonstiges");
   return (
     <IconCircle
