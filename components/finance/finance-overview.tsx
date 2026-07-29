@@ -74,6 +74,7 @@ type InvoiceRow = {
   counts_in_stats?: number | boolean | null;
   document_title: string | null;
   document_local_id: number;
+  paperless_id?: number | null;
 };
 
 type Dimension = "year" | "vendor" | "category";
@@ -265,6 +266,11 @@ function FinanceOverviewClientInner({
   const [dueOpen, setDueOpen] = useState(true);
   const [olderDueOpen, setOlderDueOpen] = useState(false);
   const [sortDir, setSortDir] = useListSortDir("finance-due", "desc");
+  const [selectedDocIds, setSelectedDocIds] = useState<Set<number>>(
+    () => new Set()
+  );
+  const [markPending, setMarkPending] = useState(false);
+  const [markMessage, setMarkMessage] = useState<string | null>(null);
 
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const dueCutoff = useMemo(() => daysAgo(DUE_VISIBILITY_DAYS), []);
@@ -447,6 +453,71 @@ function FinanceOverviewClientInner({
     router.replace(q ? `?${q}` : "?", { scroll: false });
   }
 
+  function toggleDocSelected(documentLocalId: number) {
+    setSelectedDocIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(documentLocalId)) next.delete(documentLocalId);
+      else next.add(documentLocalId);
+      return next;
+    });
+  }
+
+  function selectDocs(ids: number[]) {
+    setSelectedDocIds((prev) => {
+      const next = new Set(prev);
+      for (const id of ids) next.add(id);
+      return next;
+    });
+  }
+
+  function clearSelection() {
+    setSelectedDocIds(new Set());
+  }
+
+  async function markSelectedPaid() {
+    const ids = [...selectedDocIds];
+    if (ids.length === 0) return;
+    setMarkPending(true);
+    setMarkMessage(null);
+    try {
+      const res = await fetch("/api/finance/mark-paid", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ documentLocalIds: ids }),
+      });
+      const data = (await res.json()) as {
+        ok?: boolean;
+        markedLocal?: number;
+        writtenPaperless?: number;
+        errors?: Array<{ documentLocalId: number; error: string }>;
+        error?: string;
+      };
+      if (!res.ok && res.status !== 207) {
+        throw new Error(data.error || "Markieren fehlgeschlagen");
+      }
+      const written = data.writtenPaperless ?? 0;
+      const local = data.markedLocal ?? 0;
+      const errCount = data.errors?.length ?? 0;
+      setMarkMessage(
+        errCount > 0
+          ? `${local} lokal beglichen, ${written} in Paperless · ${errCount} Hinweis(e)`
+          : `${local} Rechnung(en) als beglichen markiert (${written} in Paperless)`
+      );
+      clearSelection();
+      router.refresh();
+    } catch (err) {
+      setMarkMessage(err instanceof Error ? err.message : String(err));
+    } finally {
+      setMarkPending(false);
+    }
+  }
+
+  const selectableDueIds = useMemo(() => {
+    const ids = new Set<number>();
+    for (const row of recentDueInvoices) ids.add(row.document_local_id);
+    return [...ids];
+  }, [recentDueInvoices]);
+
   function openDimension(next: Dimension) {
     setDimension((prev) => {
       const nextDim = prev === next ? null : next;
@@ -530,31 +601,77 @@ function FinanceOverviewClientInner({
               <div className="min-w-0">
                 <div className="flex items-center gap-2 text-[16px] font-bold">
                   <IconCircle icon={CircleAlert} tone="amber" size="sm" />
-                  Rechnungen mit Zahlungsfrist
+                  Offene Rechnungen (Zu bezahlen)
                 </div>
                 <p className="mt-1 text-sm opacity-80">
-                  Nach Dringlichkeit · {recentDueInvoices.length} aktuell ·{" "}
-                  {formatCHF(recentDueTotal)}
+                  Nur Paperless «Zu bezahlen» und nicht «Bezahlt» ·{" "}
+                  {recentDueInvoices.length} aktuell · {formatCHF(recentDueTotal)}
                   {olderDueInvoices.length > 0
                     ? ` · ${olderDueInvoices.length} ältere versteckt`
                     : ""}
                 </p>
               </div>
             </button>
-            {dueEvents.length > 0 ? (
-              <AddToCalendarButton
-                events={dueEvents}
-                filename="familybrain-zahlungsfristen"
-                label="Alle in Kalender"
-              />
-            ) : null}
+            <div className="flex flex-wrap items-center gap-2">
+              {selectableDueIds.length > 0 ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="border-amber-400/80 bg-white/70"
+                  onClick={() => selectDocs(selectableDueIds)}
+                >
+                  Alle auswählen
+                </Button>
+              ) : null}
+              {dueEvents.length > 0 ? (
+                <AddToCalendarButton
+                  events={dueEvents}
+                  filename="familybrain-zahlungsfristen"
+                  label="Alle in Kalender"
+                />
+              ) : null}
+            </div>
           </div>
+          {selectedDocIds.size > 0 ? (
+            <div className="flex flex-wrap items-center gap-2 border-b border-amber-200/80 bg-amber-50/90 px-4 py-2.5">
+              <span className="text-sm font-medium text-amber-950">
+                {selectedDocIds.size} ausgewählt
+              </span>
+              <Button
+                type="button"
+                size="sm"
+                disabled={markPending}
+                onClick={() => void markSelectedPaid()}
+                className="bg-[var(--brand-finance)] text-white hover:bg-[var(--brand-finance)]/90"
+              >
+                {markPending ? "Markiere…" : "Als beglichen markieren"}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                disabled={markPending}
+                onClick={clearSelection}
+              >
+                Auswahl aufheben
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                Schreibt «Bezahlt» nach Paperless
+              </span>
+            </div>
+          ) : null}
+          {markMessage ? (
+            <p className="border-b border-border/60 px-4 py-2 text-xs text-muted-foreground">
+              {markMessage}
+            </p>
+          ) : null}
           {dueOpen ? (
             <CardContent className="space-y-0 p-0">
               {recentDueInvoices.length === 0 ? (
                 <div className="px-6 py-4 text-sm text-muted-foreground">
-                  Keine Fälligkeiten aus den letzten {DUE_VISIBILITY_DAYS} Tagen
-                  oder in der Zukunft.
+                  Keine offenen Rechnungen mit Fälligkeit (Paperless «Zu bezahlen»
+                  / nicht «Bezahlt»).
                 </div>
               ) : (
                 <div className="space-y-4 p-4">
@@ -565,6 +682,8 @@ function FinanceOverviewClientInner({
                     today={today}
                     accent="red"
                     defaultOpen
+                    selectedDocIds={selectedDocIds}
+                    onToggleDoc={toggleDocSelected}
                   />
                   <DueBucketSection
                     title="Nächste 7 Tage"
@@ -573,6 +692,8 @@ function FinanceOverviewClientInner({
                     today={today}
                     accent="orange"
                     defaultOpen
+                    selectedDocIds={selectedDocIds}
+                    onToggleDoc={toggleDocSelected}
                   />
                   <DueBucketSection
                     title="Nächste 30 Tage"
@@ -581,6 +702,8 @@ function FinanceOverviewClientInner({
                     today={today}
                     accent="amber"
                     defaultOpen
+                    selectedDocIds={selectedDocIds}
+                    onToggleDoc={toggleDocSelected}
                   />
                   {dueBuckets.later.length > 0 ? (
                     <DueBucketSection
@@ -590,6 +713,8 @@ function FinanceOverviewClientInner({
                       today={today}
                       accent="muted"
                       defaultOpen={false}
+                      selectedDocIds={selectedDocIds}
+                      onToggleDoc={toggleDocSelected}
                     />
                   ) : null}
                 </div>
@@ -987,9 +1112,13 @@ function DueInvoiceList({
 function DueInvoiceCard({
   row,
   today,
+  selected,
+  onToggle,
 }: {
   row: InvoiceRow;
   today: string;
+  selected: boolean;
+  onToggle: (documentLocalId: number) => void;
 }) {
   const urgency = dueUrgency(row.due_date, today);
   const vendor = row.vendor?.trim() || "Unbekannt";
@@ -999,22 +1128,33 @@ function DueInvoiceCard({
   return (
     <article
       className={cn(
-        "flex min-w-0 flex-col gap-1.5 rounded-xl border border-border/70 bg-card p-3.5 shadow-[0_4px_16px_rgba(20,32,28,0.05)]",
-        !isCountedInStats(row) && "opacity-60"
+        "relative flex min-w-0 flex-col gap-1.5 rounded-xl border border-border/70 bg-card p-3.5 shadow-[0_4px_16px_rgba(20,32,28,0.05)]",
+        !isCountedInStats(row) && "opacity-60",
+        selected && "border-[var(--brand-finance)] ring-2 ring-[var(--brand-finance)]/25"
       )}
     >
       <div className="flex items-start justify-between gap-2">
-        <Link
-          href={`/documents/${row.document_local_id}`}
-          className="min-w-0 flex-1"
-        >
-          <p className="truncate text-sm font-semibold hover:underline">
-            {vendor}
-          </p>
-          <p className="mt-0.5 text-base font-bold tabular-nums tracking-tight">
-            {formatCHF(row.amount, row.currency || "CHF")}
-          </p>
-        </Link>
+        <label className="flex min-w-0 flex-1 cursor-pointer items-start gap-2.5">
+          <input
+            type="checkbox"
+            className="mt-1 size-4 shrink-0 accent-[var(--brand-finance)]"
+            checked={selected}
+            onChange={() => onToggle(row.document_local_id)}
+            aria-label={`${vendor} auswählen`}
+          />
+          <Link
+            href={`/documents/${row.document_local_id}`}
+            className="min-w-0 flex-1"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="truncate text-sm font-semibold hover:underline">
+              {vendor}
+            </p>
+            <p className="mt-0.5 text-base font-bold tabular-nums tracking-tight">
+              {formatCHF(row.amount, row.currency || "CHF")}
+            </p>
+          </Link>
+        </label>
         <DocumentInfoButton documentId={row.document_local_id} size="icon-sm" />
       </div>
       <p
@@ -1046,6 +1186,8 @@ function DueBucketSection({
   today,
   accent,
   defaultOpen,
+  selectedDocIds,
+  onToggleDoc,
 }: {
   title: string;
   rows: InvoiceRow[];
@@ -1053,6 +1195,8 @@ function DueBucketSection({
   today: string;
   accent: "red" | "orange" | "amber" | "muted";
   defaultOpen: boolean;
+  selectedDocIds: Set<number>;
+  onToggleDoc: (documentLocalId: number) => void;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   if (rows.length === 0) return null;
@@ -1091,7 +1235,13 @@ function DueBucketSection({
       {open ? (
         <div className="grid grid-cols-1 gap-2.5 border-t border-border/50 p-3 sm:grid-cols-2 xl:grid-cols-3">
           {rows.map((row) => (
-            <DueInvoiceCard key={row.id} row={row} today={today} />
+            <DueInvoiceCard
+              key={row.id}
+              row={row}
+              today={today}
+              selected={selectedDocIds.has(row.document_local_id)}
+              onToggle={onToggleDoc}
+            />
           ))}
         </div>
       ) : null}

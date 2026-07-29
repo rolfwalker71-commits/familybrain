@@ -1,0 +1,119 @@
+import {
+  getDocumentsByLocalIds,
+  getPaperlessSettings,
+  setDocumentsPaidLocally,
+} from "@/lib/db/queries";
+import { PaperlessClient, PaperlessError } from "@/lib/paperless/client";
+
+export type MarkPaidResult = {
+  ok: boolean;
+  markedLocal: number;
+  writtenPaperless: number;
+  errors: Array<{ documentLocalId: number; error: string }>;
+};
+
+/**
+ * Mark invoices as paid locally and write «Bezahlt=true» / «Zu bezahlen=false»
+ * back to Paperless.
+ */
+export async function markDocumentsPaid(
+  documentLocalIds: number[]
+): Promise<MarkPaidResult> {
+  const uniqueIds = [...new Set(documentLocalIds.filter((id) => id > 0))];
+  const errors: MarkPaidResult["errors"] = [];
+  if (uniqueIds.length === 0) {
+    return { ok: true, markedLocal: 0, writtenPaperless: 0, errors };
+  }
+
+  const docs = getDocumentsByLocalIds(uniqueIds);
+  const found = new Set(docs.map((d) => d.id));
+  for (const id of uniqueIds) {
+    if (!found.has(id)) {
+      errors.push({
+        documentLocalId: id,
+        error: "Dokument lokal nicht gefunden",
+      });
+    }
+  }
+
+  const settings = getPaperlessSettings();
+  if (!settings.baseUrl || !settings.apiToken) {
+    // Still mark locally so UI stays consistent offline
+    const markedLocal = setDocumentsPaidLocally(docs.map((d) => d.id));
+    for (const d of docs) {
+      errors.push({
+        documentLocalId: d.id,
+        error:
+          "Paperless nicht konfiguriert – nur lokal als beglichen markiert",
+      });
+    }
+    return {
+      ok: errors.length === 0,
+      markedLocal,
+      writtenPaperless: 0,
+      errors,
+    };
+  }
+
+  const client = new PaperlessClient(settings.baseUrl, settings.apiToken);
+  let fieldDefs: Awaited<ReturnType<typeof client.listCustomFields>> = [];
+  try {
+    fieldDefs = await client.listCustomFields();
+  } catch (err) {
+    const message =
+      err instanceof PaperlessError
+        ? err.message
+        : err instanceof Error
+          ? err.message
+          : String(err);
+    const markedLocal = setDocumentsPaidLocally(docs.map((d) => d.id));
+    for (const d of docs) {
+      errors.push({
+        documentLocalId: d.id,
+        error: `Paperless-Felder nicht lesbar (${message}) – nur lokal markiert`,
+      });
+    }
+    return {
+      ok: false,
+      markedLocal,
+      writtenPaperless: 0,
+      errors,
+    };
+  }
+
+  const succeededLocalIds: number[] = [];
+  let writtenPaperless = 0;
+
+  for (const doc of docs) {
+    try {
+      await client.setPaymentFlags(
+        doc.paperless_id,
+        { bezahlt: true, zuBezahlen: false },
+        fieldDefs
+      );
+      succeededLocalIds.push(doc.id);
+      writtenPaperless += 1;
+    } catch (err) {
+      const message =
+        err instanceof PaperlessError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : String(err);
+      // Still mark locally so the invoice leaves the open list after user intent
+      succeededLocalIds.push(doc.id);
+      errors.push({
+        documentLocalId: doc.id,
+        error: `Paperless-Writeback fehlgeschlagen: ${message} (lokal trotzdem markiert)`,
+      });
+    }
+  }
+
+  const markedLocal = setDocumentsPaidLocally(succeededLocalIds);
+  return {
+    ok: errors.length === 0,
+    markedLocal,
+    writtenPaperless,
+    errors,
+  };
+}

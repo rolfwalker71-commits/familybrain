@@ -6,6 +6,7 @@ import type {
   PaperlessPaginatedResponse,
   PaperlessTag,
 } from "./types";
+import { isPaidFieldName, isToPayFieldName } from "./custom-fields";
 
 export class PaperlessError extends Error {
   status: number;
@@ -47,12 +48,15 @@ export class PaperlessClient {
    * Fetch with manual redirect handling so Authorization is preserved.
    * Node/fetch often strips Authorization on cross-origin or protocol redirects.
    */
-  private async request<T>(path: string): Promise<T> {
-    const response = await this.fetchRaw(path, "application/json");
-    return response.json() as Promise<T>;
-  }
-
-  private async fetchRaw(path: string, accept = "*/*"): Promise<Response> {
+  private async fetchRaw(
+    path: string,
+    accept = "*/*",
+    init?: {
+      method?: string;
+      body?: string;
+      contentType?: string;
+    }
+  ): Promise<Response> {
     if (!this.token) {
       throw new PaperlessError(
         "Kein API-Token vorhanden. Bitte Token speichern und erneut testen.",
@@ -62,10 +66,21 @@ export class PaperlessClient {
 
     let url = path.startsWith("http") ? path : `${this.baseUrl}${path}`;
     const maxRedirects = 5;
+    const method = init?.method ?? "GET";
 
     for (let i = 0; i < maxRedirects; i++) {
+      const headers: Record<string, string> = {
+        Authorization: `Token ${this.token}`,
+        Accept: accept,
+      };
+      if (init?.contentType) {
+        headers["Content-Type"] = init.contentType;
+      }
+
       const response = await fetch(url, {
-        headers: this.headers(accept),
+        method,
+        headers,
+        body: init?.body,
         cache: "no-store",
         redirect: "manual",
         signal: AbortSignal.timeout(60_000),
@@ -80,6 +95,7 @@ export class PaperlessClient {
           );
         }
         url = new URL(location, url).toString();
+        // Redirects for mutating requests: follow as GET only if 303; else keep method
         continue;
       }
 
@@ -95,6 +111,27 @@ export class PaperlessClient {
     }
 
     throw new PaperlessError("Too many redirects while contacting Paperless", 310);
+  }
+
+  private async requestJson<T>(
+    path: string,
+    init?: {
+      method?: string;
+      body?: unknown;
+    }
+  ): Promise<T> {
+    const response = await this.fetchRaw(path, "application/json", {
+      method: init?.method ?? "GET",
+      body: init?.body !== undefined ? JSON.stringify(init.body) : undefined,
+      contentType:
+        init?.body !== undefined ? "application/json" : undefined,
+    });
+    if (response.status === 204) return undefined as T;
+    return response.json() as Promise<T>;
+  }
+
+  private async request<T>(path: string): Promise<T> {
+    return this.requestJson<T>(path);
   }
 
   private async postForm(
@@ -265,6 +302,71 @@ export class PaperlessClient {
 
   async getDocument(paperlessId: number): Promise<PaperlessDocument> {
     return this.request<PaperlessDocument>(`/api/documents/${paperlessId}/`);
+  }
+
+  /**
+   * PATCH document fields (e.g. custom_fields). Merging is caller's responsibility.
+   */
+  async patchDocument(
+    paperlessId: number,
+    body: Record<string, unknown>
+  ): Promise<PaperlessDocument> {
+    return this.requestJson<PaperlessDocument>(
+      `/api/documents/${paperlessId}/`,
+      { method: "PATCH", body }
+    );
+  }
+
+  /**
+   * Set payment UDFs «Bezahlt» / «Zu bezahlen» on a Paperless document.
+   * Resolves field IDs from custom field definitions.
+   */
+  async setPaymentFlags(
+    paperlessId: number,
+    flags: { bezahlt?: boolean; zuBezahlen?: boolean },
+    fieldDefs?: PaperlessCustomField[]
+  ): Promise<PaperlessDocument> {
+    const defs = fieldDefs ?? (await this.listCustomFields());
+    let paidFieldId: number | null = null;
+    let toPayFieldId: number | null = null;
+    for (const def of defs) {
+      if (paidFieldId == null && isPaidFieldName(def.name)) {
+        paidFieldId = def.id;
+      }
+      if (toPayFieldId == null && isToPayFieldName(def.name)) {
+        toPayFieldId = def.id;
+      }
+    }
+    if (flags.bezahlt !== undefined && paidFieldId == null) {
+      throw new PaperlessError(
+        "Paperless-Feld «Bezahlt» wurde nicht gefunden.",
+        400
+      );
+    }
+
+    const doc = await this.getDocument(paperlessId);
+    const existing = Array.isArray(doc.custom_fields)
+      ? [...doc.custom_fields]
+      : [];
+    const byField = new Map<number, { field: number; value: unknown }>();
+    for (const entry of existing) {
+      if (entry && typeof entry.field === "number") {
+        byField.set(entry.field, { field: entry.field, value: entry.value });
+      }
+    }
+    if (flags.bezahlt !== undefined && paidFieldId != null) {
+      byField.set(paidFieldId, { field: paidFieldId, value: flags.bezahlt });
+    }
+    if (flags.zuBezahlen !== undefined && toPayFieldId != null) {
+      byField.set(toPayFieldId, {
+        field: toPayFieldId,
+        value: flags.zuBezahlen,
+      });
+    }
+
+    return this.patchDocument(paperlessId, {
+      custom_fields: [...byField.values()],
+    });
   }
 
   /**

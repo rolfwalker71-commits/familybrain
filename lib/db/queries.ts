@@ -1020,9 +1020,10 @@ export function getDashboardInbox(limits = { each: 5 }) {
        WHERE f.due_date IS NOT NULL AND TRIM(f.due_date) != ''
          AND f.due_date <= ?
          AND f.due_date >= ?
-         AND COALESCE(f.counts_in_stats, 1) = 1
+         AND d.zu_bezahlen = 1
          AND COALESCE(d.bezahlt, 0) = 0
-       ORDER BY f.due_date DESC
+         AND COALESCE(d.sync_status, 'synced') != 'missing'
+       ORDER BY f.due_date ASC
        LIMIT ?`
     )
     .all(dueUntil, overdueSince, limit);
@@ -1210,6 +1211,54 @@ export function backfillPaymentFlagsFromRawMetadata(
   });
   tx();
   return updated;
+}
+
+/** Mark local documents as paid (and no longer «Zu bezahlen»). */
+export function setDocumentsPaidLocally(localIds: number[]): number {
+  if (localIds.length === 0) return 0;
+  const db = getDb();
+  const update = db.prepare(
+    `UPDATE paperless_documents
+     SET bezahlt = 1,
+         zu_bezahlen = 0,
+         updated_at = ?
+     WHERE id = ?`
+  );
+  const ts = nowIso();
+  let n = 0;
+  const tx = db.transaction(() => {
+    for (const id of localIds) {
+      const info = update.run(ts, id);
+      n += info.changes;
+    }
+  });
+  tx();
+  return n;
+}
+
+export function getDocumentsByLocalIds(localIds: number[]): Array<{
+  id: number;
+  paperless_id: number;
+  title: string | null;
+  zu_bezahlen: number | null;
+  bezahlt: number | null;
+}> {
+  if (localIds.length === 0) return [];
+  const db = getDb();
+  const placeholders = localIds.map(() => "?").join(",");
+  return db
+    .prepare(
+      `SELECT id, paperless_id, title, zu_bezahlen, bezahlt
+       FROM paperless_documents
+       WHERE id IN (${placeholders})`
+    )
+    .all(...localIds) as Array<{
+    id: number;
+    paperless_id: number;
+    title: string | null;
+    zu_bezahlen: number | null;
+    bezahlt: number | null;
+  }>;
 }
 
 export function updateDocumentEmbeddingStatus(
@@ -1470,11 +1519,15 @@ export function getFinanceOverview() {
 
   const dueInvoices = db
     .prepare(
-      `SELECT f.*, d.title as document_title, d.id as document_local_id
+      `SELECT f.*, d.title as document_title, d.id as document_local_id,
+              d.paperless_id, d.zu_bezahlen, d.bezahlt
        FROM financial_items f
        JOIN paperless_documents d ON d.id = f.document_id
        WHERE f.due_date IS NOT NULL AND TRIM(f.due_date) != ''
-       ORDER BY f.due_date DESC`
+         AND d.zu_bezahlen = 1
+         AND COALESCE(d.bezahlt, 0) = 0
+         AND COALESCE(d.sync_status, 'synced') != 'missing'
+       ORDER BY f.due_date ASC`
     )
     .all();
 
