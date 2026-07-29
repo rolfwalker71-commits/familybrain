@@ -140,9 +140,8 @@ export function RealtimeToasts() {
         const data = JSON.parse(String(ev.data)) as {
           at?: string;
           notification?: AppNotifyPayload;
-          document?: AppNotifyPayload;
         };
-        const n = data.notification || data.document;
+        const n = data.notification;
         if (n) pushToast(n, data.at || new Date().toISOString());
         if (n?.domain === "documents") onInbox();
       } catch {
@@ -152,12 +151,10 @@ export function RealtimeToasts() {
 
     es.addEventListener("inbox", onInbox);
     es.addEventListener("notify", onNotify);
-    es.addEventListener("document", onNotify);
 
     return () => {
       es.removeEventListener("inbox", onInbox);
       es.removeEventListener("notify", onNotify);
-      es.removeEventListener("document", onNotify);
       es.close();
     };
   }, [pushToast]);

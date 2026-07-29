@@ -45,7 +45,6 @@ export function notifyAppChange(
   };
 
   publishRealtime({ topic: "notify", at, notification });
-  publishRealtime({ topic: "document", at, document: notification });
 }
 
 export function getDocumentRealtimeSnapshot(localId: number): {
