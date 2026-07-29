@@ -18,6 +18,7 @@ import {
 
 const WRITEBACK_ENABLED_KEY = "paperless_writeback_enabled";
 const WEBHOOK_SECRET_KEY = "paperless_webhook_secret";
+const WEBHOOK_URL_KEY = "paperless_webhook_url";
 const LAST_WRITEBACK_ERROR_KEY = "paperless_writeback_last_error";
 
 export function isPaperlessWritebackEnabled(): boolean {
@@ -36,6 +37,16 @@ export function getPaperlessWebhookSecret(): string | null {
 
 export function setPaperlessWebhookSecret(secret: string | null): void {
   setSetting(WEBHOOK_SECRET_KEY, secret?.trim() || "");
+}
+
+/** Stored webhook URL for Paperless (often Docker-internal). */
+export function getPaperlessWebhookUrlSetting(): string | null {
+  return getSetting(WEBHOOK_URL_KEY)?.trim() || null;
+}
+
+export function setPaperlessWebhookUrl(url: string | null): void {
+  const normalized = url?.trim().replace(/\/$/, "") || "";
+  setSetting(WEBHOOK_URL_KEY, normalized);
 }
 
 export function getLastWritebackError(): string | null {

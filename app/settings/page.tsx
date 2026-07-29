@@ -334,6 +334,7 @@ function SettingsPageInner() {
           paperlessApiToken: apiToken || undefined,
           paperlessWritebackEnabled,
           documentAiIconsEnabled,
+          paperlessWebhookUrl: paperlessWebhookUrl.trim(),
           paperlessWebhookSecret: paperlessWebhookSecret || undefined,
         }),
       });
@@ -1159,6 +1160,7 @@ function SettingsPageInner() {
             <p className="text-xs text-muted-foreground">
               In Paperless Post-Consumption / Webhook hinterlegen. Header:{" "}
               <code className="rounded bg-muted px-1">X-Buddy-Webhook-Secret</code>
+              . Bei Docker auf demselben Host die interne Buddy-URL verwenden.
             </p>
             <div className="space-y-1">
               <Label htmlFor="webhookUrl" className="text-xs text-muted-foreground">
@@ -1167,9 +1169,9 @@ function SettingsPageInner() {
               <Input
                 id="webhookUrl"
                 className="rounded-xl font-mono text-xs"
-                readOnly
                 value={paperlessWebhookUrl}
-                onFocus={(e) => e.target.select()}
+                onChange={(e) => setPaperlessWebhookUrl(e.target.value)}
+                placeholder="http://buddy:3000/api/paperless/webhook"
               />
             </div>
             <div className="space-y-1">
@@ -1197,6 +1199,9 @@ function SettingsPageInner() {
             >
               Secret erzeugen
             </Button>
+            <p className="text-xs text-muted-foreground">
+              URL und Secret mit «Paperless speichern» übernehmen.
+            </p>
           </div>
 
           {paperlessCustomFieldChecklist.length > 0 ? (

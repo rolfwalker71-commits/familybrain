@@ -74,8 +74,10 @@ import {
 import {
   getLastWritebackError,
   getPaperlessWebhookSecret,
+  getPaperlessWebhookUrlSetting,
   isPaperlessWritebackEnabled,
   setPaperlessWebhookSecret,
+  setPaperlessWebhookUrl,
   setPaperlessWritebackEnabled,
 } from "@/lib/paperless/writeback";
 import {
@@ -93,12 +95,15 @@ export const dynamic = "force-dynamic";
 
 function paperlessIntegrationPayload(request?: Request) {
   const secret = getPaperlessWebhookSecret();
+  const storedWebhookUrl = getPaperlessWebhookUrlSetting();
+  const defaultWebhookUrl = absoluteAppUrl("/api/paperless/webhook", request);
   return {
     paperlessWritebackEnabled: isPaperlessWritebackEnabled(),
     paperlessWebhookSecret: secret,
     paperlessWebhookSecretMasked: maskToken(secret),
     hasPaperlessWebhookSecret: Boolean(secret),
-    paperlessWebhookUrl: absoluteAppUrl("/api/paperless/webhook", request),
+    paperlessWebhookUrl: storedWebhookUrl || defaultWebhookUrl,
+    paperlessWebhookUrlDefault: defaultWebhookUrl,
     paperlessWritebackLastError: getLastWritebackError(),
     paperlessCustomFieldChecklist: BUDDY_WRITEBACK_FIELD_CHECKLIST,
     documentAiIconsEnabled: isDocumentAiIconsEnabled(),
@@ -170,6 +175,7 @@ const PutSchema = z.object({
   paperlessPublicUrl: z.union([z.string().url(), z.literal("")]).optional(),
   paperlessApiToken: z.string().optional(),
   paperlessWritebackEnabled: z.boolean().optional(),
+  paperlessWebhookUrl: z.union([z.string().url(), z.literal("")]).optional(),
   paperlessWebhookSecret: z.string().max(200).nullable().optional(),
   generatePaperlessWebhookSecret: z.boolean().optional(),
   documentAiIconsEnabled: z.boolean().optional(),
@@ -257,6 +263,9 @@ export async function PUT(request: Request) {
 
   if (parsed.data.paperlessWritebackEnabled !== undefined) {
     setPaperlessWritebackEnabled(parsed.data.paperlessWritebackEnabled);
+  }
+  if (parsed.data.paperlessWebhookUrl !== undefined) {
+    setPaperlessWebhookUrl(parsed.data.paperlessWebhookUrl || null);
   }
   if (parsed.data.generatePaperlessWebhookSecret) {
     setPaperlessWebhookSecret(randomBytes(24).toString("hex"));
