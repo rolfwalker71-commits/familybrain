@@ -16,7 +16,12 @@ import {
   type OpenInvoiceCardModel,
 } from "@/components/finance/open-invoice-cards";
 import { formatCHF } from "@/lib/utils/format";
-import { toSwissDate } from "@/lib/utils/dates";
+import {
+  dueUrgency,
+  dueUrgencyTextClass,
+  formatDueRelative,
+  formatExpiryRelative,
+} from "@/lib/utils/due-urgency";
 
 type InboxPayload = {
   overdueDeadlines: Array<{
@@ -157,7 +162,13 @@ export function ActionInbox() {
                       >
                         <span className="font-medium">{row.title}</span>
                         <span className="mt-0.5 block text-xs text-muted-foreground">
-                          Fällig {toSwissDate(row.deadline_date)}
+                          <span
+                            className={dueUrgencyTextClass(
+                              dueUrgency(row.deadline_date)
+                            )}
+                          >
+                            {formatDueRelative(row.deadline_date)}
+                          </span>
                           <Badge
                             variant="secondary"
                             className="ml-2 bg-red-100 text-[10px] text-red-800"
@@ -195,8 +206,14 @@ export function ActionInbox() {
                           <span className="font-medium">
                             {row.vendor || row.document_title || "Rechnung"}
                           </span>
-                          <span className="mt-0.5 block text-xs text-muted-foreground">
-                            Fällig {toSwissDate(row.due_date)}
+                          <span className="mt-0.5 block text-xs">
+                            <span
+                              className={dueUrgencyTextClass(
+                                dueUrgency(row.due_date)
+                              )}
+                            >
+                              {formatDueRelative(row.due_date)}
+                            </span>
                           </span>
                         </span>
                         {row.amount != null ? (
@@ -234,7 +251,13 @@ export function ActionInbox() {
                           {row.product_name || row.vendor || "Garantie"}
                         </span>
                         <span className="mt-0.5 block text-xs text-muted-foreground">
-                          Bis {toSwissDate(row.warranty_until)}
+                          <span
+                            className={dueUrgencyTextClass(
+                              dueUrgency(row.warranty_until)
+                            )}
+                          >
+                            {formatExpiryRelative(row.warranty_until)}
+                          </span>
                         </span>
                       </Link>
                     </li>

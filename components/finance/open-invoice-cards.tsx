@@ -3,9 +3,13 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ExternalLink, FileText } from "lucide-react";
-import { toSwissDate } from "@/lib/utils/dates";
 import { formatCHF } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
+import {
+  dueUrgency,
+  dueUrgencyTextClass,
+  formatDueRelative,
+} from "@/lib/utils/due-urgency";
 
 export type OpenInvoiceCardModel = {
   id: number;
@@ -96,13 +100,16 @@ export function OpenInvoiceCard({ invoice }: { invoice: OpenInvoiceCardModel }) 
         {invoice.amount != null ? (
           <p className="text-[11px] font-semibold tabular-nums text-foreground">
             {formatCHF(invoice.amount, invoice.currency || "CHF")}
-            {invoice.due_date
-              ? ` · fällig ${toSwissDate(invoice.due_date)}`
-              : ""}
           </p>
-        ) : invoice.due_date ? (
-          <p className="text-[11px] text-muted-foreground">
-            Fällig {toSwissDate(invoice.due_date)}
+        ) : null}
+        {invoice.due_date ? (
+          <p
+            className={cn(
+              "text-[11px] font-medium",
+              dueUrgencyTextClass(dueUrgency(invoice.due_date))
+            )}
+          >
+            {formatDueRelative(invoice.due_date)}
           </p>
         ) : null}
       </div>

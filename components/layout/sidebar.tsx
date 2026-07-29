@@ -32,13 +32,10 @@ type NavItem = {
   icon: LucideIcon;
   tone: IconTone;
   countKey?:
-    | "totalDocuments"
     | "pendingCount"
-    | "knowledgeDocuments"
-    | "warrantiesTotal"
-    | "deadlinesOpen"
-    | "financialItemsTotal"
-    | "travelDocuments";
+    | "urgentDeadlinesCount"
+    | "warrantiesExpiringSoon"
+    | "openDueFinanceCount";
   /** Prefer pending styling when count is the analysis backlog */
   pendingStyle?: boolean;
 };
@@ -50,42 +47,39 @@ const navItems: NavItem[] = [
     label: "Dokumente",
     icon: Files,
     tone: "teal",
-    countKey: "totalDocuments",
   },
   {
     href: "/warranties",
     label: "Garantien",
     icon: Shield,
     tone: "teal",
-    countKey: "warrantiesTotal",
+    countKey: "warrantiesExpiringSoon",
   },
   {
     href: "/deadlines",
     label: "Fristen",
     icon: CalendarClock,
     tone: "teal",
-    countKey: "deadlinesOpen",
+    countKey: "urgentDeadlinesCount",
   },
   {
     href: "/finance",
     label: "Finanzen",
     icon: Wallet,
     tone: "green",
-    countKey: "financialItemsTotal",
+    countKey: "openDueFinanceCount",
   },
   {
     href: "/travel",
     label: "Reisen",
     icon: Plane,
     tone: "teal",
-    countKey: "travelDocuments",
   },
   {
     href: "/knowledge",
     label: "Wissen",
     icon: Brain,
     tone: "teal",
-    countKey: "knowledgeDocuments",
   },
   {
     href: "/trips",
@@ -219,9 +213,13 @@ export function Sidebar({
                   title={
                     item.countKey === "pendingCount"
                       ? "Ausstehende Analysen"
-                      : item.countKey === "deadlinesOpen"
-                        ? "Offene Fristen"
-                        : undefined
+                      : item.countKey === "urgentDeadlinesCount"
+                        ? "Dringende Fristen"
+                        : item.countKey === "warrantiesExpiringSoon"
+                          ? "Garantien bald ab"
+                          : item.countKey === "openDueFinanceCount"
+                            ? "Offene / fällige Rechnungen"
+                            : undefined
                   }
                 >
                   {formatCount(count)}

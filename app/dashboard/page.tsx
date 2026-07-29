@@ -5,19 +5,22 @@ import { UserAvatar } from "@/components/users/user-avatar";
 import Link from "next/link";
 import {
   FileText,
-  Clock3,
   CalendarDays,
   Shield,
-  TrendingUp,
   Wallet,
-  Plane,
   AlertCircle,
   Calendar,
   Sparkles,
+  Clock3,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { getDashboardStats, listDeadlines } from "@/lib/db/queries";
+import {
+  getDashboardInbox,
+  getDashboardStats,
+  listDeadlines,
+} from "@/lib/db/queries";
+import { buildDashboardBriefing } from "@/lib/dashboard/briefing";
 import { formatCHF } from "@/lib/utils/format";
 import { toSwissDate } from "@/lib/utils/dates";
 import { MetricGrid, PageHeader, MetricTile } from "@/components/layout/page-primitives";
@@ -58,8 +61,15 @@ function StatCard({
   );
 }
 
+function greetingForHour(hour: number): string {
+  if (hour < 11) return "Guten Morgen";
+  if (hour < 18) return "Guten Tag";
+  return "Guten Abend";
+}
+
 export default async function DashboardPage() {
   const stats = getDashboardStats();
+  const inbox = getDashboardInbox({ each: 3 });
   const auth = await getAuthContext();
   const user = auth?.userId
     ? getAppUserById(auth.userId)
@@ -68,6 +78,61 @@ export default async function DashboardPage() {
       : null;
   const welcomeName = user?.display_name || auth?.username || null;
   const welcomeAvatar = userAvatarPublicUrl(user?.avatar_path);
+  const greeting = greetingForHour(new Date().getHours());
+
+  const topUnpaid = inbox.openUnpaidInvoices[0] as
+    | {
+        vendor: string | null;
+        title: string | null;
+        amount: number | null;
+        currency: string | null;
+      }
+    | undefined;
+  const topDueExtract = inbox.dueInvoices[0] as
+    | {
+        vendor: string | null;
+        document_title: string | null;
+        amount: number | null;
+        currency: string | null;
+      }
+    | undefined;
+  const topWarranty = inbox.warrantiesExpiring[0] as
+    | {
+        product_name: string | null;
+        vendor: string | null;
+        warranty_until: string | null;
+      }
+    | undefined;
+
+  const briefing = buildDashboardBriefing(
+    {
+      openDueFinanceCount: stats.openDueFinanceCount,
+      openDueFinanceAmount: stats.openDueFinanceAmount,
+      overdueDeadlinesCount: stats.overdueDeadlinesCount,
+      deadlinesNext30Days: stats.deadlinesNext30Days,
+      warrantiesExpiringSoon: stats.warrantiesExpiringSoon,
+      pendingAnalysis: stats.pendingAnalysis,
+    },
+    {
+      topOpenInvoice: topUnpaid
+        ? {
+            vendor: topUnpaid.vendor,
+            title: topUnpaid.title,
+            amount: topUnpaid.amount,
+            currency: topUnpaid.currency,
+          }
+        : topDueExtract
+          ? {
+              vendor: topDueExtract.vendor,
+              title: topDueExtract.document_title,
+              amount: topDueExtract.amount,
+              currency: topDueExtract.currency,
+            }
+          : null,
+      topWarranty: topWarranty ?? null,
+    }
+  );
+
   const upcoming = (
     listDeadlines("open") as {
       id: number;
@@ -81,79 +146,101 @@ export default async function DashboardPage() {
     .filter((d) => d.deadline_date)
     .slice(0, 5);
 
+  const deadlineKpi =
+    stats.overdueDeadlinesCount > 0
+      ? `${stats.overdueDeadlinesCount} überfällig`
+      : stats.deadlinesNext30Days;
+
   return (
     <div className="min-w-0 space-y-6 pb-6 md:space-y-8">
-      {welcomeName ? (
-        <div className="flex items-center gap-3 rounded-2xl border border-border/60 bg-[var(--brand-finance-soft)]/50 px-4 py-3">
-          <UserAvatar name={welcomeName} src={welcomeAvatar} size="lg" />
-          <div className="min-w-0">
-            <p className="text-xs font-medium text-muted-foreground">Willkommen</p>
-            <p className="truncate text-lg font-semibold tracking-tight">
-              {welcomeName}
+      <div className="rounded-2xl border border-border/60 bg-[var(--brand-finance-soft)]/50 px-4 py-4 sm:px-5">
+        <div className="flex items-start gap-3">
+          {welcomeName ? (
+            <UserAvatar name={welcomeName} src={welcomeAvatar} size="lg" />
+          ) : null}
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-medium text-muted-foreground">
+              {greeting}
+              {welcomeName ? "," : ""}
             </p>
+            <p className="truncate text-lg font-semibold tracking-tight">
+              {welcomeName || "Dashboard"}
+            </p>
+            {briefing.length > 0 ? (
+              <div className="mt-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Heute relevant
+                </p>
+                <ul className="mt-1.5 space-y-1">
+                  {briefing.map((line) => (
+                    <li
+                      key={line}
+                      className="flex gap-2 text-sm text-foreground/90"
+                    >
+                      <span className="mt-2 size-1.5 shrink-0 rounded-full bg-[var(--brand-finance)]" />
+                      <span>{line}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <p className="mt-2 text-sm text-muted-foreground">
+                Aktuell nichts Dringendes.
+              </p>
+            )}
           </div>
         </div>
-      ) : null}
+      </div>
+
       <PageHeader
         title="Dashboard"
-        description="Überblick über deine Dokumente und Analysen"
+        description="Was jetzt zählt — und der Überblick darunter"
         icon={pageVisuals.dashboard.icon}
         tone={pageVisuals.dashboard.tone}
       />
 
-      <ActionInbox />
-
       <MetricGrid>
         <StatCard
-          title="Dokumente synchronisiert"
-          value={stats.totalDocuments}
-          icon={FileText}
-          tone="teal"
-          href="/documents"
+          title="Offene Beträge"
+          value={formatCHF(stats.openDueFinanceAmount)}
+          icon={Wallet}
+          tone="green"
+          href="/finance"
         />
         <StatCard
-          title="Analyse ausstehend"
-          value={stats.pendingAnalysis}
-          icon={Clock3}
-          tone="teal"
-          href="/documents?analysisStatus=pending"
-        />
-        <StatCard
-          title="Anstehende Fristen"
-          value={stats.upcomingDeadlines}
+          title="Fristen (30 Tage)"
+          value={deadlineKpi}
           icon={CalendarDays}
           tone="teal"
           href="/deadlines"
         />
         <StatCard
-          title="Garantien bald abgelaufen"
+          title="Garantien bald ab"
           value={stats.warrantiesExpiringSoon}
           icon={Shield}
           tone="teal"
           href="/warranties"
         />
-        <StatCard
-          title="Analysiert"
-          value={stats.analyzed}
-          icon={TrendingUp}
-          tone="teal"
-          href="/summaries"
-        />
-        <StatCard
-          title="Ausgaben dieses Jahr (ohne Unbekannt)"
-          value={formatCHF(stats.financialTotalThisYear)}
-          icon={Wallet}
-          tone="teal"
-          href="/finance"
-        />
-        <StatCard
-          title="Reiseunterlagen"
-          value={stats.travelDocuments}
-          icon={Plane}
-          tone="teal"
-          href="/travel"
-        />
+        {stats.pendingAnalysis > 0 ? (
+          <StatCard
+            title="Analyse ausstehend"
+            value={stats.pendingAnalysis}
+            icon={Clock3}
+            tone="teal"
+            href="/documents?analysisStatus=pending"
+          />
+        ) : (
+          <StatCard
+            title="Dokumente"
+            value={stats.totalDocuments}
+            icon={FileText}
+            tone="teal"
+            href="/documents"
+          />
+        )}
       </MetricGrid>
+
+      <ActionInbox />
 
       <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
         <Card tone="teal" className="min-w-0 overflow-hidden shadow-sm">

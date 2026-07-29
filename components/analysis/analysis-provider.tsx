@@ -18,8 +18,11 @@ type AnalysisStatus = {
   analyzedCount: number;
   totalDocuments: number;
   warrantiesTotal: number;
+  warrantiesExpiringSoon: number;
   deadlinesOpen: number;
+  urgentDeadlinesCount: number;
   financialItemsTotal: number;
+  openDueFinanceCount: number;
   travelDocuments: number;
   knowledgeDocuments: number;
   hasOpenAIKey: boolean;
@@ -56,8 +59,11 @@ const defaultStatus: AnalysisStatus = {
   analyzedCount: 0,
   totalDocuments: 0,
   warrantiesTotal: 0,
+  warrantiesExpiringSoon: 0,
   deadlinesOpen: 0,
+  urgentDeadlinesCount: 0,
   financialItemsTotal: 0,
+  openDueFinanceCount: 0,
   travelDocuments: 0,
   knowledgeDocuments: 0,
   hasOpenAIKey: false,
@@ -93,9 +99,18 @@ export function AnalysisProvider({ children }: { children: React.ReactNode }) {
         analyzedCount: Number(dash.analyzed ?? prev.analyzedCount),
         totalDocuments: Number(dash.totalDocuments ?? prev.totalDocuments),
         warrantiesTotal: Number(dash.warrantiesTotal ?? prev.warrantiesTotal),
+        warrantiesExpiringSoon: Number(
+          dash.warrantiesExpiringSoon ?? prev.warrantiesExpiringSoon
+        ),
         deadlinesOpen: Number(dash.deadlinesOpen ?? prev.deadlinesOpen),
+        urgentDeadlinesCount: Number(
+          dash.urgentDeadlinesCount ?? prev.urgentDeadlinesCount
+        ),
         financialItemsTotal: Number(
           dash.financialItemsTotal ?? prev.financialItemsTotal
+        ),
+        openDueFinanceCount: Number(
+          dash.openDueFinanceCount ?? prev.openDueFinanceCount
         ),
         travelDocuments: Number(dash.travelDocuments ?? prev.travelDocuments),
         knowledgeDocuments: Number(

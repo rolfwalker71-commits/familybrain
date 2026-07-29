@@ -39,9 +39,15 @@ import {
 } from "@/components/documents/document-link";
 import { FinanceStatsToggle } from "@/components/finance/finance-stats-toggle";
 import { formatCHF } from "@/lib/utils/format";
-import { daysAgo, toSwissDate } from "@/lib/utils/dates";
+import { daysAgo, daysFromNow, toSwissDate } from "@/lib/utils/dates";
+import {
+  dueUrgency,
+  dueUrgencyTextClass,
+  formatDueRelative,
+} from "@/lib/utils/due-urgency";
 import { compareNullableDate } from "@/lib/utils/list-sort";
 import { cn } from "@/lib/utils";
+import Link from "next/link";
 import {
   OverviewTabNav,
   parseOverviewTab,
@@ -180,17 +186,17 @@ function InvoiceListRow({
             {showDueDate ? (
               <span
                 className={cn(
-                  "tabular-nums",
-                  overdue && counted && "font-medium text-amber-800"
+                  "font-medium",
+                  dueUrgencyTextClass(dueUrgency(row.due_date, today))
                 )}
               >
-                Fällig {toSwissDate(row.due_date)}
+                {formatDueRelative(row.due_date, today)}
               </span>
             ) : null}
             {overdue ? (
               <Badge
                 variant="secondary"
-                className="bg-amber-100 text-amber-800"
+                className="bg-red-100 text-red-800"
               >
                 Überfällig
               </Badge>
@@ -285,13 +291,34 @@ function FinanceOverviewClientInner({
     [sortedDueInvoices, dueCutoff]
   );
 
+  const weekEnd = useMemo(() => daysFromNow(7), []);
+  const monthEnd = useMemo(() => daysFromNow(30), []);
+
+  const dueBuckets = useMemo(() => {
+    const overdue: InvoiceRow[] = [];
+    const week: InvoiceRow[] = [];
+    const month: InvoiceRow[] = [];
+    const later: InvoiceRow[] = [];
+    for (const row of recentDueInvoices) {
+      if (!row.due_date) continue;
+      if (row.due_date < today) overdue.push(row);
+      else if (row.due_date <= weekEnd) week.push(row);
+      else if (row.due_date <= monthEnd) month.push(row);
+      else later.push(row);
+    }
+    return { overdue, week, month, later };
+  }, [recentDueInvoices, today, weekEnd, monthEnd]);
+
+  const sumAmount = (rows: InvoiceRow[]) =>
+    rows.reduce((sum, r) => sum + (r.amount || 0), 0);
+
   const recentDueTotal = useMemo(
-    () => recentDueInvoices.reduce((sum, r) => sum + (r.amount || 0), 0),
+    () => sumAmount(recentDueInvoices),
     [recentDueInvoices]
   );
 
   const olderDueTotal = useMemo(
-    () => olderDueInvoices.reduce((sum, r) => sum + (r.amount || 0), 0),
+    () => sumAmount(olderDueInvoices),
     [olderDueInvoices]
   );
 
@@ -506,8 +533,8 @@ function FinanceOverviewClientInner({
                   Rechnungen mit Zahlungsfrist
                 </div>
                 <p className="mt-1 text-sm opacity-80">
-                  {recentDueInvoices.length} aktuell (≤ {DUE_VISIBILITY_DAYS}{" "}
-                  Tage) · {formatCHF(recentDueTotal)}
+                  Nach Dringlichkeit · {recentDueInvoices.length} aktuell ·{" "}
+                  {formatCHF(recentDueTotal)}
                   {olderDueInvoices.length > 0
                     ? ` · ${olderDueInvoices.length} ältere versteckt`
                     : ""}
@@ -530,7 +557,42 @@ function FinanceOverviewClientInner({
                   oder in der Zukunft.
                 </div>
               ) : (
-                <DueInvoiceList rows={recentDueInvoices} today={today} />
+                <div className="space-y-4 p-4">
+                  <DueBucketSection
+                    title="Überfällig"
+                    rows={dueBuckets.overdue}
+                    total={sumAmount(dueBuckets.overdue)}
+                    today={today}
+                    accent="red"
+                    defaultOpen
+                  />
+                  <DueBucketSection
+                    title="Nächste 7 Tage"
+                    rows={dueBuckets.week}
+                    total={sumAmount(dueBuckets.week)}
+                    today={today}
+                    accent="orange"
+                    defaultOpen
+                  />
+                  <DueBucketSection
+                    title="Nächste 30 Tage"
+                    rows={dueBuckets.month}
+                    total={sumAmount(dueBuckets.month)}
+                    today={today}
+                    accent="amber"
+                    defaultOpen
+                  />
+                  {dueBuckets.later.length > 0 ? (
+                    <DueBucketSection
+                      title="Später"
+                      rows={dueBuckets.later}
+                      total={sumAmount(dueBuckets.later)}
+                      today={today}
+                      accent="muted"
+                      defaultOpen={false}
+                    />
+                  ) : null}
+                </div>
               )}
 
               {olderDueInvoices.length > 0 ? (
@@ -919,5 +981,120 @@ function DueInvoiceList({
         />
       ))}
     </DataList>
+  );
+}
+
+function DueInvoiceCard({
+  row,
+  today,
+}: {
+  row: InvoiceRow;
+  today: string;
+}) {
+  const urgency = dueUrgency(row.due_date, today);
+  const vendor = row.vendor?.trim() || "Unbekannt";
+  const subtitle =
+    row.description || row.document_title || row.category || null;
+
+  return (
+    <article
+      className={cn(
+        "flex min-w-0 flex-col gap-1.5 rounded-xl border border-border/70 bg-card p-3.5 shadow-[0_4px_16px_rgba(20,32,28,0.05)]",
+        !isCountedInStats(row) && "opacity-60"
+      )}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <Link
+          href={`/documents/${row.document_local_id}`}
+          className="min-w-0 flex-1"
+        >
+          <p className="truncate text-sm font-semibold hover:underline">
+            {vendor}
+          </p>
+          <p className="mt-0.5 text-base font-bold tabular-nums tracking-tight">
+            {formatCHF(row.amount, row.currency || "CHF")}
+          </p>
+        </Link>
+        <DocumentInfoButton documentId={row.document_local_id} size="icon-sm" />
+      </div>
+      <p
+        className={cn(
+          "text-xs font-semibold",
+          dueUrgencyTextClass(urgency)
+        )}
+      >
+        {formatDueRelative(row.due_date, today)}
+      </p>
+      {subtitle ? (
+        <p className="line-clamp-2 text-xs text-muted-foreground">{subtitle}</p>
+      ) : null}
+      <div className="mt-auto flex items-center justify-end pt-1">
+        <FinanceStatsToggle
+          key={`${row.id}-${isCountedInStats(row) ? 1 : 0}`}
+          itemId={row.id}
+          countsInStats={isCountedInStats(row)}
+        />
+      </div>
+    </article>
+  );
+}
+
+function DueBucketSection({
+  title,
+  rows,
+  total,
+  today,
+  accent,
+  defaultOpen,
+}: {
+  title: string;
+  rows: InvoiceRow[];
+  total: number;
+  today: string;
+  accent: "red" | "orange" | "amber" | "muted";
+  defaultOpen: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  if (rows.length === 0) return null;
+
+  const accentClass =
+    accent === "red"
+      ? "text-red-800"
+      : accent === "orange"
+        ? "text-orange-800"
+        : accent === "amber"
+          ? "text-amber-900"
+          : "text-foreground";
+
+  return (
+    <section className="min-w-0 rounded-xl border border-border/60 bg-background/60">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center gap-2 px-3 py-2.5 text-left"
+        aria-expanded={open}
+      >
+        <ChevronDown
+          className={cn(
+            "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
+            !open && "-rotate-90"
+          )}
+        />
+        <div className="min-w-0 flex-1">
+          <p className={cn("text-sm font-bold", accentClass)}>{title}</p>
+          <p className="text-xs text-muted-foreground">
+            {rows.length}{" "}
+            {rows.length === 1 ? "Rechnung" : "Rechnungen"} · {formatCHF(total)}
+          </p>
+        </div>
+      </button>
+      {open ? (
+        <div className="grid grid-cols-1 gap-2.5 border-t border-border/50 p-3 sm:grid-cols-2 xl:grid-cols-3">
+          {rows.map((row) => (
+            <DueInvoiceCard key={row.id} row={row} today={today} />
+          ))}
+        </div>
+      ) : null}
+    </section>
   );
 }
