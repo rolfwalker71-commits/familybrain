@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { ensureInitialized } from "@/lib/db/migrations";
 import { ingestPaperlessDocumentById } from "@/lib/paperless/sync";
 import { extractPaperlessWebhookDocumentId } from "@/lib/paperless/webhook-parse";
@@ -6,6 +6,8 @@ import { getPaperlessWebhookSecret } from "@/lib/paperless/writeback";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+/** Ingest + optional AI can take minutes; Paperless webhook clients time out earlier. */
+export const maxDuration = 300;
 
 async function parseWebhookBody(request: Request): Promise<unknown> {
   const ct = request.headers.get("content-type") || "";
@@ -58,6 +60,25 @@ function bodyDebug(body: unknown): Record<string, unknown> {
   return { bodyType: Array.isArray(body) ? "array" : typeof body };
 }
 
+async function ingestAndMaybeAnalyze(paperlessId: number): Promise<void> {
+  const ingested = await ingestPaperlessDocumentById(paperlessId);
+  try {
+    const { listPendingDocumentIds } = await import("@/lib/db/queries");
+    const pending = listPendingDocumentIds(50);
+    if (!pending.includes(ingested.localId)) return;
+    const { analyzeDocument } = await import("@/lib/ai/analyze-document");
+    await analyzeDocument(ingested.localId, {
+      manageErrorStatus: true,
+    });
+  } catch (analyzeErr) {
+    console.error(
+      "[paperless webhook] analyze",
+      paperlessId,
+      analyzeErr instanceof Error ? analyzeErr.message : analyzeErr
+    );
+  }
+}
+
 export async function POST(request: Request) {
   ensureInitialized();
   const expected = getPaperlessWebhookSecret();
@@ -100,32 +121,22 @@ export async function POST(request: Request) {
     );
   }
 
-  try {
-    const ingested = await ingestPaperlessDocumentById(paperlessId);
-    // Best-effort analyze if pending
+  // Answer immediately — Paperless webhook timeout is short; analysis is slow.
+  after(async () => {
     try {
-      const { listPendingDocumentIds } = await import("@/lib/db/queries");
-      const pending = listPendingDocumentIds(50);
-      if (pending.includes(ingested.localId)) {
-        const { analyzeDocument } = await import("@/lib/ai/analyze-document");
-        await analyzeDocument(ingested.localId, {
-          manageErrorStatus: true,
-        });
-      }
-    } catch (analyzeErr) {
+      await ingestAndMaybeAnalyze(paperlessId);
+      console.info("[paperless webhook] done", { paperlessId });
+    } catch (err) {
       console.error(
-        "[paperless webhook] analyze",
-        analyzeErr instanceof Error ? analyzeErr.message : analyzeErr
+        "[paperless webhook] background",
+        paperlessId,
+        err instanceof Error ? err.message : err
       );
     }
-    return NextResponse.json({
-      ok: true,
-      localId: ingested.localId,
-      paperlessId: ingested.paperlessId,
-    });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error("[paperless webhook]", message);
-    return NextResponse.json({ error: message }, { status: 500 });
-  }
+  });
+
+  return NextResponse.json(
+    { ok: true, accepted: true, paperlessId },
+    { status: 202 }
+  );
 }
