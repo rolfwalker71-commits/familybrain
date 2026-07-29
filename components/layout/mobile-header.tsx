@@ -3,7 +3,14 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BookOpen, HandCoins, Luggage, Menu } from "lucide-react";
+import {
+  BookOpen,
+  Brain,
+  HandCoins,
+  LayoutGrid,
+  Luggage,
+  Menu,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -13,6 +20,8 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { useAdminNav } from "@/components/layout/admin-nav-provider";
+import { inferAdminNavMode } from "@/lib/navigation/admin-nav";
 import { Sidebar } from "./sidebar";
 
 type Brand = {
@@ -23,11 +32,11 @@ type Brand = {
   iconWrapClass: string;
 };
 
-function brandForPath(pathname: string): Brand {
-  if (
-    pathname === "/finance-brain" ||
-    pathname.startsWith("/finance-brain/")
-  ) {
+function brandForAdminMode(
+  mode: "home" | "mybrain" | "travelbuddy" | "finanzbuddy",
+  pathname: string
+): Brand {
+  if (mode === "finanzbuddy") {
     return {
       name: "FinanzBuddy",
       href: "/finance-brain",
@@ -37,7 +46,7 @@ function brandForPath(pathname: string): Brand {
         "bg-[var(--brand-finance)] text-white shadow-sm shadow-[var(--brand-finance)]/30",
     };
   }
-  if (pathname === "/trips" || pathname.startsWith("/trips/")) {
+  if (mode === "travelbuddy") {
     return {
       name: "TravelBuddy",
       href: "/trips",
@@ -46,6 +55,34 @@ function brandForPath(pathname: string): Brand {
       iconWrapClass:
         "bg-[var(--brand-finance)] text-white shadow-sm shadow-[var(--brand-finance)]/30",
     };
+  }
+  if (mode === "mybrain") {
+    return {
+      name: "MyBrain",
+      href: "/dashboard",
+      icon: Brain,
+      accentClass: "text-[var(--brand-docs)]",
+      iconWrapClass:
+        "bg-[var(--brand-docs)] text-white shadow-sm shadow-[var(--brand-docs)]/30",
+    };
+  }
+  return {
+    name: "BuddyApp",
+    href: "/dashboard",
+    icon: LayoutGrid,
+    accentClass: "text-[var(--brand-docs)]",
+    iconWrapClass:
+      "bg-[var(--brand-docs)] text-white shadow-sm shadow-[var(--brand-docs)]/30",
+  };
+}
+
+function brandForPath(pathname: string): Brand {
+  const mode = inferAdminNavMode(pathname);
+  if (mode === "finanzbuddy") {
+    return brandForAdminMode("finanzbuddy", pathname);
+  }
+  if (mode === "travelbuddy") {
+    return brandForAdminMode("travelbuddy", pathname);
   }
   return {
     name: "TripBook",
@@ -60,7 +97,10 @@ function brandForPath(pathname: string): Brand {
 export function MobileHeader() {
   const [open, setOpen] = useState(false);
   const pathname = usePathname() || "/";
-  const brand = brandForPath(pathname);
+  const { mode, goHome, isAdminNav } = useAdminNav();
+  const brand = isAdminNav
+    ? brandForAdminMode(mode, pathname)
+    : brandForPath(pathname);
   const BrandIcon = brand.icon;
 
   return (
@@ -84,7 +124,9 @@ export function MobileHeader() {
         >
           <SheetHeader className="sr-only">
             <SheetTitle>Navigation</SheetTitle>
-            <SheetDescription>TripBook Hauptnavigation</SheetDescription>
+            <SheetDescription>
+              {isAdminNav ? "BuddyApp Hauptnavigation" : "TripBook Hauptnavigation"}
+            </SheetDescription>
           </SheetHeader>
           <Sidebar className="w-full" onNavigate={() => setOpen(false)} />
         </SheetContent>
@@ -94,6 +136,15 @@ export function MobileHeader() {
         href={brand.href}
         className="absolute left-1/2 flex min-h-11 -translate-x-1/2 items-center gap-2 rounded-lg"
         aria-label={`${brand.name} öffnen`}
+        onClick={(e) => {
+          if (!isAdminNav) return;
+          if (mode === "home") return;
+          if (brand.name === "BuddyApp" || brand.name === "MyBrain") {
+            // tapping brand while in a section: go to BuddyApp home
+            e.preventDefault();
+            goHome();
+          }
+        }}
       >
         <span
           className={`flex size-9 items-center justify-center rounded-full ${brand.iconWrapClass}`}

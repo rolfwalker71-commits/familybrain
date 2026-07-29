@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { AnalysisProvider } from "@/components/analysis/analysis-provider";
 import { AnalysisStatusBar } from "@/components/analysis/analysis-status-bar";
 import { AuthProvider, useAuth } from "@/components/auth/auth-provider";
+import { AdminNavProvider } from "@/components/layout/admin-nav-provider";
 import { MobileHeader } from "./mobile-header";
 import { Sidebar } from "./sidebar";
 
@@ -12,7 +13,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <AuthProvider>
       <AnalysisProvider>
-        <AppShellInner>{children}</AppShellInner>
+        <AdminNavProvider>
+          <AppShellInner>{children}</AppShellInner>
+        </AdminNavProvider>
       </AnalysisProvider>
     </AuthProvider>
   );
