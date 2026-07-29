@@ -15,10 +15,19 @@ import {
   LayoutDashboard,
   List,
   PieChart,
+  Search,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import {
   DataList,
   DataListRow,
@@ -268,6 +277,10 @@ function FinanceOverviewClientInner({
 
   const [dimension, setDimension] = useState<Dimension | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
+  const [breakdownSearch, setBreakdownSearch] = useState("");
+  const [breakdownSort, setBreakdownSort] = useState<"amount" | "name">(
+    "amount"
+  );
   const [dueOpen, setDueOpen] = useState(true);
   const [olderDueOpen, setOlderDueOpen] = useState(false);
   const [sortDir, setSortDir] = useListSortDir("finance-due", "desc");
@@ -383,6 +396,23 @@ function FinanceOverviewClientInner({
 
   const activeItems = dimension ? dimensionMeta[dimension].items : [];
   const activeTotal = totals.total;
+
+  const filteredBreakdownItems = useMemo(() => {
+    const q = breakdownSearch.trim().toLowerCase();
+    let rows = activeItems;
+    if (q) {
+      rows = rows.filter((item) => item.label.toLowerCase().includes(q));
+    }
+    const sorted = [...rows];
+    if (breakdownSort === "name") {
+      sorted.sort((a, b) =>
+        a.label.localeCompare(b.label, "de-CH", { sensitivity: "base" })
+      );
+    } else {
+      sorted.sort((a, b) => b.total - a.total);
+    }
+    return sorted;
+  }, [activeItems, breakdownSearch, breakdownSort]);
 
   const selectedRow = useMemo(() => {
     if (!dimension || !selected) return null;
@@ -530,6 +560,8 @@ function FinanceOverviewClientInner({
       return nextDim;
     });
     setSelected(null);
+    setBreakdownSearch("");
+    setBreakdownSort("amount");
   }
 
   return (
@@ -879,6 +911,7 @@ function FinanceOverviewClientInner({
 
       {activeTab === "breakdown" ? (
         dimension ? (
+        <>
         <Card
           tone={dimensionMeta[dimension].tone}
           className="min-w-0 overflow-hidden shadow-sm"
@@ -892,7 +925,8 @@ function FinanceOverviewClientInner({
                 {dimensionMeta[dimension].title}
               </CardTitle>
               <p className="mt-1 text-sm text-muted-foreground">
-                Kachel wählen für Detailansicht
+                Tippen öffnet die Details im Seitenpanel — Suche findet Einträge
+                sofort.
               </p>
             </div>
             <Button
@@ -901,136 +935,189 @@ function FinanceOverviewClientInner({
               onClick={() => {
                 setDimension(null);
                 setSelected(null);
+                setBreakdownSearch("");
               }}
             >
               Schliessen
             </Button>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3">
             {activeItems.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 {dimensionMeta[dimension].empty}
               </p>
             ) : (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                {activeItems.map((item) => {
-                  const share = percent(item.total, activeTotal);
-                  const isSelected = selected === item.label;
-                  const dimTone = dimensionMeta[dimension].tone;
-                  const itemSurface = toneSurface(dimTone);
-                  return (
-                    <button
-                      key={item.label}
-                      type="button"
-                      onClick={() =>
-                        setSelected(isSelected ? null : item.label)
+              <>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <div className="relative min-w-0 flex-1">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      value={breakdownSearch}
+                      onChange={(e) => setBreakdownSearch(e.target.value)}
+                      placeholder={
+                        dimension === "vendor"
+                          ? "Lieferant suchen…"
+                          : dimension === "year"
+                            ? "Jahr suchen…"
+                            : "Kategorie suchen…"
                       }
+                      className="rounded-xl pl-9"
+                      aria-label="Suchen"
+                    />
+                  </div>
+                  <div className="flex shrink-0 gap-1">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={
+                        breakdownSort === "amount" ? "default" : "outline"
+                      }
+                      className={
+                        breakdownSort === "amount"
+                          ? "bg-[var(--brand-finance)] text-white hover:bg-[var(--brand-finance)]/90"
+                          : undefined
+                      }
+                      onClick={() => setBreakdownSort("amount")}
+                    >
+                      Betrag
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={breakdownSort === "name" ? "default" : "outline"}
+                      className={
+                        breakdownSort === "name"
+                          ? "bg-[var(--brand-finance)] text-white hover:bg-[var(--brand-finance)]/90"
+                          : undefined
+                      }
+                      onClick={() => setBreakdownSort("name")}
+                    >
+                      A–Z
+                    </Button>
+                  </div>
+                </div>
+
+                <p className="text-xs text-muted-foreground">
+                  {filteredBreakdownItems.length} von {activeItems.length} ·{" "}
+                  {dimensionMeta[dimension].hint}
+                </p>
+
+                {filteredBreakdownItems.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    Keine Treffer für «{breakdownSearch.trim()}».
+                  </p>
+                ) : (
+                  <ul className="divide-y divide-border/60 overflow-hidden rounded-xl border border-border/60">
+                    {filteredBreakdownItems.map((item) => {
+                      const share = percent(item.total, activeTotal);
+                      const isSelected = selected === item.label;
+                      return (
+                        <li key={item.label}>
+                          <button
+                            type="button"
+                            onClick={() => setSelected(item.label)}
+                            className={cn(
+                              "flex w-full min-w-0 items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-[var(--brand-finance-soft)]/50",
+                              isSelected && "bg-[var(--brand-finance-soft)]/70"
+                            )}
+                          >
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-sm font-medium text-foreground">
+                                {item.label}
+                              </span>
+                              <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                                {item.count} Positionen · {share}%
+                              </span>
+                            </span>
+                            <span className="shrink-0 text-sm font-semibold tabular-nums text-foreground">
+                              {formatCHF(item.total)}
+                            </span>
+                            <ChevronRight className="size-4 shrink-0 text-[var(--brand-finance)]" />
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        <Sheet
+          open={Boolean(selected)}
+          onOpenChange={(open) => {
+            if (!open) setSelected(null);
+          }}
+        >
+          <SheetContent
+            side="right"
+            className="w-full gap-0 overflow-hidden p-0 sm:max-w-xl"
+          >
+            <SheetHeader className="border-b border-border/60 pr-12">
+              <SheetTitle className="break-words">
+                {selectedRow?.label || "Details"}
+              </SheetTitle>
+              <SheetDescription>
+                {selectedRow
+                  ? `${selectedRow.count} Positionen · ${formatCHF(selectedRow.total)} · ${
+                      detailGroupBy === "year" ? "nach Jahr" : "nach Lieferant"
+                    }`
+                  : "Belege zur Auswahl"}
+              </SheetDescription>
+            </SheetHeader>
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              {!selectedRow || detailGroups.length === 0 ? (
+                <p className="p-4 text-sm text-muted-foreground">
+                  Keine Positionen für diese Auswahl.
+                </p>
+              ) : (
+                <div className="space-y-3 p-4">
+                  {detailGroups.map((group) => (
+                    <div
+                      key={group.key}
                       className={cn(
-                        "min-w-0 overflow-hidden rounded-xl border text-left shadow-[0_4px_16px_rgba(20,32,28,0.05)] transition-colors",
-                        itemSurface.body,
-                        isSelected
-                          ? "border-[var(--brand-finance)] ring-2 ring-[var(--brand-finance)]/20"
-                          : "border-border/60 hover:border-[var(--brand-finance)]/40"
+                        "overflow-hidden rounded-xl border border-border/60",
+                        toneSurface(dimensionMeta[dimension].tone).body
                       )}
                     >
                       <TileTitleBar
-                        tone={dimTone}
+                        tone={dimensionMeta[dimension].tone}
                         trailing={
-                          <Badge variant="secondary" className="shrink-0">
-                            {item.count}
-                          </Badge>
+                          <>
+                            <Badge variant="secondary" className="shrink-0">
+                              {group.rows.length}
+                            </Badge>
+                            <span className="text-sm font-semibold tabular-nums">
+                              {formatCHF(group.total)}
+                            </span>
+                          </>
                         }
                       >
-                        <span className="break-words">{item.label}</span>
+                        <span className="break-words">{group.label}</span>
                       </TileTitleBar>
-                      <div className="p-4">
-                        <div className="text-xl font-semibold tabular-nums">
-                          {formatCHF(item.total)}
-                        </div>
-                        <div className="mt-1 text-xs text-muted-foreground">
-                          {share}% der Gesamtausgaben (ohne Unbekannt)
-                        </div>
-                        <ShareBar value={share} />
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {selectedRow ? (
-              <div
-                className={cn(
-                  "overflow-hidden rounded-xl border border-border/60",
-                  toneSurface(dimensionMeta[dimension].tone).body
-                )}
-              >
-                <TileTitleBar tone={dimensionMeta[dimension].tone}>
-                  <div className="min-w-0">
-                    <div className="break-words">{selectedRow.label}</div>
-                    <p className="mt-0.5 text-xs font-normal opacity-80">
-                      {selectedRow.count} Positionen ·{" "}
-                      {formatCHF(selectedRow.total)} ·{" "}
-                      {detailGroupBy === "year"
-                        ? "nach Jahr"
-                        : "nach Lieferant"}
-                    </p>
-                  </div>
-                </TileTitleBar>
-
-                {detailGroups.length === 0 ? (
-                  <p className="p-4 text-sm text-muted-foreground">
-                    Keine Positionen für diese Auswahl.
-                  </p>
-                ) : (
-                  <div className="space-y-3 p-4">
-                    {detailGroups.map((group) => (
-                      <div
-                        key={group.key}
-                        className={cn(
-                          "overflow-hidden rounded-xl border border-border/60",
-                          toneSurface(dimensionMeta[dimension].tone).body
-                        )}
-                      >
-                        <TileTitleBar
-                          tone={dimensionMeta[dimension].tone}
-                          trailing={
-                            <>
-                              <Badge variant="secondary" className="shrink-0">
-                                {group.rows.length}
-                              </Badge>
-                              <span className="text-sm font-semibold tabular-nums">
-                                {formatCHF(group.total)}
-                              </span>
-                            </>
-                          }
-                        >
-                          <span className="break-words">{group.label}</span>
-                        </TileTitleBar>
-                        <DataList>
-                          {group.rows.map((row) => (
-                            <InvoiceListRow
-                              key={row.id}
-                              row={row}
-                              showDueDate
-                              showCalendar
-                              today={today}
-                              titleField={
-                                detailGroupBy === "vendor"
-                                  ? "document"
-                                  : "vendor"
-                              }
-                            />
-                          ))}
-                        </DataList>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ) : null}
-          </CardContent>
-        </Card>
+                      <DataList>
+                        {group.rows.map((row) => (
+                          <InvoiceListRow
+                            key={row.id}
+                            row={row}
+                            showDueDate
+                            showCalendar
+                            today={today}
+                            titleField={
+                              detailGroupBy === "vendor" ? "document" : "vendor"
+                            }
+                          />
+                        ))}
+                      </DataList>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </SheetContent>
+        </Sheet>
+        </>
       ) : (
           <Card className="border-border/80 shadow-sm">
             <CardContent className="py-6 text-sm text-muted-foreground">
