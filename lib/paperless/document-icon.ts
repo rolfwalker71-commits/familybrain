@@ -8,8 +8,8 @@ import { getDocumentById, type PaperlessDocumentRow } from "@/lib/db/queries";
 import { getTripsDataRoot } from "@/lib/trips/paths";
 import { nowIso } from "@/lib/utils/dates";
 
-/** Cheapest OpenAI image model that can do icon-style generation. */
-export const DOCUMENT_AI_ICON_MODEL = "gpt-image-1-mini";
+/** Document list thumbnails — gpt-image-1.5 for reliable color + prompt adherence. */
+export const DOCUMENT_AI_ICON_MODEL = "gpt-image-1.5";
 
 export function getDocumentAiIconDir(): string {
   return path.join(getTripsDataRoot(), "document-ai-icons");
@@ -82,8 +82,10 @@ export function buildDocumentAiIconPrompt(input: {
   return [
     "Tiny square app icon illustration (not photorealistic) for a household document archive.",
     `Subject: ${subjectParts.join("; ")}.`,
-    "Style: clean flat vector icon, soft sage-green and cream palette, simple recognizable symbol,",
-    "centered, generous padding, no text, no logos, no watermarks, no receipt UI, no photorealism.",
+    "Style: cheerful colorful flat illustration, bright varied hues matching the subject,",
+    "solid pure white background (#FFFFFF) filling the entire square — never black, never dark, never gray.",
+    "Centered recognizable symbol with soft shading, generous padding,",
+    "no text, no letters, no numbers, no logos, no watermarks, no receipt UI, no photorealism.",
     "Suitable as a 48px list thumbnail.",
   ].join(" ");
 }
