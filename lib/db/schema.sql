@@ -26,6 +26,8 @@ CREATE TABLE IF NOT EXISTS paperless_documents (
   raw_metadata TEXT,
   zu_bezahlen INTEGER,
   bezahlt INTEGER,
+  ai_icon_path TEXT,
+  ai_icon_prompt TEXT,
   sync_status TEXT DEFAULT 'synced',
   last_synced_at TEXT,
   created_at TEXT NOT NULL,

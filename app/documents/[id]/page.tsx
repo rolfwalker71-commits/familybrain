@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { DocumentDetailClient } from "@/components/documents/document-detail-client";
 import { getDocumentById } from "@/lib/db/queries";
+import { documentAiIconPublicUrl } from "@/lib/paperless/document-icon";
 
 export const dynamic = "force-dynamic";
 
@@ -14,5 +15,15 @@ export default async function DocumentDetailPage({ params }: Props) {
   const detail = getDocumentById(numericId);
   if (!detail) notFound();
 
-  return <DocumentDetailClient detail={detail} />;
+  return (
+    <DocumentDetailClient
+      detail={{
+        ...detail,
+        document: {
+          ...detail.document,
+          ai_icon_url: documentAiIconPublicUrl(detail.document.ai_icon_path),
+        },
+      }}
+    />
+  );
 }

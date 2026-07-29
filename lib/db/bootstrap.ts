@@ -87,6 +87,7 @@ export function bootstrapDatabase(db: Database.Database): void {
 
   ensureExtractOverrideColumns(db);
   ensurePaymentCustomFieldColumns(db);
+  ensureDocumentAiIconColumns(db);
 
   const insertArea = db.prepare(
     `INSERT OR IGNORE INTO knowledge_areas (name, description) VALUES (?, ?)`
@@ -157,6 +158,19 @@ function ensurePaymentCustomFieldColumns(db: Database.Database): void {
     `CREATE INDEX IF NOT EXISTS idx_docs_payment_flags
      ON paperless_documents(zu_bezahlen, bezahlt)`
   );
+}
+
+function ensureDocumentAiIconColumns(db: Database.Database): void {
+  const cols = db
+    .prepare(`PRAGMA table_info(paperless_documents)`)
+    .all() as Array<{ name: string }>;
+  const names = new Set(cols.map((c) => c.name));
+  if (!names.has("ai_icon_path")) {
+    db.exec(`ALTER TABLE paperless_documents ADD COLUMN ai_icon_path TEXT`);
+  }
+  if (!names.has("ai_icon_prompt")) {
+    db.exec(`ALTER TABLE paperless_documents ADD COLUMN ai_icon_prompt TEXT`);
+  }
 }
 
 function ensureTripsTables(db: Database.Database): void {

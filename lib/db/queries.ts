@@ -1,3 +1,4 @@
+import fs from "fs";
 import { getDb } from "./client";
 import { getSetting, setSetting } from "./migrations";
 import { daysFromNow, daysAgo, currentYear, nowIso } from "@/lib/utils/dates";
@@ -47,6 +48,8 @@ export type PaperlessDocumentRow = {
   raw_metadata: string | null;
   zu_bezahlen?: number | null;
   bezahlt?: number | null;
+  ai_icon_path?: string | null;
+  ai_icon_prompt?: string | null;
   sync_status: string | null;
   last_synced_at: string | null;
   created_at: string;
@@ -375,6 +378,19 @@ export function upsertDocument(input: {
       replaceTags(existing.id, input.tags);
       if (contentChanged) {
         markSummaryStale(existing.id);
+        const oldIcon = existing.ai_icon_path;
+        if (oldIcon) {
+          db.prepare(
+            `UPDATE paperless_documents
+             SET ai_icon_path = NULL, ai_icon_prompt = NULL
+             WHERE id = ?`
+          ).run(existing.id);
+          try {
+            if (fs.existsSync(oldIcon)) fs.unlinkSync(oldIcon);
+          } catch {
+            /* ignore */
+          }
+        }
       } else if (metadataChanged && !paymentChanged) {
         markSummaryStale(existing.id);
       }

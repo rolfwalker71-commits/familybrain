@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { CalendarDays, ChevronRight, Filter, Search } from "lucide-react";
+import { CalendarDays, ChevronRight, Filter, Search, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -34,8 +34,10 @@ import {
   knowledgeVisual,
   pageVisuals,
 } from "@/components/layout/icon-circle";
+import { AiImagePreview } from "@/components/layout/ai-image-preview";
 import { FilterChip, SoftFab } from "@/components/layout/soft-ui";
 import { toSwissDate } from "@/lib/utils/dates";
+import { readNdjsonStream } from "@/lib/utils/stream";
 import {
   ListSortControl,
   useListSortDir,
@@ -45,7 +47,6 @@ import {
   DocumentTitleLink,
 } from "@/components/documents/document-link";
 import Link from "next/link";
-import { cn } from "@/lib/utils";
 
 type DocRow = {
   id: number;
@@ -56,6 +57,7 @@ type DocRow = {
   category?: string | null;
   analysis_status?: string | null;
   sync_status: string | null;
+  ai_icon_url?: string | null;
 };
 
 type Filters = {
@@ -124,6 +126,11 @@ export function DocumentsClient() {
   const [error, setError] = useState<string | null>(null);
   const [analyzingId, setAnalyzingId] = useState<number | null>(null);
   const [searchFocus, setSearchFocus] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [missingAiIcons, setMissingAiIcons] = useState(0);
+  const [iconBusy, setIconBusy] = useState(false);
+  const [iconProgress, setIconProgress] = useState<string | null>(null);
+  const [zoomUrl, setZoomUrl] = useState<string | null>(null);
   const requestIdRef = useRef(0);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -189,6 +196,7 @@ export function DocumentsClient() {
       if (requestId !== requestIdRef.current) return;
       setDocs(data.documents || []);
       setTotal(Number(data.total) || 0);
+      setMissingAiIcons(Number(data.missingAiIcons) || 0);
       setFilters({
         correspondents: data.filters?.correspondents || [],
         documentTypes: data.filters?.documentTypes || [],
@@ -257,6 +265,131 @@ export function DocumentsClient() {
     } finally {
       setAnalyzingId(null);
     }
+  }
+
+  function toggleSelected(id: number) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAllVisible() {
+    const ids = docs.map((d) => d.id);
+    const allSelected = ids.length > 0 && ids.every((id) => selectedIds.has(id));
+    if (allSelected) {
+      setSelectedIds(new Set());
+      return;
+    }
+    setSelectedIds(new Set(ids));
+  }
+
+  async function runAiIconBatch(mode: "selected" | "all-missing") {
+    if (!hasOpenAIKey) {
+      setError("OpenAI-Key fehlt.");
+      return;
+    }
+    const documentIds =
+      mode === "selected" ? Array.from(selectedIds) : undefined;
+    if (mode === "selected" && (!documentIds || documentIds.length === 0)) {
+      setError("Bitte zuerst Dokumente auswählen.");
+      return;
+    }
+
+    setIconBusy(true);
+    setError(null);
+    setIconProgress("Starte AI-Icons…");
+    try {
+      let afterId = 0;
+      let totalSucceeded = 0;
+      let totalFailed = 0;
+      let done = false;
+
+      while (!done) {
+        const res = await fetch("/api/documents/ai-icons/batch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            limit: 10,
+            afterId,
+            ...(documentIds ? { documentIds } : {}),
+          }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || "Icon-Batch fehlgeschlagen");
+        }
+
+        let batchDone = true;
+        let nextAfterId = afterId;
+        let streamError: string | null = null;
+
+        await readNdjsonStream(res, (event) => {
+          if (event.type === "progress") {
+            setIconProgress(
+              `Icons: ${Number(event.succeeded || 0) + totalSucceeded} ok` +
+                (Number(event.failed || 0) + totalFailed > 0
+                  ? `, ${Number(event.failed || 0) + totalFailed} Fehler`
+                  : "")
+            );
+          } else if (event.type === "done") {
+            const processed = Number(event.processed || 0);
+            const succeeded = Number(event.succeeded || 0);
+            const failedList = Array.isArray(event.failed) ? event.failed : [];
+            totalSucceeded += succeeded;
+            totalFailed += failedList.length;
+            nextAfterId = Number(event.nextAfterId ?? afterId);
+            batchDone = Boolean(event.done) || processed === 0;
+            if (typeof event.missingRemaining === "number") {
+              setMissingAiIcons(Number(event.missingRemaining));
+            }
+            setIconProgress(
+              `Icons: ${totalSucceeded} ok` +
+                (totalFailed > 0 ? `, ${totalFailed} Fehler` : "")
+            );
+          } else if (event.type === "error") {
+            streamError = String(event.error || "Icon-Batch fehlgeschlagen");
+          }
+        });
+
+        if (streamError) throw new Error(streamError);
+        afterId = nextAfterId;
+        done = batchDone;
+      }
+
+      setSelectedIds(new Set());
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setIconBusy(false);
+      setIconProgress(null);
+    }
+  }
+
+  function DocListIcon({ doc }: { doc: DocRow }) {
+    if (doc.ai_icon_url) {
+      return (
+        <AiImagePreview
+          src={doc.ai_icon_url}
+          brand="docs"
+          alt=""
+          imageClassName="h-11 w-11 object-cover sm:h-12 sm:w-12"
+          onOpen={() => setZoomUrl(doc.ai_icon_url!)}
+        />
+      );
+    }
+    const visual = knowledgeVisual(doc.category || "Sonstiges");
+    return (
+      <IconCircle
+        icon={visual.icon}
+        tone="teal"
+        size="lg"
+        className="rounded-xl"
+      />
+    );
   }
 
   function resetFilters() {
@@ -336,7 +469,7 @@ export function DocumentsClient() {
                 <Button
                   size="sm"
                   variant="outline"
-                  disabled={isRunning}
+                  disabled={isRunning || iconBusy}
                   onClick={() =>
                     void startAnalysis({ mode: "batch", batchSize: 10 })
                   }
@@ -346,7 +479,7 @@ export function DocumentsClient() {
                 <Button
                   size="sm"
                   className="bg-[var(--brand-finance)] text-white hover:bg-[var(--brand-finance)]/90"
-                  disabled={isRunning}
+                  disabled={isRunning || iconBusy}
                   onClick={() =>
                     void startAnalysis({ mode: "all", batchSize: 10 })
                   }
@@ -355,10 +488,39 @@ export function DocumentsClient() {
                 </Button>
               </>
             ) : null}
+            {hasOpenAIKey ? (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={iconBusy || selectedIds.size === 0}
+                  onClick={() => void runAiIconBatch("selected")}
+                >
+                  <Sparkles className="size-3.5" />
+                  {iconBusy
+                    ? "Icons…"
+                    : `Icons Auswahl (${selectedIds.size})`}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={iconBusy || missingAiIcons === 0}
+                  onClick={() => void runAiIconBatch("all-missing")}
+                >
+                  <Sparkles className="size-3.5" />
+                  {iconBusy
+                    ? "Icons…"
+                    : `Alle fehlenden Icons (${missingAiIcons})`}
+                </Button>
+              </>
+            ) : null}
           </div>
         }
       />
 
+      {iconProgress ? (
+        <p className="text-sm text-muted-foreground">{iconProgress}</p>
+      ) : null}
       {/* Mobile: search + filter trigger + category chips */}
       <div className="space-y-3 md:hidden">
         {(searchFocus || searchInput) && (
@@ -699,40 +861,66 @@ export function DocumentsClient() {
         </Card>
       ) : (
         <>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <label className="inline-flex cursor-pointer items-center gap-2">
+              <input
+                type="checkbox"
+                className="size-4 accent-[var(--brand-docs)]"
+                checked={
+                  docs.length > 0 &&
+                  docs.every((d) => selectedIds.has(d.id))
+                }
+                onChange={toggleSelectAllVisible}
+              />
+              Sichtbare auswählen
+            </label>
+            {selectedIds.size > 0 ? (
+              <span>· {selectedIds.size} ausgewählt</span>
+            ) : null}
+            {missingAiIcons > 0 ? (
+              <span>· {missingAiIcons} ohne AI-Icon</span>
+            ) : null}
+          </div>
+
           {/* Mobile soft cards */}
           <div className="space-y-3 md:hidden">
             {docs.map((doc) => {
-              const visual = knowledgeVisual(doc.category || "Sonstiges");
               return (
-                <Link
+                <div
                   key={doc.id}
-                  href={`/documents/${doc.id}`}
-                  className="flex items-center gap-3 rounded-xl border border-border/60 bg-card p-3.5 shadow-[0_4px_16px_rgba(20,32,28,0.05)] transition-colors active:bg-muted/40"
+                  className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-card p-3.5 shadow-[0_4px_16px_rgba(20,32,28,0.05)]"
                 >
-                  <IconCircle
-                    icon={visual.icon}
-                    tone="teal"
-                    size="lg"
-                    className="rounded-xl"
+                  <input
+                    type="checkbox"
+                    className="size-4 shrink-0 accent-[var(--brand-docs)]"
+                    checked={selectedIds.has(doc.id)}
+                    onChange={() => toggleSelected(doc.id)}
+                    aria-label="Auswählen"
                   />
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate font-semibold text-foreground">
-                      {doc.title || `Dokument #${doc.id}`}
+                  <Link
+                    href={`/documents/${doc.id}`}
+                    className="flex min-w-0 flex-1 items-center gap-3 transition-colors active:opacity-80"
+                  >
+                    <DocListIcon doc={doc} />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate font-semibold text-foreground">
+                        {doc.title || `Dokument #${doc.id}`}
+                      </div>
+                      {doc.category ? (
+                        <span className="mt-1 inline-flex rounded-full bg-[var(--brand-docs-soft)] px-2 py-0.5 text-[11px] font-medium text-[var(--brand-docs)]">
+                          {doc.category}
+                        </span>
+                      ) : null}
+                      <div className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <CalendarDays className="size-3.5 shrink-0" />
+                        <span className="tabular-nums">
+                          {toSwissDate(doc.created_date)}
+                        </span>
+                      </div>
                     </div>
-                    {doc.category ? (
-                      <span className="mt-1 inline-flex rounded-full bg-[var(--brand-docs-soft)] px-2 py-0.5 text-[11px] font-medium text-[var(--brand-docs)]">
-                        {doc.category}
-                      </span>
-                    ) : null}
-                    <div className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <CalendarDays className="size-3.5 shrink-0" />
-                      <span className="tabular-nums">
-                        {toSwissDate(doc.created_date)}
-                      </span>
-                    </div>
-                  </div>
-                  <ChevronRight className="size-5 shrink-0 text-[var(--brand-docs)]" />
-                </Link>
+                    <ChevronRight className="size-5 shrink-0 text-[var(--brand-docs)]" />
+                  </Link>
+                </div>
               );
             })}
           </div>
@@ -745,10 +933,20 @@ export function DocumentsClient() {
                   <DataListRow key={doc.id}>
                     <DataListMain
                       title={
-                        <DocumentTitleLink
-                          documentId={doc.id}
-                          title={doc.title}
-                        />
+                        <div className="flex items-start gap-3">
+                          <input
+                            type="checkbox"
+                            className="mt-1 size-4 shrink-0 accent-[var(--brand-docs)]"
+                            checked={selectedIds.has(doc.id)}
+                            onChange={() => toggleSelected(doc.id)}
+                            aria-label="Auswählen"
+                          />
+                          <DocListIcon doc={doc} />
+                          <DocumentTitleLink
+                            documentId={doc.id}
+                            title={doc.title}
+                          />
+                        </div>
                       }
                       meta={
                         <MetaLine>
@@ -797,6 +995,21 @@ export function DocumentsClient() {
       >
         <Search className="size-5" />
       </SoftFab>
+
+      {zoomUrl ? (
+        <button
+          type="button"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          onClick={() => setZoomUrl(null)}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={zoomUrl}
+            alt=""
+            className="max-h-[90vh] max-w-[95vw] rounded-lg object-contain"
+          />
+        </button>
+      ) : null}
     </div>
   );
 }

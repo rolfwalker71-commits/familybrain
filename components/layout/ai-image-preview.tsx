@@ -3,13 +3,16 @@
 import { Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type BrandTone = "finance" | "travel";
+type BrandTone = "finance" | "travel" | "docs";
 
 const BRAND = {
   finance: {
     soft: "bg-[var(--brand-finance)]/90",
   },
   travel: {
+    soft: "bg-[var(--brand-docs)]/90",
+  },
+  docs: {
     soft: "bg-[var(--brand-docs)]/90",
   },
 } as const;

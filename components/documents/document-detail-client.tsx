@@ -44,6 +44,7 @@ import {
   IconCircle,
   knowledgeVisual,
 } from "@/components/layout/icon-circle";
+import { AiImagePreview } from "@/components/layout/ai-image-preview";
 import { ItineraryCard } from "@/components/travel/itinerary-list";
 import { resolveItinerary } from "@/lib/extraction/itinerary";
 import {
@@ -65,6 +66,8 @@ type DetailProps = {
       original_file_name: string | null;
       paperless_url: string | null;
       paperless_id: number;
+      ai_icon_path?: string | null;
+      ai_icon_url?: string | null;
     };
     tags: { tag_id: number | null; tag_name: string | null }[];
     summary: Record<string, unknown> | undefined;
@@ -119,6 +122,7 @@ export function DocumentDetailClient({ detail }: DetailProps) {
 function DocumentDetailInner({ detail }: DetailProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { document, tags, summary } = detail;
   const [analyzing, setAnalyzing] = useState(false);
   const [showOcr, setShowOcr] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -126,7 +130,11 @@ function DocumentDetailInner({ detail }: DetailProps) {
   const [taxRelevant, setTaxRelevant] = useState(false);
   const [statusBusy, setStatusBusy] = useState(false);
   const [statusLoaded, setStatusLoaded] = useState(false);
-  const { document, tags, summary } = detail;
+  const [aiIconUrl, setAiIconUrl] = useState<string | null>(
+    document.ai_icon_url ?? null
+  );
+  const [iconBusy, setIconBusy] = useState(false);
+  const [zoomUrl, setZoomUrl] = useState<string | null>(null);
 
   const activeTab = parseDocumentDetailTab(searchParams.get("tab"));
   const tabItems: DocumentTabItem[] = [
@@ -293,6 +301,55 @@ function DocumentDetailInner({ detail }: DetailProps) {
     }
   }
 
+  async function generateIcon(force = false) {
+    setIconBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/documents/${document.id}/ai-icon`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ force }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || "Icon-Generierung fehlgeschlagen");
+      }
+      setAiIconUrl(
+        typeof data.aiIconUrl === "string" ? data.aiIconUrl : null
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setIconBusy(false);
+    }
+  }
+
+  function DocIcon({ size = "sm" }: { size?: "sm" | "lg" }) {
+    if (aiIconUrl) {
+      return (
+        <AiImagePreview
+          src={aiIconUrl}
+          brand="docs"
+          alt=""
+          imageClassName={
+            size === "lg"
+              ? "h-14 w-14 object-cover"
+              : "h-10 w-10 object-cover"
+          }
+          onOpen={() => setZoomUrl(aiIconUrl)}
+        />
+      );
+    }
+    return (
+      <IconCircle
+        icon={categoryVisual.icon}
+        tone={size === "lg" ? categoryVisual.tone : "teal"}
+        size={size}
+        className={size === "sm" ? "rounded-xl" : undefined}
+      />
+    );
+  }
+
   return (
     <div className="space-y-4 pb-28 md:space-y-6 md:pb-0">
       {/* Mobile soft header */}
@@ -306,12 +363,7 @@ function DocumentDetailInner({ detail }: DetailProps) {
           <ChevronLeft className="size-5" />
         </button>
         <div className="flex min-w-0 flex-1 items-center gap-2.5">
-          <IconCircle
-            icon={categoryVisual.icon}
-            tone="teal"
-            size="sm"
-            className="rounded-xl"
-          />
+          <DocIcon size="sm" />
           <h1 className="truncate text-base font-semibold tracking-tight">
             {document.title || `Dokument #${document.id}`}
           </h1>
@@ -345,6 +397,16 @@ function DocumentDetailInner({ detail }: DetailProps) {
             >
               {analyzing ? "Analysiert…" : "Neu analysieren"}
             </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => void generateIcon(Boolean(aiIconUrl))}
+              disabled={iconBusy}
+            >
+              {iconBusy
+                ? "Icon…"
+                : aiIconUrl
+                  ? "AI-Icon neu erzeugen"
+                  : "AI-Icon erzeugen"}
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -360,11 +422,7 @@ function DocumentDetailInner({ detail }: DetailProps) {
             ← Zurück
           </button>
           <div className="flex items-start gap-3">
-            <IconCircle
-              icon={categoryVisual.icon}
-              tone={categoryVisual.tone}
-              size="lg"
-            />
+            <DocIcon size="lg" />
             <div className="min-w-0">
               <h1 className="break-words text-2xl font-semibold tracking-tight">
                 {document.title || `Dokument #${document.id}`}
@@ -389,6 +447,18 @@ function DocumentDetailInner({ detail }: DetailProps) {
               In Paperless öffnen
             </a>
           ) : null}
+          <Button
+            variant="outline"
+            disabled={iconBusy}
+            onClick={() => void generateIcon(Boolean(aiIconUrl))}
+          >
+            <Sparkles className="h-4 w-4" />
+            {iconBusy
+              ? "Icon…"
+              : aiIconUrl
+                ? "AI-Icon neu"
+                : "AI-Icon"}
+          </Button>
           <Button onClick={() => void analyze()} disabled={analyzing}>
             {analyzing ? "Analysiert…" : "Neu analysieren"}
           </Button>
@@ -824,6 +894,17 @@ function DocumentDetailInner({ detail }: DetailProps) {
               <Button onClick={() => void analyze()} disabled={analyzing}>
                 {analyzing ? "Analysiert…" : "Neu analysieren"}
               </Button>
+              <Button
+                variant="outline"
+                disabled={iconBusy}
+                onClick={() => void generateIcon(Boolean(aiIconUrl))}
+              >
+                {iconBusy
+                  ? "Icon…"
+                  : aiIconUrl
+                    ? "AI-Icon neu erzeugen"
+                    : "AI-Icon erzeugen"}
+              </Button>
               {document.paperless_url ? (
                 <a
                   href={document.paperless_url}
@@ -849,6 +930,21 @@ function DocumentDetailInner({ detail }: DetailProps) {
             </CardContent>
           </Card>
         </div>
+      ) : null}
+
+      {zoomUrl ? (
+        <button
+          type="button"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          onClick={() => setZoomUrl(null)}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={zoomUrl}
+            alt=""
+            className="max-h-[90vh] max-w-[95vw] rounded-lg object-contain"
+          />
+        </button>
       ) : null}
     </div>
   );

@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import { getFilterOptions, listDocuments } from "@/lib/db/queries";
+import {
+  countDocumentsMissingAiIcon,
+  documentAiIconPublicUrl,
+} from "@/lib/paperless/document-icon";
 import { parseSortDir } from "@/lib/utils/list-sort";
 
 export const runtime = "nodejs";
@@ -20,6 +24,11 @@ export async function GET(request: Request) {
 
   return NextResponse.json({
     ...data,
+    documents: data.documents.map((doc) => ({
+      ...doc,
+      ai_icon_url: documentAiIconPublicUrl(doc.ai_icon_path),
+    })),
+    missingAiIcons: countDocumentsMissingAiIcon(),
     filters: getFilterOptions(),
   });
 }

@@ -94,6 +94,18 @@ export async function analyzeDocument(
         wbErr instanceof Error ? wbErr.message : wbErr
       );
     }
+    try {
+      const { ensureDocumentAiIconIfMissing } = await import(
+        "@/lib/paperless/document-icon"
+      );
+      await ensureDocumentAiIconIfMissing(documentId);
+    } catch (iconErr) {
+      console.error(
+        "[analyze] document ai icon failed",
+        documentId,
+        iconErr instanceof Error ? iconErr.message : iconErr
+      );
+    }
     return { documentId, analysis: parsed.data, model };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
