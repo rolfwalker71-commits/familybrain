@@ -69,11 +69,11 @@ export function OpenInvoiceCard({ invoice }: { invoice: OpenInvoiceCardModel }) 
   return (
     <article
       className={cn(
-        "overflow-hidden rounded-lg border-2 border-[color-mix(in_oklab,var(--brand-finance)_35%,var(--border))] bg-card",
+        "flex h-full min-h-0 flex-col overflow-hidden rounded-lg border-2 border-[color-mix(in_oklab,var(--brand-finance)_35%,var(--border))] bg-card",
         "shadow-[0_1px_0_rgba(255,255,255,0.65)_inset,0_2px_3px_rgba(20,32,28,0.08),0_8px_18px_rgba(20,32,28,0.12),0_16px_32px_rgba(20,32,28,0.08)]"
       )}
     >
-      <div className="relative aspect-[5/3] bg-muted/40">
+      <div className="relative aspect-[5/3] shrink-0 bg-muted/40">
         <CardThumb paperlessId={invoice.paperless_id} title={title} />
         <span className="absolute left-1/2 top-2 -translate-x-1/2 rounded-xl shadow-md ring-2 ring-white/80">
           <DocumentAiIcon
@@ -84,7 +84,7 @@ export function OpenInvoiceCard({ invoice }: { invoice: OpenInvoiceCardModel }) 
         </span>
       </div>
 
-      <div className="space-y-0.5 border-b border-border/70 px-2.5 py-1.5">
+      <div className="flex min-h-0 flex-1 flex-col border-b border-border/70 px-2.5 py-1.5">
         <Link
           href={`/documents/${invoice.id}`}
           className="block min-w-0 text-[10px] font-semibold leading-snug text-[var(--brand-docs)] hover:underline sm:text-[11px]"
@@ -99,13 +99,13 @@ export function OpenInvoiceCard({ invoice }: { invoice: OpenInvoiceCardModel }) 
           )}
         </Link>
         {invoice.amount != null ? (
-          <p className="text-[10px] font-semibold tabular-nums text-foreground">
+          <p className="mt-0.5 text-[10px] font-semibold tabular-nums text-foreground">
             {formatCHF(invoice.amount, invoice.currency || "CHF")}
           </p>
         ) : null}
       </div>
 
-      <div className="flex items-center justify-between gap-1 px-1.5 py-1">
+      <div className="mt-auto flex shrink-0 items-center justify-between gap-1 px-1.5 py-1">
         {invoice.due_date && urgency ? (
           <Badge
             variant="secondary"
@@ -143,7 +143,7 @@ export function OpenInvoiceCardGrid({
   }
 
   return (
-    <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-5">
+    <div className="grid grid-cols-2 items-stretch gap-2.5 sm:grid-cols-3 xl:grid-cols-5">
       {invoices.map((invoice) => (
         <OpenInvoiceCard key={invoice.id} invoice={invoice} />
       ))}

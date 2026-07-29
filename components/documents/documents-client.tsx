@@ -28,7 +28,7 @@ import {
   MetaLine,
 } from "@/components/layout/data-list";
 import { useAnalysis } from "@/components/analysis/analysis-provider";
-import { FilterGrid, PageHeader } from "@/components/layout/page-primitives";
+import { PageHeader } from "@/components/layout/page-primitives";
 import {
   IconCircle,
   knowledgeVisual,
@@ -844,8 +844,8 @@ export function DocumentsClient() {
 
       <Card className="hidden min-w-0 overflow-hidden border-border/80 shadow-sm md:block">
         <CardContent className="space-y-3 py-4">
-          <FilterGrid>
-            <div className="min-w-0 xl:col-span-2">
+          <div className="flex min-w-0 flex-col gap-3">
+            <div className="min-w-0">
               <Input
                 className="w-full"
                 placeholder="Suche Titel / Inhalt / Korrespondent…"
@@ -862,70 +862,70 @@ export function DocumentsClient() {
               />
             </div>
 
-            <Select
-              value={category}
-              onValueChange={(value) => {
-                if (value == null) return;
-                setCategory(value);
-                updateUrl({ category: value });
-              }}
-              items={categoryItems}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(categoryItems).map(([value, label]) => (
-                  <SelectItem key={value} value={value}>
-                    {label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex min-w-0 flex-wrap items-stretch gap-2">
+              <Select
+                value={category}
+                onValueChange={(value) => {
+                  if (value == null) return;
+                  setCategory(value);
+                  updateUrl({ category: value });
+                }}
+                items={categoryItems}
+              >
+                <SelectTrigger className="w-full min-w-[10rem] sm:w-auto sm:min-w-[11rem]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(categoryItems).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-            <Select
-              value={correspondent}
-              onValueChange={(value) => {
-                if (value == null) return;
-                setCorrespondent(value);
-                updateUrl({ correspondent: value });
-              }}
-              items={correspondentItems}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(correspondentItems).map(([value, label]) => (
-                  <SelectItem key={value} value={value}>
-                    {label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              <Select
+                value={correspondent}
+                onValueChange={(value) => {
+                  if (value == null) return;
+                  setCorrespondent(value);
+                  updateUrl({ correspondent: value });
+                }}
+                items={correspondentItems}
+              >
+                <SelectTrigger className="w-full min-w-[10rem] sm:w-auto sm:min-w-[11rem]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(correspondentItems).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-            <Select
-              value={documentType}
-              onValueChange={(value) => {
-                if (value == null) return;
-                setDocumentType(value);
-                updateUrl({ documentType: value });
-              }}
-              items={documentTypeItems}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(documentTypeItems).map(([value, label]) => (
-                  <SelectItem key={value} value={value}>
-                    {label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              <Select
+                value={documentType}
+                onValueChange={(value) => {
+                  if (value == null) return;
+                  setDocumentType(value);
+                  updateUrl({ documentType: value });
+                }}
+                items={documentTypeItems}
+              >
+                <SelectTrigger className="w-full min-w-[10rem] sm:w-auto sm:min-w-[11rem]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(documentTypeItems).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-            <div className="grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-[1fr_auto_auto]">
               <Select
                 value={analysisStatus}
                 onValueChange={(value) => {
@@ -935,7 +935,7 @@ export function DocumentsClient() {
                 }}
                 items={statusItems}
               >
-                <SelectTrigger className="col-span-2 w-full sm:col-span-1">
+                <SelectTrigger className="w-full min-w-[8rem] sm:w-auto sm:min-w-[9rem]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -946,20 +946,23 @@ export function DocumentsClient() {
                   ))}
                 </SelectContent>
               </Select>
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => setSearch(searchInput.trim())}
-              >
-                Suchen
-              </Button>
-              {hasActiveFilters ? (
-                <Button type="button" variant="outline" onClick={resetFilters}>
-                  Reset
+
+              <div className="flex min-w-0 flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => setSearch(searchInput.trim())}
+                >
+                  Suchen
                 </Button>
-              ) : null}
+                {hasActiveFilters ? (
+                  <Button type="button" variant="outline" onClick={resetFilters}>
+                    Reset
+                  </Button>
+                ) : null}
+              </div>
             </div>
-          </FilterGrid>
+          </div>
 
           {hasActiveFilters ? (
             <p className="text-xs text-muted-foreground">
