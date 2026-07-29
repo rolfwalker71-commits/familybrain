@@ -582,3 +582,22 @@ CREATE TABLE IF NOT EXISTS user_ledger_access (
 );
 CREATE INDEX IF NOT EXISTS idx_user_ledger_access_ledger ON user_ledger_access(ledger_id);
 
+CREATE TABLE IF NOT EXISTS paperless_field_sync_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  created_at TEXT NOT NULL,
+  direction TEXT NOT NULL,
+  status TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  source TEXT NOT NULL,
+  field_name TEXT,
+  field_value TEXT,
+  document_local_id INTEGER,
+  paperless_id INTEGER,
+  document_title TEXT,
+  message TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_paperless_field_sync_log_created
+  ON paperless_field_sync_log(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_paperless_field_sync_log_doc
+  ON paperless_field_sync_log(document_local_id);
+

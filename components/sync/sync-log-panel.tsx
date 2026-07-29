@@ -2,11 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
-  AlertTriangle,
+  ArrowDownToLine,
+  ArrowUpFromLine,
   CheckCircle2,
-  ChevronDown,
-  ChevronRight,
-  Loader2,
   RefreshCw,
   ScrollText,
   SkipForward,
@@ -17,24 +15,21 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { IconCircle } from "@/components/layout/icon-circle";
+import Link from "next/link";
 
-type JobRun = {
+type SyncLogEntry = {
   id: number;
-  trigger: string;
-  status: string;
-  started_at: string;
-  finished_at: string | null;
-  summary_json: string | null;
-  error_message: string | null;
-};
-
-type JobItem = {
-  id: number;
-  item_kind: string;
-  title: string | null;
-  status: string;
-  message: string | null;
   created_at: string;
+  direction: "pull" | "push" | string;
+  status: "ok" | "error" | "skipped" | string;
+  kind: string;
+  source: string;
+  field_name: string | null;
+  field_value: string | null;
+  document_local_id: number | null;
+  paperless_id: number | null;
+  document_title: string | null;
+  message: string | null;
 };
 
 const PAGE_LIMIT = 100;
@@ -47,101 +42,97 @@ function formatDate(value: string | null): string {
   }).format(new Date(value));
 }
 
-function formatDuration(started: string, finished: string | null): string {
-  if (!finished) return "läuft…";
-  const ms = new Date(finished).getTime() - new Date(started).getTime();
-  if (!Number.isFinite(ms) || ms < 0) return "–";
-  if (ms < 1000) return `${ms} ms`;
-  const sec = Math.round(ms / 1000);
-  if (sec < 60) return `${sec} s`;
-  const min = Math.floor(sec / 60);
-  const rem = sec % 60;
-  return rem ? `${min} min ${rem} s` : `${min} min`;
-}
-
-function parseSummary(value: string | null): Record<string, unknown> {
-  if (!value) return {};
-  try {
-    return JSON.parse(value) as Record<string, unknown>;
-  } catch {
-    return {};
-  }
+function directionLabel(direction: string): string {
+  if (direction === "pull") return "Paperless → Buddy";
+  if (direction === "push") return "Buddy → Paperless";
+  return direction;
 }
 
 function statusMeta(status: string): {
   label: string;
-  tone: "ok" | "error" | "running" | "muted";
+  className: string;
   Icon: typeof CheckCircle2;
 } {
-  if (status === "success") {
-    return { label: "OK", tone: "ok", Icon: CheckCircle2 };
+  if (status === "ok") {
+    return {
+      label: "OK",
+      className: "text-emerald-700 bg-emerald-50 border-emerald-200",
+      Icon: CheckCircle2,
+    };
   }
   if (status === "error") {
-    return { label: "Problem", tone: "error", Icon: XCircle };
+    return {
+      label: "Fehler",
+      className: "text-destructive bg-destructive/5 border-destructive/30",
+      Icon: XCircle,
+    };
   }
-  if (status === "running") {
-    return { label: "Läuft", tone: "running", Icon: Loader2 };
-  }
-  if (status === "skipped") {
-    return { label: "Übersprungen", tone: "muted", Icon: SkipForward };
-  }
-  return { label: status, tone: "muted", Icon: AlertTriangle };
+  return {
+    label: "Übersprungen",
+    className: "text-muted-foreground bg-muted/40 border-border/60",
+    Icon: SkipForward,
+  };
 }
 
-function toneClasses(tone: "ok" | "error" | "running" | "muted"): string {
-  if (tone === "ok") return "text-emerald-700 bg-emerald-50 border-emerald-200";
-  if (tone === "error") return "text-destructive bg-destructive/5 border-destructive/30";
-  if (tone === "running") return "text-[var(--brand-docs)] bg-[var(--brand-docs-soft)] border-[var(--brand-docs)]/30";
-  return "text-muted-foreground bg-muted/40 border-border/60";
+function sourceLabel(source: string): string {
+  switch (source) {
+    case "sync":
+      return "Sync";
+    case "writeback_analysis":
+      return "Analyse-Writeback";
+    case "writeback_link":
+      return "Link-Writeback";
+    case "writeback_status":
+      return "Status-Writeback";
+    case "mark_paid":
+      return "Als beglichen";
+    case "webhook":
+      return "Webhook";
+    default:
+      return source;
+  }
 }
 
-function summaryLine(summary: Record<string, unknown>): string {
-  const parts = [
-    `${Number(summary.created ?? 0)} neu`,
-    `${Number(summary.updated ?? 0)} aktualisiert`,
-    `${Number(summary.analyzed ?? 0)} analysiert`,
-  ];
-  const analysisFailed = Number(summary.analysisFailed ?? 0);
-  if (analysisFailed > 0) parts.push(`${analysisFailed} Analysefehler`);
-  const syncErrors = Number(summary.syncErrors ?? 0);
-  if (syncErrors > 0) parts.push(`${syncErrors} Sync-Fehler`);
-  const trilium =
-    Number(summary.triliumCreated ?? 0) + Number(summary.triliumUpdated ?? 0);
-  if (trilium > 0) parts.push(`Trilium ${trilium}`);
-  return parts.join(" · ");
+function kindLabel(kind: string): string {
+  switch (kind) {
+    case "custom_field":
+      return "Custom Field";
+    case "payment_flag":
+      return "Zahlungsflag";
+    case "tag":
+      return "Tag";
+    case "correspondent":
+      return "Korrespondent";
+    case "document_type":
+      return "Dokumenttyp";
+    case "batch":
+      return "Batch";
+    default:
+      return kind;
+  }
 }
 
 export function SyncLogPanel() {
-  const [runs, setRuns] = useState<JobRun[]>([]);
+  const [entries, setEntries] = useState<SyncLogEntry[]>([]);
   const [total, setTotal] = useState(0);
-  const [selectedRun, setSelectedRun] = useState<number | null>(null);
-  const [items, setItems] = useState<JobItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [writebackError, setWritebackError] = useState<string | null>(null);
+  const [directionFilter, setDirectionFilter] = useState<"all" | "pull" | "push">(
+    "all"
+  );
 
   const refresh = useCallback(async () => {
-    const [runsRes, settingsRes] = await Promise.all([
-      fetch(`/api/jobs/runs?limit=${PAGE_LIMIT}&offset=0`, {
-        cache: "no-store",
-      }),
-      fetch("/api/settings", { cache: "no-store" }),
-    ]);
-    if (!runsRes.ok) {
-      throw new Error("Protokoll konnte nicht geladen werden.");
-    }
-    const data = (await runsRes.json()) as { runs: JobRun[]; total: number };
-    setRuns(data.runs);
-    setTotal(data.total);
-    if (settingsRes.ok) {
-      const settings = await settingsRes.json().catch(() => ({}));
-      setWritebackError(
-        typeof settings.paperlessWritebackLastError === "string" &&
-          settings.paperlessWritebackLastError.trim()
-          ? settings.paperlessWritebackLastError
-          : null
-      );
-    }
+    const res = await fetch(
+      `/api/paperless/sync-log?limit=${PAGE_LIMIT}&offset=0`,
+      { cache: "no-store" }
+    );
+    if (!res.ok) throw new Error("Protokoll konnte nicht geladen werden.");
+    const data = (await res.json()) as {
+      entries: SyncLogEntry[];
+      total: number;
+    };
+    setEntries(data.entries || []);
+    setTotal(Number(data.total) || 0);
   }, []);
 
   useEffect(() => {
@@ -154,38 +145,27 @@ export function SyncLogPanel() {
     }, 0);
     const timer = window.setInterval(() => {
       void refresh().catch(() => undefined);
-    }, 8000);
+    }, 10000);
     return () => {
       window.clearTimeout(initial);
       window.clearInterval(timer);
     };
   }, [refresh]);
 
-  useEffect(() => {
-    if (!selectedRun) {
-      setItems([]);
-      return;
-    }
-    void fetch(`/api/jobs/runs/${selectedRun}`, { cache: "no-store" })
-      .then(async (res) => {
-        if (!res.ok) throw new Error("Details konnten nicht geladen werden.");
-        return res.json() as Promise<{ items: JobItem[] }>;
-      })
-      .then((data) => setItems(data.items))
-      .catch((err) =>
-        setError(err instanceof Error ? err.message : String(err))
-      );
-  }, [selectedRun]);
-
-  const errorCount = runs.filter((r) => r.status === "error").length;
-  const okCount = runs.filter((r) => r.status === "success").length;
+  const filtered =
+    directionFilter === "all"
+      ? entries
+      : entries.filter((e) => e.direction === directionFilter);
+  const pushCount = entries.filter((e) => e.direction === "push").length;
+  const pullCount = entries.filter((e) => e.direction === "pull").length;
+  const errorCount = entries.filter((e) => e.status === "error").length;
 
   return (
     <Card>
       <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3">
         <CardTitle className="flex items-center gap-3">
           <IconCircle icon={ScrollText} tone="teal" size="sm" />
-          Sync-Protokoll
+          Paperless-Feldprotokoll
         </CardTitle>
         <Button
           type="button"
@@ -207,29 +187,44 @@ export function SyncLogPanel() {
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-sm text-muted-foreground">
-          Die letzten {PAGE_LIMIT} automatischen bzw. manuellen Sync-/Analyse-Läufe
-          (Scheduler und «Jetzt synchronisieren und analysieren»). Reiner
-          Paperless-Pull unter Status erscheint hier nicht.
+          Letzte Abgleiche von Custom Fields, Tags und Zahlungsflags zwischen
+          Paperless und Buddy (max. {PAGE_LIMIT} Einträge). Scheduler-Läufe
+          weiterhin unter <strong>Automation</strong>.
         </p>
 
         <div className="flex flex-wrap gap-2 text-xs">
           <Badge variant="secondary">
-            Angezeigt: {runs.length}
-            {total > runs.length ? ` von ${total}` : ""}
+            Angezeigt: {filtered.length}
+            {total > entries.length ? ` · gesamt ${total}` : ""}
           </Badge>
           <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">
-            OK: {okCount}
+            Push: {pushCount}
           </Badge>
-          <Badge variant="destructive">Probleme: {errorCount}</Badge>
+          <Badge className="bg-sky-100 text-sky-800 hover:bg-sky-100">
+            Pull: {pullCount}
+          </Badge>
+          <Badge variant="destructive">Fehler: {errorCount}</Badge>
         </div>
 
-        {writebackError ? (
-          <Alert variant="destructive">
-            <AlertDescription className="text-xs break-words">
-              Letzter Paperless-Writeback-Fehler: {writebackError}
-            </AlertDescription>
-          </Alert>
-        ) : null}
+        <div className="flex flex-wrap gap-2">
+          {(
+            [
+              ["all", "Alle"],
+              ["push", "Buddy → Paperless"],
+              ["pull", "Paperless → Buddy"],
+            ] as const
+          ).map(([id, label]) => (
+            <Button
+              key={id}
+              type="button"
+              size="sm"
+              variant={directionFilter === id ? "default" : "outline"}
+              onClick={() => setDirectionFilter(id)}
+            >
+              {label}
+            </Button>
+          ))}
+        </div>
 
         {error ? (
           <Alert variant="destructive">
@@ -237,101 +232,96 @@ export function SyncLogPanel() {
           </Alert>
         ) : null}
 
-        {loading && runs.length === 0 ? (
+        {loading && entries.length === 0 ? (
           <p className="text-sm text-muted-foreground">Lade Protokoll…</p>
-        ) : runs.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            Noch keine Läufe protokolliert.
+            Noch keine Feld-Sync-Einträge. Nach Analyse-Writeback, Sync oder
+            «Als beglichen» erscheinen sie hier.
           </p>
         ) : (
           <ul className="divide-y divide-border/60 rounded-xl border border-border/60">
-            {runs.map((run) => {
-              const meta = statusMeta(run.status);
-              const summary = parseSummary(run.summary_json);
-              const open = selectedRun === run.id;
+            {filtered.map((entry) => {
+              const meta = statusMeta(entry.status);
               const StatusIcon = meta.Icon;
+              const isPush = entry.direction === "push";
               return (
-                <li key={run.id}>
-                  <button
-                    type="button"
-                    className="flex w-full gap-3 px-3 py-3 text-left hover:bg-[var(--brand-docs-soft)]/35"
-                    onClick={() =>
-                      setSelectedRun(open ? null : run.id)
-                    }
+                <li
+                  key={entry.id}
+                  className="flex gap-3 px-3 py-3 text-sm"
+                >
+                  <span
+                    className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full border ${meta.className}`}
+                    aria-hidden
                   >
-                    <span
-                      className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full border ${toneClasses(meta.tone)}`}
-                      aria-hidden
-                    >
-                      <StatusIcon
-                        className={`size-4 ${meta.tone === "running" ? "animate-spin" : ""}`}
-                      />
-                    </span>
-                    <span className="min-w-0 flex-1 space-y-1">
-                      <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                        <span className="font-medium text-sm">
-                          #{run.id} · {meta.label}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {run.trigger === "manual" ? "manuell" : "automatisch"}
-                          {" · "}
-                          {formatDuration(run.started_at, run.finished_at)}
-                        </span>
-                        <span className="ml-auto text-xs text-muted-foreground">
-                          {formatDate(run.started_at)}
-                        </span>
+                    <StatusIcon className="size-4" />
+                  </span>
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${
+                          isPush
+                            ? "border-amber-200 bg-amber-50 text-amber-900"
+                            : "border-sky-200 bg-sky-50 text-sky-900"
+                        }`}
+                      >
+                        {isPush ? (
+                          <ArrowUpFromLine className="size-3" />
+                        ) : (
+                          <ArrowDownToLine className="size-3" />
+                        )}
+                        {directionLabel(entry.direction)}
                       </span>
-                      <span className="block text-xs text-muted-foreground">
-                        {summaryLine(summary)}
+                      <span className="text-xs text-muted-foreground">
+                        {kindLabel(entry.kind)} · {sourceLabel(entry.source)}
                       </span>
-                      {run.error_message ? (
-                        <span className="block text-xs text-destructive break-words">
-                          {run.error_message}
+                      <span className="ml-auto text-xs text-muted-foreground">
+                        {formatDate(entry.created_at)}
+                      </span>
+                    </div>
+                    <div className="font-medium">
+                      {entry.field_name || "—"}
+                      {entry.field_value != null ? (
+                        <span className="font-normal text-muted-foreground">
+                          {" "}
+                          ={" "}
+                          <code className="rounded bg-muted px-1 text-xs">
+                            {entry.field_value}
+                          </code>
                         </span>
                       ) : null}
-                    </span>
-                    <span className="mt-1 shrink-0 text-muted-foreground">
-                      {open ? (
-                        <ChevronDown className="size-4" />
-                      ) : (
-                        <ChevronRight className="size-4" />
-                      )}
-                    </span>
-                  </button>
-                  {open ? (
-                    <div className="border-t border-border/50 bg-muted/20 px-3 py-3">
-                      <div className="mb-2 text-xs font-medium text-muted-foreground">
-                        Phasen / Einträge
-                      </div>
-                      <div className="max-h-64 space-y-1 overflow-y-auto text-xs">
-                        {items.length === 0 ? (
-                          <p className="text-muted-foreground">Keine Details.</p>
-                        ) : (
-                          items.map((item) => {
-                            const itemMeta = statusMeta(item.status);
-                            return (
-                              <div
-                                key={item.id}
-                                className="rounded-lg border border-border/50 bg-background/80 px-2.5 py-2"
-                              >
-                                <div className="font-medium">
-                                  {item.title || item.item_kind}
-                                  <span className="ml-2 font-normal text-muted-foreground">
-                                    {itemMeta.label}
-                                  </span>
-                                </div>
-                                {item.message ? (
-                                  <div className="mt-0.5 text-muted-foreground break-words">
-                                    {item.message}
-                                  </div>
-                                ) : null}
-                              </div>
-                            );
-                          })
-                        )}
-                      </div>
+                      <span className="ml-2 text-xs font-normal text-muted-foreground">
+                        {meta.label}
+                      </span>
                     </div>
-                  ) : null}
+                    <div className="text-xs text-muted-foreground">
+                      {entry.document_local_id ? (
+                        <Link
+                          href={`/documents/${entry.document_local_id}`}
+                          className="hover:underline"
+                        >
+                          {entry.document_title ||
+                            `Dokument #${entry.document_local_id}`}
+                        </Link>
+                      ) : (
+                        entry.document_title || "—"
+                      )}
+                      {entry.paperless_id != null
+                        ? ` · PL #${entry.paperless_id}`
+                        : null}
+                    </div>
+                    {entry.message ? (
+                      <div
+                        className={`text-xs break-words ${
+                          entry.status === "error"
+                            ? "text-destructive"
+                            : "text-muted-foreground"
+                        }`}
+                      >
+                        {entry.message}
+                      </div>
+                    ) : null}
+                  </div>
                 </li>
               );
             })}

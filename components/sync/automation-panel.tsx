@@ -254,8 +254,9 @@ export function AutomationPanel() {
         <div className="space-y-3">
           <h3 className="font-medium">Laufhistorie</h3>
           <p className="text-sm text-muted-foreground">
-            Die ausführliche Liste (letzte 100 Läufe, OK/Probleme) findest du
-            unter dem Tab <strong>Protokoll</strong>.
+            Kurze Vorschau der letzten Scheduler-/Analyse-Läufe. Custom-Field-
+            Abgleiche (Paperless ↔ Buddy) findest du unter dem Tab{" "}
+            <strong>Protokoll</strong>.
           </p>
           {runs.length === 0 ? (
             <p className="text-sm text-muted-foreground">

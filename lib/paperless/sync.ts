@@ -2,9 +2,17 @@ import { PaperlessClient } from "./client";
 import type { PaperlessDocument, PaperlessTag } from "./types";
 import {
   boolToSql,
+  BUDDY_CUSTOM_FIELD_NAMES,
+  extractNamedBooleanField,
+  extractNamedStringField,
   extractPaymentCustomFlags,
 } from "./custom-fields";
-import { getPaperlessSettings, upsertDocument, backfillPaymentFlagsFromRawMetadata } from "@/lib/db/queries";
+import {
+  getDocumentByPaperlessId,
+  getPaperlessSettings,
+  upsertDocument,
+  backfillPaymentFlagsFromRawMetadata,
+} from "@/lib/db/queries";
 import { hashContent } from "@/lib/utils/hash";
 import {
   DELTA_OVERLAP_MS,
@@ -21,6 +29,7 @@ import {
   setLastIdReconcileAt,
   setSyncCursor,
 } from "@/lib/jobs/queries";
+import { appendPaperlessFieldSyncLogs } from "@/lib/paperless/sync-log";
 
 export type SyncMode = "full" | "delta";
 
@@ -186,6 +195,7 @@ async function upsertRemoteDocument(
     caches.correspondentCache
   );
   const payment = extractPaymentCustomFlags(doc, caches.customFieldNames);
+  const existing = getDocumentByPaperlessId(doc.id);
   const content = doc.content ?? "";
   const upserted = upsertDocument({
     paperless_id: doc.id,
@@ -207,6 +217,82 @@ async function upsertRemoteDocument(
     bezahlt: boolToSql(payment.bezahlt),
     tags: resolved.tags,
   });
+
+  if (upserted.isNew || upserted.changed) {
+    const logs: Parameters<typeof appendPaperlessFieldSyncLogs>[0] = [];
+    const base = {
+      direction: "pull" as const,
+      source: "sync" as const,
+      documentLocalId: upserted.id,
+      paperlessId: doc.id,
+      documentTitle: doc.title ?? null,
+    };
+    const prevZu = existing?.zu_bezahlen ?? null;
+    const prevBezahlt = existing?.bezahlt ?? null;
+    const nextZu = boolToSql(payment.zuBezahlen);
+    const nextBezahlt = boolToSql(payment.bezahlt);
+    if (payment.zuBezahlen != null && (upserted.isNew || prevZu !== nextZu)) {
+      logs.push({
+        ...base,
+        status: "ok",
+        kind: "payment_flag",
+        fieldName: "Zu bezahlen",
+        fieldValue: payment.zuBezahlen,
+      });
+    }
+    if (payment.bezahlt != null && (upserted.isNew || prevBezahlt !== nextBezahlt)) {
+      logs.push({
+        ...base,
+        status: "ok",
+        kind: "payment_flag",
+        fieldName: "Bezahlt",
+        fieldValue: payment.bezahlt,
+      });
+    }
+
+    // Known Buddy UDFs: log on first ingest only (avoid full-sync flood)
+    if (upserted.isNew) {
+      const buddyReviewed = extractNamedBooleanField(
+        doc,
+        caches.customFieldNames,
+        BUDDY_CUSTOM_FIELD_NAMES.buddyReviewed
+      );
+      const taxRelevant = extractNamedBooleanField(
+        doc,
+        caches.customFieldNames,
+        BUDDY_CUSTOM_FIELD_NAMES.taxRelevant
+      );
+      const buddyStatus = extractNamedStringField(
+        doc,
+        caches.customFieldNames,
+        BUDDY_CUSTOM_FIELD_NAMES.buddyStatus
+      );
+      const amount = extractNamedStringField(
+        doc,
+        caches.customFieldNames,
+        BUDDY_CUSTOM_FIELD_NAMES.amount
+      );
+      for (const [name, value] of [
+        [BUDDY_CUSTOM_FIELD_NAMES.buddyReviewed, buddyReviewed],
+        [BUDDY_CUSTOM_FIELD_NAMES.taxRelevant, taxRelevant],
+        [BUDDY_CUSTOM_FIELD_NAMES.buddyStatus, buddyStatus],
+        [BUDDY_CUSTOM_FIELD_NAMES.amount, amount],
+      ] as const) {
+        if (value == null || value === "") continue;
+        logs.push({
+          ...base,
+          status: "ok",
+          kind: "custom_field",
+          fieldName: name,
+          fieldValue: value,
+          message: "aus Paperless gelesen",
+        });
+      }
+    }
+
+    if (logs.length > 0) appendPaperlessFieldSyncLogs(logs);
+  }
+
   return { ...upserted, localId: upserted.id };
 }
 

@@ -11,6 +11,10 @@ import {
   findCustomFieldDef,
 } from "@/lib/paperless/custom-fields";
 import { normalizeFinanceCategory } from "@/lib/extraction/normalize-categories";
+import {
+  appendPaperlessFieldSyncLogs,
+  type PaperlessSyncSource,
+} from "@/lib/paperless/sync-log";
 
 const WRITEBACK_ENABLED_KEY = "paperless_writeback_enabled";
 const WEBHOOK_SECRET_KEY = "paperless_webhook_secret";
@@ -46,6 +50,32 @@ function createClientOrNull(): PaperlessClient | null {
   const { baseUrl, apiToken } = getPaperlessSettings();
   if (!baseUrl || !apiToken) return null;
   return new PaperlessClient(baseUrl, apiToken);
+}
+
+function docTitle(localDocumentId: number): string | null {
+  const row = getDb()
+    .prepare(`SELECT title FROM paperless_documents WHERE id = ?`)
+    .get(localDocumentId) as { title: string | null } | undefined;
+  return row?.title ?? null;
+}
+
+type LogDraft = Parameters<typeof appendPaperlessFieldSyncLogs>[0][number];
+
+function logCtx(
+  source: PaperlessSyncSource,
+  localDocumentId: number,
+  paperlessId: number
+): Pick<
+  LogDraft,
+  "direction" | "source" | "documentLocalId" | "paperlessId" | "documentTitle"
+> {
+  return {
+    direction: "push",
+    source,
+    documentLocalId: localDocumentId,
+    paperlessId,
+    documentTitle: docTitle(localDocumentId),
+  };
 }
 
 type AnalysisSnapshot = {
@@ -173,14 +203,33 @@ export async function writebackAnalysisToPaperless(
 
     const fieldDefs = await client.listCustomFields();
     const customFields: Array<{ field: number; value: unknown }> = [];
+    const logs: LogDraft[] = [];
+    const ctx = logCtx("writeback_analysis", localDocumentId, snapshot.paperlessId);
 
     const put = (exactName: string, raw: unknown) => {
       if (raw == null || raw === "") return;
       const def = findCustomFieldDef(fieldDefs, exactName);
-      if (!def) return;
+      if (!def) {
+        logs.push({
+          ...ctx,
+          status: "skipped",
+          kind: "custom_field",
+          fieldName: exactName,
+          fieldValue: raw,
+          message: "Custom Field fehlt in Paperless",
+        });
+        return;
+      }
       const coerced = coerceCustomFieldValue(def.data_type, raw);
       if (coerced == null || coerced === "") return;
       customFields.push({ field: def.id, value: coerced });
+      logs.push({
+        ...ctx,
+        status: "ok",
+        kind: "custom_field",
+        fieldName: exactName,
+        fieldValue: coerced,
+      });
     };
 
     if (snapshot.finance) {
@@ -217,18 +266,50 @@ export async function writebackAnalysisToPaperless(
     const addTagIds: number[] = [];
     for (const name of tagNames) {
       addTagIds.push(await client.ensureTag(name, tagCache));
+      logs.push({
+        ...ctx,
+        status: "ok",
+        kind: "tag",
+        fieldName: name,
+        fieldValue: name,
+      });
     }
 
     let correspondentId: number | undefined;
     const corrName = snapshot.finance?.vendor?.trim() || null;
     if (corrName) {
       correspondentId = await client.ensureCorrespondent(corrName, new Map());
+      logs.push({
+        ...ctx,
+        status: "ok",
+        kind: "correspondent",
+        fieldName: "Korrespondent",
+        fieldValue: corrName,
+      });
     }
 
     let documentTypeId: number | undefined;
     if (snapshot.category) {
       const found = await client.findDocumentTypeIdByName(snapshot.category);
-      if (found != null) documentTypeId = found;
+      if (found != null) {
+        documentTypeId = found;
+        logs.push({
+          ...ctx,
+          status: "ok",
+          kind: "document_type",
+          fieldName: "Dokumenttyp",
+          fieldValue: snapshot.category,
+        });
+      } else {
+        logs.push({
+          ...ctx,
+          status: "skipped",
+          kind: "document_type",
+          fieldName: "Dokumenttyp",
+          fieldValue: snapshot.category,
+          message: "Dokumenttyp existiert in Paperless nicht",
+        });
+      }
     }
 
     await client.setDocumentMetadata(snapshot.paperlessId, {
@@ -238,12 +319,24 @@ export async function writebackAnalysisToPaperless(
       documentTypeId,
     });
 
+    appendPaperlessFieldSyncLogs(logs);
     rememberWritebackError(null);
     return { ok: true };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("[paperless writeback]", localDocumentId, message);
     rememberWritebackError(message);
+    appendPaperlessFieldSyncLogs([
+      {
+        direction: "push",
+        source: "writeback_analysis",
+        status: "error",
+        kind: "batch",
+        documentLocalId: localDocumentId,
+        documentTitle: docTitle(localDocumentId),
+        message,
+      },
+    ]);
     return { ok: false, error: message };
   }
 }
@@ -277,8 +370,21 @@ export async function writebackLinkTagsToPaperless(input: {
 
     const tagCache = new Map<string, number>();
     const addTagIds: number[] = [];
+    const logs: LogDraft[] = [];
+    const ctx = logCtx(
+      "writeback_link",
+      input.localDocumentId,
+      doc.paperless_id
+    );
     for (const name of tagNames) {
       addTagIds.push(await client.ensureTag(name, tagCache));
+      logs.push({
+        ...ctx,
+        status: "ok",
+        kind: "tag",
+        fieldName: name,
+        fieldValue: name,
+      });
     }
 
     const customFields: Array<{ field: number; value: unknown }> = [];
@@ -289,9 +395,26 @@ export async function writebackLinkTagsToPaperless(input: {
         BUDDY_CUSTOM_FIELD_NAMES.buddyStatus
       );
       if (def) {
+        const value = coerceCustomFieldValue(def.data_type, input.buddyStatus);
         customFields.push({
           field: def.id,
-          value: coerceCustomFieldValue(def.data_type, input.buddyStatus),
+          value,
+        });
+        logs.push({
+          ...ctx,
+          status: "ok",
+          kind: "custom_field",
+          fieldName: BUDDY_CUSTOM_FIELD_NAMES.buddyStatus,
+          fieldValue: value,
+        });
+      } else {
+        logs.push({
+          ...ctx,
+          status: "skipped",
+          kind: "custom_field",
+          fieldName: BUDDY_CUSTOM_FIELD_NAMES.buddyStatus,
+          fieldValue: input.buddyStatus,
+          message: "Custom Field fehlt in Paperless",
         });
       }
     }
@@ -300,12 +423,24 @@ export async function writebackLinkTagsToPaperless(input: {
       addTagIds,
       customFields,
     });
+    appendPaperlessFieldSyncLogs(logs);
     rememberWritebackError(null);
     return { ok: true };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("[paperless link writeback]", message);
     rememberWritebackError(message);
+    appendPaperlessFieldSyncLogs([
+      {
+        direction: "push",
+        source: "writeback_link",
+        status: "error",
+        kind: "batch",
+        documentLocalId: input.localDocumentId,
+        documentTitle: docTitle(input.localDocumentId),
+        message,
+      },
+    ]);
     return { ok: false, error: message };
   }
 }
@@ -329,13 +464,37 @@ export async function writebackStatusFlagsToPaperless(input: {
 
     const fieldDefs = await client.listCustomFields();
     const customFields: Array<{ field: number; value: unknown }> = [];
+    const logs: LogDraft[] = [];
+    const ctx = logCtx(
+      "writeback_status",
+      input.localDocumentId,
+      doc.paperless_id
+    );
     const put = (exactName: string, raw: unknown) => {
       if (raw === undefined) return;
       const def = findCustomFieldDef(fieldDefs, exactName);
-      if (!def) return;
+      if (!def) {
+        logs.push({
+          ...ctx,
+          status: "skipped",
+          kind: "custom_field",
+          fieldName: exactName,
+          fieldValue: raw,
+          message: "Custom Field fehlt in Paperless",
+        });
+        return;
+      }
+      const value = coerceCustomFieldValue(def.data_type, raw);
       customFields.push({
         field: def.id,
-        value: coerceCustomFieldValue(def.data_type, raw),
+        value,
+      });
+      logs.push({
+        ...ctx,
+        status: "ok",
+        kind: "custom_field",
+        fieldName: exactName,
+        fieldValue: value,
       });
     };
 
@@ -364,11 +523,23 @@ export async function writebackStatusFlagsToPaperless(input: {
       /* ignore refresh */
     }
 
+    appendPaperlessFieldSyncLogs(logs);
     rememberWritebackError(null);
     return { ok: true };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     rememberWritebackError(message);
+    appendPaperlessFieldSyncLogs([
+      {
+        direction: "push",
+        source: "writeback_status",
+        status: "error",
+        kind: "batch",
+        documentLocalId: input.localDocumentId,
+        documentTitle: docTitle(input.localDocumentId),
+        message,
+      },
+    ]);
     return { ok: false, error: message };
   }
 }

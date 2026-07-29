@@ -88,6 +88,7 @@ export function bootstrapDatabase(db: Database.Database): void {
   ensureExtractOverrideColumns(db);
   ensurePaymentCustomFieldColumns(db);
   ensureDocumentAiIconColumns(db);
+  ensurePaperlessFieldSyncLogTable(db);
 
   const insertArea = db.prepare(
     `INSERT OR IGNORE INTO knowledge_areas (name, description) VALUES (?, ?)`
@@ -171,6 +172,29 @@ function ensureDocumentAiIconColumns(db: Database.Database): void {
   if (!names.has("ai_icon_prompt")) {
     db.exec(`ALTER TABLE paperless_documents ADD COLUMN ai_icon_prompt TEXT`);
   }
+}
+
+function ensurePaperlessFieldSyncLogTable(db: Database.Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS paperless_field_sync_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      created_at TEXT NOT NULL,
+      direction TEXT NOT NULL,
+      status TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      source TEXT NOT NULL,
+      field_name TEXT,
+      field_value TEXT,
+      document_local_id INTEGER,
+      paperless_id INTEGER,
+      document_title TEXT,
+      message TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_paperless_field_sync_log_created
+      ON paperless_field_sync_log(created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_paperless_field_sync_log_doc
+      ON paperless_field_sync_log(document_local_id);
+  `);
 }
 
 function ensureTripsTables(db: Database.Database): void {

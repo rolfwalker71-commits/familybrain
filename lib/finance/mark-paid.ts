@@ -92,6 +92,37 @@ export async function markDocumentsPaid(
         fieldDefs
       );
       try {
+        const { appendPaperlessFieldSyncLogs } = await import(
+          "@/lib/paperless/sync-log"
+        );
+        appendPaperlessFieldSyncLogs([
+          {
+            direction: "push",
+            source: "mark_paid",
+            status: "ok",
+            kind: "payment_flag",
+            fieldName: "Bezahlt",
+            fieldValue: true,
+            documentLocalId: doc.id,
+            paperlessId: doc.paperless_id,
+            documentTitle: doc.title,
+          },
+          {
+            direction: "push",
+            source: "mark_paid",
+            status: "ok",
+            kind: "payment_flag",
+            fieldName: "Zu bezahlen",
+            fieldValue: false,
+            documentLocalId: doc.id,
+            paperlessId: doc.paperless_id,
+            documentTitle: doc.title,
+          },
+        ]);
+      } catch {
+        /* ignore log errors */
+      }
+      try {
         const { writebackStatusFlagsToPaperless } = await import(
           "@/lib/paperless/writeback"
         );
