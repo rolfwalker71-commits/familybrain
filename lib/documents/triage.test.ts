@@ -11,6 +11,7 @@ function baseAnalysis(
 ): DocumentAnalysis {
   return {
     category: "Sonstiges",
+    suggested_title: "Testdokument",
     short_summary: null,
     detailed_summary: null,
     important_points: [],

@@ -91,6 +91,7 @@ function logCtx(
 
 type AnalysisSnapshot = {
   paperlessId: number;
+  title: string | null;
   category: string | null;
   zuBezahlen: number | null;
   bezahlt: number | null;
@@ -113,11 +114,12 @@ function loadAnalysisSnapshot(localDocumentId: number): AnalysisSnapshot | null 
   const db = getDb();
   const doc = db
     .prepare(
-      `SELECT paperless_id, zu_bezahlen, bezahlt FROM paperless_documents WHERE id = ?`
+      `SELECT paperless_id, title, zu_bezahlen, bezahlt FROM paperless_documents WHERE id = ?`
     )
     .get(localDocumentId) as
     | {
         paperless_id: number;
+        title: string | null;
         zu_bezahlen: number | null;
         bezahlt: number | null;
       }
@@ -163,6 +165,7 @@ function loadAnalysisSnapshot(localDocumentId: number): AnalysisSnapshot | null 
 
   return {
     paperlessId: doc.paperless_id,
+    title: doc.title ?? null,
     category: summary?.category ?? null,
     zuBezahlen: doc.zu_bezahlen,
     bezahlt: doc.bezahlt,
@@ -324,12 +327,22 @@ export async function writebackAnalysisToPaperless(
     }
 
     await client.setDocumentMetadata(snapshot.paperlessId, {
+      title: snapshot.title,
       addTagIds,
       customFields,
       correspondentId,
       documentTypeId,
     });
 
+    if (snapshot.title?.trim()) {
+      logs.push({
+        ...ctx,
+        status: "ok",
+        kind: "title",
+        fieldName: "Titel",
+        fieldValue: snapshot.title.trim(),
+      });
+    }
     appendPaperlessFieldSyncLogs(logs);
     rememberWritebackError(null);
     return { ok: true };

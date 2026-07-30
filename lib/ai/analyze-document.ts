@@ -95,6 +95,18 @@ export async function analyzeDocument(
       options?.expectedContentHash
     );
     try {
+      const { applySuggestedTitleAfterAnalysis } = await import(
+        "@/lib/paperless/document-title"
+      );
+      applySuggestedTitleAfterAnalysis(documentId, parsed.data);
+    } catch (titleErr) {
+      console.error(
+        "[analyze] document title failed",
+        documentId,
+        titleErr instanceof Error ? titleErr.message : titleErr
+      );
+    }
+    try {
       const { applyRecipientsAfterAnalysis } = await import(
         "@/lib/family/recipients"
       );

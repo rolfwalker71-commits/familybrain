@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { fileURLToPath } from "url";
 
 export type DocumentBrandLogo = {
   id: string;
@@ -31,20 +32,31 @@ export const DOCUMENT_BRAND_LOGOS: DocumentBrandLogo[] = [
   },
 ];
 
-function brandLogosDir(): string {
-  return path.join(
-    /*turbopackIgnore: true*/ process.cwd(),
-    "assets",
-    "document-brand-logos"
-  );
+function brandLogosCandidateDirs(): string[] {
+  const dirs = new Set<string>();
+  const cwd = /*turbopackIgnore: true*/ process.cwd();
+  dirs.add(path.join(cwd, "assets", "document-brand-logos"));
+  // Docker / nested cwd fallbacks
+  dirs.add(path.join(cwd, "..", "assets", "document-brand-logos"));
+  try {
+    const here = path.dirname(fileURLToPath(import.meta.url));
+    dirs.add(
+      path.join(here, "..", "..", "assets", "document-brand-logos")
+    );
+  } catch {
+    /* CJS / no import.meta */
+  }
+  return [...dirs];
 }
 
 export function resolveBrandLogoPath(filename: string): string | null {
   const safe = path.basename(filename);
   if (!safe || safe.includes("..")) return null;
-  const full = path.join(brandLogosDir(), safe);
-  if (!fs.existsSync(full)) return null;
-  return full;
+  for (const dir of brandLogosCandidateDirs()) {
+    const full = path.join(dir, safe);
+    if (fs.existsSync(full)) return full;
+  }
+  return null;
 }
 
 /** Build searchable text from document fields (lowercased). */

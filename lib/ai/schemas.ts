@@ -100,6 +100,8 @@ export const TravelItemSchema = z.object({
 
 export const DocumentAnalysisSchema = z.object({
   category: z.string(),
+  /** Concise German Paperless title generated during analysis. */
+  suggested_title: z.string().nullable().optional(),
   short_summary: z.string().nullable(),
   detailed_summary: z.string().nullable(),
   important_points: z.array(z.string()).default([]),

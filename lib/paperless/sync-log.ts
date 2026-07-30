@@ -9,6 +9,7 @@ export type PaperlessSyncKind =
   | "correspondent"
   | "document_type"
   | "payment_flag"
+  | "title"
   | "batch";
 
 export type PaperlessSyncSource =

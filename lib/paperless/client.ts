@@ -362,6 +362,7 @@ export class PaperlessClient {
   async setDocumentMetadata(
     paperlessId: number,
     input: {
+      title?: string | null;
       addTagIds?: number[];
       documentTypeId?: number | null;
       correspondentId?: number | null;
@@ -370,6 +371,10 @@ export class PaperlessClient {
   ): Promise<PaperlessDocument> {
     const doc = await this.getDocument(paperlessId);
     const body: Record<string, unknown> = {};
+
+    if (input.title?.trim()) {
+      body.title = input.title.trim();
+    }
 
     if (input.addTagIds && input.addTagIds.length > 0) {
       const existingTags = Array.isArray(doc.tags)
