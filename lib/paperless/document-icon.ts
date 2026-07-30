@@ -17,6 +17,11 @@ import {
 import { PaperlessClient } from "@/lib/paperless/client";
 import { getTripsDataRoot } from "@/lib/trips/paths";
 import { nowIso } from "@/lib/utils/dates";
+import {
+  buildBrandMatchHaystack,
+  matchDocumentBrandLogo,
+  resolveBrandLogoPath,
+} from "@/lib/paperless/brand-logos";
 
 /** Document list thumbnails — gpt-image-1.5 for reliable color + prompt adherence. */
 export const DOCUMENT_AI_ICON_MODEL = "gpt-image-1.5";
@@ -411,12 +416,18 @@ export function countDocumentsEligibleForAiIcon(afterId = 0): number {
 
 async function writeIconJpeg(
   documentId: number,
-  source: Buffer
+  source: Buffer,
+  options?: { fit?: "cover" | "contain" }
 ): Promise<string> {
   ensureDocumentAiIconDir();
+  const fit = options?.fit ?? "cover";
   const jpeg = await sharp(source)
     .rotate()
-    .resize(256, 256, { fit: "cover" })
+    .resize(256, 256, {
+      fit,
+      background: { r: 255, g: 255, b: 255, alpha: 1 },
+    })
+    .flatten({ background: { r: 255, g: 255, b: 255 } })
     .jpeg({ quality: 82, mozjpeg: true })
     .toBuffer();
   const filename = `doc-${documentId}-${randomUUID().slice(0, 8)}.jpg`;
@@ -427,6 +438,7 @@ async function writeIconJpeg(
 
 /**
  * Generate (or force-regenerate) a small AI icon for a document.
+ * Known brands (URI, ANG, …) use a fixed logo asset instead of OpenAI.
  */
 export async function generateDocumentAiIcon(
   documentId: number,
@@ -436,9 +448,6 @@ export async function generateDocumentAiIcon(
     throw new Error(
       "Dokument-AI-Icons sind deaktiviert (Einstellungen → Paperless)."
     );
-  }
-  if (!hasOpenAIKey()) {
-    throw new Error("OpenAI API-Key fehlt.");
   }
   const detail = getDocumentById(documentId);
   if (!detail) throw new Error("Dokument nicht gefunden");
@@ -454,6 +463,43 @@ export async function generateDocumentAiIcon(
   const warranty = detail.warranties[0] as
     | { product_name?: string | null }
     | undefined;
+
+  const letterhead = clipDocumentLetterhead(detail.document.content);
+  const brandHaystack = buildBrandMatchHaystack({
+    title: detail.document.title,
+    correspondent: detail.document.correspondent_name,
+    vendor: finance?.vendor ?? null,
+    content: detail.document.content,
+    letterhead,
+  });
+  const brandLogo = matchDocumentBrandLogo(brandHaystack);
+  if (brandLogo) {
+    const logoPath = resolveBrandLogoPath(brandLogo.filename);
+    if (!logoPath) {
+      throw new Error(`Markenlogo fehlt: ${brandLogo.filename}`);
+    }
+    const source = fs.readFileSync(logoPath);
+    const fullPath = await writeIconJpeg(documentId, source, {
+      fit: "contain",
+    });
+    deleteIconFile(existingPath);
+    const updated = setDocumentAiIcon(
+      documentId,
+      fullPath,
+      brandLogo.promptNote
+    );
+    try {
+      const { notifyAiIconGenerated } = await import("@/lib/realtime/notify");
+      notifyAiIconGenerated(documentId, { forced: Boolean(options?.force) });
+    } catch {
+      /* ignore */
+    }
+    return updated;
+  }
+
+  if (!hasOpenAIKey()) {
+    throw new Error("OpenAI API-Key fehlt.");
+  }
 
   const brandHint =
     [detail.document.correspondent_name, finance?.vendor]
@@ -479,7 +525,7 @@ export async function generateDocumentAiIcon(
       typeof detail.summary?.short_summary === "string"
         ? detail.summary.short_summary
         : null,
-    letterhead: clipDocumentLetterhead(detail.document.content),
+    letterhead,
     brandCues,
   });
 
@@ -516,6 +562,21 @@ export async function ensureDocumentAiIconIfMissing(
   const detail = getDocumentById(documentId);
   if (!detail?.document) return;
   if (detail.document.ai_icon_path) return;
-  if (!hasOpenAIKey()) return;
+
+  // Brand logo overrides work without OpenAI.
+  const finance = detail.financialItems[0] as
+    | { vendor?: string | null }
+    | undefined;
+  const letterhead = clipDocumentLetterhead(detail.document.content);
+  const brand = matchDocumentBrandLogo(
+    buildBrandMatchHaystack({
+      title: detail.document.title,
+      correspondent: detail.document.correspondent_name,
+      vendor: finance?.vendor ?? null,
+      content: detail.document.content,
+      letterhead,
+    })
+  );
+  if (!brand && !hasOpenAIKey()) return;
   await generateDocumentAiIcon(documentId, { force: false });
 }
