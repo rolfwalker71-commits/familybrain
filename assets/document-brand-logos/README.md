@@ -1,6 +1,6 @@
 # Document brand logos
 
-Fixed logos used as document list icons when keywords match (instead of AI generation).
+Reference assets for OpenAI document-icon generation. When keywords match, the logo is passed into `images.edit` (`input_fidelity: high`) so the AI icon features that mark.
 
 | File | Source | Match |
 |------|--------|--------|

@@ -11,7 +11,7 @@ export type DocumentBrandLogo = {
 };
 
 /**
- * Known organization logos used as document list icons instead of AI generation.
+ * Known organization logos passed as reference images into OpenAI icon generation.
  * Matched against title, correspondent, vendor, letterhead and OCR (word-ish).
  */
 export const DOCUMENT_BRAND_LOGOS: DocumentBrandLogo[] = [
@@ -20,14 +20,14 @@ export const DOCUMENT_BRAND_LOGOS: DocumentBrandLogo[] = [
     label: "Kanton Uri",
     filename: "uri-wappen.svg",
     promptNote:
-      "Brand logo override: Kanton Uri coat of arms (Wappen Uri, Wikimedia Commons).",
+      "Brand logo reference: Kanton Uri coat of arms (Wappen Uri, Wikimedia Commons).",
   },
   {
     id: "ang",
     label: "ANG / AN-Group",
     filename: "ang-icon.png",
     promptNote:
-      "Brand logo override: ANG International / AN-Group (an-group.one).",
+      "Brand logo reference: ANG International / AN-Group (an-group.one).",
   },
 ];
 
@@ -72,7 +72,7 @@ export function buildBrandMatchHaystack(input: {
 }
 
 /**
- * Detect fixed brand logos from document text.
+ * Detect known brands from document text (for AI logo reference).
  * URI: Kanton Uri (avoid matching inside URLs like http://…).
  * ANG: ANG / AN-Group company.
  */
