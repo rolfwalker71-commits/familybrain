@@ -779,17 +779,25 @@ export function getDashboardStats() {
 
   const openDueFinanceCount = openDueFinance.open_unpaid_count;
 
-  const recentAnalyses = db
-    .prepare(
-      `SELECT d.id, d.title, d.correspondent_name, s.category, s.short_summary,
-              s.analyzed_at, s.confidence
-       FROM document_summaries s
-       JOIN paperless_documents d ON d.id = s.document_id
-       WHERE s.analysis_status = 'completed'
-       ORDER BY s.analyzed_at DESC
-       LIMIT 8`
-    )
-    .all();
+  const recentAnalyses = withResolvedRecipients(
+    (
+      db
+        .prepare(
+          `SELECT d.id, d.title, d.correspondent_name, d.ai_icon_path,
+                  d.recipient_status, d.recipient_member_ids,
+                  s.category, s.short_summary, s.analyzed_at, s.confidence
+           FROM document_summaries s
+           JOIN paperless_documents d ON d.id = s.document_id
+           WHERE s.analysis_status = 'completed'
+           ORDER BY s.analyzed_at DESC
+           LIMIT 8`
+        )
+        .all() as Array<{ ai_icon_path?: string | null }>
+    ).map((row) => ({
+      ...row,
+      ai_icon_url: aiIconPublicUrl(row.ai_icon_path),
+    }))
+  );
 
   return {
     totalDocuments,

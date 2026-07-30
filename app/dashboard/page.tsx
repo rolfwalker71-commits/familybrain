@@ -34,6 +34,9 @@ import {
   type IconTone,
 } from "@/components/layout/icon-circle";
 import { DocumentInfoButton } from "@/components/documents/document-link";
+import { DocumentAiIcon } from "@/components/documents/document-ai-icon";
+import { RecipientAvatars } from "@/components/family/recipient-avatars";
+import type { RecipientAvatarInfo } from "@/components/family/recipient-avatars";
 import type { LucideIcon } from "lucide-react";
 import { ActionInbox } from "@/components/dashboard/action-inbox";
 
@@ -146,6 +149,9 @@ export default async function DashboardPage() {
       deadline_type: string | null;
       document_local_id: number;
       correspondent_name: string | null;
+      ai_icon_url?: string | null;
+      category?: string | null;
+      recipients?: RecipientAvatarInfo;
     }[]
   )
     .filter(
@@ -276,50 +282,63 @@ export default async function DashboardPage() {
             ) : (
               <div className="space-y-3">
                 {stats.recentAnalyses.map((item) => {
-                  const row = item as {
+                  const row = item as unknown as {
                     id: number;
                     title: string | null;
                     correspondent_name: string | null;
                     category: string | null;
                     short_summary: string | null;
                     analyzed_at: string | null;
+                    ai_icon_url?: string | null;
+                    recipients?: RecipientAvatarInfo;
                   };
                   return (
                     <div
                       key={row.id}
-                      className="flex min-w-0 items-start gap-2 rounded-xl border border-border/60 bg-card p-3.5 shadow-[0_4px_16px_rgba(20,32,28,0.05)] transition-colors hover:bg-muted/40"
+                      className="flex min-w-0 items-start gap-2.5 rounded-xl border border-border/60 bg-card p-3.5 shadow-[0_4px_16px_rgba(20,32,28,0.05)] transition-colors hover:bg-muted/40"
                     >
                       <Link
                         href={`/documents/${row.id}`}
-                        className="min-w-0 flex-1"
+                        className="flex min-w-0 flex-1 items-start gap-2.5"
                       >
-                        <div className="flex min-w-0 items-start justify-between gap-3">
-                          <div className="min-w-0 flex-1">
-                            <div className="truncate text-sm font-medium hover:underline">
-                              {row.title || `Dokument #${row.id}`}
-                            </div>
-                            {row.correspondent_name ? (
-                              <p className="mt-0.5 truncate text-xs font-medium text-foreground/75">
-                                {row.correspondent_name}
+                        <DocumentAiIcon
+                          aiIconUrl={row.ai_icon_url}
+                          category={row.category}
+                          size="sm"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex min-w-0 items-start justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <div className="truncate text-sm font-medium hover:underline">
+                                {row.title || `Dokument #${row.id}`}
+                              </div>
+                              {row.correspondent_name ? (
+                                <p className="mt-0.5 truncate text-xs font-medium text-foreground/75">
+                                  {row.correspondent_name}
+                                </p>
+                              ) : null}
+                              <RecipientAvatars
+                                recipients={row.recipients}
+                                className="mt-1 text-xs"
+                              />
+                              <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                                {row.short_summary || "Keine Kurzfassung"}
                               </p>
-                            ) : null}
-                            <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
-                              {row.short_summary || "Keine Kurzfassung"}
-                            </p>
-                          </div>
-                          <div className="flex max-w-[35%] shrink-0 flex-col items-end gap-1">
-                            {row.category ? (
-                              <Badge
-                                variant="secondary"
-                                className="max-w-full truncate"
-                                title={row.category}
-                              >
-                                {row.category}
-                              </Badge>
-                            ) : null}
-                            <span className="text-xs text-muted-foreground">
-                              {toSwissDate(row.analyzed_at)}
-                            </span>
+                            </div>
+                            <div className="flex max-w-[35%] shrink-0 flex-col items-end gap-1">
+                              {row.category ? (
+                                <Badge
+                                  variant="secondary"
+                                  className="max-w-full truncate"
+                                  title={row.category}
+                                >
+                                  {row.category}
+                                </Badge>
+                              ) : null}
+                              <span className="text-xs text-muted-foreground">
+                                {toSwissDate(row.analyzed_at)}
+                              </span>
+                            </div>
                           </div>
                         </div>
                       </Link>
@@ -355,28 +374,39 @@ export default async function DashboardPage() {
                 {upcoming.map((row) => (
                   <div
                     key={row.id}
-                    className="flex min-w-0 items-center gap-2 rounded-xl border border-border/60 bg-card p-3.5 shadow-[0_4px_16px_rgba(20,32,28,0.05)] transition-colors hover:bg-muted/40"
+                    className="flex min-w-0 items-center gap-2.5 rounded-xl border border-border/60 bg-card p-3.5 shadow-[0_4px_16px_rgba(20,32,28,0.05)] transition-colors hover:bg-muted/40"
                   >
                     <Link
                       href={`/documents/${row.document_local_id}`}
-                      className="flex min-w-0 flex-1 items-center justify-between gap-3"
+                      className="flex min-w-0 flex-1 items-center gap-2.5"
                     >
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-medium hover:underline">
-                          {row.title}
+                      <DocumentAiIcon
+                        aiIconUrl={row.ai_icon_url}
+                        category={row.category}
+                        size="sm"
+                      />
+                      <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-sm font-medium hover:underline">
+                            {row.title}
+                          </div>
+                          <div className="mt-1 truncate text-xs text-muted-foreground">
+                            {[
+                              row.correspondent_name,
+                              row.deadline_type || "Frist",
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </div>
+                          <RecipientAvatars
+                            recipients={row.recipients}
+                            className="mt-1 text-xs"
+                          />
                         </div>
-                        <div className="mt-1 truncate text-xs text-muted-foreground">
-                          {[
-                            row.correspondent_name,
-                            row.deadline_type || "Frist",
-                          ]
-                            .filter(Boolean)
-                            .join(" · ")}
-                        </div>
+                        <span className="shrink-0 text-sm font-medium">
+                          {toSwissDate(row.deadline_date)}
+                        </span>
                       </div>
-                      <span className="shrink-0 text-sm font-medium">
-                        {toSwissDate(row.deadline_date)}
-                      </span>
                     </Link>
                     <DocumentInfoButton
                       documentId={row.document_local_id}
