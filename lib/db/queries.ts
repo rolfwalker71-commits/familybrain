@@ -35,6 +35,7 @@ import {
   listFamilyMembers,
   UNKNOWN_RECIPIENT_LABEL,
 } from "@/lib/family/queries";
+import { resolveTaxYear } from "@/lib/extraction/tax";
 
 function aiIconPublicUrl(aiIconPath: string | null | undefined): string | null {
   if (!aiIconPath) return null;
@@ -226,9 +227,13 @@ export function listDocuments(filters: DocumentFilters = {}) {
     params.push(q, q, q, q, q, q, q);
   }
   if (filters.category) {
-    // Exact match on stored category; also accept common aliases via normalized compare in JS fallback not needed —
-    // knowledge area links and AI saves use canonical German names.
-    where.push(`s.category = ?`);
+    if (filters.category === "Arbeit") {
+      where.push(
+        `(s.category = ? OR instr(COALESCE(s.also_categories, ''), '"Arbeit"') > 0)`
+      );
+    } else {
+      where.push(`s.category = ?`);
+    }
     params.push(filters.category);
   }
   if (filters.correspondent) {
@@ -1870,7 +1875,14 @@ export function getKnowledgeAreaCounts() {
               COUNT(s.id) as document_count
        FROM knowledge_areas ka
        LEFT JOIN document_summaries s
-         ON s.category = ka.name AND s.analysis_status = 'completed'
+         ON s.analysis_status = 'completed'
+        AND (
+          s.category = ka.name
+          OR (
+            ka.name = 'Arbeit'
+            AND instr(COALESCE(s.also_categories, ''), '"Arbeit"') > 0
+          )
+        )
        GROUP BY ka.id
        ORDER BY ka.name`
     )
@@ -1879,6 +1891,125 @@ export function getKnowledgeAreaCounts() {
     description: string | null;
     document_count: number;
   }[];
+}
+
+export type TaxDocumentListItem = {
+  id: number;
+  paperless_id: number;
+  title: string | null;
+  created_date: string | null;
+  correspondent_name: string | null;
+  document_type_name: string | null;
+  tax_year: number | null;
+  short_summary: string | null;
+  ai_icon_path: string | null;
+  ai_icon_url: string | null;
+};
+
+export type TaxYearGroup = {
+  taxYear: number | null;
+  label: string;
+  documents: TaxDocumentListItem[];
+};
+
+/** Backfill missing tax_year for Steuern docs from title/date (no re-analysis). */
+export function backfillMissingTaxYears(): number {
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `SELECT d.id, d.title, d.content, d.created_date, s.id as summary_id
+       FROM document_summaries s
+       JOIN paperless_documents d ON d.id = s.document_id
+       WHERE s.analysis_status = 'completed'
+         AND s.category = 'Steuern'
+         AND s.tax_year IS NULL`
+    )
+    .all() as Array<{
+    id: number;
+    title: string | null;
+    content: string | null;
+    created_date: string | null;
+    summary_id: number;
+  }>;
+
+  const update = db.prepare(
+    `UPDATE document_summaries SET tax_year = ?, updated_at = ? WHERE id = ?`
+  );
+  let updated = 0;
+  const ts = nowIso();
+  for (const row of rows) {
+    const year = resolveTaxYear({
+      title: row.title,
+      content: row.content,
+      createdDate: row.created_date,
+    });
+    if (year == null) continue;
+    update.run(year, ts, row.summary_id);
+    updated += 1;
+  }
+  return updated;
+}
+
+/** Steuern documents grouped by tax_year (newest year first). */
+export function listSteuernDocumentsByYear(): TaxYearGroup[] {
+  backfillMissingTaxYears();
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `SELECT d.id, d.paperless_id, d.title, d.created_date, d.correspondent_name,
+              d.document_type_name, d.ai_icon_path, s.tax_year, s.short_summary
+       FROM document_summaries s
+       JOIN paperless_documents d ON d.id = s.document_id
+       WHERE s.analysis_status = 'completed'
+         AND s.category = 'Steuern'
+         AND COALESCE(d.sync_status, 'synced') != 'missing'
+       ORDER BY
+         CASE WHEN s.tax_year IS NULL THEN 1 ELSE 0 END,
+         s.tax_year DESC,
+         COALESCE(d.created_date, d.added_at, d.created_at) DESC`
+    )
+    .all() as Array<{
+    id: number;
+    paperless_id: number;
+    title: string | null;
+    created_date: string | null;
+    correspondent_name: string | null;
+    document_type_name: string | null;
+    ai_icon_path: string | null;
+    tax_year: number | null;
+    short_summary: string | null;
+  }>;
+
+  const byYear = new Map<number | null, TaxDocumentListItem[]>();
+  for (const row of rows) {
+    const key = row.tax_year ?? null;
+    const list = byYear.get(key) || [];
+    list.push({
+      id: row.id,
+      paperless_id: row.paperless_id,
+      title: row.title,
+      created_date: row.created_date,
+      correspondent_name: row.correspondent_name,
+      document_type_name: row.document_type_name,
+      tax_year: row.tax_year,
+      short_summary: row.short_summary,
+      ai_icon_path: row.ai_icon_path,
+      ai_icon_url: aiIconPublicUrl(row.ai_icon_path),
+    });
+    byYear.set(key, list);
+  }
+
+  const years = [...byYear.keys()].sort((a, b) => {
+    if (a == null) return 1;
+    if (b == null) return -1;
+    return b - a;
+  });
+
+  return years.map((taxYear) => ({
+    taxYear,
+    label: taxYear == null ? "Ohne Jahr" : String(taxYear),
+    documents: byYear.get(taxYear) || [],
+  }));
 }
 
 export function searchDocuments(query: string, limit = 50) {

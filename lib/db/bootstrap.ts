@@ -79,6 +79,16 @@ export function bootstrapDatabase(db: Database.Database): void {
   if (!summaryColNames.has("line_items")) {
     db.exec(`ALTER TABLE document_summaries ADD COLUMN line_items TEXT`);
   }
+  if (!summaryColNames.has("tax_year")) {
+    db.exec(`ALTER TABLE document_summaries ADD COLUMN tax_year INTEGER`);
+  }
+  if (!summaryColNames.has("also_categories")) {
+    db.exec(`ALTER TABLE document_summaries ADD COLUMN also_categories TEXT`);
+  }
+  db.exec(
+    `CREATE INDEX IF NOT EXISTS idx_summaries_tax_year
+     ON document_summaries(category, tax_year)`
+  );
   db.exec(
     `CREATE INDEX IF NOT EXISTS idx_summaries_retry
      ON document_summaries(analysis_status, analysis_next_retry_at)`

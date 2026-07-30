@@ -147,6 +147,8 @@ export function DocumentsClient() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [analyzingId, setAnalyzingId] = useState<number | null>(null);
+  const [analyzeBusy, setAnalyzeBusy] = useState(false);
+  const [analyzeProgress, setAnalyzeProgress] = useState<string | null>(null);
   const [searchFocus, setSearchFocus] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [missingAiIcons, setMissingAiIcons] = useState(0);
@@ -286,7 +288,7 @@ export function DocumentsClient() {
   }, [isRunning, load]);
 
   async function analyzeOne(id: number) {
-    if (isRunning) {
+    if (isRunning || analyzeBusy) {
       setError(
         "Batch-Analyse läuft noch. Oben «Analyse stoppen», dann erneut «Analysieren»."
       );
@@ -310,6 +312,105 @@ export function DocumentsClient() {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setAnalyzingId(null);
+    }
+  }
+
+  async function runSelectedAnalyzeBatch() {
+    if (!hasOpenAIKey) {
+      setError("OpenAI-Key fehlt.");
+      return;
+    }
+    if (isRunning || analyzeBusy || iconBusy) {
+      setError("Ein anderer Lauf ist noch aktiv.");
+      return;
+    }
+    const documentIds = Array.from(selectedIds);
+    if (documentIds.length === 0) {
+      setError("Bitte zuerst Dokumente auswählen.");
+      return;
+    }
+
+    setAnalyzeBusy(true);
+    setError(null);
+    setAnalyzeProgress(
+      `Neuanalyse… (${documentIds.length} ausgewählt)`
+    );
+    setAnalyzingId(documentIds[0] ?? null);
+    try {
+      let afterId = 0;
+      let totalSucceeded = 0;
+      let totalFailed = 0;
+      let done = false;
+
+      while (!done) {
+        const res = await fetch("/api/analyze/batch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            limit: Math.min(documentIds.length, 10),
+            afterId,
+            documentIds,
+          }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || "Analyse-Batch fehlgeschlagen");
+        }
+
+        let batchDone = true;
+        let nextAfterId = afterId;
+        let streamError: string | null = null;
+
+        await readNdjsonStream(res, (event) => {
+          if (event.type === "progress") {
+            const currentId =
+              typeof event.currentDocumentId === "number"
+                ? event.currentDocumentId
+                : null;
+            if (currentId != null) setAnalyzingId(currentId);
+            setAnalyzeProgress(
+              `Neuanalyse… ${Number(event.succeeded || 0) + totalSucceeded} ok` +
+                (Number(event.failed || 0) + totalFailed > 0
+                  ? `, ${Number(event.failed || 0) + totalFailed} Fehler`
+                  : "") +
+                (currentId != null ? ` · Dokument #${currentId}` : "")
+            );
+          } else if (event.type === "done") {
+            const processed = Number(event.processed || 0);
+            const succeeded = Number(event.succeeded || 0);
+            const failedList = Array.isArray(event.failed) ? event.failed : [];
+            totalSucceeded += succeeded;
+            totalFailed += failedList.length;
+            nextAfterId = Number(event.nextAfterId ?? afterId);
+            batchDone =
+              event.done === true ||
+              processed === 0 ||
+              (typeof event.queueRemaining === "number" &&
+                Number(event.queueRemaining) === 0);
+            setAnalyzeProgress(
+              `Fertig: ${totalSucceeded} ok` +
+                (totalFailed > 0 ? `, ${totalFailed} Fehler` : "")
+            );
+          } else if (event.type === "error") {
+            streamError = String(event.error || "Analyse-Batch fehlgeschlagen");
+          }
+        });
+
+        if (streamError) throw new Error(streamError);
+        afterId = nextAfterId;
+        done = batchDone;
+      }
+
+      setSelectedIds(new Set());
+      await refreshStats();
+      await load();
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setAnalyzeBusy(false);
+      setAnalyzingId(null);
+      window.setTimeout(() => setAnalyzeProgress(null), 2500);
     }
   }
 
@@ -363,6 +464,9 @@ export function DocumentsClient() {
     setIconBusy(false);
     setIconProgress(null);
     setGeneratingIconId(null);
+    setAnalyzeBusy(false);
+    setAnalyzeProgress(null);
+    setAnalyzingId(null);
     try {
       await fetch("/api/jobs/cancel", { method: "POST" });
     } catch {
@@ -723,7 +827,7 @@ export function DocumentsClient() {
                   <Button
                     size="sm"
                     variant="outline"
-                    disabled={iconBusy || retryingErrors}
+                    disabled={iconBusy || analyzeBusy || retryingErrors}
                     onClick={() => void retryAllErrors()}
                   >
                     {retryingErrors
@@ -736,7 +840,7 @@ export function DocumentsClient() {
                     <Button
                       size="sm"
                       variant="outline"
-                      disabled={iconBusy}
+                      disabled={iconBusy || analyzeBusy}
                       onClick={() =>
                         void startAnalysis({ mode: "batch", batchSize: 10 })
                       }
@@ -746,7 +850,7 @@ export function DocumentsClient() {
                     <Button
                       size="sm"
                       className="bg-[var(--brand-finance)] text-white hover:bg-[var(--brand-finance)]/90"
-                      disabled={iconBusy}
+                      disabled={iconBusy || analyzeBusy}
                       onClick={() =>
                         void startAnalysis({ mode: "all", batchSize: 10 })
                       }
@@ -757,12 +861,26 @@ export function DocumentsClient() {
                 ) : null}
               </>
             )}
+            {hasOpenAIKey ? (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={
+                  iconBusy || analyzeBusy || isRunning || selectedIds.size === 0
+                }
+                onClick={() => void runSelectedAnalyzeBatch()}
+              >
+                {analyzeBusy
+                  ? "Analyse…"
+                  : `Analysieren (${selectedIds.size})`}
+              </Button>
+            ) : null}
             {hasOpenAIKey && documentAiIconsEnabled ? (
               <>
                 <Button
                   size="sm"
                   variant="outline"
-                  disabled={iconBusy || selectedIds.size === 0}
+                  disabled={iconBusy || analyzeBusy || selectedIds.size === 0}
                   onClick={() => void runAiIconBatch("selected")}
                 >
                   <Sparkles className="size-3.5" />
@@ -773,7 +891,7 @@ export function DocumentsClient() {
                 <Button
                   size="sm"
                   variant="outline"
-                  disabled={iconBusy || missingAiIcons === 0}
+                  disabled={iconBusy || analyzeBusy || missingAiIcons === 0}
                   onClick={() => void runAiIconBatch("all-missing")}
                 >
                   <Sparkles className="size-3.5" />
@@ -784,7 +902,7 @@ export function DocumentsClient() {
                 <Button
                   size="sm"
                   variant="outline"
-                  disabled={iconBusy}
+                  disabled={iconBusy || analyzeBusy}
                   onClick={() => {
                     if (
                       !window.confirm(
@@ -814,12 +932,14 @@ export function DocumentsClient() {
         }
       />
 
-      {isRunning ? (
+      {isRunning || analyzeBusy ? (
         <div
           className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-950 dark:text-amber-100"
           role="status"
         >
-          Analyse läuft — «Analysieren» pro Zeile ist gesperrt.{" "}
+          {analyzeBusy && analyzeProgress
+            ? analyzeProgress
+            : "Analyse läuft — «Analysieren» pro Zeile ist gesperrt."}{" "}
           <button
             type="button"
             className="font-semibold underline underline-offset-2"
@@ -827,7 +947,7 @@ export function DocumentsClient() {
           >
             Analyse stoppen
           </button>
-          , dann erneut tippen. KI-Icons sind davon unabhängig.
+          {analyzeBusy ? null : ", dann erneut tippen. KI-Icons sind davon unabhängig."}
         </div>
       ) : null}
 
@@ -1436,9 +1556,11 @@ export function DocumentsClient() {
                           <Button
                             size="sm"
                             variant="outline"
-                            disabled={analyzingId === doc.id || isRunning}
+                            disabled={
+                              analyzingId === doc.id || isRunning || analyzeBusy
+                            }
                             title={
-                              isRunning
+                              isRunning || analyzeBusy
                                 ? "Erst Analyse stoppen"
                                 : "Dokument analysieren"
                             }

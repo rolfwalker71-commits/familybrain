@@ -5,6 +5,12 @@ import { getActiveJobRun } from "@/lib/jobs/queries";
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
+/**
+ * Batch-analyze documents.
+ * Body: { limit?, afterId?, documentIds?: number[] }
+ * With documentIds: force-reanalyze those IDs (NDJSON, client loops via afterId).
+ * Without: drain pending IDs (existing behavior).
+ */
 export async function POST(request: Request) {
   if (getActiveJobRun()) {
     return Response.json(
@@ -15,6 +21,12 @@ export async function POST(request: Request) {
 
   const body = await request.json().catch(() => ({}));
   const limit = Math.min(Math.max(Number(body.limit) || 10, 1), 50);
+  const afterId = Math.max(Number(body.afterId) || 0, 0);
+  const onlyIds: number[] | null = Array.isArray(body.documentIds)
+    ? body.documentIds
+        .map((n: unknown) => Number(n))
+        .filter((n: number) => Number.isInteger(n) && n > 0)
+    : null;
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
@@ -24,14 +36,26 @@ export async function POST(request: Request) {
       };
 
       try {
-        const ids = listPendingDocumentIds(limit);
+        let ids: number[];
+        if (onlyIds && onlyIds.length > 0) {
+          const sorted = [...new Set(onlyIds)].sort((a, b) => a - b);
+          ids = sorted.filter((id) => id > afterId).slice(0, limit);
+        } else {
+          ids = listPendingDocumentIds(limit);
+        }
+
         const failed: { documentId: number; error: string }[] = [];
         let succeeded = 0;
+        const queueTotal =
+          onlyIds && onlyIds.length > 0
+            ? onlyIds.filter((id: number) => id > afterId).length
+            : ids.length;
 
         send({
           type: "progress",
           phase: "starting",
           total: ids.length,
+          queueTotal,
           processed: 0,
           succeeded: 0,
           failed: 0,
@@ -54,6 +78,7 @@ export async function POST(request: Request) {
             type: "progress",
             phase: "analyzing",
             total: ids.length,
+            queueTotal,
             processed: i + 1,
             succeeded,
             failed: failed.length,
@@ -65,11 +90,24 @@ export async function POST(request: Request) {
           });
         }
 
+        const lastId = ids.length > 0 ? ids[ids.length - 1]! : afterId;
+        const remaining =
+          onlyIds && onlyIds.length > 0
+            ? onlyIds.filter((id: number) => id > lastId).length
+            : 0;
+        const done =
+          onlyIds && onlyIds.length > 0
+            ? remaining === 0 || ids.length === 0
+            : true;
+
         send({
           type: "done",
           processed: ids.length,
           succeeded,
           failed,
+          nextAfterId: lastId,
+          done,
+          queueRemaining: remaining,
         });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);

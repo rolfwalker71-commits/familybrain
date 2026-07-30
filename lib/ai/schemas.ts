@@ -102,6 +102,12 @@ export const DocumentAnalysisSchema = z.object({
   category: z.string(),
   /** Concise German Paperless title generated during analysis. */
   suggested_title: z.string().nullable().optional(),
+  /** Swiss tax period year (Steuerjahr), e.g. 2025 for Lohnausweis 2025. */
+  tax_year: z.number().int().min(1990).max(2100).nullable().optional(),
+  /** Extra knowledge areas where this doc should also appear (e.g. Arbeit for Lohnausweis). */
+  also_categories: z.array(z.string()).optional().default([]),
+  /** Explicit flag: also list under Arbeit (Lohnausweis). */
+  also_in_arbeit: z.boolean().nullable().optional(),
   short_summary: z.string().nullable(),
   detailed_summary: z.string().nullable(),
   important_points: z.array(z.string()).default([]),

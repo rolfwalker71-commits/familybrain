@@ -59,6 +59,8 @@ CREATE TABLE IF NOT EXISTS document_summaries (
   warranty_info TEXT,
   cancellation_terms TEXT,
   category TEXT,
+  tax_year INTEGER,
+  also_categories TEXT,
   possible_todos TEXT,
   confidence REAL,
   model_name TEXT,

@@ -28,7 +28,11 @@ export default function KnowledgePage() {
           return (
             <Link
               key={area.name}
-              href={`/documents?category=${encodeURIComponent(area.name)}`}
+              href={
+                area.name === "Steuern"
+                  ? "/knowledge/steuern"
+                  : `/documents?category=${encodeURIComponent(area.name)}`
+              }
               className="min-w-0"
             >
               <Card

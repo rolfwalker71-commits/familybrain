@@ -343,12 +343,18 @@ export function normalizeKnowledgeCategory(
     return "Versicherungen";
   if (includesAny(key, ["wohn", "miete", "nebenkost", "liegensch"]))
     return "Wohnen";
-  if (includesAny(key, ["steuer", "tax"])) return "Steuern";
+  // Lohnausweis / salary certificate for Swiss tax return → Steuern (also_categories handles Arbeit)
+  if (includesAny(key, ["lohnausweis", "lohnmeldeschein", "salary statement"]))
+    return "Steuern";
+  if (includesAny(key, ["steuer", "tax", "veranlag"])) return "Steuern";
   if (includesAny(key, ["reise", "travel", "flug", "hotel", "cruise"]))
     return "Reisen";
   if (includesAny(key, ["fahrzeug", "auto", "motorrad", "vehicle"]))
     return "Fahrzeuge";
-  if (includesAny(key, ["arbeit", "lohn", "gehalt", "employ"])) return "Arbeit";
+  // "lohn" alone → Arbeit only when not already classified as tax document keyword
+  if (includesAny(key, ["arbeit", "gehalt", "employ", "anstell"])) return "Arbeit";
+  if (includesAny(key, ["lohn"]) && !includesAny(key, ["ausweis", "steuer"]))
+    return "Arbeit";
   if (includesAny(key, ["gerat", "garantie", "warranty", "device", "serial"]))
     return "Geräte & Garantien";
   if (includesAny(key, ["vertrag", "contract", "kundig"])) return "Verträge";

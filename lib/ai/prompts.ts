@@ -26,6 +26,7 @@ Rules:
 - Always extract booking_reference / confirmation / PNR / reservation code into booking_reference when present.
 - Also capture other date-relevant fields in important_dates: payment due, cancellation deadline, boarding, check-in, flight departure/arrival, hotel check-in/out, appointment dates, warranty end, contract start/end.
 - Always set suggested_title: a concise German Paperless document title (max ~120 characters). Prefer document type + subject + organization (e.g. «Kaufvertrag Grundstück …», «Rechnung Swisscom März 2026», «Haftpflicht Police»). Never use scanner/file names (SCAN__, IMG_, DSC_, UUID-like strings). Household member / Empfänger names are optional — omit them unless needed to distinguish the document (recipients are linked separately).
+- Swiss tax documents for the Steuererklärung (Steuererklärung, Veranlagung, Steuerrechnung/-bescheid, Quellensteuer, Lohnausweis / Lohnmeldeschein, Belege die typischerweise der Steuererklärung beigelegt werden): set category to «Steuern». For Lohnausweis/Lohnmeldeschein also set also_in_arbeit=true (or also_categories including «Arbeit»). Set tax_year to the Steuerperiode / Steuerjahr as an integer (e.g. Lohnausweis 2025 → 2025), not the scan date unless no period is visible.
 - category MUST be one of: ${categoriesList}
 - travel_items[].travel_type SHOULD be one of: ${travelTypesList} (use German labels; map Cruise→Kreuzfahrt, Hotelaufenthalt→Hotel, Visa Waiver→Visa / Einreise). Flights/air tickets/e-tickets MUST be "Flug" (never Kreuzfahrt). Kreuzfahrt is ONLY for ship cruises (ports of call / Kreuzfahrtverlauf). Package PDFs may contain multiple travel_items — classify each item by its own segment (flight vs hotel vs cruise vs transfer).
 - deadlines[].type SHOULD be one of: ${deadlineTypesList} (map cancellation→Kündigung, payment→Zahlung, appeal/einspruch→Einsprache)
@@ -67,6 +68,9 @@ Required JSON shape:
 {
   "category": "Versicherungen",
   "suggested_title": "Haftpflichtversicherung Police 2026",
+  "tax_year": null,
+  "also_categories": [],
+  "also_in_arbeit": false,
   "short_summary": "...",
   "detailed_summary": "...",
   "important_points": ["..."],
@@ -140,6 +144,10 @@ Required JSON shape:
 Title (suggested_title):
 - Always rewrite a clear German archive title, even when metadata Title is already set (scanner names like SCAN__… must be replaced).
 - Focus on what the document is; do not force household names into the title.
+
+Tax (Steuern / tax_year):
+- For Swiss Steuererklärung-related docs set category «Steuern» and tax_year to the tax period year when known.
+- Lohnausweis → category «Steuern», also_in_arbeit true, tax_year = year on the form.
 
 Travel/cruise specifics:
 - If OCR contains "Kreuzfahrtverlauf", "PORTS-OF-CALL", "Cruise Itinerary" or similar day-by-day stops, fill travel_items[0].itinerary completely (one object per day/port).

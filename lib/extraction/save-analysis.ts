@@ -21,6 +21,13 @@ import {
   itineraryStopLabel,
 } from "@/lib/extraction/itinerary-labels";
 import { updateDocumentEmbeddingStatus } from "@/lib/db/queries";
+import {
+  looksLikeLohnausweis,
+  looksLikeSwissTaxDocument,
+  resolveAlsoCategories,
+  resolveTaxYear,
+  serializeAlsoCategories,
+} from "@/lib/extraction/tax";
 
 function warrantyStatus(warrantyUntil: string | null): string {
   if (!warrantyUntil) return "unknown";
@@ -128,10 +135,48 @@ export function saveAnalysis(
 ): void {
   const db = getDb();
   const ts = nowIso();
-  const doc = db
-    .prepare(`SELECT content FROM paperless_documents WHERE id = ?`)
-    .get(documentId) as { content: string | null } | undefined;
-  const enriched = enrichTravelWithItinerary(analysis, doc?.content ?? null);
+  const docMeta = db
+    .prepare(
+      `SELECT title, content, created_date FROM paperless_documents WHERE id = ?`
+    )
+    .get(documentId) as
+    | { title: string | null; content: string | null; created_date: string | null }
+    | undefined;
+  const enriched = enrichTravelWithItinerary(
+    analysis,
+    docMeta?.content ?? null
+  );
+
+  let category = normalizeKnowledgeCategory(enriched.category);
+  const taxText = [
+    docMeta?.title,
+    enriched.suggested_title,
+    enriched.short_summary,
+    enriched.detailed_summary,
+    (docMeta?.content || "").slice(0, 4000),
+  ]
+    .filter(Boolean)
+    .join("\n");
+  if (
+    category !== "Steuern" &&
+    (looksLikeSwissTaxDocument(taxText) || looksLikeLohnausweis(taxText))
+  ) {
+    category = "Steuern";
+  }
+
+  const taxYear = resolveTaxYear({
+    taxYear: enriched.tax_year ?? null,
+    title: enriched.suggested_title || docMeta?.title,
+    content: docMeta?.content,
+    createdDate: docMeta?.created_date,
+  });
+  const alsoCategories = resolveAlsoCategories({
+    analysis: enriched,
+    title: enriched.suggested_title || docMeta?.title,
+    content: docMeta?.content,
+    category,
+  });
+  const alsoCategoriesJson = serializeAlsoCategories(alsoCategories);
 
   const tx = db.transaction(() => {
     if (expectedContentHash !== undefined) {
@@ -147,9 +192,9 @@ export function saveAnalysis(
       `INSERT INTO document_summaries (
         document_id, short_summary, detailed_summary, important_points, important_dates,
         amounts, line_items, deadlines, contract_parties, warranty_info, cancellation_terms,
-        category, possible_todos, confidence, model_name, analysis_status, analyzed_at,
-        created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', ?, ?, ?)
+        category, tax_year, also_categories, possible_todos, confidence, model_name,
+        analysis_status, analyzed_at, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', ?, ?, ?)
       ON CONFLICT(document_id) DO UPDATE SET
         short_summary = excluded.short_summary,
         detailed_summary = excluded.detailed_summary,
@@ -162,6 +207,8 @@ export function saveAnalysis(
         warranty_info = excluded.warranty_info,
         cancellation_terms = excluded.cancellation_terms,
         category = excluded.category,
+        tax_year = excluded.tax_year,
+        also_categories = excluded.also_categories,
         possible_todos = excluded.possible_todos,
         confidence = excluded.confidence,
         model_name = excluded.model_name,
@@ -185,7 +232,9 @@ export function saveAnalysis(
       JSON.stringify(enriched.contract_parties),
       JSON.stringify(enriched.warranty_info),
       JSON.stringify(enriched.cancellation_terms),
-      normalizeKnowledgeCategory(enriched.category),
+      category,
+      taxYear,
+      alsoCategoriesJson,
       JSON.stringify(enriched.possible_todos),
       enriched.confidence,
       modelName,

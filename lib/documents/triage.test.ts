@@ -12,6 +12,9 @@ function baseAnalysis(
   return {
     category: "Sonstiges",
     suggested_title: "Testdokument",
+    tax_year: null,
+    also_categories: [],
+    also_in_arbeit: false,
     short_summary: null,
     detailed_summary: null,
     important_points: [],
