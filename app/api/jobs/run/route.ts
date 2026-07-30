@@ -22,24 +22,26 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
-  const BodySchema = z.object({
-    jobType: z
-      .enum([
-        JOB_TYPE_SYNC_ANALYZE,
-        JOB_TYPE_ANALYZE_PENDING,
-        JOB_TYPE_AI_ICONS_MISSING,
-        JOB_TYPE_AI_ICONS_REGENERATE,
-        JOB_TYPE_PAPERLESS_WRITEBACK,
-      ])
-      .optional()
-      .default(JOB_TYPE_SYNC_ANALYZE),
-    /** With analyze_pending: re-queue all analysis_status=error first. */
-    resetErrors: z.boolean().optional().default(false),
-  });
+const BodySchema = z.object({
+  jobType: z
+    .enum([
+      JOB_TYPE_SYNC_ANALYZE,
+      JOB_TYPE_ANALYZE_PENDING,
+      JOB_TYPE_AI_ICONS_MISSING,
+      JOB_TYPE_AI_ICONS_REGENERATE,
+      JOB_TYPE_PAPERLESS_WRITEBACK,
+    ])
+    .optional()
+    .default(JOB_TYPE_SYNC_ANALYZE),
+  /** With analyze_pending: re-queue all analysis_status=error first. */
+  resetErrors: z.boolean().optional().default(false),
+  /** With analyze_pending: re-queue all completed/error/stale for full re-run. */
+  requeueAll: z.boolean().optional().default(false),
+});
 
 /**
  * Fire-and-forget durable background job. Continues after the HTTP response.
- * Body: { jobType?, resetErrors? }
+ * Body: { jobType?, resetErrors?, requeueAll? }
  */
 export async function POST(request: Request) {
   const auth = await requireAdmin();
@@ -53,6 +55,7 @@ export async function POST(request: Request) {
 
   const jobType = parsed.data.jobType;
   const resetErrors = parsed.data.resetErrors;
+  const requeueAll = parsed.data.requeueAll;
   const active = getActiveJobRun();
   if (active) {
     return NextResponse.json(
@@ -67,7 +70,7 @@ export async function POST(request: Request) {
   if (jobType === JOB_TYPE_SYNC_ANALYZE) {
     void runSyncAnalyzeJob("manual");
   } else if (jobType === JOB_TYPE_ANALYZE_PENDING) {
-    void runAnalyzePendingJob("manual", { resetErrors });
+    void runAnalyzePendingJob("manual", { resetErrors, requeueAll });
   } else if (jobType === JOB_TYPE_AI_ICONS_MISSING) {
     void runAiIconsMissingJob("manual");
   } else if (jobType === JOB_TYPE_AI_ICONS_REGENERATE) {
@@ -82,6 +85,7 @@ export async function POST(request: Request) {
       accepted: true,
       jobType,
       resetErrors: jobType === JOB_TYPE_ANALYZE_PENDING ? resetErrors : false,
+      requeueAll: jobType === JOB_TYPE_ANALYZE_PENDING ? requeueAll : false,
       label: jobTypeLabel(jobType),
     },
     { status: 202 }

@@ -24,6 +24,7 @@ import {
   recoverExpiredJobLeases,
   releaseAnalysisClaimAsPending,
   resetAllAnalysisErrors,
+  requeueAllAnalysesForRerun,
   tryAcquireJobRun,
   updateJobRunSummary,
   type JobRunSummary,
@@ -58,7 +59,7 @@ async function assertNotCancelled(runId: number): Promise<boolean> {
 
 export async function runAnalyzePendingJob(
   trigger: JobTrigger = "manual",
-  options?: { resetErrors?: boolean }
+  options?: { resetErrors?: boolean; requeueAll?: boolean }
 ): Promise<BackgroundRunResult> {
   recoverExpiredJobLeases();
   recoverExpiredAnalysisClaims();
@@ -90,7 +91,10 @@ export async function runAnalyzePendingJob(
 
   try {
     let resetCount = 0;
-    if (options?.resetErrors) {
+    if (options?.requeueAll) {
+      resetCount = requeueAllAnalysesForRerun();
+      summary.errorsReset = resetCount;
+    } else if (options?.resetErrors) {
       resetCount = resetAllAnalysisErrors();
       summary.errorsReset = resetCount;
     }
@@ -100,9 +104,11 @@ export async function runAnalyzePendingJob(
       itemKind: "phase",
       status: "running",
       title: "AI-Analyse",
-      message: options?.resetErrors
-        ? `Fehlerhafte zurückgesetzt (${resetCount}), starte Analyse`
-        : "Starte Hintergrund-Analyse ausstehender Dokumente",
+      message: options?.requeueAll
+        ? `Komplette Neuanalyse vorbereitet (${resetCount} zurückgesetzt), starte Analyse`
+        : options?.resetErrors
+          ? `Fehlerhafte zurückgesetzt (${resetCount}), starte Analyse`
+          : "Starte Hintergrund-Analyse ausstehender Dokumente",
     });
 
     while (await assertNotCancelled(run.id)) {

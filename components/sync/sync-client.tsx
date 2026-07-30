@@ -156,7 +156,7 @@ function SyncClientInner() {
       | "ai_icons_missing"
       | "ai_icons_regenerate"
       | "sync_analyze",
-    options?: { resetErrors?: boolean }
+    options?: { resetErrors?: boolean; requeueAll?: boolean }
   ) {
     setBusy("job");
     setError(null);
@@ -168,6 +168,7 @@ function SyncClientInner() {
         body: JSON.stringify({
           jobType,
           resetErrors: options?.resetErrors === true,
+          requeueAll: options?.requeueAll === true,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -180,9 +181,11 @@ function SyncClientInner() {
         );
       }
       setMessage(
-        options?.resetErrors
-          ? "Fehlerhafte zurückgesetzt — Analyse läuft im Hintergrund weiter."
-          : `${data.label || "Job"} gestartet — läuft auf dem Server weiter, auch wenn du die Seite verlässt.`
+        options?.requeueAll
+          ? "Komplette Neuanalyse gestartet — läuft im Hintergrund weiter."
+          : options?.resetErrors
+            ? "Fehlerhafte zurückgesetzt — Analyse läuft im Hintergrund weiter."
+            : `${data.label || "Job"} gestartet — läuft auf dem Server weiter, auch wenn du die Seite verlässt.`
       );
       await refreshBackgroundJob();
       await refreshStats();
@@ -792,9 +795,11 @@ function SyncClientInner() {
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            <strong>Wichtig:</strong> „10 analysieren“ ist ein kurzer Browser-Batch.
-            „Alle im Hintergrund“ und Writeback laufen als Server-Job weiter — der
-            Tab darf geschlossen werden.
+            <strong>Wichtig:</strong> „10 analysieren“ und „Alle im Hintergrund“
+            gelten nur für <em>ausstehende</em> Dokumente (hier: {pendingCount}).
+            Für eine komplette Neuanalyse zuerst Triage in den Einstellungen
+            pausieren, dann „Alle neu analysieren“. Hintergrund-Jobs laufen
+            weiter, wenn der Tab geschlossen wird.
           </p>
           <div className="rounded-xl border border-border/60 bg-[var(--brand-docs-soft)]/50 p-4 text-sm">
             Ausstehend: <strong>{pendingCount}</strong>
@@ -891,6 +896,37 @@ function SyncClientInner() {
                   onClick={() => void startBackgroundJob("analyze_pending")}
                 >
                   Alle im Hintergrund analysieren
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  disabled={
+                    analyzedCount + errorCount === 0 ||
+                    !hasOpenAIKey ||
+                    busy !== null ||
+                    bgJob != null ||
+                    analysisRunning
+                  }
+                  onClick={() => {
+                    if (
+                      !window.confirm(
+                        `${analyzedCount + errorCount} Dokument(e) komplett neu analysieren?\n\n` +
+                          "Tipp: Triage nach Analyse in den Einstellungen vorher pausieren, " +
+                          "sonst füllt sich die Inbox (und ggf. Mails).\n\n" +
+                          "Das kostet OpenAI-Tokens und läuft im Hintergrund."
+                      )
+                    ) {
+                      return;
+                    }
+                    void startBackgroundJob("analyze_pending", {
+                      requeueAll: true,
+                    });
+                  }}
+                >
+                  Alle neu analysieren
+                  {analyzedCount + errorCount > 0
+                    ? ` (${analyzedCount + errorCount})`
+                    : ""}
                 </Button>
                 <Button
                   variant="outline"

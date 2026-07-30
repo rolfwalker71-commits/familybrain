@@ -626,6 +626,29 @@ export function resetAllAnalysisErrors(): number {
   return result.changes;
 }
 
+/**
+ * Re-queue completed/error/stale analyses for a full re-run
+ * (manual «Alle neu analysieren»).
+ */
+export function requeueAllAnalysesForRerun(): number {
+  const db = getDb();
+  const ts = nowIso();
+  const result = db
+    .prepare(
+      `UPDATE document_summaries
+       SET analysis_status = 'pending',
+           analysis_attempts = 0,
+           analysis_claimed_at = NULL,
+           analysis_claim_hash = NULL,
+           analysis_next_retry_at = NULL,
+           analysis_last_error = NULL,
+           updated_at = ?
+       WHERE analysis_status IN ('completed', 'error', 'stale')`
+    )
+    .run(ts);
+  return result.changes;
+}
+
 export function countAnalysisErrors(): number {
   const db = getDb();
   return (
