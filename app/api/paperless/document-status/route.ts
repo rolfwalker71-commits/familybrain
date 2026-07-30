@@ -8,6 +8,7 @@ import {
   BUDDY_CUSTOM_FIELD_NAMES,
   extractNamedBooleanField,
   extractNamedStringField,
+  extractPaymentCustomFlags,
 } from "@/lib/paperless/custom-fields";
 import { writebackStatusFlagsToPaperless } from "@/lib/paperless/writeback";
 
@@ -19,6 +20,10 @@ const PatchSchema = z.object({
   buddyReviewed: z.boolean().optional(),
   taxRelevant: z.boolean().optional(),
   buddyStatus: z.string().max(40).nullable().optional(),
+  /** Paperless UDF «Bezahlt» / «Rechnung Bezahlt» */
+  bezahlt: z.boolean().optional(),
+  /** Paperless UDF «Zu bezahlen» / «Rechnung Offen» */
+  zuBezahlen: z.boolean().optional(),
 });
 
 async function resolveStatusFromRaw(
@@ -27,6 +32,8 @@ async function resolveStatusFromRaw(
   buddyReviewed: boolean | null;
   taxRelevant: boolean | null;
   buddyStatus: string | null;
+  bezahlt: boolean | null;
+  zuBezahlen: boolean | null;
 }> {
   const fieldIdToName = new Map<number, string>();
   const { baseUrl, apiToken, publicUrl } = getPaperlessSettings();
@@ -39,6 +46,7 @@ async function resolveStatusFromRaw(
       /* use names embedded in raw only */
     }
   }
+  const payment = extractPaymentCustomFlags(raw, fieldIdToName);
   return {
     buddyReviewed: extractNamedBooleanField(
       raw,
@@ -55,6 +63,8 @@ async function resolveStatusFromRaw(
       fieldIdToName,
       BUDDY_CUSTOM_FIELD_NAMES.buddyStatus
     ),
+    bezahlt: payment.bezahlt,
+    zuBezahlen: payment.zuBezahlen,
   };
 }
 
@@ -97,6 +107,8 @@ export async function PATCH(request: Request) {
     buddyReviewed: parsed.data.buddyReviewed,
     taxRelevant: parsed.data.taxRelevant,
     buddyStatus: parsed.data.buddyStatus,
+    bezahlt: parsed.data.bezahlt,
+    zuBezahlen: parsed.data.zuBezahlen,
   });
   if (!result.ok) {
     return NextResponse.json(

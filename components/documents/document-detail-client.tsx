@@ -133,6 +133,8 @@ function DocumentDetailInner({ detail }: DetailProps) {
   const [error, setError] = useState<string | null>(null);
   const [buddyReviewed, setBuddyReviewed] = useState(false);
   const [taxRelevant, setTaxRelevant] = useState(false);
+  const [invoicePaid, setInvoicePaid] = useState(false);
+  const [invoiceOpen, setInvoiceOpen] = useState(false);
   const [statusBusy, setStatusBusy] = useState(false);
   const [statusLoaded, setStatusLoaded] = useState(false);
   const [aiIconUrl, setAiIconUrl] = useState<string | null>(
@@ -257,6 +259,9 @@ function DocumentDetailInner({ detail }: DetailProps) {
 
   useEffect(() => {
     let cancelled = false;
+    // Seed from local sync columns while Paperless metadata loads
+    setInvoicePaid(Number(document.bezahlt) === 1);
+    setInvoiceOpen(Number(document.zu_bezahlen) === 1);
     void (async () => {
       try {
         const res = await fetch(
@@ -266,6 +271,12 @@ function DocumentDetailInner({ detail }: DetailProps) {
         if (!res.ok || cancelled) return;
         setBuddyReviewed(data.buddyReviewed === true);
         setTaxRelevant(data.taxRelevant === true);
+        if (typeof data.bezahlt === "boolean") {
+          setInvoicePaid(data.bezahlt);
+        }
+        if (typeof data.zuBezahlen === "boolean") {
+          setInvoiceOpen(data.zuBezahlen);
+        }
       } catch {
         /* ignore */
       } finally {
@@ -275,11 +286,13 @@ function DocumentDetailInner({ detail }: DetailProps) {
     return () => {
       cancelled = true;
     };
-  }, [document.id]);
+  }, [document.id, document.bezahlt, document.zu_bezahlen]);
 
   async function patchStatus(next: {
     buddyReviewed?: boolean;
     taxRelevant?: boolean;
+    bezahlt?: boolean;
+    zuBezahlen?: boolean;
   }) {
     setStatusBusy(true);
     setError(null);
@@ -302,11 +315,33 @@ function DocumentDetailInner({ detail }: DetailProps) {
       if (next.taxRelevant !== undefined) {
         setTaxRelevant(next.taxRelevant);
       }
+      if (next.bezahlt !== undefined) {
+        setInvoicePaid(next.bezahlt);
+      }
+      if (next.zuBezahlen !== undefined) {
+        setInvoiceOpen(next.zuBezahlen);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setStatusBusy(false);
     }
+  }
+
+  async function patchInvoiceFlags(next: {
+    bezahlt?: boolean;
+    zuBezahlen?: boolean;
+  }) {
+    // Mutual exclusivity when checking one side (like Finance «als bezahlt»)
+    if (next.bezahlt === true) {
+      await patchStatus({ bezahlt: true, zuBezahlen: false });
+      return;
+    }
+    if (next.zuBezahlen === true) {
+      await patchStatus({ zuBezahlen: true, bezahlt: false });
+      return;
+    }
+    await patchStatus(next);
   }
 
   async function generateIcon() {
@@ -501,50 +536,99 @@ function DocumentDetailInner({ detail }: DetailProps) {
                 </span>
               ) : null}
             </div>
-            <Card className="h-full border-border/50">
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-3 text-base">
-                  <IconCircle icon={Shield} tone="teal" size="sm" />
-                  Buddy-Status
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <label className="flex cursor-pointer items-start gap-3 text-sm">
-                  <input
-                    type="checkbox"
-                    className="mt-0.5 size-4 accent-[var(--brand-docs)]"
-                    checked={buddyReviewed}
-                    disabled={!statusLoaded || statusBusy}
-                    onChange={(e) =>
-                      void patchStatus({ buddyReviewed: e.target.checked })
-                    }
-                  />
-                  <span>
-                    <span className="font-medium">Geprüft</span>
-                    <span className="mt-0.5 block text-xs text-muted-foreground">
-                      Schreibt «Buddy geprüft» nach Paperless.
+            <div className="grid h-full min-h-0 grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+              <Card className="h-full border-border/50">
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-3 text-base">
+                    <IconCircle icon={Shield} tone="teal" size="sm" />
+                    Buddy-Status
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <label className="flex cursor-pointer items-start gap-3 text-sm">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5 size-4 accent-[var(--brand-docs)]"
+                      checked={buddyReviewed}
+                      disabled={!statusLoaded || statusBusy}
+                      onChange={(e) =>
+                        void patchStatus({ buddyReviewed: e.target.checked })
+                      }
+                    />
+                    <span>
+                      <span className="font-medium">Geprüft</span>
+                      <span className="mt-0.5 block text-xs text-muted-foreground">
+                        Schreibt «Buddy geprüft» nach Paperless.
+                      </span>
                     </span>
-                  </span>
-                </label>
-                <label className="flex cursor-pointer items-start gap-3 text-sm">
-                  <input
-                    type="checkbox"
-                    className="mt-0.5 size-4 accent-[var(--brand-docs)]"
-                    checked={taxRelevant}
-                    disabled={!statusLoaded || statusBusy}
-                    onChange={(e) =>
-                      void patchStatus({ taxRelevant: e.target.checked })
-                    }
-                  />
-                  <span>
-                    <span className="font-medium">Steuer relevant</span>
-                    <span className="mt-0.5 block text-xs text-muted-foreground">
-                      Für Jahres-/Steuerfilter in Paperless.
+                  </label>
+                  <label className="flex cursor-pointer items-start gap-3 text-sm">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5 size-4 accent-[var(--brand-docs)]"
+                      checked={taxRelevant}
+                      disabled={!statusLoaded || statusBusy}
+                      onChange={(e) =>
+                        void patchStatus({ taxRelevant: e.target.checked })
+                      }
+                    />
+                    <span>
+                      <span className="font-medium">Steuer relevant</span>
+                      <span className="mt-0.5 block text-xs text-muted-foreground">
+                        Für Jahres-/Steuerfilter in Paperless.
+                      </span>
                     </span>
-                  </span>
-                </label>
-              </CardContent>
-            </Card>
+                  </label>
+                </CardContent>
+              </Card>
+
+              <Card className="h-full border-border/50">
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-3 text-base">
+                    <IconCircle icon={Banknote} tone="green" size="sm" />
+                    Rechnungsfelder
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <label className="flex cursor-pointer items-start gap-3 text-sm">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5 size-4 accent-[var(--brand-docs)]"
+                      checked={invoicePaid}
+                      disabled={!statusLoaded || statusBusy}
+                      onChange={(e) =>
+                        void patchInvoiceFlags({ bezahlt: e.target.checked })
+                      }
+                    />
+                    <span>
+                      <span className="font-medium">Rechnung Bezahlt</span>
+                      <span className="mt-0.5 block text-xs text-muted-foreground">
+                        Paperless «Bezahlt» — schreibt zurück.
+                      </span>
+                    </span>
+                  </label>
+                  <label className="flex cursor-pointer items-start gap-3 text-sm">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5 size-4 accent-[var(--brand-docs)]"
+                      checked={invoiceOpen}
+                      disabled={!statusLoaded || statusBusy}
+                      onChange={(e) =>
+                        void patchInvoiceFlags({
+                          zuBezahlen: e.target.checked,
+                        })
+                      }
+                    />
+                    <span>
+                      <span className="font-medium">Rechnung Offen</span>
+                      <span className="mt-0.5 block text-xs text-muted-foreground">
+                        Paperless «Zu bezahlen» — schreibt zurück.
+                      </span>
+                    </span>
+                  </label>
+                </CardContent>
+              </Card>
+            </div>
           </div>
 
           {/* Summary + PDF preview side by side (equal height on md+) */}

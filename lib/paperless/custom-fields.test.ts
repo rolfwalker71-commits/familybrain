@@ -9,6 +9,8 @@ import {
   extractNamedBooleanField,
   extractNamedStringField,
   findCustomFieldId,
+  isPaidFieldName,
+  isToPayFieldName,
   normalizeFieldName,
   slugifyBuddyTagPart,
 } from "./custom-fields.ts";
@@ -17,6 +19,15 @@ import { extractPaperlessWebhookDocumentId } from "./webhook-parse.ts";
 test("normalizeFieldName collapses whitespace and case", () => {
   assert.equal(normalizeFieldName("  Buddy  geprüft "), "buddy geprüft");
   assert.equal(normalizeFieldName("Steuer\u00a0relevant"), "steuer relevant");
+});
+
+test("payment field names recognize Rechnung Bezahlt / Offen", () => {
+  assert.equal(isPaidFieldName("Bezahlt"), true);
+  assert.equal(isPaidFieldName("Rechnung Bezahlt"), true);
+  assert.equal(isPaidFieldName("Zu bezahlen"), false);
+  assert.equal(isToPayFieldName("Zu bezahlen"), true);
+  assert.equal(isToPayFieldName("Rechnung Offen"), true);
+  assert.equal(isToPayFieldName("Bezahlt"), false);
 });
 
 test("findCustomFieldId matches exact German names", () => {

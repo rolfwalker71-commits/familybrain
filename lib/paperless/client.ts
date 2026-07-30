@@ -494,6 +494,12 @@ export class PaperlessClient {
         400
       );
     }
+    if (flags.zuBezahlen !== undefined && toPayFieldId == null) {
+      throw new PaperlessError(
+        "Paperless-Feld «Zu bezahlen» wurde nicht gefunden.",
+        400
+      );
+    }
 
     const doc = await this.getDocument(paperlessId);
     const existing = Array.isArray(doc.custom_fields)

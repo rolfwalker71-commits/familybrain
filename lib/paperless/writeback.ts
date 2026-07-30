@@ -461,6 +461,8 @@ export async function writebackStatusFlagsToPaperless(input: {
   buddyReviewed?: boolean;
   taxRelevant?: boolean;
   buddyStatus?: string | null;
+  bezahlt?: boolean;
+  zuBezahlen?: boolean;
 }): Promise<{ ok: boolean; error?: string }> {
   if (!isPaperlessWritebackEnabled()) return { ok: true };
   const client = createClientOrNull();
@@ -469,8 +471,16 @@ export async function writebackStatusFlagsToPaperless(input: {
   try {
     const db = getDb();
     const doc = db
-      .prepare(`SELECT paperless_id FROM paperless_documents WHERE id = ?`)
-      .get(input.localDocumentId) as { paperless_id: number } | undefined;
+      .prepare(
+        `SELECT paperless_id, zu_bezahlen, bezahlt FROM paperless_documents WHERE id = ?`
+      )
+      .get(input.localDocumentId) as
+      | {
+          paperless_id: number;
+          zu_bezahlen: number | null;
+          bezahlt: number | null;
+        }
+      | undefined;
     if (!doc) return { ok: false, error: "Dokument nicht gefunden" };
 
     const fieldDefs = await client.listCustomFields();
@@ -519,7 +529,58 @@ export async function writebackStatusFlagsToPaperless(input: {
       put(BUDDY_CUSTOM_FIELD_NAMES.buddyStatus, input.buddyStatus);
     }
 
-    await client.setDocumentMetadata(doc.paperless_id, { customFields });
+    if (customFields.length > 0) {
+      await client.setDocumentMetadata(doc.paperless_id, { customFields });
+    }
+
+    if (input.bezahlt !== undefined || input.zuBezahlen !== undefined) {
+      await client.setPaymentFlags(
+        doc.paperless_id,
+        {
+          ...(input.bezahlt !== undefined ? { bezahlt: input.bezahlt } : {}),
+          ...(input.zuBezahlen !== undefined
+            ? { zuBezahlen: input.zuBezahlen }
+            : {}),
+        },
+        fieldDefs
+      );
+      if (input.bezahlt !== undefined) {
+        logs.push({
+          ...ctx,
+          status: "ok",
+          kind: "payment_flag",
+          fieldName: "Bezahlt",
+          fieldValue: input.bezahlt,
+        });
+      }
+      if (input.zuBezahlen !== undefined) {
+        logs.push({
+          ...ctx,
+          status: "ok",
+          kind: "payment_flag",
+          fieldName: "Zu bezahlen",
+          fieldValue: input.zuBezahlen,
+        });
+      }
+
+      const nextBezahlt =
+        input.bezahlt !== undefined
+          ? input.bezahlt
+            ? 1
+            : 0
+          : doc.bezahlt;
+      const nextZu =
+        input.zuBezahlen !== undefined
+          ? input.zuBezahlen
+            ? 1
+            : 0
+          : doc.zu_bezahlen;
+      db.prepare(
+        `UPDATE paperless_documents
+         SET bezahlt = ?, zu_bezahlen = ?, updated_at = ?
+         WHERE id = ?`
+      ).run(nextBezahlt, nextZu, new Date().toISOString(), input.localDocumentId);
+    }
 
     try {
       const remote = await client.getDocument(doc.paperless_id);

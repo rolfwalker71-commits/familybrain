@@ -64,8 +64,15 @@ const TO_PAY_NAMES = new Set([
   "payable",
   "offen",
   "unbezahlt",
+  "rechnung offen",
 ]);
-const PAID_NAMES = new Set(["bezahlt", "paid", "bezahlt?", "bezahlt ja"]);
+const PAID_NAMES = new Set([
+  "bezahlt",
+  "paid",
+  "bezahlt?",
+  "bezahlt ja",
+  "rechnung bezahlt",
+]);
 
 export function normalizeFieldName(name: string): string {
   return name
@@ -78,14 +85,25 @@ export function normalizeFieldName(name: string): string {
 export function isToPayFieldName(name: string): boolean {
   const n = normalizeFieldName(name);
   if (TO_PAY_NAMES.has(n)) return true;
-  return n.includes("zu bezahl") || n === "zahlbar";
+  if (n.includes("zu bezahl") || n === "zahlbar") return true;
+  if (n.includes("offen") && (n.includes("rechnung") || n.includes("invoice"))) {
+    return true;
+  }
+  return false;
 }
 
 export function isPaidFieldName(name: string): boolean {
   const n = normalizeFieldName(name);
-  if (PAID_NAMES.has(n)) return true;
   if (n.includes("zu bezahl")) return false;
-  return n === "bezahlt" || n.startsWith("bezahlt ") || n === "paid";
+  if (PAID_NAMES.has(n)) return true;
+  if (n === "bezahlt" || n.startsWith("bezahlt ") || n === "paid") return true;
+  if (
+    n.includes("bezahlt") &&
+    (n.includes("rechnung") || n.includes("invoice"))
+  ) {
+    return true;
+  }
+  return false;
 }
 
 export function findCustomFieldId(
