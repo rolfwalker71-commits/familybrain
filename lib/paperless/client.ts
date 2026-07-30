@@ -461,6 +461,21 @@ export class PaperlessClient {
   }
 
   /**
+   * Permanently delete a document in Paperless.
+   * 404 is treated as success (already gone).
+   */
+  async deleteDocument(paperlessId: number): Promise<void> {
+    try {
+      await this.fetchRaw(`/api/documents/${paperlessId}/`, "application/json", {
+        method: "DELETE",
+      });
+    } catch (err) {
+      if (err instanceof PaperlessError && err.status === 404) return;
+      throw err;
+    }
+  }
+
+  /**
    * PATCH document fields (e.g. custom_fields). Merging is caller's responsibility.
    */
   async patchDocument(

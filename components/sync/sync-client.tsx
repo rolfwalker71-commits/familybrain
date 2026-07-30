@@ -14,6 +14,7 @@ import {
   CloudCheck,
   Info,
   ScrollText,
+  Copy,
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,7 @@ import { IconCircle, pageVisuals } from "@/components/layout/icon-circle";
 import { AutomationPanel } from "@/components/sync/automation-panel";
 import { SyncLogPanel } from "@/components/sync/sync-log-panel";
 import { VectorIndexStatusPanel } from "@/components/sync/vector-index-status-panel";
+import { DocumentDuplicatesPanel } from "@/components/sync/document-duplicates-panel";
 import {
   SyncTabNav,
   parseSyncTab,
@@ -514,6 +516,7 @@ function SyncClientInner() {
     { id: "status", label: "Status", icon: Activity },
     { id: "automation", label: "Automation", icon: Bot },
     { id: "analyse", label: "Analyse", icon: Sparkles },
+    { id: "duplicates", label: "Duplikate", icon: Copy },
     { id: "log", label: "Protokoll", icon: ScrollText },
   ];
 
@@ -1033,7 +1036,7 @@ function SyncClientInner() {
       </Card>
       ) : null}
 
-
+      {activeTab === "duplicates" ? <DocumentDuplicatesPanel /> : null}
 
       {message ? (
         <Alert>

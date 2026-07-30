@@ -2,7 +2,7 @@
 
 import { AppTabNav, type AppTabItem } from "@/components/layout/app-tab-nav";
 
-export type SyncTab = "status" | "automation" | "analyse" | "log";
+export type SyncTab = "status" | "automation" | "analyse" | "duplicates" | "log";
 
 export type SyncTabItem = AppTabItem<SyncTab>;
 
@@ -11,6 +11,7 @@ export function parseSyncTab(raw: string | null | undefined): SyncTab {
     raw === "status" ||
     raw === "automation" ||
     raw === "analyse" ||
+    raw === "duplicates" ||
     raw === "log"
   ) {
     return raw;
