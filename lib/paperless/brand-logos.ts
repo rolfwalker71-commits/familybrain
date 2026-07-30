@@ -13,7 +13,7 @@ export type DocumentBrandLogo = {
 
 /**
  * Visual reference assets for OpenAI document-icon generation (inspiration only).
- * Matched against title, correspondent, vendor, letterhead and OCR (word-ish).
+ * Matched only when Paperless correspondent / finance vendor equals a known alias.
  */
 export const DOCUMENT_BRAND_LOGOS: DocumentBrandLogo[] = [
   {
@@ -37,6 +37,13 @@ export const DOCUMENT_BRAND_LOGOS: DocumentBrandLogo[] = [
     promptNote:
       "Optical reference for Kanton Uri coat of arms (Wappen Uri, Wikimedia Commons); generate a fresh icon, do not paste the reference.",
   },
+];
+
+/** Exact Absender/Provider aliases (normalized) → brand id. More specific first. */
+const PROVIDER_ALIAS_RULES: { id: string; names: string[] }[] = [
+  { id: "altdorf", names: ["altdorf", "altdorf ur"] },
+  { id: "ang", names: ["ang", "ang schweiz"] },
+  { id: "uri", names: ["kanton uri", "uri"] },
 ];
 
 function brandLogosCandidateDirs(): string[] {
@@ -66,59 +73,36 @@ export function resolveBrandLogoPath(filename: string): string | null {
   return null;
 }
 
-/** Build searchable text from document fields (lowercased). */
-export function buildBrandMatchHaystack(input: {
-  title?: string | null;
-  correspondent?: string | null;
-  vendor?: string | null;
-  content?: string | null;
-  letterhead?: string | null;
-}): string {
-  const parts = [
-    input.title,
-    input.correspondent,
-    input.vendor,
-    input.letterhead,
-    // Cap OCR — logos usually appear early / in letterhead
-    (input.content || "").slice(0, 12000),
-  ];
-  return parts
-    .filter(Boolean)
-    .join("\n")
+/** Normalize Absender/Provider for exact alias comparison. */
+export function normalizeBrandProviderName(
+  raw: string | null | undefined
+): string {
+  return (raw || "")
+    .trim()
     .toLowerCase()
     .normalize("NFD")
-    .replace(/\p{M}/gu, "");
+    .replace(/\p{M}/gu, "")
+    .replace(/\s+/g, " ");
 }
 
 /**
- * Detect known place/brand keywords for optical AI icon references.
- * Prefer more specific matches first (Altdorf before Uri).
+ * Match optical brand reference only when correspondent or vendor
+ * equals a known Absender/Provider alias (not OCR/title text).
  */
-export function matchDocumentBrandLogo(
-  haystack: string
-): DocumentBrandLogo | null {
-  if (!haystack.trim()) return null;
+export function matchDocumentBrandLogo(input: {
+  correspondent?: string | null;
+  vendor?: string | null;
+}): DocumentBrandLogo | null {
+  const providers = [input.correspondent, input.vendor]
+    .map((p) => normalizeBrandProviderName(p))
+    .filter(Boolean);
 
-  if (/\baltdorf\b/.test(haystack)) {
-    return DOCUMENT_BRAND_LOGOS.find((b) => b.id === "altdorf") || null;
+  for (const provider of providers) {
+    for (const rule of PROVIDER_ALIAS_RULES) {
+      if (rule.names.includes(provider)) {
+        return DOCUMENT_BRAND_LOGOS.find((b) => b.id === rule.id) || null;
+      }
+    }
   }
-
-  if (
-    /\ban[\s-]?group\b/.test(haystack) ||
-    /\ban-group\.one\b/.test(haystack) ||
-    /(^|[^a-z0-9])ang([^a-z0-9]|$)/.test(haystack)
-  ) {
-    return DOCUMENT_BRAND_LOGOS.find((b) => b.id === "ang") || null;
-  }
-
-  // "Kanton Uri", standalone "Uri" as word, or "URI" acronym — not inside http URIs.
-  const withoutUrls = haystack.replace(/https?:\/\/\S+/gi, " ");
-  if (
-    /\bkanton\s+uri\b/.test(withoutUrls) ||
-    /(^|[^a-z0-9])uri([^a-z0-9]|$)/.test(withoutUrls)
-  ) {
-    return DOCUMENT_BRAND_LOGOS.find((b) => b.id === "uri") || null;
-  }
-
   return null;
 }

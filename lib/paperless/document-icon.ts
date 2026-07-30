@@ -19,7 +19,6 @@ import { PaperlessClient } from "@/lib/paperless/client";
 import { getTripsDataRoot } from "@/lib/trips/paths";
 import { nowIso } from "@/lib/utils/dates";
 import {
-  buildBrandMatchHaystack,
   matchDocumentBrandLogo,
   resolveBrandLogoPath,
   type DocumentBrandLogo,
@@ -531,14 +530,10 @@ export async function generateDocumentAiIcon(
     | undefined;
 
   const letterhead = clipDocumentLetterhead(detail.document.content);
-  const brandHaystack = buildBrandMatchHaystack({
-    title: detail.document.title,
+  const brandLogo = matchDocumentBrandLogo({
     correspondent: detail.document.correspondent_name,
     vendor: finance?.vendor ?? null,
-    content: detail.document.content,
-    letterhead,
   });
-  const brandLogo = matchDocumentBrandLogo(brandHaystack);
 
   const category =
     typeof detail.summary?.category === "string"
