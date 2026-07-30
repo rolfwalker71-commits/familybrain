@@ -76,6 +76,9 @@ export function bootstrapDatabase(db: Database.Database): void {
   if (!summaryColNames.has("last_indexed_at")) {
     db.exec(`ALTER TABLE document_summaries ADD COLUMN last_indexed_at TEXT`);
   }
+  if (!summaryColNames.has("line_items")) {
+    db.exec(`ALTER TABLE document_summaries ADD COLUMN line_items TEXT`);
+  }
   db.exec(
     `CREATE INDEX IF NOT EXISTS idx_summaries_retry
      ON document_summaries(analysis_status, analysis_next_retry_at)`

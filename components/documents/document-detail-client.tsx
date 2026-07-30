@@ -162,6 +162,13 @@ function DocumentDetailInner({ detail }: DetailProps) {
   }
 
   const importantPoints = parseJsonArray(summary?.important_points) as string[];
+  const lineItems = parseJsonArray(summary?.line_items) as {
+    description?: string;
+    amount?: number | null;
+    currency?: string | null;
+    quantity?: number | null;
+    unit?: string | null;
+  }[];
   const importantDates = (
     parseJsonArray(summary?.important_dates) as {
       date?: string;
@@ -838,6 +845,51 @@ function DocumentDetailInner({ detail }: DetailProps) {
               </CardContent>
             </Card>
           </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-3 text-base">
+                <IconCircle icon={ListChecks} tone="teal" size="sm" />
+                Positionen
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              {lineItems.length === 0 ? (
+                <p className="text-muted-foreground">
+                  Keine Einzelpositionen erkannt (Rechnung / Lieferschein /
+                  Leistungsauflistung). Neu analysieren, um Positionen aus dem
+                  Beleg zu extrahieren.
+                </p>
+              ) : (
+                <ul className="divide-y divide-border/60">
+                  {lineItems.map((item, i) => {
+                    const qty =
+                      item.quantity != null && item.quantity !== 1
+                        ? `${item.quantity}${item.unit ? ` ${item.unit}` : "×"} · `
+                        : item.quantity === 1 && item.unit
+                          ? `1 ${item.unit} · `
+                          : "";
+                    return (
+                      <li
+                        key={i}
+                        className="flex items-start justify-between gap-3 py-2 first:pt-0 last:pb-0"
+                      >
+                        <span className="min-w-0 text-foreground/90">
+                          {qty}
+                          {item.description || "Position"}
+                        </span>
+                        {item.amount != null ? (
+                          <span className="shrink-0 tabular-nums font-medium">
+                            {formatCHF(item.amount, item.currency || "CHF")}
+                          </span>
+                        ) : null}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
 
           <div className="grid gap-4 lg:grid-cols-2">
             <Card>

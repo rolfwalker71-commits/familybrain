@@ -142,16 +142,17 @@ export function saveAnalysis(
     db.prepare(
       `INSERT INTO document_summaries (
         document_id, short_summary, detailed_summary, important_points, important_dates,
-        amounts, deadlines, contract_parties, warranty_info, cancellation_terms,
+        amounts, line_items, deadlines, contract_parties, warranty_info, cancellation_terms,
         category, possible_todos, confidence, model_name, analysis_status, analyzed_at,
         created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', ?, ?, ?)
       ON CONFLICT(document_id) DO UPDATE SET
         short_summary = excluded.short_summary,
         detailed_summary = excluded.detailed_summary,
         important_points = excluded.important_points,
         important_dates = excluded.important_dates,
         amounts = excluded.amounts,
+        line_items = excluded.line_items,
         deadlines = excluded.deadlines,
         contract_parties = excluded.contract_parties,
         warranty_info = excluded.warranty_info,
@@ -175,6 +176,7 @@ export function saveAnalysis(
       JSON.stringify(enriched.important_points),
       JSON.stringify(enriched.important_dates),
       JSON.stringify(enriched.amounts),
+      JSON.stringify(enriched.line_items ?? []),
       JSON.stringify(enriched.deadlines),
       JSON.stringify(enriched.contract_parties),
       JSON.stringify(enriched.warranty_info),

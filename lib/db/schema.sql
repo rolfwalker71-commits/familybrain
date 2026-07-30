@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS document_summaries (
   important_points TEXT,
   important_dates TEXT,
   amounts TEXT,
+  line_items TEXT,
   deadlines TEXT,
   contract_parties TEXT,
   warranty_info TEXT,

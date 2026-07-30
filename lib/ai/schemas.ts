@@ -60,6 +60,15 @@ export const FinancialItemSchema = z.object({
   description: z.string().nullable().optional(),
 });
 
+/** Individual product/service lines from invoices, delivery notes, work reports. */
+export const LineItemSchema = z.object({
+  description: z.string(),
+  amount: z.number().nullable(),
+  currency: z.string().nullable().optional(),
+  quantity: z.number().nullable().optional(),
+  unit: z.string().nullable().optional(),
+});
+
 export const TravelItineraryStopSchema = z.object({
   date: z.string().nullable(),
   day_label: z.string().nullable().optional(),
@@ -102,6 +111,7 @@ export const DocumentAnalysisSchema = z.object({
   cancellation_terms: CancellationTermsSchema.nullable(),
   possible_todos: z.array(TodoSchema).default([]),
   financial_items: z.array(FinancialItemSchema).default([]),
+  line_items: z.array(LineItemSchema).default([]),
   travel_items: z.array(TravelItemSchema).default([]),
   confidence: z.number().min(0).max(1).nullable(),
 });

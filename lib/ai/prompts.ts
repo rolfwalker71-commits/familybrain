@@ -28,6 +28,7 @@ Rules:
 - travel_items[].travel_type SHOULD be one of: ${travelTypesList} (use German labels; map Cruise→Kreuzfahrt, Hotelaufenthalt→Hotel, Visa Waiver→Visa / Einreise). Flights/air tickets/e-tickets MUST be "Flug" (never Kreuzfahrt). Kreuzfahrt is ONLY for ship cruises (ports of call / Kreuzfahrtverlauf). Package PDFs may contain multiple travel_items — classify each item by its own segment (flight vs hotel vs cruise vs transfer).
 - deadlines[].type SHOULD be one of: ${deadlineTypesList} (map cancellation→Kündigung, payment→Zahlung, appeal/einspruch→Einsprache)
 - financial_items[].category SHOULD map into these buckets when possible: ${financeBucketsList} (use short German labels; salary/balance lines → Saldo / Konto or Lohn; never invent English duplicates)
+- For invoices (Rechnung), delivery notes (Lieferschein), quotes, work reports, or any document with a list of products/services/activities: extract EACH line into line_items[] with description (product/service name) and amount. Include quantity/unit when clearly present. Do NOT put totals, VAT-only lines, or shipping into line_items — those belong in amounts / financial_items. Skip line_items when there is no itemized list.
 - Return VALID JSON only. No markdown. No commentary.
 - Category must be one of: ${categoriesList}`;
 
@@ -92,6 +93,13 @@ Required JSON shape:
     "is_recurring": false,
     "description": null
   }],
+  "line_items": [{
+    "description": "Produkt oder Leistung",
+    "amount": 12.5,
+    "currency": "CHF",
+    "quantity": 1,
+    "unit": null
+  }],
   "travel_items": [{
     "travel_type": null,
     "provider": null,
@@ -127,7 +135,12 @@ Travel/cruise specifics:
 - Also put payment due dates, cancellation deadlines, boarding/sailing times into important_dates.
 - For Flug items: set flight_number (IATA+digits), cabin_class when visible (Economy / Premium Economy / Business / First), and booking_reference/PNR when visible; set start_time/end_time from scheduled departure/arrival when known.
 - For Hotel items: set address to the full street address when present; destination can be the city.
-- Sections titled Flüge / Flugarrangements / Flight / E-Ticket are separate travel_items with travel_type "Flug", even when the same PDF also describes a cruise or hotel stay.`;
+- Sections titled Flüge / Flugarrangements / Flight / E-Ticket are separate travel_items with travel_type "Flug", even when the same PDF also describes a cruise or hotel stay.
+
+Line items (Rechnungen / Lieferscheine / Belege):
+- Prefer the article/service text as description (German as on the document).
+- amount is the line total (inkl. or excl. MwSt as shown for that line); currency defaults to CHF when Swiss.
+- financial_items holds the invoice as a whole (vendor, due date, total); line_items holds the individual positions.`;
 }
 
 export function buildRepairPrompt(invalidJson: string, validationError: string): string {

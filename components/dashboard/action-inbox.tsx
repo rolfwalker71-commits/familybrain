@@ -141,6 +141,20 @@ export function ActionInbox() {
     data.warrantiesExpiring.length === 0 &&
     analysisTotal === 0;
 
+  /** Half-width sections; last one alone on a row spans full width. */
+  const halfKeys = [
+    data.overdueDeadlines.length > 0 ? "overdue" : null,
+    data.dueInvoices.length > 0 ? "due" : null,
+    data.warrantiesExpiring.length > 0 ? "warranties" : null,
+    analysisTotal > 0 ? "analysis" : null,
+  ].filter((k): k is string => k != null);
+  const halfClass = (key: string) => {
+    const idx = halfKeys.indexOf(key);
+    const alone =
+      halfKeys.length % 2 === 1 && idx === halfKeys.length - 1;
+    return alone ? "space-y-2 md:col-span-2" : "space-y-2";
+  };
+
   return (
     <Card className="border-border/70 shadow-[0_2px_4px_rgba(20,32,28,0.06),0_10px_28px_rgba(20,32,28,0.08)]">
       <CardContent className="space-y-4 p-4 sm:p-5">
@@ -179,7 +193,7 @@ export function ActionInbox() {
             ) : null}
 
             {data.overdueDeadlines.length > 0 ? (
-              <section className="space-y-2">
+              <section className={halfClass("overdue")}>
                 <div className="flex items-center gap-2 text-sm font-semibold">
                   <CalendarClock className="size-4 text-red-600" />
                   Überfällige Fristen
@@ -228,7 +242,7 @@ export function ActionInbox() {
             ) : null}
 
             {data.dueInvoices.length > 0 ? (
-              <section className="space-y-2">
+              <section className={halfClass("due")}>
                 <div className="flex items-center gap-2 text-sm font-semibold">
                   <Receipt className="size-4 text-[var(--brand-finance)]" />
                   Bald fällig (Extrakt)
@@ -280,10 +294,10 @@ export function ActionInbox() {
             ) : null}
 
             {data.warrantiesExpiring.length > 0 ? (
-              <section className="space-y-2">
+              <section className={halfClass("warranties")}>
                 <div className="flex items-center gap-2 text-sm font-semibold">
                   <Shield className="size-4 text-orange-600" />
-                  Garantien bald ab
+                  Ablaufende Garantien
                   <Link
                     href="/warranties"
                     className="ml-auto text-xs font-medium text-[var(--brand-finance)] underline-offset-2 hover:underline"
@@ -325,7 +339,7 @@ export function ActionInbox() {
             ) : null}
 
             {analysisTotal > 0 ? (
-              <section className="space-y-2">
+              <section className={halfClass("analysis")}>
                 <div className="flex items-center gap-2 text-sm font-semibold">
                   <FileWarning className="size-4 text-amber-600" />
                   Analysen
