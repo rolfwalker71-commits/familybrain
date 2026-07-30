@@ -181,7 +181,7 @@ export function DocumentDuplicatesPanel() {
 
         {!loading && clusters.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            Keine identischen Beschreibungen (ggf. mit gleichem Datum) gefunden.
+            Keine Duplikate gefunden (Beschreibung + Belegnummer, ggf. Datum).
           </p>
         ) : null}
 
@@ -216,6 +216,11 @@ export function DocumentDuplicatesPanel() {
                         <Badge variant="secondary" className="text-[10px]">
                           {cluster.count}× gleich
                         </Badge>
+                        {cluster.refNumber ? (
+                          <Badge variant="outline" className="text-[10px]">
+                            Nr. {cluster.refNumber}
+                          </Badge>
+                        ) : null}
                         {cluster.matchedByDate ? (
                           <Badge variant="secondary" className="text-[10px]">
                             + gleiches Datum

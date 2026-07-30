@@ -20,6 +20,8 @@ export type DuplicateCluster = {
   count: number;
   /** True when cluster was narrowed by matching created_date as well. */
   matchedByDate: boolean;
+  /** Document / invoice number included in the match key. */
+  refNumber: string | null;
   documents: DuplicateDocItem[];
 };
 
@@ -54,9 +56,46 @@ export function documentDateKey(createdDate: string | null | undefined): string 
 }
 
 /**
- * Find clusters with identical normalized short_summary.
- * Short/generic descriptions (< 40 chars) only count as duplicates when the
- * document date (day) is also identical.
+ * Extract a Beleg-/Rechnungsnummer from title (preferred) or fallback text.
+ * Returns digits only, or null if none found.
+ */
+export function extractDocumentRefNumber(
+  title: string | null | undefined,
+  fallback?: string | null | undefined
+): string | null {
+  for (const raw of [title, fallback]) {
+    if (!raw?.trim()) continue;
+    const text = raw.trim();
+
+    const labeled =
+      /\b(?:rechnungs(?:nr|nummer)|beleg(?:nr|nummer)|dokument(?:nr|nummer)|invoice|inv|nr|no|nummer)[\s.:#/-]*([0-9][0-9\s./-]{3,})\b/i.exec(
+        text
+      );
+    if (labeled?.[1]) {
+      const digits = labeled[1].replace(/\D/g, "");
+      if (digits.length >= 4) return digits;
+    }
+
+    const hash = /#\s*([0-9]{5,})\b/.exec(text);
+    if (hash?.[1]) return hash[1];
+
+    // Bare long digit runs — skip calendar-ish yyyymmdd / years alone.
+    for (const m of text.matchAll(/\b(\d{6,})\b/g)) {
+      const d = m[1];
+      if (/^(19|20)\d{6}$/.test(d)) continue;
+      if (/^(19|20)\d{2}$/.test(d)) continue;
+      return d;
+    }
+  }
+  return null;
+}
+
+/**
+ * Find clusters of likely duplicates.
+ * When a Belegnummer is present (title preferred), description AND number
+ * must both match — same summary with different Nr. is not a duplicate.
+ * Without a number: short/generic texts need the same calendar day;
+ * longer summaries may still group by description alone.
  */
 export function findDuplicateClustersByDescription(limit = 80): DuplicateCluster[] {
   const db = getDb();
@@ -86,24 +125,40 @@ export function findDuplicateClustersByDescription(limit = 80): DuplicateCluster
     analysis_status: string | null;
   }>;
 
-  type Bucket = { matchedByDate: boolean; documents: DuplicateDocItem[] };
+  type Bucket = {
+    matchedByDate: boolean;
+    refNumber: string | null;
+    documents: DuplicateDocItem[];
+  };
   const groups = new Map<string, Bucket>();
 
   for (const row of rows) {
     const descKey = normalizeDuplicateDescription(row.short_summary);
     if (!descKey) continue;
 
+    const refNumber = extractDocumentRefNumber(row.title, row.short_summary);
     const dateKey = documentDateKey(row.created_date);
     const isSpecific = descKey.length >= DUPLICATE_SPECIFIC_MIN_LENGTH;
 
-    // Generic short text (e.g. «Prämienrechnung»): only with same calendar day.
-    if (!isSpecific) {
+    let groupKey: string;
+    let matchedByDate = false;
+
+    if (refNumber) {
+      // Beschreibung + Nummer must both match.
+      groupKey = `d:${descKey}|n:${refNumber}`;
+    } else if (!isSpecific) {
+      // Generic short text without number: only with same calendar day.
       if (!dateKey) continue;
+      groupKey = `d:${descKey}|t:${dateKey}`;
+      matchedByDate = true;
+    } else {
+      // Specific summary, no number in title/summary — description only.
+      groupKey = `d:${descKey}`;
     }
 
-    const groupKey = isSpecific ? `d:${descKey}` : `d:${descKey}|t:${dateKey}`;
     const bucket = groups.get(groupKey) || {
-      matchedByDate: !isSpecific,
+      matchedByDate,
+      refNumber,
       documents: [],
     };
     bucket.documents.push({
@@ -131,11 +186,19 @@ export function findDuplicateClustersByDescription(limit = 80): DuplicateCluster
       if (da !== db_) return db_.localeCompare(da);
       return b.id - a.id;
     });
+    const base =
+      bucket.documents[0]?.short_summary?.trim() ||
+      bucket.documents[0]?.title?.trim() ||
+      key;
+    const description = bucket.refNumber
+      ? `${base} · Nr. ${bucket.refNumber}`
+      : base;
     clusters.push({
       key,
-      description: bucket.documents[0]?.short_summary?.trim() || key,
+      description,
       count: bucket.documents.length,
       matchedByDate: bucket.matchedByDate,
+      refNumber: bucket.refNumber,
       documents: bucket.documents,
     });
   }

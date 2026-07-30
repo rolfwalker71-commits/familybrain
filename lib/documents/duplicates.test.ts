@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   documentDateKey,
   DUPLICATE_SPECIFIC_MIN_LENGTH,
+  extractDocumentRefNumber,
   normalizeDuplicateDescription,
 } from "@/lib/documents/duplicates";
 
@@ -27,4 +28,36 @@ test("generic descriptions are below specificity threshold", () => {
     "Prämienrechnung AXA Haushaltversicherung März 2025 CHF 234.50 für Rolf Walker"
   );
   assert.ok(specific.length >= DUPLICATE_SPECIFIC_MIN_LENGTH);
+});
+
+test("extractDocumentRefNumber reads Nr. from title", () => {
+  assert.equal(
+    extractDocumentRefNumber("Prämienrechnung Nr. 615284766"),
+    "615284766"
+  );
+  assert.equal(
+    extractDocumentRefNumber("Prämienrechnung Nr. 612774842"),
+    "612774842"
+  );
+  assert.notEqual(
+    extractDocumentRefNumber("Prämienrechnung Nr. 615284766"),
+    extractDocumentRefNumber("Prämienrechnung Nr. 612774842")
+  );
+});
+
+test("extractDocumentRefNumber prefers title over summary without number", () => {
+  assert.equal(
+    extractDocumentRefNumber(
+      "Prämienrechnung Nr. 610819062",
+      "Prämienrechnung für Rolf Walker von CONCORDIA."
+    ),
+    "610819062"
+  );
+  assert.equal(
+    extractDocumentRefNumber(
+      null,
+      "Prämienrechnung für Rolf Walker von CONCORDIA."
+    ),
+    null
+  );
 });
