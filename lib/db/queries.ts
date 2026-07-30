@@ -63,6 +63,9 @@ export type PaperlessDocumentRow = {
   raw_metadata: string | null;
   zu_bezahlen?: number | null;
   bezahlt?: number | null;
+  triage_status?: string | null;
+  triage_reasons?: string | null;
+  triage_at?: string | null;
   ai_icon_path?: string | null;
   ai_icon_prompt?: string | null;
   sync_status: string | null;

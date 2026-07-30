@@ -236,10 +236,19 @@ export function notifyDocumentTriageQueued(
 
 export function notifyDocumentTriageResolved(
   localId: number,
-  action: "pay" | "ignore" | "done"
+  action: "pay" | "ignore" | "done" | "ebill" | "twint" | "card"
 ): void {
-  const headline =
-    action === "pay"
+  const paidVia =
+    action === "ebill"
+      ? "eBill"
+      : action === "twint"
+        ? "Twint"
+        : action === "card"
+          ? "Kreditkarte"
+          : null;
+  const headline = paidVia
+    ? `Bereits per ${paidVia} bezahlt`
+    : action === "pay"
       ? "Als zu bezahlen markiert"
       : action === "ignore"
         ? "Beleg als irrelevant markiert"
@@ -248,8 +257,9 @@ export function notifyDocumentTriageResolved(
     localId,
     reason: "document_triage",
     headline,
-    detail:
-      action === "pay"
+    detail: paidVia
+      ? `Als bezahlt markiert (${paidVia}) — Paperless «Bezahlt».`
+      : action === "pay"
         ? "Erscheint unter Offene Rechnungen (Paperless «Zu bezahlen»)."
         : action === "ignore"
           ? "Nicht in der Zahlungspflicht-Liste."

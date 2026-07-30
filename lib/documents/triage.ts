@@ -5,7 +5,14 @@ import { PaperlessClient } from "@/lib/paperless/client";
 import { nowIso } from "@/lib/utils/dates";
 
 /** Local review queue after analysis. */
-export type TriageStatus = "pending" | "pay" | "ignored" | "done";
+export type TriageStatus =
+  | "pending"
+  | "pay"
+  | "ignored"
+  | "done"
+  | "ebill"
+  | "twint"
+  | "card";
 
 export type TriageReason =
   | "invoice"
@@ -21,6 +28,26 @@ export const TRIAGE_REASON_LABELS: Record<TriageReason, string> = {
   deadline: "Frist",
   travel: "Reise",
 };
+
+/** Human-readable triage outcome (inbox + document detail). */
+export const TRIAGE_STATUS_LABELS: Record<TriageStatus, string> = {
+  pending: "Zur Prüfung",
+  pay: "Muss bezahlt werden",
+  ignored: "Irrelevant",
+  done: "Erledigt",
+  ebill: "eBill",
+  twint: "Twint",
+  card: "Kreditkarte",
+};
+
+const SETTLED_TRIAGE_STATUSES = new Set<string>([
+  "pay",
+  "ignored",
+  "done",
+  "ebill",
+  "twint",
+  "card",
+]);
 
 export const HIGH_AMOUNT_CHF = 500;
 
@@ -155,7 +182,7 @@ export function applyTriageAfterAnalysis(
   if (!row) return { queued: false, reasons: [] };
 
   const status = row.triage_status;
-  if (status === "pay" || status === "ignored" || status === "done") {
+  if (status && SETTLED_TRIAGE_STATUSES.has(status)) {
     return { queued: false, reasons: [] };
   }
 
@@ -271,11 +298,20 @@ export function listPendingTriageDocuments(limit = 12): TriageInboxItem[] {
   }));
 }
 
-export type TriageAction = "pay" | "ignore" | "done";
+export type TriageAction =
+  | "pay"
+  | "ignore"
+  | "done"
+  | "ebill"
+  | "twint"
+  | "card";
+
+const PAID_VIA_ACTIONS = new Set<TriageAction>(["ebill", "twint", "card"]);
 
 /**
  * Resolve a pending triage item.
  * - pay: set Paperless/Buddy «Zu bezahlen»
+ * - ebill / twint / card: already settled that way → «Bezahlt»
  * - ignore: leave payment flags alone
  * - done: acknowledge (e.g. warranty/travel only)
  */
@@ -298,6 +334,35 @@ export async function resolveDocumentTriage(input: {
 
   const ts = nowIso();
 
+  async function syncPaymentFlags(flags: {
+    zuBezahlen: boolean;
+    bezahlt: boolean;
+  }): Promise<{ ok: boolean; error?: string }> {
+    const baseUrl = getSetting("paperless_base_url");
+    const apiToken = getSetting("paperless_api_token");
+    const publicUrl = getSetting("paperless_public_url") || baseUrl;
+    if (!baseUrl || !apiToken) return { ok: true };
+    try {
+      const client = new PaperlessClient(baseUrl, apiToken, publicUrl);
+      await client.setPaymentFlags(current!.paperless_id, flags);
+      try {
+        const remote = await client.getDocument(current!.paperless_id);
+        db.prepare(
+          `UPDATE paperless_documents SET raw_metadata = ?, updated_at = ? WHERE id = ?`
+        ).run(JSON.stringify(remote), ts, input.documentLocalId);
+      } catch {
+        /* ignore */
+      }
+      return { ok: true };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return {
+        ok: false,
+        error: `Lokal markiert, Paperless-Writeback fehlgeschlagen: ${message}`,
+      };
+    }
+  }
+
   if (input.action === "pay") {
     db.prepare(
       `UPDATE paperless_documents
@@ -306,31 +371,30 @@ export async function resolveDocumentTriage(input: {
        WHERE id = ?`
     ).run(ts, ts, input.documentLocalId);
 
-    const baseUrl = getSetting("paperless_base_url");
-    const apiToken = getSetting("paperless_api_token");
-    const publicUrl = getSetting("paperless_public_url") || baseUrl;
-    if (baseUrl && apiToken) {
-      try {
-        const client = new PaperlessClient(baseUrl, apiToken, publicUrl);
-        await client.setPaymentFlags(current.paperless_id, {
-          zuBezahlen: true,
-          bezahlt: false,
-        });
-        try {
-          const remote = await client.getDocument(current.paperless_id);
-          db.prepare(
-            `UPDATE paperless_documents SET raw_metadata = ?, updated_at = ? WHERE id = ?`
-          ).run(JSON.stringify(remote), ts, input.documentLocalId);
-        } catch {
-          /* ignore */
-        }
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        return {
-          ok: false,
-          error: `Lokal markiert, Paperless-Writeback fehlgeschlagen: ${message}`,
-        };
-      }
+    const sync = await syncPaymentFlags({ zuBezahlen: true, bezahlt: false });
+    if (!sync.ok) return sync;
+  } else if (PAID_VIA_ACTIONS.has(input.action)) {
+    const nextStatus = input.action as TriageStatus;
+    db.prepare(
+      `UPDATE paperless_documents
+       SET zu_bezahlen = 0, bezahlt = 1,
+           triage_status = ?, triage_at = ?, updated_at = ?
+       WHERE id = ?`
+    ).run(nextStatus, ts, ts, input.documentLocalId);
+
+    const sync = await syncPaymentFlags({ zuBezahlen: false, bezahlt: true });
+    if (!sync.ok) return sync;
+
+    try {
+      const { writebackStatusFlagsToPaperless } = await import(
+        "@/lib/paperless/writeback"
+      );
+      await writebackStatusFlagsToPaperless({
+        localDocumentId: input.documentLocalId,
+        buddyStatus: TRIAGE_STATUS_LABELS[nextStatus],
+      });
+    } catch {
+      /* optional buddyStatus mirror */
     }
   } else {
     const nextStatus: TriageStatus =

@@ -61,6 +61,10 @@ import {
   ExtractFinanceEditor,
   ExtractWarrantyEditor,
 } from "@/components/documents/extract-editors";
+import {
+  TRIAGE_STATUS_LABELS,
+  type TriageStatus,
+} from "@/lib/documents/triage";
 
 type DetailProps = {
   detail: {
@@ -79,6 +83,8 @@ type DetailProps = {
       ai_icon_url?: string | null;
       zu_bezahlen?: number | null;
       bezahlt?: number | null;
+      triage_status?: string | null;
+      triage_at?: string | null;
     };
     tags: { tag_id: number | null; tag_name: string | null }[];
     summary: Record<string, unknown> | undefined;
@@ -566,6 +572,37 @@ function DocumentDetailInner({ detail }: DetailProps) {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
+                  {(() => {
+                    const raw = document.triage_status;
+                    if (!raw || !(raw in TRIAGE_STATUS_LABELS)) return null;
+                    const status = raw as TriageStatus;
+                    const label = TRIAGE_STATUS_LABELS[status];
+                    const tone =
+                      status === "pending"
+                        ? "border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-100"
+                        : status === "pay"
+                          ? "border-[var(--brand-finance)]/40 bg-[var(--brand-finance)]/10 text-[var(--brand-finance)]"
+                          : status === "ignored"
+                            ? "border-border bg-muted text-muted-foreground"
+                            : status === "ebill" ||
+                                status === "twint" ||
+                                status === "card"
+                              ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-800 dark:text-emerald-100"
+                              : "border-border bg-muted/60 text-foreground";
+                    return (
+                      <div className="rounded-lg border border-border/60 px-3 py-2">
+                        <p className="text-xs text-muted-foreground">
+                          Beleg-Triage
+                        </p>
+                        <Badge
+                          variant="outline"
+                          className={`mt-1.5 font-medium ${tone}`}
+                        >
+                          {label}
+                        </Badge>
+                      </div>
+                    );
+                  })()}
                   <label className="flex cursor-pointer items-start gap-3 text-sm">
                     <input
                       type="checkbox"

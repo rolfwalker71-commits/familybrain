@@ -156,7 +156,7 @@ export function ActionInbox() {
 
   async function resolveTriage(
     documentLocalId: number,
-    action: "pay" | "ignore" | "done"
+    action: "pay" | "ignore" | "done" | "ebill" | "twint" | "card"
   ) {
     setBusyId(documentLocalId);
     setActionError(null);
@@ -337,6 +337,30 @@ export function ActionInbox() {
                               {busy ? "…" : "Erledigt"}
                             </Button>
                           )}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={busy}
+                            onClick={() => void resolveTriage(row.id, "ebill")}
+                          >
+                            {busy ? "…" : "eBill"}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={busy}
+                            onClick={() => void resolveTriage(row.id, "twint")}
+                          >
+                            {busy ? "…" : "Twint"}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={busy}
+                            onClick={() => void resolveTriage(row.id, "card")}
+                          >
+                            {busy ? "…" : "Kreditkarte"}
+                          </Button>
                           <Button
                             size="sm"
                             variant="outline"
