@@ -878,34 +878,31 @@ function DocumentDetailInner({ detail }: DetailProps) {
                     {lineItems.map((item, i) => (
                       <li
                         key={i}
-                        className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-start gap-x-3 gap-y-0.5 py-2 first:pt-0 last:pb-0"
+                        className="grid grid-cols-[minmax(0,1fr)_3.25rem_minmax(6.5rem,auto)] items-baseline gap-x-3 py-2 first:pt-0 last:pb-0"
                       >
                         <span className="min-w-0 text-foreground/90">
                           {item.description}
                         </span>
-                        <span className="whitespace-nowrap text-xs text-muted-foreground tabular-nums sm:text-sm">
+                        <span className="text-right tabular-nums text-muted-foreground">
                           {item.quantity != null
-                            ? `Anzahl: ${
-                                Number.isInteger(item.quantity)
-                                  ? item.quantity
-                                  : String(item.quantity)
-                              }${item.unit ? ` ${item.unit}` : ""}`
+                            ? Number.isInteger(item.quantity)
+                              ? item.quantity
+                              : String(item.quantity)
                             : ""}
                         </span>
-                        {item.amount != null ? (
-                          <span className="shrink-0 justify-self-end tabular-nums font-medium">
-                            {formatCHF(item.amount, item.currency || "CHF")}
-                          </span>
-                        ) : (
-                          <span />
-                        )}
+                        <span className="text-right tabular-nums font-medium">
+                          {item.amount != null
+                            ? formatCHF(item.amount, item.currency || "CHF")
+                            : ""}
+                        </span>
                       </li>
                     ))}
                   </ul>
                   {invoiceTotal ? (
-                    <div className="flex items-baseline justify-between gap-3 border-t border-border/60 pt-3 text-sm font-bold">
+                    <div className="grid grid-cols-[minmax(0,1fr)_3.25rem_minmax(6.5rem,auto)] items-baseline gap-x-3 border-t border-border/60 pt-3 text-sm font-bold">
                       <span>Gesamtbetrag</span>
-                      <span className="tabular-nums">
+                      <span />
+                      <span className="text-right tabular-nums">
                         {formatCHF(
                           invoiceTotal.amount,
                           invoiceTotal.currency
