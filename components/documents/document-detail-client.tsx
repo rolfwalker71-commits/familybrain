@@ -73,6 +73,8 @@ type DetailProps = {
       paperless_id: number;
       ai_icon_path?: string | null;
       ai_icon_url?: string | null;
+      zu_bezahlen?: number | null;
+      bezahlt?: number | null;
     };
     tags: { tag_id: number | null; tag_name: string | null }[];
     summary: Record<string, unknown> | undefined;
