@@ -2,10 +2,19 @@ import fs from "fs";
 import path from "path";
 import { randomUUID } from "crypto";
 import sharp from "sharp";
-import { getOpenAIClient, hasOpenAIKey } from "@/lib/ai/client";
+import {
+  getOpenAIClient,
+  getOpenAIModel,
+  hasOpenAIKey,
+} from "@/lib/ai/client";
 import { getDb } from "@/lib/db/client";
 import { getSetting, setSetting } from "@/lib/db/migrations";
-import { getDocumentById, type PaperlessDocumentRow } from "@/lib/db/queries";
+import {
+  getDocumentById,
+  getPaperlessSettings,
+  type PaperlessDocumentRow,
+} from "@/lib/db/queries";
+import { PaperlessClient } from "@/lib/paperless/client";
 import { getTripsDataRoot } from "@/lib/trips/paths";
 import { nowIso } from "@/lib/utils/dates";
 
@@ -64,6 +73,31 @@ function clip(raw: string | null | undefined, max: number): string {
   return t.length > max ? `${t.slice(0, max - 1)}…` : t;
 }
 
+/** First lines of OCR often carry letterhead / firm name. */
+export function clipDocumentLetterhead(
+  content: string | null | undefined,
+  max = 500
+): string {
+  if (!content) return "";
+  const lines = content
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .slice(0, 18);
+  return clip(lines.join(" · "), max);
+}
+
+export type BrandVisualCues = {
+  /** True when thumbnail clearly shows a known commercial logo. */
+  knownLogoVisible: boolean;
+  brandNameGuess: string | null;
+  /** e.g. "deep red and white", "teal gradient" */
+  colors: string[];
+  /** Shape / mark description without asking for readable text in the icon. */
+  logoDescription: string | null;
+  styleNotes: string | null;
+};
+
 export function buildDocumentAiIconPrompt(input: {
   title?: string | null;
   category?: string | null;
@@ -72,6 +106,10 @@ export function buildDocumentAiIconPrompt(input: {
   vendor?: string | null;
   product?: string | null;
   shortSummary?: string | null;
+  /** OCR letterhead snippet for obscure brands. */
+  letterhead?: string | null;
+  /** Vision cues from Paperless thumbnail. */
+  brandCues?: BrandVisualCues | null;
 }): string {
   const category = clip(input.category, 40) || "Dokument";
   const title = clip(input.title, 80) || "Dokument";
@@ -80,12 +118,22 @@ export function buildDocumentAiIconPrompt(input: {
   const docType = clip(input.documentType, 40);
   const product = clip(input.product, 40);
   const hint = clip(input.shortSummary, 100);
+  const letterhead = clip(input.letterhead, 220);
+  const cues = input.brandCues;
 
   // Prefer named organization for logo cues — title/summary often omit the firm.
   const brandParts: string[] = [];
   if (correspondent) brandParts.push(correspondent);
   if (vendor && vendor.toLowerCase() !== correspondent.toLowerCase()) {
     brandParts.push(vendor);
+  }
+  if (
+    cues?.brandNameGuess &&
+    !brandParts.some(
+      (b) => b.toLowerCase() === cues.brandNameGuess!.toLowerCase()
+    )
+  ) {
+    brandParts.push(cues.brandNameGuess);
   }
   const brand = brandParts.join(" / ");
 
@@ -101,6 +149,32 @@ export function buildDocumentAiIconPrompt(input: {
   if (docType) subjectParts.push(`type «${docType}»`);
   if (product) subjectParts.push(`product «${product}»`);
   if (hint) subjectParts.push(`context: ${hint}`);
+  if (letterhead) {
+    subjectParts.push(`document letterhead cues: «${letterhead}»`);
+  }
+
+  const cueBits: string[] = [];
+  if (cues?.colors?.length) {
+    cueBits.push(`colors ${cues.colors.slice(0, 4).join(", ")}`);
+  }
+  if (cues?.logoDescription) {
+    cueBits.push(`mark/shape «${clip(cues.logoDescription, 160)}»`);
+  }
+  if (cues?.styleNotes) {
+    cueBits.push(`style «${clip(cues.styleNotes, 120)}»`);
+  }
+  if (cueBits.length > 0) {
+    subjectParts.push(`visual identity from document preview: ${cueBits.join("; ")}`);
+  }
+
+  const knownLogoPath = cues?.knownLogoVisible
+    ? `The document preview shows a recognizable logo — reproduce that mark as closely as possible (still as a clean flat icon, no photorealism).`
+    : brand
+      ? `Primary visual: if «${brand}» is a well-known company or brand, use their official logo as the main symbol when you can render it accurately.`
+      : `If the subject clearly identifies a well-known provider or brand (from title or context), prefer their official logo as the main symbol when accurate.`;
+
+  const fallbackPath =
+    "If no accurate official logo is possible: invent a clean logo-like emblem inspired by the brand name AND the document visual cues (colors, shapes, industry). Aim for something that feels like that firm's mark — not a generic folder/receipt icon.";
 
   return [
     "Tiny square app icon illustration (not photorealistic) for a household document archive.",
@@ -108,12 +182,102 @@ export function buildDocumentAiIconPrompt(input: {
     "Style: cheerful colorful flat illustration, bright varied hues matching the subject,",
     "solid pure white background (#FFFFFF) filling the entire square — never black, never dark, never gray.",
     "Centered recognizable symbol with soft shading, generous padding,",
-    brand
-      ? `Primary visual: if «${brand}» is a well-known company or brand, use their official logo as the main symbol when you can render it accurately; otherwise a generic subject-matched icon.`
-      : "If the subject clearly identifies a well-known provider or brand (from title or context), prefer their official logo as the main symbol when accurate; otherwise a generic subject-matched icon.",
+    knownLogoPath,
+    fallbackPath,
     "no text, no letters, no numbers, no watermarks, no receipt UI, no photorealism.",
     "Suitable as a 48px list thumbnail.",
   ].join(" ");
+}
+
+async function inferBrandVisualCuesFromThumb(input: {
+  paperlessId: number;
+  brandHint: string | null;
+}): Promise<BrandVisualCues | null> {
+  const { baseUrl, apiToken, publicUrl } = getPaperlessSettings();
+  if (!baseUrl || !apiToken) return null;
+
+  try {
+    const paperless = new PaperlessClient(baseUrl, apiToken, publicUrl);
+    const thumb = await paperless.getThumbnail(input.paperlessId);
+    if (!thumb || thumb.buffer.byteLength < 80) return null;
+
+    const resized = await sharp(Buffer.from(thumb.buffer))
+      .rotate()
+      .resize(512, 512, { fit: "inside", withoutEnlargement: true })
+      .jpeg({ quality: 72 })
+      .toBuffer();
+
+    const client = getOpenAIClient();
+    const completion = await client.chat.completions.create({
+      model: getOpenAIModel(),
+      temperature: 0.2,
+      max_tokens: 280,
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content:
+            "You inspect document page previews to describe branding for icon generation. Return JSON only.",
+        },
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: [
+                "Describe brand/logo visual identity visible on this document preview.",
+                input.brandHint
+                  ? `Expected organization name (may be wrong): «${input.brandHint}».`
+                  : "Organization name unknown.",
+                "JSON keys:",
+                'knownLogoVisible (boolean) — true only if a clear commercial logo mark is visible,',
+                "brandNameGuess (string|null),",
+                "colors (string[] of 1–4 short color phrases),",
+                "logoDescription (string|null) — shapes/symbols of the logo or letterhead ornament, no transcription of long text,",
+                "styleNotes (string|null) — e.g. minimal, playful, corporate blue bars.",
+                "If the page is mostly plain text with no branding, still guess colors from any header bars/accents and set knownLogoVisible false.",
+              ].join(" "),
+            },
+            {
+              type: "image_url",
+              image_url: {
+                url: `data:image/jpeg;base64,${resized.toString("base64")}`,
+                detail: "low",
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    const raw = completion.choices[0]?.message?.content?.trim();
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const colors = Array.isArray(parsed.colors)
+      ? parsed.colors
+          .filter((c): c is string => typeof c === "string" && c.trim() !== "")
+          .map((c) => clip(c, 40))
+          .slice(0, 4)
+      : [];
+    return {
+      knownLogoVisible: parsed.knownLogoVisible === true,
+      brandNameGuess:
+        typeof parsed.brandNameGuess === "string"
+          ? clip(parsed.brandNameGuess, 60) || null
+          : null,
+      colors,
+      logoDescription:
+        typeof parsed.logoDescription === "string"
+          ? clip(parsed.logoDescription, 180) || null
+          : null,
+      styleNotes:
+        typeof parsed.styleNotes === "string"
+          ? clip(parsed.styleNotes, 140) || null
+          : null,
+    };
+  } catch {
+    return null;
+  }
 }
 
 export function clearDocumentAiIcon(documentId: number): void {
@@ -291,6 +455,16 @@ export async function generateDocumentAiIcon(
     | { product_name?: string | null }
     | undefined;
 
+  const brandHint =
+    [detail.document.correspondent_name, finance?.vendor]
+      .filter((s): s is string => Boolean(s && String(s).trim()))
+      .join(" / ") || null;
+
+  const brandCues = await inferBrandVisualCuesFromThumb({
+    paperlessId: detail.document.paperless_id,
+    brandHint,
+  });
+
   const prompt = buildDocumentAiIconPrompt({
     title: detail.document.title,
     category:
@@ -305,6 +479,8 @@ export async function generateDocumentAiIcon(
       typeof detail.summary?.short_summary === "string"
         ? detail.summary.short_summary
         : null,
+    letterhead: clipDocumentLetterhead(detail.document.content),
+    brandCues,
   });
 
   const client = getOpenAIClient();
