@@ -450,7 +450,7 @@ async function brandLogoAsPngFile(logoPath: string) {
   return toFile(png, "brand-logo.png", { type: "image/png" });
 }
 
-/** Prompt when a known brand logo is supplied as reference image. */
+/** Prompt when a visual reference image is supplied (inspiration only). */
 export function buildBrandLogoReferenceIconPrompt(input: {
   brand: DocumentBrandLogo;
   title?: string | null;
@@ -476,6 +476,7 @@ export function buildBrandLogoReferenceIconPrompt(input: {
     `category «${category}»`,
     `title «${title}»`,
     `organization/brand «${org}»`,
+    `place/brand keyword «${input.brand.label}»`,
   ];
   if (docType) subjectParts.push(`type «${docType}»`);
   if (hint) subjectParts.push(`context: ${hint}`);
@@ -483,13 +484,14 @@ export function buildBrandLogoReferenceIconPrompt(input: {
   return [
     "Tiny square app icon illustration (not photorealistic) for a household document archive.",
     `Subject: ${subjectParts.join("; ")}.`,
-    `Attached reference image is the official mark for «${input.brand.label}».`,
-    "Reproduce that exact logo as the primary centered symbol — preserve colors, shapes, and proportions with high fidelity.",
-    "Do not invent a different emblem; do not redraw into an unrelated icon.",
-    "Style: cheerful colorful flat illustration matching the logo’s palette,",
+    `Attached image is ONLY an optical mood/reference for «${input.brand.label}» (colors, motifs, shapes).`,
+    "Create a NEW cheerful flat app icon inspired by that reference — reinterpret freely for a 48px thumbnail.",
+    "Do NOT copy, paste, crop, or photographically reproduce the reference image as the icon.",
+    "Do NOT output the coat of arms / logo itself unchanged; invent a related stylized symbol.",
+    "Style: colorful flat illustration,",
     "solid pure white background (#FFFFFF) filling the entire square — never black, never dark, never gray.",
-    "Generous padding around the logo, soft clean edges,",
-    "no extra text, no letters, no numbers, no watermarks, no receipt UI, no photorealism.",
+    "Centered recognizable symbol with soft shading, generous padding,",
+    "no text, no letters, no numbers, no watermarks, no receipt UI, no photorealism.",
     "Suitable as a 48px list thumbnail.",
     input.brand.promptNote,
   ].join(" ");
@@ -497,7 +499,8 @@ export function buildBrandLogoReferenceIconPrompt(input: {
 
 /**
  * Generate (or force-regenerate) a small AI icon for a document.
- * Known brands (URI, ANG, …) pass a logo reference into OpenAI images.edit.
+ * Known brands/places (URI, ANG, Altdorf, …) pass a visual reference into OpenAI images.edit
+ * as inspiration only — the model must generate a new icon, not paste the asset.
  */
 export async function generateDocumentAiIcon(
   documentId: number,
@@ -571,7 +574,8 @@ export async function generateDocumentAiIcon(
       prompt,
       size: "1024x1024",
       quality: "low",
-      input_fidelity: "high",
+      // low: treat asset as mood/palette cue, not a lock on the exact mark
+      input_fidelity: "low",
       background: "opaque",
     });
     b64 = result.data?.[0]?.b64_json;

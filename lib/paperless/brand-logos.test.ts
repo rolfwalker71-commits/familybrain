@@ -33,6 +33,18 @@ test("matches Kanton Uri and URI without URL false positives", () => {
   );
 });
 
+test("matches Altdorf before Uri", () => {
+  assert.equal(
+    matchDocumentBrandLogo(
+      buildBrandMatchHaystack({
+        title: "Gemeindeversammlung Altdorf",
+        correspondent: "Einwohnergemeinde Altdorf UR",
+      })
+    )?.id,
+    "altdorf"
+  );
+});
+
 test("matches ANG / AN-Group", () => {
   assert.equal(
     matchDocumentBrandLogo(

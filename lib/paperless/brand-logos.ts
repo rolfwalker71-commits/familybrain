@@ -12,23 +12,30 @@ export type DocumentBrandLogo = {
 };
 
 /**
- * Known organization logos passed as reference images into OpenAI icon generation.
+ * Visual reference assets for OpenAI document-icon generation (inspiration only).
  * Matched against title, correspondent, vendor, letterhead and OCR (word-ish).
  */
 export const DOCUMENT_BRAND_LOGOS: DocumentBrandLogo[] = [
   {
-    id: "uri",
-    label: "Kanton Uri",
-    filename: "uri-wappen.svg",
+    id: "altdorf",
+    label: "Altdorf",
+    filename: "altdorf-ref.png",
     promptNote:
-      "Brand logo reference: Kanton Uri coat of arms (Wappen Uri, Wikimedia Commons).",
+      "Optical reference for Altdorf (UR) — inspired by vereins.fandom.com/wiki/Altdorf_UR; generate a fresh icon, do not paste the reference.",
   },
   {
     id: "ang",
     label: "ANG / AN-Group",
     filename: "ang-icon.png",
     promptNote:
-      "Brand logo reference: ANG International / AN-Group (an-group.one).",
+      "Optical reference for ANG International / AN-Group (an-group.one); generate a fresh icon, do not paste the reference.",
+  },
+  {
+    id: "uri",
+    label: "Kanton Uri",
+    filename: "uri-wappen.svg",
+    promptNote:
+      "Optical reference for Kanton Uri coat of arms (Wappen Uri, Wikimedia Commons); generate a fresh icon, do not paste the reference.",
   },
 ];
 
@@ -84,16 +91,18 @@ export function buildBrandMatchHaystack(input: {
 }
 
 /**
- * Detect known brands from document text (for AI logo reference).
- * URI: Kanton Uri (avoid matching inside URLs like http://…).
- * ANG: ANG / AN-Group company.
+ * Detect known place/brand keywords for optical AI icon references.
+ * Prefer more specific matches first (Altdorf before Uri).
  */
 export function matchDocumentBrandLogo(
   haystack: string
 ): DocumentBrandLogo | null {
   if (!haystack.trim()) return null;
 
-  // Prefer more specific company match first when both could appear (unlikely).
+  if (/\baltdorf\b/.test(haystack)) {
+    return DOCUMENT_BRAND_LOGOS.find((b) => b.id === "altdorf") || null;
+  }
+
   if (
     /\ban[\s-]?group\b/.test(haystack) ||
     /\ban-group\.one\b/.test(haystack) ||
