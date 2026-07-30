@@ -66,6 +66,10 @@ import {
   saveTriageMailSettings,
 } from "@/lib/mail/triage-mail-settings";
 import {
+  getTriageAfterAnalysisSettingsPublic,
+  setTriageAfterAnalysisEnabled,
+} from "@/lib/documents/triage-settings";
+import {
   APP_PUBLIC_URL_KEY,
   getAppPublicUrlSetting,
   absoluteAppUrl,
@@ -175,6 +179,7 @@ export async function GET(request: Request) {
     appPublicUrl: getAppPublicUrlSetting() || "",
     ...getSmtpSettingsPublic(),
     ...getTriageMailSettingsPublic(),
+    ...getTriageAfterAnalysisSettingsPublic(),
   });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -222,6 +227,7 @@ const PutSchema = z.object({
   appPublicUrl: z.string().max(500).nullable().optional(),
   triageMailEnabled: z.boolean().optional(),
   triageMailRecipients: z.string().max(2000).nullable().optional(),
+  triageAfterAnalysisEnabled: z.boolean().optional(),
 });
 
 export async function PUT(request: Request) {
@@ -426,6 +432,10 @@ export async function PUT(request: Request) {
     });
   }
 
+  if (parsed.data.triageAfterAnalysisEnabled !== undefined) {
+    setTriageAfterAnalysisEnabled(parsed.data.triageAfterAnalysisEnabled);
+  }
+
   if (
     parsed.data.triageMailEnabled !== undefined ||
     parsed.data.triageMailRecipients !== undefined
@@ -487,5 +497,6 @@ export async function PUT(request: Request) {
     appPublicUrl: getAppPublicUrlSetting() || "",
     ...getSmtpSettingsPublic(),
     ...getTriageMailSettingsPublic(),
+    ...getTriageAfterAnalysisSettingsPublic(),
   });
 }

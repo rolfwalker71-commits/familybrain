@@ -10,9 +10,15 @@ import {
   type TriageReason,
   type TriageStatus,
 } from "@/lib/documents/triage-shared";
+import { isTriageAfterAnalysisEnabled } from "@/lib/documents/triage-settings";
 
 export type { TriageAction, TriageReason, TriageStatus };
 export { TRIAGE_REASON_LABELS, TRIAGE_STATUS_LABELS };
+export {
+  isTriageAfterAnalysisEnabled,
+  setTriageAfterAnalysisEnabled,
+  getTriageAfterAnalysisSettingsPublic,
+} from "@/lib/documents/triage-settings";
 
 const SETTLED_TRIAGE_STATUSES = new Set<string>([
   "pay",
@@ -137,6 +143,10 @@ export function applyTriageAfterAnalysis(
   documentId: number,
   analysis: DocumentAnalysis
 ): { queued: boolean; newlyQueued: boolean; reasons: TriageReason[] } {
+  if (!isTriageAfterAnalysisEnabled()) {
+    return { queued: false, newlyQueued: false, reasons: [] };
+  }
+
   const db = getDb();
   const row = db
     .prepare(

@@ -186,6 +186,8 @@ function SettingsPageInner() {
   const [appPublicUrl, setAppPublicUrl] = useState("");
   const [triageMailEnabled, setTriageMailEnabled] = useState(false);
   const [triageMailRecipients, setTriageMailRecipients] = useState("");
+  const [triageAfterAnalysisEnabled, setTriageAfterAnalysisEnabled] =
+    useState(true);
   const [testMailTo, setTestMailTo] = useState("");
   const [testMailBusy, setTestMailBusy] = useState(false);
   const [triageTestBusy, setTriageTestBusy] = useState(false);
@@ -319,6 +321,9 @@ function SettingsPageInner() {
       setAppPublicUrl(data.appPublicUrl || "");
       setTriageMailEnabled(Boolean(data.triageMailEnabled));
       setTriageMailRecipients(data.triageMailRecipients || "");
+      setTriageAfterAnalysisEnabled(
+        data.triageAfterAnalysisEnabled !== false
+      );
       setError(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
@@ -715,6 +720,7 @@ function SettingsPageInner() {
           appPublicUrl: appPublicUrl.trim() || null,
           triageMailEnabled,
           triageMailRecipients: triageMailRecipients.trim() || null,
+          triageAfterAnalysisEnabled,
         }),
       });
       const data = await res.json();
@@ -730,6 +736,9 @@ function SettingsPageInner() {
       setAppPublicUrl(data.appPublicUrl || "");
       setTriageMailEnabled(Boolean(data.triageMailEnabled));
       setTriageMailRecipients(data.triageMailRecipients || "");
+      setTriageAfterAnalysisEnabled(
+        data.triageAfterAnalysisEnabled !== false
+      );
       setSmtpPassword("");
       setMessage("E-Mail-Einstellungen gespeichert.");
     } catch (err) {
@@ -1887,11 +1896,74 @@ function SettingsPageInner() {
           <div className="space-y-3 rounded-xl border border-border/60 bg-muted/20 p-4">
             <div className="flex items-start gap-3">
               <input
+                id="triageAfterAnalysisEnabled"
+                type="checkbox"
+                className="mt-1 size-4 accent-[var(--brand-docs)]"
+                checked={triageAfterAnalysisEnabled}
+                disabled={saving !== null}
+                onChange={(e) => {
+                  const enabled = e.target.checked;
+                  setTriageAfterAnalysisEnabled(enabled);
+                  void (async () => {
+                    setSaving("email");
+                    setError(null);
+                    setMessage(null);
+                    try {
+                      const res = await fetch("/api/settings", {
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          triageAfterAnalysisEnabled: enabled,
+                        }),
+                      });
+                      const data = await res.json();
+                      if (!res.ok) {
+                        throw new Error(
+                          data.error || "Speichern fehlgeschlagen"
+                        );
+                      }
+                      setTriageAfterAnalysisEnabled(
+                        data.triageAfterAnalysisEnabled !== false
+                      );
+                      setMessage(
+                        enabled
+                          ? "Triage nach Analyse wieder aktiv."
+                          : "Triage nach Analyse pausiert — Neuanalyse ohne Inbox-Flut."
+                      );
+                    } catch (err) {
+                      setTriageAfterAnalysisEnabled(!enabled);
+                      setError(
+                        err instanceof Error ? err.message : String(err)
+                      );
+                    } finally {
+                      setSaving(null);
+                    }
+                  })();
+                }}
+              />
+              <div className="min-w-0 space-y-1">
+                <Label
+                  htmlFor="triageAfterAnalysisEnabled"
+                  className="cursor-pointer"
+                >
+                  Triage nach Analyse
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Dokumente nach der Analyse in die Triage-Inbox legen. Für eine
+                  komplette Neuanalyse abschalten, danach wieder einschalten —
+                  sonst landen alle Belege erneut in der Inbox (und ggf. als
+                  Mail).
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3 border-t border-border/50 pt-3">
+              <input
                 id="triageMailEnabled"
                 type="checkbox"
                 className="mt-1 size-4 accent-[var(--brand-docs)]"
                 checked={triageMailEnabled}
                 onChange={(e) => setTriageMailEnabled(e.target.checked)}
+                disabled={!triageAfterAnalysisEnabled}
               />
               <div className="min-w-0 space-y-1">
                 <Label htmlFor="triageMailEnabled" className="cursor-pointer">
