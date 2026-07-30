@@ -1,15 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   AlertCircle,
   CalendarClock,
+  Check,
   FileWarning,
+  Inbox,
   Receipt,
   Shield,
+  X,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   OpenInvoiceCardGrid,
@@ -23,6 +27,35 @@ import {
   formatDueRelative,
   formatExpiryRelative,
 } from "@/lib/utils/due-urgency";
+
+type TriageReason =
+  | "invoice"
+  | "high_amount"
+  | "warranty"
+  | "deadline"
+  | "travel";
+
+const TRIAGE_LABELS: Record<TriageReason, string> = {
+  invoice: "Rechnung",
+  high_amount: "Hoher Betrag",
+  warranty: "Garantie",
+  deadline: "Frist",
+  travel: "Reise",
+};
+
+type TriageItem = {
+  id: number;
+  title: string | null;
+  correspondent_name: string | null;
+  category: string | null;
+  short_summary: string | null;
+  amount: number | null;
+  currency: string | null;
+  due_date: string | null;
+  vendor: string | null;
+  reasons: TriageReason[];
+  ai_icon_url: string | null;
+};
 
 type InboxPayload = {
   overdueDeadlines: Array<{
@@ -46,6 +79,7 @@ type InboxPayload = {
     category?: string | null;
   }>;
   openUnpaidInvoices?: OpenInvoiceCardModel[];
+  triagePending?: TriageItem[];
   warrantiesExpiring: Array<{
     id: number;
     product_name: string | null;
@@ -65,11 +99,25 @@ type InboxPayload = {
 export function ActionInbox() {
   const [data, setData] = useState<InboxPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<number | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch("/api/dashboard/inbox");
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Laden fehlgeschlagen");
+      setData(json);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
 
-    async function load() {
+    void (async () => {
       try {
         const res = await fetch("/api/dashboard/inbox");
         const json = await res.json();
@@ -83,16 +131,13 @@ export function ActionInbox() {
           setError(err instanceof Error ? err.message : String(err));
         }
       }
-    }
-
-    void load();
+    })();
 
     const onInbox = () => {
       void load();
     };
     window.addEventListener("buddy:inbox", onInbox);
 
-    // Fallback: rare poll + refresh when tab becomes visible again
     const poll = window.setInterval(() => {
       if (document.visibilityState === "visible") void load();
     }, 45000);
@@ -107,7 +152,31 @@ export function ActionInbox() {
       window.clearInterval(poll);
       document.removeEventListener("visibilitychange", onVis);
     };
-  }, []);
+  }, [load]);
+
+  async function resolveTriage(
+    documentLocalId: number,
+    action: "pay" | "ignore" | "done"
+  ) {
+    setBusyId(documentLocalId);
+    setActionError(null);
+    try {
+      const res = await fetch("/api/dashboard/triage", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ documentLocalId, action }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(json.error || "Aktion fehlgeschlagen");
+      }
+      await load();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   if (error) {
     return (
@@ -134,7 +203,9 @@ export function ActionInbox() {
     data.analysisIssues.error +
     data.analysisIssues.stale;
   const openUnpaid = data.openUnpaidInvoices || [];
+  const triagePending = data.triagePending || [];
   const empty =
+    triagePending.length === 0 &&
     data.overdueDeadlines.length === 0 &&
     data.dueInvoices.length === 0 &&
     openUnpaid.length === 0 &&
@@ -167,12 +238,122 @@ export function ActionInbox() {
           </h2>
         </div>
 
+        {actionError ? (
+          <p className="text-sm text-destructive">{actionError}</p>
+        ) : null}
+
         {empty ? (
           <p className="text-sm text-muted-foreground">
             Aktuell nichts Dringendes.
           </p>
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
+            {triagePending.length > 0 ? (
+              <section className="space-y-2 md:col-span-2">
+                <div className="flex items-center gap-2 text-sm font-semibold">
+                  <Inbox className="size-4 text-[var(--brand-docs)]" />
+                  Neue Belege prüfen
+                  <Badge variant="secondary" className="text-[10px]">
+                    {triagePending.length}
+                  </Badge>
+                </div>
+                <ul className="space-y-2">
+                  {triagePending.map((row) => {
+                    const needsPay =
+                      row.reasons.includes("invoice") ||
+                      row.reasons.includes("high_amount");
+                    const busy = busyId === row.id;
+                    return (
+                      <li
+                        key={row.id}
+                        className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2.5"
+                      >
+                        <div className="flex items-start gap-2.5">
+                          <Link
+                            href={`/documents/${row.id}`}
+                            className="flex min-w-0 flex-1 items-start gap-2.5 hover:opacity-90"
+                          >
+                            <DocumentAiIcon
+                              aiIconUrl={row.ai_icon_url}
+                              category={row.category}
+                              size="xs"
+                            />
+                            <span className="min-w-0 flex-1">
+                              <span className="font-medium">
+                                {row.vendor ||
+                                  row.correspondent_name ||
+                                  row.title ||
+                                  "Dokument"}
+                              </span>
+                              <span className="mt-1 flex flex-wrap gap-1">
+                                {row.reasons.map((reason) => (
+                                  <Badge
+                                    key={reason}
+                                    variant="secondary"
+                                    className="text-[10px]"
+                                  >
+                                    {TRIAGE_LABELS[reason] || reason}
+                                  </Badge>
+                                ))}
+                              </span>
+                              <span className="mt-1 block text-xs text-muted-foreground">
+                                {[
+                                  row.amount != null
+                                    ? formatCHF(
+                                        row.amount,
+                                        row.currency || "CHF"
+                                      )
+                                    : null,
+                                  row.due_date
+                                    ? formatDueRelative(row.due_date)
+                                    : null,
+                                  row.short_summary,
+                                ]
+                                  .filter(Boolean)
+                                  .join(" · ")}
+                              </span>
+                            </span>
+                          </Link>
+                        </div>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {needsPay ? (
+                            <Button
+                              size="sm"
+                              className="bg-[var(--brand-finance)] text-white hover:bg-[var(--brand-finance)]/90"
+                              disabled={busy}
+                              onClick={() => void resolveTriage(row.id, "pay")}
+                            >
+                              <Check className="size-3.5" />
+                              {busy ? "…" : "Muss bezahlt werden"}
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={busy}
+                              onClick={() => void resolveTriage(row.id, "done")}
+                            >
+                              <Check className="size-3.5" />
+                              {busy ? "…" : "Erledigt"}
+                            </Button>
+                          )}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={busy}
+                            onClick={() => void resolveTriage(row.id, "ignore")}
+                          >
+                            <X className="size-3.5" />
+                            Irrelevant
+                          </Button>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            ) : null}
+
             {openUnpaid.length > 0 ? (
               <section className="space-y-2 md:col-span-2">
                 <div className="flex items-center gap-2 text-sm font-semibold">

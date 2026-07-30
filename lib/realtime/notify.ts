@@ -218,6 +218,46 @@ export function notifyMarkedPaid(localId: number): void {
   });
 }
 
+export function notifyDocumentTriageQueued(
+  localId: number,
+  reasonLabels: string[]
+): void {
+  notifyDocumentChange({
+    localId,
+    reason: "document_triage",
+    headline: "Neuer Beleg zur Prüfung",
+    detail:
+      reasonLabels.length > 0
+        ? reasonLabels.join(" · ")
+        : "Bitte entscheiden: zahlen oder irrelevant.",
+    source: "buddy",
+  });
+}
+
+export function notifyDocumentTriageResolved(
+  localId: number,
+  action: "pay" | "ignore" | "done"
+): void {
+  const headline =
+    action === "pay"
+      ? "Als zu bezahlen markiert"
+      : action === "ignore"
+        ? "Beleg als irrelevant markiert"
+        : "Beleg-Prüfung erledigt";
+  notifyDocumentChange({
+    localId,
+    reason: "document_triage",
+    headline,
+    detail:
+      action === "pay"
+        ? "Erscheint unter Offene Rechnungen (Paperless «Zu bezahlen»)."
+        : action === "ignore"
+          ? "Nicht in der Zahlungspflicht-Liste."
+          : "Aus der Prüfliste entfernt.",
+    source: "buddy",
+  });
+}
+
 export function notifyTripComment(input: {
   tripId: number;
   eventId: number;

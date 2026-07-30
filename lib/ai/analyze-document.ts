@@ -83,6 +83,27 @@ export async function analyzeDocument(
       options?.expectedContentHash
     );
     try {
+      const { applyTriageAfterAnalysis, TRIAGE_REASON_LABELS } = await import(
+        "@/lib/documents/triage"
+      );
+      const triage = applyTriageAfterAnalysis(documentId, parsed.data);
+      if (triage.queued) {
+        const { notifyDocumentTriageQueued } = await import(
+          "@/lib/realtime/notify"
+        );
+        notifyDocumentTriageQueued(
+          documentId,
+          triage.reasons.map((r) => TRIAGE_REASON_LABELS[r])
+        );
+      }
+    } catch (triageErr) {
+      console.error(
+        "[analyze] document triage failed",
+        documentId,
+        triageErr instanceof Error ? triageErr.message : triageErr
+      );
+    }
+    try {
       const { notifyAnalysisCompleted } = await import("@/lib/realtime/notify");
       notifyAnalysisCompleted(documentId, {
         category: parsed.data.category,

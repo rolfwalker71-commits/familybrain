@@ -22,6 +22,7 @@ const ALL: NotifyReason[] = [
   "ai_icon",
   "buddy_status",
   "mark_paid",
+  "document_triage",
   "trip_comment",
   "trip_event_updated",
   "trip_event_ai_image",

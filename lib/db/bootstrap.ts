@@ -91,6 +91,7 @@ export function bootstrapDatabase(db: Database.Database): void {
   ensureExtractOverrideColumns(db);
   ensurePaymentCustomFieldColumns(db);
   ensureDocumentAiIconColumns(db);
+  ensureDocumentTriageColumns(db);
   ensurePaperlessFieldSyncLogTable(db);
 
   const insertArea = db.prepare(
@@ -175,6 +176,26 @@ function ensureDocumentAiIconColumns(db: Database.Database): void {
   if (!names.has("ai_icon_prompt")) {
     db.exec(`ALTER TABLE paperless_documents ADD COLUMN ai_icon_prompt TEXT`);
   }
+}
+
+function ensureDocumentTriageColumns(db: Database.Database): void {
+  const cols = db
+    .prepare(`PRAGMA table_info(paperless_documents)`)
+    .all() as Array<{ name: string }>;
+  const names = new Set(cols.map((c) => c.name));
+  if (!names.has("triage_status")) {
+    db.exec(`ALTER TABLE paperless_documents ADD COLUMN triage_status TEXT`);
+  }
+  if (!names.has("triage_reasons")) {
+    db.exec(`ALTER TABLE paperless_documents ADD COLUMN triage_reasons TEXT`);
+  }
+  if (!names.has("triage_at")) {
+    db.exec(`ALTER TABLE paperless_documents ADD COLUMN triage_at TEXT`);
+  }
+  db.exec(
+    `CREATE INDEX IF NOT EXISTS idx_docs_triage_status
+     ON paperless_documents(triage_status)`
+  );
 }
 
 function ensurePaperlessFieldSyncLogTable(db: Database.Database): void {

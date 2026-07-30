@@ -28,6 +28,7 @@ import {
   boolToSql,
   extractPaymentCustomFlags,
 } from "@/lib/paperless/custom-fields";
+import { listPendingTriageDocuments } from "@/lib/documents/triage";
 
 function aiIconPublicUrl(aiIconPath: string | null | undefined): string | null {
   if (!aiIconPath) return null;
@@ -1202,6 +1203,7 @@ export function getDashboardInbox(limits = { each: 5 }) {
     warrantiesExpiring: withIcons(
       warrantiesExpiring as Array<Record<string, unknown>>
     ),
+    triagePending: listPendingTriageDocuments(Math.max(limit, 10)),
     analysisIssues: {
       pending: analysisPending,
       error: analysisError,
