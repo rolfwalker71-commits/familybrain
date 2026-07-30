@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
   AlertCircle,
@@ -15,6 +15,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import {
   OpenInvoiceCardGrid,
   type OpenInvoiceCardModel,
@@ -29,6 +30,8 @@ import {
   formatDueRelative,
   formatExpiryRelative,
 } from "@/lib/utils/due-urgency";
+import { cn } from "@/lib/utils";
+import type { TriageAction } from "@/lib/documents/triage-shared";
 
 type TriageReason =
   | "invoice"
@@ -57,6 +60,8 @@ type TriageItem = {
   vendor: string | null;
   reasons: TriageReason[];
   ai_icon_url: string | null;
+  tax_year?: number | null;
+  tax_suggested?: boolean;
 };
 
 type InboxPayload = {
@@ -159,17 +164,19 @@ export function ActionInbox() {
     };
   }, [load]);
 
-  async function resolveTriage(
-    documentLocalId: number,
-    action: "pay" | "ignore" | "done" | "ebill" | "twint" | "card"
-  ) {
-    setBusyId(documentLocalId);
+  async function resolveTriage(input: {
+    documentLocalId: number;
+    action: TriageAction;
+    taxRelevant: boolean;
+    taxYear: number | null;
+  }) {
+    setBusyId(input.documentLocalId);
     setActionError(null);
     try {
       const res = await fetch("/api/dashboard/triage", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ documentLocalId, action }),
+        body: JSON.stringify(input),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -263,122 +270,14 @@ export function ActionInbox() {
                   </Badge>
                 </div>
                 <ul className="space-y-2">
-                  {triagePending.map((row) => {
-                    const needsPay =
-                      row.reasons.includes("invoice") ||
-                      row.reasons.includes("high_amount");
-                    const busy = busyId === row.id;
-                    return (
-                      <li
-                        key={row.id}
-                        className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2.5"
-                      >
-                        <div className="flex items-start gap-2.5">
-                          <Link
-                            href={`/documents/${row.id}`}
-                            className="flex min-w-0 flex-1 items-start gap-2.5 hover:opacity-90"
-                          >
-                            <DocumentAiIcon
-                              aiIconUrl={row.ai_icon_url}
-                              category={row.category}
-                              size="xs"
-                            />
-                            <span className="min-w-0 flex-1">
-                              <span className="font-medium">
-                                {row.vendor ||
-                                  row.correspondent_name ||
-                                  row.title ||
-                                  "Dokument"}
-                              </span>
-                              <span className="mt-1 flex flex-wrap gap-1">
-                                {row.reasons.map((reason) => (
-                                  <Badge
-                                    key={reason}
-                                    variant="secondary"
-                                    className="text-[10px]"
-                                  >
-                                    {TRIAGE_LABELS[reason] || reason}
-                                  </Badge>
-                                ))}
-                              </span>
-                              <span className="mt-1 block text-xs text-muted-foreground">
-                                {[
-                                  row.amount != null
-                                    ? formatCHF(
-                                        row.amount,
-                                        row.currency || "CHF"
-                                      )
-                                    : null,
-                                  row.due_date
-                                    ? formatDueRelative(row.due_date)
-                                    : null,
-                                  row.short_summary,
-                                ]
-                                  .filter(Boolean)
-                                  .join(" · ")}
-                              </span>
-                            </span>
-                          </Link>
-                        </div>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {needsPay ? (
-                            <Button
-                              size="sm"
-                              className="bg-[var(--brand-finance)] text-white hover:bg-[var(--brand-finance)]/90"
-                              disabled={busy}
-                              onClick={() => void resolveTriage(row.id, "pay")}
-                            >
-                              <Check className="size-3.5" />
-                              {busy ? "…" : "Muss bezahlt werden"}
-                            </Button>
-                          ) : (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              disabled={busy}
-                              onClick={() => void resolveTriage(row.id, "done")}
-                            >
-                              <Check className="size-3.5" />
-                              {busy ? "…" : "Erledigt"}
-                            </Button>
-                          )}
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={busy}
-                            onClick={() => void resolveTriage(row.id, "ebill")}
-                          >
-                            {busy ? "…" : "eBill"}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={busy}
-                            onClick={() => void resolveTriage(row.id, "twint")}
-                          >
-                            {busy ? "…" : "Twint"}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={busy}
-                            onClick={() => void resolveTriage(row.id, "card")}
-                          >
-                            {busy ? "…" : "Kreditkarte"}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={busy}
-                            onClick={() => void resolveTriage(row.id, "ignore")}
-                          >
-                            <X className="size-3.5" />
-                            Irrelevant
-                          </Button>
-                        </div>
-                      </li>
-                    );
-                  })}
+                  {triagePending.map((row) => (
+                    <TriagePendingCard
+                      key={row.id}
+                      row={row}
+                      busy={busyId === row.id}
+                      onSubmit={(payload) => void resolveTriage(payload)}
+                    />
+                  ))}
                 </ul>
               </section>
             ) : null}
@@ -590,5 +489,239 @@ export function ActionInbox() {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+function ChoiceChip({
+  active,
+  disabled,
+  onClick,
+  children,
+  accent,
+}: {
+  active: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+  children: ReactNode;
+  accent?: boolean;
+}) {
+  return (
+    <Button
+      type="button"
+      size="sm"
+      variant={active ? "default" : "outline"}
+      disabled={disabled}
+      className={cn(
+        active && accent
+          ? "bg-[var(--brand-finance)] text-white hover:bg-[var(--brand-finance)]/90"
+          : undefined
+      )}
+      onClick={onClick}
+    >
+      {children}
+    </Button>
+  );
+}
+
+function TriagePendingCard({
+  row,
+  busy,
+  onSubmit,
+}: {
+  row: TriageItem;
+  busy: boolean;
+  onSubmit: (payload: {
+    documentLocalId: number;
+    action: TriageAction;
+    taxRelevant: boolean;
+    taxYear: number | null;
+  }) => void;
+}) {
+  const needsPay =
+    row.reasons.includes("invoice") || row.reasons.includes("high_amount");
+  const [action, setAction] = useState<TriageAction | null>(null);
+  const [taxRelevant, setTaxRelevant] = useState<boolean | null>(
+    row.tax_suggested ? true : null
+  );
+  const [taxYearInput, setTaxYearInput] = useState(
+    row.tax_year != null ? String(row.tax_year) : ""
+  );
+
+  const taxYearNum = (() => {
+    const n = Number(taxYearInput);
+    return Number.isInteger(n) && n >= 1990 && n <= 2100 ? n : null;
+  })();
+
+  const canSubmit =
+    action != null &&
+    taxRelevant != null &&
+    (taxRelevant === false || taxYearNum != null);
+
+  return (
+    <li className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2.5">
+      <div className="flex items-start gap-2.5">
+        <Link
+          href={`/documents/${row.id}`}
+          className="flex min-w-0 flex-1 items-start gap-2.5 hover:opacity-90"
+        >
+          <DocumentAiIcon
+            aiIconUrl={row.ai_icon_url}
+            category={row.category}
+            size="xs"
+          />
+          <span className="min-w-0 flex-1">
+            <span className="font-medium">
+              {row.vendor ||
+                row.correspondent_name ||
+                row.title ||
+                "Dokument"}
+            </span>
+            <span className="mt-1 flex flex-wrap gap-1">
+              {row.reasons.map((reason) => (
+                <Badge
+                  key={reason}
+                  variant="secondary"
+                  className="text-[10px]"
+                >
+                  {TRIAGE_LABELS[reason] || reason}
+                </Badge>
+              ))}
+              {row.tax_suggested ? (
+                <Badge variant="secondary" className="text-[10px]">
+                  Steuern
+                  {row.tax_year != null ? ` ${row.tax_year}` : ""}
+                </Badge>
+              ) : null}
+            </span>
+            <span className="mt-1 block text-xs text-muted-foreground">
+              {[
+                row.amount != null
+                  ? formatCHF(row.amount, row.currency || "CHF")
+                  : null,
+                row.due_date ? formatDueRelative(row.due_date) : null,
+                row.short_summary,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            </span>
+          </span>
+        </Link>
+      </div>
+
+      <div className="mt-3 space-y-3">
+        <div className="space-y-1.5">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Status
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {needsPay ? (
+              <ChoiceChip
+                active={action === "pay"}
+                accent
+                disabled={busy}
+                onClick={() => setAction("pay")}
+              >
+                Muss bezahlt werden
+              </ChoiceChip>
+            ) : (
+              <ChoiceChip
+                active={action === "done"}
+                disabled={busy}
+                onClick={() => setAction("done")}
+              >
+                Erledigt
+              </ChoiceChip>
+            )}
+            <ChoiceChip
+              active={action === "ebill"}
+              disabled={busy}
+              onClick={() => setAction("ebill")}
+            >
+              eBill
+            </ChoiceChip>
+            <ChoiceChip
+              active={action === "twint"}
+              disabled={busy}
+              onClick={() => setAction("twint")}
+            >
+              Twint
+            </ChoiceChip>
+            <ChoiceChip
+              active={action === "card"}
+              disabled={busy}
+              onClick={() => setAction("card")}
+            >
+              Kreditkarte
+            </ChoiceChip>
+            <ChoiceChip
+              active={action === "ignore"}
+              disabled={busy}
+              onClick={() => setAction("ignore")}
+            >
+              <X className="size-3.5" />
+              Irrelevant
+            </ChoiceChip>
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Steuerrelevant
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <ChoiceChip
+              active={taxRelevant === true}
+              disabled={busy}
+              onClick={() => setTaxRelevant(true)}
+            >
+              Ja
+            </ChoiceChip>
+            <ChoiceChip
+              active={taxRelevant === false}
+              disabled={busy}
+              onClick={() => setTaxRelevant(false)}
+            >
+              Nein
+            </ChoiceChip>
+            {taxRelevant === true ? (
+              <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                Steuerjahr
+                <Input
+                  type="number"
+                  inputMode="numeric"
+                  min={1990}
+                  max={2100}
+                  placeholder="2025"
+                  className="h-8 w-24"
+                  value={taxYearInput}
+                  disabled={busy}
+                  onChange={(e) => setTaxYearInput(e.target.value)}
+                />
+              </label>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="flex justify-end">
+          <Button
+            size="sm"
+            disabled={busy || !canSubmit}
+            onClick={() => {
+              if (!action || taxRelevant == null) return;
+              if (taxRelevant && taxYearNum == null) return;
+              onSubmit({
+                documentLocalId: row.id,
+                action,
+                taxRelevant,
+                taxYear: taxRelevant ? taxYearNum : null,
+              });
+            }}
+          >
+            <Check className="size-3.5" />
+            {busy ? "…" : "OK"}
+          </Button>
+        </div>
+      </div>
+    </li>
   );
 }

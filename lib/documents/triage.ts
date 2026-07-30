@@ -209,6 +209,9 @@ export type TriageInboxItem = {
   reasons: TriageReason[];
   triage_at: string | null;
   ai_icon_url: string | null;
+  tax_year: number | null;
+  /** Suggested from analysis category === Steuern */
+  tax_suggested: boolean;
 };
 
 export function listPendingTriageDocuments(limit = 12): TriageInboxItem[] {
@@ -217,7 +220,7 @@ export function listPendingTriageDocuments(limit = 12): TriageInboxItem[] {
     .prepare(
       `SELECT d.id, d.paperless_id, d.title, d.correspondent_name,
               d.document_type_name, d.triage_reasons, d.triage_at, d.ai_icon_path,
-              s.category, s.short_summary,
+              s.category, s.short_summary, s.tax_year,
               (SELECT f.amount FROM financial_items f
                WHERE f.document_id = d.id
                ORDER BY f.id LIMIT 1) AS amount,
@@ -248,6 +251,7 @@ export function listPendingTriageDocuments(limit = 12): TriageInboxItem[] {
     ai_icon_path: string | null;
     category: string | null;
     short_summary: string | null;
+    tax_year: number | null;
     amount: number | null;
     currency: string | null;
     due_date: string | null;
@@ -269,6 +273,8 @@ export function listPendingTriageDocuments(limit = 12): TriageInboxItem[] {
     reasons: parseTriageReasons(row.triage_reasons),
     triage_at: row.triage_at,
     ai_icon_url: aiIconPublicUrl(row.ai_icon_path),
+    tax_year: row.tax_year ?? null,
+    tax_suggested: row.category === "Steuern",
   }));
 }
 
@@ -280,10 +286,13 @@ const PAID_VIA_ACTIONS = new Set<TriageAction>(["ebill", "twint", "card"]);
  * - ebill / twint / card: already settled that way → «Bezahlt»
  * - ignore: leave payment flags alone
  * - done: acknowledge (e.g. warranty/travel only)
+ * Optional taxRelevant / taxYear update document_summaries.
  */
 export async function resolveDocumentTriage(input: {
   documentLocalId: number;
   action: TriageAction;
+  taxRelevant?: boolean | null;
+  taxYear?: number | null;
 }): Promise<{ ok: boolean; error?: string }> {
   const db = getDb();
   const current = db
@@ -296,6 +305,21 @@ export async function resolveDocumentTriage(input: {
   if (!current) return { ok: false, error: "Dokument nicht gefunden" };
   if (current.triage_status !== "pending") {
     return { ok: false, error: "Dokument ist nicht in der Prüfliste" };
+  }
+
+  if (input.taxRelevant === true) {
+    const year = input.taxYear;
+    if (
+      year == null ||
+      !Number.isInteger(year) ||
+      year < 1990 ||
+      year > 2100
+    ) {
+      return {
+        ok: false,
+        error: "Steuerjahr fehlt oder ist ungültig (z. B. 2025).",
+      };
+    }
   }
 
   const ts = nowIso();
@@ -328,6 +352,44 @@ export async function resolveDocumentTriage(input: {
       };
     }
   }
+
+  function applyTaxDecision() {
+    if (input.taxRelevant == null) return;
+    const summary = db
+      .prepare(
+        `SELECT id, category, also_categories FROM document_summaries WHERE document_id = ?`
+      )
+      .get(input.documentLocalId) as
+      | {
+          id: number;
+          category: string | null;
+          also_categories: string | null;
+        }
+      | undefined;
+    if (!summary) return;
+
+    if (input.taxRelevant === true) {
+      db.prepare(
+        `UPDATE document_summaries
+         SET category = 'Steuern', tax_year = ?, updated_at = ?
+         WHERE id = ?`
+      ).run(input.taxYear!, ts, summary.id);
+      return;
+    }
+
+    // Not tax-relevant: clear tax year; demote Steuern category
+    let nextCategory = summary.category;
+    if (summary.category === "Steuern") {
+      nextCategory = "Sonstiges";
+    }
+    db.prepare(
+      `UPDATE document_summaries
+       SET category = ?, tax_year = NULL, also_categories = NULL, updated_at = ?
+       WHERE id = ?`
+    ).run(nextCategory, ts, summary.id);
+  }
+
+  applyTaxDecision();
 
   if (input.action === "pay") {
     db.prepare(

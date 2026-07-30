@@ -10,6 +10,8 @@ export const dynamic = "force-dynamic";
 const BodySchema = z.object({
   documentLocalId: z.number().int().positive(),
   action: z.enum(["pay", "ignore", "done", "ebill", "twint", "card"]),
+  taxRelevant: z.boolean().nullable().optional(),
+  taxYear: z.number().int().min(1990).max(2100).nullable().optional(),
 });
 
 export async function POST(request: Request) {
