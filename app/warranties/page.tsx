@@ -7,6 +7,6 @@ import {
 export const dynamic = "force-dynamic";
 
 export default function WarrantiesPage() {
-  const rows = listWarranties() as WarrantyRow[];
+  const rows = listWarranties() as unknown as WarrantyRow[];
   return <WarrantiesClient rows={rows} />;
 }

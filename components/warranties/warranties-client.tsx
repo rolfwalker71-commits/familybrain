@@ -26,6 +26,7 @@ import {
   DocumentTitleLink,
 } from "@/components/documents/document-link";
 import { DocumentAiIcon } from "@/components/documents/document-ai-icon";
+import { RecipientAvatars } from "@/components/family/recipient-avatars";
 import { toSwissDate } from "@/lib/utils/dates";
 import { compareNullableDate } from "@/lib/utils/list-sort";
 import { formatCHF } from "@/lib/utils/format";
@@ -37,6 +38,7 @@ import {
   warrantyStatusLabel,
 } from "@/lib/utils/temporal-status";
 import type { CalendarEvent } from "@/lib/utils/ics";
+import type { RecipientAvatarInfo } from "@/components/family/recipient-avatars";
 
 export type WarrantyRow = {
   id: number;
@@ -54,6 +56,7 @@ export type WarrantyRow = {
   correspondent_name: string | null;
   ai_icon_url?: string | null;
   category?: string | null;
+  recipients?: RecipientAvatarInfo;
 };
 
 function warrantyToEvent(row: WarrantyRow): CalendarEvent | null {
@@ -264,6 +267,7 @@ export function WarrantiesClient({ rows }: { rows: WarrantyRow[] }) {
                             }
                             meta={
                               <MetaLine>
+                                <RecipientAvatars recipients={row.recipients} />
                                 <span>
                                   Kauf {toSwissDate(row.purchase_date)}
                                 </span>

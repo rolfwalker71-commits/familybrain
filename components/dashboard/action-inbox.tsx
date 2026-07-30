@@ -20,6 +20,8 @@ import {
   type OpenInvoiceCardModel,
 } from "@/components/finance/open-invoice-cards";
 import { DocumentAiIcon } from "@/components/documents/document-ai-icon";
+import { RecipientAvatars } from "@/components/family/recipient-avatars";
+import type { RecipientAvatarInfo } from "@/components/family/recipient-avatars";
 import { formatCHF } from "@/lib/utils/format";
 import {
   dueUrgency,
@@ -66,6 +68,7 @@ type InboxPayload = {
     document_title: string | null;
     ai_icon_url?: string | null;
     category?: string | null;
+    recipients?: RecipientAvatarInfo;
   }>;
   dueInvoices: Array<{
     id: number;
@@ -77,6 +80,7 @@ type InboxPayload = {
     document_title: string | null;
     ai_icon_url?: string | null;
     category?: string | null;
+    recipients?: RecipientAvatarInfo;
   }>;
   openUnpaidInvoices?: OpenInvoiceCardModel[];
   triagePending?: TriageItem[];
@@ -88,6 +92,7 @@ type InboxPayload = {
     document_local_id: number;
     ai_icon_url?: string | null;
     category?: string | null;
+    recipients?: RecipientAvatarInfo;
   }>;
   analysisIssues: {
     pending: number;
@@ -424,6 +429,10 @@ export function ActionInbox() {
                         <span className="min-w-0">
                           <span className="font-medium">{row.title}</span>
                           <span className="mt-0.5 block text-xs text-muted-foreground">
+                            <RecipientAvatars
+                              recipients={row.recipients}
+                              className="mb-0.5"
+                            />
                             <span
                               className={dueUrgencyTextClass(
                                 dueUrgency(row.deadline_date)
@@ -476,6 +485,10 @@ export function ActionInbox() {
                               {row.vendor || row.document_title || "Rechnung"}
                             </span>
                             <span className="mt-0.5 block text-xs">
+                              <RecipientAvatars
+                                recipients={row.recipients}
+                                className="mb-0.5"
+                              />
                               <span
                                 className={dueUrgencyTextClass(
                                   dueUrgency(row.due_date)
@@ -527,6 +540,10 @@ export function ActionInbox() {
                             {row.product_name || row.vendor || "Garantie"}
                           </span>
                           <span className="mt-0.5 block text-xs text-muted-foreground">
+                            <RecipientAvatars
+                              recipients={row.recipients}
+                              className="mb-0.5"
+                            />
                             <span
                               className={dueUrgencyTextClass(
                                 dueUrgency(row.warranty_until)

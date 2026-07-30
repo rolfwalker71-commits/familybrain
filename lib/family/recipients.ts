@@ -272,6 +272,49 @@ export function resolveDocumentRecipients(input: {
   return { status, memberIds, members, label };
 }
 
+/** Attach resolved `recipients` to rows that carry raw recipient columns. */
+export function withResolvedRecipients<T extends Record<string, unknown>>(
+  rows: T[]
+): Array<T & { recipients: DocumentRecipientInfo }> {
+  const membersById = new Map(
+    listFamilyMembers().map((m) => [m.id, m] as const)
+  );
+  return rows.map((row) => ({
+    ...row,
+    recipients: resolveDocumentRecipients({
+      recipient_status:
+        typeof row.recipient_status === "string" ||
+        row.recipient_status === null
+          ? (row.recipient_status as string | null)
+          : null,
+      recipient_member_ids:
+        typeof row.recipient_member_ids === "string" ||
+        row.recipient_member_ids === null
+          ? (row.recipient_member_ids as string | null)
+          : null,
+      membersById,
+    }),
+  }));
+}
+
+/**
+ * Manually set document recipients (empty = unknown).
+ */
+export function updateDocumentRecipientsManual(
+  documentId: number,
+  memberIds: number[]
+): DocumentRecipientInfo {
+  const activeIds = new Set(
+    listFamilyMembers({ activeOnly: true }).map((m) => m.id)
+  );
+  const filtered = [...new Set(memberIds)].filter((id) => activeIds.has(id));
+  const saved = setDocumentRecipients(documentId, filtered);
+  return resolveDocumentRecipients({
+    recipient_status: saved.status,
+    recipient_member_ids: JSON.stringify(saved.memberIds),
+  });
+}
+
 export function recipientFilterSql(
   filter: string
 ): { clause: string; params: unknown[] } | null {

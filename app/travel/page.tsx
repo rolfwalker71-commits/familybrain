@@ -7,6 +7,6 @@ import {
 export const dynamic = "force-dynamic";
 
 export default function TravelPage() {
-  const items = listTravelItems() as TravelRow[];
+  const items = listTravelItems() as unknown as TravelRow[];
   return <TravelOverviewClient items={items} />;
 }

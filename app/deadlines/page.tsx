@@ -42,6 +42,8 @@ import {
   DocumentTitleLink,
 } from "@/components/documents/document-link";
 import { DocumentAiIcon } from "@/components/documents/document-ai-icon";
+import { RecipientAvatars } from "@/components/family/recipient-avatars";
+import type { RecipientAvatarInfo } from "@/components/family/recipient-avatars";
 import type { CalendarEvent } from "@/lib/utils/ics";
 
 type DeadlineRow = {
@@ -59,6 +61,7 @@ type DeadlineRow = {
   correspondent_name: string | null;
   ai_icon_url?: string | null;
   category?: string | null;
+  recipients?: RecipientAvatarInfo;
 };
 
 function deadlineToEvent(row: DeadlineRow): CalendarEvent | null {
@@ -297,6 +300,7 @@ function DeadlinesPageInner() {
           }
           meta={
             <MetaLine>
+              <RecipientAvatars recipients={row.recipients} />
               <span className="font-semibold tabular-nums">
                 {toSwissDate(row.deadline_date)}
               </span>

@@ -93,6 +93,7 @@ type DetailProps = {
     recipients?: {
       status: "matched" | "unknown" | null;
       label: string | null;
+      memberIds?: number[];
       members: Array<{
         id: number;
         display_name: string;
@@ -152,7 +153,20 @@ export function DocumentDetailClient({ detail }: DetailProps) {
 function DocumentDetailInner({ detail }: DetailProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { document, tags, summary, recipients } = detail;
+  const { document, tags, summary, recipients: initialRecipients } = detail;
+  const [recipients, setRecipients] = useState(initialRecipients);
+  const [familyOptions, setFamilyOptions] = useState<
+    Array<{
+      id: number;
+      display_name: string;
+      avatar_url: string | null;
+    }>
+  >([]);
+  const [recipientEdit, setRecipientEdit] = useState(false);
+  const [recipientDraft, setRecipientDraft] = useState<number[]>(
+    initialRecipients?.memberIds || []
+  );
+  const [recipientBusy, setRecipientBusy] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [showOcr, setShowOcr] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -327,6 +341,60 @@ function DocumentDetailInner({ detail }: DetailProps) {
       cancelled = true;
     };
   }, [document.id, document.bezahlt, document.zu_bezahlen]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/family");
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || cancelled) return;
+        const members = (data.members || []) as Array<{
+          id: number;
+          display_name: string;
+          avatar_url: string | null;
+          active: number;
+        }>;
+        setFamilyOptions(
+          members
+            .filter((m) => m.active === 1)
+            .map((m) => ({
+              id: m.id,
+              display_name: m.display_name,
+              avatar_url: m.avatar_url,
+            }))
+        );
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function saveRecipients() {
+    setRecipientBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/documents/${document.id}/recipients`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ memberIds: recipientDraft }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || "Empfänger speichern fehlgeschlagen");
+      }
+      setRecipients(data.recipients);
+      setRecipientEdit(false);
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRecipientBusy(false);
+    }
+  }
 
   async function patchStatus(next: {
     buddyReviewed?: boolean;
@@ -586,9 +654,89 @@ function DocumentDetailInner({ detail }: DetailProps) {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="rounded-lg border border-border/60 px-3 py-2">
-                    <p className="text-xs text-muted-foreground">Empfänger</p>
-                    {recipients?.status === "matched" &&
-                    recipients.members.length > 0 ? (
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs text-muted-foreground">Empfänger</p>
+                      {!recipientEdit ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 px-2 text-xs"
+                          onClick={() => {
+                            setRecipientDraft(recipients?.memberIds || []);
+                            setRecipientEdit(true);
+                          }}
+                        >
+                          Ändern
+                        </Button>
+                      ) : null}
+                    </div>
+                    {recipientEdit ? (
+                      <div className="mt-2 space-y-2">
+                        {familyOptions.length === 0 ? (
+                          <p className="text-xs text-muted-foreground">
+                            Keine Familienmitglieder — unter Einstellungen →
+                            Familie anlegen.
+                          </p>
+                        ) : (
+                          familyOptions.map((m) => {
+                            const checked = recipientDraft.includes(m.id);
+                            return (
+                              <label
+                                key={m.id}
+                                className="flex cursor-pointer items-center gap-2 text-sm"
+                              >
+                                <input
+                                  type="checkbox"
+                                  className="size-4 accent-[var(--brand-docs)]"
+                                  checked={checked}
+                                  disabled={recipientBusy}
+                                  onChange={() => {
+                                    setRecipientDraft((prev) =>
+                                      checked
+                                        ? prev.filter((id) => id !== m.id)
+                                        : [...prev, m.id]
+                                    );
+                                  }}
+                                />
+                                <UserAvatar
+                                  name={m.display_name}
+                                  src={m.avatar_url}
+                                  size="sm"
+                                />
+                                <span>{m.display_name}</span>
+                              </label>
+                            );
+                          })
+                        )}
+                        <p className="text-[11px] text-muted-foreground">
+                          Keine Auswahl = Empfänger unbekannt.
+                        </p>
+                        <div className="flex flex-wrap gap-2 pt-1">
+                          <Button
+                            type="button"
+                            size="sm"
+                            disabled={recipientBusy}
+                            onClick={() => void saveRecipients()}
+                          >
+                            {recipientBusy ? "…" : "Speichern"}
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={recipientBusy}
+                            onClick={() => {
+                              setRecipientDraft(recipients?.memberIds || []);
+                              setRecipientEdit(false);
+                            }}
+                          >
+                            Abbrechen
+                          </Button>
+                        </div>
+                      </div>
+                    ) : recipients?.status === "matched" &&
+                      recipients.members.length > 0 ? (
                       <div className="mt-1.5 flex flex-wrap items-center gap-2">
                         {recipients.members.map((m) => (
                           <span

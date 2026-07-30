@@ -53,6 +53,8 @@ import {
 } from "@/components/layout/overview-tab-nav";
 
 import type { CalendarEvent } from "@/lib/utils/ics";
+import { RecipientAvatars } from "@/components/family/recipient-avatars";
+import type { RecipientAvatarInfo } from "@/components/family/recipient-avatars";
 
 export type TravelRow = {
   id: number;
@@ -74,6 +76,7 @@ export type TravelRow = {
   correspondent_name?: string | null;
   ai_icon_url?: string | null;
   category?: string | null;
+  recipients?: RecipientAvatarInfo;
 };
 
 type AggRow = { label: string; count: number; total: number };
@@ -216,6 +219,7 @@ function TravelListRow({
         }
         meta={
           <MetaLine>
+            <RecipientAvatars recipients={row.recipients} />
             <Badge variant="secondary">{typeLabel(row)}</Badge>
             <span className="tabular-nums">
               {toSwissDate(row.start_date)}

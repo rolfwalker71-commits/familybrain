@@ -12,6 +12,8 @@ import {
   formatDueRelative,
 } from "@/lib/utils/due-urgency";
 import { DocumentAiIcon } from "@/components/documents/document-ai-icon";
+import { RecipientAvatars } from "@/components/family/recipient-avatars";
+import type { RecipientAvatarInfo } from "@/components/family/recipient-avatars";
 
 export type OpenInvoiceCardModel = {
   id: number;
@@ -30,6 +32,7 @@ export type OpenInvoiceCardModel = {
   bezahlt?: number | null;
   ai_icon_url?: string | null;
   category?: string | null;
+  recipients?: RecipientAvatarInfo;
 };
 
 function CardThumb({
@@ -102,6 +105,15 @@ export function OpenInvoiceCard({ invoice }: { invoice: OpenInvoiceCardModel }) 
           <p className="mt-0.5 text-[10px] font-semibold tabular-nums text-foreground">
             {formatCHF(invoice.amount, invoice.currency || "CHF")}
           </p>
+        ) : null}
+        {invoice.recipients ? (
+          <div className="mt-1">
+            <RecipientAvatars
+              recipients={invoice.recipients}
+              size="xs"
+              className="text-[10px]"
+            />
+          </div>
         ) : null}
       </div>
 

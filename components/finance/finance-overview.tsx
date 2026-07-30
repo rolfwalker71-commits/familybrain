@@ -68,6 +68,8 @@ import {
 
 import type { CalendarEvent } from "@/lib/utils/ics";
 import { financeBucket } from "@/lib/extraction/normalize-categories";
+import { RecipientAvatars } from "@/components/family/recipient-avatars";
+import type { RecipientAvatarInfo } from "@/components/family/recipient-avatars";
 
 const DUE_VISIBILITY_DAYS = 180;
 
@@ -87,6 +89,7 @@ type InvoiceRow = {
   document_local_id: number;
   paperless_id?: number | null;
   ai_icon_url?: string | null;
+  recipients?: RecipientAvatarInfo;
 };
 
 type Dimension = "year" | "vendor" | "category";
@@ -185,6 +188,7 @@ function InvoiceListRow({
         }
         meta={
           <MetaLine>
+            <RecipientAvatars recipients={row.recipients} />
             {showDueDate ? (
               <span
                 className={cn(
