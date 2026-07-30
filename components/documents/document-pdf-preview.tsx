@@ -193,9 +193,14 @@ export function DocumentPdfThumb({
 export function DocumentPdfPreview({
   paperlessId,
   title,
+  className,
+  fillHeight = false,
 }: {
   paperlessId: number;
   title?: string | null;
+  className?: string;
+  /** Stretch card to parent height (e.g. overview two-column layout). */
+  fillHeight?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [thumbError, setThumbError] = useState(false);
@@ -204,9 +209,14 @@ export function DocumentPdfPreview({
   const pdfUrl = `/api/paperless/documents/${paperlessId}/file?type=pdf`;
 
   return (
-    <>
-      <Card className="border-border/80 shadow-sm">
-        <CardHeader className="flex flex-row items-center justify-between">
+    <div className={cn(fillHeight && "flex h-full min-h-0 flex-col", className)}>
+      <Card
+        className={cn(
+          "border-border/80 shadow-sm",
+          fillHeight && "flex h-full min-h-0 flex-col"
+        )}
+      >
+        <CardHeader className="flex shrink-0 flex-row items-center justify-between">
           <CardTitle className="flex items-center gap-3 text-base">
             <IconCircle icon={FileText} tone="teal" size="sm" />
             PDF-Vorschau
@@ -232,22 +242,36 @@ export function DocumentPdfPreview({
             </Button>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent
+          className={cn(fillHeight && "flex min-h-0 flex-1 flex-col")}
+        >
           <button
             type="button"
             onClick={() => setOpen(true)}
-            className="group relative w-full overflow-hidden rounded-lg border border-border bg-muted/40 text-left transition-colors hover:bg-muted"
+            className={cn(
+              "group relative w-full overflow-hidden rounded-lg border border-border bg-muted/40 text-left transition-colors hover:bg-muted",
+              fillHeight &&
+                "flex min-h-[12rem] flex-1 items-center justify-center"
+            )}
           >
             {!thumbError ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={thumbUrl}
                 alt={title || "PDF Vorschau"}
-                className="mx-auto max-h-64 object-contain"
+                className={cn(
+                  "mx-auto object-contain",
+                  fillHeight ? "max-h-full w-full" : "max-h-64"
+                )}
                 onError={() => setThumbError(true)}
               />
             ) : (
-              <div className="flex h-48 flex-col items-center justify-center gap-2 text-muted-foreground">
+              <div
+                className={cn(
+                  "flex flex-col items-center justify-center gap-2 text-muted-foreground",
+                  fillHeight ? "min-h-[12rem] flex-1" : "h-48"
+                )}
+              >
                 <FileText className="h-8 w-8" />
                 <span className="text-sm">Vorschau klicken · PDF öffnen</span>
               </div>
@@ -265,6 +289,6 @@ export function DocumentPdfPreview({
         pdfUrl={pdfUrl}
         title={title}
       />
-    </>
+    </div>
   );
 }

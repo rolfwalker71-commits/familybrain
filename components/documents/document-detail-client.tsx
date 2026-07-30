@@ -145,7 +145,7 @@ function DocumentDetailInner({ detail }: DetailProps) {
   const tabItems: DocumentTabItem[] = [
     { id: "overview", label: "Übersicht", icon: LayoutDashboard },
     { id: "extracts", label: "Extrakte", icon: Layers },
-    { id: "files", label: "Belege", icon: FileText },
+    { id: "files", label: "OCR", icon: FileText },
     { id: "more", label: "Mehr", icon: MoreHorizontal },
   ];
 
@@ -547,69 +547,82 @@ function DocumentDetailInner({ detail }: DetailProps) {
             </Card>
           </div>
 
-          {/* Soft UI hero card (mobile-first, also on desktop) */}
-          <Card className="overflow-hidden border-border/50 shadow-[0_8px_28px_rgba(20,32,28,0.07)]">
-            <CardContent className="space-y-5 p-5">
-              <div className="flex gap-3">
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--brand-docs-soft)] text-[var(--brand-docs)]">
-                  <Sparkles className="size-5" />
-                </span>
-                <div className="min-w-0">
-                  <h2 className="font-semibold text-[var(--brand-docs)]">
-                    KI-Zusammenfassung
-                  </h2>
-                  <p className="mt-1.5 text-sm leading-relaxed text-foreground/85">
-                    {String(
-                      summary?.detailed_summary ||
-                        summary?.short_summary ||
-                        "Noch nicht analysiert."
-                    )}
-                  </p>
+          {/* Summary + PDF preview side by side (equal height on md+) */}
+          <div className="grid items-stretch gap-4 md:grid-cols-2">
+            <Card className="h-full overflow-hidden border-border/50 shadow-[0_8px_28px_rgba(20,32,28,0.07)]">
+              <CardContent className="space-y-5 p-5">
+                <div className="flex gap-3">
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--brand-docs-soft)] text-[var(--brand-docs)]">
+                    <Sparkles className="size-5" />
+                  </span>
+                  <div className="min-w-0">
+                    <h2 className="font-semibold text-[var(--brand-docs)]">
+                      KI-Zusammenfassung
+                    </h2>
+                    <p className="mt-1.5 text-sm leading-relaxed text-foreground/85">
+                      {String(
+                        summary?.detailed_summary ||
+                          summary?.short_summary ||
+                          "Noch nicht analysiert."
+                      )}
+                    </p>
+                  </div>
                 </div>
-              </div>
 
-              {importantPoints.length > 0 ? (
-                <>
-                  <div className="border-t border-border/60" />
-                  <div className="flex gap-3">
-                    <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--brand-docs-soft)] text-[var(--brand-docs)]">
-                      <CheckCircle2 className="size-5" />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <h2 className="font-semibold text-[var(--brand-docs)]">
-                        {importantPoints.length} zentrale Punkte
-                      </h2>
-                      <ul className="mt-2 space-y-2.5">
-                        {importantPoints.slice(0, 5).map((p, i) => {
-                          const colon = p.indexOf(":");
-                          const hasLabel = colon > 0 && colon < 40;
-                          const label = hasLabel ? p.slice(0, colon) : null;
-                          const body = hasLabel ? p.slice(colon + 1).trim() : p;
-                          return (
-                            <li key={i} className="text-sm leading-snug">
-                              {label ? (
-                                <>
-                                  <span className="font-semibold text-[var(--brand-docs)]">
-                                    {label}
-                                  </span>
-                                  <span className="text-foreground/80">
-                                    {" "}
+                {importantPoints.length > 0 ? (
+                  <>
+                    <div className="border-t border-border/60" />
+                    <div className="flex gap-3">
+                      <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--brand-docs-soft)] text-[var(--brand-docs)]">
+                        <CheckCircle2 className="size-5" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <h2 className="font-semibold text-[var(--brand-docs)]">
+                          {importantPoints.length} zentrale Punkte
+                        </h2>
+                        <ul className="mt-2 space-y-2.5">
+                          {importantPoints.slice(0, 5).map((p, i) => {
+                            const colon = p.indexOf(":");
+                            const hasLabel = colon > 0 && colon < 40;
+                            const label = hasLabel ? p.slice(0, colon) : null;
+                            const body = hasLabel
+                              ? p.slice(colon + 1).trim()
+                              : p;
+                            return (
+                              <li key={i} className="text-sm leading-snug">
+                                {label ? (
+                                  <>
+                                    <span className="font-semibold text-[var(--brand-docs)]">
+                                      {label}
+                                    </span>
+                                    <span className="text-foreground/80">
+                                      {" "}
+                                      {body}
+                                    </span>
+                                  </>
+                                ) : (
+                                  <span className="text-foreground/85">
                                     {body}
                                   </span>
-                                </>
-                              ) : (
-                                <span className="text-foreground/85">{body}</span>
-                              )}
-                            </li>
-                          );
-                        })}
-                      </ul>
+                                )}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
                     </div>
-                  </div>
-                </>
-              ) : null}
-            </CardContent>
-          </Card>
+                  </>
+                ) : null}
+              </CardContent>
+            </Card>
+
+            <DocumentPdfPreview
+              paperlessId={document.paperless_id}
+              title={document.title}
+              fillHeight
+              className="border-border/50 shadow-[0_8px_28px_rgba(20,32,28,0.07)]"
+            />
+          </div>
 
           <div className="hidden gap-4 sm:grid sm:grid-cols-2 md:grid">
             <Card>
@@ -863,10 +876,6 @@ function DocumentDetailInner({ detail }: DetailProps) {
 
       {activeTab === "files" ? (
         <div className="space-y-4">
-          <DocumentPdfPreview
-            paperlessId={document.paperless_id}
-            title={document.title}
-          />
           <Card>
             <CardHeader className="flex flex-row items-center justify-between gap-3">
               <CardTitle className="flex items-center gap-3 text-base">
