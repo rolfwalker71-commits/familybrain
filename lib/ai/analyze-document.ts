@@ -31,6 +31,17 @@ export async function analyzeDocument(
   const model = getOpenAIModel();
   const client = getOpenAIClient();
 
+  let householdMembers: string[] = [];
+  try {
+    const { listFamilyMembers } = await import("@/lib/family/queries");
+    householdMembers = listFamilyMembers({ activeOnly: true }).flatMap((m) => [
+      m.display_name,
+      ...m.aliases,
+    ]);
+  } catch {
+    /* optional */
+  }
+
   const userPrompt = buildAnalysisUserPrompt({
     title: document.title,
     correspondent: document.correspondent_name,
@@ -38,6 +49,7 @@ export async function analyzeDocument(
     createdDate: document.created_date,
     tags: tags.map((t) => t.tag_name).filter(Boolean) as string[],
     content: document.content,
+    householdMembers,
   });
 
   try {
@@ -82,6 +94,18 @@ export async function analyzeDocument(
       model,
       options?.expectedContentHash
     );
+    try {
+      const { applyRecipientsAfterAnalysis } = await import(
+        "@/lib/family/recipients"
+      );
+      applyRecipientsAfterAnalysis(documentId, parsed.data);
+    } catch (recErr) {
+      console.error(
+        "[analyze] document recipients failed",
+        documentId,
+        recErr instanceof Error ? recErr.message : recErr
+      );
+    }
     try {
       const { applyTriageAfterAnalysis, TRIAGE_REASON_LABELS } = await import(
         "@/lib/documents/triage"

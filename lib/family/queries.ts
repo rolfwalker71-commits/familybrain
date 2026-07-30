@@ -1,6 +1,9 @@
 import path from "path";
 import { getDb } from "@/lib/db/client";
 import { nowIso } from "@/lib/utils/dates";
+import { UNKNOWN_RECIPIENT_LABEL } from "@/lib/family/constants";
+
+export { UNKNOWN_RECIPIENT_LABEL };
 
 export type FamilyGender = "male" | "female" | null;
 
@@ -30,8 +33,6 @@ export type FamilyMemberPublic = {
   created_at: string;
   updated_at: string;
 };
-
-export const UNKNOWN_RECIPIENT_LABEL = "Empfänger unbekannt";
 
 function normalizeGender(raw: string | null | undefined): FamilyGender {
   if (raw === "male" || raw === "female") return raw;

@@ -29,6 +29,11 @@ import {
   extractPaymentCustomFlags,
 } from "@/lib/paperless/custom-fields";
 import { listPendingTriageDocuments } from "@/lib/documents/triage";
+import { recipientFilterSql } from "@/lib/family/recipients";
+import {
+  listFamilyMembers,
+  UNKNOWN_RECIPIENT_LABEL,
+} from "@/lib/family/queries";
 
 function aiIconPublicUrl(aiIconPath: string | null | undefined): string | null {
   if (!aiIconPath) return null;
@@ -66,6 +71,9 @@ export type PaperlessDocumentRow = {
   triage_status?: string | null;
   triage_reasons?: string | null;
   triage_at?: string | null;
+  recipient_member_ids?: string | null;
+  recipient_status?: string | null;
+  recipient_at?: string | null;
   ai_icon_path?: string | null;
   ai_icon_prompt?: string | null;
   sync_status: string | null;
@@ -83,6 +91,8 @@ export type DocumentFilters = {
   correspondent?: string;
   documentType?: string;
   analysisStatus?: string;
+  /** Family member id, or "unknown" */
+  recipient?: string;
   limit?: number;
   offset?: number;
   /** Document date sort: newest first by default */
@@ -234,6 +244,13 @@ export function listDocuments(filters: DocumentFilters = {}) {
     } else {
       where.push(`s.analysis_status = ?`);
       params.push(filters.analysisStatus);
+    }
+  }
+  if (filters.recipient) {
+    const rec = recipientFilterSql(filters.recipient);
+    if (rec) {
+      where.push(rec.clause);
+      params.push(...rec.params);
     }
   }
 
@@ -567,6 +584,14 @@ export function getFilterOptions() {
     correspondents: correspondents.map((r) => r.value),
     documentTypes: documentTypes.map((r) => r.value),
     categories: categories.map((r) => r.value),
+    recipients: [
+      ...listFamilyMembers({ activeOnly: true }).map((m) => ({
+        value: String(m.id),
+        label: m.display_name,
+        avatar_url: m.avatar_url,
+      })),
+      { value: "unknown", label: UNKNOWN_RECIPIENT_LABEL, avatar_url: null },
+    ],
   };
 }
 

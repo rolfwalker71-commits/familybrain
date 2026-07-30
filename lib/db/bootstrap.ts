@@ -92,6 +92,7 @@ export function bootstrapDatabase(db: Database.Database): void {
   ensurePaymentCustomFieldColumns(db);
   ensureDocumentAiIconColumns(db);
   ensureDocumentTriageColumns(db);
+  ensureDocumentRecipientColumns(db);
   ensurePaperlessFieldSyncLogTable(db);
 
   const insertArea = db.prepare(
@@ -196,6 +197,30 @@ function ensureDocumentTriageColumns(db: Database.Database): void {
   db.exec(
     `CREATE INDEX IF NOT EXISTS idx_docs_triage_status
      ON paperless_documents(triage_status)`
+  );
+}
+
+function ensureDocumentRecipientColumns(db: Database.Database): void {
+  const cols = db
+    .prepare(`PRAGMA table_info(paperless_documents)`)
+    .all() as Array<{ name: string }>;
+  const names = new Set(cols.map((c) => c.name));
+  if (!names.has("recipient_member_ids")) {
+    db.exec(
+      `ALTER TABLE paperless_documents ADD COLUMN recipient_member_ids TEXT`
+    );
+  }
+  if (!names.has("recipient_status")) {
+    db.exec(
+      `ALTER TABLE paperless_documents ADD COLUMN recipient_status TEXT`
+    );
+  }
+  if (!names.has("recipient_at")) {
+    db.exec(`ALTER TABLE paperless_documents ADD COLUMN recipient_at TEXT`);
+  }
+  db.exec(
+    `CREATE INDEX IF NOT EXISTS idx_docs_recipient_status
+     ON paperless_documents(recipient_status)`
   );
 }
 

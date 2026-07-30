@@ -19,6 +19,7 @@ Rules:
 - Prefer ISO dates yyyy-mm-dd for all date fields.
 - Extract CHF amounts carefully.
 - Identify whether the document is Rechnung, Vertrag, Versicherung, Garantie, Reiseunterlage, Arztbericht, Steuerdokument or Sonstiges.
+- In contract_parties, list people/companies that appear. When the document is addressed to a household person (recipient / Empfänger / Adressat / Versicherte / Patient), set role to "Empfänger".
 - For travel/cruise documents, extract the full itinerary (daily stops / Kreuzfahrtverlauf / stations) into travel_items[].itinerary AND also list each stop date in important_dates.
 - For flights, always extract flight_number (e.g. LX80, LH400) and booking_reference when present in the OCR.
 - For hotels, extract the street address into travel_items[].address when present; also capture check-in/out times as start_time/end_time when known.
@@ -39,8 +40,13 @@ export function buildAnalysisUserPrompt(input: {
   createdDate: string | null;
   tags: string[];
   content: string | null;
+  householdMembers?: string[];
 }): string {
   const content = selectAnalysisOcrWindow(input.content, 28000);
+  const household =
+    input.householdMembers && input.householdMembers.length > 0
+      ? input.householdMembers.join(", ")
+      : null;
   return `Analyze this Paperless document and return JSON matching the required schema.
 
 Metadata:
@@ -49,6 +55,7 @@ Metadata:
 - Document type: ${input.documentType ?? "null"}
 - Created date: ${input.createdDate ?? "null"}
 - Tags: ${input.tags.length ? input.tags.join(", ") : "none"}
+${household ? `- Household members (possible Empfänger): ${household}` : ""}
 
 OCR content:
 """

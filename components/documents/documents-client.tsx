@@ -37,6 +37,7 @@ import {
 import { AiImagePreview } from "@/components/layout/ai-image-preview";
 import { AiImageZoom } from "@/components/layout/ai-image-zoom";
 import { FilterChip, SoftFab } from "@/components/layout/soft-ui";
+import { UserAvatar } from "@/components/users/user-avatar";
 import { toSwissDate } from "@/lib/utils/dates";
 import { readNdjsonStream } from "@/lib/utils/stream";
 import {
@@ -59,12 +60,26 @@ type DocRow = {
   analysis_status?: string | null;
   sync_status: string | null;
   ai_icon_url?: string | null;
+  recipients?: {
+    status: "matched" | "unknown" | null;
+    label: string | null;
+    members: Array<{
+      id: number;
+      display_name: string;
+      avatar_url: string | null;
+    }>;
+  };
 };
 
 type Filters = {
   correspondents: string[];
   documentTypes: string[];
   categories: string[];
+  recipients: Array<{
+    value: string;
+    label: string;
+    avatar_url: string | null;
+  }>;
 };
 
 function statusBadge(status?: string | null) {
@@ -107,6 +122,7 @@ export function DocumentsClient() {
     correspondents: [],
     documentTypes: [],
     categories: [],
+    recipients: [],
   });
   const [searchInput, setSearchInput] = useState(
     searchParams.get("search") || ""
@@ -123,6 +139,9 @@ export function DocumentsClient() {
   );
   const [analysisStatus, setAnalysisStatus] = useState(
     searchParams.get("analysisStatus") || "all"
+  );
+  const [recipient, setRecipient] = useState(
+    searchParams.get("recipient") || "all"
   );
   const [filterOpen, setFilterOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -144,6 +163,7 @@ export function DocumentsClient() {
     setCorrespondent(searchParams.get("correspondent") || "all");
     setDocumentType(searchParams.get("documentType") || "all");
     setAnalysisStatus(searchParams.get("analysisStatus") || "all");
+    setRecipient(searchParams.get("recipient") || "all");
     const q = searchParams.get("search") || "";
     setSearchInput(q);
     setSearch(q);
@@ -155,6 +175,7 @@ export function DocumentsClient() {
     correspondent?: string;
     documentType?: string;
     analysisStatus?: string;
+    recipient?: string;
   }) {
     const params = new URLSearchParams();
     const s = next.search ?? search;
@@ -162,11 +183,13 @@ export function DocumentsClient() {
     const corr = next.correspondent ?? correspondent;
     const dt = next.documentType ?? documentType;
     const st = next.analysisStatus ?? analysisStatus;
+    const rec = next.recipient ?? recipient;
     if (s.trim()) params.set("search", s.trim());
     if (c !== "all") params.set("category", c);
     if (corr !== "all") params.set("correspondent", corr);
     if (dt !== "all") params.set("documentType", dt);
     if (st !== "all") params.set("analysisStatus", st);
+    if (rec !== "all") params.set("recipient", rec);
     const qs = params.toString();
     router.replace(qs ? `/documents?${qs}` : "/documents", { scroll: false });
   }
@@ -176,7 +199,8 @@ export function DocumentsClient() {
     category !== "all" ||
     correspondent !== "all" ||
     documentType !== "all" ||
-    analysisStatus !== "all";
+    analysisStatus !== "all" ||
+    recipient !== "all";
 
   const load = useCallback(async () => {
     const requestId = ++requestIdRef.current;
@@ -190,6 +214,7 @@ export function DocumentsClient() {
     if (correspondent !== "all") params.set("correspondent", correspondent);
     if (documentType !== "all") params.set("documentType", documentType);
     if (analysisStatus !== "all") params.set("analysisStatus", analysisStatus);
+    if (recipient !== "all") params.set("recipient", recipient);
     params.set("limit", "250");
     params.set("sortDir", sortDir);
 
@@ -205,6 +230,7 @@ export function DocumentsClient() {
         correspondents: data.filters?.correspondents || [],
         documentTypes: data.filters?.documentTypes || [],
         categories: data.filters?.categories || [],
+        recipients: data.filters?.recipients || [],
       });
       try {
         const settingsRes = await fetch("/api/settings", { cache: "no-store" });
@@ -228,6 +254,7 @@ export function DocumentsClient() {
     correspondent,
     documentType,
     analysisStatus,
+    recipient,
     sortDir,
     refreshStats,
   ]);
@@ -600,6 +627,7 @@ export function DocumentsClient() {
     setCorrespondent("all");
     setDocumentType("all");
     setAnalysisStatus("all");
+    setRecipient("all");
     router.replace("/documents", { scroll: false });
   }
 
@@ -644,6 +672,22 @@ export function DocumentsClient() {
       ]),
     []
   );
+
+  const recipientItems = useMemo(
+    () =>
+      toItemsRecord([
+        { value: "all", label: "Alle Empfänger" },
+        ...filters.recipients.map((r) => ({
+          value: r.value,
+          label: r.label,
+        })),
+      ]),
+    [filters.recipients]
+  );
+
+  function recipientLabel(value: string): string {
+    return recipientItems[value] || value;
+  }
 
   return (
     <div className="min-w-0 space-y-4 pb-6 md:space-y-6">
@@ -1012,6 +1056,27 @@ export function DocumentsClient() {
                 </SelectContent>
               </Select>
 
+              <Select
+                value={recipient}
+                onValueChange={(value) => {
+                  if (value == null) return;
+                  setRecipient(value);
+                  updateUrl({ recipient: value });
+                }}
+                items={recipientItems}
+              >
+                <SelectTrigger className="w-full min-w-[10rem] sm:w-auto sm:min-w-[11rem]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(recipientItems).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
               <div className="flex min-w-0 flex-wrap gap-2">
                 <Button
                   type="button"
@@ -1039,6 +1104,9 @@ export function DocumentsClient() {
                 : ""}
               {documentType !== "all" ? ` · Typ: ${documentType}` : ""}
               {analysisStatus !== "all" ? ` · Status: ${analysisStatus}` : ""}
+              {recipient !== "all"
+                ? ` · Empfänger: ${recipientLabel(recipient)}`
+                : ""}
               {total > docs.length
                 ? ` · Anzeige der ersten ${docs.length} von ${total}`
                 : ""}
@@ -1052,7 +1120,7 @@ export function DocumentsClient() {
           <SheetHeader>
             <SheetTitle>Filter</SheetTitle>
             <SheetDescription>
-              Dokumente nach Kategorie, Typ und Status eingrenzen.
+              Dokumente nach Kategorie, Empfänger, Typ und Status eingrenzen.
             </SheetDescription>
           </SheetHeader>
           <div className="space-y-3 px-4 pb-6">
@@ -1070,6 +1138,26 @@ export function DocumentsClient() {
               </SelectTrigger>
               <SelectContent>
                 {Object.entries(categoryItems).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select
+              value={recipient}
+              onValueChange={(value) => {
+                if (value == null) return;
+                setRecipient(value);
+                updateUrl({ recipient: value });
+              }}
+              items={recipientItems}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Empfänger" />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(recipientItems).map(([value, label]) => (
                   <SelectItem key={value} value={value}>
                     {label}
                   </SelectItem>
@@ -1246,6 +1334,19 @@ export function DocumentsClient() {
                           {doc.category}
                         </span>
                       ) : null}
+                      {doc.recipients?.label ? (
+                        <div className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+                          {doc.recipients.members.slice(0, 3).map((m) => (
+                            <UserAvatar
+                              key={m.id}
+                              name={m.display_name}
+                              src={m.avatar_url}
+                              size="xs"
+                            />
+                          ))}
+                          <span className="truncate">{doc.recipients.label}</span>
+                        </div>
+                      ) : null}
                       <div className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
                         <CalendarDays className="size-3.5 shrink-0" />
                         <span className="tabular-nums">
@@ -1290,6 +1391,19 @@ export function DocumentsClient() {
                           </span>
                           {doc.correspondent_name ? (
                             <span>{doc.correspondent_name}</span>
+                          ) : null}
+                          {doc.recipients?.label ? (
+                            <span className="inline-flex items-center gap-1">
+                              {doc.recipients.members.slice(0, 3).map((m) => (
+                                <UserAvatar
+                                  key={m.id}
+                                  name={m.display_name}
+                                  src={m.avatar_url}
+                                  size="xs"
+                                />
+                              ))}
+                              {doc.recipients.label}
+                            </span>
                           ) : null}
                           {doc.document_type_name ? (
                             <span>{doc.document_type_name}</span>

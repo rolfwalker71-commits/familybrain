@@ -65,6 +65,8 @@ import {
   TRIAGE_STATUS_LABELS,
   type TriageStatus,
 } from "@/lib/documents/triage-shared";
+import { UserAvatar } from "@/components/users/user-avatar";
+import { UNKNOWN_RECIPIENT_LABEL } from "@/lib/family/constants";
 
 type DetailProps = {
   detail: {
@@ -85,6 +87,17 @@ type DetailProps = {
       bezahlt?: number | null;
       triage_status?: string | null;
       triage_at?: string | null;
+      recipient_member_ids?: string | null;
+      recipient_status?: string | null;
+    };
+    recipients?: {
+      status: "matched" | "unknown" | null;
+      label: string | null;
+      members: Array<{
+        id: number;
+        display_name: string;
+        avatar_url: string | null;
+      }>;
     };
     tags: { tag_id: number | null; tag_name: string | null }[];
     summary: Record<string, unknown> | undefined;
@@ -139,7 +152,7 @@ export function DocumentDetailClient({ detail }: DetailProps) {
 function DocumentDetailInner({ detail }: DetailProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { document, tags, summary } = detail;
+  const { document, tags, summary, recipients } = detail;
   const [analyzing, setAnalyzing] = useState(false);
   const [showOcr, setShowOcr] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -572,6 +585,36 @@ function DocumentDetailInner({ detail }: DetailProps) {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
+                  <div className="rounded-lg border border-border/60 px-3 py-2">
+                    <p className="text-xs text-muted-foreground">Empfänger</p>
+                    {recipients?.status === "matched" &&
+                    recipients.members.length > 0 ? (
+                      <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                        {recipients.members.map((m) => (
+                          <span
+                            key={m.id}
+                            className="inline-flex items-center gap-1.5"
+                          >
+                            <UserAvatar
+                              name={m.display_name}
+                              src={m.avatar_url}
+                              size="sm"
+                            />
+                            <span className="text-sm font-medium">
+                              {m.display_name}
+                            </span>
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <Badge
+                        variant="outline"
+                        className="mt-1.5 font-medium text-muted-foreground"
+                      >
+                        {recipients?.label || UNKNOWN_RECIPIENT_LABEL}
+                      </Badge>
+                    )}
+                  </div>
                   {(() => {
                     const raw = document.triage_status;
                     if (!raw || !(raw in TRIAGE_STATUS_LABELS)) return null;
