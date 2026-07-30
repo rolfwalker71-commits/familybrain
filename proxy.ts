@@ -48,6 +48,9 @@ function isLimitedUserAllowedPath(pathname: string): boolean {
   if (pathname.startsWith("/api/users/media/avatar/")) {
     return true;
   }
+  if (pathname.startsWith("/api/family/media/avatar/")) {
+    return true;
+  }
   if (
     pathname === "/api/finance-ledgers" ||
     pathname.startsWith("/api/finance-ledgers/")

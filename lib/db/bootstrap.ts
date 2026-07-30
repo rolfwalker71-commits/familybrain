@@ -108,6 +108,7 @@ export function bootstrapDatabase(db: Database.Database): void {
   ensureChatCorrectionsTable(db);
   ensureTripsTables(db);
   ensureUsersTable(db);
+  ensureFamilyMembersTable(db);
   ensureTripTravelersTable(db);
   ensureFinanceBrainTables(db);
   ensureUserAccessTables(db);
@@ -748,6 +749,53 @@ function ensureUsersTable(db: Database.Database): void {
   if (!names.has("notification_prefs")) {
     db.exec(`ALTER TABLE users ADD COLUMN notification_prefs TEXT`);
   }
+}
+
+function ensureFamilyMembersTable(db: Database.Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS family_members (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      display_name TEXT NOT NULL,
+      aliases TEXT,
+      gender TEXT,
+      avatar_path TEXT,
+      avatar_prompt TEXT,
+      user_id INTEGER,
+      sort_key INTEGER NOT NULL DEFAULT 0,
+      active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE SET NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_family_members_active
+      ON family_members(active);
+    CREATE INDEX IF NOT EXISTS idx_family_members_sort
+      ON family_members(sort_key);
+  `);
+
+  const count = db
+    .prepare(`SELECT COUNT(*) AS c FROM family_members`)
+    .get() as { c: number };
+  if (count.c > 0) return;
+
+  const ts = new Date().toISOString();
+  const insert = db.prepare(
+    `INSERT INTO family_members (
+       display_name, aliases, gender, avatar_path, avatar_prompt,
+       user_id, sort_key, active, created_at, updated_at
+     ) VALUES (?, ?, ?, NULL, NULL, NULL, ?, 1, ?, ?)`
+  );
+  const defaults: Array<[string, string, string, number]> = [
+    ["Rolf", JSON.stringify(["Rolf Walker"]), "male", 0],
+    ["Valentyna", JSON.stringify(["Valentyna Walker"]), "female", 1],
+    ["Dariusch", JSON.stringify(["Dariusch Walker"]), "male", 2],
+  ];
+  const seed = db.transaction(() => {
+    for (const [name, aliases, gender, sortKey] of defaults) {
+      insert.run(name, aliases, gender, sortKey, ts, ts);
+    }
+  });
+  seed();
 }
 
 function ensureTripTravelersTable(db: Database.Database): void {

@@ -64,7 +64,7 @@ import {
 import {
   TRIAGE_STATUS_LABELS,
   type TriageStatus,
-} from "@/lib/documents/triage";
+} from "@/lib/documents/triage-shared";
 
 type DetailProps = {
   detail: {

@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { KeyRound, Server, BookOpen, MessageSquareText, Luggage, HandCoins, Mail, MoreHorizontal, Users, Bell } from "lucide-react";
+import { KeyRound, Server, BookOpen, MessageSquareText, Luggage, HandCoins, Mail, MoreHorizontal, Users, Bell, Heart } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,6 +26,7 @@ import {
   type SettingsTabItem,
 } from "@/components/settings/settings-tab-nav";
 import { SettingsUsersPanel } from "@/components/settings/settings-users-panel";
+import { SettingsFamilyPanel } from "@/components/settings/settings-family-panel";
 import { NotificationPrefsPanel } from "@/components/settings/notification-prefs-panel";
 
 
@@ -961,6 +962,7 @@ function SettingsPageInner() {
     { id: "mail", label: "Mail", icon: Mail },
     { id: "notify", label: "Hinweise", icon: Bell },
     { id: "users", label: "User", icon: Users },
+    { id: "family", label: "Familie", icon: Heart },
     { id: "more", label: "Mehr", icon: MoreHorizontal },
   ];
 
@@ -1872,6 +1874,7 @@ function SettingsPageInner() {
       ) : null}
 
       {activeTab === "users" ? <SettingsUsersPanel /> : null}
+      {activeTab === "family" ? <SettingsFamilyPanel /> : null}
 
       {activeTab === "notify" ? (
         <Card>

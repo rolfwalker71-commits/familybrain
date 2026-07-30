@@ -3,42 +3,16 @@ import { getSetting } from "@/lib/db/migrations";
 import type { DocumentAnalysis } from "@/lib/ai/schemas";
 import { PaperlessClient } from "@/lib/paperless/client";
 import { nowIso } from "@/lib/utils/dates";
+import {
+  TRIAGE_REASON_LABELS,
+  TRIAGE_STATUS_LABELS,
+  type TriageAction,
+  type TriageReason,
+  type TriageStatus,
+} from "@/lib/documents/triage-shared";
 
-/** Local review queue after analysis. */
-export type TriageStatus =
-  | "pending"
-  | "pay"
-  | "ignored"
-  | "done"
-  | "ebill"
-  | "twint"
-  | "card";
-
-export type TriageReason =
-  | "invoice"
-  | "high_amount"
-  | "warranty"
-  | "deadline"
-  | "travel";
-
-export const TRIAGE_REASON_LABELS: Record<TriageReason, string> = {
-  invoice: "Rechnung",
-  high_amount: "Hoher Betrag",
-  warranty: "Garantie",
-  deadline: "Frist",
-  travel: "Reise",
-};
-
-/** Human-readable triage outcome (inbox + document detail). */
-export const TRIAGE_STATUS_LABELS: Record<TriageStatus, string> = {
-  pending: "Zur Prüfung",
-  pay: "Muss bezahlt werden",
-  ignored: "Irrelevant",
-  done: "Erledigt",
-  ebill: "eBill",
-  twint: "Twint",
-  card: "Kreditkarte",
-};
+export type { TriageAction, TriageReason, TriageStatus };
+export { TRIAGE_REASON_LABELS, TRIAGE_STATUS_LABELS };
 
 const SETTLED_TRIAGE_STATUSES = new Set<string>([
   "pay",
@@ -297,14 +271,6 @@ export function listPendingTriageDocuments(limit = 12): TriageInboxItem[] {
     ai_icon_url: aiIconPublicUrl(row.ai_icon_path),
   }));
 }
-
-export type TriageAction =
-  | "pay"
-  | "ignore"
-  | "done"
-  | "ebill"
-  | "twint"
-  | "card";
 
 const PAID_VIA_ACTIONS = new Set<TriageAction>(["ebill", "twint", "card"]);
 
