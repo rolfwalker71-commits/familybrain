@@ -18,14 +18,14 @@ export type DuplicateCluster = {
   key: string;
   description: string;
   count: number;
-  /** True when cluster was narrowed by matching created_date as well. */
+  /** Always true — clusters require identical calendar day. */
   matchedByDate: boolean;
-  /** Document / invoice number included in the match key. */
+  /** Document / invoice number if present in the title (informational). */
   refNumber: string | null;
   documents: DuplicateDocItem[];
 };
 
-/** Below this length, identical short_summary alone is too generic — also require same date. */
+/** @deprecated kept for tests — title+date matching no longer uses this threshold. */
 export const DUPLICATE_SPECIFIC_MIN_LENGTH = 40;
 
 function aiIconPublicUrl(aiIconPath: string | null | undefined): string | null {
@@ -35,7 +35,7 @@ function aiIconPublicUrl(aiIconPath: string | null | undefined): string | null {
   return `/api/documents/media/ai-icon/${encodeURIComponent(base)}`;
 }
 
-/** Normalize description for exact duplicate grouping. */
+/** Normalize title/description for exact duplicate grouping. */
 export function normalizeDuplicateDescription(
   raw: string | null | undefined
 ): string {
@@ -46,6 +46,8 @@ export function normalizeDuplicateDescription(
     .replace(/\p{M}/gu, "")
     .replace(/\s+/g, " ");
 }
+
+export const normalizeDuplicateTitle = normalizeDuplicateDescription;
 
 /** YYYY-MM-DD from created_date (or empty if unknown). */
 export function documentDateKey(createdDate: string | null | undefined): string {
@@ -79,7 +81,6 @@ export function extractDocumentRefNumber(
     const hash = /#\s*([0-9]{5,})\b/.exec(text);
     if (hash?.[1]) return hash[1];
 
-    // Bare long digit runs — skip calendar-ish yyyymmdd / years alone.
     for (const m of text.matchAll(/\b(\d{6,})\b/g)) {
       const d = m[1];
       if (/^(19|20)\d{6}$/.test(d)) continue;
@@ -90,74 +91,56 @@ export function extractDocumentRefNumber(
   return null;
 }
 
-/**
- * Find clusters of likely duplicates.
- * When a Belegnummer is present (title preferred), description AND number
- * must both match — same summary with different Nr. is not a duplicate.
- * Without a number: short/generic texts need the same calendar day;
- * longer summaries may still group by description alone.
- */
-export function findDuplicateClustersByDescription(limit = 80): DuplicateCluster[] {
-  const db = getDb();
-  const rows = db
-    .prepare(
-      `SELECT d.id, d.paperless_id, d.title, d.correspondent_name, d.created_date,
-              d.content_hash, d.paperless_url, d.ai_icon_path,
-              s.short_summary, s.category, s.analysis_status
-       FROM paperless_documents d
-       INNER JOIN document_summaries s ON s.document_id = d.id
-       WHERE COALESCE(d.sync_status, 'synced') != 'missing'
-         AND s.analysis_status = 'completed'
-         AND NULLIF(TRIM(COALESCE(s.short_summary, '')), '') IS NOT NULL
-       ORDER BY d.id ASC`
-    )
-    .all() as Array<{
-    id: number;
-    paperless_id: number;
-    title: string | null;
-    correspondent_name: string | null;
-    created_date: string | null;
-    content_hash: string | null;
-    paperless_url: string | null;
-    ai_icon_path: string | null;
-    short_summary: string | null;
-    category: string | null;
-    analysis_status: string | null;
-  }>;
+type RawDupRow = {
+  id: number;
+  paperless_id: number;
+  title: string | null;
+  correspondent_name: string | null;
+  created_date: string | null;
+  content_hash: string | null;
+  paperless_url: string | null;
+  ai_icon_path: string | null;
+  short_summary: string | null;
+  category: string | null;
+  analysis_status: string | null;
+};
 
+/**
+ * Duplicate = identical document name (title) AND identical calendar date.
+ * Different years / different titles are never one cluster, even if the
+ * AI short_summary is the same generic sentence.
+ */
+export function clusterDocumentsByTitleAndDate(
+  rows: RawDupRow[]
+): DuplicateCluster[] {
   type Bucket = {
-    matchedByDate: boolean;
+    nameKey: string;
+    dateKey: string;
+    displayTitle: string;
     refNumber: string | null;
     documents: DuplicateDocItem[];
   };
   const groups = new Map<string, Bucket>();
 
   for (const row of rows) {
-    const descKey = normalizeDuplicateDescription(row.short_summary);
-    if (!descKey) continue;
-
-    const refNumber = extractDocumentRefNumber(row.title, row.short_summary);
     const dateKey = documentDateKey(row.created_date);
-    const isSpecific = descKey.length >= DUPLICATE_SPECIFIC_MIN_LENGTH;
+    if (!dateKey) continue;
 
-    let groupKey: string;
-    let matchedByDate = false;
+    const titleKey = normalizeDuplicateTitle(row.title);
+    const summaryKey = normalizeDuplicateDescription(row.short_summary);
+    // Name = title when present; only fall back to summary if title is empty.
+    const nameKey = titleKey.length >= 2 ? titleKey : summaryKey;
+    if (nameKey.length < 2) continue;
 
-    if (refNumber) {
-      // Beschreibung + Nummer must both match.
-      groupKey = `d:${descKey}|n:${refNumber}`;
-    } else if (!isSpecific) {
-      // Generic short text without number: only with same calendar day.
-      if (!dateKey) continue;
-      groupKey = `d:${descKey}|t:${dateKey}`;
-      matchedByDate = true;
-    } else {
-      // Specific summary, no number in title/summary — description only.
-      groupKey = `d:${descKey}`;
-    }
+    const groupKey = `name:${nameKey}|date:${dateKey}`;
+    const refNumber = extractDocumentRefNumber(row.title, row.short_summary);
+    const displayTitle =
+      row.title?.trim() || row.short_summary?.trim() || nameKey;
 
     const bucket = groups.get(groupKey) || {
-      matchedByDate,
+      nameKey,
+      dateKey,
+      displayTitle,
       refNumber,
       documents: [],
     };
@@ -180,24 +163,14 @@ export function findDuplicateClustersByDescription(limit = 80): DuplicateCluster
   const clusters: DuplicateCluster[] = [];
   for (const [key, bucket] of groups) {
     if (bucket.documents.length < 2) continue;
-    bucket.documents.sort((a, b) => {
-      const da = a.created_date || "";
-      const db_ = b.created_date || "";
-      if (da !== db_) return db_.localeCompare(da);
-      return b.id - a.id;
-    });
-    const base =
-      bucket.documents[0]?.short_summary?.trim() ||
-      bucket.documents[0]?.title?.trim() ||
-      key;
-    const description = bucket.refNumber
-      ? `${base} · Nr. ${bucket.refNumber}`
-      : base;
+    bucket.documents.sort((a, b) => b.id - a.id);
+    const dateLabel = bucket.dateKey.split("-").reverse().join(".");
+    const description = `${bucket.displayTitle} · ${dateLabel}`;
     clusters.push({
       key,
       description,
       count: bucket.documents.length,
-      matchedByDate: bucket.matchedByDate,
+      matchedByDate: true,
       refNumber: bucket.refNumber,
       documents: bucket.documents,
     });
@@ -206,5 +179,31 @@ export function findDuplicateClustersByDescription(limit = 80): DuplicateCluster
   clusters.sort(
     (a, b) => b.count - a.count || a.description.localeCompare(b.description)
   );
-  return clusters.slice(0, Math.max(1, Math.min(limit, 200)));
+  return clusters;
+}
+
+/** Load analyzed docs and cluster by title + date. */
+export function findDuplicateClustersByDescription(limit = 80): DuplicateCluster[] {
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `SELECT d.id, d.paperless_id, d.title, d.correspondent_name, d.created_date,
+              d.content_hash, d.paperless_url, d.ai_icon_path,
+              s.short_summary, s.category, s.analysis_status
+       FROM paperless_documents d
+       INNER JOIN document_summaries s ON s.document_id = d.id
+       WHERE COALESCE(d.sync_status, 'synced') != 'missing'
+         AND s.analysis_status = 'completed'
+         AND (
+           NULLIF(TRIM(COALESCE(d.title, '')), '') IS NOT NULL
+           OR NULLIF(TRIM(COALESCE(s.short_summary, '')), '') IS NOT NULL
+         )
+       ORDER BY d.id ASC`
+    )
+    .all() as RawDupRow[];
+
+  return clusterDocumentsByTitleAndDate(rows).slice(
+    0,
+    Math.max(1, Math.min(limit, 200))
+  );
 }

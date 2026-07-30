@@ -121,9 +121,9 @@ export function DocumentDuplicatesPanel() {
           Doppelte Dokumente
         </CardTitle>
         <p className="text-sm text-muted-foreground">
-          Nur bei <strong>identischer</strong> Kurzbeschreibung. Kurze/generische
-          Texte (z. B. «Prämienrechnung») zählen nur mit <strong>gleichem
-          Datum</strong> als Duplikat. Pro Gruppe eines behalten, Rest löschen.
+          Duplikat nur wenn <strong>Titel und Datum</strong> identisch sind —
+          gleiche KI-Kurzbeschreibung allein reicht nicht. Pro Gruppe eines
+          behalten, Rest löschen.
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -181,7 +181,7 @@ export function DocumentDuplicatesPanel() {
 
         {!loading && clusters.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            Keine Duplikate gefunden (Beschreibung + Belegnummer, ggf. Datum).
+            Keine Duplikate gefunden (gleicher Titel und gleiches Datum).
           </p>
         ) : null}
 
@@ -223,7 +223,7 @@ export function DocumentDuplicatesPanel() {
                         ) : null}
                         {cluster.matchedByDate ? (
                           <Badge variant="secondary" className="text-[10px]">
-                            + gleiches Datum
+                            Titel + Datum
                           </Badge>
                         ) : null}
                       </span>
