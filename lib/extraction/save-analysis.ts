@@ -10,6 +10,10 @@ import {
   normalizeFinanceCategory,
   normalizeKnowledgeCategory,
 } from "@/lib/extraction/normalize-categories";
+import {
+  ensureGesamtbetragAmount,
+  normalizeLineItems,
+} from "@/lib/extraction/line-items";
 import { resolveTravelType, findTravelTypeRule } from "@/lib/extraction/classification-rules";
 import {
   displayImportantDateLabel,
@@ -175,8 +179,8 @@ export function saveAnalysis(
       enriched.detailed_summary,
       JSON.stringify(enriched.important_points),
       JSON.stringify(enriched.important_dates),
-      JSON.stringify(enriched.amounts),
-      JSON.stringify(enriched.line_items ?? []),
+      JSON.stringify(ensureGesamtbetragAmount(enriched)),
+      JSON.stringify(normalizeLineItems(enriched.line_items)),
       JSON.stringify(enriched.deadlines),
       JSON.stringify(enriched.contract_parties),
       JSON.stringify(enriched.warranty_info),

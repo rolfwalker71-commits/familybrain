@@ -8,6 +8,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toSwissDate } from "@/lib/utils/dates";
 import { formatCHF } from "@/lib/utils/format";
 import {
+  normalizeLineItem,
+  resolveInvoiceTotal,
+} from "@/lib/extraction/line-items";
+import {
   ChevronLeft,
   CheckCircle2,
   ExternalLink,
@@ -162,13 +166,14 @@ function DocumentDetailInner({ detail }: DetailProps) {
   }
 
   const importantPoints = parseJsonArray(summary?.important_points) as string[];
-  const lineItems = parseJsonArray(summary?.line_items) as {
+  const rawLineItems = parseJsonArray(summary?.line_items) as {
     description?: string;
     amount?: number | null;
     currency?: string | null;
     quantity?: number | null;
     unit?: string | null;
   }[];
+  const lineItems = rawLineItems.map(normalizeLineItem);
   const importantDates = (
     parseJsonArray(summary?.important_dates) as {
       date?: string;
@@ -184,6 +189,13 @@ function DocumentDetailInner({ detail }: DetailProps) {
     currency?: string;
     label?: string;
   }[];
+  const invoiceTotal = resolveInvoiceTotal({
+    amounts,
+    financialItems: detail.financialItems as Array<{
+      amount?: number | null;
+      currency?: string | null;
+    }>,
+  });
   const parties = parseJsonArray(summary?.contract_parties) as {
     name?: string;
     role?: string;
@@ -861,32 +873,47 @@ function DocumentDetailInner({ detail }: DetailProps) {
                   Beleg zu extrahieren.
                 </p>
               ) : (
-                <ul className="divide-y divide-border/60">
-                  {lineItems.map((item, i) => {
-                    const qty =
-                      item.quantity != null && item.quantity !== 1
-                        ? `${item.quantity}${item.unit ? ` ${item.unit}` : "×"} · `
-                        : item.quantity === 1 && item.unit
-                          ? `1 ${item.unit} · `
-                          : "";
-                    return (
+                <>
+                  <ul className="divide-y divide-border/60">
+                    {lineItems.map((item, i) => (
                       <li
                         key={i}
-                        className="flex items-start justify-between gap-3 py-2 first:pt-0 last:pb-0"
+                        className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-start gap-x-3 gap-y-0.5 py-2 first:pt-0 last:pb-0"
                       >
                         <span className="min-w-0 text-foreground/90">
-                          {qty}
-                          {item.description || "Position"}
+                          {item.description}
+                        </span>
+                        <span className="whitespace-nowrap text-xs text-muted-foreground tabular-nums sm:text-sm">
+                          {item.quantity != null
+                            ? `Anzahl: ${
+                                Number.isInteger(item.quantity)
+                                  ? item.quantity
+                                  : String(item.quantity)
+                              }${item.unit ? ` ${item.unit}` : ""}`
+                            : ""}
                         </span>
                         {item.amount != null ? (
-                          <span className="shrink-0 tabular-nums font-medium">
+                          <span className="shrink-0 justify-self-end tabular-nums font-medium">
                             {formatCHF(item.amount, item.currency || "CHF")}
                           </span>
-                        ) : null}
+                        ) : (
+                          <span />
+                        )}
                       </li>
-                    );
-                  })}
-                </ul>
+                    ))}
+                  </ul>
+                  {invoiceTotal ? (
+                    <div className="flex items-baseline justify-between gap-3 border-t border-border/60 pt-3 text-sm font-bold">
+                      <span>Gesamtbetrag</span>
+                      <span className="tabular-nums">
+                        {formatCHF(
+                          invoiceTotal.amount,
+                          invoiceTotal.currency
+                        )}
+                      </span>
+                    </div>
+                  ) : null}
+                </>
               )}
             </CardContent>
           </Card>

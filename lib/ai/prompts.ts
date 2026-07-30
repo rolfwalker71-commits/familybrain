@@ -28,7 +28,7 @@ Rules:
 - travel_items[].travel_type SHOULD be one of: ${travelTypesList} (use German labels; map Cruise→Kreuzfahrt, Hotelaufenthalt→Hotel, Visa Waiver→Visa / Einreise). Flights/air tickets/e-tickets MUST be "Flug" (never Kreuzfahrt). Kreuzfahrt is ONLY for ship cruises (ports of call / Kreuzfahrtverlauf). Package PDFs may contain multiple travel_items — classify each item by its own segment (flight vs hotel vs cruise vs transfer).
 - deadlines[].type SHOULD be one of: ${deadlineTypesList} (map cancellation→Kündigung, payment→Zahlung, appeal/einspruch→Einsprache)
 - financial_items[].category SHOULD map into these buckets when possible: ${financeBucketsList} (use short German labels; salary/balance lines → Saldo / Konto or Lohn; never invent English duplicates)
-- For invoices (Rechnung), delivery notes (Lieferschein), quotes, work reports, or any document with a list of products/services/activities: extract EACH line into line_items[] with description (product/service name) and amount. Include quantity/unit when clearly present. Do NOT put totals, VAT-only lines, or shipping into line_items — those belong in amounts / financial_items. Skip line_items when there is no itemized list.
+- For invoices (Rechnung), delivery notes (Lieferschein), quotes, work reports, or any document with a list of products/services/activities: extract EACH line into line_items[] with description (product/service name only — do NOT prefix quantity like "7x ·" into description), amount (line total), and quantity as a separate number when visible (Stückzahl / Menge / «3x»). Put unit in unit when present (Stk, kg, m, …). Do NOT put totals, VAT-only lines, or shipping into line_items — put the invoice grand total into amounts[] with label «Gesamtbetrag» (and also financial_items[].amount). Skip line_items when there is no itemized list.
 - Return VALID JSON only. No markdown. No commentary.
 - Category must be one of: ${categoriesList}`;
 
@@ -138,8 +138,10 @@ Travel/cruise specifics:
 - Sections titled Flüge / Flugarrangements / Flight / E-Ticket are separate travel_items with travel_type "Flug", even when the same PDF also describes a cruise or hotel stay.
 
 Line items (Rechnungen / Lieferscheine / Belege):
-- Prefer the article/service text as description (German as on the document).
+- Prefer the article/service text as description (German as on the document); never embed quantity in the description text.
+- quantity = Stückzahl/Menge as a number when shown (e.g. 7 for «7x» or «7 Stk»); null if unknown.
 - amount is the line total (inkl. or excl. MwSt as shown for that line); currency defaults to CHF when Swiss.
+- Always add the final payable/invoice total to amounts with label exactly «Gesamtbetrag» when a total is visible (Endbetrag / Total / Zu zahlen / Rechnungsbetrag).
 - financial_items holds the invoice as a whole (vendor, due date, total); line_items holds the individual positions.`;
 }
 
