@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Copy, Loader2, Trash2 } from "lucide-react";
+import { ChevronDown, Copy, Loader2, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,7 +11,7 @@ import { toSwissDate } from "@/lib/utils/dates";
 import { cn } from "@/lib/utils";
 import type { DuplicateCluster, DuplicateDocItem } from "@/lib/documents/duplicates";
 
-type KeepMap = Record<string, number>; // cluster key → keep local id
+type KeepMap = Record<string, number>;
 
 export function DocumentDuplicatesPanel() {
   const [clusters, setClusters] = useState<DuplicateCluster[]>([]);
@@ -20,6 +20,7 @@ export function DocumentDuplicatesPanel() {
   const [message, setMessage] = useState<string | null>(null);
   const [keepByCluster, setKeepByCluster] = useState<KeepMap>({});
   const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [openKeys, setOpenKeys] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -32,10 +33,11 @@ export function DocumentDuplicatesPanel() {
       setClusters(next);
       const keep: KeepMap = {};
       for (const c of next) {
-        // Default: keep newest (already sorted)
         if (c.documents[0]) keep[c.key] = c.documents[0].id;
       }
       setKeepByCluster(keep);
+      // All clusters collapsed by default
+      setOpenKeys(new Set());
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -46,6 +48,23 @@ export function DocumentDuplicatesPanel() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  function expandAll() {
+    setOpenKeys(new Set(clusters.map((c) => c.key)));
+  }
+
+  function collapseAll() {
+    setOpenKeys(new Set());
+  }
+
+  function toggleCluster(key: string) {
+    setOpenKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
 
   async function deleteDuplicates(cluster: DuplicateCluster) {
     const keepId = keepByCluster[cluster.key];
@@ -102,9 +121,9 @@ export function DocumentDuplicatesPanel() {
           Doppelte Dokumente
         </CardTitle>
         <p className="text-sm text-muted-foreground">
-          Gruppiert nach gleicher Kurzbeschreibung (Analyse). Pro Gruppe ein
-          Dokument behalten, die anderen nach Prüfung löschen (Paperless +
-          Buddy).
+          Nur bei <strong>identischer</strong> Kurzbeschreibung. Kurze/generische
+          Texte (z. B. «Prämienrechnung») zählen nur mit <strong>gleichem
+          Datum</strong> als Duplikat. Pro Gruppe eines behalten, Rest löschen.
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -123,6 +142,22 @@ export function DocumentDuplicatesPanel() {
             ) : (
               "Erneut suchen"
             )}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={loading || clusters.length === 0}
+            onClick={expandAll}
+          >
+            Alles aufklappen
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={loading || clusters.length === 0 || openKeys.size === 0}
+            onClick={collapseAll}
+          >
+            Alles zuklappen
           </Button>
           {!loading ? (
             <span className="text-xs text-muted-foreground">
@@ -146,56 +181,82 @@ export function DocumentDuplicatesPanel() {
 
         {!loading && clusters.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            Keine doppelten Kurzbeschreibungen gefunden.
+            Keine identischen Beschreibungen (ggf. mit gleichem Datum) gefunden.
           </p>
         ) : null}
 
-        <div className="space-y-4">
+        <div className="space-y-2">
           {clusters.map((cluster) => {
             const keepId = keepByCluster[cluster.key];
             const busy = busyKey === cluster.key;
+            const open = openKeys.has(cluster.key);
             return (
               <section
                 key={cluster.key}
                 className="overflow-hidden rounded-xl border border-border/70 bg-muted/10"
               >
-                <div className="flex flex-wrap items-start justify-between gap-2 border-b border-border/60 px-3 py-2.5">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium leading-snug">
-                      {cluster.description}
-                    </p>
-                    <Badge variant="secondary" className="mt-1 text-[10px]">
-                      {cluster.count}× gleich
-                    </Badge>
-                  </div>
+                <div className="flex flex-wrap items-start gap-2 px-3 py-2.5">
+                  <button
+                    type="button"
+                    className="flex min-w-0 flex-1 items-start gap-2 text-left"
+                    onClick={() => toggleCluster(cluster.key)}
+                    aria-expanded={open}
+                  >
+                    <ChevronDown
+                      className={cn(
+                        "mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform",
+                        open && "rotate-180"
+                      )}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-medium leading-snug">
+                        {cluster.description}
+                      </span>
+                      <span className="mt-1 flex flex-wrap gap-1">
+                        <Badge variant="secondary" className="text-[10px]">
+                          {cluster.count}× gleich
+                        </Badge>
+                        {cluster.matchedByDate ? (
+                          <Badge variant="secondary" className="text-[10px]">
+                            + gleiches Datum
+                          </Badge>
+                        ) : null}
+                      </span>
+                    </span>
+                  </button>
                   <Button
                     size="sm"
                     variant="outline"
                     className="text-destructive"
                     disabled={busy || keepId == null}
-                    onClick={() => void deleteDuplicates(cluster)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void deleteDuplicates(cluster);
+                    }}
                   >
                     <Trash2 className="size-3.5" />
                     {busy ? "Lösche…" : "Duplikate löschen"}
                   </Button>
                 </div>
-                <ul className="divide-y divide-border/50">
-                  {cluster.documents.map((doc) => (
-                    <DuplicateRow
-                      key={doc.id}
-                      doc={doc}
-                      groupName={cluster.key}
-                      selected={keepId === doc.id}
-                      disabled={busy}
-                      onSelect={() =>
-                        setKeepByCluster((prev) => ({
-                          ...prev,
-                          [cluster.key]: doc.id,
-                        }))
-                      }
-                    />
-                  ))}
-                </ul>
+                {open ? (
+                  <ul className="divide-y divide-border/50 border-t border-border/60">
+                    {cluster.documents.map((doc) => (
+                      <DuplicateRow
+                        key={doc.id}
+                        doc={doc}
+                        groupName={cluster.key}
+                        selected={keepId === doc.id}
+                        disabled={busy}
+                        onSelect={() =>
+                          setKeepByCluster((prev) => ({
+                            ...prev,
+                            [cluster.key]: doc.id,
+                          }))
+                        }
+                      />
+                    ))}
+                  </ul>
+                ) : null}
               </section>
             );
           })}

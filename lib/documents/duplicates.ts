@@ -18,8 +18,13 @@ export type DuplicateCluster = {
   key: string;
   description: string;
   count: number;
+  /** True when cluster was narrowed by matching created_date as well. */
+  matchedByDate: boolean;
   documents: DuplicateDocItem[];
 };
+
+/** Below this length, identical short_summary alone is too generic — also require same date. */
+export const DUPLICATE_SPECIFIC_MIN_LENGTH = 40;
 
 function aiIconPublicUrl(aiIconPath: string | null | undefined): string | null {
   if (!aiIconPath) return null;
@@ -28,7 +33,7 @@ function aiIconPublicUrl(aiIconPath: string | null | undefined): string | null {
   return `/api/documents/media/ai-icon/${encodeURIComponent(base)}`;
 }
 
-/** Normalize description for duplicate grouping. */
+/** Normalize description for exact duplicate grouping. */
 export function normalizeDuplicateDescription(
   raw: string | null | undefined
 ): string {
@@ -40,9 +45,18 @@ export function normalizeDuplicateDescription(
     .replace(/\s+/g, " ");
 }
 
+/** YYYY-MM-DD from created_date (or empty if unknown). */
+export function documentDateKey(createdDate: string | null | undefined): string {
+  const raw = (createdDate || "").trim();
+  if (!raw) return "";
+  const m = /^(\d{4}-\d{2}-\d{2})/.exec(raw);
+  return m?.[1] || "";
+}
+
 /**
- * Find document clusters that share the same normalized short_summary
- * (min 2 docs, summary at least 12 chars after normalize).
+ * Find clusters with identical normalized short_summary.
+ * Short/generic descriptions (< 40 chars) only count as duplicates when the
+ * document date (day) is also identical.
  */
 export function findDuplicateClustersByDescription(limit = 80): DuplicateCluster[] {
   const db = getDb();
@@ -72,12 +86,27 @@ export function findDuplicateClustersByDescription(limit = 80): DuplicateCluster
     analysis_status: string | null;
   }>;
 
-  const groups = new Map<string, DuplicateDocItem[]>();
+  type Bucket = { matchedByDate: boolean; documents: DuplicateDocItem[] };
+  const groups = new Map<string, Bucket>();
+
   for (const row of rows) {
-    const key = normalizeDuplicateDescription(row.short_summary);
-    if (key.length < 12) continue;
-    const list = groups.get(key) || [];
-    list.push({
+    const descKey = normalizeDuplicateDescription(row.short_summary);
+    if (!descKey) continue;
+
+    const dateKey = documentDateKey(row.created_date);
+    const isSpecific = descKey.length >= DUPLICATE_SPECIFIC_MIN_LENGTH;
+
+    // Generic short text (e.g. «Prämienrechnung»): only with same calendar day.
+    if (!isSpecific) {
+      if (!dateKey) continue;
+    }
+
+    const groupKey = isSpecific ? `d:${descKey}` : `d:${descKey}|t:${dateKey}`;
+    const bucket = groups.get(groupKey) || {
+      matchedByDate: !isSpecific,
+      documents: [],
+    };
+    bucket.documents.push({
       id: row.id,
       paperless_id: row.paperless_id,
       title: row.title,
@@ -90,14 +119,13 @@ export function findDuplicateClustersByDescription(limit = 80): DuplicateCluster
       paperless_url: row.paperless_url,
       ai_icon_url: aiIconPublicUrl(row.ai_icon_path),
     });
-    groups.set(key, list);
+    groups.set(groupKey, bucket);
   }
 
   const clusters: DuplicateCluster[] = [];
-  for (const [key, documents] of groups) {
-    if (documents.length < 2) continue;
-    // Prefer newest created_date first for review
-    documents.sort((a, b) => {
+  for (const [key, bucket] of groups) {
+    if (bucket.documents.length < 2) continue;
+    bucket.documents.sort((a, b) => {
       const da = a.created_date || "";
       const db_ = b.created_date || "";
       if (da !== db_) return db_.localeCompare(da);
@@ -105,12 +133,15 @@ export function findDuplicateClustersByDescription(limit = 80): DuplicateCluster
     });
     clusters.push({
       key,
-      description: documents[0]?.short_summary?.trim() || key,
-      count: documents.length,
-      documents,
+      description: bucket.documents[0]?.short_summary?.trim() || key,
+      count: bucket.documents.length,
+      matchedByDate: bucket.matchedByDate,
+      documents: bucket.documents,
     });
   }
 
-  clusters.sort((a, b) => b.count - a.count || a.description.localeCompare(b.description));
+  clusters.sort(
+    (a, b) => b.count - a.count || a.description.localeCompare(b.description)
+  );
   return clusters.slice(0, Math.max(1, Math.min(limit, 200)));
 }
