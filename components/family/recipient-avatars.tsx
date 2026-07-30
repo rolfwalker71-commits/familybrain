@@ -37,7 +37,7 @@ export function RecipientAvatars({
   return (
     <span
       className={cn(
-        "inline-flex min-w-0 max-w-full items-center gap-1",
+        "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap",
         className
       )}
       title={label || undefined}
@@ -51,7 +51,7 @@ export function RecipientAvatars({
         />
       ))}
       {showLabel && label ? (
-        <span className="truncate text-muted-foreground">{label}</span>
+        <span className="text-muted-foreground">{label}</span>
       ) : null}
     </span>
   );

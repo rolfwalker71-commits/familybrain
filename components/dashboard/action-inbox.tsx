@@ -428,11 +428,8 @@ export function ActionInbox() {
                         />
                         <span className="min-w-0">
                           <span className="font-medium">{row.title}</span>
-                          <span className="mt-0.5 block text-xs text-muted-foreground">
-                            <RecipientAvatars
-                              recipients={row.recipients}
-                              className="mb-0.5"
-                            />
+                          <span className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-xs text-muted-foreground">
+                            <RecipientAvatars recipients={row.recipients} />
                             <span
                               className={dueUrgencyTextClass(
                                 dueUrgency(row.deadline_date)
@@ -442,7 +439,7 @@ export function ActionInbox() {
                             </span>
                             <Badge
                               variant="secondary"
-                              className="ml-2 bg-red-100 text-[10px] text-red-800"
+                              className="bg-red-100 text-[10px] text-red-800"
                             >
                               Überfällig
                             </Badge>
@@ -484,11 +481,8 @@ export function ActionInbox() {
                             <span className="font-medium">
                               {row.vendor || row.document_title || "Rechnung"}
                             </span>
-                            <span className="mt-0.5 block text-xs">
-                              <RecipientAvatars
-                                recipients={row.recipients}
-                                className="mb-0.5"
-                              />
+                            <span className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-xs">
+                              <RecipientAvatars recipients={row.recipients} />
                               <span
                                 className={dueUrgencyTextClass(
                                   dueUrgency(row.due_date)
@@ -539,11 +533,8 @@ export function ActionInbox() {
                           <span className="font-medium">
                             {row.product_name || row.vendor || "Garantie"}
                           </span>
-                          <span className="mt-0.5 block text-xs text-muted-foreground">
-                            <RecipientAvatars
-                              recipients={row.recipients}
-                              className="mb-0.5"
-                            />
+                          <span className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-xs text-muted-foreground">
+                            <RecipientAvatars recipients={row.recipients} />
                             <span
                               className={dueUrgencyTextClass(
                                 dueUrgency(row.warranty_until)
