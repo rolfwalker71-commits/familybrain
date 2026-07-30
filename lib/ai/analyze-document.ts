@@ -132,6 +132,27 @@ export async function analyzeDocument(
           triage.reasons.map((r) => TRIAGE_REASON_LABELS[r])
         );
       }
+      if (triage.newlyQueued) {
+        try {
+          const { notifyTriageReadyEmail } = await import(
+            "@/lib/mail/notify-triage"
+          );
+          const mailResult = await notifyTriageReadyEmail(documentId);
+          if (!mailResult.ok && mailResult.error) {
+            console.error(
+              "[analyze] triage mail failed",
+              documentId,
+              mailResult.error
+            );
+          }
+        } catch (mailErr) {
+          console.error(
+            "[analyze] triage mail failed",
+            documentId,
+            mailErr instanceof Error ? mailErr.message : mailErr
+          );
+        }
+      }
     } catch (triageErr) {
       console.error(
         "[analyze] document triage failed",

@@ -62,6 +62,10 @@ import {
   saveSmtpSettings,
 } from "@/lib/finance-brain/mail-settings";
 import {
+  getTriageMailSettingsPublic,
+  saveTriageMailSettings,
+} from "@/lib/mail/triage-mail-settings";
+import {
   APP_PUBLIC_URL_KEY,
   getAppPublicUrlSetting,
   absoluteAppUrl,
@@ -170,6 +174,7 @@ export async function GET(request: Request) {
     financeExpenseAiImagePromptPlaceholders: EXPENSE_AI_IMAGE_PROMPT_PLACEHOLDERS,
     appPublicUrl: getAppPublicUrlSetting() || "",
     ...getSmtpSettingsPublic(),
+    ...getTriageMailSettingsPublic(),
   });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -215,6 +220,8 @@ const PutSchema = z.object({
   clearSmtpPassword: z.boolean().optional(),
   smtpFrom: z.string().max(320).nullable().optional(),
   appPublicUrl: z.string().max(500).nullable().optional(),
+  triageMailEnabled: z.boolean().optional(),
+  triageMailRecipients: z.string().max(2000).nullable().optional(),
 });
 
 export async function PUT(request: Request) {
@@ -419,6 +426,16 @@ export async function PUT(request: Request) {
     });
   }
 
+  if (
+    parsed.data.triageMailEnabled !== undefined ||
+    parsed.data.triageMailRecipients !== undefined
+  ) {
+    saveTriageMailSettings({
+      enabled: parsed.data.triageMailEnabled,
+      recipients: parsed.data.triageMailRecipients,
+    });
+  }
+
   const paperless = getPaperlessSettings();
   const openai = getOpenAISettings();
   const trilium = getTriliumSettings();
@@ -469,5 +486,6 @@ export async function PUT(request: Request) {
     financeExpenseAiImagePromptPlaceholders: EXPENSE_AI_IMAGE_PROMPT_PLACEHOLDERS,
     appPublicUrl: getAppPublicUrlSetting() || "",
     ...getSmtpSettingsPublic(),
+    ...getTriageMailSettingsPublic(),
   });
 }

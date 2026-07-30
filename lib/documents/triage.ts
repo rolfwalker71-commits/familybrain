@@ -136,7 +136,7 @@ export function detectTriageReasons(
 export function applyTriageAfterAnalysis(
   documentId: number,
   analysis: DocumentAnalysis
-): { queued: boolean; reasons: TriageReason[] } {
+): { queued: boolean; newlyQueued: boolean; reasons: TriageReason[] } {
   const db = getDb();
   const row = db
     .prepare(
@@ -153,11 +153,11 @@ export function applyTriageAfterAnalysis(
       }
     | undefined;
 
-  if (!row) return { queued: false, reasons: [] };
+  if (!row) return { queued: false, newlyQueued: false, reasons: [] };
 
   const status = row.triage_status;
   if (status && SETTLED_TRIAGE_STATUSES.has(status)) {
-    return { queued: false, reasons: [] };
+    return { queued: false, newlyQueued: false, reasons: [] };
   }
 
   if (Number(row.zu_bezahlen) === 1 && Number(row.bezahlt) !== 1) {
@@ -166,7 +166,7 @@ export function applyTriageAfterAnalysis(
        SET triage_status = 'pay', triage_reasons = ?, triage_at = ?, updated_at = ?
        WHERE id = ?`
     ).run(JSON.stringify(["invoice"]), nowIso(), nowIso(), documentId);
-    return { queued: false, reasons: ["invoice"] };
+    return { queued: false, newlyQueued: false, reasons: ["invoice"] };
   }
 
   const reasons = detectTriageReasons(analysis, {
@@ -182,16 +182,17 @@ export function applyTriageAfterAnalysis(
          WHERE id = ?`
       ).run(nowIso(), documentId);
     }
-    return { queued: false, reasons: [] };
+    return { queued: false, newlyQueued: false, reasons: [] };
   }
 
+  const newlyQueued = status !== "pending";
   db.prepare(
     `UPDATE paperless_documents
      SET triage_status = 'pending', triage_reasons = ?, triage_at = ?, updated_at = ?
      WHERE id = ?`
   ).run(JSON.stringify(reasons), nowIso(), nowIso(), documentId);
 
-  return { queued: true, reasons };
+  return { queued: true, newlyQueued, reasons };
 }
 
 export type TriageInboxItem = {

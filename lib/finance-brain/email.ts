@@ -126,13 +126,13 @@ export async function sendBalanceReminderEmail(input: {
 export async function sendTestEmail(to: string): Promise<{ ok: boolean; error?: string }> {
   return sendMail({
     to,
-    subject: "TripBook Testmail",
+    subject: "Buddy SMTP-Testmail",
     text:
-      "Hallo,\n\ndies ist eine Testmail aus den TripBook-Einstellungen.\n" +
+      "Hallo,\n\ndies ist eine Testmail aus den Buddy-Einstellungen.\n" +
       "Wenn du diese Nachricht siehst, ist SMTP korrekt konfiguriert.\n",
-    html: `<!DOCTYPE html><body style="font-family:system-ui,sans-serif;padding:24px;">
-      <h2>TripBook Testmail</h2>
-      <p>SMTP ist korrekt konfiguriert. FinanzBuddy kann Beleg-Mails versenden.</p>
+    html: `<!DOCTYPE html><body style="font-family:system-ui,sans-serif;padding:24px;color:#14201c;">
+      <h2 style="color:#3f6b52;">Buddy SMTP-Testmail</h2>
+      <p>SMTP ist korrekt konfiguriert. FinanzBuddy- und Triage-Mails können versendet werden.</p>
     </body>`,
   });
 }

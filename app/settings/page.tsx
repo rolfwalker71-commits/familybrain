@@ -184,8 +184,11 @@ function SettingsPageInner() {
   const [smtpFrom, setSmtpFrom] = useState("");
   const [emailConfigured, setEmailConfigured] = useState(false);
   const [appPublicUrl, setAppPublicUrl] = useState("");
+  const [triageMailEnabled, setTriageMailEnabled] = useState(false);
+  const [triageMailRecipients, setTriageMailRecipients] = useState("");
   const [testMailTo, setTestMailTo] = useState("");
   const [testMailBusy, setTestMailBusy] = useState(false);
+  const [triageTestBusy, setTriageTestBusy] = useState(false);
   const [flightTestNumber, setFlightTestNumber] = useState("LX1594");
   const [flightTestDate, setFlightTestDate] = useState("2026-10-23");
   const [flightTestBusy, setFlightTestBusy] = useState(false);
@@ -314,6 +317,8 @@ function SettingsPageInner() {
       setSmtpFrom(data.smtpFrom || "");
       setEmailConfigured(Boolean(data.emailConfigured));
       setAppPublicUrl(data.appPublicUrl || "");
+      setTriageMailEnabled(Boolean(data.triageMailEnabled));
+      setTriageMailRecipients(data.triageMailRecipients || "");
       setError(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
@@ -708,6 +713,8 @@ function SettingsPageInner() {
           smtpPassword: smtpPassword || undefined,
           smtpFrom: smtpFrom.trim() || null,
           appPublicUrl: appPublicUrl.trim() || null,
+          triageMailEnabled,
+          triageMailRecipients: triageMailRecipients.trim() || null,
         }),
       });
       const data = await res.json();
@@ -721,8 +728,10 @@ function SettingsPageInner() {
       setSmtpFrom(data.smtpFrom || "");
       setEmailConfigured(Boolean(data.emailConfigured));
       setAppPublicUrl(data.appPublicUrl || "");
+      setTriageMailEnabled(Boolean(data.triageMailEnabled));
+      setTriageMailRecipients(data.triageMailRecipients || "");
       setSmtpPassword("");
-      setMessage("SMTP-Einstellungen gespeichert.");
+      setMessage("E-Mail-Einstellungen gespeichert.");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -777,15 +786,44 @@ function SettingsPageInner() {
       const res = await fetch("/api/settings/test-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ to: testMailTo.trim() }),
+        body: JSON.stringify({ to: testMailTo.trim(), kind: "smtp" }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Testmail fehlgeschlagen");
-      setMessage(`Testmail an ${testMailTo.trim()} gesendet.`);
+      setMessage(`SMTP-Testmail an ${testMailTo.trim()} gesendet.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setTestMailBusy(false);
+    }
+  }
+
+  async function sendTriageSettingsTestMail() {
+    setTriageTestBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const to =
+        testMailTo.trim() ||
+        triageMailRecipients.split(/[,;\n]/)[0]?.trim() ||
+        "";
+      if (!to) {
+        throw new Error(
+          "Bitte Empfänger (Testfeld oder Triage-Empfänger) angeben."
+        );
+      }
+      const res = await fetch("/api/settings/test-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to, kind: "triage" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Triage-Testmail fehlgeschlagen");
+      setMessage(`Triage-Testmail (HTML) an ${to} gesendet.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setTriageTestBusy(false);
     }
   }
 
@@ -1715,11 +1753,10 @@ function SettingsPageInner() {
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            Für FinanzBuddy-Belegmails (Ausgabe / Rückzahlung) inkl. PDF-Anhang.
-            Empfohlen: iCloud+ mit App-spezifischem Passwort. Werte können auch
-            per Env gesetzt sein (
-            <code className="text-[11px]">SMTP_HOST</code>,{" "}
-            <code className="text-[11px]">SMTP_USER</code>, …).
+            SMTP für FinanzBuddy-Belegmails und Buddy-Triage-Benachrichtigungen.
+            Triage-Mails sind HTML only — keine PDF-Anhänge (vermeidet
+            Doppelimporte in Paperless). Empfohlen: iCloud+ mit App-spezifischem
+            Passwort.
           </p>
           <div className="space-y-2">
             <Label htmlFor="appPublicUrl">Öffentliche App-URL</Label>
@@ -1730,8 +1767,7 @@ function SettingsPageInner() {
               placeholder="https://familybrain.example.com"
             />
             <p className="text-xs text-muted-foreground">
-              Basis für Links in Einladungs- und Erinnerungsmails (nicht
-              localhost).
+              Basis für Links in Mails (Inbox, Einladungen) — nicht localhost.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -1845,10 +1881,58 @@ function SettingsPageInner() {
             disabled={saving !== null}
             className={settingsPrimaryBtn}
           >
-            {saving === "email" ? "Speichert…" : "SMTP speichern"}
+            {saving === "email" ? "Speichert…" : "E-Mail speichern"}
           </Button>
+
+          <div className="space-y-3 rounded-xl border border-border/60 bg-muted/20 p-4">
+            <div className="flex items-start gap-3">
+              <input
+                id="triageMailEnabled"
+                type="checkbox"
+                className="mt-1 size-4 accent-[var(--brand-docs)]"
+                checked={triageMailEnabled}
+                onChange={(e) => setTriageMailEnabled(e.target.checked)}
+              />
+              <div className="min-w-0 space-y-1">
+                <Label htmlFor="triageMailEnabled" className="cursor-pointer">
+                  Triage-Mail nach Analyse
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Wenn ein Dokument neu in die Triage-Inbox kommt, HTML-Mail an
+                  die Empfänger senden (ohne PDF-Anhang).
+                </p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="triageMailRecipients">Empfänger</Label>
+              <Input
+                id="triageMailRecipients"
+                value={triageMailRecipients}
+                onChange={(e) => setTriageMailRecipients(e.target.value)}
+                placeholder="du@example.com, partner@example.com"
+              />
+              <p className="text-xs text-muted-foreground">
+                Mehrere Adressen mit Komma trennen.
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={
+                triageTestBusy ||
+                testMailBusy ||
+                saving !== null ||
+                !emailConfigured
+              }
+              onClick={() => void sendTriageSettingsTestMail()}
+            >
+              {triageTestBusy ? "Sendet…" : "Triage-Testmail senden"}
+            </Button>
+          </div>
+
           <div className="space-y-2 border-t border-border/60 pt-4">
-            <Label htmlFor="testMailTo">Testmail senden</Label>
+            <Label htmlFor="testMailTo">SMTP-Testmail</Label>
             <div className="flex flex-col gap-2 sm:flex-row">
               <Input
                 id="testMailTo"
@@ -1862,12 +1946,21 @@ function SettingsPageInner() {
                 type="button"
                 variant="outline"
                 className="w-full sm:w-auto"
-                disabled={testMailBusy || saving !== null || !emailConfigured}
+                disabled={
+                  testMailBusy ||
+                  triageTestBusy ||
+                  saving !== null ||
+                  !emailConfigured
+                }
                 onClick={() => void sendSettingsTestMail()}
               >
-                {testMailBusy ? "Sendet…" : "Testmail"}
+                {testMailBusy ? "Sendet…" : "SMTP-Test"}
               </Button>
             </div>
+            <p className="text-xs text-muted-foreground">
+              Wird auch als Empfänger für die Triage-Testmail genutzt, falls
+              gesetzt.
+            </p>
           </div>
         </CardContent>
       </Card>
