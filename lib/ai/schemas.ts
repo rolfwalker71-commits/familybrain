@@ -54,6 +54,8 @@ export const FinancialItemSchema = z.object({
   amount: z.number().nullable(),
   currency: z.string().nullable(),
   invoice_date: z.string().nullable(),
+  /** Rechnungs-/Belegnummer when present on the invoice. */
+  invoice_number: z.string().nullable().optional(),
   due_date: z.string().nullable(),
   category: z.string().nullable(),
   is_recurring: z.boolean().nullable(),
@@ -108,6 +110,11 @@ export const DocumentAnalysisSchema = z.object({
   also_categories: z.array(z.string()).optional().default([]),
   /** Explicit flag: also list under Arbeit (Lohnausweis). */
   also_in_arbeit: z.boolean().nullable().optional(),
+  /**
+   * Primary Beleg-/Rechnungs-/Policen-/Vertrags-/Kundennummer that uniquely
+   * identifies this document instance (digits or alphanumeric as printed).
+   */
+  document_reference: z.string().nullable().optional(),
   short_summary: z.string().nullable(),
   detailed_summary: z.string().nullable(),
   important_points: z.array(z.string()).default([]),

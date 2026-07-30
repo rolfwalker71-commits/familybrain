@@ -28,6 +28,7 @@ import {
   resolveTaxYear,
   serializeAlsoCategories,
 } from "@/lib/extraction/tax";
+import { enrichAnalysisIdentity } from "@/lib/extraction/enrich-identity";
 
 function warrantyStatus(warrantyUntil: string | null): string {
   if (!warrantyUntil) return "unknown";
@@ -142,9 +143,9 @@ export function saveAnalysis(
     .get(documentId) as
     | { title: string | null; content: string | null; created_date: string | null }
     | undefined;
-  const enriched = enrichTravelWithItinerary(
-    analysis,
-    docMeta?.content ?? null
+  const enriched = enrichAnalysisIdentity(
+    enrichTravelWithItinerary(analysis, docMeta?.content ?? null),
+    { title: docMeta?.title, createdDate: docMeta?.created_date }
   );
 
   let category = normalizeKnowledgeCategory(enriched.category);

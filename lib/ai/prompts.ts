@@ -25,7 +25,9 @@ Rules:
 - For hotels, extract the street address into travel_items[].address when present; also capture check-in/out times as start_time/end_time when known.
 - Always extract booking_reference / confirmation / PNR / reservation code into booking_reference when present.
 - Also capture other date-relevant fields in important_dates: payment due, cancellation deadline, boarding, check-in, flight departure/arrival, hotel check-in/out, appointment dates, warranty end, contract start/end.
-- Always set suggested_title: a concise German Paperless document title (max ~120 characters). Prefer document type + subject + organization (e.g. «Kaufvertrag Grundstück …», «Rechnung Swisscom März 2026», «Haftpflicht Police»). Never use scanner/file names (SCAN__, IMG_, DSC_, UUID-like strings). Household member / Empfänger names are optional — omit them unless needed to distinguish the document (recipients are linked separately).
+- Always set suggested_title: a concise German Paperless document title (max ~120 characters). Prefer document type + subject + organization + identifying number/date when available (e.g. «Prämienrechnung CONCORDIA Nr. 615284766», «Rechnung Swisscom 03.2026 Nr. …», «Haftpflicht Police 2026»). Never use scanner/file names (SCAN__, IMG_, DSC_, UUID-like strings). Household member / Empfänger names are optional — omit them unless needed to distinguish the document (recipients are linked separately).
+- Always set document_reference when the OCR shows a Belegnummer, Rechnungsnummer, Dokumentennummer, Policennummer, Vertragsnummer, Kundennummer, Auftragsnummer, Referenz, Nr./No./Invoice # (prefer the invoice/document number over phone numbers or amounts). Also put the same value into financial_items[].invoice_number for invoices.
+- short_summary MUST uniquely identify this document instance in one German sentence: include document type/subject, organization, AND whenever present (1) Beleg-/Rechnungsnummer (Nr. …) and (2) Beleg-/Rechnungsdatum (dd.mm.yyyy). Never write a generic summary that could apply to every monthly invoice from the same vendor (bad: «Prämienrechnung für Rolf Walker von CONCORDIA.» — good: «Prämienrechnung Nr. 615284766 vom 01.09.2026 von CONCORDIA.»).
 - Swiss tax documents for the Steuererklärung (Steuererklärung, Veranlagung, Steuerrechnung/-bescheid, Quellensteuer, Lohnausweis / Lohnmeldeschein, Belege die typischerweise der Steuererklärung beigelegt werden): set category to «Steuern». For Lohnausweis/Lohnmeldeschein also set also_in_arbeit=true (or also_categories including «Arbeit»). Set tax_year to the Steuerperiode / Steuerjahr as an integer (e.g. Lohnausweis 2025 → 2025), not the scan date unless no period is visible.
 - category MUST be one of: ${categoriesList}
 - travel_items[].travel_type SHOULD be one of: ${travelTypesList} (use German labels; map Cruise→Kreuzfahrt, Hotelaufenthalt→Hotel, Visa Waiver→Visa / Einreise). Flights/air tickets/e-tickets MUST be "Flug" (never Kreuzfahrt). Kreuzfahrt is ONLY for ship cruises (ports of call / Kreuzfahrtverlauf). Package PDFs may contain multiple travel_items — classify each item by its own segment (flight vs hotel vs cruise vs transfer).
@@ -71,7 +73,8 @@ Required JSON shape:
   "tax_year": null,
   "also_categories": [],
   "also_in_arbeit": false,
-  "short_summary": "...",
+  "document_reference": "615284766",
+  "short_summary": "Prämienrechnung Nr. 615284766 vom 01.09.2026 von CONCORDIA.",
   "detailed_summary": "...",
   "important_points": ["..."],
   "important_dates": [{"date": "2026-09-30", "label": "...", "description": "..."}],
@@ -101,6 +104,7 @@ Required JSON shape:
     "amount": null,
     "currency": "CHF",
     "invoice_date": null,
+    "invoice_number": null,
     "due_date": null,
     "category": null,
     "is_recurring": false,
@@ -144,6 +148,12 @@ Required JSON shape:
 Title (suggested_title):
 - Always rewrite a clear German archive title, even when metadata Title is already set (scanner names like SCAN__… must be replaced).
 - Focus on what the document is; do not force household names into the title.
+- When a Beleg-/Rechnungsnummer is visible, include «Nr. …» in the title.
+
+Identity (document_reference / short_summary):
+- Extract the strongest document identifier into document_reference (Rechnungsnr., Belegnr., Policen-/Vertragsnr., Referenz).
+- short_summary must include that number as «Nr. …» and the Beleg-/Rechnungsdatum when known — so two monthly invoices from the same vendor never share the same summary text.
+- Also set financial_items[].invoice_number and invoice_date for invoices/bills.
 
 Tax (Steuern / tax_year):
 - For Swiss Steuererklärung-related docs set category «Steuern» and tax_year to the tax period year when known.
