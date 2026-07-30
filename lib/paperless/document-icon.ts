@@ -2,7 +2,6 @@ import fs from "fs";
 import path from "path";
 import { randomUUID } from "crypto";
 import sharp from "sharp";
-import { toFile } from "openai";
 import {
   getOpenAIClient,
   getOpenAIModel,
@@ -18,11 +17,6 @@ import {
 import { PaperlessClient } from "@/lib/paperless/client";
 import { getTripsDataRoot } from "@/lib/trips/paths";
 import { nowIso } from "@/lib/utils/dates";
-import {
-  matchDocumentBrandLogo,
-  resolveBrandLogoPath,
-  type DocumentBrandLogo,
-} from "@/lib/paperless/brand-logos";
 
 /** Document list thumbnails — gpt-image-1.5 for reliable color + prompt adherence. */
 export const DOCUMENT_AI_ICON_MODEL = "gpt-image-1.5";
@@ -435,71 +429,8 @@ async function writeIconJpeg(
   return fullPath;
 }
 
-/** Rasterize SVG/PNG brand assets for OpenAI images.edit. */
-async function brandLogoAsPngFile(logoPath: string) {
-  const png = await sharp(fs.readFileSync(logoPath))
-    .rotate()
-    .resize(1024, 1024, {
-      fit: "contain",
-      background: { r: 255, g: 255, b: 255, alpha: 1 },
-    })
-    .flatten({ background: { r: 255, g: 255, b: 255 } })
-    .png()
-    .toBuffer();
-  return toFile(png, "brand-logo.png", { type: "image/png" });
-}
-
-/** Prompt when a visual reference image is supplied (inspiration only). */
-export function buildBrandLogoReferenceIconPrompt(input: {
-  brand: DocumentBrandLogo;
-  title?: string | null;
-  category?: string | null;
-  correspondent?: string | null;
-  documentType?: string | null;
-  vendor?: string | null;
-  shortSummary?: string | null;
-}): string {
-  const category = clip(input.category, 40) || "Dokument";
-  const title = clip(input.title, 80) || "Dokument";
-  const correspondent = clip(input.correspondent, 60);
-  const vendor = clip(input.vendor, 60);
-  const docType = clip(input.documentType, 40);
-  const hint = clip(input.shortSummary, 100);
-  const org =
-    [correspondent, vendor]
-      .filter(Boolean)
-      .filter((a, i, arr) => arr.findIndex((b) => b.toLowerCase() === a.toLowerCase()) === i)
-      .join(" / ") || input.brand.label;
-
-  const subjectParts = [
-    `category «${category}»`,
-    `title «${title}»`,
-    `organization/brand «${org}»`,
-    `place/brand keyword «${input.brand.label}»`,
-  ];
-  if (docType) subjectParts.push(`type «${docType}»`);
-  if (hint) subjectParts.push(`context: ${hint}`);
-
-  return [
-    "Tiny square app icon illustration (not photorealistic) for a household document archive.",
-    `Subject: ${subjectParts.join("; ")}.`,
-    `Attached image is ONLY an optical mood/reference for «${input.brand.label}» (colors, motifs, shapes).`,
-    "Create a NEW cheerful flat app icon inspired by that reference — reinterpret freely for a 48px thumbnail.",
-    "Do NOT copy, paste, crop, or photographically reproduce the reference image as the icon.",
-    "Do NOT output the coat of arms / logo itself unchanged; invent a related stylized symbol.",
-    "Style: colorful flat illustration,",
-    "solid pure white background (#FFFFFF) filling the entire square — never black, never dark, never gray.",
-    "Centered recognizable symbol with soft shading, generous padding,",
-    "no text, no letters, no numbers, no watermarks, no receipt UI, no photorealism.",
-    "Suitable as a 48px list thumbnail.",
-    input.brand.promptNote,
-  ].join(" ");
-}
-
 /**
  * Generate (or force-regenerate) a small AI icon for a document.
- * Known brands/places (URI, ANG, Altdorf, …) pass a visual reference into OpenAI images.edit
- * as inspiration only — the model must generate a new icon, not paste the asset.
  */
 export async function generateDocumentAiIcon(
   documentId: number,
@@ -530,11 +461,6 @@ export async function generateDocumentAiIcon(
     | undefined;
 
   const letterhead = clipDocumentLetterhead(detail.document.content);
-  const brandLogo = matchDocumentBrandLogo({
-    correspondent: detail.document.correspondent_name,
-    vendor: finance?.vendor ?? null,
-  });
-
   const category =
     typeof detail.summary?.category === "string"
       ? detail.summary.category
@@ -544,68 +470,36 @@ export async function generateDocumentAiIcon(
       ? detail.summary.short_summary
       : null;
 
+  const brandHint =
+    [detail.document.correspondent_name, finance?.vendor]
+      .filter((s): s is string => Boolean(s && String(s).trim()))
+      .join(" / ") || null;
+
+  const brandCues = await inferBrandVisualCuesFromThumb({
+    paperlessId: detail.document.paperless_id,
+    brandHint,
+  });
+
+  const prompt = buildDocumentAiIconPrompt({
+    title: detail.document.title,
+    category,
+    correspondent: detail.document.correspondent_name,
+    documentType: detail.document.document_type_name,
+    vendor: finance?.vendor ?? null,
+    product: warranty?.product_name ?? null,
+    shortSummary,
+    letterhead,
+    brandCues,
+  });
+
   const client = getOpenAIClient();
-  let prompt: string;
-  let b64: string | undefined;
-
-  if (brandLogo) {
-    const logoPath = resolveBrandLogoPath(brandLogo.filename);
-    if (!logoPath) {
-      throw new Error(`Markenlogo fehlt: ${brandLogo.filename}`);
-    }
-    prompt = buildBrandLogoReferenceIconPrompt({
-      brand: brandLogo,
-      title: detail.document.title,
-      category,
-      correspondent: detail.document.correspondent_name,
-      documentType: detail.document.document_type_name,
-      vendor: finance?.vendor ?? null,
-      shortSummary,
-    });
-    const image = await brandLogoAsPngFile(logoPath);
-    const result = await client.images.edit({
-      model: DOCUMENT_AI_ICON_MODEL,
-      image,
-      prompt,
-      size: "1024x1024",
-      quality: "low",
-      // low: treat asset as mood/palette cue, not a lock on the exact mark
-      input_fidelity: "low",
-      background: "opaque",
-    });
-    b64 = result.data?.[0]?.b64_json;
-  } else {
-    const brandHint =
-      [detail.document.correspondent_name, finance?.vendor]
-        .filter((s): s is string => Boolean(s && String(s).trim()))
-        .join(" / ") || null;
-
-    const brandCues = await inferBrandVisualCuesFromThumb({
-      paperlessId: detail.document.paperless_id,
-      brandHint,
-    });
-
-    prompt = buildDocumentAiIconPrompt({
-      title: detail.document.title,
-      category,
-      correspondent: detail.document.correspondent_name,
-      documentType: detail.document.document_type_name,
-      vendor: finance?.vendor ?? null,
-      product: warranty?.product_name ?? null,
-      shortSummary,
-      letterhead,
-      brandCues,
-    });
-
-    const result = await client.images.generate({
-      model: DOCUMENT_AI_ICON_MODEL,
-      prompt,
-      size: "1024x1024",
-      quality: "low",
-    });
-    b64 = result.data?.[0]?.b64_json;
-  }
-
+  const result = await client.images.generate({
+    model: DOCUMENT_AI_ICON_MODEL,
+    prompt,
+    size: "1024x1024",
+    quality: "low",
+  });
+  const b64 = result.data?.[0]?.b64_json;
   if (!b64) throw new Error("Bildgenerierung lieferte kein Bild.");
 
   const fullPath = await writeIconJpeg(
