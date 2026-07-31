@@ -267,6 +267,34 @@ export async function writebackAnalysisToPaperless(
     if (snapshot.category) {
       put(BUDDY_CUSTOM_FIELD_NAMES.buddyCategory, snapshot.category);
     }
+    // Boolean must allow false (clear UDF when not in Steuern).
+    {
+      const taxRelevant = snapshot.category === "Steuern";
+      const def = findCustomFieldDef(
+        fieldDefs,
+        BUDDY_CUSTOM_FIELD_NAMES.taxRelevant
+      );
+      if (!def) {
+        logs.push({
+          ...ctx,
+          status: "skipped",
+          kind: "custom_field",
+          fieldName: BUDDY_CUSTOM_FIELD_NAMES.taxRelevant,
+          fieldValue: taxRelevant,
+          message: "Custom Field fehlt in Paperless",
+        });
+      } else {
+        const coerced = coerceCustomFieldValue(def.data_type, taxRelevant);
+        customFields.push({ field: def.id, value: coerced });
+        logs.push({
+          ...ctx,
+          status: "ok",
+          kind: "custom_field",
+          fieldName: BUDDY_CUSTOM_FIELD_NAMES.taxRelevant,
+          fieldValue: coerced,
+        });
+      }
+    }
     put(BUDDY_CUSTOM_FIELD_NAMES.buddyStatus, resolveBuddyStatus(snapshot));
 
     const tagNames = ["buddy:analysiert"];
@@ -473,10 +501,27 @@ export async function writebackStatusFlagsToPaperless(input: {
   localDocumentId: number;
   buddyReviewed?: boolean;
   taxRelevant?: boolean;
+  /** When toggling Steuer relevant from Buddy-Status / Triage. Default true. */
+  applyLocalTaxCategory?: boolean;
+  taxYear?: number | null;
   buddyStatus?: string | null;
   bezahlt?: boolean;
   zuBezahlen?: boolean;
 }): Promise<{ ok: boolean; error?: string }> {
+  if (
+    input.taxRelevant !== undefined &&
+    input.applyLocalTaxCategory !== false
+  ) {
+    const { applyTaxRelevantLocal } = await import(
+      "@/lib/documents/tax-relevance"
+    );
+    applyTaxRelevantLocal({
+      documentId: input.localDocumentId,
+      taxRelevant: input.taxRelevant,
+      taxYear: input.taxYear,
+    });
+  }
+
   if (!isPaperlessWritebackEnabled()) return { ok: true };
   const client = createClientOrNull();
   if (!client) return { ok: false, error: "Paperless nicht konfiguriert" };
@@ -649,4 +694,168 @@ export async function writebackStatusFlagsToPaperless(input: {
     ]);
     return { ok: false, error: message };
   }
+}
+
+const TAX_RELEVANT_BACKFILL_DONE_KEY = "tax_relevant_udf_backfill_done";
+const TAX_RELEVANT_BACKFILL_AFTER_KEY = "tax_relevant_udf_backfill_after_id";
+
+/** Lightweight: only push «Steuer relevant» from local Steuern category. */
+export async function writebackTaxRelevantToPaperless(
+  localDocumentId: number
+): Promise<{ ok: boolean; error?: string; taxRelevant?: boolean }> {
+  if (!isPaperlessWritebackEnabled()) return { ok: true };
+  const client = createClientOrNull();
+  if (!client) return { ok: false, error: "Paperless nicht konfiguriert" };
+
+  try {
+    const db = getDb();
+    const row = db
+      .prepare(
+        `SELECT d.paperless_id, s.category
+         FROM paperless_documents d
+         JOIN document_summaries s ON s.document_id = d.id
+         WHERE d.id = ? AND s.analysis_status = 'completed'`
+      )
+      .get(localDocumentId) as
+      | { paperless_id: number; category: string | null }
+      | undefined;
+    if (!row) return { ok: false, error: "Dokument/Analyse nicht gefunden" };
+
+    const taxRelevant = row.category === "Steuern";
+    const fieldDefs = await client.listCustomFields();
+    const def = findCustomFieldDef(
+      fieldDefs,
+      BUDDY_CUSTOM_FIELD_NAMES.taxRelevant
+    );
+    if (!def) {
+      return { ok: false, error: "Custom Field «Steuer relevant» fehlt" };
+    }
+    const value = coerceCustomFieldValue(def.data_type, taxRelevant);
+    await client.setDocumentMetadata(row.paperless_id, {
+      customFields: [{ field: def.id, value }],
+    });
+    appendPaperlessFieldSyncLogs([
+      {
+        direction: "push",
+        source: "writeback_status",
+        status: "ok",
+        kind: "custom_field",
+        documentLocalId: localDocumentId,
+        paperlessId: row.paperless_id,
+        documentTitle: docTitle(localDocumentId),
+        fieldName: BUDDY_CUSTOM_FIELD_NAMES.taxRelevant,
+        fieldValue: value,
+      },
+    ]);
+    return { ok: true, taxRelevant };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: message };
+  }
+}
+
+export function isTaxRelevantUdfBackfillDone(): boolean {
+  return getSetting(TAX_RELEVANT_BACKFILL_DONE_KEY) === "1";
+}
+
+/**
+ * One-time: set Paperless «Steuer relevant» = ja for Steuern docs, = nein otherwise.
+ * Processes batches; call until `{ done: true }`.
+ */
+export async function continueTaxRelevantUdfBackfill(options?: {
+  limit?: number;
+}): Promise<{
+  done: boolean;
+  processed: number;
+  succeeded: number;
+  failed: number;
+  nextAfterId: number;
+}> {
+  if (isTaxRelevantUdfBackfillDone()) {
+    return {
+      done: true,
+      processed: 0,
+      succeeded: 0,
+      failed: 0,
+      nextAfterId: 0,
+    };
+  }
+  if (!isPaperlessWritebackEnabled()) {
+    return {
+      done: false,
+      processed: 0,
+      succeeded: 0,
+      failed: 0,
+      nextAfterId: Number(getSetting(TAX_RELEVANT_BACKFILL_AFTER_KEY) || 0),
+    };
+  }
+
+  const { listCompletedAnalysisDocumentIds } = await import(
+    "@/lib/db/queries"
+  );
+  const limit = Math.min(Math.max(options?.limit ?? 40, 1), 100);
+  const afterId = Math.max(
+    Number(getSetting(TAX_RELEVANT_BACKFILL_AFTER_KEY) || 0),
+    0
+  );
+  const ids = listCompletedAnalysisDocumentIds(limit, afterId);
+  let succeeded = 0;
+  let failed = 0;
+
+  for (const id of ids) {
+    const result = await writebackTaxRelevantToPaperless(id);
+    if (result.ok) succeeded += 1;
+    else failed += 1;
+  }
+
+  const nextAfterId = ids.length > 0 ? ids[ids.length - 1]! : afterId;
+  setSetting(TAX_RELEVANT_BACKFILL_AFTER_KEY, String(nextAfterId));
+
+  const done = ids.length < limit;
+  if (done) {
+    setSetting(TAX_RELEVANT_BACKFILL_DONE_KEY, "1");
+  }
+
+  return {
+    done,
+    processed: ids.length,
+    succeeded,
+    failed,
+    nextAfterId,
+  };
+}
+
+/** Drain remaining tax-relevant UDF backfill batches (best-effort). */
+export async function drainTaxRelevantUdfBackfill(options?: {
+  maxBatches?: number;
+  batchSize?: number;
+  onBatch?: (batch: {
+    done: boolean;
+    processed: number;
+    succeeded: number;
+    failed: number;
+  }) => void | Promise<void>;
+}): Promise<{
+  done: boolean;
+  processed: number;
+  succeeded: number;
+  failed: number;
+}> {
+  let processed = 0;
+  let succeeded = 0;
+  let failed = 0;
+  let done = isTaxRelevantUdfBackfillDone();
+  const maxBatches = options?.maxBatches ?? 200;
+  for (let i = 0; i < maxBatches && !done; i++) {
+    const batch = await continueTaxRelevantUdfBackfill({
+      limit: options?.batchSize ?? 40,
+    });
+    processed += batch.processed;
+    succeeded += batch.succeeded;
+    failed += batch.failed;
+    done = batch.done;
+    if (options?.onBatch) await options.onBatch(batch);
+    if (batch.processed === 0 && !done) break;
+  }
+  return { done, processed, succeeded, failed };
 }

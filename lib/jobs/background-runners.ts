@@ -433,6 +433,40 @@ export async function runPaperlessWritebackJob(
       };
     }
 
+    try {
+      const {
+        drainTaxRelevantUdfBackfill,
+        isTaxRelevantUdfBackfillDone,
+      } = await import("@/lib/paperless/writeback");
+      if (!isTaxRelevantUdfBackfillDone()) {
+        addJobRunItem({
+          runId: run.id,
+          itemKind: "phase",
+          status: "running",
+          title: "Steuer-relevant UDF",
+          message: "Befülle Paperless «Steuer relevant» aus Wissensrubrik",
+        });
+        const backfill = await drainTaxRelevantUdfBackfill({
+          maxBatches: 100,
+          batchSize: 40,
+          onBatch: async () => {
+            heartbeatJobRun(run.id);
+          },
+        });
+        addJobRunItem({
+          runId: run.id,
+          itemKind: "phase",
+          status: backfill.done ? "success" : "info",
+          title: "Steuer-relevant UDF",
+          message: `${backfill.succeeded} ok, ${backfill.failed} Fehler${
+            backfill.done ? " — fertig" : " — Fortsetzung folgt"
+          }`,
+        });
+      }
+    } catch {
+      /* optional one-time backfill */
+    }
+
     addJobRunItem({
       runId: run.id,
       itemKind: "phase",

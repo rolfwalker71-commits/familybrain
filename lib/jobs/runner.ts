@@ -480,6 +480,47 @@ export async function runSyncAnalyzeJob(
       "Indexiere neu analysierte Dokumente in Qdrant"
     );
 
+    // One-time: mirror Steuern category → Paperless «Steuer relevant» UDF.
+    try {
+      const {
+        drainTaxRelevantUdfBackfill,
+        isTaxRelevantUdfBackfillDone,
+      } = await import("@/lib/paperless/writeback");
+      if (!isTaxRelevantUdfBackfillDone()) {
+        addJobRunItem({
+          runId: run.id,
+          itemKind: "phase",
+          status: "running",
+          title: "Steuer-relevant UDF",
+          message: "Befülle Paperless «Steuer relevant» aus Wissensrubrik Steuern",
+        });
+        const backfill = await drainTaxRelevantUdfBackfill({
+          maxBatches: 50,
+          batchSize: 40,
+          onBatch: async () => {
+            heartbeatJobRun(run.id);
+          },
+        });
+        addJobRunItem({
+          runId: run.id,
+          itemKind: "phase",
+          status: backfill.done ? "success" : "info",
+          title: "Steuer-relevant UDF",
+          message: backfill.done
+            ? `${backfill.succeeded} gesetzt, ${backfill.failed} Fehler — fertig`
+            : `${backfill.succeeded} gesetzt, ${backfill.failed} Fehler — Fortsetzung beim nächsten Sync`,
+        });
+      }
+    } catch (error) {
+      addJobRunItem({
+        runId: run.id,
+        itemKind: "phase",
+        status: "error",
+        title: "Steuer-relevant UDF",
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+
     const incomplete = initialRun ? countIncompleteAnalyses() : 0;
     const hardFailure =
       (summary.syncErrors ?? 0) > 0 &&

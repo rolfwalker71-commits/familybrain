@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -153,6 +153,7 @@ export function DocumentDetailClient({ detail }: DetailProps) {
 function DocumentDetailInner({ detail }: DetailProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [, startTransition] = useTransition();
   const { document, tags, summary, recipients: initialRecipients } = detail;
   const [recipients, setRecipients] = useState(initialRecipients);
   const [familyOptions, setFamilyOptions] = useState<
@@ -422,6 +423,7 @@ function DocumentDetailInner({ detail }: DetailProps) {
       }
       if (next.taxRelevant !== undefined) {
         setTaxRelevant(next.taxRelevant);
+        startTransition(() => router.refresh());
       }
       if (next.bezahlt !== undefined) {
         setInvoicePaid(next.bezahlt);
@@ -824,7 +826,7 @@ function DocumentDetailInner({ detail }: DetailProps) {
                     <span>
                       <span className="font-medium">Steuer relevant</span>
                       <span className="mt-0.5 block text-xs text-muted-foreground">
-                        Für Jahres-/Steuerfilter in Paperless.
+                        Steuert Wissensrubrik Steuern und den Paperless-Filter.
                       </span>
                     </span>
                   </label>

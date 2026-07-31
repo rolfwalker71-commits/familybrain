@@ -32,7 +32,7 @@ export function updateDocumentTaxClassification(input: {
   bankName?: string | null;
   accountNumber?: string | null;
   taxYear?: number | null;
-}): { ok: boolean; error?: string } {
+}): { ok: boolean; error?: string; category?: string | null } {
   const db = getDb();
   const existing = db
     .prepare(
@@ -129,5 +129,31 @@ export function updateDocumentTaxClassification(input: {
     input.documentId
   );
 
-  return { ok: true };
+  const prevWasSteuern = existing.category === "Steuern";
+  const nowSteuern = category === "Steuern";
+  if (prevWasSteuern !== nowSteuern) {
+    queueTaxRelevantUdfWriteback(input.documentId, nowSteuern);
+  }
+
+  return { ok: true, category };
+}
+
+/**
+ * Fire-and-forget Paperless UDF sync after local Steuern category changes.
+ */
+export function queueTaxRelevantUdfWriteback(
+  documentId: number,
+  taxRelevant: boolean
+): void {
+  void import("@/lib/paperless/writeback")
+    .then(({ writebackStatusFlagsToPaperless }) =>
+      writebackStatusFlagsToPaperless({
+        localDocumentId: documentId,
+        taxRelevant,
+        applyLocalTaxCategory: false,
+      })
+    )
+    .catch(() => {
+      /* optional */
+    });
 }

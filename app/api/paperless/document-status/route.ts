@@ -90,7 +90,18 @@ export async function GET(request: Request) {
     raw = {};
   }
   const status = await resolveStatusFromRaw(raw);
-  return NextResponse.json(status);
+  const category =
+    typeof detail.summary?.category === "string"
+      ? detail.summary.category
+      : null;
+  // Prefer Paperless UDF; if unset, fall back to Buddy Steuern category.
+  const taxRelevant =
+    status.taxRelevant != null
+      ? status.taxRelevant
+      : category === "Steuern"
+        ? true
+        : status.taxRelevant;
+  return NextResponse.json({ ...status, taxRelevant });
 }
 
 export async function PATCH(request: Request) {

@@ -11,6 +11,7 @@ import {
   type TriageStatus,
 } from "@/lib/documents/triage-shared";
 import { isTriageAfterAnalysisEnabled } from "@/lib/documents/triage-settings";
+import { applyTaxRelevantLocal } from "@/lib/documents/tax-relevance";
 
 export type { TriageAction, TriageReason, TriageStatus };
 export { TRIAGE_REASON_LABELS, TRIAGE_STATUS_LABELS };
@@ -366,41 +367,30 @@ export async function resolveDocumentTriage(input: {
 
   function applyTaxDecision() {
     if (input.taxRelevant == null) return;
-    const summary = db
-      .prepare(
-        `SELECT id, category, also_categories FROM document_summaries WHERE document_id = ?`
-      )
-      .get(input.documentLocalId) as
-      | {
-          id: number;
-          category: string | null;
-          also_categories: string | null;
-        }
-      | undefined;
-    if (!summary) return;
-
-    if (input.taxRelevant === true) {
-      db.prepare(
-        `UPDATE document_summaries
-         SET category = 'Steuern', tax_year = ?, updated_at = ?
-         WHERE id = ?`
-      ).run(input.taxYear!, ts, summary.id);
-      return;
-    }
-
-    // Not tax-relevant: clear tax year; demote Steuern category
-    let nextCategory = summary.category;
-    if (summary.category === "Steuern") {
-      nextCategory = "Sonstiges";
-    }
-    db.prepare(
-      `UPDATE document_summaries
-       SET category = ?, tax_year = NULL, also_categories = NULL, updated_at = ?
-       WHERE id = ?`
-    ).run(nextCategory, ts, summary.id);
+    applyTaxRelevantLocal({
+      documentId: input.documentLocalId,
+      taxRelevant: input.taxRelevant,
+      taxYear: input.taxYear,
+    });
   }
 
   applyTaxDecision();
+
+  if (input.taxRelevant != null) {
+    try {
+      const { writebackStatusFlagsToPaperless } = await import(
+        "@/lib/paperless/writeback"
+      );
+      await writebackStatusFlagsToPaperless({
+        localDocumentId: input.documentLocalId,
+        taxRelevant: input.taxRelevant,
+        taxYear: input.taxYear,
+        applyLocalTaxCategory: false,
+      });
+    } catch {
+      /* optional UDF mirror */
+    }
+  }
 
   if (input.action === "pay") {
     db.prepare(
