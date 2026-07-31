@@ -80,7 +80,7 @@ export function resolveDocumentIdentityDate(
 }
 
 /**
- * Ensure short_summary carries Belegnummer/Datum; bank docs get (Kontonummer).
+ * Ensure short_summary carries Belegnummer/Datum; bank docs get (Kontonummer oder IBAN).
  */
 export function enrichAnalysisIdentity(
   analysis: DocumentAnalysis,

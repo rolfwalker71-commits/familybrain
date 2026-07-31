@@ -9,6 +9,7 @@ import type {
   KnowledgeFilterMember,
   KnowledgeYearGroup,
 } from "@/lib/knowledge/browse";
+import { KNOWLEDGE_AREAS } from "@/lib/extraction/categories";
 import { toSwissDate } from "@/lib/utils/dates";
 import { PageHeader } from "@/components/layout/page-primitives";
 import {
@@ -151,14 +152,17 @@ export function KnowledgeBrowseClient({
     });
   }
 
-  async function setTaxKind(docId: number, taxKind: "bank" | "normal") {
+  async function patchTaxClass(
+    docId: number,
+    body: Record<string, unknown>
+  ) {
     setClassBusyId(docId);
     setExportError(null);
     try {
       const res = await fetch(`/api/documents/${docId}/tax-class`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ taxKind, category: "Steuern" }),
+        body: JSON.stringify(body),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -170,6 +174,15 @@ export function KnowledgeBrowseClient({
     } finally {
       setClassBusyId(null);
     }
+  }
+
+  async function setTaxKind(docId: number, taxKind: "bank" | "normal") {
+    await patchTaxClass(docId, { taxKind, category: "Steuern" });
+  }
+
+  async function moveToCategory(docId: number, nextCategory: string) {
+    if (!nextCategory || nextCategory === "Steuern") return;
+    await patchTaxClass(docId, { category: nextCategory });
   }
 
   async function exportSelected() {
@@ -264,7 +277,7 @@ export function KnowledgeBrowseClient({
               </p>
             ) : null}
             {isSteuern ? (
-              <div className="flex flex-wrap gap-1.5 pt-1">
+              <div className="flex flex-wrap items-center gap-1.5 pt-1">
                 {doc.isBank ? (
                   <Button
                     type="button"
@@ -286,6 +299,31 @@ export function KnowledgeBrowseClient({
                     Als Bankbeleg
                   </Button>
                 )}
+                <label className="sr-only" htmlFor={`cat-${doc.id}`}>
+                  Rubrik wechseln
+                </label>
+                <select
+                  id={`cat-${doc.id}`}
+                  className="h-6 max-w-[11rem] rounded-md border border-border bg-background px-1.5 text-xs text-muted-foreground disabled:opacity-50"
+                  disabled={busy}
+                  defaultValue=""
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    e.target.value = "";
+                    if (next) void moveToCategory(doc.id, next);
+                  }}
+                >
+                  <option value="" disabled>
+                    Rubrik wechseln…
+                  </option>
+                  {KNOWLEDGE_AREAS.filter((a) => a.name !== "Steuern").map(
+                    (a) => (
+                      <option key={a.name} value={a.name}>
+                        {a.name}
+                      </option>
+                    )
+                  )}
+                </select>
               </div>
             ) : null}
           </div>
@@ -326,8 +364,9 @@ export function KnowledgeBrowseClient({
       {isSteuern ? (
         <p className="text-xs text-muted-foreground">
           Bankbelege erscheinen unter dem Familienmitglied nach Konto. Falsch
-          erkannte Belege kannst du mit «Als Bankbeleg» / «Als normalen
-          Steuerbeleg» umklassifizieren.
+          erkannte Bank-/Steuer-Zuordnung: «Als Bankbeleg» / «Als normalen
+          Steuerbeleg». Belege, die gar nicht nach Steuern gehören: Rubrik
+          wechseln.
         </p>
       ) : null}
 

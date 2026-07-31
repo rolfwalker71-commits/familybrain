@@ -117,7 +117,7 @@ export const DocumentAnalysisSchema = z.object({
   document_reference: z.string().nullable().optional(),
   /** Bank name for Kontoauszug / Zinsausweis etc. */
   bank_name: z.string().nullable().optional(),
-  /** Account number / IBAN as printed (for summary + Steuern grouping). */
+  /** Kontonummer preferred; IBAN if no local account number (summary + Steuern grouping). */
   account_number: z.string().nullable().optional(),
   short_summary: z.string().nullable(),
   detailed_summary: z.string().nullable(),

@@ -71,17 +71,17 @@ export function updateDocumentTaxClassification(input: {
   let isBank = existing.is_bank_document;
   if (input.taxKind === "bank") {
     isBank = 1;
-    if (!category || category === "Sonstiges" || category === "Finanzen") {
-      category = "Steuern";
-    }
-    if (category !== "Steuern") {
-      category = "Steuern";
-    }
+    category = "Steuern";
   } else if (input.taxKind === "normal") {
     isBank = 0;
     if (category !== "Steuern") category = "Steuern";
   } else if (input.taxKind === "auto") {
     isBank = null;
+  }
+
+  // Leaving Steuern: drop bank flag so the doc does not stay marked as Bankbeleg.
+  if (category && category !== "Steuern") {
+    isBank = 0;
   }
 
   let shortSummary = existing.short_summary?.trim() || "";
@@ -94,13 +94,15 @@ export function updateDocumentTaxClassification(input: {
       ? input.accountNumber?.trim() || null
       : existing.account_number;
 
-  if (
-    isBank === 1 &&
-    accountNumber &&
-    shortSummary &&
-    !shortSummary.includes(accountNumber)
-  ) {
-    shortSummary = `${shortSummary.replace(/\.\s*$/, "")} (${accountNumber}).`;
+  if (isBank === 1 && accountNumber && shortSummary) {
+    const compact = accountNumber.replace(/[\s._\-]/g, "");
+    const already =
+      shortSummary.includes(accountNumber) ||
+      (compact.length >= 4 &&
+        shortSummary.replace(/[\s._\-]/g, "").includes(compact));
+    if (!already) {
+      shortSummary = `${shortSummary.replace(/\.\s*$/, "")} (${accountNumber}).`;
+    }
   }
 
   const taxYear =
