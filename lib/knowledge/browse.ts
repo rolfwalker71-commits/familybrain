@@ -10,6 +10,11 @@ import {
   type DocumentRecipientInfo,
 } from "@/lib/family/recipients";
 import { looksLikeLohnabrechnung } from "@/lib/extraction/tax";
+import {
+  formatBankAccountHeading,
+  normalizeAccountKey,
+} from "@/lib/extraction/bank";
+import { resolveIsBankDocument } from "@/lib/documents/tax-classification";
 import type { KnowledgeAreaName } from "@/lib/extraction/categories";
 import { KNOWLEDGE_AREAS } from "@/lib/extraction/categories";
 
@@ -33,6 +38,16 @@ export type KnowledgeDocItem = {
   recipient_member_ids: string | null;
   recipient_status: string | null;
   recipients: DocumentRecipientInfo;
+  isBank: boolean;
+  bankName: string | null;
+  accountNumber: string | null;
+  isBankManual: boolean;
+};
+
+export type KnowledgeAccountGroup = {
+  accountKey: string;
+  label: string;
+  documents: KnowledgeDocItem[];
 };
 
 export type KnowledgeMemberGroup = {
@@ -41,13 +56,16 @@ export type KnowledgeMemberGroup = {
   label: string;
   avatarUrl: string | null;
   documents: KnowledgeDocItem[];
+  /** Steuern only: bank docs grouped by account */
+  bankAccountGroups: KnowledgeAccountGroup[];
+  /** Steuern only: non-bank tax docs */
+  otherDocuments: KnowledgeDocItem[];
 };
 
 export type KnowledgeYearGroup = {
   year: number | null;
   label: string;
   memberGroups: KnowledgeMemberGroup[];
-  /** Flat list for selection / export */
   documents: KnowledgeDocItem[];
 };
 
@@ -62,7 +80,6 @@ function isKnowledgeArea(name: string): name is KnowledgeAreaName {
   return KNOWLEDGE_AREAS.some((a) => a.name === name);
 }
 
-/** Move misclassified monthly payslips out of Steuern → Arbeit. */
 export function demoteLohnabrechnungenFromSteuern(): number {
   const db = getDb();
   const rows = db
@@ -97,9 +114,43 @@ export function demoteLohnabrechnungenFromSteuern(): number {
   return n;
 }
 
+function splitMemberDocs(
+  docs: KnowledgeDocItem[],
+  forSteuern: boolean
+): Pick<KnowledgeMemberGroup, "bankAccountGroups" | "otherDocuments"> {
+  if (!forSteuern) {
+    return { bankAccountGroups: [], otherDocuments: docs };
+  }
+  const bankDocs = docs.filter((d) => d.isBank);
+  const otherDocuments = docs.filter((d) => !d.isBank);
+  const byAccount = new Map<string, KnowledgeAccountGroup>();
+  for (const doc of bankDocs) {
+    const key =
+      normalizeAccountKey(doc.accountNumber) ||
+      (doc.bankName
+        ? `bank:${doc.bankName.trim().toLowerCase()}`
+        : "ohne-konto");
+    const label = formatBankAccountHeading({
+      bankName: doc.bankName || doc.correspondent_name,
+      accountNumber: doc.accountNumber,
+    });
+    const bucket = byAccount.get(key) || {
+      accountKey: key,
+      label,
+      documents: [],
+    };
+    bucket.documents.push(doc);
+    byAccount.set(key, bucket);
+  }
+  const bankAccountGroups = [...byAccount.values()].sort((a, b) =>
+    a.label.localeCompare(b.label, "de")
+  );
+  return { bankAccountGroups, otherDocuments };
+}
+
 /**
  * Knowledge documents grouped by year, then family member.
- * Steuern uses tax_year; other areas use created_date year.
+ * Steuern: under each member, bank docs by account + other tax docs.
  */
 export function listKnowledgeDocumentsGrouped(
   category: string
@@ -118,12 +169,14 @@ export function listKnowledgeDocumentsGrouped(
   const db = getDb();
   const members = listFamilyMembers({ activeOnly: true });
   const membersById = new Map(members.map((m) => [m.id, m]));
+  const forSteuern = category === "Steuern";
 
   const rows = db
     .prepare(
       `SELECT d.id, d.paperless_id, d.title, d.created_date, d.correspondent_name,
               d.document_type_name, d.ai_icon_path, d.recipient_member_ids,
-              d.recipient_status, s.tax_year, s.short_summary, s.detailed_summary
+              d.recipient_status, s.tax_year, s.short_summary, s.detailed_summary,
+              s.bank_name, s.account_number, s.is_bank_document
        FROM document_summaries s
        JOIN paperless_documents d ON d.id = s.document_id
        WHERE s.analysis_status = 'completed'
@@ -150,11 +203,14 @@ export function listKnowledgeDocumentsGrouped(
     tax_year: number | null;
     short_summary: string | null;
     detailed_summary: string | null;
+    bank_name: string | null;
+    account_number: string | null;
+    is_bank_document: number | null;
   }>;
 
   const docs: KnowledgeDocItem[] = [];
   for (const row of rows) {
-    if (category === "Steuern") {
+    if (forSteuern) {
       const text = [row.title, row.short_summary, row.detailed_summary]
         .filter(Boolean)
         .join("\n");
@@ -162,7 +218,7 @@ export function listKnowledgeDocumentsGrouped(
     }
 
     const year =
-      category === "Steuern"
+      forSteuern
         ? row.tax_year ?? yearFromCreatedDate(row.created_date)
         : yearFromCreatedDate(row.created_date);
 
@@ -170,6 +226,13 @@ export function listKnowledgeDocumentsGrouped(
       recipient_status: row.recipient_status,
       recipient_member_ids: row.recipient_member_ids,
       membersById,
+    });
+
+    const isBank = resolveIsBankDocument({
+      isBankDocument: row.is_bank_document,
+      title: row.title,
+      shortSummary: row.short_summary,
+      detailedSummary: row.detailed_summary,
     });
 
     docs.push({
@@ -186,6 +249,11 @@ export function listKnowledgeDocumentsGrouped(
       recipient_member_ids: row.recipient_member_ids,
       recipient_status: row.recipient_status,
       recipients,
+      isBank: forSteuern ? isBank : false,
+      bankName: row.bank_name,
+      accountNumber: row.account_number,
+      isBankManual:
+        row.is_bank_document === 0 || row.is_bank_document === 1,
     });
   }
 
@@ -233,22 +301,29 @@ export function listKnowledgeDocumentsGrouped(
         label,
         avatarUrl,
         documents: [],
+        bankAccountGroups: [],
+        otherDocuments: [],
       };
       bucket.documents.push(doc);
       memberBuckets.set(memberKey, bucket);
     }
 
-    const memberGroups = [...memberBuckets.values()].sort((a, b) => {
-      const rank = (g: KnowledgeMemberGroup) => {
-        if (g.memberKey === "none") return 9000;
-        if (g.memberKey === "multi") return 8000;
-        return membersById.get(g.memberId!)?.sort_key ?? 100;
-      };
-      const ra = rank(a);
-      const rb = rank(b);
-      if (ra !== rb) return ra - rb;
-      return a.label.localeCompare(b.label, "de");
-    });
+    const memberGroups = [...memberBuckets.values()]
+      .map((mg) => {
+        const split = splitMemberDocs(mg.documents, forSteuern);
+        return { ...mg, ...split };
+      })
+      .sort((a, b) => {
+        const rank = (g: KnowledgeMemberGroup) => {
+          if (g.memberKey === "none") return 9000;
+          if (g.memberKey === "multi") return 8000;
+          return membersById.get(g.memberId!)?.sort_key ?? 100;
+        };
+        const ra = rank(a);
+        const rb = rank(b);
+        if (ra !== rb) return ra - rb;
+        return a.label.localeCompare(b.label, "de");
+      });
 
     return {
       year,

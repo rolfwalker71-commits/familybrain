@@ -85,6 +85,17 @@ export function bootstrapDatabase(db: Database.Database): void {
   if (!summaryColNames.has("also_categories")) {
     db.exec(`ALTER TABLE document_summaries ADD COLUMN also_categories TEXT`);
   }
+  if (!summaryColNames.has("bank_name")) {
+    db.exec(`ALTER TABLE document_summaries ADD COLUMN bank_name TEXT`);
+  }
+  if (!summaryColNames.has("account_number")) {
+    db.exec(`ALTER TABLE document_summaries ADD COLUMN account_number TEXT`);
+  }
+  if (!summaryColNames.has("is_bank_document")) {
+    db.exec(
+      `ALTER TABLE document_summaries ADD COLUMN is_bank_document INTEGER`
+    );
+  }
   db.exec(
     `CREATE INDEX IF NOT EXISTS idx_summaries_tax_year
      ON document_summaries(category, tax_year)`

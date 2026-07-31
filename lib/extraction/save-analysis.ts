@@ -21,6 +21,7 @@ import {
   itineraryStopLabel,
 } from "@/lib/extraction/itinerary-labels";
 import { updateDocumentEmbeddingStatus } from "@/lib/db/queries";
+import { looksLikeBankDocument } from "@/lib/extraction/bank";
 import {
   looksLikeLohnabrechnung,
   looksLikeLohnausweis,
@@ -139,14 +140,24 @@ export function saveAnalysis(
   const ts = nowIso();
   const docMeta = db
     .prepare(
-      `SELECT title, content, created_date FROM paperless_documents WHERE id = ?`
+      `SELECT title, content, created_date, correspondent_name FROM paperless_documents WHERE id = ?`
     )
     .get(documentId) as
-    | { title: string | null; content: string | null; created_date: string | null }
+    | {
+        title: string | null;
+        content: string | null;
+        created_date: string | null;
+        correspondent_name: string | null;
+      }
     | undefined;
   const enriched = enrichAnalysisIdentity(
     enrichTravelWithItinerary(analysis, docMeta?.content ?? null),
-    { title: docMeta?.title, createdDate: docMeta?.created_date }
+    {
+      title: docMeta?.title,
+      createdDate: docMeta?.created_date,
+      correspondent: docMeta?.correspondent_name,
+      content: docMeta?.content,
+    }
   );
 
   let category = normalizeKnowledgeCategory(enriched.category);
@@ -162,6 +173,8 @@ export function saveAnalysis(
   // Monthly payslips → Arbeit, never Steuern (Lohnausweis is the tax certificate).
   if (looksLikeLohnabrechnung(taxText)) {
     category = "Arbeit";
+  } else if (looksLikeBankDocument(taxText)) {
+    category = "Steuern";
   } else if (
     category !== "Steuern" &&
     (looksLikeSwissTaxDocument(taxText) || looksLikeLohnausweis(taxText))
@@ -183,6 +196,19 @@ export function saveAnalysis(
   });
   const alsoCategoriesJson = serializeAlsoCategories(alsoCategories);
 
+  const prevBankFlag = db
+    .prepare(
+      `SELECT is_bank_document FROM document_summaries WHERE document_id = ?`
+    )
+    .get(documentId) as { is_bank_document: number | null } | undefined;
+  let isBankDocument: number | null =
+    prevBankFlag?.is_bank_document === 0 || prevBankFlag?.is_bank_document === 1
+      ? prevBankFlag.is_bank_document
+      : null;
+  if (isBankDocument == null && looksLikeBankDocument(taxText)) {
+    isBankDocument = 1;
+  }
+
   const tx = db.transaction(() => {
     if (expectedContentHash !== undefined) {
       const current = db
@@ -197,9 +223,10 @@ export function saveAnalysis(
       `INSERT INTO document_summaries (
         document_id, short_summary, detailed_summary, important_points, important_dates,
         amounts, line_items, deadlines, contract_parties, warranty_info, cancellation_terms,
-        category, tax_year, also_categories, possible_todos, confidence, model_name,
+        category, tax_year, also_categories, bank_name, account_number, is_bank_document,
+        possible_todos, confidence, model_name,
         analysis_status, analyzed_at, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', ?, ?, ?)
       ON CONFLICT(document_id) DO UPDATE SET
         short_summary = excluded.short_summary,
         detailed_summary = excluded.detailed_summary,
@@ -214,6 +241,9 @@ export function saveAnalysis(
         category = excluded.category,
         tax_year = excluded.tax_year,
         also_categories = excluded.also_categories,
+        bank_name = excluded.bank_name,
+        account_number = excluded.account_number,
+        is_bank_document = excluded.is_bank_document,
         possible_todos = excluded.possible_todos,
         confidence = excluded.confidence,
         model_name = excluded.model_name,
@@ -240,6 +270,9 @@ export function saveAnalysis(
       category,
       taxYear,
       alsoCategoriesJson,
+      enriched.bank_name ?? null,
+      enriched.account_number ?? null,
+      isBankDocument,
       JSON.stringify(enriched.possible_todos),
       enriched.confidence,
       modelName,

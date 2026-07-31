@@ -1,5 +1,10 @@
 import type { DocumentAnalysis } from "@/lib/ai/schemas";
 import { extractDocumentRefNumber } from "@/lib/documents/duplicates";
+import {
+  looksLikeBankDocument,
+  resolveAccountNumber,
+  resolveBankName,
+} from "@/lib/extraction/bank";
 
 function isoToSwiss(iso: string | null | undefined): string | null {
   if (!iso?.trim()) return null;
@@ -17,11 +22,16 @@ function textHasRef(text: string, ref: string): boolean {
 function textHasDateHint(text: string, swiss: string, iso: string): boolean {
   if (swiss && text.includes(swiss)) return true;
   if (iso && text.includes(iso)) return true;
-  // «März 2026» / month names — skip; only exact day matches
   return false;
 }
 
-/** Prefer AI field, then title / summary / suggested title. */
+function textHasAccount(text: string, account: string): boolean {
+  const compact = account.replace(/[\s._\-]/g, "");
+  if (!compact) return false;
+  if (text.includes(account)) return true;
+  return text.replace(/[\s._\-]/g, "").includes(compact);
+}
+
 export function resolveDocumentReference(
   analysis: DocumentAnalysis,
   title?: string | null
@@ -47,7 +57,6 @@ export function resolveDocumentReference(
   );
 }
 
-/** Prefer financial invoice_date, then labeled important date, then created. */
 export function resolveDocumentIdentityDate(
   analysis: DocumentAnalysis,
   createdDate?: string | null
@@ -71,16 +80,43 @@ export function resolveDocumentIdentityDate(
 }
 
 /**
- * Ensure short_summary (and suggested_title) carry Belegnummer + Belegdatum
- * so invoices stay distinguishable (duplicates, triage, search).
+ * Ensure short_summary carries Belegnummer/Datum; bank docs get (Kontonummer).
  */
 export function enrichAnalysisIdentity(
   analysis: DocumentAnalysis,
-  meta?: { title?: string | null; createdDate?: string | null }
+  meta?: {
+    title?: string | null;
+    createdDate?: string | null;
+    correspondent?: string | null;
+    content?: string | null;
+  }
 ): DocumentAnalysis {
   const ref = resolveDocumentReference(analysis, meta?.title);
   const isoDate = resolveDocumentIdentityDate(analysis, meta?.createdDate);
   const swissDate = isoToSwiss(isoDate);
+
+  const hay = [
+    meta?.title,
+    analysis.suggested_title,
+    analysis.short_summary,
+    analysis.detailed_summary,
+    meta?.content?.slice(0, 4000),
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const bankName = resolveBankName({
+    bankName: analysis.bank_name,
+    correspondent: meta?.correspondent,
+  });
+  const accountNumber = resolveAccountNumber({
+    accountNumber: analysis.account_number,
+    title: meta?.title || analysis.suggested_title,
+    shortSummary: analysis.short_summary,
+    content: meta?.content,
+  });
+  const isBank =
+    looksLikeBankDocument(hay) || Boolean(accountNumber && bankName);
 
   let short = (analysis.short_summary || "").trim();
   let title = (analysis.suggested_title || "").trim();
@@ -91,8 +127,19 @@ export function enrichAnalysisIdentity(
     short = `Beleg Nr. ${ref}.`;
   }
 
-  if (swissDate && isoDate && short && !textHasDateHint(short, swissDate, isoDate)) {
+  if (
+    swissDate &&
+    isoDate &&
+    short &&
+    !textHasDateHint(short, swissDate, isoDate)
+  ) {
     short = `${short.replace(/\.\s*$/, "")} · ${swissDate}.`;
+  }
+
+  if (isBank && accountNumber && short && !textHasAccount(short, accountNumber)) {
+    short = `${short.replace(/\.\s*$/, "")} (${accountNumber}).`;
+  } else if (isBank && accountNumber && !short) {
+    short = `Bankbeleg (${accountNumber}).`;
   }
 
   if (ref && title && !textHasRef(title, ref)) {
@@ -102,6 +149,8 @@ export function enrichAnalysisIdentity(
   return {
     ...analysis,
     document_reference: ref || analysis.document_reference || null,
+    bank_name: bankName || analysis.bank_name || null,
+    account_number: accountNumber || analysis.account_number || null,
     short_summary: short || analysis.short_summary,
     suggested_title: title || analysis.suggested_title,
   };

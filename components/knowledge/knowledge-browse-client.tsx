@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ChevronDown, Download } from "lucide-react";
 import type {
   KnowledgeDocItem,
@@ -24,6 +25,14 @@ import { UserAvatar } from "@/components/users/user-avatar";
 import { RecipientAvatars } from "@/components/family/recipient-avatars";
 import { cn } from "@/lib/utils";
 
+function filterMemberGroupDocs(
+  docs: KnowledgeDocItem[],
+  memberFilter: number | null
+): KnowledgeDocItem[] {
+  if (memberFilter == null) return docs;
+  return docs.filter((d) => d.recipients.memberIds.includes(memberFilter));
+}
+
 export function KnowledgeBrowseClient({
   category,
   description,
@@ -35,6 +44,8 @@ export function KnowledgeBrowseClient({
   groups: KnowledgeYearGroup[];
   filterMembers: KnowledgeFilterMember[];
 }) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
   const isSteuern = category === "Steuern";
   const latestYear = useMemo(() => {
     const years = groups
@@ -55,18 +66,31 @@ export function KnowledgeBrowseClient({
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [exportBusy, setExportBusy] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [classBusyId, setClassBusyId] = useState<number | null>(null);
 
   const filteredGroups = useMemo(() => {
-    if (memberFilter == null) return groups;
     return groups
       .map((year) => {
         const memberGroups = year.memberGroups
-          .map((mg) => ({
-            ...mg,
-            documents: mg.documents.filter((d) =>
-              d.recipients.memberIds.includes(memberFilter)
-            ),
-          }))
+          .map((mg) => {
+            const documents = filterMemberGroupDocs(mg.documents, memberFilter);
+            const bankAccountGroups = mg.bankAccountGroups
+              .map((ag) => ({
+                ...ag,
+                documents: filterMemberGroupDocs(ag.documents, memberFilter),
+              }))
+              .filter((ag) => ag.documents.length > 0);
+            const otherDocuments = filterMemberGroupDocs(
+              mg.otherDocuments,
+              memberFilter
+            );
+            return {
+              ...mg,
+              documents,
+              bankAccountGroups,
+              otherDocuments,
+            };
+          })
           .filter((mg) => mg.documents.length > 0);
         const documents = memberGroups.flatMap((mg) => mg.documents);
         return { ...year, memberGroups, documents };
@@ -127,6 +151,27 @@ export function KnowledgeBrowseClient({
     });
   }
 
+  async function setTaxKind(docId: number, taxKind: "bank" | "normal") {
+    setClassBusyId(docId);
+    setExportError(null);
+    try {
+      const res = await fetch(`/api/documents/${docId}/tax-class`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taxKind, category: "Steuern" }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || "Umklassifizierung fehlgeschlagen");
+      }
+      startTransition(() => router.refresh());
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setClassBusyId(null);
+    }
+  }
+
   async function exportSelected() {
     const documentIds = Array.from(selectedIds);
     if (documentIds.length === 0 || exportBusy || !isSteuern) return;
@@ -168,6 +213,7 @@ export function KnowledgeBrowseClient({
   }
 
   function renderDoc(doc: KnowledgeDocItem) {
+    const busy = classBusyId === doc.id || pending;
     return (
       <li key={doc.id} className="px-3 py-3 sm:px-4">
         <div className="flex min-w-0 items-start gap-3">
@@ -217,6 +263,31 @@ export function KnowledgeBrowseClient({
                 {doc.short_summary}
               </p>
             ) : null}
+            {isSteuern ? (
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {doc.isBank ? (
+                  <Button
+                    type="button"
+                    size="xs"
+                    variant="outline"
+                    disabled={busy}
+                    onClick={() => void setTaxKind(doc.id, "normal")}
+                  >
+                    Als normalen Steuerbeleg
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    size="xs"
+                    variant="outline"
+                    disabled={busy}
+                    onClick={() => void setTaxKind(doc.id, "bank")}
+                  >
+                    Als Bankbeleg
+                  </Button>
+                )}
+              </div>
+            ) : null}
           </div>
         </div>
       </li>
@@ -251,6 +322,14 @@ export function KnowledgeBrowseClient({
           Flache Liste
         </Link>
       </div>
+
+      {isSteuern ? (
+        <p className="text-xs text-muted-foreground">
+          Bankbelege erscheinen unter dem Familienmitglied nach Konto. Falsch
+          erkannte Belege kannst du mit «Als Bankbeleg» / «Als normalen
+          Steuerbeleg» umklassifizieren.
+        </p>
+      ) : null}
 
       {filterMembers.length > 0 ? (
         <div className="flex flex-wrap gap-2">
@@ -312,12 +391,11 @@ export function KnowledgeBrowseClient({
           >
             Auswahl leeren
           </Button>
-          {exportError ? (
-            <span className="w-full text-xs text-amber-700 dark:text-amber-400">
-              {exportError}
-            </span>
-          ) : null}
         </div>
+      ) : null}
+
+      {exportError ? (
+        <p className="text-xs text-amber-700 dark:text-amber-400">{exportError}</p>
       ) : null}
 
       {filteredGroups.length === 0 ? (
@@ -440,9 +518,50 @@ export function KnowledgeBrowseClient({
                             />
                           </button>
                           {memberOpen ? (
-                            <ul className="divide-y divide-border/50 border-t border-border/50 bg-card/60">
-                              {mg.documents.map(renderDoc)}
-                            </ul>
+                            <div className="space-y-2 border-t border-border/50 bg-card/60 p-2">
+                              {isSteuern && mg.bankAccountGroups.length > 0 ? (
+                                <div className="space-y-2">
+                                  <p className="px-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                    Bankbelege
+                                  </p>
+                                  {mg.bankAccountGroups.map((ag) => (
+                                    <section
+                                      key={ag.accountKey}
+                                      className="overflow-hidden rounded-lg border border-border/40"
+                                    >
+                                      <div className="bg-muted/30 px-3 py-1.5 text-sm font-medium">
+                                        {ag.label}
+                                        <span className="ml-2 text-xs font-normal text-muted-foreground">
+                                          {ag.documents.length}
+                                        </span>
+                                      </div>
+                                      <ul className="divide-y divide-border/50">
+                                        {ag.documents.map(renderDoc)}
+                                      </ul>
+                                    </section>
+                                  ))}
+                                </div>
+                              ) : null}
+                              {isSteuern && mg.otherDocuments.length > 0 ? (
+                                <div className="space-y-1">
+                                  {mg.bankAccountGroups.length > 0 ? (
+                                    <p className="px-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                      Weitere Steuerbelege
+                                    </p>
+                                  ) : null}
+                                  <ul className="divide-y divide-border/50 rounded-lg border border-border/40">
+                                    {mg.otherDocuments.map(renderDoc)}
+                                  </ul>
+                                </div>
+                              ) : null}
+                              {!isSteuern ||
+                              (mg.bankAccountGroups.length === 0 &&
+                                mg.otherDocuments.length === 0) ? (
+                                <ul className="divide-y divide-border/50 rounded-lg border border-border/40">
+                                  {mg.documents.map(renderDoc)}
+                                </ul>
+                              ) : null}
+                            </div>
                           ) : null}
                         </section>
                       );
