@@ -74,3 +74,46 @@ test("enrichAnalysisIdentity does not duplicate Nr.", () => {
     1
   );
 });
+
+test("enrichAnalysisIdentity prefers IBAN over period dates in Kontoauszug title", () => {
+  const title =
+    "Kontoauszug Raiffeisenbank Cham-Steinhausen 01.06.2026 - 30.06.2026";
+  const content = `Kontoinhaber Rolf Josef Walker
+IBAN CH78 8080 B002 2500 9227 7
+Kontoart / Währung Mitglieder Privatkonto / CHF
+Kontorubrik Steuern`;
+  const enriched = enrichAnalysisIdentity(
+    baseAnalysis({
+      category: "Steuern",
+      short_summary:
+        "Kontoauszug 01.06.2026–30.06.2026 von Raiffeisenbank Cham-Steinhausen.",
+      suggested_title: title,
+    }),
+    {
+      title,
+      content,
+      correspondent: "Raiffeisenbank Cham-Steinhausen",
+    }
+  );
+  assert.match(enriched.short_summary || "", /CH78\s*8080/i);
+  assert.doesNotMatch(enriched.account_number || "", /^01\.06\.2026$/);
+  assert.match(enriched.account_number || "", /CH78/i);
+});
+
+test("enrichAnalysisIdentity appends masked card number for Kreditkartenabrechnung", () => {
+  const enriched = enrichAnalysisIdentity(
+    baseAnalysis({
+      category: "Steuern",
+      short_summary: "Kreditkartenabrechnung Visa Juni 2026.",
+      suggested_title: "Kreditkartenabrechnung Visa 06.2026",
+    }),
+    {
+      title: "Kreditkartenabrechnung Visa 06.2026",
+      content:
+        "Kartennummer **** **** **** 4291\nAbrechnung Juni 2026\nBetrag CHF 120.00",
+      correspondent: "Visa",
+    }
+  );
+  assert.match(enriched.short_summary || "", /••••\s*4291/);
+  assert.equal(enriched.account_number, "•••• 4291");
+});

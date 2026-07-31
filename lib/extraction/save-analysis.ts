@@ -21,7 +21,7 @@ import {
   itineraryStopLabel,
 } from "@/lib/extraction/itinerary-labels";
 import { updateDocumentEmbeddingStatus } from "@/lib/db/queries";
-import { looksLikeBankDocument } from "@/lib/extraction/bank";
+import { looksLikeAccountStatement } from "@/lib/extraction/bank";
 import {
   looksLikeLohnabrechnung,
   looksLikeLohnausweis,
@@ -173,7 +173,7 @@ export function saveAnalysis(
   // Monthly payslips → Arbeit, never Steuern (Lohnausweis is the tax certificate).
   if (looksLikeLohnabrechnung(taxText)) {
     category = "Arbeit";
-  } else if (looksLikeBankDocument(taxText)) {
+  } else if (looksLikeAccountStatement(taxText)) {
     category = "Steuern";
   } else if (
     category !== "Steuern" &&
@@ -205,7 +205,7 @@ export function saveAnalysis(
     prevBankFlag?.is_bank_document === 0 || prevBankFlag?.is_bank_document === 1
       ? prevBankFlag.is_bank_document
       : null;
-  if (isBankDocument == null && looksLikeBankDocument(taxText)) {
+  if (isBankDocument == null && looksLikeAccountStatement(taxText)) {
     isBankDocument = 1;
   }
 

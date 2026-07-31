@@ -1,7 +1,7 @@
 import type { DocumentAnalysis } from "@/lib/ai/schemas";
 import { extractDocumentRefNumber } from "@/lib/documents/duplicates";
 import {
-  looksLikeBankDocument,
+  looksLikeAccountStatement,
   resolveAccountNumber,
   resolveBankName,
 } from "@/lib/extraction/bank";
@@ -80,7 +80,8 @@ export function resolveDocumentIdentityDate(
 }
 
 /**
- * Ensure short_summary carries Belegnummer/Datum; bank docs get (Kontonummer oder IBAN).
+ * Ensure short_summary carries Belegnummer/Datum;
+ * bank/card statements get (Kontonummer | Kartennummer | IBAN).
  */
 export function enrichAnalysisIdentity(
   analysis: DocumentAnalysis,
@@ -100,7 +101,7 @@ export function enrichAnalysisIdentity(
     analysis.suggested_title,
     analysis.short_summary,
     analysis.detailed_summary,
-    meta?.content?.slice(0, 4000),
+    meta?.content?.slice(0, 12000),
   ]
     .filter(Boolean)
     .join("\n");
@@ -115,8 +116,8 @@ export function enrichAnalysisIdentity(
     shortSummary: analysis.short_summary,
     content: meta?.content,
   });
-  const isBank =
-    looksLikeBankDocument(hay) || Boolean(accountNumber && bankName);
+  const isAccountStatement =
+    looksLikeAccountStatement(hay) || Boolean(accountNumber && bankName);
 
   let short = (analysis.short_summary || "").trim();
   let title = (analysis.suggested_title || "").trim();
@@ -136,10 +137,15 @@ export function enrichAnalysisIdentity(
     short = `${short.replace(/\.\s*$/, "")} · ${swissDate}.`;
   }
 
-  if (isBank && accountNumber && short && !textHasAccount(short, accountNumber)) {
+  if (
+    isAccountStatement &&
+    accountNumber &&
+    short &&
+    !textHasAccount(short, accountNumber)
+  ) {
     short = `${short.replace(/\.\s*$/, "")} (${accountNumber}).`;
-  } else if (isBank && accountNumber && !short) {
-    short = `Bankbeleg (${accountNumber}).`;
+  } else if (isAccountStatement && accountNumber && !short) {
+    short = `Kontobeleg (${accountNumber}).`;
   }
 
   if (ref && title && !textHasRef(title, ref)) {

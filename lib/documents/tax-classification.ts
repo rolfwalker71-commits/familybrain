@@ -1,7 +1,7 @@
 import { getDb } from "@/lib/db/client";
 import { nowIso } from "@/lib/utils/dates";
 import { KNOWLEDGE_AREAS } from "@/lib/extraction/categories";
-import { looksLikeBankDocument } from "@/lib/extraction/bank";
+import { looksLikeAccountStatement } from "@/lib/extraction/bank";
 
 export type TaxDocKind = "bank" | "normal" | "auto";
 
@@ -21,7 +21,7 @@ export function resolveIsBankDocument(input: {
   const text = [input.title, input.shortSummary, input.detailedSummary]
     .filter(Boolean)
     .join("\n");
-  return looksLikeBankDocument(text);
+  return looksLikeAccountStatement(text);
 }
 
 export function updateDocumentTaxClassification(input: {
