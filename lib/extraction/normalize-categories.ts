@@ -346,6 +346,17 @@ export function normalizeKnowledgeCategory(
   // Lohnausweis / salary certificate for Swiss tax return → Steuern (also_categories handles Arbeit)
   if (includesAny(key, ["lohnausweis", "lohnmeldeschein", "salary statement"]))
     return "Steuern";
+  // Monthly payslip → Arbeit (not Steuern)
+  if (
+    includesAny(key, [
+      "lohnabrechnung",
+      "verdienstabrechnung",
+      "gehaltsabrechnung",
+      "payslip",
+      "lohnblatt",
+    ])
+  )
+    return "Arbeit";
   if (includesAny(key, ["steuer", "tax", "veranlag"])) return "Steuern";
   if (includesAny(key, ["reise", "travel", "flug", "hotel", "cruise"]))
     return "Reisen";

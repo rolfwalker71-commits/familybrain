@@ -35,7 +35,7 @@ import {
   listFamilyMembers,
   UNKNOWN_RECIPIENT_LABEL,
 } from "@/lib/family/queries";
-import { resolveTaxYear } from "@/lib/extraction/tax";
+import { looksLikeLohnabrechnung, resolveTaxYear } from "@/lib/extraction/tax";
 
 function aiIconPublicUrl(aiIconPath: string | null | undefined): string | null {
   if (!aiIconPath) return null;
@@ -1982,6 +1982,8 @@ export function listSteuernDocumentsByYear(): TaxYearGroup[] {
 
   const byYear = new Map<number | null, TaxDocumentListItem[]>();
   for (const row of rows) {
+    const text = [row.title, row.short_summary].filter(Boolean).join("\n");
+    if (looksLikeLohnabrechnung(text)) continue;
     const key = row.tax_year ?? null;
     const list = byYear.get(key) || [];
     list.push({

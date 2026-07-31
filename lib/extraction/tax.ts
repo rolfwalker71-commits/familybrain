@@ -15,6 +15,17 @@ export function looksLikeLohnausweis(text: string): boolean {
   );
 }
 
+/**
+ * Monthly payslip / Lohnabrechnung — belongs under Arbeit, not Steuern.
+ * Must not match Jahres-Lohnausweis.
+ */
+export function looksLikeLohnabrechnung(text: string): boolean {
+  if (looksLikeLohnausweis(text)) return false;
+  return /lohnabrechnung|lohnabrechnungen|verdienstabrechnung|gehaltsabrechnung|sal[aä]rabrechnung|payslip|salary\s*slip|lohnblatt/i.test(
+    text
+  );
+}
+
 export function yearsFromText(raw: string | null | undefined): number[] {
   if (!raw) return [];
   const years: number[] = [];

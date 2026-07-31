@@ -316,35 +316,74 @@ export function ActionInbox() {
                 <ul className="space-y-1.5">
                   {data.overdueDeadlines.map((row) => (
                     <li key={row.id}>
-                      <Link
-                        href={`/documents/${row.document_local_id}`}
-                        className="flex items-start gap-2.5 rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-sm hover:bg-muted/40"
-                      >
-                        <DocumentAiIcon
-                          aiIconUrl={row.ai_icon_url}
-                          category={row.category}
-                          size="xs"
-                        />
-                        <span className="min-w-0">
-                          <span className="font-medium">{row.title}</span>
-                          <span className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-xs text-muted-foreground">
-                            <RecipientAvatars recipients={row.recipients} />
-                            <span
-                              className={dueUrgencyTextClass(
-                                dueUrgency(row.deadline_date)
-                              )}
-                            >
-                              {formatDueRelative(row.deadline_date)}
+                      <div className="flex items-start gap-2 rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-sm">
+                        <Link
+                          href={`/documents/${row.document_local_id}`}
+                          className="flex min-w-0 flex-1 items-start gap-2.5 hover:opacity-90"
+                        >
+                          <DocumentAiIcon
+                            aiIconUrl={row.ai_icon_url}
+                            category={row.category}
+                            size="xs"
+                          />
+                          <span className="min-w-0">
+                            <span className="font-medium">{row.title}</span>
+                            <span className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-xs text-muted-foreground">
+                              <RecipientAvatars recipients={row.recipients} />
+                              <span
+                                className={dueUrgencyTextClass(
+                                  dueUrgency(row.deadline_date)
+                                )}
+                              >
+                                {formatDueRelative(row.deadline_date)}
+                              </span>
+                              <Badge
+                                variant="secondary"
+                                className="bg-red-100 text-[10px] text-red-800"
+                              >
+                                Überfällig
+                              </Badge>
                             </span>
-                            <Badge
-                              variant="secondary"
-                              className="bg-red-100 text-[10px] text-red-800"
-                            >
-                              Überfällig
-                            </Badge>
                           </span>
-                        </span>
-                      </Link>
+                        </Link>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="shrink-0"
+                          onClick={() =>
+                            void (async () => {
+                              try {
+                                const res = await fetch("/api/deadlines", {
+                                  method: "PATCH",
+                                  headers: {
+                                    "Content-Type": "application/json",
+                                  },
+                                  body: JSON.stringify({
+                                    id: row.id,
+                                    status: "completed",
+                                  }),
+                                });
+                                if (!res.ok) {
+                                  const data = await res.json().catch(() => ({}));
+                                  throw new Error(
+                                    data.error || "Speichern fehlgeschlagen"
+                                  );
+                                }
+                                window.dispatchEvent(
+                                  new Event("buddy:inbox")
+                                );
+                                await load();
+                              } catch (err) {
+                                console.error(err);
+                              }
+                            })()
+                          }
+                        >
+                          <Check className="size-3.5" />
+                          Erledigt
+                        </Button>
+                      </div>
                     </li>
                   ))}
                 </ul>

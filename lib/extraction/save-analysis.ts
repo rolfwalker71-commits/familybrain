@@ -22,6 +22,7 @@ import {
 } from "@/lib/extraction/itinerary-labels";
 import { updateDocumentEmbeddingStatus } from "@/lib/db/queries";
 import {
+  looksLikeLohnabrechnung,
   looksLikeLohnausweis,
   looksLikeSwissTaxDocument,
   resolveAlsoCategories,
@@ -158,7 +159,10 @@ export function saveAnalysis(
   ]
     .filter(Boolean)
     .join("\n");
-  if (
+  // Monthly payslips → Arbeit, never Steuern (Lohnausweis is the tax certificate).
+  if (looksLikeLohnabrechnung(taxText)) {
+    category = "Arbeit";
+  } else if (
     category !== "Steuern" &&
     (looksLikeSwissTaxDocument(taxText) || looksLikeLohnausweis(taxText))
   ) {

@@ -1,9 +1,8 @@
-import { listSteuernDocumentsByYear } from "@/lib/db/queries";
-import { SteuernYearClient } from "@/components/knowledge/steuern-year-client";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
-export default function KnowledgeSteuernPage() {
-  const groups = listSteuernDocumentsByYear();
-  return <SteuernYearClient groups={groups} />;
+/** Legacy URL → generic Wissen browse. */
+export default function KnowledgeSteuernRedirectPage() {
+  redirect("/knowledge/Steuern");
 }
