@@ -79,15 +79,16 @@ test("enrichAnalysisIdentity prefers IBAN over period dates in Kontoauszug title
   const title =
     "Kontoauszug Raiffeisenbank Cham-Steinhausen 01.06.2026 - 30.06.2026";
   const content = `Kontoinhaber Rolf Josef Walker
-IBAN CH78 8080 B002 2500 9227 7
+IBAN CH78 8080 8002 2500 9227 7
 Kontoart / Währung Mitglieder Privatkonto / CHF
 Kontorubrik Steuern`;
   const enriched = enrichAnalysisIdentity(
     baseAnalysis({
       category: "Steuern",
       short_summary:
-        "Kontoauszug 01.06.2026–30.06.2026 von Raiffeisenbank Cham-Steinhausen.",
+        "Kontoauszug für den Zeitraum vom 01.06.2026 bis 30.06.2026 mit verschiedenen Buchungen und einem Endsaldo von 14'620.85 CHF.",
       suggested_title: title,
+      account_number: "Mitglieder Privatkonto",
     }),
     {
       title,
@@ -95,9 +96,11 @@ Kontorubrik Steuern`;
       correspondent: "Raiffeisenbank Cham-Steinhausen",
     }
   );
-  assert.match(enriched.short_summary || "", /CH78\s*8080/i);
+  assert.match(enriched.short_summary || "", /CH78\s*8080\s*8002/i);
   assert.doesNotMatch(enriched.account_number || "", /^01\.06\.2026$/);
   assert.match(enriched.account_number || "", /CH78/i);
+  assert.equal(enriched.bank_name, "Raiffeisen");
+  assert.match(enriched.suggested_title || "", /^Kontoauszug Raiffeisen/);
 });
 
 test("enrichAnalysisIdentity appends masked card number for Kreditkartenabrechnung", () => {

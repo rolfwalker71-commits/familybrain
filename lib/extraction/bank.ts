@@ -120,18 +120,25 @@ function haystack(input: {
   shortSummary?: string | null;
   content?: string | null;
 }): string {
-  return [input.title, input.shortSummary, (input.content || "").slice(0, 12000)]
-    .filter(Boolean)
-    .join("\n");
+  return normalizeOcrText(
+    [input.title, input.shortSummary, (input.content || "").slice(0, 12000)]
+      .filter(Boolean)
+      .join("\n")
+  );
 }
 
 function isPlausibleLocalAccount(cand: string): boolean {
   if (!cand || looksLikeIban(cand) || looksLikeDateToken(cand)) return false;
   const digits = cand.replace(/\D/g, "");
+  // Need a real digit run — reject prose like «Mitglieder Privatkonto».
+  if (digits.length < 4) return false;
   if (digits.length < 6 && !/[A-Za-z*]/.test(cand)) return false;
   if (/^(19|20)\d{2}$/.test(digits)) return false;
   // Pure amounts / years
   if (/^\d{1,5}([.,]\d{2})?$/.test(cand.trim())) return false;
+  // Too many letters → product/account-type label, not a number
+  const letters = (cand.match(/[A-Za-zÄÖÜäöü]/g) || []).length;
+  if (letters >= 8 && digits.length < 6) return false;
   return true;
 }
 
@@ -148,6 +155,19 @@ function sanitizeAiAccount(
     return formatCardDisplay(t);
   }
   return null;
+}
+
+/** Collapse long branch names in titles/summaries (e.g. Raiffeisenbank Cham-Steinhausen → Raiffeisen). */
+export function shortenInstitutionName(text: string): string {
+  return (text || "")
+    .replace(/Raiffeisenbank\s+Cham[-\s]?Steinhausen/gi, "Raiffeisen")
+    .replace(/Raiffeisenbank(?:\s+[A-Za-zÄÖÜäöüéèê.\-]+)+/gi, "Raiffeisen")
+    .replace(/\bRaiffeisenbank\b/gi, "Raiffeisen");
+}
+
+/** Normalize OCR quirks (nbsp etc.) before IBAN / account regexes. */
+function normalizeOcrText(text: string): string {
+  return (text || "").replace(/[\u00A0\u202F\u2007\u2008\u2009\u200A]/g, " ");
 }
 
 /** First labeled Kontonummer in text. */
@@ -215,6 +235,7 @@ export function extractCardNumber(text: string): string | null {
 
 /**
  * Prefer Kontonummer; else card number; else IBAN.
+ * OCR beats AI prose (AI often invents «Mitglieder Privatkonto» as account_number).
  * Stored in account_number and appended to short_summary as «(…)».
  */
 export function resolveAccountNumber(input: {
@@ -223,9 +244,6 @@ export function resolveAccountNumber(input: {
   shortSummary?: string | null;
   content?: string | null;
 }): string | null {
-  const fromAi = sanitizeAiAccount(input.accountNumber);
-  if (fromAi) return fromAi;
-
   const hay = haystack(input);
   const labeled = extractLabeledAccountNumber(hay);
   if (labeled) return labeled;
@@ -236,7 +254,10 @@ export function resolveAccountNumber(input: {
   const card = extractCardNumber(hay);
   if (card) return card;
 
-  return extractIban(hay);
+  const iban = extractIban(hay);
+  if (iban) return iban;
+
+  return sanitizeAiAccount(input.accountNumber);
 }
 
 export function resolveBankName(input: {
@@ -244,7 +265,7 @@ export function resolveBankName(input: {
   correspondent?: string | null;
 }): string | null {
   const fromAi = input.bankName?.trim();
-  if (fromAi) return fromAi;
+  if (fromAi) return shortenInstitutionName(fromAi);
   const corr = input.correspondent?.trim();
   if (
     corr &&
@@ -252,7 +273,7 @@ export function resolveBankName(input: {
       corr
     )
   ) {
-    return corr;
+    return shortenInstitutionName(corr);
   }
   return null;
 }

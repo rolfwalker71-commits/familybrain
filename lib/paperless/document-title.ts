@@ -1,5 +1,6 @@
 import { getDb } from "@/lib/db/client";
 import type { DocumentAnalysis } from "@/lib/ai/schemas";
+import { shortenInstitutionName } from "@/lib/extraction/bank";
 import { nowIso } from "@/lib/utils/dates";
 
 /** Normalize AI-suggested Paperless titles. */
@@ -7,7 +8,7 @@ export function clipSuggestedDocumentTitle(
   raw: string | null | undefined,
   max = 160
 ): string | null {
-  const t = (raw || "").replace(/\s+/g, " ").trim();
+  const t = shortenInstitutionName((raw || "").replace(/\s+/g, " ").trim());
   if (t.length < 3) return null;
   return t.length > max ? `${t.slice(0, max - 1)}…` : t;
 }

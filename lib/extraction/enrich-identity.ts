@@ -4,6 +4,7 @@ import {
   looksLikeAccountStatement,
   resolveAccountNumber,
   resolveBankName,
+  shortenInstitutionName,
 } from "@/lib/extraction/bank";
 
 function isoToSwiss(iso: string | null | undefined): string | null {
@@ -119,8 +120,11 @@ export function enrichAnalysisIdentity(
   const isAccountStatement =
     looksLikeAccountStatement(hay) || Boolean(accountNumber && bankName);
 
-  let short = (analysis.short_summary || "").trim();
-  let title = (analysis.suggested_title || "").trim();
+  let short = shortenInstitutionName((analysis.short_summary || "").trim());
+  let title = shortenInstitutionName((analysis.suggested_title || "").trim());
+  const detailed = analysis.detailed_summary
+    ? shortenInstitutionName(analysis.detailed_summary)
+    : analysis.detailed_summary;
 
   if (ref && short && !textHasRef(short, ref)) {
     short = `${short.replace(/\.\s*$/, "")} · Nr. ${ref}.`;
@@ -158,6 +162,7 @@ export function enrichAnalysisIdentity(
     bank_name: bankName || analysis.bank_name || null,
     account_number: accountNumber || analysis.account_number || null,
     short_summary: short || analysis.short_summary,
+    detailed_summary: detailed,
     suggested_title: title || analysis.suggested_title,
   };
 }

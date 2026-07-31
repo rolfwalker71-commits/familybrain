@@ -6,6 +6,7 @@ import {
   extractCardNumber,
   resolveAccountNumber,
   looksLikeDateToken,
+  shortenInstitutionName,
 } from "./bank.ts";
 
 test("extractLocalAccountNumber ignores statement period dates", () => {
@@ -42,5 +43,27 @@ test("extractCardNumber finds masked card", () => {
   assert.equal(
     extractCardNumber("Kartennummer **** **** **** 4291"),
     "•••• 4291"
+  );
+});
+
+test("resolveAccountNumber ignores AI prose and uses IBAN from OCR", () => {
+  const resolved = resolveAccountNumber({
+    accountNumber: "Mitglieder Privatkonto",
+    title: "Kontoauszug Raiffeisenbank Cham-Steinhausen 01.06.2026 - 30.06.2026",
+    shortSummary:
+      "Kontoauszug für den Zeitraum vom 01.06.2026 bis 30.06.2026 mit verschiedenen Buchungen und einem Endsaldo von 14'620.85 CHF.",
+    content: `Kontoinhaber Rolf Josef Walker
+IBAN CH78 8080 8002 2500 9227 7
+Kontoart / Währung Mitglieder Privatkonto / CHF`,
+  });
+  assert.match(resolved || "", /CH78\s*8080\s*8002/);
+});
+
+test("shortenInstitutionName collapses Raiffeisen branch names", () => {
+  assert.equal(
+    shortenInstitutionName(
+      "Kontoauszug Raiffeisenbank Cham-Steinhausen Juni 2026"
+    ),
+    "Kontoauszug Raiffeisen Juni 2026"
   );
 });
