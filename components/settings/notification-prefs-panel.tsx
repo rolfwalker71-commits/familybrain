@@ -6,6 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { NotifyReason } from "@/lib/realtime/hub";
 import {
+  desktopNotificationsSupported,
+  getDesktopNotificationPermission,
+  requestDesktopNotificationPermission,
+} from "@/lib/realtime/desktop-notify";
+import {
   mergeNotificationPrefs,
   type UserNotificationPrefs,
 } from "@/lib/realtime/prefs-client";
@@ -35,8 +40,12 @@ export function NotificationPrefsPanel() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [desktopPermission, setDesktopPermission] = useState<
+    NotificationPermission | "unsupported"
+  >("default");
 
   useEffect(() => {
+    setDesktopPermission(getDesktopNotificationPermission());
     void (async () => {
       try {
         const res = await fetch("/api/me/notification-prefs");
@@ -129,9 +138,10 @@ export function NotificationPrefsPanel() {
   return (
     <div className="space-y-4">
       <p className="text-xs text-muted-foreground">
-        Live-Toasts erscheinen in der App und in der installierten PWA,{" "}
-        <strong>solange die App geöffnet</strong> ist. Hintergrund-Push (App
-        zu) folgt später. Pro Benutzer speicherbar.
+        Live-Toasts erscheinen in der App, solange ein Tab geöffnet ist.
+        Desktop-Benachrichtigungen (Windows) kommen dazu, wenn der Tab im
+        Hintergrund liegt. Push bei komplett geschlossener App folgt später.
+        Pro Benutzer speicherbar.
       </p>
 
       <div className="flex items-start gap-3 rounded-xl border border-border/60 bg-muted/30 px-3 py-3">
@@ -174,6 +184,72 @@ export function NotificationPrefsPanel() {
           </p>
         </div>
       </div>
+
+      {desktopNotificationsSupported() ? (
+        <div className="space-y-3 rounded-xl border border-border/60 bg-muted/30 px-3 py-3">
+          <div className="flex items-start gap-3">
+            <input
+              id="notifDesktop"
+              type="checkbox"
+              className="mt-1 size-4 accent-[var(--brand-docs)]"
+              checked={prefs.desktopEnabled}
+              disabled={!prefs.enabled || desktopPermission === "denied"}
+              onChange={(e) =>
+                setPrefs((p) => ({ ...p, desktopEnabled: e.target.checked }))
+              }
+            />
+            <div className="min-w-0 space-y-1">
+              <Label htmlFor="notifDesktop" className="cursor-pointer">
+                Desktop-Benachrichtigungen (Windows)
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Windows-/Browser-Toast, wenn Buddy im Hintergrund-Tab läuft.
+                Der Tab muss geöffnet bleiben (nicht komplett schliessen).
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Browser-Erlaubnis:{" "}
+                <strong>
+                  {desktopPermission === "granted"
+                    ? "erteilt"
+                    : desktopPermission === "denied"
+                      ? "blockiert — in den Browser-Einstellungen für diese Seite erlauben"
+                      : "noch nicht erteilt"}
+                </strong>
+              </p>
+            </div>
+          </div>
+          {desktopPermission !== "granted" && desktopPermission !== "denied" ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={!prefs.enabled || saving}
+              onClick={() => {
+                void (async () => {
+                  const perm = await requestDesktopNotificationPermission();
+                  setDesktopPermission(perm);
+                  if (perm === "granted") {
+                    setPrefs((p) => ({ ...p, desktopEnabled: true }));
+                    setMessage(
+                      "Desktop-Benachrichtigungen erlaubt. Speichern nicht vergessen."
+                    );
+                  } else if (perm === "denied") {
+                    setError(
+                      "Desktop-Benachrichtigungen wurden vom Browser blockiert."
+                    );
+                  }
+                })();
+              }}
+            >
+              Desktop-Benachrichtigungen erlauben
+            </Button>
+          ) : null}
+        </div>
+      ) : (
+        <p className="text-xs text-muted-foreground">
+          Dieser Browser unterstützt keine Desktop-Benachrichtigungen.
+        </p>
+      )}
 
       <div className="flex flex-wrap items-center gap-2">
         <Label htmlFor="notifDuration" className="text-xs text-muted-foreground">

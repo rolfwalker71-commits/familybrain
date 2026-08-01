@@ -22,6 +22,7 @@ export const dynamic = "force-dynamic";
 const PutSchema = z.object({
   enabled: z.boolean().optional(),
   soundEnabled: z.boolean().optional(),
+  desktopEnabled: z.boolean().optional(),
   durationSec: z.number().int().min(3).max(60).optional(),
   events: z.record(z.string(), z.boolean()).optional(),
   tripIds: z.array(z.number().int().positive()).nullable().optional(),
@@ -116,6 +117,7 @@ export async function PUT(request: Request) {
   const next = mergeNotificationPrefs({
     enabled: parsed.data.enabled ?? current.enabled,
     soundEnabled: parsed.data.soundEnabled ?? current.soundEnabled,
+    desktopEnabled: parsed.data.desktopEnabled ?? current.desktopEnabled,
     durationSec: parsed.data.durationSec ?? current.durationSec,
     events,
     tripIds:

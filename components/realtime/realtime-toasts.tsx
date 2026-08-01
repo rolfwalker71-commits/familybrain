@@ -5,6 +5,7 @@ import Link from "next/link";
 import { BellOff, X } from "lucide-react";
 import { DocumentAiIcon } from "@/components/documents/document-ai-icon";
 import type { AppNotifyPayload, NotifyReason } from "@/lib/realtime/hub";
+import { showDesktopNotification } from "@/lib/realtime/desktop-notify";
 import {
   isReasonEnabled,
   mergeNotificationPrefs,
@@ -103,6 +104,14 @@ export function RealtimeToasts() {
       const id = `${notification.reason}-${at}-${Math.random().toString(36).slice(2, 7)}`;
       setToasts((prev) => [{ id, notification, at }, ...prev].slice(0, 4));
       if (p.soundEnabled) playBling();
+      // Windows / OS notification when Buddy tab is open but in the background
+      if (
+        p.desktopEnabled &&
+        typeof document !== "undefined" &&
+        document.visibilityState === "hidden"
+      ) {
+        showDesktopNotification(notification);
+      }
       const ms = Math.max(3, p.durationSec) * 1000;
       const timer = window.setTimeout(() => dismiss(id), ms);
       timersRef.current.set(id, timer);

@@ -72,6 +72,8 @@ export const NOTIFY_REASON_DOMAIN: Record<
 export type UserNotificationPrefs = {
   enabled: boolean;
   soundEnabled: boolean;
+  /** OS/Windows desktop notifications when the Buddy tab is in the background. */
+  desktopEnabled: boolean;
   durationSec: number;
   /** Missing keys inherit default true */
   events: Partial<Record<NotifyReason, boolean>>;
@@ -97,6 +99,7 @@ export function defaultNotificationPrefs(): UserNotificationPrefs {
   return {
     enabled: true,
     soundEnabled: true,
+    desktopEnabled: true,
     durationSec: LIVE_NOTIFICATIONS_DEFAULT_DURATION_SEC,
     events,
     tripIds: null,
@@ -137,6 +140,7 @@ export function mergeNotificationPrefs(
   return {
     enabled: partial.enabled ?? base.enabled,
     soundEnabled: partial.soundEnabled ?? base.soundEnabled,
+    desktopEnabled: partial.desktopEnabled ?? base.desktopEnabled,
     durationSec: clampDuration(
       partial.durationSec ?? base.durationSec
     ),

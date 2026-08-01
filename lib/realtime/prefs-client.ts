@@ -8,6 +8,7 @@ import type { NotifyReason } from "@/lib/realtime/hub";
 export type UserNotificationPrefs = {
   enabled: boolean;
   soundEnabled: boolean;
+  desktopEnabled: boolean;
   durationSec: number;
   events: Partial<Record<NotifyReason, boolean>>;
   tripIds: number[] | null;
@@ -42,6 +43,7 @@ export function mergeNotificationPrefs(
   const base: UserNotificationPrefs = {
     enabled: true,
     soundEnabled: true,
+    desktopEnabled: true,
     durationSec: 9,
     events,
     tripIds: null,
@@ -51,6 +53,7 @@ export function mergeNotificationPrefs(
   return {
     enabled: partial.enabled ?? base.enabled,
     soundEnabled: partial.soundEnabled ?? base.soundEnabled,
+    desktopEnabled: partial.desktopEnabled ?? base.desktopEnabled,
     durationSec: partial.durationSec ?? base.durationSec,
     events: { ...base.events, ...partial.events },
     tripIds: partial.tripIds === undefined ? base.tripIds : partial.tripIds,
