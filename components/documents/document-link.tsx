@@ -63,15 +63,12 @@ export function DocumentTitleLink({
   iconSize = "xs",
 }: DocumentTitleLinkProps) {
   const text = title?.trim() || fallback || `Dokument #${documentId}`;
+  const linkClass = cn(
+    "block min-w-0 max-w-full wrap-break-word font-medium text-foreground underline-offset-2 hover:underline",
+    className
+  );
   const link = (
-    <Link
-      href={`/documents/${documentId}`}
-      className={cn(
-        "block min-w-0 break-words font-medium text-foreground underline-offset-2 hover:underline",
-        className
-      )}
-      title={text}
-    >
+    <Link href={`/documents/${documentId}`} className={linkClass} title={text}>
       {text}
     </Link>
   );
@@ -81,13 +78,19 @@ export function DocumentTitleLink({
   }
 
   return (
-    <span className="flex min-w-0 items-start gap-2.5">
+    <span className="flex min-w-0 max-w-full items-start gap-2.5">
       <DocumentAiIcon
         aiIconUrl={aiIconUrl}
         category={category}
         size={iconSize}
       />
-      {link}
+      <Link
+        href={`/documents/${documentId}`}
+        className={linkClass}
+        title={text}
+      >
+        {text}
+      </Link>
     </span>
   );
 }

@@ -1008,13 +1008,13 @@ function FinanceOverviewClientInner({
         >
           <SheetContent
             side="right"
-            className="w-full gap-0 overflow-hidden p-0 sm:max-w-xl"
+            className="w-full max-w-[min(100%,36rem)] gap-0 overflow-hidden p-0 data-[side=right]:w-full data-[side=right]:max-w-[min(100%,36rem)]"
           >
-            <SheetHeader className="border-b border-border/60 pr-12">
-              <SheetTitle className="break-words">
+            <SheetHeader className="shrink-0 border-b border-border/60 pr-12 text-left">
+              <SheetTitle className="wrap-break-word">
                 {selectedRow?.label || "Details"}
               </SheetTitle>
-              <SheetDescription>
+              <SheetDescription className="wrap-break-word">
                 {selectedRow
                   ? `${selectedRow.count} Positionen · ${formatCHF(selectedRow.total)} · ${
                       detailGroupBy === "year" ? "nach Jahr" : "nach Lieferant"
@@ -1022,18 +1022,18 @@ function FinanceOverviewClientInner({
                   : "Belege zur Auswahl"}
               </SheetDescription>
             </SheetHeader>
-            <div className="min-h-0 flex-1 overflow-y-auto">
+            <div className="min-h-0 w-full min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
               {!selectedRow || detailGroups.length === 0 ? (
                 <p className="p-4 text-sm text-muted-foreground">
                   Keine Positionen für diese Auswahl.
                 </p>
               ) : (
-                <div className="space-y-3 p-4">
+                <div className="w-full min-w-0 space-y-3 p-4">
                   {detailGroups.map((group) => (
                     <div
                       key={group.key}
                       className={cn(
-                        "overflow-hidden rounded-xl border border-border/60",
+                        "w-full min-w-0 overflow-hidden rounded-xl border border-border/60",
                         toneSurface(dimensionMeta[dimension].tone).body
                       )}
                     >
@@ -1050,9 +1050,9 @@ function FinanceOverviewClientInner({
                           </>
                         }
                       >
-                        <span className="break-words">{group.label}</span>
+                        <span className="wrap-break-word">{group.label}</span>
                       </TileTitleBar>
-                      <DataList>
+                      <DataList className="w-full min-w-0">
                         {group.rows.map((row) => (
                           <InvoiceListRow
                             key={row.id}

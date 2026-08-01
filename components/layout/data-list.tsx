@@ -12,7 +12,7 @@ export function VendorText({
   className?: string;
 }) {
   return (
-    <div className={cn("font-semibold text-foreground break-words", className)}>
+    <div className={cn("font-semibold text-foreground wrap-break-word", className)}>
       {children || "–"}
     </div>
   );
@@ -27,7 +27,7 @@ export function SoftText({
 }) {
   if (children == null || children === "") return null;
   return (
-    <div className={cn("mt-0.5 text-xs text-muted-foreground break-words", className)}>
+    <div className={cn("mt-0.5 text-xs text-muted-foreground wrap-break-word", className)}>
       {children}
     </div>
   );
@@ -86,7 +86,7 @@ export function DataList({
   return (
     <div
       className={cn(
-        "flex flex-col gap-3 p-3 md:gap-0 md:divide-y md:divide-border/70 md:p-0",
+        "flex w-full min-w-0 flex-col gap-3 p-3 md:gap-0 md:divide-y md:divide-border/70 md:p-0",
         className
       )}
     >
@@ -107,7 +107,7 @@ export function DataListRow({
   return (
     <div
       className={cn(
-        "rounded-xl border border-border/60 bg-card p-3.5 shadow-[0_4px_16px_rgba(20,32,28,0.05)] transition-colors hover:bg-muted/30 md:rounded-none md:border-0 md:bg-transparent md:px-4 md:py-3 md:shadow-none",
+        "w-full min-w-0 rounded-xl border border-border/60 bg-card p-3.5 shadow-[0_4px_16px_rgba(20,32,28,0.05)] transition-colors hover:bg-muted/30 md:rounded-none md:border-0 md:bg-transparent md:px-4 md:py-3 md:shadow-none",
         onClick && "cursor-pointer",
         className
       )}
@@ -137,23 +137,27 @@ export function DataListMain({
   return (
     <div
       className={cn(
-        "flex gap-3",
+        "flex w-full min-w-0 gap-3",
         className
       )}
     >
       {leading ? (
         <div className="shrink-0 self-start pt-0.5">{leading}</div>
       ) : null}
-      <div className="flex min-w-0 flex-1 flex-col gap-3 md:flex-row md:items-start md:justify-between">
-        <div className="min-w-0 flex-1 space-y-1.5">
-          <div className="font-semibold text-foreground break-words">{title}</div>
+      <div className="flex w-full min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 w-full flex-1 space-y-1.5 overflow-hidden">
+          <div className="font-semibold text-foreground wrap-break-word">
+            {title}
+          </div>
           {subtitle ? (
-            <div className="text-sm text-foreground/90 break-words">{subtitle}</div>
+            <div className="text-sm text-foreground/90 wrap-break-word">
+              {subtitle}
+            </div>
           ) : null}
-          {meta ? <div className="pt-0.5">{meta}</div> : null}
+          {meta ? <div className="min-w-0 pt-0.5">{meta}</div> : null}
         </div>
         {actions ? (
-          <div className="shrink-0 md:pl-4">
+          <div className="w-full shrink-0 sm:w-auto sm:pl-4">
             <ActionCluster>{actions}</ActionCluster>
           </div>
         ) : null}
