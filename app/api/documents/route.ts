@@ -18,6 +18,18 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   ensureInitialized();
   try {
+    const { ensureBuiltinKnowledgeAreas } = await import(
+      "@/lib/knowledge/areas"
+    );
+    const { maybeRemapKnowledgeCategoriesOnce } = await import(
+      "@/lib/documents/category-remap"
+    );
+    ensureBuiltinKnowledgeAreas();
+    maybeRemapKnowledgeCategoriesOnce();
+  } catch {
+    /* non-fatal */
+  }
+  try {
     backfillDocumentRecipients(60);
   } catch {
     /* non-fatal */

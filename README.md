@@ -220,6 +220,12 @@ git push origin v0.2.0
 ```
 
 
+## Backup / Disaster Recovery
+
+Restore-taugliches Konzept mit **restic** und gemounteter **Hetzner Storage Box** (Buddy `./data` + Paperless-Volumes):
+
+→ [`docs/backup-restic.md`](docs/backup-restic.md)
+
 ## Notes
 
 - Paperless remains source of truth

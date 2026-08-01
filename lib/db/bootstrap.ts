@@ -119,9 +119,14 @@ export function bootstrapDatabase(db: Database.Database): void {
   const insertArea = db.prepare(
     `INSERT OR IGNORE INTO knowledge_areas (name, description) VALUES (?, ?)`
   );
+  const updateAreaDesc = db.prepare(
+    `UPDATE knowledge_areas SET description = ?
+     WHERE name = ? AND (description IS NULL OR description = '')`
+  );
   const seed = db.transaction(() => {
     for (const area of KNOWLEDGE_AREAS) {
       insertArea.run(area.name, area.description);
+      updateAreaDesc.run(area.description, area.name);
     }
   });
   seed();

@@ -28,6 +28,7 @@ import {
 import { SettingsUsersPanel } from "@/components/settings/settings-users-panel";
 import { SettingsFamilyPanel } from "@/components/settings/settings-family-panel";
 import { NotificationPrefsPanel } from "@/components/settings/notification-prefs-panel";
+import { SettingsCategorySuggestionsPanel } from "@/components/settings/settings-category-suggestions-panel";
 
 
 const ICLOUD_SMTP = {
@@ -1305,6 +1306,7 @@ function SettingsPageInner() {
 
       {activeTab === "more" ? (
         <div className="space-y-4">
+      <SettingsCategorySuggestionsPanel />
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="flex items-center gap-3">

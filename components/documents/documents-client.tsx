@@ -151,6 +151,8 @@ export function DocumentsClient() {
   const [analyzeProgress, setAnalyzeProgress] = useState<string | null>(null);
   const [searchFocus, setSearchFocus] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [knowledgeAreas, setKnowledgeAreas] = useState<string[]>([]);
+  const [bulkCategoryBusy, setBulkCategoryBusy] = useState(false);
   const [missingAiIcons, setMissingAiIcons] = useState(0);
   const [iconBusy, setIconBusy] = useState(false);
   const [iconProgress, setIconProgress] = useState<string | null>(null);
@@ -278,6 +280,50 @@ export function DocumentsClient() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const res = await fetch("/api/knowledge/areas");
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) return;
+        const names = Array.isArray(data.areas)
+          ? data.areas
+              .map((a: { name?: string }) => a.name)
+              .filter((n: unknown): n is string => typeof n === "string")
+          : [];
+        setKnowledgeAreas(names);
+      } catch {
+        /* ignore */
+      }
+    })();
+  }, []);
+
+  async function runBulkCategory(nextCategory: string) {
+    if (!nextCategory || selectedIds.size === 0 || bulkCategoryBusy) return;
+    setBulkCategoryBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/documents/category/batch", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          documentIds: Array.from(selectedIds),
+          category: nextCategory,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || "Umklassifizierung fehlgeschlagen");
+      }
+      setSelectedIds(new Set());
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBulkCategoryBusy(false);
+    }
+  }
 
   useEffect(() => {
     if (!isRunning) return;
@@ -874,6 +920,33 @@ export function DocumentsClient() {
                   ? "Analyse…"
                   : `Analysieren (${selectedIds.size})`}
               </Button>
+            ) : null}
+            {selectedIds.size > 0 ? (
+              <select
+                className="h-8 max-w-[12rem] rounded-lg border border-border bg-background px-2 text-sm disabled:opacity-50"
+                disabled={
+                  bulkCategoryBusy || iconBusy || analyzeBusy || isRunning
+                }
+                defaultValue=""
+                onChange={(e) => {
+                  const next = e.target.value;
+                  e.target.value = "";
+                  if (next) void runBulkCategory(next);
+                }}
+                aria-label="Rubrik zuweisen"
+              >
+                <option value="" disabled>
+                  Rubrik zuweisen ({selectedIds.size})…
+                </option>
+                {(knowledgeAreas.length
+                  ? knowledgeAreas
+                  : filters.categories
+                ).map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
             ) : null}
             {hasOpenAIKey && documentAiIconsEnabled ? (
               <>

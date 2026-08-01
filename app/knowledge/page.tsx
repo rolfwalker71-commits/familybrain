@@ -7,10 +7,16 @@ import {
   knowledgeVisual,
   pageVisuals,
 } from "@/components/layout/icon-circle";
+import { ensureInitialized } from "@/lib/db/migrations";
+import { ensureBuiltinKnowledgeAreas } from "@/lib/knowledge/areas";
+import { maybeRemapKnowledgeCategoriesOnce } from "@/lib/documents/category-remap";
 
 export const dynamic = "force-dynamic";
 
 export default function KnowledgePage() {
+  ensureInitialized();
+  ensureBuiltinKnowledgeAreas();
+  maybeRemapKnowledgeCategoriesOnce();
   const areas = getKnowledgeAreaCounts();
 
   return (

@@ -25,6 +25,8 @@ import {
   BookOpen,
   HandCoins,
   Luggage,
+  CreditCard,
+  Monitor,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -173,10 +175,12 @@ export const knowledgeAreaVisuals: Record<
   Versicherungen: { icon: Shield, tone: "teal" },
   Wohnen: { icon: Home, tone: "teal" },
   Steuern: { icon: Landmark, tone: "teal" },
+  Kreditkarten: { icon: CreditCard, tone: "teal" },
   Finanzen: { icon: Wallet, tone: "teal" },
   Reisen: { icon: Plane, tone: "teal" },
   Fahrzeuge: { icon: Car, tone: "teal" },
   Arbeit: { icon: Briefcase, tone: "teal" },
+  Computer: { icon: Monitor, tone: "teal" },
   "Geräte & Garantien": { icon: Cpu, tone: "teal" },
   Verträge: { icon: FileSignature, tone: "teal" },
   "Kinder / Familie": { icon: Users, tone: "teal" },

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronDown, Download } from "lucide-react";
@@ -9,7 +9,6 @@ import type {
   KnowledgeFilterMember,
   KnowledgeYearGroup,
 } from "@/lib/knowledge/browse";
-import { KNOWLEDGE_AREAS } from "@/lib/extraction/categories";
 import { toSwissDate } from "@/lib/utils/dates";
 import { PageHeader } from "@/components/layout/page-primitives";
 import {
@@ -47,7 +46,27 @@ export function KnowledgeBrowseClient({
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [areaNames, setAreaNames] = useState<string[]>([]);
   const isSteuern = category === "Steuern";
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const res = await fetch("/api/knowledge/areas");
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) return;
+        const names = Array.isArray(data.areas)
+          ? data.areas
+              .map((a: { name?: string }) => a.name)
+              .filter((n: unknown): n is string => typeof n === "string")
+          : [];
+        setAreaNames(names);
+      } catch {
+        /* ignore */
+      }
+    })();
+  }, []);
+
   const latestYear = useMemo(() => {
     const years = groups
       .map((g) => g.year)
@@ -316,13 +335,13 @@ export function KnowledgeBrowseClient({
                   <option value="" disabled>
                     Rubrik wechseln…
                   </option>
-                  {KNOWLEDGE_AREAS.filter((a) => a.name !== "Steuern").map(
-                    (a) => (
-                      <option key={a.name} value={a.name}>
-                        {a.name}
+                  {areaNames
+                    .filter((name) => name !== category)
+                    .map((name) => (
+                      <option key={name} value={name}>
+                        {name}
                       </option>
-                    )
-                  )}
+                    ))}
                 </select>
               </div>
             ) : null}

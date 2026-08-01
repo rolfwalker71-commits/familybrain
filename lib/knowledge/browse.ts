@@ -15,8 +15,7 @@ import {
   normalizeAccountKey,
 } from "@/lib/extraction/bank";
 import { resolveIsBankDocument } from "@/lib/documents/tax-classification";
-import type { KnowledgeAreaName } from "@/lib/extraction/categories";
-import { KNOWLEDGE_AREAS } from "@/lib/extraction/categories";
+import { isKnownKnowledgeArea } from "@/lib/knowledge/areas";
 
 export type KnowledgeFilterMember = {
   id: number;
@@ -76,8 +75,8 @@ function yearFromCreatedDate(createdDate: string | null | undefined): number | n
   return y >= 1990 && y <= 2100 ? y : null;
 }
 
-function isKnowledgeArea(name: string): name is KnowledgeAreaName {
-  return KNOWLEDGE_AREAS.some((a) => a.name === name);
+function isKnowledgeArea(name: string): boolean {
+  return isKnownKnowledgeArea(name);
 }
 
 export function demoteLohnabrechnungenFromSteuern(): number {

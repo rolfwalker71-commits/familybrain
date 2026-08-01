@@ -1,11 +1,9 @@
 import { getDb } from "@/lib/db/client";
 import { nowIso } from "@/lib/utils/dates";
-import { KNOWLEDGE_AREAS } from "@/lib/extraction/categories";
+import { isKnownKnowledgeArea } from "@/lib/knowledge/areas";
 import { looksLikeAccountStatement } from "@/lib/extraction/bank";
 
 export type TaxDocKind = "bank" | "normal" | "auto";
-
-const KNOWN_CATEGORIES = new Set(KNOWLEDGE_AREAS.map((a) => a.name));
 
 /**
  * Effective bank flag: manual override wins; else heuristic on title/summary.
@@ -62,7 +60,7 @@ export function updateDocumentTaxClassification(input: {
   let category = existing.category;
   if (input.category !== undefined) {
     const next = input.category.trim();
-    if (!KNOWN_CATEGORIES.has(next as (typeof KNOWLEDGE_AREAS)[number]["name"])) {
+    if (!isKnownKnowledgeArea(next)) {
       return { ok: false, error: "Ungültige Wissensrubrik." };
     }
     category = next;

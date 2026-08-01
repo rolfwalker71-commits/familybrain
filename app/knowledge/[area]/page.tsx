@@ -1,7 +1,10 @@
 import { notFound } from "next/navigation";
-import { KNOWLEDGE_AREAS } from "@/lib/extraction/categories";
+import { getKnowledgeAreaByName } from "@/lib/knowledge/areas";
 import { listKnowledgeDocumentsGrouped } from "@/lib/knowledge/browse";
 import { KnowledgeBrowseClient } from "@/components/knowledge/knowledge-browse-client";
+import { ensureInitialized } from "@/lib/db/migrations";
+import { ensureBuiltinKnowledgeAreas } from "@/lib/knowledge/areas";
+import { maybeRemapKnowledgeCategoriesOnce } from "@/lib/documents/category-remap";
 
 export const dynamic = "force-dynamic";
 
@@ -10,9 +13,13 @@ type Props = {
 };
 
 export default async function KnowledgeAreaPage({ params }: Props) {
+  ensureInitialized();
+  ensureBuiltinKnowledgeAreas();
+  maybeRemapKnowledgeCategoriesOnce();
+
   const { area: raw } = await params;
   const areaName = decodeURIComponent(raw);
-  const area = KNOWLEDGE_AREAS.find((a) => a.name === areaName);
+  const area = getKnowledgeAreaByName(areaName);
   if (!area) notFound();
 
   const { groups, filterMembers } = listKnowledgeDocumentsGrouped(area.name);

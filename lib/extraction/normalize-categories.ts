@@ -272,10 +272,12 @@ export const KNOWLEDGE_CANONICAL = [
   "Versicherungen",
   "Wohnen",
   "Steuern",
+  "Kreditkarten",
   "Finanzen",
   "Reisen",
   "Fahrzeuge",
   "Arbeit",
+  "Computer",
   "Geräte & Garantien",
   "Verträge",
   "Kinder / Familie",
@@ -298,6 +300,9 @@ const KNOWLEDGE_EXACT: Record<string, KnowledgeCanonical> = {
   steuern: "Steuern",
   tax: "Steuern",
   taxes: "Steuern",
+  kreditkarten: "Kreditkarten",
+  kreditkarte: "Kreditkarten",
+  "credit card": "Kreditkarten",
   finanzen: "Finanzen",
   finance: "Finanzen",
   financial: "Finanzen",
@@ -310,6 +315,9 @@ const KNOWLEDGE_EXACT: Record<string, KnowledgeCanonical> = {
   arbeit: "Arbeit",
   work: "Arbeit",
   employment: "Arbeit",
+  computer: "Computer",
+  it: "Computer",
+  software: "Computer",
   "gerate & garantien": "Geräte & Garantien",
   "gerate und garantien": "Geräte & Garantien",
   devices: "Geräte & Garantien",
@@ -357,6 +365,17 @@ export function normalizeKnowledgeCategory(
     ])
   )
     return "Arbeit";
+  if (
+    includesAny(key, [
+      "kreditkarte",
+      "kartenabrechnung",
+      "credit card",
+      "visa abrechnung",
+      "mastercard",
+    ])
+  ) {
+    return "Kreditkarten";
+  }
   if (includesAny(key, ["steuer", "tax", "veranlag"])) return "Steuern";
   if (includesAny(key, ["reise", "travel", "flug", "hotel", "cruise"]))
     return "Reisen";
@@ -366,6 +385,29 @@ export function normalizeKnowledgeCategory(
   if (includesAny(key, ["arbeit", "gehalt", "employ", "anstell"])) return "Arbeit";
   if (includesAny(key, ["lohn"]) && !includesAny(key, ["ausweis", "steuer"]))
     return "Arbeit";
+  if (
+    includesAny(key, [
+      "software",
+      "lizenz",
+      "license",
+      "microsoft 365",
+      "office 365",
+      "adobe",
+      "jetbrains",
+      "github",
+      "laptop",
+      "notebook",
+      "macbook",
+      "grafikkarte",
+      "ssd",
+      "drucker",
+      "monitor",
+      "windows pro",
+      "windows home",
+    ])
+  ) {
+    return "Computer";
+  }
   if (includesAny(key, ["gerat", "garantie", "warranty", "device", "serial"]))
     return "Geräte & Garantien";
   if (includesAny(key, ["vertrag", "contract", "kundig"])) return "Verträge";
