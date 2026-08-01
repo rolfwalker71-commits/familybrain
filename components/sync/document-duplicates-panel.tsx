@@ -6,7 +6,7 @@ import { ChevronDown, Copy, Loader2, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DocumentAiIcon } from "@/components/documents/document-ai-icon";
+import { DocumentPdfThumb } from "@/components/documents/document-pdf-preview";
 import { toSwissDate } from "@/lib/utils/dates";
 import { cn } from "@/lib/utils";
 import type { DuplicateCluster, DuplicateDocItem } from "@/lib/documents/duplicates";
@@ -123,7 +123,8 @@ export function DocumentDuplicatesPanel() {
         <p className="text-sm text-muted-foreground">
           Duplikat nur wenn <strong>Titel und Datum</strong> identisch sind —
           gleiche KI-Kurzbeschreibung allein reicht nicht. Pro Gruppe eines
-          behalten, Rest löschen.
+          behalten, Rest löschen. PDF-Vorschau: Hover öffnet Zoom, Klick auf den
+          Zoom schliesst ihn wieder.
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -300,10 +301,12 @@ function DuplicateRow({
         onChange={onSelect}
         aria-label={`Behalten: Dokument ${doc.id}`}
       />
-      <DocumentAiIcon
-        aiIconUrl={doc.ai_icon_url}
-        category={doc.category}
-        size="xs"
+      <DocumentPdfThumb
+        paperlessId={doc.paperless_id}
+        title={doc.title}
+        size="square"
+        zoomOnHover
+        className="mt-0.5"
       />
       <div className="min-w-0 flex-1 space-y-0.5">
         <Link

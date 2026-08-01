@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ExternalLink, FileText, Maximize2, XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { AiImageZoom } from "@/components/layout/ai-image-zoom";
 import { IconCircle } from "@/components/layout/icon-circle";
 import { cn } from "@/lib/utils";
 
@@ -71,6 +72,11 @@ export function DocumentPdfThumb({
   onRemove,
   removing,
   size = "default",
+  /**
+   * Hover (desktop) opens thumbnail zoom lightbox; click on zoom closes it.
+   * Useful for comparing duplicates side-by-side without leaving the list.
+   */
+  zoomOnHover = false,
 }: {
   /** Paperless document id (legacy). Prefer pdfUrl for local files. */
   paperlessId?: number;
@@ -87,9 +93,12 @@ export function DocumentPdfThumb({
   removing?: boolean;
   /** `square` matches compact AI thumbs (3.5rem). */
   size?: "default" | "square";
+  zoomOnHover?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const [zoomOpen, setZoomOpen] = useState(false);
   const [thumbError, setThumbError] = useState(false);
+  const hoverTimer = useRef<number | null>(null);
   const resolvedPdf =
     pdfUrl ||
     (paperlessId != null
@@ -102,6 +111,24 @@ export function DocumentPdfThumb({
         ? `/api/paperless/documents/${paperlessId}/file?type=thumb`
         : null;
   const square = size === "square";
+  const canZoomHover =
+    zoomOnHover && Boolean(resolvedThumb) && !thumbError;
+
+  function clearHoverTimer() {
+    if (hoverTimer.current != null) {
+      window.clearTimeout(hoverTimer.current);
+      hoverTimer.current = null;
+    }
+  }
+
+  function scheduleZoomOpen() {
+    if (!canZoomHover) return;
+    clearHoverTimer();
+    hoverTimer.current = window.setTimeout(() => {
+      setZoomOpen(true);
+      hoverTimer.current = null;
+    }, 180);
+  }
 
   if (!resolvedPdf) return null;
 
@@ -113,6 +140,8 @@ export function DocumentPdfThumb({
         className
       )}
       style={square ? undefined : { width: "3.5rem" }}
+      onMouseEnter={canZoomHover ? scheduleZoomOpen : undefined}
+      onMouseLeave={canZoomHover ? clearHoverTimer : undefined}
     >
       {onRemove ? (
         <button
@@ -132,9 +161,24 @@ export function DocumentPdfThumb({
       ) : null}
       <button
         type="button"
-        onClick={() => setOpen(true)}
-        title={title || "PDF öffnen"}
-        className="group relative block h-full w-full overflow-hidden rounded-md border border-border/70 bg-muted/40 text-left transition-colors hover:bg-muted"
+        onClick={(e) => {
+          e.stopPropagation();
+          clearHoverTimer();
+          if (canZoomHover && resolvedThumb && !thumbError) {
+            setZoomOpen(true);
+            return;
+          }
+          setOpen(true);
+        }}
+        title={
+          canZoomHover
+            ? "Hover oder Tippen für Zoom · Klick auf Zoom schliesst"
+            : title || "PDF öffnen"
+        }
+        className={cn(
+          "group relative block h-full w-full overflow-hidden rounded-md border border-border/70 bg-muted/40 text-left transition-colors hover:bg-muted",
+          canZoomHover && "cursor-zoom-in"
+        )}
       >
         {resolvedThumb && !thumbError ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -162,7 +206,7 @@ export function DocumentPdfThumb({
         )}
         <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-0.5 bg-gradient-to-t from-black/55 to-transparent px-0.5 py-1 text-[9px] text-white opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
           <Maximize2 className="size-2.5" />
-          Öffnen
+          {canZoomHover ? "Zoom" : "Öffnen"}
         </div>
       </button>
       {!square && (title || href) ? (
@@ -179,6 +223,13 @@ export function DocumentPdfThumb({
             <span title={title || undefined}>{title}</span>
           )}
         </div>
+      ) : null}
+      {zoomOpen && resolvedThumb && !thumbError ? (
+        <AiImageZoom
+          src={resolvedThumb}
+          alt={title || "PDF Vorschau"}
+          onClose={() => setZoomOpen(false)}
+        />
       ) : null}
       <PdfPreviewDialog
         open={open}
