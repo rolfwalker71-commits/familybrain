@@ -1,2 +1,2 @@
-/** Bumped automatically by `.githooks/pre-commit` / `npm run version:bump`. */
-export const APP_VERSION = "20260729-2010";
+/** Sidebar build stamp (YYYYMMDD-HHMM). Bump with `npm run version:bump` before each commit. */
+export const APP_VERSION = "20260801-0737";
