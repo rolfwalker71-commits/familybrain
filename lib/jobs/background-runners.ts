@@ -38,6 +38,10 @@ import {
   listDocumentIdsForAiIcon,
 } from "@/lib/paperless/document-icon";
 import { writebackAnalysisToPaperless } from "@/lib/paperless/writeback";
+import {
+  pauseTriageForMassAnalysis,
+  resumeTriageAfterMassAnalysis,
+} from "@/lib/documents/triage-mass-pause";
 
 export type BackgroundRunResult =
   | {
@@ -88,6 +92,15 @@ export async function runAnalyzePendingJob(
     succeeded: 0,
     failed: 0,
   };
+
+  // Mass / full re-runs: suppress triage inbox + mail; restore afterwards
+  const triagePaused =
+    options?.requeueAll === true ||
+    options?.resetErrors === true ||
+    countIncompleteAnalyses() > 1;
+  if (triagePaused) {
+    pauseTriageForMassAnalysis();
+  }
 
   try {
     let resetCount = 0;
@@ -193,6 +206,14 @@ export async function runAnalyzePendingJob(
       summary,
       error: message,
     };
+  } finally {
+    if (triagePaused) {
+      try {
+        resumeTriageAfterMassAnalysis();
+      } catch {
+        /* best-effort */
+      }
+    }
   }
 }
 

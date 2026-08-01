@@ -7,6 +7,8 @@ import {
   resolveAccountNumber,
   looksLikeDateToken,
   shortenInstitutionName,
+  recoverIbanDisplay,
+  ensureAccountInParens,
 } from "./bank.ts";
 
 test("extractLocalAccountNumber ignores statement period dates", () => {
@@ -65,5 +67,54 @@ test("shortenInstitutionName collapses Raiffeisen branch names", () => {
       "Kontoauszug Raiffeisenbank Cham-Steinhausen Juni 2026"
     ),
     "Kontoauszug Raiffeisen Juni 2026"
+  );
+});
+
+test("recoverIbanDisplay adds missing CH prefix", () => {
+  assert.equal(
+    recoverIbanDisplay("7880808002250092277"),
+    "CH78 8080 8002 2500 9227 7"
+  );
+  assert.equal(
+    recoverIbanDisplay("CH78 8080 8002 2500 9227 7"),
+    "CH78 8080 8002 2500 9227 7"
+  );
+});
+
+test("ensureAccountInParens fixes glued IBAN in title", () => {
+  assert.equal(
+    ensureAccountInParens(
+      "Kontoauszug Raiffeisen7880808002250092277",
+      "7880808002250092277"
+    ),
+    "Kontoauszug Raiffeisen (CH78 8080 8002 2500 9227 7)"
+  );
+});
+
+test("ensureAccountInParens keeps period plain and appends IBAN", () => {
+  assert.equal(
+    ensureAccountInParens(
+      "Kontoauszug Raiffeisen 01.07.2026 - 31.07.2026",
+      "CH78 8080 8002 2500 9227 7"
+    ),
+    "Kontoauszug Raiffeisen 01.07.2026 - 31.07.2026 (CH78 8080 8002 2500 9227 7)"
+  );
+});
+
+test("ensureAccountInParens does not treat date-range parens as account", () => {
+  // defensive: if a title ever has a period in parens, keep it and still add IBAN
+  assert.equal(
+    ensureAccountInParens(
+      "Kontoauszug Raiffeisen (01.07.2026 - 31.07.2026)",
+      "CH78 8080 8002 2500 9227 7"
+    ),
+    "Kontoauszug Raiffeisen (01.07.2026 - 31.07.2026) (CH78 8080 8002 2500 9227 7)"
+  );
+});
+
+test("resolveAccountNumber recovers AI IBAN without CH", () => {
+  assert.equal(
+    resolveAccountNumber({ accountNumber: "7880808002250092277" }),
+    "CH78 8080 8002 2500 9227 7"
   );
 });

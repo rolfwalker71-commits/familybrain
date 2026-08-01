@@ -40,6 +40,7 @@ import { FilterChip, SoftFab } from "@/components/layout/soft-ui";
 import { UserAvatar } from "@/components/users/user-avatar";
 import { toSwissDate } from "@/lib/utils/dates";
 import { readNdjsonStream } from "@/lib/utils/stream";
+import { withTriageMassPause } from "@/lib/documents/triage-mass-pause-client";
 import {
   ListSortControl,
   useListSortDir,
@@ -383,69 +384,73 @@ export function DocumentsClient() {
     );
     setAnalyzingId(documentIds[0] ?? null);
     try {
-      let afterId = 0;
-      let totalSucceeded = 0;
-      let totalFailed = 0;
-      let done = false;
+      await withTriageMassPause(documentIds.length, async () => {
+        let afterId = 0;
+        let totalSucceeded = 0;
+        let totalFailed = 0;
+        let done = false;
 
-      while (!done) {
-        const res = await fetch("/api/analyze/batch", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            limit: Math.min(documentIds.length, 10),
-            afterId,
-            documentIds,
-          }),
-        });
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          throw new Error(data.error || "Analyse-Batch fehlgeschlagen");
-        }
-
-        let batchDone = true;
-        let nextAfterId = afterId;
-        let streamError: string | null = null;
-
-        await readNdjsonStream(res, (event) => {
-          if (event.type === "progress") {
-            const currentId =
-              typeof event.currentDocumentId === "number"
-                ? event.currentDocumentId
-                : null;
-            if (currentId != null) setAnalyzingId(currentId);
-            setAnalyzeProgress(
-              `Neuanalyse… ${Number(event.succeeded || 0) + totalSucceeded} ok` +
-                (Number(event.failed || 0) + totalFailed > 0
-                  ? `, ${Number(event.failed || 0) + totalFailed} Fehler`
-                  : "") +
-                (currentId != null ? ` · Dokument #${currentId}` : "")
-            );
-          } else if (event.type === "done") {
-            const processed = Number(event.processed || 0);
-            const succeeded = Number(event.succeeded || 0);
-            const failedList = Array.isArray(event.failed) ? event.failed : [];
-            totalSucceeded += succeeded;
-            totalFailed += failedList.length;
-            nextAfterId = Number(event.nextAfterId ?? afterId);
-            batchDone =
-              event.done === true ||
-              processed === 0 ||
-              (typeof event.queueRemaining === "number" &&
-                Number(event.queueRemaining) === 0);
-            setAnalyzeProgress(
-              `Fertig: ${totalSucceeded} ok` +
-                (totalFailed > 0 ? `, ${totalFailed} Fehler` : "")
-            );
-          } else if (event.type === "error") {
-            streamError = String(event.error || "Analyse-Batch fehlgeschlagen");
+        while (!done) {
+          const res = await fetch("/api/analyze/batch", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              limit: Math.min(documentIds.length, 10),
+              afterId,
+              documentIds,
+            }),
+          });
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            throw new Error(data.error || "Analyse-Batch fehlgeschlagen");
           }
-        });
 
-        if (streamError) throw new Error(streamError);
-        afterId = nextAfterId;
-        done = batchDone;
-      }
+          let batchDone = true;
+          let nextAfterId = afterId;
+          let streamError: string | null = null;
+
+          await readNdjsonStream(res, (event) => {
+            if (event.type === "progress") {
+              const currentId =
+                typeof event.currentDocumentId === "number"
+                  ? event.currentDocumentId
+                  : null;
+              if (currentId != null) setAnalyzingId(currentId);
+              setAnalyzeProgress(
+                `Neuanalyse… ${Number(event.succeeded || 0) + totalSucceeded} ok` +
+                  (Number(event.failed || 0) + totalFailed > 0
+                    ? `, ${Number(event.failed || 0) + totalFailed} Fehler`
+                    : "") +
+                  (currentId != null ? ` · Dokument #${currentId}` : "")
+              );
+            } else if (event.type === "done") {
+              const processed = Number(event.processed || 0);
+              const succeeded = Number(event.succeeded || 0);
+              const failedList = Array.isArray(event.failed) ? event.failed : [];
+              totalSucceeded += succeeded;
+              totalFailed += failedList.length;
+              nextAfterId = Number(event.nextAfterId ?? afterId);
+              batchDone =
+                event.done === true ||
+                processed === 0 ||
+                (typeof event.queueRemaining === "number" &&
+                  Number(event.queueRemaining) === 0);
+              setAnalyzeProgress(
+                `Fertig: ${totalSucceeded} ok` +
+                  (totalFailed > 0 ? `, ${totalFailed} Fehler` : "")
+              );
+            } else if (event.type === "error") {
+              streamError = String(
+                event.error || "Analyse-Batch fehlgeschlagen"
+              );
+            }
+          });
+
+          if (streamError) throw new Error(streamError);
+          afterId = nextAfterId;
+          done = batchDone;
+        }
+      });
 
       setSelectedIds(new Set());
       await refreshStats();

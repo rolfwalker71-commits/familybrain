@@ -139,7 +139,7 @@ export function saveAnalysis(
   analysis: DocumentAnalysis,
   modelName: string,
   expectedContentHash?: string | null
-): void {
+): DocumentAnalysis {
   const db = getDb();
   const ts = nowIso();
   const docMeta = db
@@ -608,6 +608,8 @@ export function saveAnalysis(
   } catch {
     /* optional — summary row may be missing in edge cases */
   }
+
+  return { ...enriched, category };
 }
 
 export function markAnalysisError(documentId: number, message: string): void {

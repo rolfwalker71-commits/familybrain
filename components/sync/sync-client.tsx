@@ -797,9 +797,9 @@ function SyncClientInner() {
           <p className="text-sm text-muted-foreground">
             <strong>Wichtig:</strong> „10 analysieren“ und „Alle im Hintergrund“
             gelten nur für <em>ausstehende</em> Dokumente (hier: {pendingCount}).
-            Für eine komplette Neuanalyse zuerst Triage in den Einstellungen
-            pausieren, dann „Alle neu analysieren“. Hintergrund-Jobs laufen
-            weiter, wenn der Tab geschlossen wird.
+            Bei Massenanalysen werden Triage-Inbox und Triage-Mail automatisch
+            pausiert und danach inkl. Empfänger wieder aktiviert.
+            Hintergrund-Jobs laufen weiter, wenn der Tab geschlossen wird.
           </p>
           <div className="rounded-xl border border-border/60 bg-[var(--brand-docs-soft)]/50 p-4 text-sm">
             Ausstehend: <strong>{pendingCount}</strong>
@@ -911,8 +911,8 @@ function SyncClientInner() {
                     if (
                       !window.confirm(
                         `${analyzedCount + errorCount} Dokument(e) komplett neu analysieren?\n\n` +
-                          "Tipp: Triage nach Analyse in den Einstellungen vorher pausieren, " +
-                          "sonst füllt sich die Inbox (und ggf. Mails).\n\n" +
+                          "Triage-Inbox und Triage-Mail werden währenddessen " +
+                          "automatisch pausiert und danach wiederhergestellt.\n\n" +
                           "Das kostet OpenAI-Tokens und läuft im Hintergrund."
                       )
                     ) {

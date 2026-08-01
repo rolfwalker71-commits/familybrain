@@ -189,6 +189,12 @@ function SettingsPageInner() {
   const [triageMailRecipients, setTriageMailRecipients] = useState("");
   const [triageAfterAnalysisEnabled, setTriageAfterAnalysisEnabled] =
     useState(true);
+  const [triageMassPaused, setTriageMassPaused] = useState(false);
+  const [triageMassPauseRestores, setTriageMassPauseRestores] = useState<{
+    triageAfterAnalysisEnabled: boolean;
+    triageMailEnabled: boolean;
+    triageMailRecipients: string;
+  } | null>(null);
   const [testMailTo, setTestMailTo] = useState("");
   const [testMailBusy, setTestMailBusy] = useState(false);
   const [triageTestBusy, setTriageTestBusy] = useState(false);
@@ -325,12 +331,65 @@ function SettingsPageInner() {
       setTriageAfterAnalysisEnabled(
         data.triageAfterAnalysisEnabled !== false
       );
+      setTriageMassPaused(Boolean(data.triageMassPaused));
+      setTriageMassPauseRestores(
+        data.triageMassPauseRestores &&
+          typeof data.triageMassPauseRestores === "object"
+          ? {
+              triageAfterAnalysisEnabled: Boolean(
+                data.triageMassPauseRestores.triageAfterAnalysisEnabled
+              ),
+              triageMailEnabled: Boolean(
+                data.triageMassPauseRestores.triageMailEnabled
+              ),
+              triageMailRecipients:
+                data.triageMassPauseRestores.triageMailRecipients || "",
+            }
+          : null
+      );
       setError(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
       }
     })();
   }, []);
+
+  useEffect(() => {
+    if (!triageMassPaused) return;
+    const id = window.setInterval(() => {
+      void (async () => {
+        try {
+          const res = await fetch("/api/settings/triage-mass-pause");
+          if (!res.ok) return;
+          const data = await res.json();
+          setTriageMassPaused(Boolean(data.triageMassPaused));
+          setTriageAfterAnalysisEnabled(
+            data.triageAfterAnalysisEnabled !== false
+          );
+          setTriageMailEnabled(Boolean(data.triageMailEnabled));
+          setTriageMailRecipients(data.triageMailRecipients || "");
+          setTriageMassPauseRestores(
+            data.triageMassPauseRestores &&
+              typeof data.triageMassPauseRestores === "object"
+              ? {
+                  triageAfterAnalysisEnabled: Boolean(
+                    data.triageMassPauseRestores.triageAfterAnalysisEnabled
+                  ),
+                  triageMailEnabled: Boolean(
+                    data.triageMassPauseRestores.triageMailEnabled
+                  ),
+                  triageMailRecipients:
+                    data.triageMassPauseRestores.triageMailRecipients || "",
+                }
+              : null
+          );
+        } catch {
+          /* ignore */
+        }
+      })();
+    }, 4000);
+    return () => window.clearInterval(id);
+  }, [triageMassPaused]);
 
   async function savePaperless() {
     setSaving("paperless");
@@ -1895,14 +1954,45 @@ function SettingsPageInner() {
             {saving === "email" ? "Speichert…" : "E-Mail speichern"}
           </Button>
 
-          <div className="space-y-3 rounded-xl border border-border/60 bg-muted/20 p-4">
+          <div
+            id="triage-mail"
+            className="space-y-3 rounded-xl border border-border/60 bg-muted/20 p-4"
+          >
+            {triageMassPaused ? (
+              <div className="rounded-lg border border-amber-500/40 bg-amber-50 px-3 py-2.5 text-sm text-amber-950 dark:bg-amber-950/40 dark:text-amber-50">
+                <p className="font-medium">
+                  Temporär ausgeschaltet (Massenanalyse)
+                </p>
+                <p className="mt-1 text-xs opacity-90">
+                  Triage nach Analyse
+                  {triageMassPauseRestores?.triageAfterAnalysisEnabled
+                    ? " (war aktiv)"
+                    : ""}{" "}
+                  und Triage-Mail
+                  {triageMassPauseRestores?.triageMailEnabled
+                    ? " (war aktiv)"
+                    : ""}{" "}
+                  sind während der Massenanalyse pausiert
+                  {triageMassPauseRestores?.triageMailRecipients
+                    ? ` — Empfänger bleibt: ${triageMassPauseRestores.triageMailRecipients}`
+                    : ""}
+                  . Nach Abschluss werden beide Optionen wiederhergestellt.
+                </p>
+              </div>
+            ) : null}
             <div className="flex items-start gap-3">
               <input
                 id="triageAfterAnalysisEnabled"
                 type="checkbox"
                 className="mt-1 size-4 accent-[var(--brand-docs)]"
-                checked={triageAfterAnalysisEnabled}
-                disabled={saving !== null}
+                checked={
+                  triageMassPaused
+                    ? Boolean(
+                        triageMassPauseRestores?.triageAfterAnalysisEnabled
+                      )
+                    : triageAfterAnalysisEnabled
+                }
+                disabled={saving !== null || triageMassPaused}
                 onChange={(e) => {
                   const enabled = e.target.checked;
                   setTriageAfterAnalysisEnabled(enabled);
@@ -1949,12 +2039,16 @@ function SettingsPageInner() {
                   className="cursor-pointer"
                 >
                   Triage nach Analyse
+                  {triageMassPaused ? (
+                    <span className="ml-2 text-xs font-normal text-amber-700 dark:text-amber-300">
+                      (pausiert)
+                    </span>
+                  ) : null}
                 </Label>
                 <p className="text-xs text-muted-foreground">
-                  Dokumente nach der Analyse in die Triage-Inbox legen. Für eine
-                  komplette Neuanalyse abschalten, danach wieder einschalten —
-                  sonst landen alle Belege erneut in der Inbox (und ggf. als
-                  Mail).
+                  Dokumente nach der Analyse in die Triage-Inbox legen. Bei
+                  Massenanalysen (mehrere Belege) wird das automatisch
+                  vorübergehend ausgeschaltet und danach wiederhergestellt.
                 </p>
               </div>
             </div>
@@ -1963,13 +2057,24 @@ function SettingsPageInner() {
                 id="triageMailEnabled"
                 type="checkbox"
                 className="mt-1 size-4 accent-[var(--brand-docs)]"
-                checked={triageMailEnabled}
+                checked={
+                  triageMassPaused
+                    ? Boolean(triageMassPauseRestores?.triageMailEnabled)
+                    : triageMailEnabled
+                }
                 onChange={(e) => setTriageMailEnabled(e.target.checked)}
-                disabled={!triageAfterAnalysisEnabled}
+                disabled={
+                  triageMassPaused || !triageAfterAnalysisEnabled
+                }
               />
               <div className="min-w-0 space-y-1">
                 <Label htmlFor="triageMailEnabled" className="cursor-pointer">
                   Triage-Mail nach Analyse
+                  {triageMassPaused ? (
+                    <span className="ml-2 text-xs font-normal text-amber-700 dark:text-amber-300">
+                      (pausiert)
+                    </span>
+                  ) : null}
                 </Label>
                 <p className="text-xs text-muted-foreground">
                   Wenn ein Dokument neu in die Triage-Inbox kommt, HTML-Mail an
@@ -1981,9 +2086,15 @@ function SettingsPageInner() {
               <Label htmlFor="triageMailRecipients">Empfänger</Label>
               <Input
                 id="triageMailRecipients"
-                value={triageMailRecipients}
+                value={
+                  triageMassPaused &&
+                  triageMassPauseRestores?.triageMailRecipients
+                    ? triageMassPauseRestores.triageMailRecipients
+                    : triageMailRecipients
+                }
                 onChange={(e) => setTriageMailRecipients(e.target.value)}
                 placeholder="du@example.com, partner@example.com"
+                disabled={triageMassPaused}
               />
               <p className="text-xs text-muted-foreground">
                 Mehrere Adressen mit Komma trennen.

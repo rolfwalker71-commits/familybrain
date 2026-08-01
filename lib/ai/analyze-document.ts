@@ -88,7 +88,7 @@ export async function analyzeDocument(
       }
     }
 
-    saveAnalysis(
+    const saved = saveAnalysis(
       documentId,
       parsed.data,
       model,
@@ -98,7 +98,8 @@ export async function analyzeDocument(
       const { applySuggestedTitleAfterAnalysis } = await import(
         "@/lib/paperless/document-title"
       );
-      applySuggestedTitleAfterAnalysis(documentId, parsed.data);
+      // Use enriched analysis (IBAN in parentheses), not raw AI JSON
+      applySuggestedTitleAfterAnalysis(documentId, saved);
     } catch (titleErr) {
       console.error(
         "[analyze] document title failed",

@@ -10,6 +10,10 @@ import {
   useState,
 } from "react";
 import { readNdjsonStream } from "@/lib/utils/stream";
+import {
+  pauseTriageForMassAnalysisClient,
+  resumeTriageAfterMassAnalysisClient,
+} from "@/lib/documents/triage-mass-pause-client";
 
 export type AnalysisMode = "batch" | "all";
 
@@ -201,6 +205,7 @@ export function AnalysisProvider({ children }: { children: React.ReactNode }) {
       }
 
       const runTarget = mode === "all" ? pending : Math.min(batchSize, pending);
+      const triagePaused = runTarget > 1;
 
       setStatus((prev) => ({
         ...prev,
@@ -225,6 +230,9 @@ export function AnalysisProvider({ children }: { children: React.ReactNode }) {
       let runFailed = 0;
 
       try {
+        if (triagePaused) {
+          await pauseTriageForMassAnalysisClient();
+        }
         // Loop: one or many batches
         // eslint-disable-next-line no-constant-condition
         while (true) {
@@ -339,6 +347,13 @@ export function AnalysisProvider({ children }: { children: React.ReactNode }) {
           }));
         }
       } finally {
+        if (triagePaused) {
+          try {
+            await resumeTriageAfterMassAnalysisClient();
+          } catch {
+            /* best-effort */
+          }
+        }
         runningRef.current = false;
         abortRef.current = null;
         await refreshStats();

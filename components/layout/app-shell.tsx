@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { AnalysisProvider } from "@/components/analysis/analysis-provider";
 import { AnalysisStatusBar } from "@/components/analysis/analysis-status-bar";
+import { TriageMassPauseBanner } from "@/components/analysis/triage-mass-pause-banner";
 import { AuthProvider, useAuth } from "@/components/auth/auth-provider";
 import { AdminNavProvider } from "@/components/layout/admin-nav-provider";
 import { RealtimeToasts } from "@/components/realtime/realtime-toasts";
@@ -70,6 +71,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
         }
       >
         <MobileHeader />
+        {!isLimitedUser ? <TriageMassPauseBanner /> : null}
         {!isLimitedUser ? <AnalysisStatusBar /> : null}
         {me ? <RealtimeToasts /> : null}
         <div

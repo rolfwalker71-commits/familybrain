@@ -75,7 +75,7 @@ test("enrichAnalysisIdentity does not duplicate Nr.", () => {
   );
 });
 
-test("enrichAnalysisIdentity prefers IBAN over period dates in Kontoauszug title", () => {
+test("enrichAnalysisIdentity appends IBAN after plain period in title", () => {
   const title =
     "Kontoauszug Raiffeisenbank Cham-Steinhausen 01.06.2026 - 30.06.2026";
   const content = `Kontoinhaber Rolf Josef Walker
@@ -97,10 +97,35 @@ Kontorubrik Steuern`;
     }
   );
   assert.match(enriched.short_summary || "", /CH78\s*8080\s*8002/i);
+  assert.match(enriched.short_summary || "", /\(CH78/);
   assert.doesNotMatch(enriched.account_number || "", /^01\.06\.2026$/);
   assert.match(enriched.account_number || "", /CH78/i);
   assert.equal(enriched.bank_name, "Raiffeisen");
-  assert.match(enriched.suggested_title || "", /^Kontoauszug Raiffeisen/);
+  assert.equal(
+    enriched.suggested_title,
+    "Kontoauszug Raiffeisen 01.06.2026 - 30.06.2026 (CH78 8080 8002 2500 9227 7)"
+  );
+});
+
+test("enrichAnalysisIdentity fixes glued title IBAN without CH", () => {
+  const enriched = enrichAnalysisIdentity(
+    baseAnalysis({
+      category: "Steuern",
+      short_summary: "Kontoauszug Juli 2026 mit Saldo.",
+      suggested_title: "Kontoauszug Raiffeisen7880808002250092277",
+      account_number: "7880808002250092277",
+    }),
+    {
+      title: "Kontoauszug Raiffeisen7880808002250092277",
+      content: "IBAN CH78 8080 8002 2500 9227 7",
+      correspondent: "Raiffeisenbank Cham-Steinhausen",
+    }
+  );
+  assert.equal(
+    enriched.suggested_title,
+    "Kontoauszug Raiffeisen (CH78 8080 8002 2500 9227 7)"
+  );
+  assert.match(enriched.short_summary || "", /\(CH78 8080 8002 2500 9227 7\)/);
 });
 
 test("enrichAnalysisIdentity appends masked card number for Kreditkartenabrechnung", () => {

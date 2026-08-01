@@ -1,7 +1,9 @@
 import type { DocumentAnalysis } from "@/lib/ai/schemas";
 import { extractDocumentRefNumber } from "@/lib/documents/duplicates";
 import {
+  ensureAccountInParens,
   looksLikeAccountStatement,
+  recoverIbanDisplay,
   resolveAccountNumber,
   resolveBankName,
   shortenInstitutionName,
@@ -117,8 +119,19 @@ export function enrichAnalysisIdentity(
     shortSummary: analysis.short_summary,
     content: meta?.content,
   });
+  const accountDisplay =
+    (accountNumber && (recoverIbanDisplay(accountNumber) || accountNumber)) ||
+    null;
+  const looksLikeIbanOrCard = Boolean(
+    accountDisplay &&
+      (recoverIbanDisplay(accountDisplay) ||
+        /[•*]{2,}|\bxxxx\b/i.test(accountDisplay))
+  );
+  // Always surface IBAN/card when detected — even if the title already has a period
   const isAccountStatement =
-    looksLikeAccountStatement(hay) || Boolean(accountNumber && bankName);
+    looksLikeAccountStatement(hay) ||
+    Boolean(accountNumber && bankName) ||
+    looksLikeIbanOrCard;
 
   let short = shortenInstitutionName((analysis.short_summary || "").trim());
   let title = shortenInstitutionName((analysis.suggested_title || "").trim());
@@ -141,26 +154,29 @@ export function enrichAnalysisIdentity(
     short = `${short.replace(/\.\s*$/, "")} · ${swissDate}.`;
   }
 
-  if (
-    isAccountStatement &&
-    accountNumber &&
-    short &&
-    !textHasAccount(short, accountNumber)
-  ) {
-    short = `${short.replace(/\.\s*$/, "")} (${accountNumber}).`;
-  } else if (isAccountStatement && accountNumber && !short) {
-    short = `Kontobeleg (${accountNumber}).`;
+  if (isAccountStatement && accountDisplay && short) {
+    short = ensureAccountInParens(short.replace(/\.\s*$/, ""), accountDisplay);
+    if (!short.endsWith(".")) short = `${short}.`;
+  } else if (isAccountStatement && accountDisplay && !short) {
+    short = `Kontobeleg (${accountDisplay}).`;
   }
 
   if (ref && title && !textHasRef(title, ref)) {
     title = `${title} Nr. ${ref}`.slice(0, 120);
   }
 
+  // Title: period stays plain; IBAN/card always in parentheses at the end
+  if (isAccountStatement && accountDisplay && title) {
+    title = ensureAccountInParens(title, accountDisplay).slice(0, 160);
+  } else if (isAccountStatement && accountDisplay && !title) {
+    title = `Kontoauszug (${accountDisplay})`.slice(0, 160);
+  }
+
   return {
     ...analysis,
     document_reference: ref || analysis.document_reference || null,
     bank_name: bankName || analysis.bank_name || null,
-    account_number: accountNumber || analysis.account_number || null,
+    account_number: accountDisplay || analysis.account_number || null,
     short_summary: short || analysis.short_summary,
     detailed_summary: detailed,
     suggested_title: title || analysis.suggested_title,

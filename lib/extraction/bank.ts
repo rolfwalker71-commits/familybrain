@@ -70,6 +70,142 @@ export function formatIbanDisplay(raw: string): string {
   return compact.replace(/(.{4})/g, "$1 ").trim();
 }
 
+/**
+ * Normalize IBAN for display; recover missing CH/country prefix
+ * (AI often returns 7880808002250092277 instead of CH78…).
+ */
+export function recoverIbanDisplay(
+  raw: string | null | undefined
+): string | null {
+  if (!raw?.trim()) return null;
+  const compact = raw.replace(/[\s._\-]/g, "").toUpperCase();
+  if (looksLikeIban(compact)) return formatIbanDisplay(compact);
+  // Swiss BBAN+check without country (19 chars) → prepend CH
+  if (/^\d{19}$/.test(compact)) {
+    const withCh = `CH${compact}`;
+    if (looksLikeIban(withCh)) return formatIbanDisplay(withCh);
+  }
+  return null;
+}
+
+/** Period / calendar range inside parentheses — keep; do not treat as account. */
+export function looksLikePeriodParen(inner: string): boolean {
+  const t = (inner || "").trim();
+  if (!t) return false;
+  if (
+    /\d{1,2}[./\-]\d{1,2}[./\-]\d{2,4}\s*[-–—]\s*\d{1,2}[./\-]\d{1,2}[./\-]\d{2,4}/.test(
+      t
+    )
+  ) {
+    return true;
+  }
+  if (
+    /\d{1,2}[./\-]\d{1,2}[./\-]\d{2,4}\s+bis\s+\d{1,2}[./\-]\d{1,2}[./\-]\d{2,4}/i.test(
+      t
+    )
+  ) {
+    return true;
+  }
+  if (looksLikeDateToken(t)) return true;
+  if (/^\d{1,2}[./\-]\d{4}$/.test(t)) return true;
+  if (
+    /^(jan|feb|mär|maerz|apr|mai|jun|jul|aug|sep|okt|nov|dez)[a-zäöü.]*\s+\d{4}$/i.test(
+      t
+    )
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function looksLikeAccountParen(inner: string): boolean {
+  const t = (inner || "").trim();
+  if (!t || looksLikePeriodParen(t)) return false;
+  if (recoverIbanDisplay(t)) return true;
+  const compact = t.replace(/[\s._\-]/g, "").toUpperCase();
+  if (/^(?:CH)?\d{15,34}$/.test(compact)) return true;
+  if (/^[•*X]{2,}.+\d{4}$/i.test(t) || /^••••\s*\d{4}$/.test(t)) return true;
+  if (/^\d{2,6}[.\-]\d{2,8}/.test(t)) return true;
+  // Masked / spaced card-like, not a date
+  if (
+    /[•*X]{3,}|\d{4}[\s\-]+\d{4}/i.test(t) &&
+    t.replace(/\D/g, "").length >= 4 &&
+    t.replace(/\D/g, "").length <= 19 &&
+    !/\d{1,2}[./]\d{1,2}[./]\d{2,4}/.test(t)
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function parenAlreadyShowsAccount(text: string, account: string): boolean {
+  const compactAcct = account.replace(/[\s._\-]/g, "").toUpperCase();
+  if (compactAcct.length < 4) return false;
+  const acctIban = recoverIbanDisplay(account);
+  for (const m of text.matchAll(/\(([^)]+)\)/g)) {
+    const inner = (m[1] || "").trim();
+    if (looksLikePeriodParen(inner)) continue;
+    const innerCompact = inner.replace(/[\s._\-]/g, "").toUpperCase();
+    if (innerCompact === compactAcct) return true;
+    if (acctIban && recoverIbanDisplay(inner) === acctIban) return true;
+    // Card last-4 match
+    const acctLast4 = compactAcct.replace(/\D/g, "").slice(-4);
+    const innerLast4 = innerCompact.replace(/\D/g, "").slice(-4);
+    if (
+      acctLast4.length === 4 &&
+      innerLast4 === acctLast4 &&
+      (/[•*]/.test(inner) || /[•*]/.test(account))
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Ensure account/IBAN/card appears as « (xxx)» after the free text
+ * (period ranges stay as-is, not in parentheses).
+ * e.g. «Kontoauszug Raiffeisen 01.07.2026 - 31.07.2026»
+ *   → «Kontoauszug Raiffeisen 01.07.2026 - 31.07.2026 (CH78 …)»
+ */
+export function ensureAccountInParens(
+  text: string,
+  account: string
+): string {
+  const acct = (recoverIbanDisplay(account) || account).trim();
+  if (!acct) return text.trim();
+  let t = (text || "").replace(/\s+/g, " ").trim();
+
+  // Strip only trailing account/IBAN/card parens — never date ranges
+  t = t
+    .replace(/\s*\(([^)]{2,48})\)\s*\.?$/i, (full, inner: string) =>
+      looksLikeAccountParen(inner) ? "" : full
+    )
+    .replace(/(?:CH)?\d{15,34}\s*\.?$/i, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/[.,;:]+$/, "");
+
+  if (parenAlreadyShowsAccount(t, acct)) {
+    return t;
+  }
+
+  const compactAcct = acct.replace(/[\s._\-]/g, "");
+  const compactText = t.replace(/[\s._\-]/g, "");
+  // Glued at end without parentheses → peel off then re-append cleanly
+  if (
+    compactAcct.length >= 4 &&
+    new RegExp(`${compactAcct}$`, "i").test(compactText)
+  ) {
+    t = t
+      .replace(new RegExp(`${compactAcct.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i"), "")
+      .trim()
+      .replace(/[.,;:]+$/, "");
+  }
+
+  return `${t} (${acct})`;
+}
+
 /** Display card as •••• 1234 when we only trust the last four. */
 export function formatCardDisplay(raw: string): string {
   const compact = raw.replace(/[\s\-]/g, "").toUpperCase();
@@ -148,7 +284,11 @@ function sanitizeAiAccount(
   const t = (raw || "").trim();
   if (!t || t.length < 4) return null;
   if (looksLikeDateToken(t)) return null;
-  if (looksLikeIban(t)) return formatIbanDisplay(t);
+  const iban = recoverIbanDisplay(t);
+  if (iban) return iban;
+  // Bare long digit runs are almost always broken IBANs — do not keep as «Konto»
+  const compactDigits = t.replace(/[\s._\-]/g, "");
+  if (/^\d{15,34}$/.test(compactDigits)) return null;
   if (isPlausibleLocalAccount(t)) return t;
   // Masked card or last-4 from AI
   if (/[*X]{2,}|\d{4}/i.test(t) && t.replace(/\D/g, "").length >= 4) {
@@ -196,17 +336,23 @@ export function extractLocalAccountNumber(text: string): string | null {
 
 /** First IBAN in text, normalized for display. */
 export function extractIban(text: string): string | null {
-  // Prefer IBAN after an «IBAN» label
+  const norm = normalizeOcrText(text || "");
+  // Prefer IBAN after an «IBAN» label (country code optional — recover CH)
   const labeled =
-    /IBAN\s*[:#.]?\s*([A-Z]{2}\d{2}(?:[\s]?[A-Z0-9]{4}){2,7}(?:[\s]?[A-Z0-9]{1,4})?)/gi;
-  for (const m of (text || "").matchAll(labeled)) {
-    const cand = (m[1] || "").replace(/\s+/g, "").toUpperCase();
-    if (looksLikeIban(cand)) return formatIbanDisplay(cand);
+    /IBAN\s*[:#.]?\s*((?:[A-Z]{2})?\d{2}(?:[\s]?[A-Z0-9]{4}){2,7}(?:[\s]?[A-Z0-9]{1,4})?)/gi;
+  for (const m of norm.matchAll(labeled)) {
+    const recovered = recoverIbanDisplay(m[1] || "");
+    if (recovered) return recovered;
   }
-  for (const m of (text || "").matchAll(IBAN_RE)) {
-    const cand = (m[1] || "").replace(/\s+/g, "").toUpperCase();
-    if (!looksLikeIban(cand)) continue;
-    return formatIbanDisplay(cand);
+  for (const m of norm.matchAll(IBAN_RE)) {
+    const recovered = recoverIbanDisplay(m[1] || "");
+    if (recovered) return recovered;
+  }
+  // Digit-only Swiss IBAN near «IBAN» without country letters
+  const bare = /IBAN\s*[:#.]?\s*(\d{4}(?:[\s]?\d{4}){3,5})/gi;
+  for (const m of norm.matchAll(bare)) {
+    const recovered = recoverIbanDisplay(m[1] || "");
+    if (recovered) return recovered;
   }
   return null;
 }
@@ -234,9 +380,10 @@ export function extractCardNumber(text: string): string | null {
 }
 
 /**
- * Prefer Kontonummer; else card number; else IBAN.
+ * Bank statements → IBAN first; credit-card statements → card first;
+ * otherwise Kontonummer → card → IBAN.
  * OCR beats AI prose (AI often invents «Mitglieder Privatkonto» as account_number).
- * Stored in account_number and appended to short_summary as «(…)».
+ * Stored in account_number and appended to title/summary as «(…)».
  */
 export function resolveAccountNumber(input: {
   accountNumber?: string | null;
@@ -245,6 +392,27 @@ export function resolveAccountNumber(input: {
   content?: string | null;
 }): string | null {
   const hay = haystack(input);
+  const cardDoc = looksLikeCreditCardStatement(hay);
+  const bankDoc = looksLikeBankDocument(hay) && !cardDoc;
+
+  if (cardDoc) {
+    const card = extractCardNumber(hay);
+    if (card) return card;
+    const iban = extractIban(hay);
+    if (iban) return iban;
+    return sanitizeAiAccount(input.accountNumber);
+  }
+
+  if (bankDoc) {
+    const iban = extractIban(hay);
+    if (iban) return iban;
+    const labeled = extractLabeledAccountNumber(hay);
+    if (labeled) return labeled;
+    const local = extractLocalAccountNumber(hay);
+    if (local) return local;
+    return sanitizeAiAccount(input.accountNumber);
+  }
+
   const labeled = extractLabeledAccountNumber(hay);
   if (labeled) return labeled;
 
