@@ -187,6 +187,7 @@ function SettingsPageInner() {
   const [appPublicUrl, setAppPublicUrl] = useState("");
   const [triageMailEnabled, setTriageMailEnabled] = useState(false);
   const [triageMailRecipients, setTriageMailRecipients] = useState("");
+  const [triageMailFrom, setTriageMailFrom] = useState("");
   const [triageAfterAnalysisEnabled, setTriageAfterAnalysisEnabled] =
     useState(true);
   const [triageMassPaused, setTriageMassPaused] = useState(false);
@@ -328,6 +329,7 @@ function SettingsPageInner() {
       setAppPublicUrl(data.appPublicUrl || "");
       setTriageMailEnabled(Boolean(data.triageMailEnabled));
       setTriageMailRecipients(data.triageMailRecipients || "");
+      setTriageMailFrom(data.triageMailFrom || "");
       setTriageAfterAnalysisEnabled(
         data.triageAfterAnalysisEnabled !== false
       );
@@ -780,6 +782,7 @@ function SettingsPageInner() {
           appPublicUrl: appPublicUrl.trim() || null,
           triageMailEnabled,
           triageMailRecipients: triageMailRecipients.trim() || null,
+          triageMailFrom: triageMailFrom.trim() || null,
           triageAfterAnalysisEnabled,
         }),
       });
@@ -796,6 +799,7 @@ function SettingsPageInner() {
       setAppPublicUrl(data.appPublicUrl || "");
       setTriageMailEnabled(Boolean(data.triageMailEnabled));
       setTriageMailRecipients(data.triageMailRecipients || "");
+      setTriageMailFrom(data.triageMailFrom || "");
       setTriageAfterAnalysisEnabled(
         data.triageAfterAnalysisEnabled !== false
       );
@@ -1924,7 +1928,7 @@ function SettingsPageInner() {
               ) : null}
             </div>
             <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="smtpFrom">Absender (From)</Label>
+              <Label htmlFor="smtpFrom">Absender TripBook / FinanzBuddy</Label>
               <Input
                 id="smtpFrom"
                 value={smtpFrom}
@@ -1932,8 +1936,10 @@ function SettingsPageInner() {
                 placeholder="TripBook <name@icloud.com>"
               />
               <p className="text-xs text-muted-foreground">
-                Bei iCloud muss die From-Adresse deine iCloud-Mail (oder eine
-                iCloud+-Custom-Domain) sein. App-Passwort unter{" "}
+                Standard-From für TripBook und FinanzBuddy. Triage-Mails haben
+                darunter einen eigenen Absendernamen. Bei iCloud muss die
+                From-Adresse deine iCloud-Mail (oder eine iCloud+-Custom-Domain)
+                sein. App-Passwort unter{" "}
                 <a
                   className="underline underline-offset-2"
                   href="https://appleid.apple.com/account/manage"
@@ -2081,6 +2087,24 @@ function SettingsPageInner() {
                   die Empfänger senden (ohne PDF-Anhang).
                 </p>
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="triageMailFrom">Absenderbezeichnung Triage</Label>
+              <Input
+                id="triageMailFrom"
+                value={triageMailFrom}
+                onChange={(e) => setTriageMailFrom(e.target.value)}
+                placeholder="Buddy"
+                disabled={triageMassPaused}
+              />
+              <p className="text-xs text-muted-foreground">
+                Anzeigename in der Mail (z.B. «Buddy»). Leer = Buddy mit der
+                SMTP-Adresse. Optional vollständig:{" "}
+                <span className="font-mono text-[11px]">
+                  Buddy &lt;name@icloud.com&gt;
+                </span>
+                .
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="triageMailRecipients">Empfänger</Label>

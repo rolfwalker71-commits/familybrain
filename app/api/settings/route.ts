@@ -229,6 +229,7 @@ const PutSchema = z.object({
   appPublicUrl: z.string().max(500).nullable().optional(),
   triageMailEnabled: z.boolean().optional(),
   triageMailRecipients: z.string().max(2000).nullable().optional(),
+  triageMailFrom: z.string().max(320).nullable().optional(),
   triageAfterAnalysisEnabled: z.boolean().optional(),
 });
 
@@ -440,11 +441,13 @@ export async function PUT(request: Request) {
 
   if (
     parsed.data.triageMailEnabled !== undefined ||
-    parsed.data.triageMailRecipients !== undefined
+    parsed.data.triageMailRecipients !== undefined ||
+    parsed.data.triageMailFrom !== undefined
   ) {
     saveTriageMailSettings({
       enabled: parsed.data.triageMailEnabled,
       recipients: parsed.data.triageMailRecipients,
+      from: parsed.data.triageMailFrom,
     });
   }
 

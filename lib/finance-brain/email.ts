@@ -19,6 +19,8 @@ export async function sendMail(input: {
   subject: string;
   text: string;
   html?: string;
+  /** Override From (e.g. Buddy triage vs TripBook default). */
+  from?: string | null;
   attachments?: MailAttachment[];
 }): Promise<{ ok: boolean; error?: string }> {
   if (!isEmailConfigured()) {
@@ -32,6 +34,7 @@ export async function sendMail(input: {
   if (to.length === 0) {
     return { ok: false, error: "Keine Empfänger" };
   }
+  const from = input.from?.trim() || smtp.from;
 
   try {
     const transporter = nodemailer.createTransport({
@@ -45,7 +48,7 @@ export async function sendMail(input: {
     });
 
     await transporter.sendMail({
-      from: smtp.from,
+      from,
       to: to.join(", "),
       subject: input.subject,
       text: input.text,

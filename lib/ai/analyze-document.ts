@@ -133,7 +133,20 @@ export async function analyzeDocument(
           triage.reasons.map((r) => TRIAGE_REASON_LABELS[r])
         );
       }
+      // Generate AI icon before triage mail so CID embed can include it
       if (triage.newlyQueued) {
+        try {
+          const { ensureDocumentAiIconIfMissing } = await import(
+            "@/lib/paperless/document-icon"
+          );
+          await ensureDocumentAiIconIfMissing(documentId);
+        } catch (iconErr) {
+          console.error(
+            "[analyze] document ai icon (pre-mail) failed",
+            documentId,
+            iconErr instanceof Error ? iconErr.message : iconErr
+          );
+        }
         try {
           const { notifyTriageReadyEmail } = await import(
             "@/lib/mail/notify-triage"
@@ -182,6 +195,7 @@ export async function analyzeDocument(
         wbErr instanceof Error ? wbErr.message : wbErr
       );
     }
+    // Icon for docs that did not newly enter triage (or if pre-mail step skipped)
     try {
       const { ensureDocumentAiIconIfMissing } = await import(
         "@/lib/paperless/document-icon"

@@ -1,22 +1,27 @@
 /**
  * Send HTML triage-ready mails (no PDF attachments — avoids Paperless re-import).
+ * AI icons are embedded inline via CID (not remote URLs).
  */
 
+import fs from "node:fs";
+import path from "node:path";
 import { absoluteAppUrl } from "@/lib/app-url";
 import {
   listPendingTriageDocuments,
   type TriageInboxItem,
 } from "@/lib/documents/triage";
 import { getDb } from "@/lib/db/client";
-import { sendMail } from "@/lib/finance-brain/email";
+import { sendMail, type MailAttachment } from "@/lib/finance-brain/email";
 import { formatMoney } from "@/lib/finance-brain/format";
 import { isEmailConfigured } from "@/lib/finance-brain/mail-settings";
 import { toSwissDate } from "@/lib/utils/dates";
 import { buildTriageReadyMail } from "@/lib/mail/triage-ready-template";
 import {
+  getTriageMailFrom,
   getTriageMailRecipients,
   isTriageMailEnabled,
 } from "@/lib/mail/triage-mail-settings";
+import { resolveDocumentAiIconPath } from "@/lib/paperless/document-icon";
 
 function amountLabel(item: {
   amount: number | null;
@@ -26,12 +31,37 @@ function amountLabel(item: {
   return formatMoney(item.amount, item.currency || "CHF");
 }
 
-function itemToMailFields(item: TriageInboxItem) {
-  const iconPath = item.ai_icon_url;
-  const iconSrc =
-    iconPath && iconPath.startsWith("/")
-      ? absoluteAppUrl(iconPath)
-      : iconPath || null;
+function resolveAiIconFsPath(documentId: number): string | null {
+  const db = getDb();
+  const row = db
+    .prepare(`SELECT ai_icon_path FROM paperless_documents WHERE id = ?`)
+    .get(documentId) as { ai_icon_path: string | null } | undefined;
+  const stored = row?.ai_icon_path?.trim();
+  if (!stored) return null;
+  if (fs.existsSync(stored)) return stored;
+  const byName = resolveDocumentAiIconPath(path.basename(stored));
+  return byName && fs.existsSync(byName) ? byName : null;
+}
+
+function aiIconAttachment(documentId: number): MailAttachment | null {
+  const fsPath = resolveAiIconFsPath(documentId);
+  if (!fsPath) return null;
+  try {
+    const ext = path.extname(fsPath).toLowerCase() || ".jpg";
+    return {
+      filename: `doc-${documentId}-ai${ext}`,
+      content: fs.readFileSync(fsPath).toString("base64"),
+      content_id: `doc-ai-${documentId}`,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function itemToMailFields(
+  item: TriageInboxItem,
+  iconCid: string | null
+) {
   return {
     title: item.title?.trim() || item.vendor || `Dokument #${item.id}`,
     meta: [
@@ -43,7 +73,7 @@ function itemToMailFields(item: TriageInboxItem) {
       .join(" · ") || null,
     amountLabel: amountLabel(item),
     reasons: item.reasons,
-    iconSrc,
+    iconSrc: iconCid ? `cid:${iconCid}` : null,
   };
 }
 
@@ -67,7 +97,7 @@ export function countPendingTriageDocuments(): number {
 
 /**
  * After analysis newly queued a doc for triage — send HTML mail if enabled.
- * Never attaches PDFs.
+ * Never attaches PDFs. AI icons are CID-inlined when present on disk.
  */
 export async function notifyTriageReadyEmail(documentId: number): Promise<{
   ok: boolean;
@@ -90,22 +120,25 @@ export async function notifyTriageReadyEmail(documentId: number): Promise<{
     return { ok: false, skipped: "Dokument nicht in Triage-Inbox" };
   }
 
+  const iconAtt = aiIconAttachment(documentId);
   const totalPending = countPendingTriageDocuments();
   const mail = buildTriageReadyMail({
-    items: [itemToMailFields(item)],
+    items: [itemToMailFields(item, iconAtt?.content_id || null)],
     inboxUrl: absoluteAppUrl("/dashboard"),
     totalPending,
   });
 
   return sendMail({
     to: recipients,
+    from: getTriageMailFrom(),
     subject: mail.subject,
     text: mail.text,
     html: mail.html,
+    attachments: iconAtt ? [iconAtt] : undefined,
   });
 }
 
-/** Settings test: sample or live pending item, HTML only. */
+/** Settings test: sample or live pending item, HTML only (+ CID icons when available). */
 export async function sendTriageTestEmail(to: string): Promise<{
   ok: boolean;
   error?: string;
@@ -118,9 +151,14 @@ export async function sendTriageTestEmail(to: string): Promise<{
   }
 
   const pending = listPendingTriageDocuments(3);
+  const attachments: MailAttachment[] = [];
   const items =
     pending.length > 0
-      ? pending.map(itemToMailFields)
+      ? pending.map((item) => {
+          const att = aiIconAttachment(item.id);
+          if (att) attachments.push(att);
+          return itemToMailFields(item, att?.content_id || null);
+        })
       : [
           {
             title: "Beispiel: Swisscom Rechnung",
@@ -146,8 +184,10 @@ export async function sendTriageTestEmail(to: string): Promise<{
 
   return sendMail({
     to,
+    from: getTriageMailFrom(),
     subject: `[Test] ${mail.subject}`,
     text: mail.text,
     html: mail.html,
+    attachments: attachments.length ? attachments : undefined,
   });
 }
