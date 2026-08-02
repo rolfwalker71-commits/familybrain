@@ -28,6 +28,7 @@ import { useAdminNav } from "@/components/layout/admin-nav-provider";
 import { UserAvatar } from "@/components/users/user-avatar";
 import { APP_VERSION } from "@/lib/app-version";
 import { BRAND } from "@/lib/branding";
+import { BuddyLogo } from "@/components/brand/buddy-logo";
 import { IconCircle, type IconTone } from "@/components/layout/icon-circle";
 import type { AdminNavMode } from "@/lib/navigation/admin-nav";
 
@@ -304,12 +305,8 @@ export function Sidebar({
             onNavigate?.();
           }}
         >
-          <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground shadow-sm">
-            {isAdminNav ? (
-              <LayoutGrid className="h-6 w-6" />
-            ) : (
-              <BookOpen className="h-6 w-6" />
-            )}
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white shadow-sm">
+            <BuddyLogo size={44} className="h-11 w-11" priority />
           </span>
           <span className="text-3xl font-extrabold leading-none tracking-tight text-white">
             {brandTitle}

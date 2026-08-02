@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { BookOpen, Loader2, LockKeyhole } from "lucide-react";
+import { Loader2, LockKeyhole } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { BuddyLogo } from "@/components/brand/buddy-logo";
 import { BRAND, BRAND_TAGLINE } from "@/lib/branding";
 
 export function LoginForm({ nextPath }: { nextPath: string }) {
@@ -48,8 +49,8 @@ export function LoginForm({ nextPath }: { nextPath: string }) {
     <Card className="mx-auto w-full max-w-md border-white/50 bg-white/95 shadow-2xl shadow-slate-950/20 backdrop-blur">
       <CardHeader className="space-y-5 px-6 pb-2 pt-7 sm:px-8">
         <div className="flex items-center gap-4">
-          <span className="flex size-14 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/25">
-            <BookOpen className="size-7" />
+          <span className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white shadow-lg shadow-slate-950/10 ring-1 ring-border/60">
+            <BuddyLogo size={52} className="size-[52px]" priority />
           </span>
           <div>
             <p className="text-sm font-medium text-primary">{BRAND.app}</p>

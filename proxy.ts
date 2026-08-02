@@ -18,6 +18,7 @@ const PUBLIC_PATHS = new Set([
   "/icon-192.png",
   "/icon-512.png",
   "/icon-maskable-512.png",
+  "/buddy-logo.png",
 ]);
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);

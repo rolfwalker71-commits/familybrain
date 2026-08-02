@@ -23,6 +23,7 @@ import {
 import { useAdminNav } from "@/components/layout/admin-nav-provider";
 import { inferAdminNavMode } from "@/lib/navigation/admin-nav";
 import { BRAND } from "@/lib/branding";
+import { BuddyLogo } from "@/components/brand/buddy-logo";
 import { Sidebar } from "./sidebar";
 
 type Brand = {
@@ -103,6 +104,8 @@ export function MobileHeader() {
     ? brandForAdminMode(mode, pathname)
     : brandForPath(pathname);
   const BrandIcon = brand.icon;
+  const useBuddyMark =
+    brand.name === BRAND.app || brand.name === BRAND.buddy;
 
   return (
     <header className="sticky top-0 z-40 flex min-h-14 items-center justify-between border-b border-border/60 bg-card/95 px-4 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] shadow-[0_1px_0_rgba(20,32,28,0.06)] backdrop-blur-md lg:hidden">
@@ -148,9 +151,17 @@ export function MobileHeader() {
         }}
       >
         <span
-          className={`flex size-9 items-center justify-center rounded-full ${brand.iconWrapClass}`}
+          className={
+            useBuddyMark
+              ? "flex size-9 items-center justify-center overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-border/50"
+              : `flex size-9 items-center justify-center rounded-full ${brand.iconWrapClass}`
+          }
         >
-          <BrandIcon className="size-5 stroke-[2.25]" />
+          {useBuddyMark ? (
+            <BuddyLogo size={32} className="size-8" />
+          ) : (
+            <BrandIcon className="size-5 stroke-[2.25]" />
+          )}
         </span>
         <span
           className={`text-lg font-bold tracking-tight ${brand.accentClass}`}
