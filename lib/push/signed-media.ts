@@ -38,7 +38,12 @@ export function isPushMediaPathAllowed(pathname: string): boolean {
     pathname.startsWith("/api/documents/media/ai-icon/") ||
     pathname.startsWith("/api/trips/media/ai/") ||
     pathname.startsWith("/api/trips/media/cover/") ||
-    pathname.startsWith("/api/finance-ledgers/media/ai/")
+    pathname.startsWith("/api/trips/media/aircraft/") ||
+    pathname.startsWith("/api/trips/media/map/") ||
+    pathname.startsWith("/api/trips/media/comment-image/") ||
+    pathname.startsWith("/api/finance-ledgers/media/ai/") ||
+    pathname.startsWith("/api/finance-ledgers/media/receipt/") ||
+    pathname.startsWith("/api/finance-ledgers/media/cover/")
   );
 }
 

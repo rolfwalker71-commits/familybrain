@@ -4,7 +4,10 @@ import sharp from "sharp";
 import { NextResponse } from "next/server";
 import { resolveDocumentAiIconPath } from "@/lib/paperless/document-icon";
 import { resolveFinanceExpenseAiPath } from "@/lib/finance-brain/expense-image";
+import { resolveFinanceReceiptPath } from "@/lib/finance-brain/receipts";
+import { resolveFinanceLedgerCoverPath } from "@/lib/finance-brain/cover";
 import { resolveMediaPath } from "@/lib/trips/cover";
+import { resolveTripEventCommentImagePath } from "@/lib/trips/comment-images";
 import {
   verifyPushMediaQuery,
   verifyPushMediaToken,
@@ -30,8 +33,23 @@ function resolveFilesystemPath(mediaPath: string): string | null {
   if (mediaPath.startsWith("/api/trips/media/cover/")) {
     return resolveMediaPath("cover", base);
   }
+  if (mediaPath.startsWith("/api/trips/media/aircraft/")) {
+    return resolveMediaPath("aircraft", base);
+  }
+  if (mediaPath.startsWith("/api/trips/media/map/")) {
+    return resolveMediaPath("map", base);
+  }
+  if (mediaPath.startsWith("/api/trips/media/comment-image/")) {
+    return resolveTripEventCommentImagePath(base);
+  }
   if (mediaPath.startsWith("/api/finance-ledgers/media/ai/")) {
     return resolveFinanceExpenseAiPath(base);
+  }
+  if (mediaPath.startsWith("/api/finance-ledgers/media/receipt/")) {
+    return resolveFinanceReceiptPath(base);
+  }
+  if (mediaPath.startsWith("/api/finance-ledgers/media/cover/")) {
+    return resolveFinanceLedgerCoverPath(base);
   }
   return null;
 }

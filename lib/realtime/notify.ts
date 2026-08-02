@@ -7,6 +7,21 @@ import {
   type NotifyReason,
 } from "@/lib/realtime/hub";
 import { isLiveNotificationsEnabled } from "@/lib/realtime/prefs";
+import {
+  aircraftPublicUrl,
+  coverPublicUrl,
+  eventAiImagePublicUrl,
+  mapPublicUrl,
+} from "@/lib/trips/cover";
+import { tripEventCommentImagePublicUrl } from "@/lib/trips/comment-images";
+import { getTripById, getTripEventById } from "@/lib/trips/queries";
+import {
+  getFinanceExpenseById,
+  getFinanceLedgerById,
+} from "@/lib/finance-brain/queries";
+import { expenseAiImagePublicUrl } from "@/lib/finance-brain/expense-image";
+import { receiptPublicUrl } from "@/lib/finance-brain/receipts";
+import { ledgerCoverPublicUrl } from "@/lib/finance-brain/cover";
 
 export {
   isLiveNotificationsEnabled,
@@ -284,6 +299,52 @@ export function notifyDocumentTriageResolved(
   });
 }
 
+/** Best visual for TravelBuddy push/toasts (event AI → flight/map → trip cover). */
+function resolveTripNotifyImageUrl(input: {
+  tripId: number;
+  eventId?: number | null;
+  commentImagePath?: string | null;
+  overrideUrl?: string | null;
+}): string | null {
+  if (input.overrideUrl?.trim()) return input.overrideUrl.trim();
+  if (input.commentImagePath) {
+    const commentUrl = tripEventCommentImagePublicUrl(input.commentImagePath);
+    if (commentUrl) return commentUrl;
+  }
+  if (input.eventId != null) {
+    const event = getTripEventById(input.eventId);
+    if (event) {
+      const fromEvent =
+        eventAiImagePublicUrl(event.ai_image_path) ||
+        aircraftPublicUrl(event.aircraft_image_path) ||
+        mapPublicUrl(event.map_image_path);
+      if (fromEvent) return fromEvent;
+    }
+  }
+  const trip = getTripById(input.tripId);
+  return coverPublicUrl(trip?.cover_path) || null;
+}
+
+/** Best visual for FinanzBuddy push/toasts (expense AI → receipt → ledger cover). */
+function resolveFinanceNotifyImageUrl(input: {
+  ledgerId: number;
+  expenseId?: number | null;
+  overrideUrl?: string | null;
+}): string | null {
+  if (input.overrideUrl?.trim()) return input.overrideUrl.trim();
+  if (input.expenseId != null) {
+    const expense = getFinanceExpenseById(input.expenseId);
+    if (expense) {
+      const fromExpense =
+        expenseAiImagePublicUrl(expense.ai_image_path) ||
+        receiptPublicUrl(expense.receipt_path);
+      if (fromExpense) return fromExpense;
+    }
+  }
+  const ledger = getFinanceLedgerById(input.ledgerId);
+  return ledgerCoverPublicUrl(ledger?.cover_path) || null;
+}
+
 export function notifyTripComment(input: {
   tripId: number;
   eventId: number;
@@ -291,6 +352,9 @@ export function notifyTripComment(input: {
   eventTitle: string | null;
   authorName: string | null;
   bodyPreview: string | null;
+  /** Optional comment attachment path (filesystem) for push preview. */
+  commentImagePath?: string | null;
+  imageUrl?: string | null;
 }): void {
   notifyAppChange({
     domain: "travel",
@@ -302,7 +366,12 @@ export function notifyTripComment(input: {
     ),
     title: input.eventTitle || input.tripTitle || `Reise #${input.tripId}`,
     href: `/trips/${input.tripId}`,
-    aiIconUrl: null,
+    aiIconUrl: resolveTripNotifyImageUrl({
+      tripId: input.tripId,
+      eventId: input.eventId,
+      commentImagePath: input.commentImagePath,
+      overrideUrl: input.imageUrl,
+    }),
     category: null,
     meta: input.tripTitle,
     source: "travel",
@@ -315,6 +384,7 @@ export function notifyTripEventUpdated(input: {
   eventId: number;
   tripTitle: string | null;
   eventTitle: string | null;
+  imageUrl?: string | null;
 }): void {
   notifyAppChange({
     domain: "travel",
@@ -323,7 +393,11 @@ export function notifyTripEventUpdated(input: {
     detail: "Eintrag geändert.",
     title: input.eventTitle || `Ereignis #${input.eventId}`,
     href: `/trips/${input.tripId}`,
-    aiIconUrl: null,
+    aiIconUrl: resolveTripNotifyImageUrl({
+      tripId: input.tripId,
+      eventId: input.eventId,
+      overrideUrl: input.imageUrl,
+    }),
     category: null,
     meta: input.tripTitle,
     source: "travel",
@@ -345,7 +419,11 @@ export function notifyTripEventAiImage(input: {
     detail: "Neues Bild erzeugt oder hochgeladen.",
     title: input.eventTitle || `Ereignis #${input.eventId}`,
     href: `/trips/${input.tripId}`,
-    aiIconUrl: input.imageUrl ?? null,
+    aiIconUrl: resolveTripNotifyImageUrl({
+      tripId: input.tripId,
+      eventId: input.eventId,
+      overrideUrl: input.imageUrl,
+    }),
     category: null,
     meta: input.tripTitle,
     source: "travel",
@@ -360,6 +438,7 @@ export function notifyFinanceExpense(input: {
   description: string | null;
   amountLabel: string | null;
   reason: "finance_expense_created" | "finance_expense_updated";
+  imageUrl?: string | null;
 }): void {
   notifyAppChange({
     domain: "finance",
@@ -371,7 +450,11 @@ export function notifyFinanceExpense(input: {
     detail: input.amountLabel,
     title: input.description || `Ausgabe #${input.expenseId}`,
     href: `/finance-brain/${input.ledgerId}`,
-    aiIconUrl: null,
+    aiIconUrl: resolveFinanceNotifyImageUrl({
+      ledgerId: input.ledgerId,
+      expenseId: input.expenseId,
+      overrideUrl: input.imageUrl,
+    }),
     category: null,
     meta: input.ledgerTitle,
     source: "finance",
@@ -393,7 +476,11 @@ export function notifyFinanceExpenseAiImage(input: {
     detail: "Ausgabenbild aktualisiert.",
     title: input.description || `Ausgabe #${input.expenseId}`,
     href: `/finance-brain/${input.ledgerId}`,
-    aiIconUrl: input.imageUrl ?? null,
+    aiIconUrl: resolveFinanceNotifyImageUrl({
+      ledgerId: input.ledgerId,
+      expenseId: input.expenseId,
+      overrideUrl: input.imageUrl,
+    }),
     category: null,
     meta: input.ledgerTitle,
     source: "finance",
@@ -406,6 +493,7 @@ export function notifyFinanceSettlement(input: {
   settlementId: number;
   ledgerTitle: string | null;
   amountLabel: string | null;
+  imageUrl?: string | null;
 }): void {
   notifyAppChange({
     domain: "finance",
@@ -414,7 +502,10 @@ export function notifyFinanceSettlement(input: {
     detail: input.amountLabel,
     title: input.ledgerTitle || `Abrechnung #${input.ledgerId}`,
     href: `/finance-brain/${input.ledgerId}`,
-    aiIconUrl: null,
+    aiIconUrl: resolveFinanceNotifyImageUrl({
+      ledgerId: input.ledgerId,
+      overrideUrl: input.imageUrl,
+    }),
     category: null,
     meta: null,
     source: "finance",

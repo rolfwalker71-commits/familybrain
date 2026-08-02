@@ -159,6 +159,7 @@ export async function POST(request: Request, context: Ctx) {
         eventTitle: event.title ?? null,
         authorName: comment.author_name,
         bodyPreview: body,
+        commentImagePath: comment.image_path,
       });
     } catch {
       /* ignore realtime */
