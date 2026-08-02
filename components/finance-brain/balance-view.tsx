@@ -108,6 +108,7 @@ import { cn } from "@/lib/utils";
 import { NameWithAvatar, UserAvatar } from "@/components/users/user-avatar";
 import { AiImagePreview } from "@/components/layout/ai-image-preview";
 import { DetailCarousel } from "@/components/layout/detail-carousel";
+import { ActivityLogPanel } from "@/components/activity/activity-log-panel";
 import { SettlementAuditPanel } from "@/components/finance-brain/settlement-audit-panel";
 import { explainSimplifyDebts } from "@/lib/finance-brain/settlement";
 
@@ -1819,6 +1820,14 @@ function ExpenseCard({
                       </Button>
                     ) : null}
                   </div>
+                </div>
+
+                <div className="px-2 py-1">
+                  <ActivityLogPanel
+                    entityType="finance_expense"
+                    entityId={exp.id}
+                    compact
+                  />
                 </div>
               </DetailCarousel>
             </div>

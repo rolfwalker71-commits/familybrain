@@ -95,6 +95,19 @@ export async function analyzeDocument(
       options?.expectedContentHash
     );
     try {
+      const { appendActivityLog } = await import("@/lib/activity-log");
+      appendActivityLog({
+        entityType: "document",
+        entityId: documentId,
+        action: "analysis",
+        summary: `Analyse gespeichert (${model}) · ${saved.category || "ohne Kategorie"}`,
+        source: "analyze",
+        newValue: saved.category,
+      });
+    } catch {
+      /* optional */
+    }
+    try {
       const { applySuggestedTitleAfterAnalysis } = await import(
         "@/lib/paperless/document-title"
       );

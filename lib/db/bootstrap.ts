@@ -140,6 +140,30 @@ export function bootstrapDatabase(db: Database.Database): void {
   ensureFinanceBrainTables(db);
   ensureUserAccessTables(db);
   ensureInboxTaskTables(db);
+  ensureActivityLogTable(db);
+}
+
+function ensureActivityLogTable(db: Database.Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS activity_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      created_at TEXT NOT NULL,
+      entity_type TEXT NOT NULL,
+      entity_id INTEGER NOT NULL,
+      action TEXT NOT NULL,
+      summary TEXT NOT NULL,
+      field_name TEXT,
+      old_value TEXT,
+      new_value TEXT,
+      actor TEXT,
+      source TEXT,
+      metadata_json TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_activity_log_entity
+      ON activity_log(entity_type, entity_id, id DESC);
+    CREATE INDEX IF NOT EXISTS idx_activity_log_created
+      ON activity_log(created_at DESC);
+  `);
 }
 
 function ensureInboxTaskTables(db: Database.Database): void {

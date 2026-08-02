@@ -31,6 +31,7 @@ import {
 import { listPendingTriageDocuments } from "@/lib/documents/triage";
 import { recipientFilterSql } from "@/lib/family/recipients";
 import { withResolvedRecipients } from "@/lib/family/recipients";
+import { appendActivityLog } from "@/lib/activity-log";
 import {
   listFamilyMembers,
   UNKNOWN_RECIPIENT_LABEL,
@@ -1424,6 +1425,20 @@ export function setDocumentsPaidLocally(localIds: number[]): number {
     for (const id of localIds) {
       const info = update.run(ts, id);
       n += info.changes;
+      if (info.changes > 0) {
+        try {
+          appendActivityLog({
+            entityType: "document",
+            entityId: id,
+            action: "payment",
+            summary: "Als bezahlt markiert",
+            source: "payment",
+            newValue: "bezahlt",
+          });
+        } catch {
+          /* optional */
+        }
+      }
     }
   });
   tx();

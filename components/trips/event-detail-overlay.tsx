@@ -41,6 +41,7 @@ import {
 } from "@/components/layout/icon-circle";
 import { AiImagePreview } from "@/components/layout/ai-image-preview";
 import { DetailCarousel } from "@/components/layout/detail-carousel";
+import { ActivityLogPanel } from "@/components/activity/activity-log-panel";
 import { DocumentPdfThumb } from "@/components/documents/document-pdf-preview";
 import { BelegNotesBlock } from "@/components/trips/beleg-notes-block";
 import {
@@ -477,7 +478,7 @@ export function EventDetailOverlay({
 
   const canEdit = !readOnly;
 
-  // Slide order: overview → details? → map? → belege? → diary → actions?
+  // Slide order: overview → details? → map? → belege? → diary → actions? → activity
   let diarySlideIndex = 1;
   if (hasDetailsSlide) diarySlideIndex += 1;
   if (mapModel) diarySlideIndex += 1;
@@ -1035,6 +1036,15 @@ export function EventDetailOverlay({
                 </div>
               </div>
             ) : null}
+
+            {/* 7. Aktivität */}
+            <div className="px-2 py-1">
+              <ActivityLogPanel
+                entityType="trip_event"
+                entityId={event.id}
+                compact
+              />
+            </div>
           </DetailCarousel>
         </div>
       </DialogContent>

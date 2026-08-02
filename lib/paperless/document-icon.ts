@@ -17,6 +17,7 @@ import {
 import { PaperlessClient } from "@/lib/paperless/client";
 import { getTripsDataRoot } from "@/lib/trips/paths";
 import { nowIso } from "@/lib/utils/dates";
+import { appendActivityLog } from "@/lib/activity-log";
 
 /** Document list thumbnails — gpt-image-1.5 for reliable color + prompt adherence. */
 export const DOCUMENT_AI_ICON_MODEL = "gpt-image-1.5";
@@ -286,12 +287,26 @@ export function clearDocumentAiIcon(documentId: number): void {
     .prepare(`SELECT ai_icon_path FROM paperless_documents WHERE id = ?`)
     .get(documentId) as { ai_icon_path: string | null } | undefined;
   if (!row) return;
+  const hadIcon = Boolean(row.ai_icon_path);
   deleteIconFile(row.ai_icon_path);
   db.prepare(
     `UPDATE paperless_documents
      SET ai_icon_path = NULL, ai_icon_prompt = NULL, updated_at = ?
      WHERE id = ?`
   ).run(nowIso(), documentId);
+  if (hadIcon) {
+    try {
+      appendActivityLog({
+        entityType: "document",
+        entityId: documentId,
+        action: "ai_icon",
+        summary: "KI-Icon entfernt",
+        source: "document-icon",
+      });
+    } catch {
+      /* optional */
+    }
+  }
 }
 
 export function setDocumentAiIcon(
@@ -300,6 +315,9 @@ export function setDocumentAiIcon(
   aiIconPrompt: string
 ): PaperlessDocumentRow {
   const db = getDb();
+  const prev = db
+    .prepare(`SELECT ai_icon_path FROM paperless_documents WHERE id = ?`)
+    .get(documentId) as { ai_icon_path: string | null } | undefined;
   db.prepare(
     `UPDATE paperless_documents
      SET ai_icon_path = ?, ai_icon_prompt = ?, updated_at = ?
@@ -309,6 +327,17 @@ export function setDocumentAiIcon(
     .prepare(`SELECT * FROM paperless_documents WHERE id = ?`)
     .get(documentId) as PaperlessDocumentRow | undefined;
   if (!row) throw new Error("Dokument nicht gefunden");
+  try {
+    appendActivityLog({
+      entityType: "document",
+      entityId: documentId,
+      action: "ai_icon",
+      summary: prev?.ai_icon_path ? "KI-Icon neu erzeugt" : "KI-Icon erzeugt",
+      source: "document-icon",
+    });
+  } catch {
+    /* optional */
+  }
   return row;
 }
 

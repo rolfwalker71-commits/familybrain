@@ -20,6 +20,7 @@ import {
   getAppUserById,
   grantLedgerAccess,
 } from "@/lib/users/queries";
+import { appendActivityLog, logFieldChange } from "@/lib/activity-log";
 
 export type FinanceLedgerRow = {
   id: number;
@@ -914,7 +915,23 @@ export function createFinanceExpense(
     settleExpenseSharesToPayer(expenseId);
   }
   touchLedger(ledgerId);
-  return getFinanceExpenseById(expenseId)!;
+  const created = getFinanceExpenseById(expenseId)!;
+  try {
+    const label =
+      created.description?.trim() ||
+      `${created.amount} ${created.currency}`;
+    appendActivityLog({
+      entityType: "finance_expense",
+      entityId: expenseId,
+      action: "created",
+      summary: `Ausgabe angelegt: ${label}`,
+      source: "finance-expense",
+      newValue: label,
+    });
+  } catch {
+    /* optional */
+  }
+  return created;
 }
 
 /**
@@ -1408,7 +1425,88 @@ export function updateFinanceExpense(
         : "Auto-Ausgleich";
     settleExpenseSharesToPayer(expenseId, { notePrefix });
   }
-  return getFinanceExpenseById(expenseId)!;
+  const updated = getFinanceExpenseById(expenseId)!;
+  try {
+    const tracked: Array<{
+      changed: boolean;
+      field: string;
+      label: string;
+      oldValue: unknown;
+      newValue: unknown;
+    }> = [
+      {
+        changed: input.description !== undefined,
+        field: "description",
+        label: "Beschreibung",
+        oldValue: existing.description,
+        newValue: updated.description,
+      },
+      {
+        changed: input.expenseDate !== undefined,
+        field: "expense_date",
+        label: "Datum",
+        oldValue: existing.expense_date,
+        newValue: updated.expense_date,
+      },
+      {
+        changed: input.amount !== undefined,
+        field: "amount",
+        label: "Betrag",
+        oldValue: existing.amount,
+        newValue: updated.amount,
+      },
+      {
+        changed: input.currency !== undefined,
+        field: "currency",
+        label: "Währung",
+        oldValue: existing.currency,
+        newValue: updated.currency,
+      },
+      {
+        changed: input.placeName !== undefined,
+        field: "place_name",
+        label: "Ort",
+        oldValue: existing.place_name,
+        newValue: updated.place_name,
+      },
+      {
+        changed: input.note !== undefined,
+        field: "note",
+        label: "Notiz",
+        oldValue: existing.note,
+        newValue: updated.note,
+      },
+      {
+        changed: input.paidByMemberId !== undefined,
+        field: "paid_by_member_id",
+        label: "Zahler",
+        oldValue: existing.paid_by_member_id,
+        newValue: updated.paid_by_member_id,
+      },
+      {
+        changed: input.direction !== undefined,
+        field: "direction",
+        label: "Richtung",
+        oldValue: existing.direction,
+        newValue: updated.direction,
+      },
+    ];
+    for (const t of tracked) {
+      if (!t.changed) continue;
+      logFieldChange({
+        entityType: "finance_expense",
+        entityId: expenseId,
+        fieldName: t.field,
+        label: t.label,
+        oldValue: t.oldValue,
+        newValue: t.newValue,
+        source: "finance-expense",
+      });
+    }
+  } catch {
+    /* optional */
+  }
+  return updated;
 }
 
 export function setFinanceExpenseAiImage(
@@ -1426,7 +1524,27 @@ export function setFinanceExpenseAiImage(
      WHERE id = ?`
   ).run(input.aiImagePath, input.aiImagePrompt, nowIso(), expenseId);
   touchLedger(existing.ledger_id);
-  return getFinanceExpenseById(expenseId)!;
+  const updated = getFinanceExpenseById(expenseId)!;
+  try {
+    const had = Boolean(existing.ai_image_path);
+    const has = Boolean(updated.ai_image_path);
+    if (had !== has || existing.ai_image_path !== updated.ai_image_path) {
+      appendActivityLog({
+        entityType: "finance_expense",
+        entityId: expenseId,
+        action: "ai_image",
+        summary: !has
+          ? "KI-Bild entfernt"
+          : had
+            ? "KI-Bild neu erzeugt"
+            : "KI-Bild erzeugt",
+        source: "finance-expense",
+      });
+    }
+  } catch {
+    /* optional */
+  }
+  return updated;
 }
 
 export function setFinanceExpenseReceiptPath(
@@ -1463,6 +1581,21 @@ export function deleteFinanceExpense(expenseId: number): void {
         /* ignore */
       }
     }
+  }
+  try {
+    const label =
+      existing.description?.trim() ||
+      `${existing.amount} ${existing.currency}`;
+    appendActivityLog({
+      entityType: "finance_expense",
+      entityId: expenseId,
+      action: "deleted",
+      summary: `Ausgabe gelöscht: ${label}`,
+      source: "finance-expense",
+      oldValue: label,
+    });
+  } catch {
+    /* optional */
   }
 }
 

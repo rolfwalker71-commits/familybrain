@@ -2,6 +2,7 @@ import { getDb } from "@/lib/db/client";
 import type { DocumentAnalysis } from "@/lib/ai/schemas";
 import { shortenInstitutionName } from "@/lib/extraction/bank";
 import { nowIso } from "@/lib/utils/dates";
+import { logFieldChange } from "@/lib/activity-log";
 
 /** Normalize AI-suggested Paperless titles. */
 export function clipSuggestedDocumentTitle(
@@ -18,13 +19,28 @@ export function updateLocalDocumentTitle(
   title: string
 ): void {
   const ts = nowIso();
-  getDb()
-    .prepare(
-      `UPDATE paperless_documents
+  const db = getDb();
+  const prev = db
+    .prepare(`SELECT title FROM paperless_documents WHERE id = ?`)
+    .get(localDocumentId) as { title: string | null } | undefined;
+  db.prepare(
+    `UPDATE paperless_documents
        SET title = ?, updated_at = ?
        WHERE id = ?`
-    )
-    .run(title, ts, localDocumentId);
+  ).run(title, ts, localDocumentId);
+  try {
+    logFieldChange({
+      entityType: "document",
+      entityId: localDocumentId,
+      fieldName: "title",
+      label: "Titel",
+      oldValue: prev?.title,
+      newValue: title,
+      source: "document-title",
+    });
+  } catch {
+    /* optional */
+  }
 }
 
 /**

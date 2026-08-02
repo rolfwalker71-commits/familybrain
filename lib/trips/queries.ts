@@ -11,6 +11,7 @@ import {
 import { formatAirportRoute, normalizeIataCode } from "@/lib/trips/iata";
 import { unlinkTripEventAttachmentFile } from "@/lib/trips/attachments";
 import { unlinkTripEventCommentImageFile } from "@/lib/trips/comment-images";
+import { appendActivityLog, logFieldChange } from "@/lib/activity-log";
 
 export type TripRow = {
   id: number;
@@ -543,7 +544,20 @@ export function createTripEvent(
     resequenceTripEventsByDate(tripId);
   }
   syncTripDatesFromEvents(tripId);
-  return getTripEventById(event.id) ?? event;
+  const created = getTripEventById(event.id) ?? event;
+  try {
+    appendActivityLog({
+      entityType: "trip_event",
+      entityId: created.id,
+      action: "created",
+      summary: `Aktivität angelegt: ${created.title}`,
+      source: "trip-event",
+      newValue: created.title,
+    });
+  } catch {
+    /* optional */
+  }
+  return created;
 }
 
 export function updateTripEvent(
@@ -767,7 +781,126 @@ export function updateTripEvent(
   }
 
   syncTripDatesFromEvents(event.trip_id);
-  return getTripEventById(eventId) ?? event;
+  const updated = getTripEventById(eventId) ?? event;
+  try {
+    const tracked: Array<{
+      key: keyof TripEventInput;
+      field: string;
+      label: string;
+      oldValue: unknown;
+      newValue: unknown;
+    }> = [
+      {
+        key: "title",
+        field: "title",
+        label: "Titel",
+        oldValue: existing.title,
+        newValue: updated.title,
+      },
+      {
+        key: "eventType",
+        field: "event_type",
+        label: "Typ",
+        oldValue: existing.event_type,
+        newValue: updated.event_type,
+      },
+      {
+        key: "startDate",
+        field: "start_date",
+        label: "Startdatum",
+        oldValue: existing.start_date,
+        newValue: updated.start_date,
+      },
+      {
+        key: "endDate",
+        field: "end_date",
+        label: "Enddatum",
+        oldValue: existing.end_date,
+        newValue: updated.end_date,
+      },
+      {
+        key: "startTime",
+        field: "start_time",
+        label: "Startzeit",
+        oldValue: existing.start_time,
+        newValue: updated.start_time,
+      },
+      {
+        key: "endTime",
+        field: "end_time",
+        label: "Endzeit",
+        oldValue: existing.end_time,
+        newValue: updated.end_time,
+      },
+      {
+        key: "location",
+        field: "location",
+        label: "Ort",
+        oldValue: existing.location,
+        newValue: updated.location,
+      },
+      {
+        key: "provider",
+        field: "provider",
+        label: "Anbieter",
+        oldValue: existing.provider,
+        newValue: updated.provider,
+      },
+      {
+        key: "bookingReference",
+        field: "booking_reference",
+        label: "Buchungsnr.",
+        oldValue: existing.booking_reference,
+        newValue: updated.booking_reference,
+      },
+      {
+        key: "notes",
+        field: "notes",
+        label: "Notizen",
+        oldValue: existing.notes,
+        newValue: updated.notes,
+      },
+      {
+        key: "placeName",
+        field: "place_name",
+        label: "Ortname",
+        oldValue: existing.place_name,
+        newValue: updated.place_name,
+      },
+    ];
+    for (const t of tracked) {
+      if (input[t.key] === undefined) continue;
+      logFieldChange({
+        entityType: "trip_event",
+        entityId: eventId,
+        fieldName: t.field,
+        label: t.label,
+        oldValue: t.oldValue,
+        newValue: t.newValue,
+        source: "trip-event",
+      });
+    }
+    if (input.aiImagePath !== undefined) {
+      const had = Boolean(existing.ai_image_path);
+      const has = Boolean(updated.ai_image_path);
+      if (had !== has || existing.ai_image_path !== updated.ai_image_path) {
+        appendActivityLog({
+          entityType: "trip_event",
+          entityId: eventId,
+          action: "ai_image",
+          summary: !has
+            ? "KI-Bild entfernt"
+            : had
+              ? "KI-Bild neu erzeugt"
+              : "KI-Bild erzeugt",
+          source: "trip-event",
+        });
+      }
+    }
+  } catch {
+    /* optional */
+  }
+  return updated;
 }
 
 export function deleteTripEvent(eventId: number): void {
@@ -784,6 +917,18 @@ export function deleteTripEvent(eventId: number): void {
   }
   for (const comment of comments) {
     unlinkTripEventCommentImageFile(comment.image_path);
+  }
+  try {
+    appendActivityLog({
+      entityType: "trip_event",
+      entityId: eventId,
+      action: "deleted",
+      summary: `Aktivität gelöscht: ${existing.title}`,
+      source: "trip-event",
+      oldValue: existing.title,
+    });
+  } catch {
+    /* optional */
   }
 }
 

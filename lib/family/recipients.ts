@@ -7,6 +7,7 @@ import {
   type FamilyMemberPublic,
 } from "@/lib/family/queries";
 import type { DocumentAnalysis } from "@/lib/ai/schemas";
+import { logFieldChange } from "@/lib/activity-log";
 
 export type RecipientStatus = "matched" | "unknown";
 
@@ -105,11 +106,26 @@ export function parseRecipientMemberIds(
   }
 }
 
+function recipientLabel(memberIds: number[]): string {
+  if (memberIds.length === 0) return UNKNOWN_RECIPIENT_LABEL;
+  const byId = new Map(listFamilyMembers().map((m) => [m.id, m.display_name]));
+  const names = memberIds
+    .map((id) => byId.get(id))
+    .filter((n): n is string => Boolean(n));
+  return names.length > 0 ? names.join(", ") : UNKNOWN_RECIPIENT_LABEL;
+}
+
 export function setDocumentRecipients(
   documentId: number,
   memberIds: number[]
 ): { status: RecipientStatus; memberIds: number[] } {
   const db = getDb();
+  const prev = db
+    .prepare(
+      `SELECT recipient_member_ids FROM paperless_documents WHERE id = ?`
+    )
+    .get(documentId) as { recipient_member_ids: string | null } | undefined;
+  const prevIds = parseRecipientMemberIds(prev?.recipient_member_ids);
   const unique = [...new Set(memberIds)].sort((a, b) => a - b);
   const status: RecipientStatus = unique.length > 0 ? "matched" : "unknown";
   const ts = nowIso();
@@ -118,6 +134,19 @@ export function setDocumentRecipients(
      SET recipient_member_ids = ?, recipient_status = ?, recipient_at = ?, updated_at = ?
      WHERE id = ?`
   ).run(JSON.stringify(unique), status, ts, ts, documentId);
+  try {
+    logFieldChange({
+      entityType: "document",
+      entityId: documentId,
+      fieldName: "recipients",
+      label: "Empfänger",
+      oldValue: recipientLabel(prevIds),
+      newValue: recipientLabel(unique),
+      source: "recipients",
+    });
+  } catch {
+    /* optional */
+  }
   return { status, memberIds: unique };
 }
 

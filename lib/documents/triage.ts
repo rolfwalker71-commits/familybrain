@@ -12,6 +12,7 @@ import {
 } from "@/lib/documents/triage-shared";
 import { isTriageAfterAnalysisEnabled } from "@/lib/documents/triage-settings";
 import { applyTaxRelevantLocal } from "@/lib/documents/tax-relevance";
+import { appendActivityLog } from "@/lib/activity-log";
 
 export type { TriageAction, TriageReason, TriageStatus };
 export { TRIAGE_REASON_LABELS, TRIAGE_STATUS_LABELS };
@@ -342,6 +343,18 @@ export async function resolveDocumentTriage(input: {
        SET triage_snoozed_until = ?, triage_at = ?, updated_at = ?
        WHERE id = ?`
     ).run(untilIso, ts, ts, input.documentLocalId);
+    try {
+      appendActivityLog({
+        entityType: "document",
+        entityId: input.documentLocalId,
+        action: "triage",
+        summary: `Prüfung: Zurückgestellt (${days} Tage)`,
+        source: "triage",
+        newValue: untilIso,
+      });
+    } catch {
+      /* optional */
+    }
     return { ok: true };
   }
 
@@ -467,6 +480,29 @@ export async function resolveDocumentTriage(input: {
   } catch {
     const { publishInboxRefresh } = await import("@/lib/realtime/hub");
     publishInboxRefresh();
+  }
+
+  try {
+    const nextStatus: TriageStatus =
+      input.action === "ignore"
+        ? "ignored"
+        : input.action === "done"
+          ? "done"
+          : (input.action as TriageStatus);
+    const actionLabel = TRIAGE_STATUS_LABELS[nextStatus] || input.action;
+    appendActivityLog({
+      entityType: "document",
+      entityId: input.documentLocalId,
+      action:
+        input.action === "pay" || PAID_VIA_ACTIONS.has(input.action)
+          ? "payment"
+          : "triage",
+      summary: `Prüfung: ${actionLabel}`,
+      source: "triage",
+      newValue: input.action,
+    });
+  } catch {
+    /* optional */
   }
 
   return { ok: true };

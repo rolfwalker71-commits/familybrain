@@ -30,6 +30,7 @@ import {
   MoreHorizontal,
   RefreshCw,
   Sparkles,
+  History,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -44,6 +45,7 @@ import {
   type DocumentDetailTab,
   type DocumentTabItem,
 } from "@/components/documents/document-tab-nav";
+import { ActivityLogPanel } from "@/components/activity/activity-log-panel";
 import {
   IconCircle,
   knowledgeVisual,
@@ -188,6 +190,7 @@ function DocumentDetailInner({ detail }: DetailProps) {
     { id: "overview", label: "Übersicht", icon: LayoutDashboard },
     { id: "extracts", label: "Extrakte", icon: Layers },
     { id: "files", label: "OCR", icon: FileText },
+    { id: "activity", label: "Log", icon: History },
     { id: "more", label: "Mehr", icon: MoreHorizontal },
   ];
 
@@ -1291,6 +1294,10 @@ function DocumentDetailInner({ detail }: DetailProps) {
             ) : null}
           </Card>
         </div>
+      ) : null}
+
+      {activeTab === "activity" ? (
+        <ActivityLogPanel entityType="document" entityId={document.id} />
       ) : null}
 
       {activeTab === "more" ? (

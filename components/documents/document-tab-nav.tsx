@@ -2,7 +2,12 @@
 
 import { AppTabNav, type AppTabItem } from "@/components/layout/app-tab-nav";
 
-export type DocumentDetailTab = "overview" | "extracts" | "files" | "more";
+export type DocumentDetailTab =
+  | "overview"
+  | "extracts"
+  | "files"
+  | "more"
+  | "activity";
 
 export type DocumentTabItem = AppTabItem<DocumentDetailTab>;
 
@@ -13,7 +18,8 @@ export function parseDocumentDetailTab(
     raw === "overview" ||
     raw === "extracts" ||
     raw === "files" ||
-    raw === "more"
+    raw === "more" ||
+    raw === "activity"
   ) {
     return raw;
   }
