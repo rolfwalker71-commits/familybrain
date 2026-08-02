@@ -1,6 +1,9 @@
 import { getDb } from "@/lib/db/client";
 import { listOpenUnpaidInvoices, publicAiIconUrl } from "@/lib/db/queries";
-import { listPendingTriageDocuments } from "@/lib/documents/triage";
+import {
+  countPendingTriageDocuments,
+  listPendingTriageDocuments,
+} from "@/lib/documents/triage";
 import {
   ACTION_OVERDUE_LOOKBACK_DAYS,
   ACTION_WARRANTY_AHEAD_DAYS,
@@ -146,7 +149,9 @@ export function buildInboxTaskBoard(limits = { each: 12 }): InboxTaskBoard {
 
   const candidates: InboxTask[] = [];
 
-  const triagePending = listPendingTriageDocuments(Math.max(limit, 12));
+  const triagePendingTotal = countPendingTriageDocuments();
+  // Show more triage rows so multi-select is useful; full queue via discard-all.
+  const triagePending = listPendingTriageDocuments(Math.max(limit, 40));
   for (const row of triagePending) {
     const triage: InboxTriagePayload = {
       id: row.id,
@@ -437,6 +442,7 @@ export function buildInboxTaskBoard(limits = { each: 12 }): InboxTaskBoard {
       snoozed: snoozed.length,
       completed: completed.length,
     },
+    triagePendingTotal,
   };
 }
 

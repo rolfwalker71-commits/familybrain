@@ -7,6 +7,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { absoluteAppUrl } from "@/lib/app-url";
 import {
+  countPendingTriageDocuments,
   listPendingTriageDocuments,
   type TriageInboxItem,
 } from "@/lib/documents/triage";
@@ -106,18 +107,7 @@ function loadTriageItem(documentId: number): TriageInboxItem | null {
   return pending.find((d) => d.id === documentId) || null;
 }
 
-/** Count pending triage docs (cheap). */
-export function countPendingTriageDocuments(): number {
-  const db = getDb();
-  const row = db
-    .prepare(
-      `SELECT COUNT(*) AS n FROM paperless_documents
-       WHERE triage_status = 'pending'
-         AND COALESCE(sync_status, 'synced') != 'missing'`
-    )
-    .get() as { n: number };
-  return Number(row?.n) || 0;
-}
+export { countPendingTriageDocuments };
 
 /**
  * After analysis newly queued a doc for triage — send HTML mail if enabled.

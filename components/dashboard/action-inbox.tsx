@@ -68,6 +68,10 @@ export function ActionInbox() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [tab, setTab] = useState<BoardTab>("open");
+  const [selectedTriageIds, setSelectedTriageIds] = useState<Set<number>>(
+    () => new Set()
+  );
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -75,6 +79,7 @@ export function ActionInbox() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Laden fehlgeschlagen");
       setBoard(json as InboxTaskBoard);
+      setSelectedTriageIds(new Set());
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -171,6 +176,11 @@ export function ActionInbox() {
       const syncJson = await sync.json().catch(() => ({}));
       if (sync.ok && (syncJson as { board?: InboxTaskBoard }).board) {
         setBoard((syncJson as { board: InboxTaskBoard }).board);
+        setSelectedTriageIds((prev) => {
+          const next = new Set(prev);
+          next.delete(input.documentLocalId);
+          return next;
+        });
       } else {
         await load();
       }
@@ -178,6 +188,49 @@ export function ActionInbox() {
       setActionError(err instanceof Error ? err.message : String(err));
     } finally {
       setBusyKey(null);
+    }
+  }
+
+  async function discardTriageBulk(mode: "all" | "selected") {
+    if (mode === "selected" && selectedTriageIds.size === 0) {
+      setActionError("Bitte mindestens ein Dokument auswählen.");
+      return;
+    }
+    const total = board?.triagePendingTotal ?? 0;
+    const confirmMsg =
+      mode === "all"
+        ? `${total} Dokumente in der gesamten Prüfliste als irrelevant verwerfen? Das lässt sich nicht rückgängig machen.`
+        : `${selectedTriageIds.size} ausgewählte Dokumente verwerfen?`;
+    if (!window.confirm(confirmMsg)) return;
+
+    setBulkBusy(true);
+    setActionError(null);
+    try {
+      const res = await fetch("/api/dashboard/triage/batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode,
+          documentLocalIds:
+            mode === "selected" ? [...selectedTriageIds] : undefined,
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          (json as { error?: string }).error || "Verwerfen fehlgeschlagen"
+        );
+      }
+      if ((json as { board?: InboxTaskBoard }).board) {
+        setBoard((json as { board: InboxTaskBoard }).board);
+      } else {
+        await load();
+      }
+      setSelectedTriageIds(new Set());
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBulkBusy(false);
     }
   }
 
@@ -207,6 +260,14 @@ export function ActionInbox() {
       : tab === "snoozed"
         ? board.snoozed
         : board.completed;
+
+  const visibleTriageIds = list
+    .filter((t) => t.sourceKind === "triage" && t.triage)
+    .map((t) => t.triage!.id);
+  const triagePendingTotal = board.triagePendingTotal ?? 0;
+  const allVisibleSelected =
+    visibleTriageIds.length > 0 &&
+    visibleTriageIds.every((id) => selectedTriageIds.has(id));
 
   return (
     <Card className="border-border/70 shadow-[0_2px_4px_rgba(20,32,28,0.06),0_10px_28px_rgba(20,32,28,0.08)]">
@@ -258,6 +319,65 @@ export function ActionInbox() {
           </div>
         </div>
 
+        {tab === "open" && triagePendingTotal > 0 ? (
+          <div className="flex flex-col gap-2 rounded-lg border border-amber-500/30 bg-amber-50/80 px-3 py-2.5 text-sm text-amber-950 dark:bg-amber-950/30 dark:text-amber-50 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+            <p className="text-xs sm:text-sm">
+              Prüfliste:{" "}
+              <span className="font-semibold tabular-nums">
+                {triagePendingTotal}
+              </span>{" "}
+              Dokument
+              {triagePendingTotal === 1 ? "" : "e"} in der Queue
+              {visibleTriageIds.length < triagePendingTotal
+                ? ` · ${visibleTriageIds.length} angezeigt`
+                : ""}
+              {selectedTriageIds.size > 0
+                ? ` · ${selectedTriageIds.size} ausgewählt`
+                : ""}
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-8 border-amber-600/35 bg-white/70 dark:bg-amber-950/50"
+                disabled={bulkBusy || visibleTriageIds.length === 0}
+                onClick={() => {
+                  if (allVisibleSelected) {
+                    setSelectedTriageIds(new Set());
+                  } else {
+                    setSelectedTriageIds(new Set(visibleTriageIds));
+                  }
+                }}
+              >
+                {allVisibleSelected
+                  ? "Auswahl aufheben"
+                  : "Sichtbare auswählen"}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-8 border-amber-600/35 bg-white/70 dark:bg-amber-950/50"
+                disabled={bulkBusy || selectedTriageIds.size === 0}
+                onClick={() => void discardTriageBulk("selected")}
+              >
+                {bulkBusy ? "…" : "Auswahl verwerfen"}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-8 border-destructive/40 text-destructive hover:bg-destructive/10"
+                disabled={bulkBusy || triagePendingTotal === 0}
+                onClick={() => void discardTriageBulk("all")}
+              >
+                {bulkBusy ? "…" : "Alle verwerfen"}
+              </Button>
+            </div>
+          </div>
+        ) : null}
+
         {actionError ? (
           <p className="text-sm text-destructive">{actionError}</p>
         ) : null}
@@ -278,6 +398,24 @@ export function ActionInbox() {
                 task={task}
                 tab={tab}
                 busyKey={busyKey}
+                selected={
+                  task.triage
+                    ? selectedTriageIds.has(task.triage.id)
+                    : false
+                }
+                onToggleSelect={
+                  task.sourceKind === "triage" && task.triage
+                    ? () => {
+                        const id = task.triage!.id;
+                        setSelectedTriageIds((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(id)) next.delete(id);
+                          else next.add(id);
+                          return next;
+                        });
+                      }
+                    : undefined
+                }
                 onAction={(action, snoozeDays) =>
                   void runTaskAction(task, action, snoozeDays)
                 }
@@ -295,12 +433,16 @@ function TaskRow({
   task,
   tab,
   busyKey,
+  selected,
+  onToggleSelect,
   onAction,
   onTriage,
 }: {
   task: InboxTask;
   tab: BoardTab;
   busyKey: string | null;
+  selected?: boolean;
+  onToggleSelect?: () => void;
   onAction: (action: InboxTaskAction, snoozeDays?: number) => void;
   onTriage: (payload: {
     documentLocalId: number;
@@ -318,6 +460,8 @@ function TaskRow({
       <TriagePendingCard
         row={task.triage}
         busy={Boolean(busy)}
+        selected={Boolean(selected)}
+        onToggleSelect={onToggleSelect}
         onSubmit={onTriage}
       />
     );
@@ -487,10 +631,14 @@ function ChoiceChip({
 function TriagePendingCard({
   row,
   busy,
+  selected,
+  onToggleSelect,
   onSubmit,
 }: {
   row: InboxTriagePayload;
   busy: boolean;
+  selected?: boolean;
+  onToggleSelect?: () => void;
   onSubmit: (payload: {
     documentLocalId: number;
     action: TriageAction;
@@ -520,8 +668,27 @@ function TriagePendingCard({
     (taxRelevant === false || taxYearNum != null);
 
   return (
-    <li className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2.5">
+    <li
+      className={cn(
+        "rounded-lg border bg-muted/20 px-3 py-2.5",
+        selected
+          ? "border-[var(--brand-docs)]/50 bg-[var(--brand-docs)]/5"
+          : "border-border/60"
+      )}
+    >
       <div className="flex items-start gap-2.5">
+        {onToggleSelect ? (
+          <label className="mt-1 flex shrink-0 cursor-pointer items-center">
+            <input
+              type="checkbox"
+              className="size-4 accent-[var(--brand-docs)]"
+              checked={Boolean(selected)}
+              disabled={busy}
+              onChange={onToggleSelect}
+              aria-label="Zur Auswahl hinzufügen"
+            />
+          </label>
+        ) : null}
         <Link
           href={`/documents/${row.id}`}
           className="flex min-w-0 flex-1 items-start gap-2.5 hover:opacity-90"

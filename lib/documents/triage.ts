@@ -228,6 +228,69 @@ export type TriageInboxItem = {
   tax_suggested: boolean;
 };
 
+/** All pending triage docs (incl. snoozed) — for queue size / mass discard. */
+export function countPendingTriageDocuments(): number {
+  const db = getDb();
+  const row = db
+    .prepare(
+      `SELECT COUNT(*) AS n FROM paperless_documents
+       WHERE triage_status = 'pending'
+         AND COALESCE(sync_status, 'synced') != 'missing'`
+    )
+    .get() as { n: number };
+  return Number(row?.n) || 0;
+}
+
+/**
+ * Mark pending triage as ignored (bulk). Leaves payment/tax flags alone.
+ * mode «all»: entire pending queue; «selected»: only given local ids.
+ */
+export function discardPendingTriageDocuments(input: {
+  mode: "all" | "selected";
+  documentLocalIds?: number[];
+}): { discarded: number } {
+  const db = getDb();
+  const ts = nowIso();
+
+  if (input.mode === "all") {
+    const result = db
+      .prepare(
+        `UPDATE paperless_documents
+         SET triage_status = 'ignored', triage_at = ?, triage_snoozed_until = NULL, updated_at = ?
+         WHERE triage_status = 'pending'
+           AND COALESCE(sync_status, 'synced') != 'missing'`
+      )
+      .run(ts, ts);
+    return { discarded: Number(result.changes) || 0 };
+  }
+
+  const ids = [
+    ...new Set(
+      (input.documentLocalIds || []).filter(
+        (id) => Number.isInteger(id) && id > 0
+      )
+    ),
+  ];
+  if (ids.length === 0) return { discarded: 0 };
+
+  let discarded = 0;
+  const chunkSize = 400;
+  for (let i = 0; i < ids.length; i += chunkSize) {
+    const chunk = ids.slice(i, i + chunkSize);
+    const placeholders = chunk.map(() => "?").join(",");
+    const result = db
+      .prepare(
+        `UPDATE paperless_documents
+         SET triage_status = 'ignored', triage_at = ?, triage_snoozed_until = NULL, updated_at = ?
+         WHERE triage_status = 'pending'
+           AND id IN (${placeholders})`
+      )
+      .run(ts, ts, ...chunk);
+    discarded += Number(result.changes) || 0;
+  }
+  return { discarded };
+}
+
 export function listPendingTriageDocuments(limit = 12): TriageInboxItem[] {
   const db = getDb();
   const rows = db

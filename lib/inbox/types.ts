@@ -65,6 +65,8 @@ export type InboxTaskBoard = {
     snoozed: number;
     completed: number;
   };
+  /** True pending triage queue size in DB (not capped by board page size). */
+  triagePendingTotal: number;
 };
 
 export function inboxTaskId(
