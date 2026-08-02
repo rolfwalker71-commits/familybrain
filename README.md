@@ -222,7 +222,7 @@ git push origin v0.2.0
 
 ## Backup / Disaster Recovery
 
-Restore-taugliches Konzept mit **restic** und gemounteter **Hetzner Storage Box** (Buddy `./data` + Paperless-Volumes):
+Restore-taugliches Konzept mit **restic** und **Hetzner Storage Box per SFTP** (Buddy `./data` ohne Qdrant + Paperless-Volumes):
 
 → [`docs/backup-restic.md`](docs/backup-restic.md)
 
