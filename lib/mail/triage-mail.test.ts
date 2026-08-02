@@ -57,3 +57,18 @@ test("buildTriageReadyMail embeds cid icon when provided", () => {
   assert.match(mail.html, /src="cid:doc-ai-42"/);
   assert.match(mail.html, /<img[^>]+cid:doc-ai-42/);
 });
+
+test("buildTriageReadyMail header shows logo and BuddyApp wordmark", () => {
+  const mail = buildTriageReadyMail({
+    items: [{ title: "Test", reasons: ["invoice"] }],
+    inboxUrl: "https://example.com/dashboard",
+    brandLogoSrc: "cid:buddy-logo",
+    totalPending: 1,
+  });
+  assert.match(mail.html, /src="cid:buddy-logo"/);
+  assert.match(mail.html, />BuddyApp</);
+  assert.doesNotMatch(
+    mail.html,
+    /text-transform:uppercase;color:[^"]+;">Buddy</
+  );
+});

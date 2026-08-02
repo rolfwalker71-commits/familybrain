@@ -36,6 +36,8 @@ export type TriageReadyMailInput = {
   inboxUrl: string;
   /** Optional absolute URL or cid: for hero illustration. */
   heroImageSrc?: string | null;
+  /** Absolute URL or cid: for header brand mark (Buddy logo). */
+  brandLogoSrc?: string | null;
   totalPending?: number;
 };
 
@@ -108,6 +110,10 @@ export function buildTriageReadyMail(input: TriageReadyMailInput): {
     ? `<img src="${escapeHtml(input.heroImageSrc)}" width="600" alt="" style="display:block;width:100%;max-width:600px;height:auto;border:0;" />`
     : `<div style="height:120px;background:linear-gradient(135deg,${BRAND.heroFrom} 0%,${BRAND.heroTo} 100%);"></div>`;
 
+  const brandMark = input.brandLogoSrc
+    ? `<img src="${escapeHtml(input.brandLogoSrc)}" width="56" height="56" alt="BuddyApp" style="display:block;width:56px;height:56px;border:0;border-radius:12px;object-fit:contain;" />`
+    : `<div style="width:56px;height:56px;border-radius:12px;background:${BRAND.docs};"></div>`;
+
   const html = `<!DOCTYPE html>
 <html lang="de">
 <head>
@@ -122,8 +128,13 @@ export function buildTriageReadyMail(input: TriageReadyMailInput): {
       <td align="center">
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="max-width:600px;width:100%;background:${BRAND.card};border:1px solid ${BRAND.border};border-radius:16px;overflow:hidden;">
           <tr>
-            <td style="background:${BRAND.docsSoft};padding:14px 22px;">
-              <div style="font-family:system-ui,-apple-system,sans-serif;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:${BRAND.docs};">Buddy</div>
+            <td style="background:${BRAND.docsSoft};padding:18px 22px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td valign="middle" style="padding-right:14px;line-height:0;">${brandMark}</td>
+                  <td valign="middle" style="font-family:system-ui,-apple-system,sans-serif;font-size:22px;font-weight:800;letter-spacing:-0.02em;color:${BRAND.docs};line-height:1.1;">BuddyApp</td>
+                </tr>
+              </table>
             </td>
           </tr>
           <tr>

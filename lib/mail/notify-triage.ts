@@ -59,6 +59,29 @@ function aiIconAttachment(documentId: number): MailAttachment | null {
   }
 }
 
+const BUDDY_LOGO_CID = "buddy-logo";
+
+/** Inline Buddy mark for triage mail header (CID). */
+function buddyLogoAttachment(): MailAttachment | null {
+  const candidates = [
+    path.join(process.cwd(), "public", "buddy-logo.png"),
+    path.join(process.cwd(), "buddy-logo.png"),
+  ];
+  for (const fsPath of candidates) {
+    if (!fs.existsSync(fsPath)) continue;
+    try {
+      return {
+        filename: "buddy-logo.png",
+        content: fs.readFileSync(fsPath).toString("base64"),
+        content_id: BUDDY_LOGO_CID,
+      };
+    } catch {
+      /* try next */
+    }
+  }
+  return null;
+}
+
 function itemToMailFields(
   item: TriageInboxItem,
   iconCid: string | null
@@ -125,12 +148,18 @@ export async function notifyTriageReadyEmail(documentId: number): Promise<{
   }
 
   const iconAtt = aiIconAttachment(documentId);
+  const logoAtt = buddyLogoAttachment();
   const totalPending = countPendingTriageDocuments();
   const mail = buildTriageReadyMail({
     items: [itemToMailFields(item, iconAtt?.content_id || null)],
     inboxUrl: absoluteAppUrl("/dashboard"),
+    brandLogoSrc: logoAtt ? `cid:${BUDDY_LOGO_CID}` : null,
     totalPending,
   });
+
+  const attachments = [logoAtt, iconAtt].filter(
+    (a): a is MailAttachment => a != null
+  );
 
   return sendMail({
     to: recipients,
@@ -138,7 +167,7 @@ export async function notifyTriageReadyEmail(documentId: number): Promise<{
     subject: mail.subject,
     text: mail.text,
     html: mail.html,
-    attachments: iconAtt ? [iconAtt] : undefined,
+    attachments: attachments.length ? attachments : undefined,
   });
 }
 
@@ -181,6 +210,8 @@ export async function sendTriageTestEmail(to: string): Promise<{
 
   const pending = listPendingTriageDocuments(3);
   const attachments: MailAttachment[] = [];
+  const logoAtt = buddyLogoAttachment();
+  if (logoAtt) attachments.push(logoAtt);
   const items =
     pending.length > 0
       ? pending.map((item) => {
@@ -208,6 +239,7 @@ export async function sendTriageTestEmail(to: string): Promise<{
   const mail = buildTriageReadyMail({
     items,
     inboxUrl: absoluteAppUrl("/dashboard"),
+    brandLogoSrc: logoAtt ? `cid:${BUDDY_LOGO_CID}` : null,
     totalPending: pending.length || items.length,
   });
 
