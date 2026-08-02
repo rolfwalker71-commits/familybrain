@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS paperless_documents (
   triage_status TEXT,
   triage_reasons TEXT,
   triage_at TEXT,
+  triage_snoozed_until TEXT,
   ai_icon_path TEXT,
   ai_icon_prompt TEXT,
   sync_status TEXT DEFAULT 'synced',

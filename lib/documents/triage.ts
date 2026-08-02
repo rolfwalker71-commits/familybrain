@@ -249,6 +249,11 @@ export function listPendingTriageDocuments(limit = 12): TriageInboxItem[] {
        LEFT JOIN document_summaries s ON s.document_id = d.id
        WHERE d.triage_status = 'pending'
          AND COALESCE(d.sync_status, 'synced') != 'missing'
+         AND (
+           d.triage_snoozed_until IS NULL
+           OR TRIM(d.triage_snoozed_until) = ''
+           OR d.triage_snoozed_until < date('now', 'localtime')
+         )
        ORDER BY COALESCE(d.triage_at, d.updated_at) DESC
        LIMIT ?`
     )
@@ -305,6 +310,7 @@ export async function resolveDocumentTriage(input: {
   action: TriageAction;
   taxRelevant?: boolean | null;
   taxYear?: number | null;
+  snoozeDays?: number | null;
 }): Promise<{ ok: boolean; error?: string }> {
   const db = getDb();
   const current = db
@@ -317,6 +323,26 @@ export async function resolveDocumentTriage(input: {
   if (!current) return { ok: false, error: "Dokument nicht gefunden" };
   if (current.triage_status !== "pending") {
     return { ok: false, error: "Dokument ist nicht in der Prüfliste" };
+  }
+
+  const ts = nowIso();
+
+  if (input.action === "snooze") {
+    const days = Math.min(Math.max(input.snoozeDays ?? 7, 1), 90);
+    const until = new Date();
+    until.setHours(0, 0, 0, 0);
+    until.setDate(until.getDate() + days);
+    const untilIso = [
+      until.getFullYear(),
+      String(until.getMonth() + 1).padStart(2, "0"),
+      String(until.getDate()).padStart(2, "0"),
+    ].join("-");
+    db.prepare(
+      `UPDATE paperless_documents
+       SET triage_snoozed_until = ?, triage_at = ?, updated_at = ?
+       WHERE id = ?`
+    ).run(untilIso, ts, ts, input.documentLocalId);
+    return { ok: true };
   }
 
   if (input.taxRelevant === true) {
@@ -333,8 +359,6 @@ export async function resolveDocumentTriage(input: {
       };
     }
   }
-
-  const ts = nowIso();
 
   async function syncPaymentFlags(flags: {
     zuBezahlen: boolean;
@@ -396,7 +420,7 @@ export async function resolveDocumentTriage(input: {
     db.prepare(
       `UPDATE paperless_documents
        SET zu_bezahlen = 1, bezahlt = 0,
-           triage_status = 'pay', triage_at = ?, updated_at = ?
+           triage_status = 'pay', triage_at = ?, triage_snoozed_until = NULL, updated_at = ?
        WHERE id = ?`
     ).run(ts, ts, input.documentLocalId);
 
@@ -407,7 +431,7 @@ export async function resolveDocumentTriage(input: {
     db.prepare(
       `UPDATE paperless_documents
        SET zu_bezahlen = 0, bezahlt = 1,
-           triage_status = ?, triage_at = ?, updated_at = ?
+           triage_status = ?, triage_at = ?, triage_snoozed_until = NULL, updated_at = ?
        WHERE id = ?`
     ).run(nextStatus, ts, ts, input.documentLocalId);
 
@@ -430,7 +454,7 @@ export async function resolveDocumentTriage(input: {
       input.action === "ignore" ? "ignored" : "done";
     db.prepare(
       `UPDATE paperless_documents
-       SET triage_status = ?, triage_at = ?, updated_at = ?
+       SET triage_status = ?, triage_at = ?, triage_snoozed_until = NULL, updated_at = ?
        WHERE id = ?`
     ).run(nextStatus, ts, ts, input.documentLocalId);
   }

@@ -1,4 +1,5 @@
 import { listTravelItems } from "@/lib/db/queries";
+import { listDocumentTripLinks } from "@/lib/trips/queries";
 import {
   TravelOverviewClient,
   type TravelRow,
@@ -8,5 +9,8 @@ export const dynamic = "force-dynamic";
 
 export default function TravelPage() {
   const items = listTravelItems() as unknown as TravelRow[];
-  return <TravelOverviewClient items={items} />;
+  const documentTripLinks = Object.fromEntries(
+    listDocumentTripLinks(items.map((item) => item.document_local_id))
+  );
+  return <TravelOverviewClient items={items} documentTripLinks={documentTripLinks} />;
 }

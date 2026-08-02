@@ -27,6 +27,7 @@ import { useAuth } from "@/components/auth/auth-provider";
 import { useAdminNav } from "@/components/layout/admin-nav-provider";
 import { UserAvatar } from "@/components/users/user-avatar";
 import { APP_VERSION } from "@/lib/app-version";
+import { BRAND } from "@/lib/branding";
 import { IconCircle, type IconTone } from "@/components/layout/icon-circle";
 import type { AdminNavMode } from "@/lib/navigation/admin-nav";
 
@@ -68,14 +69,14 @@ const myBrainNavItems: NavItem[] = [
   },
   {
     href: "/finance",
-    label: "Finanzen",
+    label: BRAND.financeBlick,
     icon: Wallet,
     tone: "green",
     countKey: "openDueFinanceCount",
   },
   {
     href: "/travel",
-    label: "Reisen",
+    label: BRAND.travelMemory,
     icon: Plane,
     tone: "teal",
   },
@@ -100,14 +101,14 @@ const myBrainNavItems: NavItem[] = [
 
 const travelBuddyItem: NavItem = {
   href: "/trips",
-  label: "TravelBuddy",
+  label: BRAND.travel,
   icon: Luggage,
   tone: "green",
 };
 
 const finanzBuddyItem: NavItem = {
   href: "/finance-brain",
-  label: "FinanzBuddy",
+  label: BRAND.finance,
   icon: HandCoins,
   tone: "green",
 };
@@ -127,16 +128,16 @@ type AreaEntry = {
 const areaEntries: AreaEntry[] = [
   {
     mode: "mybrain",
-    label: "MyBrain",
-    shortLabel: "Brain",
-    description: "Dokumente, Wissen und Assistent",
+    label: BRAND.buddy,
+    shortLabel: "Buddy",
+    description: "Dokumente, Fristen, Finanzblick und Wissen",
     icon: Brain,
     tone: "teal",
     href: "/dashboard",
   },
   {
     mode: "travelbuddy",
-    label: "TravelBuddy",
+    label: BRAND.travel,
     shortLabel: "Travel",
     description: "Reisen planen und teilen",
     icon: Luggage,
@@ -145,7 +146,7 @@ const areaEntries: AreaEntry[] = [
   },
   {
     mode: "finanzbuddy",
-    label: "FinanzBuddy",
+    label: BRAND.finance,
     shortLabel: "Finanz",
     description: "Gemeinsame Ausgaben und Abrechnung",
     icon: HandCoins,
@@ -245,11 +246,7 @@ export function Sidebar({
   const { isRunning } = analysis;
   const isLimitedUser = me != null && !me.isAdmin;
 
-  const brandTitle = isAdminNav
-    ? "BuddyApp"
-    : isLimitedUser
-      ? "TripBook"
-      : "TripBook";
+  const brandTitle = BRAND.app;
   const brandHref = isLimitedUser
     ? "/trips"
     : isAdminNav
@@ -349,7 +346,7 @@ export function Sidebar({
             className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-white"
           >
             <ArrowLeft className="size-3.5 shrink-0" />
-            Zurück zu BuddyApp
+            Zurück zu {BRAND.app}
           </button>
           <div className="grid grid-cols-3 gap-1 rounded-xl bg-white/10 p-1">
             {areaEntries.map((entry) => {

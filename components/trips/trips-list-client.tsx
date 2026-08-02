@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Download, Plus, Trash2, Upload } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -33,6 +33,8 @@ import { useAuth } from "@/components/auth/auth-provider";
 import { TodayHub } from "@/components/trips/today-hub";
 import { toSwissDate } from "@/lib/utils/dates";
 import { TRIP_STATUSES } from "@/lib/trips/constants";
+import { SoftFab } from "@/components/layout/soft-ui";
+import { ModuleBackupCard } from "@/components/layout/module-backup-card";
 
 type Trip = {
   id: number;
@@ -67,7 +69,6 @@ export function TripsListClient() {
   const [creating, setCreating] = useState(false);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
-  const importRef = useRef<HTMLInputElement>(null);
   const [sortDir, setSortDir] = useListSortDir("trips", "desc");
 
   async function load(dir = sortDir) {
@@ -154,8 +155,6 @@ export function TripsListClient() {
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      if (importRef.current) importRef.current.value = "";
     }
   }
 
@@ -239,7 +238,7 @@ export function TripsListClient() {
         }
       />
 
-      {showTodayHub ? <TodayHub isAdmin={isAdmin} /> : null}
+      {showTodayHub ? <TodayHub /> : null}
 
       {isAdmin ? (
         <Card className="hidden border-border shadow-[0_2px_4px_rgba(20,32,28,0.06),0_10px_28px_rgba(20,32,28,0.1)] md:block">
@@ -253,43 +252,11 @@ export function TripsListClient() {
       ) : null}
 
       {isAdmin ? (
-      <Card className="border-border shadow-[0_2px_4px_rgba(20,32,28,0.06),0_10px_28px_rgba(20,32,28,0.1)]">
-        <CardContent className="flex flex-wrap items-center gap-2 p-4">
-          <p className="mr-auto text-sm text-muted-foreground">
-            TravelBuddy-Backup
-          </p>
-          <a
-            href="/api/trips/backup"
-            className={cn(
-              buttonVariants({ variant: "outline", size: "sm" }),
-              "gap-1.5"
-            )}
-          >
-            <Download className="size-3.5" />
-            Export
-          </a>
-          <input
-            ref={importRef}
-            type="file"
-            accept="application/json,.json"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) void importBackup(file);
-            }}
-          />
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="gap-1.5"
-            onClick={() => importRef.current?.click()}
-          >
-            <Upload className="size-3.5" />
-            Import
-          </Button>
-        </CardContent>
-      </Card>
+        <ModuleBackupCard
+          title="TravelBuddy-Backup"
+          exportHref="/api/trips/backup"
+          onImport={importBackup}
+        />
       ) : null}
 
       {error ? (
@@ -412,14 +379,14 @@ export function TripsListClient() {
 
       {isAdmin ? (
         <>
-          <button
-            type="button"
-            className="fixed right-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-30 flex size-14 items-center justify-center rounded-full bg-foreground text-background shadow-lg md:hidden"
+          <SoftFab
+            accent="green"
+            label="Neue Reise"
             aria-label="Neue Reise"
             onClick={() => setCreateOpen(true)}
           >
             <Plus className="size-6" />
-          </button>
+          </SoftFab>
 
           <Sheet open={createOpen} onOpenChange={setCreateOpen}>
             <SheetContent side="bottom" className="max-h-[90dvh] overflow-y-auto">

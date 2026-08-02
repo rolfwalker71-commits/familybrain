@@ -9,9 +9,18 @@ export const dynamic = "force-dynamic";
 
 const BodySchema = z.object({
   documentLocalId: z.number().int().positive(),
-  action: z.enum(["pay", "ignore", "done", "ebill", "twint", "card"]),
+  action: z.enum([
+    "pay",
+    "ignore",
+    "done",
+    "ebill",
+    "twint",
+    "card",
+    "snooze",
+  ]),
   taxRelevant: z.boolean().nullable().optional(),
   taxYear: z.number().int().min(1990).max(2100).nullable().optional(),
+  snoozeDays: z.number().int().positive().max(90).optional(),
 });
 
 export async function POST(request: Request) {
@@ -25,7 +34,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Ungültige Eingabe" }, { status: 400 });
   }
 
-  const result = await resolveDocumentTriage(parsed.data);
+  const result = await resolveDocumentTriage({
+    documentLocalId: parsed.data.documentLocalId,
+    action: parsed.data.action,
+    taxRelevant: parsed.data.taxRelevant,
+    taxYear: parsed.data.taxYear,
+    snoozeDays: parsed.data.snoozeDays,
+  });
   if (!result.ok) {
     return NextResponse.json(
       { error: result.error || "Triage fehlgeschlagen" },

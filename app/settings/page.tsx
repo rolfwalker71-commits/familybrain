@@ -29,6 +29,7 @@ import { SettingsUsersPanel } from "@/components/settings/settings-users-panel";
 import { SettingsFamilyPanel } from "@/components/settings/settings-family-panel";
 import { NotificationPrefsPanel } from "@/components/settings/notification-prefs-panel";
 import { SettingsCategorySuggestionsPanel } from "@/components/settings/settings-category-suggestions-panel";
+import { BackupStatusPanel } from "@/components/settings/backup-status-panel";
 
 
 const ICLOUD_SMTP = {
@@ -841,7 +842,7 @@ function SettingsPageInner() {
     setSmtpPort(String(ICLOUD_SMTP.port));
     setSmtpSecure(ICLOUD_SMTP.secure);
     if (smtpUser.trim() && !smtpFrom.trim()) {
-      setSmtpFrom(`TripBook <${smtpUser.trim()}>`);
+      setSmtpFrom(`Buddy <${smtpUser.trim()}>`);
     }
     setMessage(
       "iCloud+-Preset gesetzt. Als Passwort ein App-spezifisches Passwort von appleid.apple.com verwenden."
@@ -1092,7 +1093,7 @@ function SettingsPageInner() {
     <div className="space-y-6 pb-28 md:space-y-8 md:pb-0">
       <PageHeader
         title="Einstellungen"
-        description="Verbindungen, KI und Chat-Verhalten für TripBook."
+        description="Verbindungen, KI und Chat-Verhalten für Buddy."
         icon={pageVisuals.settings.icon}
         tone={pageVisuals.settings.tone}
       />
@@ -1928,15 +1929,15 @@ function SettingsPageInner() {
               ) : null}
             </div>
             <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="smtpFrom">Absender TripBook / FinanzBuddy</Label>
+              <Label htmlFor="smtpFrom">Absender Buddy / FinanzBuddy</Label>
               <Input
                 id="smtpFrom"
                 value={smtpFrom}
                 onChange={(e) => setSmtpFrom(e.target.value)}
-                placeholder="TripBook <name@icloud.com>"
+                placeholder="Buddy <name@icloud.com>"
               />
               <p className="text-xs text-muted-foreground">
-                Standard-From für TripBook und FinanzBuddy. Triage-Mails haben
+                Standard-From für Buddy und FinanzBuddy. Triage-Mails haben
                 darunter einen eigenen Absendernamen. Bei iCloud muss die
                 From-Adresse deine iCloud-Mail (oder eine iCloud+-Custom-Domain)
                 sein. App-Passwort unter{" "}
@@ -2179,17 +2180,20 @@ function SettingsPageInner() {
       {activeTab === "family" ? <SettingsFamilyPanel /> : null}
 
       {activeTab === "notify" ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-3">
-              <IconCircle icon={Bell} tone="teal" size="sm" />
-              Live-Benachrichtigungen
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <NotificationPrefsPanel />
-          </CardContent>
-        </Card>
+        <>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-3">
+                <IconCircle icon={Bell} tone="teal" size="sm" />
+                Live-Benachrichtigungen
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <NotificationPrefsPanel />
+            </CardContent>
+          </Card>
+          <BackupStatusPanel />
+        </>
       ) : null}
 
       {activeTab === "more" ? (

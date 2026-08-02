@@ -22,7 +22,8 @@ export type TriageAction =
   | "done"
   | "ebill"
   | "twint"
-  | "card";
+  | "card"
+  | "snooze";
 
 export const TRIAGE_REASON_LABELS: Record<TriageReason, string> = {
   invoice: "Rechnung",

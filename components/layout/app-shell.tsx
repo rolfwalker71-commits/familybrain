@@ -8,6 +8,7 @@ import { TriageMassPauseBanner } from "@/components/analysis/triage-mass-pause-b
 import { AuthProvider, useAuth } from "@/components/auth/auth-provider";
 import { AdminNavProvider } from "@/components/layout/admin-nav-provider";
 import { RealtimeToasts } from "@/components/realtime/realtime-toasts";
+import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register";
 import { MobileHeader } from "./mobile-header";
 import { Sidebar } from "./sidebar";
 
@@ -74,6 +75,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
         {!isLimitedUser ? <TriageMassPauseBanner /> : null}
         {!isLimitedUser ? <AnalysisStatusBar /> : null}
         {me ? <RealtimeToasts /> : null}
+        {me ? <ServiceWorkerRegister /> : null}
         <div
           className={
             isChat

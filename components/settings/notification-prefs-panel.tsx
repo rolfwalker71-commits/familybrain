@@ -140,8 +140,9 @@ export function NotificationPrefsPanel() {
       <p className="text-xs text-muted-foreground">
         Live-Toasts erscheinen in der App, solange ein Tab geöffnet ist.
         Desktop-Benachrichtigungen (Windows) kommen dazu, wenn der Tab im
-        Hintergrund liegt. Push bei komplett geschlossener App folgt später.
-        Pro Benutzer speicherbar.
+        Hintergrund liegt. Der Service Worker ist für Benachrichtigungs-Klicks
+        und als Grundlage aktiv; vollständige Push-Zustellung bei geschlossener
+        App braucht noch VAPID und Server-Versand. Pro Benutzer speicherbar.
       </p>
 
       <div className="flex items-start gap-3 rounded-xl border border-border/60 bg-muted/30 px-3 py-3">

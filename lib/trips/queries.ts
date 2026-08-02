@@ -87,6 +87,12 @@ export type TripEventRow = {
   updated_at: string;
 };
 
+export type DocumentTripLink = {
+  document_id: number;
+  trip_id: number;
+  trip_title: string;
+};
+
 export function listTrips(sortDir: "asc" | "desc" = "desc"): TripRow[] {
   const db = getDb();
   const sortSql = sortDir === "asc" ? "ASC" : "DESC";
@@ -100,6 +106,31 @@ export function listTrips(sortDir: "asc" | "desc" = "desc"): TripRow[] {
          t.id ${sortSql}`
     )
     .all() as TripRow[];
+}
+
+export function listDocumentTripLinks(
+  documentIds: number[]
+): Map<number, DocumentTripLink> {
+  if (documentIds.length === 0) return new Map();
+
+  const db = getDb();
+  const placeholders = documentIds.map(() => "?").join(",");
+  const rows = db
+    .prepare(
+      `SELECT ted.document_id, t.id AS trip_id, t.title AS trip_title
+       FROM trip_event_documents ted
+       INNER JOIN trip_events te ON te.id = ted.trip_event_id
+       INNER JOIN trips t ON t.id = te.trip_id
+       WHERE ted.document_id IN (${placeholders})
+       ORDER BY t.updated_at DESC, t.id DESC, te.id DESC`
+    )
+    .all(...documentIds) as DocumentTripLink[];
+
+  const links = new Map<number, DocumentTripLink>();
+  for (const row of rows) {
+    if (!links.has(row.document_id)) links.set(row.document_id, row);
+  }
+  return links;
 }
 
 export function getTripById(id: number): TripRow | null {

@@ -59,6 +59,7 @@ import { cn } from "@/lib/utils";
 import { groupByTimeBucket } from "@/lib/utils/time-buckets";
 import Link from "next/link";
 import { DocumentAiIcon } from "@/components/documents/document-ai-icon";
+import { BRAND } from "@/lib/branding";
 import {
   OverviewTabNav,
   parseOverviewTab,
@@ -497,6 +498,13 @@ function FinanceOverviewClientInner({
   async function markSelectedPaid() {
     const ids = [...selectedDocIds];
     if (ids.length === 0) return;
+    if (
+      !window.confirm(
+        `${ids.length} Rechnung${ids.length === 1 ? "" : "en"} als beglichen markieren?`
+      )
+    ) {
+      return;
+    }
     setMarkPending(true);
     setMarkMessage(null);
     try {
@@ -520,7 +528,12 @@ function FinanceOverviewClientInner({
       const errCount = data.errors?.length ?? 0;
       setMarkMessage(
         errCount > 0
-          ? `${local} lokal beglichen, ${written} in Paperless · ${errCount} Hinweis(e)`
+          ? [
+              `${local} lokal beglichen, ${written} in Paperless · ${errCount} Hinweis(e)`,
+              ...data.errors!.map(
+                ({ documentLocalId, error }) => `Beleg ${documentLocalId}: ${error}`
+              ),
+            ].join("\n")
           : `${local} Rechnung(en) als beglichen markiert (${written} in Paperless)`
       );
       clearSelection();
@@ -553,23 +566,26 @@ function FinanceOverviewClientInner({
     <div className="min-w-0 space-y-4 pb-28 md:space-y-6 md:pb-0">
       <PageHeader
         title="Finanzblick"
-        description={
-          [
-            "KPIs ohne Lieferant «Unbekannt»",
-            unknownVendor.count > 0
-              ? `${unknownVendor.count} Positionen ohne Lieferant ausgeklammert (${formatCHF(unknownVendor.total)})`
-              : null,
-            excludedCount > 0
-              ? `${excludedCount} manuell ohne Statistik`
-              : null,
-          ]
-            .filter(Boolean)
-            .join(" · ")
-        }
+        description={[
+          "Paperless-Finanzblick in Buddy",
+          "KPIs ohne Lieferant «Unbekannt»",
+          unknownVendor.count > 0
+            ? `${unknownVendor.count} Positionen ohne Lieferant ausgeklammert (${formatCHF(unknownVendor.total)})`
+            : null,
+          excludedCount > 0 ? `${excludedCount} manuell ohne Statistik` : null,
+        ]
+          .filter(Boolean)
+          .join(" · ")}
         icon={pageVisuals.finance.icon}
         tone={pageVisuals.finance.tone}
         actions={
           <div className="flex flex-wrap gap-2">
+            <Link
+              href="/finance-brain"
+              className="inline-flex h-8 items-center rounded-md border border-border px-3 text-sm font-medium hover:bg-accent"
+            >
+              {BRAND.finance}
+            </Link>
             <ListSortControl
               storageKey="finance-due"
               label="Fälligkeit"
@@ -684,7 +700,7 @@ function FinanceOverviewClientInner({
             </div>
           ) : null}
           {markMessage ? (
-            <p className="border-b border-border/60 px-4 py-2 text-xs text-muted-foreground">
+            <p className="whitespace-pre-line border-b border-border/60 px-4 py-2 text-xs text-muted-foreground">
               {markMessage}
             </p>
           ) : null}

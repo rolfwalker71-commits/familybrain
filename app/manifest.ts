@@ -1,11 +1,11 @@
 import type { MetadataRoute } from "next";
+import { BRAND, BRAND_TAGLINE } from "@/lib/branding";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "TripBook",
-    short_name: "TripBook",
-    description:
-      "Reiseplanung und Reisekosten in einem — Tagebuch, Ausgaben und Abrechnung.",
+    name: BRAND.app,
+    short_name: BRAND.app,
+    description: BRAND_TAGLINE,
     start_url: "/dashboard",
     scope: "/",
     display: "standalone",
@@ -35,21 +35,21 @@ export default function manifest(): MetadataRoute.Manifest {
     ],
     shortcuts: [
       {
-        name: "Dokumente",
-        short_name: "Dokumente",
-        url: "/documents",
+        name: "Dashboard",
+        short_name: "Home",
+        url: "/dashboard",
         icons: [{ src: "/icon-192.png", sizes: "192x192" }],
       },
       {
-        name: "Chat",
-        short_name: "Chat",
-        url: "/chat",
+        name: BRAND.travel,
+        short_name: "Reisen",
+        url: "/trips",
         icons: [{ src: "/icon-192.png", sizes: "192x192" }],
       },
       {
-        name: "Synchronisieren",
-        short_name: "Sync",
-        url: "/sync",
+        name: BRAND.finance,
+        short_name: "Finanzen",
+        url: "/finance-brain",
         icons: [{ src: "/icon-192.png", sizes: "192x192" }],
       },
     ],

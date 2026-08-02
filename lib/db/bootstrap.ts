@@ -220,6 +220,11 @@ function ensureDocumentTriageColumns(db: Database.Database): void {
   if (!names.has("triage_at")) {
     db.exec(`ALTER TABLE paperless_documents ADD COLUMN triage_at TEXT`);
   }
+  if (!names.has("triage_snoozed_until")) {
+    db.exec(
+      `ALTER TABLE paperless_documents ADD COLUMN triage_snoozed_until TEXT`
+    );
+  }
   db.exec(
     `CREATE INDEX IF NOT EXISTS idx_docs_triage_status
      ON paperless_documents(triage_status)`

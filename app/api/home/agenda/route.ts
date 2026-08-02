@@ -28,7 +28,6 @@ export async function GET() {
     const payload = getHomeAgenda({
       isAdmin: auth.isAdmin,
       userId: auth.userId,
-      includeDueInvoices: auth.isAdmin,
     });
 
     return NextResponse.json({

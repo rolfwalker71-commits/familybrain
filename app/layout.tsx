@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { AppShell } from "@/components/layout/app-shell";
+import { BRAND, BRAND_TAGLINE } from "@/lib/branding";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -15,16 +16,16 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "TripBook",
-    template: "%s · TripBook",
+    default: BRAND.app,
+    template: `%s · ${BRAND.app}`,
   },
-  description: "Reiseplanung und Reisekosten — Tagebuch, Ausgaben und Abrechnung",
-  applicationName: "TripBook",
+  description: BRAND_TAGLINE,
+  applicationName: BRAND.app,
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "TripBook",
+    title: BRAND.app,
   },
   formatDetection: {
     telephone: false,

@@ -1,8 +1,4 @@
 import { getDb } from "@/lib/db/client";
-import {
-  listOpenUnpaidInvoices,
-  type OpenUnpaidInvoice,
-} from "@/lib/db/queries";
 import { listTrips, type TripEventRow, type TripRow } from "@/lib/trips/queries";
 import { listUserTripIds } from "@/lib/users/queries";
 import { toTimeInputValue } from "@/lib/utils/dates";
@@ -28,32 +24,11 @@ export type HomeAgendaDay = {
   events: HomeAgendaEvent[];
 };
 
-export type HomeDueInvoice = {
-  id: number;
-  vendor: string | null;
-  amount: number | null;
-  currency: string | null;
-  due_date: string;
-  description: string | null;
-  document_local_id: number;
-  document_title: string | null;
-  overdue: boolean;
-  paperless_id?: number;
-  correspondent_name?: string | null;
-  document_type_name?: string | null;
-  created_date?: string | null;
-  zu_bezahlen?: number | null;
-  bezahlt?: number | null;
-  tags?: string[];
-};
-
 export type HomeAgendaPayload = {
   todayIso: string;
   activeTrip: (TripRow & { cover_url?: string | null }) | null;
   upcomingTrips: TripRow[];
   days: HomeAgendaDay[];
-  dueInvoices: HomeDueInvoice[];
-  openUnpaidInvoices: OpenUnpaidInvoice[];
 };
 
 function todayIsoLocal(): string {
@@ -132,53 +107,9 @@ function listAgendaEventsForTrips(
   >;
 }
 
-function listUpcomingDueInvoices(today: string, horizonDays = 7): HomeDueInvoice[] {
-  const db = getDb();
-  const until = addDaysIso(today, horizonDays);
-  const rows = db
-    .prepare(
-      `SELECT f.id, f.vendor, f.amount, f.currency, f.due_date, f.description,
-              d.id AS document_local_id, d.title AS document_title
-       FROM financial_items f
-       JOIN paperless_documents d ON d.id = f.document_id
-       WHERE f.due_date IS NOT NULL AND TRIM(f.due_date) != ''
-         AND f.due_date <= ?
-         AND COALESCE(f.counts_in_stats, 1) = 1
-         AND COALESCE(d.bezahlt, 0) = 0
-       ORDER BY f.due_date DESC
-       LIMIT 8`
-    )
-    .all(until) as Array<{
-    id: number;
-    vendor: string | null;
-    amount: number | null;
-    currency: string | null;
-    due_date: string;
-    description: string | null;
-    document_local_id: number;
-    document_title: string | null;
-  }>;
-
-  return rows
-    .filter((r) => r.due_date >= addDaysIso(today, -30) || r.due_date >= today)
-    .slice(0, 5)
-    .map((r) => ({
-      id: r.id,
-      vendor: r.vendor,
-      amount: r.amount,
-      currency: r.currency,
-      due_date: r.due_date,
-      description: r.description,
-      document_local_id: r.document_local_id,
-      document_title: r.document_title,
-      overdue: r.due_date < today,
-    }));
-}
-
 export function getHomeAgenda(input: {
   isAdmin: boolean;
   userId: number | null;
-  includeDueInvoices: boolean;
 }): HomeAgendaPayload {
   const today = todayIsoLocal();
   let trips = listTrips().filter((t) => t.status !== "cancelled");
@@ -243,11 +174,5 @@ export function getHomeAgenda(input: {
     activeTrip,
     upcomingTrips,
     days,
-    dueInvoices: input.includeDueInvoices
-      ? listUpcomingDueInvoices(today)
-      : [],
-    openUnpaidInvoices: input.includeDueInvoices
-      ? listOpenUnpaidInvoices(8)
-      : [],
   };
 }

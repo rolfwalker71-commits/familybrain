@@ -43,10 +43,12 @@ type CostSummary = {
 export function TripFinanceLedgerCard({
   tripId,
   travelerCount = 0,
+  onLedgerChange,
 }: {
   tripId: number;
   /** Reisende on the trip — shown before ledger create. */
   travelerCount?: number;
+  onLedgerChange?: (hasLedger: boolean) => void;
 }) {
   const [ledger, setLedger] = useState<LedgerSummary | null>(null);
   const [balances, setBalances] = useState<Balance[]>([]);
@@ -65,11 +67,13 @@ export function TripFinanceLedgerCard({
         setBalances(data.balances || []);
         setCashbook(data.cashbook ?? null);
         setCostSummary(data.costSummary ?? null);
+        onLedgerChange?.(true);
       } else {
         setLedger(null);
         setBalances([]);
         setCashbook(null);
         setCostSummary(null);
+        onLedgerChange?.(false);
       }
     } finally {
       setLoading(false);
@@ -111,7 +115,7 @@ export function TripFinanceLedgerCard({
       >
         <CardTitle className="flex items-center gap-2 text-base">
           <IconCircle icon={HandCoins} tone="green" size="sm" />
-          Abrechnung
+          FinanzBuddy
         </CardTitle>
         {ledger ? (
           <Link
@@ -224,7 +228,7 @@ export function TripFinanceLedgerCard({
       ) : (
         <CardContent className="pt-0">
           <p className="text-sm text-muted-foreground">
-            Geteilte Kosten für diese Reise erfassen (Settle-Up).
+            Kosten für diese Reise laufen über FinanzBuddy.
           </p>
           {travelerCount > 0 ? (
             <p className="mt-1 text-xs text-[var(--brand-finance)]">

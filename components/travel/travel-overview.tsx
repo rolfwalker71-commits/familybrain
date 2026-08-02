@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useMemo, useState, type ReactNode } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   CalendarDays,
@@ -77,6 +78,12 @@ export type TravelRow = {
   ai_icon_url?: string | null;
   category?: string | null;
   recipients?: RecipientAvatarInfo;
+};
+
+type DocumentTripLink = {
+  document_id: number;
+  trip_id: number;
+  trip_title: string;
 };
 
 type AggRow = { label: string; count: number; total: number };
@@ -187,10 +194,12 @@ function aggregate(
 
 function TravelListRow({
   row,
+  tripLink,
   selected,
   onSelect,
 }: {
   row: TravelRow;
+  tripLink?: DocumentTripLink;
   selected: boolean;
   onSelect: () => void;
 }) {
@@ -221,6 +230,16 @@ function TravelListRow({
           <MetaLine>
             <RecipientAvatars recipients={row.recipients} />
             <Badge variant="secondary">{typeLabel(row)}</Badge>
+            {tripLink ? (
+              <Link
+                href={`/trips/${tripLink.trip_id}`}
+                className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <Badge variant="secondary" className="hover:bg-accent">
+                  In Reise: {tripLink.trip_title}
+                </Badge>
+              </Link>
+            ) : null}
             <span className="tabular-nums">
               {toSwissDate(row.start_date)}
               {row.end_date ? ` – ${toSwissDate(row.end_date)}` : ""}
@@ -282,6 +301,7 @@ function TravelListRow({
 
 type Props = {
   items: TravelRow[];
+  documentTripLinks?: Record<string, DocumentTripLink>;
 };
 
 export function TravelOverviewClient(props: Parameters<typeof TravelOverviewClientInner>[0]) {
@@ -296,7 +316,7 @@ export function TravelOverviewClient(props: Parameters<typeof TravelOverviewClie
   );
 }
 
-function TravelOverviewClientInner({ items }: Props) {
+function TravelOverviewClientInner({ items, documentTripLinks = {} }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [sortDir, setSortDir] = useListSortDir("travel", "desc");
@@ -684,6 +704,7 @@ function TravelOverviewClientInner({ items }: Props) {
                       <TravelListRow
                         key={row.id}
                         row={row}
+                        tripLink={documentTripLinks[row.document_local_id]}
                         selected={detailId === row.id}
                         onSelect={() =>
                           setDetailId(detailId === row.id ? null : row.id)
@@ -827,6 +848,7 @@ function TravelOverviewClientInner({ items }: Props) {
                 <TravelListRow
                   key={row.id}
                   row={row}
+                  tripLink={documentTripLinks[row.document_local_id]}
                   selected={detailId === row.id && !dimension}
                   onSelect={() =>
                     setDetailId(detailId === row.id ? null : row.id)

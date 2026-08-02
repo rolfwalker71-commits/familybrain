@@ -150,7 +150,7 @@ function buildSystemPrompt(
 
   const instructionsBlock = formatChatInstructionsForPrompt(userInstructions);
 
-  return `Du bist TripBook, ein Assistent für die ausgewählte Wissensbasis einer Familie.
+  return `Du bist Buddy, ein Assistent für die ausgewählte Wissensbasis einer Familie.
 
 Aktive Quellen für diese Antwort: ${describeChatSources(sources)}.
 Die Wissensbasis umfasst in dieser Anfrage:

@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Download, Plus, Trash2, Upload } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -28,6 +28,7 @@ import {
 } from "@/components/layout/list-sort-control";
 import { IconCircle, pageVisuals } from "@/components/layout/icon-circle";
 import { SoftFab } from "@/components/layout/soft-ui";
+import { ModuleBackupCard } from "@/components/layout/module-backup-card";
 import { useAuth } from "@/components/auth/auth-provider";
 import {
   COMMON_CURRENCIES,
@@ -70,7 +71,6 @@ export function FinanceLedgersListClient() {
   const [creating, setCreating] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
-  const importRef = useRef<HTMLInputElement>(null);
   const [sortDir, setSortDir] = useListSortDir("finance-ledgers", "desc");
 
   async function load(dir = sortDir) {
@@ -189,8 +189,6 @@ export function FinanceLedgersListClient() {
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      if (importRef.current) importRef.current.value = "";
     }
   }
 
@@ -325,17 +323,25 @@ export function FinanceLedgersListClient() {
     <div className="relative space-y-6 pb-28 md:pb-0">
       <PageHeader
         title="FinanzBuddy"
-        description="Abrechnungen einfach im Griff."
+        description="Gemeinsame Abrechnungen und Kostenaufteilung in FinanzBuddy."
         icon={pageVisuals.financeBrain.icon}
         tone={pageVisuals.financeBrain.tone}
         actions={
-          <ListSortControl
-            storageKey="finance-ledgers"
-            label="Aktualisiert"
-            defaultDir="desc"
-            dir={sortDir}
-            onDirChange={setSortDir}
-          />
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href="/finance"
+              className={buttonVariants({ variant: "outline", size: "sm" })}
+            >
+              Finanzblick
+            </Link>
+            <ListSortControl
+              storageKey="finance-ledgers"
+              label="Aktualisiert"
+              defaultDir="desc"
+              dir={sortDir}
+              onDirChange={setSortDir}
+            />
+          </div>
         }
       />
 
@@ -351,43 +357,11 @@ export function FinanceLedgersListClient() {
       ) : null}
 
       {isAdmin ? (
-        <Card className="border-border shadow-[0_2px_4px_rgba(20,32,28,0.06),0_10px_28px_rgba(20,32,28,0.1)]">
-          <CardContent className="flex flex-wrap items-center gap-2 p-4">
-            <p className="mr-auto text-sm text-muted-foreground">
-              FinanzBuddy-Backup
-            </p>
-            <a
-              href="/api/finance-ledgers/backup"
-              className={cn(
-                buttonVariants({ variant: "outline", size: "sm" }),
-                "gap-1.5"
-              )}
-            >
-              <Download className="size-3.5" />
-              Export
-            </a>
-            <input
-              ref={importRef}
-              type="file"
-              accept="application/json,.json"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) void importBackup(file);
-              }}
-            />
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              onClick={() => importRef.current?.click()}
-            >
-              <Upload className="size-3.5" />
-              Import
-            </Button>
-          </CardContent>
-        </Card>
+        <ModuleBackupCard
+          title="FinanzBuddy-Backup"
+          exportHref="/api/finance-ledgers/backup"
+          onImport={importBackup}
+        />
       ) : null}
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}

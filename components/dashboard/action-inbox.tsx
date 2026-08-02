@@ -169,6 +169,7 @@ export function ActionInbox() {
     action: TriageAction;
     taxRelevant: boolean;
     taxYear: number | null;
+    snoozeDays?: number;
   }) {
     setBusyId(input.documentLocalId);
     setActionError(null);
@@ -187,6 +188,24 @@ export function ActionInbox() {
       setActionError(err instanceof Error ? err.message : String(err));
     } finally {
       setBusyId(null);
+    }
+  }
+
+  async function snoozeDeadline(id: number, days: number) {
+    setActionError(null);
+    try {
+      const res = await fetch("/api/deadlines", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, snoozeDays: days }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Snooze fehlgeschlagen");
+      }
+      await load();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : String(err));
     }
   }
 
@@ -294,7 +313,7 @@ export function ActionInbox() {
                     href="/finance"
                     className="ml-auto text-xs font-medium text-[var(--brand-finance)] underline-offset-2 hover:underline"
                   >
-                    Finanzen
+                    Finanzblick
                   </Link>
                 </div>
                 <OpenInvoiceCardGrid invoices={openUnpaid} />
@@ -346,6 +365,15 @@ export function ActionInbox() {
                             </span>
                           </span>
                         </Link>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="shrink-0"
+                          onClick={() => void snoozeDeadline(row.id, 7)}
+                        >
+                          +7 Tage
+                        </Button>
                         <Button
                           type="button"
                           size="sm"
@@ -574,6 +602,7 @@ function TriagePendingCard({
     action: TriageAction;
     taxRelevant: boolean;
     taxYear: number | null;
+    snoozeDays?: number;
   }) => void;
 }) {
   const needsPay =
@@ -700,9 +729,37 @@ function TriagePendingCard({
               <X className="size-3.5" />
               Irrelevant
             </ChoiceChip>
+            <ChoiceChip
+              active={action === "snooze"}
+              disabled={busy}
+              onClick={() => setAction("snooze")}
+            >
+              Später (+7)
+            </ChoiceChip>
           </div>
         </div>
 
+        {action === "snooze" ? (
+          <div className="flex justify-end">
+            <Button
+              size="sm"
+              disabled={busy}
+              onClick={() =>
+                onSubmit({
+                  documentLocalId: row.id,
+                  action: "snooze",
+                  taxRelevant: false,
+                  taxYear: null,
+                  snoozeDays: 7,
+                })
+              }
+            >
+              <Check className="size-3.5" />
+              {busy ? "…" : "7 Tage pausieren"}
+            </Button>
+          </div>
+        ) : (
+          <>
         <div className="space-y-1.5">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             Steuerrelevant
@@ -760,6 +817,8 @@ function TriagePendingCard({
             {busy ? "…" : "OK"}
           </Button>
         </div>
+          </>
+        )}
       </div>
     </li>
   );

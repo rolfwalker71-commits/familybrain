@@ -236,8 +236,18 @@ export function notifyDocumentTriageQueued(
 
 export function notifyDocumentTriageResolved(
   localId: number,
-  action: "pay" | "ignore" | "done" | "ebill" | "twint" | "card"
+  action: "pay" | "ignore" | "done" | "ebill" | "twint" | "card" | "snooze"
 ): void {
+  if (action === "snooze") {
+    notifyDocumentChange({
+      localId,
+      reason: "document_triage",
+      headline: "Prüfung pausiert",
+      detail: "Erscheint später wieder in der Action-Inbox.",
+      source: "buddy",
+    });
+    return;
+  }
   const paidVia =
     action === "ebill"
       ? "eBill"

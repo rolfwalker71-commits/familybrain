@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/sheet";
 import { useAdminNav } from "@/components/layout/admin-nav-provider";
 import { inferAdminNavMode } from "@/lib/navigation/admin-nav";
+import { BRAND } from "@/lib/branding";
 import { Sidebar } from "./sidebar";
 
 type Brand = {
@@ -38,7 +39,7 @@ function brandForAdminMode(
 ): Brand {
   if (mode === "finanzbuddy") {
     return {
-      name: "FinanzBuddy",
+      name: BRAND.finance,
       href: "/finance-brain",
       icon: HandCoins,
       accentClass: "text-[var(--brand-finance)]",
@@ -48,7 +49,7 @@ function brandForAdminMode(
   }
   if (mode === "travelbuddy") {
     return {
-      name: "TravelBuddy",
+      name: BRAND.travel,
       href: "/trips",
       icon: Luggage,
       accentClass: "text-[var(--brand-finance)]",
@@ -58,7 +59,7 @@ function brandForAdminMode(
   }
   if (mode === "mybrain") {
     return {
-      name: "MyBrain",
+      name: BRAND.buddy,
       href: "/dashboard",
       icon: Brain,
       accentClass: "text-[var(--brand-docs)]",
@@ -67,7 +68,7 @@ function brandForAdminMode(
     };
   }
   return {
-    name: "BuddyApp",
+    name: BRAND.app,
     href: "/dashboard",
     icon: LayoutGrid,
     accentClass: "text-[var(--brand-docs)]",
@@ -85,7 +86,7 @@ function brandForPath(pathname: string): Brand {
     return brandForAdminMode("travelbuddy", pathname);
   }
   return {
-    name: "TripBook",
+    name: BRAND.app,
     href: "/dashboard",
     icon: BookOpen,
     accentClass: "text-[var(--brand-docs)]",
@@ -125,7 +126,7 @@ export function MobileHeader() {
           <SheetHeader className="sr-only">
             <SheetTitle>Navigation</SheetTitle>
             <SheetDescription>
-              {isAdminNav ? "BuddyApp Hauptnavigation" : "TripBook Hauptnavigation"}
+              {isAdminNav ? "Buddy Hauptnavigation" : "Buddy Navigation"}
             </SheetDescription>
           </SheetHeader>
           <Sidebar className="w-full" onNavigate={() => setOpen(false)} />
@@ -139,8 +140,8 @@ export function MobileHeader() {
         onClick={(e) => {
           if (!isAdminNav) return;
           if (mode === "home") return;
-          if (brand.name === "BuddyApp" || brand.name === "MyBrain") {
-            // tapping brand while in a section: go to BuddyApp home
+          if (brand.name === BRAND.app || brand.name === BRAND.buddy) {
+            // tapping brand while in a section: go to Buddy home
             e.preventDefault();
             goHome();
           }

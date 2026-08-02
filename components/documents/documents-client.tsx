@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { CalendarDays, ChevronRight, Filter, Search, Sparkles } from "lucide-react";
+import { CalendarDays, ChevronRight, Filter, MoreHorizontal, Search, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -49,6 +49,12 @@ import {
   DocumentInfoButton,
   DocumentTitleLink,
 } from "@/components/documents/document-link";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import Link from "next/link";
 
 type DocRow = {
@@ -874,18 +880,6 @@ export function DocumentsClient() {
               </Button>
             ) : (
               <>
-                {errorCount > 0 && hasOpenAIKey ? (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={iconBusy || analyzeBusy || retryingErrors}
-                    onClick={() => void retryAllErrors()}
-                  >
-                    {retryingErrors
-                      ? "Starte…"
-                      : `Fehlerhafte erneut (${errorCount})`}
-                  </Button>
-                ) : null}
                 {pendingCount > 0 && hasOpenAIKey ? (
                   <>
                     <Button
@@ -953,49 +947,64 @@ export function DocumentsClient() {
                 ))}
               </select>
             ) : null}
-            {hasOpenAIKey && documentAiIconsEnabled ? (
-              <>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={iconBusy || analyzeBusy || selectedIds.size === 0}
-                  onClick={() => void runAiIconBatch("selected")}
+            {hasOpenAIKey && (documentAiIconsEnabled || errorCount > 0) ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  render={<Button size="sm" variant="outline" className="gap-1.5" />}
                 >
-                  <Sparkles className="size-3.5" />
-                  {iconBusy
-                    ? "Generierung…"
-                    : `Icons neu (${selectedIds.size})`}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={iconBusy || analyzeBusy || missingAiIcons === 0}
-                  onClick={() => void runAiIconBatch("all-missing")}
-                >
-                  <Sparkles className="size-3.5" />
-                  {iconBusy
-                    ? "Generierung…"
-                    : `Nur fehlende (${missingAiIcons})`}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={iconBusy || analyzeBusy}
-                  onClick={() => {
-                    if (
-                      !window.confirm(
-                        "Alle KI-Icons neu generieren? Bestehende Icons werden ersetzt. Der Job läuft im Hintergrund."
-                      )
-                    ) {
-                      return;
-                    }
-                    void runAiIconBatch("all-force");
-                  }}
-                >
-                  <Sparkles className="size-3.5" />
-                  Alle Icons neu
-                </Button>
-              </>
+                  <MoreHorizontal className="size-3.5" />
+                  Mehr
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  {errorCount > 0 ? (
+                    <DropdownMenuItem
+                      disabled={iconBusy || analyzeBusy || retryingErrors}
+                      onClick={() => void retryAllErrors()}
+                    >
+                      {retryingErrors
+                        ? "Starte…"
+                        : `Fehlerhafte erneut (${errorCount})`}
+                    </DropdownMenuItem>
+                  ) : null}
+                  {documentAiIconsEnabled ? (
+                    <>
+                      <DropdownMenuItem
+                        disabled={iconBusy || analyzeBusy || selectedIds.size === 0}
+                        onClick={() => void runAiIconBatch("selected")}
+                      >
+                        <Sparkles className="size-3.5" />
+                        {iconBusy
+                          ? "Generierung…"
+                          : `Icons neu (${selectedIds.size})`}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        disabled={iconBusy || analyzeBusy || missingAiIcons === 0}
+                        onClick={() => void runAiIconBatch("all-missing")}
+                      >
+                        <Sparkles className="size-3.5" />
+                        {iconBusy
+                          ? "Generierung…"
+                          : `Nur fehlende (${missingAiIcons})`}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        disabled={iconBusy || analyzeBusy}
+                        onClick={() => {
+                          if (
+                            window.confirm(
+                              "Alle KI-Icons neu generieren? Bestehende Icons werden ersetzt. Der Job läuft im Hintergrund."
+                            )
+                          ) {
+                            void runAiIconBatch("all-force");
+                          }
+                        }}
+                      >
+                        <Sparkles className="size-3.5" />
+                        Alle Icons neu
+                      </DropdownMenuItem>
+                    </>
+                  ) : null}
+                </DropdownMenuContent>
+              </DropdownMenu>
             ) : hasOpenAIKey ? (
               <Button
                 size="sm"

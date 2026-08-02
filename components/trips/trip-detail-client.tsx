@@ -862,6 +862,7 @@ function TripDetailInner({
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [travelerCount, setTravelerCount] = useState(0);
+  const [hasFinanceLedger, setHasFinanceLedger] = useState(false);
   const [editMode, setEditMode] = useState(false);
   /** Mobile edit toolbar focuses actions on one event. */
   const [editFocusEventId, setEditFocusEventId] = useState<number | null>(null);
@@ -948,6 +949,22 @@ function TripDetailInner({
       setError(err instanceof Error ? err.message : String(err))
     );
   }, [load]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(`/api/trips/${tripId}/finance-ledger`);
+        const data = await res.json().catch(() => ({}));
+        if (!cancelled) setHasFinanceLedger(Boolean(data.ledger));
+      } catch {
+        if (!cancelled) setHasFinanceLedger(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [tripId]);
 
   useEffect(() => {
     if (readOnly) setEditMode(false);
@@ -2199,7 +2216,9 @@ function TripDetailInner({
   const activeTab = parseTripDetailTab(searchParams.get("tab"));
   const tabItems: TripTabItem[] = [
     { id: "ablauf", label: "Ablauf", icon: LayoutList },
-    { id: "finanzen", label: "Finanzen", icon: Wallet },
+    ...(hasFinanceLedger || activeTab === "finanzen"
+      ? [{ id: "finanzen" as const, label: "Kosten", icon: Wallet }]
+      : []),
     { id: "reisende", label: "Reisende", icon: Users },
     { id: "dokumente", label: "Dokumente", icon: FileText },
   ];
@@ -2380,11 +2399,19 @@ function TripDetailInner({
         <TripFinanceLedgerCard
           tripId={tripId}
           travelerCount={travelerCount}
+          onLedgerChange={setHasFinanceLedger}
         />
       ) : null}
 
       {activeTab === "mehr" ? (
         <div className="space-y-6">
+      {!readOnly && !hasFinanceLedger ? (
+        <TripFinanceLedgerCard
+          tripId={tripId}
+          travelerCount={travelerCount}
+          onLedgerChange={setHasFinanceLedger}
+        />
+      ) : null}
       {!readOnly ? (
       <div className="flex flex-wrap gap-2">
         <TripExportMenu
@@ -4180,7 +4207,9 @@ function TripDetailInner({
             },
             {
               id: "finanzen",
-              label: "Finanzen",
+              label: hasFinanceLedger
+                ? "Kosten (FinanzBuddy)"
+                : "Abrechnung anlegen",
               icon: Wallet,
               onSelect: () => setTab("finanzen"),
             },

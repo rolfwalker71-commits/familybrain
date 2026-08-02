@@ -576,9 +576,10 @@ export function SettingsUsersPanel() {
                             <span className="min-w-0">
                               <span className="font-medium">Heute-Hub</span>
                               <span className="mt-0.5 block text-xs text-muted-foreground">
-                                Zeigt auf TravelBuddy die Übersicht «Heute &amp;
-                                demnächst». Admins haben den Hub immer; für
-                                normale App-User optional.
+                                Zeigt auf TravelBuddy aktuelle Reise und
+                                anstehende Termine. Keine Finanzinfos. Admins
+                                haben den Hub immer; für normale App-User
+                                optional.
                               </span>
                             </span>
                           </label>

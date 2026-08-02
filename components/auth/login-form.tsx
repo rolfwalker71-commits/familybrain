@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { BRAND, BRAND_TAGLINE } from "@/lib/branding";
 
 export function LoginForm({ nextPath }: { nextPath: string }) {
   const [username, setUsername] = useState("");
@@ -51,12 +52,12 @@ export function LoginForm({ nextPath }: { nextPath: string }) {
             <BookOpen className="size-7" />
           </span>
           <div>
-            <p className="text-sm font-medium text-primary">TripBook</p>
+            <p className="text-sm font-medium text-primary">{BRAND.app}</p>
             <CardTitle className="text-2xl">Willkommen zurück</CardTitle>
           </div>
         </div>
         <p className="text-sm leading-6 text-muted-foreground">
-          Melde dich an, um auf deine Dokumente und Auswertungen zuzugreifen.
+          {BRAND_TAGLINE}
         </p>
       </CardHeader>
       <CardContent className="px-6 pb-7 pt-5 sm:px-8">
