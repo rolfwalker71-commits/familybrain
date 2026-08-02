@@ -6,9 +6,13 @@ import {
   pauseTriageForMassAnalysis,
   resumeTriageAfterMassAnalysis,
 } from "@/lib/documents/triage-mass-pause";
-import { backfillTriageForAnalyzedDocuments } from "@/lib/documents/triage-backfill";
+import {
+  backfillTriageForAnalyzedDocuments,
+  getTriageDiagnostics,
+} from "@/lib/documents/triage-backfill";
 import { getTriageAfterAnalysisSettingsPublic } from "@/lib/documents/triage-settings";
 import { getTriageMailSettingsPublic } from "@/lib/mail/triage-mail-settings";
+import { notifyTriageReadyEmailsForDocuments } from "@/lib/mail/notify-triage";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,12 +21,19 @@ const BodySchema = z.object({
   action: z.enum(["pause", "resume", "force-resume", "backfill"]),
 });
 
-export async function GET() {
-  return NextResponse.json({
-    ok: true,
+function publicPayload() {
+  return {
     ...getTriageMassPausePublic(),
     ...getTriageAfterAnalysisSettingsPublic(),
     ...getTriageMailSettingsPublic(),
+    triageDiagnostics: getTriageDiagnostics(),
+  };
+}
+
+export async function GET() {
+  return NextResponse.json({
+    ok: true,
+    ...publicPayload(),
   });
 }
 
@@ -44,25 +55,43 @@ export async function POST(request: Request) {
     case "pause":
       result = pauseTriageForMassAnalysis();
       break;
-    case "resume":
-      result = resumeTriageAfterMassAnalysis();
+    case "resume": {
+      const resumed = resumeTriageAfterMassAnalysis();
+      let mail: { sent: number; skipped: number; errors: number } | undefined;
+      const ids = resumed.backfill?.newlyQueuedIds ?? [];
+      if (ids.length > 0) {
+        mail = await notifyTriageReadyEmailsForDocuments(ids);
+      }
+      result = { ...resumed, mail };
       break;
-    case "force-resume":
-      result = forceResumeTriageMassPause();
+    }
+    case "force-resume": {
+      const forced = forceResumeTriageMassPause();
+      let mail: { sent: number; skipped: number; errors: number } | undefined;
+      const ids = forced.backfill?.newlyQueuedIds ?? [];
+      if (ids.length > 0) {
+        mail = await notifyTriageReadyEmailsForDocuments(ids);
+      }
+      result = { ...forced, mail };
       break;
-    case "backfill":
-      result = {
-        backfill: backfillTriageForAnalyzedDocuments({ limit: 500 }),
-      };
+    }
+    case "backfill": {
+      const backfill = backfillTriageForAnalyzedDocuments({ limit: 500 });
+      let mail: { sent: number; skipped: number; errors: number } | undefined;
+      if (backfill.newlyQueuedIds.length > 0) {
+        mail = await notifyTriageReadyEmailsForDocuments(
+          backfill.newlyQueuedIds
+        );
+      }
+      result = { backfill, mail };
       break;
+    }
   }
 
   return NextResponse.json({
     ok: true,
     action: parsed.data.action,
     ...result,
-    ...getTriageMassPausePublic(),
-    ...getTriageAfterAnalysisSettingsPublic(),
-    ...getTriageMailSettingsPublic(),
+    ...publicPayload(),
   });
 }

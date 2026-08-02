@@ -30,6 +30,7 @@ export type TriageBackfillSummary = {
   queued: number;
   skipped: number;
   pay: number;
+  newlyQueuedIds: number[];
 };
 
 function readSnapshot(): TriageMassPauseSnapshot | null {

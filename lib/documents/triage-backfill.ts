@@ -195,6 +195,8 @@ export function backfillTriageForAnalyzedDocuments(options?: {
   queued: number;
   skipped: number;
   pay: number;
+  /** Local document ids newly set to pending (for optional mail fan-out). */
+  newlyQueuedIds: number[];
 } {
   const limit = Math.min(Math.max(options?.limit ?? 200, 1), 2000);
   const db = getDb();
@@ -214,6 +216,7 @@ export function backfillTriageForAnalyzedDocuments(options?: {
   let queued = 0;
   let skipped = 0;
   let pay = 0;
+  const newlyQueuedIds: number[] = [];
 
   for (const row of rows) {
     const analysis = buildAnalysisSnapshotForTriage(row.id);
@@ -221,6 +224,7 @@ export function backfillTriageForAnalyzedDocuments(options?: {
     const result = applyTriageAfterAnalysis(row.id, analysis);
     if (result.queued) {
       queued += 1;
+      if (result.newlyQueued) newlyQueuedIds.push(row.id);
       continue;
     }
     const status = (
@@ -232,5 +236,43 @@ export function backfillTriageForAnalyzedDocuments(options?: {
     else if (status === "skipped") skipped += 1;
   }
 
-  return { scanned: rows.length, queued, skipped, pay };
+  return { scanned: rows.length, queued, skipped, pay, newlyQueuedIds };
+}
+
+/** Live counters for settings diagnostics. */
+export function getTriageDiagnostics() {
+  const db = getDb();
+  const count = (sql: string) =>
+    Number(
+      (db.prepare(sql).get() as { n: number } | undefined)?.n || 0
+    );
+
+  return {
+    triagePending: count(
+      `SELECT COUNT(*) AS n FROM paperless_documents
+       WHERE triage_status = 'pending'
+         AND COALESCE(sync_status, 'synced') != 'missing'`
+    ),
+    triageSkipped: count(
+      `SELECT COUNT(*) AS n FROM paperless_documents
+       WHERE triage_status = 'skipped'
+         AND COALESCE(sync_status, 'synced') != 'missing'`
+    ),
+    triagePay: count(
+      `SELECT COUNT(*) AS n FROM paperless_documents
+       WHERE triage_status = 'pay'
+         AND COALESCE(sync_status, 'synced') != 'missing'`
+    ),
+    triageMissingStatus: count(
+      `SELECT COUNT(*) AS n
+       FROM paperless_documents d
+       INNER JOIN document_summaries s ON s.document_id = d.id
+       WHERE s.analysis_status = 'completed'
+         AND COALESCE(d.sync_status, 'synced') != 'missing'
+         AND (d.triage_status IS NULL OR TRIM(d.triage_status) = '')`
+    ),
+    analysisCompleted: count(
+      `SELECT COUNT(*) AS n FROM document_summaries WHERE analysis_status = 'completed'`
+    ),
+  };
 }

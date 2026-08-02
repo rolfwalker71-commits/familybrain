@@ -66,6 +66,7 @@ import {
   saveTriageMailSettings,
 } from "@/lib/mail/triage-mail-settings";
 import { getTriageMassPausePublic } from "@/lib/documents/triage-mass-pause";
+import { getTriageDiagnostics } from "@/lib/documents/triage-backfill";
 import {
   getTriageAfterAnalysisSettingsPublic,
   setTriageAfterAnalysisEnabled,
@@ -182,6 +183,7 @@ export async function GET(request: Request) {
     ...getTriageMailSettingsPublic(),
     ...getTriageAfterAnalysisSettingsPublic(),
     ...getTriageMassPausePublic(),
+    triageDiagnostics: getTriageDiagnostics(),
   });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -504,5 +506,6 @@ export async function PUT(request: Request) {
     ...getTriageMailSettingsPublic(),
     ...getTriageAfterAnalysisSettingsPublic(),
     ...getTriageMassPausePublic(),
+    triageDiagnostics: getTriageDiagnostics(),
   });
 }

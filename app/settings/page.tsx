@@ -198,6 +198,13 @@ function SettingsPageInner() {
     triageMailRecipients: string;
   } | null>(null);
   const [triageActionBusy, setTriageActionBusy] = useState(false);
+  const [triageDiagnostics, setTriageDiagnostics] = useState<{
+    triagePending: number;
+    triageSkipped: number;
+    triagePay: number;
+    triageMissingStatus: number;
+    analysisCompleted: number;
+  } | null>(null);
   const [testMailTo, setTestMailTo] = useState("");
   const [testMailBusy, setTestMailBusy] = useState(false);
   const [triageTestBusy, setTriageTestBusy] = useState(false);
@@ -351,6 +358,20 @@ function SettingsPageInner() {
             }
           : null
       );
+      if (
+        data.triageDiagnostics &&
+        typeof data.triageDiagnostics === "object"
+      ) {
+        setTriageDiagnostics({
+          triagePending: Number(data.triageDiagnostics.triagePending) || 0,
+          triageSkipped: Number(data.triageDiagnostics.triageSkipped) || 0,
+          triagePay: Number(data.triageDiagnostics.triagePay) || 0,
+          triageMissingStatus:
+            Number(data.triageDiagnostics.triageMissingStatus) || 0,
+          analysisCompleted:
+            Number(data.triageDiagnostics.analysisCompleted) || 0,
+        });
+      }
       setError(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
@@ -1966,6 +1987,26 @@ function SettingsPageInner() {
             id="triage-mail"
             className="space-y-3 rounded-xl border border-border/60 bg-muted/20 p-4"
           >
+            {triageDiagnostics ? (
+              <div className="rounded-lg border border-border/50 bg-background/60 px-3 py-2.5 text-xs text-muted-foreground">
+                <p className="font-medium text-foreground">
+                  Triage-Stand (Server)
+                </p>
+                <p className="mt-1">
+                  Inbox: {triageDiagnostics.triagePending} · Ohne Bedarf:{" "}
+                  {triageDiagnostics.triageSkipped} · Zu zahlen:{" "}
+                  {triageDiagnostics.triagePay} · Noch ohne Status:{" "}
+                  {triageDiagnostics.triageMissingStatus} · Analysiert:{" "}
+                  {triageDiagnostics.analysisCompleted}
+                </p>
+                <p className="mt-1 opacity-90">
+                  Die Testmail prüft nur SMTP/Layout (Betreff mit «[Test]»).
+                  Echte Triage-Mails kommen nur, wenn ein Beleg neu in die Inbox
+                  kommt — nicht bei jedem Analyse-Lauf und nicht bei «Kein
+                  Handlungsbedarf».
+                </p>
+              </div>
+            ) : null}
             {triageMassPaused ? (
               <div className="space-y-2 rounded-lg border border-amber-500/40 bg-amber-50 px-3 py-2.5 text-sm text-amber-950 dark:bg-amber-950/40 dark:text-amber-50">
                 <p className="font-medium">
@@ -2015,6 +2056,27 @@ function SettingsPageInner() {
                           data.triageAfterAnalysisEnabled !== false
                         );
                         setTriageMailEnabled(Boolean(data.triageMailEnabled));
+                        if (
+                          data.triageDiagnostics &&
+                          typeof data.triageDiagnostics === "object"
+                        ) {
+                          setTriageDiagnostics({
+                            triagePending:
+                              Number(data.triageDiagnostics.triagePending) || 0,
+                            triageSkipped:
+                              Number(data.triageDiagnostics.triageSkipped) || 0,
+                            triagePay:
+                              Number(data.triageDiagnostics.triagePay) || 0,
+                            triageMissingStatus:
+                              Number(
+                                data.triageDiagnostics.triageMissingStatus
+                              ) || 0,
+                            analysisCompleted:
+                              Number(
+                                data.triageDiagnostics.analysisCompleted
+                              ) || 0,
+                          });
+                        }
                         const bf = data.backfill as
                           | {
                               scanned?: number;
@@ -2023,10 +2085,20 @@ function SettingsPageInner() {
                               pay?: number;
                             }
                           | undefined;
+                        const mail = data.mail as
+                          | { sent?: number; skipped?: number; errors?: number }
+                          | undefined;
                         setMessage(
-                          bf
-                            ? `Triage wieder aktiv. Nachgezogen: ${bf.queued ?? 0} Inbox, ${bf.skipped ?? 0} ohne Bedarf, ${bf.pay ?? 0} zu zahlen (${bf.scanned ?? 0} geprüft).`
-                            : "Triage wieder aktiv."
+                          [
+                            bf
+                              ? `Triage wieder aktiv. Nachgezogen: ${bf.queued ?? 0} Inbox, ${bf.skipped ?? 0} ohne Bedarf, ${bf.pay ?? 0} zu zahlen (${bf.scanned ?? 0} geprüft).`
+                              : "Triage wieder aktiv.",
+                            mail
+                              ? `Mails: ${mail.sent ?? 0} gesendet.`
+                              : null,
+                          ]
+                            .filter(Boolean)
+                            .join(" ")
                         );
                       } catch (err) {
                         setError(
@@ -2113,10 +2185,51 @@ function SettingsPageInner() {
                     ? Boolean(triageMassPauseRestores?.triageMailEnabled)
                     : triageMailEnabled
                 }
-                onChange={(e) => setTriageMailEnabled(e.target.checked)}
                 disabled={
-                  triageMassPaused || !triageAfterAnalysisEnabled
+                  triageMassPaused ||
+                  !triageAfterAnalysisEnabled ||
+                  saving !== null
                 }
+                onChange={(e) => {
+                  const enabled = e.target.checked;
+                  setTriageMailEnabled(enabled);
+                  void (async () => {
+                    setSaving("email");
+                    setError(null);
+                    setMessage(null);
+                    try {
+                      const res = await fetch("/api/settings", {
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          triageMailEnabled: enabled,
+                          triageMailRecipients:
+                            triageMailRecipients.trim() || null,
+                          triageMailFrom: triageMailFrom.trim() || null,
+                        }),
+                      });
+                      const data = await res.json();
+                      if (!res.ok) {
+                        throw new Error(
+                          data.error || "Speichern fehlgeschlagen"
+                        );
+                      }
+                      setTriageMailEnabled(Boolean(data.triageMailEnabled));
+                      setMessage(
+                        enabled
+                          ? "Triage-Mail aktiv — Versand bei neuer Inbox."
+                          : "Triage-Mail aus — Status/Inbox laufen weiter ohne Mail."
+                      );
+                    } catch (err) {
+                      setTriageMailEnabled(!enabled);
+                      setError(
+                        err instanceof Error ? err.message : String(err)
+                      );
+                    } finally {
+                      setSaving(null);
+                    }
+                  })();
+                }}
               />
               <div className="min-w-0 space-y-1">
                 <Label htmlFor="triageMailEnabled" className="cursor-pointer">
@@ -2129,7 +2242,9 @@ function SettingsPageInner() {
                 </Label>
                 <p className="text-xs text-muted-foreground">
                   Wenn ein Dokument neu in die Triage-Inbox kommt, HTML-Mail an
-                  die Empfänger senden (ohne PDF-Anhang).
+                  die Empfänger senden (ohne PDF-Anhang). Speichert sofort —
+                  Absender/Empfänger unten trotzdem mit «E-Mail speichern»
+                  sichern.
                 </p>
               </div>
             </div>
@@ -2214,10 +2329,44 @@ function SettingsPageInner() {
                           pay?: number;
                         }
                       | undefined;
+                    const mail = data.mail as
+                      | { sent?: number; skipped?: number; errors?: number }
+                      | undefined;
+                    if (
+                      data.triageDiagnostics &&
+                      typeof data.triageDiagnostics === "object"
+                    ) {
+                      setTriageDiagnostics({
+                        triagePending:
+                          Number(data.triageDiagnostics.triagePending) || 0,
+                        triageSkipped:
+                          Number(data.triageDiagnostics.triageSkipped) || 0,
+                        triagePay:
+                          Number(data.triageDiagnostics.triagePay) || 0,
+                        triageMissingStatus:
+                          Number(data.triageDiagnostics.triageMissingStatus) ||
+                          0,
+                        analysisCompleted:
+                          Number(data.triageDiagnostics.analysisCompleted) || 0,
+                      });
+                    }
                     setMessage(
-                      bf
-                        ? `Triage nachgezogen: ${bf.queued ?? 0} Inbox, ${bf.skipped ?? 0} ohne Bedarf, ${bf.pay ?? 0} zu zahlen (${bf.scanned ?? 0} ohne Status geprüft).`
-                        : "Triage nachgezogen."
+                      [
+                        bf
+                          ? `Triage nachgezogen: ${bf.queued ?? 0} Inbox, ${bf.skipped ?? 0} ohne Bedarf, ${bf.pay ?? 0} zu zahlen (${bf.scanned ?? 0} ohne Status geprüft).`
+                          : "Triage nachgezogen.",
+                        mail
+                          ? `Mails: ${mail.sent ?? 0} gesendet${
+                              mail.skipped
+                                ? `, ${mail.skipped} übersprungen`
+                                : ""
+                            }.`
+                          : bf && (bf.queued ?? 0) === 0
+                            ? "Keine neuen Inbox-Mails — entweder schon Status gesetzt oder kein Handlungsbedarf erkannt."
+                            : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" ")
                     );
                   } catch (err) {
                     setError(err instanceof Error ? err.message : String(err));

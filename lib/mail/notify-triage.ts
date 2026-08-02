@@ -142,6 +142,31 @@ export async function notifyTriageReadyEmail(documentId: number): Promise<{
   });
 }
 
+/**
+ * Fan-out triage-ready mails for document ids (e.g. after backfill).
+ * Caps sends to avoid flooding after large catch-up runs.
+ */
+export async function notifyTriageReadyEmailsForDocuments(
+  documentIds: number[],
+  options?: { limit?: number }
+): Promise<{ sent: number; skipped: number; errors: number }> {
+  const limit = Math.min(Math.max(options?.limit ?? 15, 0), 50);
+  let sent = 0;
+  let skipped = 0;
+  let errors = 0;
+  for (const id of documentIds.slice(0, limit)) {
+    try {
+      const result = await notifyTriageReadyEmail(id);
+      if (result.ok) sent += 1;
+      else if (result.error) errors += 1;
+      else skipped += 1;
+    } catch {
+      errors += 1;
+    }
+  }
+  return { sent, skipped, errors };
+}
+
 /** Settings test: sample or live pending item, HTML only (+ CID icons when available). */
 export async function sendTriageTestEmail(to: string): Promise<{
   ok: boolean;
