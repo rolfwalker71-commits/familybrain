@@ -18,8 +18,7 @@ import {
   type PushSubscriptionRow,
 } from "@/lib/push/subscriptions";
 import { ensureWebPushConfigured } from "@/lib/push/vapid";
-import { absoluteAppUrl } from "@/lib/app-url";
-import { absolutePushMediaUrl } from "@/lib/push/signed-media";
+import { signedPushMediaPath } from "@/lib/push/signed-media";
 
 function ownerMayReceive(
   ownerKey: string,
@@ -76,8 +75,9 @@ export async function dispatchWebPush(
   const rows = listAllPushSubscriptions();
   if (rows.length === 0) return { sent: 0 };
 
-  const fallbackIcon = absoluteAppUrl("/icon-512.png");
-  const mediaUrl = absolutePushMediaUrl(notification.aiIconUrl);
+  // Relative URLs — SW resolves against the PWA install origin (critical on Android
+  // when APP_PUBLIC_URL differs from the phone's Buddy host).
+  const mediaPath = signedPushMediaPath(notification.aiIconUrl);
   const payload = JSON.stringify({
     title: notification.headline || "Buddy",
     body:
@@ -86,11 +86,11 @@ export async function dispatchWebPush(
     url: notification.href || "/dashboard",
     reason: notification.reason,
     domain: notification.domain,
-    /** Small/medium toast icon (Android + desktop). */
-    icon: mediaUrl || fallbackIcon,
-    badge: absoluteAppUrl("/icon-192.png"),
-    /** Large image when the notification is expanded (esp. Android). */
-    image: mediaUrl || fallbackIcon,
+    /** Large icon (Android right-side / desktop toast). */
+    icon: mediaPath || "/icon-512.png",
+    badge: "/icon-192.png",
+    /** Big-picture when expanded (Android Chrome). */
+    image: mediaPath || "/icon-512.png",
   });
 
   const byOwner = new Map<string, PushSubscriptionRow[]>();

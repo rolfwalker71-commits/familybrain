@@ -36,8 +36,13 @@ Event «Neuer Reise-Kommentar» (und andere) wie gewohnt filtern.
 
 Push-Benachrichtigungen enthalten das passende AI-Bild (Dokument-/Ereignis-/Ausgabenbild)
 als `icon` und — wo das OS es unterstützt — als grosses `image` beim Aufklappen.
-Die Bilder werden über kurzlebige, signierte URLs unter `/api/push/media` geladen
-(ohne Login-Cookie; Signatur mit `FAMILYBRAIN_SESSION_SECRET`).
+Die Bilder werden als **relative**, signierte Pfade unter `/api/push/media/t/…`
+mitgeschickt; der Service Worker löst sie gegen die PWA-Install-Origin auf
+(wichtig auf Android, wenn `APP_PUBLIC_URL` vom Handy-Host abweicht).
+Ohne Login-Cookie; Signatur mit `FAMILYBRAIN_SESSION_SECRET`. Auslieferung als 512×512 PNG.
+
+Nach einem Update Buddy auf dem Handy **einmal im Browser/PWA öffnen** (nicht nur
+hart schliessen), damit der Service Worker (`sw.js?v=…`) aktualisiert wird.
 
 ## Dev
 

@@ -12,10 +12,13 @@ export function ServiceWorkerRegister() {
     let cancelled = false;
     void (async () => {
       try {
-        const reg = await navigator.serviceWorker.register("/sw.js", {
-          scope: "/",
-          updateViaCache: "none",
-        });
+        const reg = await navigator.serviceWorker.register(
+          "/sw.js?v=push-media-v3",
+          {
+            scope: "/",
+            updateViaCache: "none",
+          }
+        );
         if (cancelled) return;
         await reg.update().catch(() => {
           /* optional */

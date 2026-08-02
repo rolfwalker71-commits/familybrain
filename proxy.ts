@@ -12,7 +12,6 @@ const PUBLIC_PATHS = new Set([
   "/api/auth/logout",
   "/api/finance-ledgers/exchange-rate",
   "/api/paperless/webhook",
-  "/api/push/media",
   "/manifest.webmanifest",
   "/favicon.ico",
   "/apple-touch-icon.png",
@@ -26,6 +25,10 @@ const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
 function isPublicPath(pathname: string): boolean {
   if (PUBLIC_PATHS.has(pathname)) return true;
+  // Signed push notification images (no session cookie on Android/FCM fetch)
+  if (pathname === "/api/push/media" || pathname.startsWith("/api/push/media/")) {
+    return true;
+  }
   if (pathname.startsWith("/share/t/")) return true;
   if (pathname.startsWith("/api/share/t/")) return true;
   if (pathname.startsWith("/share/f/")) return true;

@@ -90,10 +90,16 @@ async function ensureServiceWorkerRegistration(): Promise<ServiceWorkerRegistrat
   const existing = await navigator.serviceWorker.getRegistration("/");
   const reg =
     existing ||
-    (await navigator.serviceWorker.register("/sw.js", {
+    (await navigator.serviceWorker.register("/sw.js?v=push-media-v3", {
       scope: "/",
       updateViaCache: "none",
     }));
+  // Force update so Android picks up icon/image payload handling.
+  try {
+    await reg.update();
+  } catch {
+    /* optional */
+  }
   // Wait until active (Windows can race permission dialog vs SW activate)
   if (!reg.active) {
     await Promise.race([
