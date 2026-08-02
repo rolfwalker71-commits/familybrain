@@ -2,19 +2,32 @@
 
 import { useEffect } from "react";
 
-/** Registers /sw.js once; enables notificationclick + future push. */
+/** Registers /sw.js early so Push subscribe on Windows/Desktop is reliable. */
 export function ServiceWorkerRegister() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (!("serviceWorker" in navigator)) return;
-    const onLoad = () => {
-      void navigator.serviceWorker.register("/sw.js").catch(() => {
+    if (!window.isSecureContext) return;
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const reg = await navigator.serviceWorker.register("/sw.js", {
+          scope: "/",
+          updateViaCache: "none",
+        });
+        if (cancelled) return;
+        await reg.update().catch(() => {
+          /* optional */
+        });
+      } catch {
         /* ignore offline / unsupported */
-      });
+      }
+    })();
+
+    return () => {
+      cancelled = true;
     };
-    if (document.readyState === "complete") onLoad();
-    else window.addEventListener("load", onLoad, { once: true });
-    return () => window.removeEventListener("load", onLoad);
   }, []);
 
   return null;

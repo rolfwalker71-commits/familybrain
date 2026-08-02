@@ -1,10 +1,15 @@
-/* Buddy service worker — notification click routing + future web push hook. */
+/* Buddy service worker — web push + notification click routing. */
 self.addEventListener("install", (event) => {
   event.waitUntil(self.skipWaiting());
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(self.clients.claim());
+});
+
+/* Required by Chromium for a “proper” SW; keep network default. */
+self.addEventListener("fetch", () => {
+  /* no-op — online-only app */
 });
 
 self.addEventListener("notificationclick", (event) => {

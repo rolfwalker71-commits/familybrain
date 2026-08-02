@@ -29,13 +29,89 @@ const DOMAIN_LABEL: Record<string, string> = {
   finance: "FinanzBuddy",
 };
 
-function urlBase64ToUint8Array(base64String: string): BufferSource {
+function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
   const raw = atob(base64);
   const out = new Uint8Array(raw.length);
   for (let i = 0; i < raw.length; i += 1) out[i] = raw.charCodeAt(i);
   return out;
+}
+
+function bufferToBase64Url(buf: ArrayBuffer | null): string | null {
+  if (!buf) return null;
+  const bytes = new Uint8Array(buf);
+  let s = "";
+  for (let i = 0; i < bytes.length; i += 1) s += String.fromCharCode(bytes[i]!);
+  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function pushSubscriptionPayload(sub: PushSubscription): {
+  endpoint: string;
+  keys: { p256dh: string; auth: string };
+} {
+  const json = sub.toJSON();
+  const p256dh =
+    json.keys?.p256dh || bufferToBase64Url(sub.getKey("p256dh"));
+  const auth = json.keys?.auth || bufferToBase64Url(sub.getKey("auth"));
+  if (!json.endpoint || !p256dh || !auth) {
+    throw new Error("Push-Subscription unvollständig (Keys fehlen).");
+  }
+  return { endpoint: json.endpoint, keys: { p256dh, auth } };
+}
+
+function explainPushError(err: unknown): string {
+  const msg = err instanceof Error ? err.message : String(err);
+  const name =
+    err && typeof err === "object" && "name" in err
+      ? String((err as { name: unknown }).name)
+      : "";
+  if (/secure|https|insecure/i.test(msg) || name === "SecurityError") {
+    return "Push braucht HTTPS (oder localhost). Bitte Buddy über die HTTPS-URL öffnen — nicht nur http://IP:Port.";
+  }
+  if (/push service|AbortError|Registration failed/i.test(msg) || name === "AbortError") {
+    return `${msg} — Unter Windows: Chrome/Edge-Benachrichtigungen in den Windows-Einstellungen erlauben; ggf. Buddy als App installieren.`;
+  }
+  if (/applicationServerKey|InvalidAccessError/i.test(msg)) {
+    return "VAPID-Public-Key ungültig — Keys in der Server-.env prüfen und Container neu erstellen.";
+  }
+  return msg || "Push aktivieren fehlgeschlagen.";
+}
+
+async function ensureServiceWorkerRegistration(): Promise<ServiceWorkerRegistration> {
+  if (!("serviceWorker" in navigator)) {
+    throw new Error("Dieser Browser unterstützt keinen Service Worker.");
+  }
+  if (!window.isSecureContext) {
+    throw new Error(
+      "Kein sicherer Kontext (HTTPS). Buddy unter HTTPS öffnen."
+    );
+  }
+  const existing = await navigator.serviceWorker.getRegistration("/");
+  const reg =
+    existing ||
+    (await navigator.serviceWorker.register("/sw.js", {
+      scope: "/",
+      updateViaCache: "none",
+    }));
+  // Wait until active (Windows can race permission dialog vs SW activate)
+  if (!reg.active) {
+    await Promise.race([
+      navigator.serviceWorker.ready,
+      new Promise<never>((_, reject) =>
+        setTimeout(
+          () =>
+            reject(
+              new Error(
+                "Service Worker startet nicht. Seite neu laden und erneut versuchen."
+              )
+            ),
+          15000
+        )
+      ),
+    ]);
+  }
+  return (await navigator.serviceWorker.getRegistration("/")) || reg;
 }
 
 export function NotificationPrefsPanel() {
@@ -76,10 +152,21 @@ export function NotificationPrefsPanel() {
     })();
     void (async () => {
       try {
+        if (typeof window !== "undefined" && !window.isSecureContext) {
+          setPushStatus("unsupported");
+          setError(
+            "Diese Seite läuft nicht über HTTPS — Web Push unter Windows braucht HTTPS (oder localhost)."
+          );
+          // still check vapid so status text isn't misleading
+        }
         const res = await fetch("/api/push/vapid-public-key");
         const data = await res.json().catch(() => ({}));
         const configured = Boolean(data.configured && data.publicKey);
         setPushConfigured(configured);
+        if (typeof window !== "undefined" && !window.isSecureContext) {
+          setPushStatus("unsupported");
+          return;
+        }
         if (
           !configured ||
           typeof window === "undefined" ||
@@ -89,6 +176,7 @@ export function NotificationPrefsPanel() {
           setPushStatus(configured ? "unsupported" : "off");
           return;
         }
+        await ensureServiceWorkerRegistration().catch(() => null);
         const reg = await navigator.serviceWorker.ready;
         const sub = await reg.pushManager.getSubscription();
         setPushStatus(sub ? "on" : "off");
@@ -169,6 +257,11 @@ export function NotificationPrefsPanel() {
     setError(null);
     setMessage(null);
     try {
+      if (!window.isSecureContext) {
+        throw new Error(
+          "Kein HTTPS. Unter Windows Buddy über die öffentliche HTTPS-URL öffnen (nicht http://IP:3100)."
+        );
+      }
       const keyRes = await fetch("/api/push/vapid-public-key");
       const keyJson = await keyRes.json();
       if (!keyRes.ok || !keyJson.publicKey) {
@@ -180,23 +273,40 @@ export function NotificationPrefsPanel() {
       const perm = await Notification.requestPermission();
       setDesktopPermission(perm);
       if (perm !== "granted") {
-        throw new Error("Benachrichtigungen wurden nicht erlaubt.");
+        throw new Error(
+          "Benachrichtigungen wurden nicht erlaubt (Browser- oder Windows-Einstellung)."
+        );
       }
-      const reg = await navigator.serviceWorker.ready;
+
+      const reg = await ensureServiceWorkerRegistration();
+      if (!reg.pushManager) {
+        throw new Error("PushManager fehlt in diesem Browser.");
+      }
+
+      const existing = await reg.pushManager.getSubscription();
+      if (existing) {
+        try {
+          await existing.unsubscribe();
+        } catch {
+          /* recreate below */
+        }
+      }
+
+      const applicationServerKey = urlBase64ToUint8Array(
+        String(keyJson.publicKey).trim()
+      );
+      // Copy into a fresh ArrayBuffer-backed view (Chromium on Windows is picky).
+      const keyCopy = new Uint8Array(applicationServerKey);
+
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(
-          keyJson.publicKey as string
-        ),
+        applicationServerKey: keyCopy,
       });
-      const json = sub.toJSON();
+      const payload = pushSubscriptionPayload(sub);
       const res = await fetch("/api/push/subscribe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          endpoint: json.endpoint,
-          keys: json.keys,
-        }),
+        body: JSON.stringify(payload),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error || "Subscribe fehlgeschlagen");
@@ -205,7 +315,7 @@ export function NotificationPrefsPanel() {
       setMessage("Push aktiv — auch bei geschlossener App.");
     } catch (err) {
       setPushStatus("off");
-      setError(err instanceof Error ? err.message : String(err));
+      setError(explainPushError(err));
     }
   }
 
@@ -254,7 +364,9 @@ export function NotificationPrefsPanel() {
             : pushStatus === "on"
               ? "aktiv"
               : pushStatus === "unsupported"
-                ? "Browser unterstützt Push nicht"
+                ? window.isSecureContext === false
+                  ? "braucht HTTPS"
+                  : "Browser unterstützt Push nicht"
                 : pushStatus === "busy"
                   ? "…"
                   : "aus"}
