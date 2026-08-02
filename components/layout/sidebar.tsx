@@ -113,11 +113,7 @@ const finanzBuddyItem: NavItem = {
   tone: "green",
 };
 
-const limitedUserNavItems: NavItem[] = [
-  travelBuddyItem,
-  finanzBuddyItem,
-  { href: "/account", label: "Konto", icon: Settings, tone: "teal" },
-];
+const limitedUserNavItems: NavItem[] = [travelBuddyItem, finanzBuddyItem];
 
 type AreaEntry = {
   mode: Exclude<AdminNavMode, "home">;

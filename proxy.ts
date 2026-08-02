@@ -18,8 +18,6 @@ const PUBLIC_PATHS = new Set([
   "/icon-192.png",
   "/icon-512.png",
   "/icon-maskable-512.png",
-  "/.well-known/assetlinks.json",
-  "/sw.js",
 ]);
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
@@ -37,13 +35,6 @@ function isLimitedUserAllowedPath(pathname: string): boolean {
   if (pathname === "/api/auth/me" || pathname === "/api/auth/logout") {
     return true;
   }
-  if (pathname === "/account" || pathname.startsWith("/account/")) {
-    return true;
-  }
-  if (pathname === "/api/me/notification-prefs") return true;
-  if (pathname.startsWith("/api/push/")) return true;
-  if (pathname === "/api/device-tokens") return true;
-  if (pathname.startsWith("/api/mobile/")) return true;
   if (pathname === "/trips" || pathname.startsWith("/trips/")) return true;
   if (pathname === "/finance-brain" || pathname.startsWith("/finance-brain/")) {
     return true;

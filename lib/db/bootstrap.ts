@@ -141,38 +141,6 @@ export function bootstrapDatabase(db: Database.Database): void {
   ensureUserAccessTables(db);
   ensureInboxTaskTables(db);
   ensureActivityLogTable(db);
-  ensurePushAndDeviceTables(db);
-}
-
-function ensurePushAndDeviceTables(db: Database.Database): void {
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS push_subscriptions (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      owner_key TEXT NOT NULL,
-      endpoint TEXT NOT NULL,
-      endpoint_hash TEXT NOT NULL UNIQUE,
-      p256dh TEXT NOT NULL,
-      auth TEXT NOT NULL,
-      user_agent TEXT,
-      created_at TEXT NOT NULL,
-      last_seen_at TEXT NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_push_subscriptions_owner
-      ON push_subscriptions(owner_key);
-
-    CREATE TABLE IF NOT EXISTS device_tokens (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      owner_key TEXT NOT NULL,
-      label TEXT NOT NULL,
-      token_hash TEXT NOT NULL UNIQUE,
-      token_prefix TEXT NOT NULL,
-      created_at TEXT NOT NULL,
-      last_used_at TEXT,
-      revoked_at TEXT
-    );
-    CREATE INDEX IF NOT EXISTS idx_device_tokens_owner
-      ON device_tokens(owner_key);
-  `);
 }
 
 function ensureActivityLogTable(db: Database.Database): void {

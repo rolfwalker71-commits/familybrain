@@ -228,29 +228,6 @@ export function getNotificationPrefsForAuth(
   }
 }
 
-export function getNotificationPrefsForOwnerKey(
-  ownerKey: string
-): UserNotificationPrefs {
-  if (ownerKey === "admin") return getGlobalNotificationPrefs();
-  const m = /^user:(\d+)$/.exec(ownerKey);
-  if (!m) return getGlobalNotificationPrefs();
-  const userId = Number(m[1]);
-  const global = getGlobalNotificationPrefs();
-  const raw = getUserNotificationPrefsJson(userId);
-  if (!raw) return global;
-  try {
-    const parsed = JSON.parse(raw) as Partial<UserNotificationPrefs>;
-    return mergeNotificationPrefs({
-      ...parsed,
-      tripIds: parseIdList(parsed.tripIds),
-      ledgerIds: parseIdList(parsed.ledgerIds),
-      events: parsed.events ?? {},
-    });
-  } catch {
-    return global;
-  }
-}
-
 export function saveNotificationPrefsForAuth(
   auth: AuthContext,
   prefs: UserNotificationPrefs
