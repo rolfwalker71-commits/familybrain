@@ -78,6 +78,10 @@ In `/etc/fstab` (Werte anpassen):
 //u123456.your-storagebox.de/backup  /mnt/storagebox  cifs  credentials=/root/.smbcredentials-storagebox,uid=0,gid=0,iocharset=utf8,file_mode=0600,dir_mode=0700,_netdev,x-systemd.automount  0  0
 ```
 
+**Hinweis zu `x-systemd.automount`:** Der Mount wird oft erst beim ersten Zugriff aktiv.
+`mountpoint -q /mnt/storagebox` kann dann **fälschlich fehlschlagen**, obwohl die Box erreichbar ist.
+Das Backup-Skript prüft deshalb Schreibzugriff auf `RESTIC_REPOSITORY`, nicht `mountpoint`.
+
 `/root/.smbcredentials-storagebox`:
 
 ```text
@@ -183,44 +187,109 @@ BUDDY_DIR=/opt/familybrain          # anpassen
 PAPERLESS_DIR=/opt/paperless        # anpassen
 PAPERLESS_MEDIA=/var/lib/docker/volumes/paperless_media/_data   # anpassen!
 PAPERLESS_PGDATA=/var/lib/docker/volumes/paperless_pgdata/_data # anpassen!
+# Optional: wenn RESTIC_REPOSITORY per SFTP gesetzt ist, entfällt der lokale Mount-Check
+STORAGE_ROOT="${STORAGE_ROOT:-/mnt/storagebox}"
 
+mkdir -p "$(dirname "$LOG")"
 exec > >(tee -a "$LOG") 2>&1
 echo "=== backup start $(date -Is) ==="
 
-# Mount prüfen
-if ! mountpoint -q /mnt/storagebox; then
-  echo "ERROR: Storage Box nicht gemountet"
-  exit 1
-fi
+# --- Storage prüfen (automount-freundlich) ---
+# Nicht mountpoint -q /mnt/storagebox: bei x-systemd.automount oft false-negativ.
+ensure_restic_target() {
+  case "${RESTIC_REPOSITORY:-}" in
+    sftp:*|rest:*|s3:*|b2:*|azure:*|gs:*|rclone:*)
+      echo "Remote-Repository: $RESTIC_REPOSITORY (kein lokaler Mount nötig)"
+      return 0
+      ;;
+  esac
+
+  local repo="${RESTIC_REPOSITORY:-$STORAGE_ROOT/restic-repo}"
+  # Automount anstoßen
+  ls "$STORAGE_ROOT" >/dev/null 2>&1 || true
+  mkdir -p "$repo" 2>/dev/null || true
+
+  if [[ ! -d "$repo" ]]; then
+    echo "ERROR: Repository-Pfad fehlt oder nicht erreichbar: $repo"
+    echo "Hinweis: findmnt -T $STORAGE_ROOT ; df -h $STORAGE_ROOT"
+    exit 1
+  fi
+
+  local probe="$repo/.buddy-backup-write-test-$$"
+  if ! touch "$probe" 2>/dev/null; then
+    echo "ERROR: Kein Schreibzugriff auf $repo (Mount/Rechte/Automount?)"
+    if command -v findmnt >/dev/null; then
+      findmnt -T "$repo" || findmnt -T "$STORAGE_ROOT" || true
+    fi
+    exit 1
+  fi
+  rm -f "$probe"
+  echo "OK: Schreibzugriff auf $repo"
+  if command -v findmnt >/dev/null; then
+    findmnt -T "$repo" || true
+  fi
+}
+ensure_restic_target
+
+# Env-Datei sichern (fehlt oft, wenn Compose nur mit exportierten Vars läuft)
+copy_env_file() {
+  local dest="$1"
+  if [[ -f .env ]]; then
+    cp -a .env "$dest"
+  elif [[ -f .env.local ]]; then
+    echo "WARN: keine .env — kopiere .env.local → $dest"
+    cp -a .env.local "$dest"
+  else
+    echo "WARN: weder .env noch .env.local in $(pwd) — Staging ohne Env-Datei"
+  fi
+}
 
 rm -rf "$STAGING"
 mkdir -p "$STAGING"/{buddy,paperless}
 
 # --- Buddy konsistent ---
-cd "$BUDDY_DIR"
-docker compose stop familybrain
-mkdir -p "$STAGING/buddy/data"
-rsync -a --delete ./data/ "$STAGING/buddy/data/"
-cp -a .env "$STAGING/buddy/env"
-cp -a docker-compose.yml "$STAGING/buddy/docker-compose.yml" || true
-docker compose start familybrain
+# Wichtig: bei Fehlern nach stop Container trotzdem wieder starten
+buddy_up() {
+  (cd "$BUDDY_DIR" && docker compose start familybrain) || \
+    (cd "$BUDDY_DIR" && docker compose up -d familybrain) || true
+}
+(
+  set -euo pipefail
+  cd "$BUDDY_DIR"
+  docker compose stop familybrain
+  trap buddy_up EXIT
+  mkdir -p "$STAGING/buddy/data"
+  rsync -a --delete ./data/ "$STAGING/buddy/data/"
+  copy_env_file "$STAGING/buddy/env"
+  cp -a docker-compose.yml "$STAGING/buddy/docker-compose.yml" 2>/dev/null || true
+  trap - EXIT
+  buddy_up
+)
 
 # --- Paperless konsistent ---
-cd "$PAPERLESS_DIR"
-docker compose stop
-mkdir -p "$STAGING/paperless"/{media,pgdata}
-rsync -a --delete "$PAPERLESS_MEDIA"/ "$STAGING/paperless/media/"
-rsync -a --delete "$PAPERLESS_PGDATA"/ "$STAGING/paperless/pgdata/"
-cp -a .env "$STAGING/paperless/env"
-cp -a docker-compose.yml "$STAGING/paperless/docker-compose.yml" || true
-docker compose up -d
+paperless_up() {
+  (cd "$PAPERLESS_DIR" && docker compose up -d) || true
+}
+(
+  set -euo pipefail
+  cd "$PAPERLESS_DIR"
+  docker compose stop
+  trap paperless_up EXIT
+  mkdir -p "$STAGING/paperless"/{media,pgdata}
+  rsync -a --delete "$PAPERLESS_MEDIA"/ "$STAGING/paperless/media/"
+  rsync -a --delete "$PAPERLESS_PGDATA"/ "$STAGING/paperless/pgdata/"
+  copy_env_file "$STAGING/paperless/env"
+  cp -a docker-compose.yml "$STAGING/paperless/docker-compose.yml" 2>/dev/null || true
+  trap - EXIT
+  paperless_up
+)
 
 # Manifest
 {
   echo "host=$(hostname)"
   echo "time=$(date -Is)"
   echo "buddy_image=$(cd "$BUDDY_DIR" && docker compose images -q familybrain 2>/dev/null | head -1)"
-  du -sh "$STAGING"/*/*
+  du -sh "$STAGING"/*/* 2>/dev/null || true
 } > "$STAGING/MANIFEST.txt"
 
 # --- restic ---
@@ -237,6 +306,20 @@ restic forget --tag buddy-paperless \
 
 restic check --read-data-subset=5%
 
+# Optional: Status für Buddy-UI (Settings → Backup)
+STATUS_FILE="${BUDDY_BACKUP_STATUS_FILE:-$BUDDY_DIR/data/backup-status.json}"
+if [[ -d "$(dirname "$STATUS_FILE")" ]]; then
+  cat > "$STATUS_FILE" <<EOF
+{
+  "lastSnapshotAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "lastCheckAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "lastCheckOk": true,
+  "repository": "${RESTIC_REPOSITORY:-}",
+  "summary": "restic backup + check ok"
+}
+EOF
+fi
+
 echo "=== backup done $(date -Is) ==="
 ```
 
@@ -245,6 +328,8 @@ sudo chmod 750 /usr/local/sbin/buddy-paperless-backup.sh
 ```
 
 **Pfade anpassen:** Volume-Namen mit `docker volume ls` und `docker volume inspect …` ermitteln.
+
+**`.env` fehlt?** Im Compose-Verzeichnis prüfen (`ls -la "$BUDDY_DIR"/.env`). Fehlt die Datei, läuft Buddy oft trotzdem (Secrets in der Shell/`EnvironmentFile`). Das Skript warnt dann nur noch und lässt den Lauf weiterlaufen — Container werden per `trap` wieder gestartet.
 
 ### Optional: Qdrant weglassen
 
