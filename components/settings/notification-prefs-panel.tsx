@@ -278,6 +278,9 @@ export function NotificationPrefsPanel() {
         );
       }
 
+      // Windows Chromium: permission dialog can race ahead of PushManager.
+      await new Promise((r) => setTimeout(r, 250));
+
       const reg = await ensureServiceWorkerRegistration();
       if (!reg.pushManager) {
         throw new Error("PushManager fehlt in diesem Browser.");
@@ -307,9 +310,22 @@ export function NotificationPrefsPanel() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
+        credentials: "same-origin",
       });
       const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body.error || "Subscribe fehlgeschlagen");
+      if (!res.ok) {
+        throw new Error(
+          typeof body.error === "string"
+            ? `${body.error} (HTTP ${res.status})`
+            : `Subscribe fehlgeschlagen (HTTP ${res.status})`
+        );
+      }
+      const confirmed = await reg.pushManager.getSubscription();
+      if (!confirmed) {
+        throw new Error(
+          "Subscription wurde vom Browser verworfen. Windows-Benachrichtigungen für Chrome/Edge prüfen."
+        );
+      }
       setPushStatus("on");
       setPrefs((p) => ({ ...p, desktopEnabled: true }));
       setMessage("Push aktiv — auch bei geschlossener App.");
@@ -397,6 +413,12 @@ export function NotificationPrefsPanel() {
             Push aus
           </Button>
         </div>
+        {error ? (
+          <p className="text-sm text-destructive">{error}</p>
+        ) : null}
+        {message ? (
+          <p className="text-sm text-muted-foreground">{message}</p>
+        ) : null}
       </div>
 
       <div className="flex items-start gap-3 rounded-xl border border-border/60 bg-muted/30 px-3 py-3">

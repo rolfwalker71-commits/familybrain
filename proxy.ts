@@ -69,22 +69,53 @@ function isLimitedUserAllowedPath(pathname: string): boolean {
   return false;
 }
 
+function normalizeHost(host: string): string {
+  const h = host.trim().toLowerCase();
+  // Drop default ports so https://x and https://x:443 match.
+  if (h.endsWith(":443") || h.endsWith(":80")) {
+    return h.replace(/:(443|80)$/, "");
+  }
+  return h;
+}
+
+function expectedRequestHost(request: NextRequest): string {
+  const forwardedHost = request.headers.get("x-forwarded-host");
+  return normalizeHost(
+    forwardedHost?.split(",")[0]?.trim() ||
+      request.headers.get("host") ||
+      request.nextUrl.host
+  );
+}
+
 function hasValidOrigin(request: NextRequest): boolean {
   if (SAFE_METHODS.has(request.method)) return true;
-  const origin = request.headers.get("origin");
-  if (!origin) return false;
+  const expectedHost = expectedRequestHost(request);
 
-  try {
-    const originUrl = new URL(origin);
-    const forwardedHost = request.headers.get("x-forwarded-host");
-    const expectedHost =
-      forwardedHost?.split(",")[0]?.trim() ||
-      request.headers.get("host") ||
-      request.nextUrl.host;
-    return originUrl.host === expectedHost;
-  } catch {
-    return false;
+  const origin = request.headers.get("origin");
+  if (origin) {
+    try {
+      return normalizeHost(new URL(origin).host) === expectedHost;
+    } catch {
+      return false;
+    }
   }
+
+  // Some desktop browsers omit Origin on same-origin fetch POST.
+  const referer = request.headers.get("referer");
+  if (referer) {
+    try {
+      return normalizeHost(new URL(referer).host) === expectedHost;
+    } catch {
+      return false;
+    }
+  }
+
+  const fetchSite = request.headers.get("sec-fetch-site");
+  if (fetchSite === "same-origin" || fetchSite === "same-site") {
+    return true;
+  }
+
+  return false;
 }
 
 function requestOrigin(request: NextRequest): string {

@@ -10,7 +10,12 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const BodySchema = z.object({
-  endpoint: z.string().url().max(2048),
+  // z.url() is picky; FCM/Mozilla endpoints are always https.
+  endpoint: z
+    .string()
+    .min(12)
+    .max(2048)
+    .refine((v) => /^https:\/\//i.test(v), "endpoint must be https"),
   keys: z.object({
     p256dh: z.string().min(1).max(512),
     auth: z.string().min(1).max(512),
