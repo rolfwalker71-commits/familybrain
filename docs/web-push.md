@@ -20,12 +20,14 @@ docker run --rm -w /tmp node:22-bookworm-slim sh -c '
 '
 ```
 
-Zeilen in die Host-`.env` einfügen, dann:
+Zeilen in die Host-`.env` einfügen. Die Variablen müssen in `docker-compose.yml`
+unter `environment` stehen (sonst sieht der Container sie nicht). Dann:
 
 ```bash
-docker compose pull
-docker compose up -d
+docker compose up -d --force-recreate familybrain
 ```
+
+Nur `restart` reicht nicht immer — neu erstellen, damit Env neu gelesen wird.
 
 ## In der App
 
