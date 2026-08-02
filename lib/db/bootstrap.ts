@@ -141,6 +141,25 @@ export function bootstrapDatabase(db: Database.Database): void {
   ensureUserAccessTables(db);
   ensureInboxTaskTables(db);
   ensureActivityLogTable(db);
+  ensurePushSubscriptionsTable(db);
+}
+
+function ensurePushSubscriptionsTable(db: Database.Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS push_subscriptions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      owner_key TEXT NOT NULL,
+      endpoint TEXT NOT NULL,
+      endpoint_hash TEXT NOT NULL UNIQUE,
+      p256dh TEXT NOT NULL,
+      auth TEXT NOT NULL,
+      user_agent TEXT,
+      created_at TEXT NOT NULL,
+      last_seen_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_push_subscriptions_owner
+      ON push_subscriptions(owner_key);
+  `);
 }
 
 function ensureActivityLogTable(db: Database.Database): void {

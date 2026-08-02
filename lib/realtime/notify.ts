@@ -45,6 +45,12 @@ export function notifyAppChange(
   };
 
   publishRealtime({ topic: "notify", at, notification });
+
+  void import("@/lib/push/dispatch")
+    .then((m) => m.dispatchWebPush(notification))
+    .catch(() => {
+      /* optional */
+    });
 }
 
 export function getDocumentRealtimeSnapshot(localId: number): {
