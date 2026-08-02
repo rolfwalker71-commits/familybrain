@@ -137,6 +137,21 @@ export async function analyzeDocument(
         "@/lib/documents/triage"
       );
       const triage = applyTriageAfterAnalysis(documentId, parsed.data);
+      // AI icon first so push/mail can embed it on triage notify
+      if (triage.queued || triage.newlyQueued) {
+        try {
+          const { ensureDocumentAiIconIfMissing } = await import(
+            "@/lib/paperless/document-icon"
+          );
+          await ensureDocumentAiIconIfMissing(documentId);
+        } catch (iconErr) {
+          console.error(
+            "[analyze] document ai icon (pre-notify) failed",
+            documentId,
+            iconErr instanceof Error ? iconErr.message : iconErr
+          );
+        }
+      }
       if (triage.queued) {
         const { notifyDocumentTriageQueued } = await import(
           "@/lib/realtime/notify"
@@ -146,20 +161,7 @@ export async function analyzeDocument(
           triage.reasons.map((r) => TRIAGE_REASON_LABELS[r])
         );
       }
-      // Generate AI icon before triage mail so CID embed can include it
       if (triage.newlyQueued) {
-        try {
-          const { ensureDocumentAiIconIfMissing } = await import(
-            "@/lib/paperless/document-icon"
-          );
-          await ensureDocumentAiIconIfMissing(documentId);
-        } catch (iconErr) {
-          console.error(
-            "[analyze] document ai icon (pre-mail) failed",
-            documentId,
-            iconErr instanceof Error ? iconErr.message : iconErr
-          );
-        }
         try {
           const { notifyTriageReadyEmail } = await import(
             "@/lib/mail/notify-triage"

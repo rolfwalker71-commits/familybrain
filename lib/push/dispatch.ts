@@ -18,6 +18,8 @@ import {
   type PushSubscriptionRow,
 } from "@/lib/push/subscriptions";
 import { ensureWebPushConfigured } from "@/lib/push/vapid";
+import { absoluteAppUrl } from "@/lib/app-url";
+import { absolutePushMediaUrl } from "@/lib/push/signed-media";
 
 function ownerMayReceive(
   ownerKey: string,
@@ -74,6 +76,8 @@ export async function dispatchWebPush(
   const rows = listAllPushSubscriptions();
   if (rows.length === 0) return { sent: 0 };
 
+  const fallbackIcon = absoluteAppUrl("/icon-512.png");
+  const mediaUrl = absolutePushMediaUrl(notification.aiIconUrl);
   const payload = JSON.stringify({
     title: notification.headline || "Buddy",
     body:
@@ -82,6 +86,11 @@ export async function dispatchWebPush(
     url: notification.href || "/dashboard",
     reason: notification.reason,
     domain: notification.domain,
+    /** Small/medium toast icon (Android + desktop). */
+    icon: mediaUrl || fallbackIcon,
+    badge: absoluteAppUrl("/icon-192.png"),
+    /** Large image when the notification is expanded (esp. Android). */
+    image: mediaUrl || fallbackIcon,
   });
 
   const byOwner = new Map<string, PushSubscriptionRow[]>();

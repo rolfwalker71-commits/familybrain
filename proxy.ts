@@ -12,6 +12,7 @@ const PUBLIC_PATHS = new Set([
   "/api/auth/logout",
   "/api/finance-ledgers/exchange-rate",
   "/api/paperless/webhook",
+  "/api/push/media",
   "/manifest.webmanifest",
   "/favicon.ico",
   "/apple-touch-icon.png",

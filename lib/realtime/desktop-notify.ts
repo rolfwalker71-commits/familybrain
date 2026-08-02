@@ -44,7 +44,9 @@ export function showDesktopNotification(n: AppNotifyPayload): void {
     .filter((x) => Boolean(x && String(x).trim()))
     .join(" — ");
   const icon =
-    absoluteUrl(n.aiIconUrl) || absoluteUrl("/icon-192.png") || undefined;
+    absoluteUrl(n.aiIconUrl) || absoluteUrl("/icon-512.png") || undefined;
+  const image =
+    absoluteUrl(n.aiIconUrl) || absoluteUrl("/icon-512.png") || undefined;
   const tag = [
     n.reason,
     n.localId ?? n.paperlessId ?? n.tripId ?? n.ledgerId ?? "",
@@ -54,9 +56,11 @@ export function showDesktopNotification(n: AppNotifyPayload): void {
     const note = new Notification(title, {
       body: body || undefined,
       icon,
+      // Chromium: larger preview when the toast is expanded (where supported).
+      ...(image ? { image } : {}),
       tag: tag || undefined,
       data: { href: n.href || null },
-    });
+    } as NotificationOptions);
     note.onclick = () => {
       try {
         window.focus();

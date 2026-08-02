@@ -443,14 +443,15 @@ async function writeIconJpeg(
   source: Buffer
 ): Promise<string> {
   ensureDocumentAiIconDir();
+  // 512px: sharp enough for expanded push notifications (Android big picture).
   const jpeg = await sharp(source)
     .rotate()
-    .resize(256, 256, {
+    .resize(512, 512, {
       fit: "cover",
       background: { r: 255, g: 255, b: 255, alpha: 1 },
     })
     .flatten({ background: { r: 255, g: 255, b: 255 } })
-    .jpeg({ quality: 82, mozjpeg: true })
+    .jpeg({ quality: 84, mozjpeg: true })
     .toBuffer();
   const filename = `doc-${documentId}-${randomUUID().slice(0, 8)}.jpg`;
   const fullPath = path.join(getDocumentAiIconDir(), filename);

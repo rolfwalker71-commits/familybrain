@@ -34,6 +34,11 @@ Nur `restart` reicht nicht immer — neu erstellen, damit Env neu gelesen wird.
 Einstellungen → Live-Benachrichtigungen → **Push aktivieren**.
 Event «Neuer Reise-Kommentar» (und andere) wie gewohnt filtern.
 
+Push-Benachrichtigungen enthalten das passende AI-Bild (Dokument-/Ereignis-/Ausgabenbild)
+als `icon` und — wo das OS es unterstützt — als grosses `image` beim Aufklappen.
+Die Bilder werden über kurzlebige, signierte URLs unter `/api/push/media` geladen
+(ohne Login-Cookie; Signatur mit `FAMILYBRAIN_SESSION_SECRET`).
+
 ## Dev
 
 ```bash
