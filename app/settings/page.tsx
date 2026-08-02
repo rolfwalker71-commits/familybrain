@@ -27,6 +27,7 @@ import {
 } from "@/components/settings/settings-tab-nav";
 import { SettingsUsersPanel } from "@/components/settings/settings-users-panel";
 import { SettingsFamilyPanel } from "@/components/settings/settings-family-panel";
+import { DeviceTokensPanel } from "@/components/settings/device-tokens-panel";
 import { NotificationPrefsPanel } from "@/components/settings/notification-prefs-panel";
 import { SettingsCategorySuggestionsPanel } from "@/components/settings/settings-category-suggestions-panel";
 import { BackupStatusPanel } from "@/components/settings/backup-status-panel";
@@ -2188,8 +2189,12 @@ function SettingsPageInner() {
                 Live-Benachrichtigungen
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-6">
               <NotificationPrefsPanel />
+              <div className="border-t border-border/60 pt-6">
+                <h3 className="mb-3 text-sm font-semibold">Android / Widgets</h3>
+                <DeviceTokensPanel />
+              </div>
             </CardContent>
           </Card>
           <BackupStatusPanel />

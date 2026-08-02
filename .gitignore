@@ -42,8 +42,11 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# local sqlite database
-/data/*.sqlite
+/android/**/build/
+/android/**/.gradle/
+*.jks
+*.keystore
+!android/snippets/**
 /data/*.sqlite-*
 /data/trip-covers/
 /data/trip-aircraft/

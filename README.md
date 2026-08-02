@@ -12,6 +12,7 @@ Local-first MVP: connect Paperless-ngx, sync documents into SQLite, and extract 
 - TravelBrain: trip planning (`/trips`) with timeline, covers, ICS, chat capture; optional flight/hotel enrichment
 - Single-user login for every page and API route
 - Installable online PWA for iOS, iPadOS and Android
+- Android TWA / Widgets / Web Push — see [docs/android-twa.md](docs/android-twa.md)
 
 ## Stack
 

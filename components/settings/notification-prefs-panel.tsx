@@ -29,6 +29,15 @@ const DOMAIN_LABEL: Record<string, string> = {
   finance: "FinanzBuddy",
 };
 
+function urlBase64ToUint8Array(base64String: string): BufferSource {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(base64);
+  const out = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i += 1) out[i] = raw.charCodeAt(i);
+  return out;
+}
+
 export function NotificationPrefsPanel() {
   const [prefs, setPrefs] = useState<UserNotificationPrefs>(() =>
     mergeNotificationPrefs(null)
@@ -43,6 +52,10 @@ export function NotificationPrefsPanel() {
   const [desktopPermission, setDesktopPermission] = useState<
     NotificationPermission | "unsupported"
   >("default");
+  const [pushConfigured, setPushConfigured] = useState(false);
+  const [pushStatus, setPushStatus] = useState<
+    "unknown" | "unsupported" | "off" | "on" | "busy"
+  >("unknown");
 
   useEffect(() => {
     setDesktopPermission(getDesktopNotificationPermission());
@@ -59,6 +72,28 @@ export function NotificationPrefsPanel() {
         setError(err instanceof Error ? err.message : String(err));
       } finally {
         setLoading(false);
+      }
+    })();
+    void (async () => {
+      try {
+        const res = await fetch("/api/push/vapid-public-key");
+        const data = await res.json().catch(() => ({}));
+        const configured = Boolean(data.configured && data.publicKey);
+        setPushConfigured(configured);
+        if (
+          !configured ||
+          typeof window === "undefined" ||
+          !("serviceWorker" in navigator) ||
+          !("PushManager" in window)
+        ) {
+          setPushStatus(configured ? "unsupported" : "off");
+          return;
+        }
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.getSubscription();
+        setPushStatus(sub ? "on" : "off");
+      } catch {
+        setPushStatus("off");
       }
     })();
   }, []);
@@ -129,6 +164,71 @@ export function NotificationPrefsPanel() {
     });
   }
 
+  async function enableWebPush() {
+    setPushStatus("busy");
+    setError(null);
+    setMessage(null);
+    try {
+      const keyRes = await fetch("/api/push/vapid-public-key");
+      const keyJson = await keyRes.json();
+      if (!keyRes.ok || !keyJson.publicKey) {
+        throw new Error(
+          keyJson.error ||
+            "VAPID nicht konfiguriert. Auf dem Server Keys erzeugen (npm run push:vapid)."
+        );
+      }
+      const perm = await Notification.requestPermission();
+      setDesktopPermission(perm);
+      if (perm !== "granted") {
+        throw new Error("Benachrichtigungen wurden nicht erlaubt.");
+      }
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(keyJson.publicKey as string),
+      });
+      const json = sub.toJSON();
+      const res = await fetch("/api/push/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          endpoint: json.endpoint,
+          keys: json.keys,
+        }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || "Subscribe fehlgeschlagen");
+      setPushStatus("on");
+      setPrefs((p) => ({ ...p, desktopEnabled: true }));
+      setMessage("Push aktiv — auch bei geschlossener App (PWA/TWA).");
+    } catch (err) {
+      setPushStatus("off");
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function disableWebPush() {
+    setPushStatus("busy");
+    setError(null);
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      if (sub) {
+        await fetch("/api/push/unsubscribe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ endpoint: sub.endpoint }),
+        });
+        await sub.unsubscribe();
+      }
+      setPushStatus("off");
+      setMessage("Push deaktiviert.");
+    } catch (err) {
+      setPushStatus("off");
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
   if (loading) {
     return (
       <p className="text-sm text-muted-foreground">Lade Einstellungen…</p>
@@ -138,12 +238,52 @@ export function NotificationPrefsPanel() {
   return (
     <div className="space-y-4">
       <p className="text-xs text-muted-foreground">
-        Live-Toasts erscheinen in der App, solange ein Tab geöffnet ist.
-        Desktop-Benachrichtigungen (Windows) kommen dazu, wenn der Tab im
-        Hintergrund liegt. Der Service Worker ist für Benachrichtigungs-Klicks
-        und als Grundlage aktiv; vollständige Push-Zustellung bei geschlossener
-        App braucht noch VAPID und Server-Versand. Pro Benutzer speicherbar.
+        Live-Toasts bei offenem Tab; Desktop-Toasts im Hintergrund-Tab; Web Push
+        auch bei geschlossener PWA/TWA (z. B. neuer TravelBuddy-Kommentar). Pro
+        Benutzer speicherbar — Event «Neuer Reise-Kommentar» unten aktiv lassen.
       </p>
+
+      <div className="space-y-3 rounded-xl border border-border/60 bg-muted/30 px-3 py-3">
+        <p className="text-sm font-medium text-foreground">Web Push (Handy/PWA)</p>
+        <p className="text-xs text-muted-foreground">
+          Status:{" "}
+          {!pushConfigured
+            ? "Server ohne VAPID (Keys setzen)"
+            : pushStatus === "on"
+              ? "aktiv"
+              : pushStatus === "unsupported"
+                ? "Browser unterstützt Push nicht"
+                : pushStatus === "busy"
+                  ? "…"
+                  : "aus"}
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={
+              !prefs.enabled ||
+              !pushConfigured ||
+              pushStatus === "busy" ||
+              pushStatus === "on" ||
+              pushStatus === "unsupported"
+            }
+            onClick={() => void enableWebPush()}
+          >
+            Push aktivieren
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            disabled={pushStatus !== "on"}
+            onClick={() => void disableWebPush()}
+          >
+            Push aus
+          </Button>
+        </div>
+      </div>
 
       <div className="flex items-start gap-3 rounded-xl border border-border/60 bg-muted/30 px-3 py-3">
         <input

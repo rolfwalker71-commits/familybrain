@@ -45,6 +45,13 @@ export function notifyAppChange(
   };
 
   publishRealtime({ topic: "notify", at, notification });
+
+  // Background web push (closed app / TWA). Never block the caller.
+  void import("@/lib/push/dispatch")
+    .then((m) => m.dispatchWebPush(notification))
+    .catch(() => {
+      /* optional */
+    });
 }
 
 export function getDocumentRealtimeSnapshot(localId: number): {

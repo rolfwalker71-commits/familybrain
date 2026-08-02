@@ -1,0 +1,15 @@
+<!--
+  Add to AndroidManifest inside <application> for TWA notification delegation.
+  Requires androidx.browser / androidbrowserhelper dependency (Bubblewrap usually includes it).
+-->
+<!--
+<service
+    android:name="com.google.androidbrowserhelper.trusted.DelegationService"
+    android:enabled="true"
+    android:exported="true">
+  <intent-filter>
+    <action android:name="android.support.customtabs.trusted.TRUSTED_WEB_ACTIVITY_SERVICE" />
+    <category android:name="android.intent.category.DEFAULT" />
+  </intent-filter>
+</service>
+-->
