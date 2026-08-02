@@ -1717,17 +1717,49 @@ export function getFinanceOverview() {
 
   const dueInvoices = db
     .prepare(
-      `SELECT f.*, d.title as document_title, d.id as document_local_id,
-              d.paperless_id, d.zu_bezahlen, d.bezahlt, d.ai_icon_path,
-              d.recipient_status, d.recipient_member_ids,
-              (SELECT s.category FROM document_summaries s WHERE s.document_id = d.id LIMIT 1) AS category
-       FROM financial_items f
-       JOIN paperless_documents d ON d.id = f.document_id
-       WHERE f.due_date IS NOT NULL AND TRIM(f.due_date) != ''
+      `SELECT
+          COALESCE(f.id, d.id) AS id,
+          f.id AS financial_item_id,
+          COALESCE(NULLIF(TRIM(f.vendor), ''), d.correspondent_name) AS vendor,
+          f.amount,
+          f.currency,
+          f.invoice_date,
+          f.due_date,
+          f.description,
+          f.counts_in_stats,
+          d.title AS document_title,
+          d.id AS document_local_id,
+          d.paperless_id,
+          d.zu_bezahlen,
+          d.bezahlt,
+          d.ai_icon_path,
+          d.recipient_status,
+          d.recipient_member_ids,
+          (SELECT s.category FROM document_summaries s WHERE s.document_id = d.id LIMIT 1) AS category
+       FROM paperless_documents d
+       LEFT JOIN financial_items f ON f.id = (
+         SELECT f2.id
+         FROM financial_items f2
+         WHERE f2.document_id = d.id
+         ORDER BY
+           CASE
+             WHEN f2.due_date IS NOT NULL AND TRIM(f2.due_date) != '' THEN 0
+             ELSE 1
+           END,
+           f2.due_date ASC,
+           f2.id ASC
+         LIMIT 1
+       )
+       WHERE COALESCE(d.sync_status, 'synced') != 'missing'
          AND d.zu_bezahlen = 1
          AND COALESCE(d.bezahlt, 0) = 0
-         AND COALESCE(d.sync_status, 'synced') != 'missing'
-       ORDER BY f.due_date ASC`
+       ORDER BY
+         CASE
+           WHEN f.due_date IS NOT NULL AND TRIM(f.due_date) != '' THEN 0
+           ELSE 1
+         END,
+         f.due_date ASC,
+         d.id ASC`
     )
     .all();
 

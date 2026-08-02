@@ -78,6 +78,8 @@ type AggRow = { label: string; count: number; total: number };
 
 type InvoiceRow = {
   id: number;
+  /** Real financial_items.id when present; null if only the Paperless doc is open. */
+  financial_item_id?: number | null;
   vendor: string | null;
   amount: number | null;
   currency: string | null;
@@ -298,7 +300,7 @@ function FinanceOverviewClientInner({
   const recentDueInvoices = useMemo(
     () =>
       sortedDueInvoices.filter(
-        (r) => r.due_date && r.due_date >= dueCutoff
+        (r) => !r.due_date || r.due_date >= dueCutoff
       ),
     [sortedDueInvoices, dueCutoff]
   );
@@ -306,15 +308,18 @@ function FinanceOverviewClientInner({
   const olderDueInvoices = useMemo(
     () =>
       sortedDueInvoices.filter(
-        (r) => r.due_date && r.due_date < dueCutoff
+        (r) => Boolean(r.due_date) && r.due_date! < dueCutoff
       ),
     [sortedDueInvoices, dueCutoff]
   );
 
   const dueBuckets = useMemo(
     () =>
-      groupByTimeBucket(recentDueInvoices, (r) => r.due_date, today).filter(
-        (b) => b.id !== "none"
+      groupByTimeBucket(recentDueInvoices, (r) => r.due_date, today).map(
+        (b) =>
+          b.id === "none"
+            ? { ...b, title: "Ohne Fälligkeit", defaultOpen: true }
+            : b
       ),
     [recentDueInvoices, today]
   );
@@ -642,8 +647,12 @@ function FinanceOverviewClientInner({
                   Offene Rechnungen (Zu bezahlen)
                 </div>
                 <p className="mt-1 text-sm opacity-80">
-                  Nur Paperless «Zu bezahlen» und nicht «Bezahlt» ·{" "}
-                  {recentDueInvoices.length} aktuell · {formatCHF(recentDueTotal)}
+                  Paperless «Zu bezahlen» und nicht «Bezahlt» ·{" "}
+                  {recentDueInvoices.length} offen
+                  {recentDueInvoices.length !== sortedDueInvoices.length
+                    ? ` von ${sortedDueInvoices.length}`
+                    : ""}{" "}
+                  · {formatCHF(recentDueTotal)}
                   {olderDueInvoices.length > 0
                     ? ` · ${olderDueInvoices.length} ältere versteckt`
                     : ""}
@@ -708,8 +717,8 @@ function FinanceOverviewClientInner({
             <CardContent className="space-y-0 p-0">
               {recentDueInvoices.length === 0 ? (
                 <div className="px-6 py-4 text-sm text-muted-foreground">
-                  Keine offenen Rechnungen mit Fälligkeit (Paperless «Zu bezahlen»
-                  / nicht «Bezahlt»).
+                  Keine offenen Rechnungen (Paperless «Zu bezahlen» / nicht
+                  «Bezahlt»).
                 </div>
               ) : (
                 <div className="space-y-4 p-4">
@@ -1238,11 +1247,17 @@ function DueInvoiceCard({
           category={row.category}
           size="md"
         />
-        <FinanceStatsToggle
-          key={`${row.id}-${isCountedInStats(row) ? 1 : 0}`}
-          itemId={row.id}
-          countsInStats={isCountedInStats(row)}
-        />
+        {row.financial_item_id != null ? (
+          <FinanceStatsToggle
+            key={`${row.financial_item_id}-${isCountedInStats(row) ? 1 : 0}`}
+            itemId={row.financial_item_id}
+            countsInStats={isCountedInStats(row)}
+          />
+        ) : (
+          <span className="text-[10px] text-muted-foreground">
+            Kein Extrakt
+          </span>
+        )}
       </div>
     </article>
   );
@@ -1305,7 +1320,7 @@ function DueBucketSection({
         <div className="grid grid-cols-1 gap-2.5 border-t border-border/50 p-3 sm:grid-cols-2 xl:grid-cols-3">
           {rows.map((row) => (
             <DueInvoiceCard
-              key={row.id}
+              key={`doc-${row.document_local_id}`}
               row={row}
               today={today}
               selected={selectedDocIds.has(row.document_local_id)}
