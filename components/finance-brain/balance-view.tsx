@@ -2083,16 +2083,17 @@ export function ExpenseList({
     (coupleFilter !== "__all__" ? 1 : 0) +
     (settledFilter !== "__show__" ? 1 : 0);
 
+  // Sticky navigator: always oldest → newest (left → right), independent of list sort.
   const expenseDayDates = useMemo(
     () =>
       uniqueSortedIsoDates(
         filteredExpenses.map((e) => e.expense_date),
-        sortDir
+        "asc"
       ),
-    [filteredExpenses, sortDir]
+    [filteredExpenses]
   );
 
-  /** Day anchors in DOM order (list is newest-first) for scroll highlighting. */
+  /** Day anchors in DOM order (matches list sort) for scroll highlighting. */
   const expenseDayDatesDom = useMemo(() => {
     const out: string[] = [];
     const seen = new Set<string>();
