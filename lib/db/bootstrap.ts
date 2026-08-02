@@ -139,6 +139,38 @@ export function bootstrapDatabase(db: Database.Database): void {
   ensureTripTravelersTable(db);
   ensureFinanceBrainTables(db);
   ensureUserAccessTables(db);
+  ensureInboxTaskTables(db);
+}
+
+function ensureInboxTaskTables(db: Database.Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS inbox_task_state (
+      owner_key TEXT NOT NULL,
+      source_kind TEXT NOT NULL,
+      source_id TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'open',
+      snoozed_until TEXT,
+      note TEXT,
+      completed_at TEXT,
+      updated_at TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (owner_key, source_kind, source_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_inbox_task_state_status
+      ON inbox_task_state(owner_key, status, completed_at);
+
+    CREATE TABLE IF NOT EXISTS inbox_task_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      owner_key TEXT NOT NULL,
+      source_kind TEXT NOT NULL,
+      source_id TEXT NOT NULL,
+      action TEXT NOT NULL,
+      detail TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_inbox_task_events_created
+      ON inbox_task_events(owner_key, created_at DESC);
+  `);
 }
 
 function ensureExtractOverrideColumns(db: Database.Database): void {

@@ -608,3 +608,30 @@ CREATE INDEX IF NOT EXISTS idx_paperless_field_sync_log_created
 CREATE INDEX IF NOT EXISTS idx_paperless_field_sync_log_doc
   ON paperless_field_sync_log(document_local_id);
 
+CREATE TABLE IF NOT EXISTS inbox_task_state (
+  owner_key TEXT NOT NULL,
+  source_kind TEXT NOT NULL,
+  source_id TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'open',
+  snoozed_until TEXT,
+  note TEXT,
+  completed_at TEXT,
+  updated_at TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (owner_key, source_kind, source_id)
+);
+CREATE INDEX IF NOT EXISTS idx_inbox_task_state_status
+  ON inbox_task_state(owner_key, status, completed_at);
+
+CREATE TABLE IF NOT EXISTS inbox_task_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  owner_key TEXT NOT NULL,
+  source_kind TEXT NOT NULL,
+  source_id TEXT NOT NULL,
+  action TEXT NOT NULL,
+  detail TEXT,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_inbox_task_events_created
+  ON inbox_task_events(owner_key, created_at DESC);
+

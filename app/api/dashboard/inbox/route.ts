@@ -5,11 +5,11 @@ import {
 } from "@/lib/auth/current-user";
 import {
   backfillPaymentFlagsFromRawMetadata,
-  getDashboardInbox,
   getPaperlessSettings,
   listOpenUnpaidInvoices,
 } from "@/lib/db/queries";
 import { ensureInitialized } from "@/lib/db/migrations";
+import { buildInboxTaskBoard } from "@/lib/inbox/build-tasks";
 import { PaperlessClient } from "@/lib/paperless/client";
 import { ingestPaperlessDocumentById } from "@/lib/paperless/sync";
 
@@ -36,7 +36,6 @@ async function ensurePaymentFlagsPopulated() {
 
     if (listOpenUnpaidInvoices(1).length > 0) return;
 
-    // Metadata may lack custom_fields — pull open invoices directly from Paperless.
     const query = JSON.stringify([
       "AND",
       [
@@ -53,7 +52,7 @@ async function ensurePaymentFlagsPopulated() {
       await ingestPaperlessDocumentById(doc.id);
     }
   } catch {
-    /* Paperless unreachable — keep inbox without open cards */
+    /* Paperless unreachable */
   }
 }
 
@@ -62,5 +61,5 @@ export async function GET() {
   const auth = await requireAdmin();
   if (isAuthError(auth)) return auth;
   await ensurePaymentFlagsPopulated();
-  return NextResponse.json(getDashboardInbox());
+  return NextResponse.json(buildInboxTaskBoard());
 }
