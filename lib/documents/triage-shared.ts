@@ -5,6 +5,7 @@ export type TriageStatus =
   | "pay"
   | "ignored"
   | "done"
+  | "skipped"
   | "ebill"
   | "twint"
   | "card";
@@ -39,6 +40,7 @@ export const TRIAGE_STATUS_LABELS: Record<TriageStatus, string> = {
   pay: "Muss bezahlt werden",
   ignored: "Irrelevant",
   done: "Erledigt",
+  skipped: "Kein Handlungsbedarf",
   ebill: "eBill",
   twint: "Twint",
   card: "Kreditkarte",

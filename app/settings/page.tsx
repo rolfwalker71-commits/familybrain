@@ -197,6 +197,7 @@ function SettingsPageInner() {
     triageMailEnabled: boolean;
     triageMailRecipients: string;
   } | null>(null);
+  const [triageActionBusy, setTriageActionBusy] = useState(false);
   const [testMailTo, setTestMailTo] = useState("");
   const [testMailBusy, setTestMailBusy] = useState(false);
   const [triageTestBusy, setTriageTestBusy] = useState(false);
@@ -1966,25 +1967,79 @@ function SettingsPageInner() {
             className="space-y-3 rounded-xl border border-border/60 bg-muted/20 p-4"
           >
             {triageMassPaused ? (
-              <div className="rounded-lg border border-amber-500/40 bg-amber-50 px-3 py-2.5 text-sm text-amber-950 dark:bg-amber-950/40 dark:text-amber-50">
+              <div className="space-y-2 rounded-lg border border-amber-500/40 bg-amber-50 px-3 py-2.5 text-sm text-amber-950 dark:bg-amber-950/40 dark:text-amber-50">
                 <p className="font-medium">
-                  Temporär ausgeschaltet (Massenanalyse)
+                  Massenanalyse: nur Triage-Mails pausiert
                 </p>
-                <p className="mt-1 text-xs opacity-90">
-                  Triage nach Analyse
-                  {triageMassPauseRestores?.triageAfterAnalysisEnabled
-                    ? " (war aktiv)"
-                    : ""}{" "}
-                  und Triage-Mail
+                <p className="text-xs opacity-90">
+                  Der Triage-Status wird weiter gesetzt. Mails
                   {triageMassPauseRestores?.triageMailEnabled
-                    ? " (war aktiv)"
+                    ? " (waren aktiv)"
                     : ""}{" "}
-                  sind während der Massenanalyse pausiert
+                  sind vorübergehend aus
                   {triageMassPauseRestores?.triageMailRecipients
-                    ? ` — Empfänger bleibt: ${triageMassPauseRestores.triageMailRecipients}`
+                    ? ` — Empfänger danach: ${triageMassPauseRestores.triageMailRecipients}`
                     : ""}
-                  . Nach Abschluss werden beide Optionen wiederhergestellt.
+                  . Nach Abschluss werden sie wiederhergestellt — oder jetzt
+                  manuell.
                 </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-8 border-amber-600/40"
+                  disabled={triageActionBusy || saving !== null}
+                  onClick={() => {
+                    void (async () => {
+                      setTriageActionBusy(true);
+                      setError(null);
+                      setMessage(null);
+                      try {
+                        const res = await fetch(
+                          "/api/settings/triage-mass-pause",
+                          {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ action: "force-resume" }),
+                          }
+                        );
+                        const data = await res.json();
+                        if (!res.ok) {
+                          throw new Error(
+                            data.error || "Wiederaktivieren fehlgeschlagen"
+                          );
+                        }
+                        setTriageMassPaused(Boolean(data.triageMassPaused));
+                        setTriageMassPauseRestores(null);
+                        setTriageAfterAnalysisEnabled(
+                          data.triageAfterAnalysisEnabled !== false
+                        );
+                        setTriageMailEnabled(Boolean(data.triageMailEnabled));
+                        const bf = data.backfill as
+                          | {
+                              scanned?: number;
+                              queued?: number;
+                              skipped?: number;
+                              pay?: number;
+                            }
+                          | undefined;
+                        setMessage(
+                          bf
+                            ? `Triage wieder aktiv. Nachgezogen: ${bf.queued ?? 0} Inbox, ${bf.skipped ?? 0} ohne Bedarf, ${bf.pay ?? 0} zu zahlen (${bf.scanned ?? 0} geprüft).`
+                            : "Triage wieder aktiv."
+                        );
+                      } catch (err) {
+                        setError(
+                          err instanceof Error ? err.message : String(err)
+                        );
+                      } finally {
+                        setTriageActionBusy(false);
+                      }
+                    })();
+                  }}
+                >
+                  {triageActionBusy ? "…" : "Jetzt wieder aktivieren"}
+                </Button>
               </div>
             ) : null}
             <div className="flex items-start gap-3">
@@ -1992,14 +2047,8 @@ function SettingsPageInner() {
                 id="triageAfterAnalysisEnabled"
                 type="checkbox"
                 className="mt-1 size-4 accent-[var(--brand-docs)]"
-                checked={
-                  triageMassPaused
-                    ? Boolean(
-                        triageMassPauseRestores?.triageAfterAnalysisEnabled
-                      )
-                    : triageAfterAnalysisEnabled
-                }
-                disabled={saving !== null || triageMassPaused}
+                checked={triageAfterAnalysisEnabled}
+                disabled={saving !== null}
                 onChange={(e) => {
                   const enabled = e.target.checked;
                   setTriageAfterAnalysisEnabled(enabled);
@@ -2026,8 +2075,8 @@ function SettingsPageInner() {
                       );
                       setMessage(
                         enabled
-                          ? "Triage nach Analyse wieder aktiv."
-                          : "Triage nach Analyse pausiert — Neuanalyse ohne Inbox-Flut."
+                          ? "Triage nach Analyse aktiv — Status wird gesetzt."
+                          : "Triage nach Analyse aus — kein Status und keine Inbox."
                       );
                     } catch (err) {
                       setTriageAfterAnalysisEnabled(!enabled);
@@ -2046,16 +2095,11 @@ function SettingsPageInner() {
                   className="cursor-pointer"
                 >
                   Triage nach Analyse
-                  {triageMassPaused ? (
-                    <span className="ml-2 text-xs font-normal text-amber-700 dark:text-amber-300">
-                      (pausiert)
-                    </span>
-                  ) : null}
                 </Label>
                 <p className="text-xs text-muted-foreground">
-                  Dokumente nach der Analyse in die Triage-Inbox legen. Bei
-                  Massenanalysen (mehrere Belege) wird das automatisch
-                  vorübergehend ausgeschaltet und danach wiederhergestellt.
+                  Nach jeder Analyse den effektiven Triage-Status setzen und bei
+                  Handlungsbedarf in die Inbox legen. Bei Massenanalysen bleiben
+                  Status/Inbox aktiv; nur Mails werden pausiert.
                 </p>
               </div>
             </div>
@@ -2138,6 +2182,52 @@ function SettingsPageInner() {
               onClick={() => void sendTriageSettingsTestMail()}
             >
               {triageTestBusy ? "Sendet…" : "Triage-Testmail senden"}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="ml-2"
+              disabled={triageActionBusy || saving !== null}
+              onClick={() => {
+                void (async () => {
+                  setTriageActionBusy(true);
+                  setError(null);
+                  setMessage(null);
+                  try {
+                    const res = await fetch("/api/settings/triage-mass-pause", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ action: "backfill" }),
+                    });
+                    const data = await res.json();
+                    if (!res.ok) {
+                      throw new Error(
+                        data.error || "Triage-Nachziehen fehlgeschlagen"
+                      );
+                    }
+                    const bf = data.backfill as
+                      | {
+                          scanned?: number;
+                          queued?: number;
+                          skipped?: number;
+                          pay?: number;
+                        }
+                      | undefined;
+                    setMessage(
+                      bf
+                        ? `Triage nachgezogen: ${bf.queued ?? 0} Inbox, ${bf.skipped ?? 0} ohne Bedarf, ${bf.pay ?? 0} zu zahlen (${bf.scanned ?? 0} ohne Status geprüft).`
+                        : "Triage nachgezogen."
+                    );
+                  } catch (err) {
+                    setError(err instanceof Error ? err.message : String(err));
+                  } finally {
+                    setTriageActionBusy(false);
+                  }
+                })();
+              }}
+            >
+              {triageActionBusy ? "…" : "Triage nachziehen"}
             </Button>
           </div>
 

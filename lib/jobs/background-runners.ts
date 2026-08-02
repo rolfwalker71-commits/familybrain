@@ -93,7 +93,7 @@ export async function runAnalyzePendingJob(
     failed: 0,
   };
 
-  // Mass / full re-runs: suppress triage inbox + mail; restore afterwards
+  // Mass / full re-runs: suppress triage mail only; status still written
   const triagePaused =
     options?.requeueAll === true ||
     options?.resetErrors === true ||

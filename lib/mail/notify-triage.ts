@@ -21,6 +21,7 @@ import {
   getTriageMailRecipients,
   isTriageMailEnabled,
 } from "@/lib/mail/triage-mail-settings";
+import { isTriageMailPausedForMassAnalysis } from "@/lib/documents/triage-mass-pause";
 import { resolveDocumentAiIconPath } from "@/lib/paperless/document-icon";
 
 function amountLabel(item: {
@@ -104,6 +105,9 @@ export async function notifyTriageReadyEmail(documentId: number): Promise<{
   skipped?: string;
   error?: string;
 }> {
+  if (isTriageMailPausedForMassAnalysis()) {
+    return { ok: false, skipped: "Triage-Mail pausiert (Massenanalyse)" };
+  }
   if (!isTriageMailEnabled()) {
     return { ok: false, skipped: "Triage-Mail deaktiviert" };
   }

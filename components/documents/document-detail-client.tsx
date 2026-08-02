@@ -770,9 +770,14 @@ function DocumentDetailInner({ detail }: DetailProps) {
                   </div>
                   {(() => {
                     const raw = document.triage_status;
-                    if (!raw || !(raw in TRIAGE_STATUS_LABELS)) return null;
-                    const status = raw as TriageStatus;
-                    const label = TRIAGE_STATUS_LABELS[status];
+                    const known =
+                      raw && raw in TRIAGE_STATUS_LABELS
+                        ? (raw as TriageStatus)
+                        : null;
+                    const label = known
+                      ? TRIAGE_STATUS_LABELS[known]
+                      : "Noch nicht geprüft";
+                    const status = known;
                     const tone =
                       status === "pending"
                         ? "border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-100"
@@ -780,11 +785,15 @@ function DocumentDetailInner({ detail }: DetailProps) {
                           ? "border-[var(--brand-finance)]/40 bg-[var(--brand-finance)]/10 text-[var(--brand-finance)]"
                           : status === "ignored"
                             ? "border-border bg-muted text-muted-foreground"
-                            : status === "ebill" ||
-                                status === "twint" ||
-                                status === "card"
-                              ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-800 dark:text-emerald-100"
-                              : "border-border bg-muted/60 text-foreground";
+                            : status === "skipped"
+                              ? "border-border bg-muted/40 text-muted-foreground"
+                              : status === "ebill" ||
+                                  status === "twint" ||
+                                  status === "card"
+                                ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-800 dark:text-emerald-100"
+                                : status
+                                  ? "border-border bg-muted/60 text-foreground"
+                                  : "border-dashed border-border bg-transparent text-muted-foreground";
                     return (
                       <div className="rounded-lg border border-border/60 px-3 py-2">
                         <p className="text-xs text-muted-foreground">

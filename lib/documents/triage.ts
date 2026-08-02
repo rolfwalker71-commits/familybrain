@@ -187,12 +187,13 @@ export function applyTriageAfterAnalysis(
   });
 
   if (reasons.length === 0) {
-    if (status === "pending") {
+    // Always record an effective status — never leave analysed docs as NULL.
+    if (status !== "skipped") {
       db.prepare(
         `UPDATE paperless_documents
-         SET triage_status = NULL, triage_reasons = NULL, triage_at = NULL, updated_at = ?
+         SET triage_status = 'skipped', triage_reasons = '[]', triage_at = ?, updated_at = ?
          WHERE id = ?`
-      ).run(nowIso(), documentId);
+      ).run(nowIso(), nowIso(), documentId);
     }
     return { queued: false, newlyQueued: false, reasons: [] };
   }
