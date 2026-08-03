@@ -9,7 +9,7 @@ import {
   formatBackupBytes,
   type BackupRunAction,
   type BackupStatusPayload,
-} from "@/lib/backup/status";
+} from "@/lib/backup/types";
 import { toSwissDate } from "@/lib/utils/dates";
 
 function fmtWhen(iso: string | null | undefined): string {
