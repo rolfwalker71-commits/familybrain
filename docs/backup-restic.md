@@ -1,10 +1,16 @@
-# Sicherungs- und Restore-Konzept (restic + Hetzner Storage Box per SFTP)
+# Sicherungs- und Restore-Konzept (restic + Hetzner Storage Box)
 
-Restore-taugliches Backup für **Buddy (FamilyBrain)** und **Paperless-ngx** auf derselben Maschine (VM oder LXC).
+Restore-taugliches Backup für **Buddy (FamilyBrain)** und **Paperless-ngx** (typisch Proxmox-LXC/VM, oft **lokal zu Hause**).
 Ziel: Neue Instanz aufsetzen → App/Compose pullen → Restore → Stand der Sicherung.
 
-**Standardweg: SFTP** — restic spricht die Storage Box direkt per SSH/SFTP an.  
-**Kein CIFS-Mount** nötig (vermeidet `permission denied` / `Operation not permitted` in LXC-Containern).
+### Welcher Weg?
+
+| Test vom Proxmox-Host / LXC | Empfehlung |
+|-----------------------------|------------|
+| `nc -vz u….your-storagebox.de 23` → **open**, Port **445** hängt/timeout | **SFTP (Port 23)** — Standard hier ([Abschnitt 3](#3-storage-box-per-sftp-empfohlen-wenn-port-445-blockiert-ist)) |
+| Port **445** erreichbar + SMB in Robot aktiv | optional CIFS ([Abschnitt 3-CIFS](#3-cifs-optional-nur-wenn-port-445-geht)) |
+
+Viele Heim-Provider blockieren ausgehendes **SMB (445)**. Hetzner Storage Box SFTP läuft auf **Port 23** und funktioniert dann trotzdem. Proxmox-Datastore „SMB/CIFS“ braucht 445 — ohne 445 bleibt er `inactive`; das ist dann **kein** Konfigurationsfehler in der UI, sondern Netzwerk.
 
 ---
 
@@ -23,24 +29,25 @@ Ziel: Neue Instanz aufsetzen → App/Compose pullen → Restore → Stand der Si
 
 ---
 
-## 2. Architektur (einfach)
+## 2. Architektur (SFTP — empfohlen)
 
 ```text
-┌────────────── Server (VM / LXC) ──────────────┐
-│  /opt/familybrain/     Buddy + ./data         │
-│  /opt/paperless/       Paperless + volumes    │
-│  /var/backups/.../     lokales Staging        │
-│  /usr/local/sbin/      backup-Skript          │
-│  /etc/buddy-backup/    restic.env + SSH-Key   │
-└───────────────────┬───────────────────────────┘
-                    │ SFTP (oft Port 23)
+┌────────── Proxmox lokal (Heimnetz) ───────────┐
+│  LXC paperlessngx / Buddy                     │
+│  /home/familybrain/familybrain/  Buddy+data   │
+│  /data/paperless/                Paperless    │
+│  /var/backups/.../               Staging      │
+│  /etc/buddy-backup/              restic.env   │
+│  restic ──SFTP :23──► Hetzner Storage Box     │
+└───────────────────────────────────────────────┘
+                    │
                     ▼
-┌──────── Hetzner Storage Box ─────────────────┐
-│  /home/restic-repo/     restic repository    │
-└──────────────────────────────────────────────┘
+┌──────── Hetzner Storage Box ──────────────────┐
+│  /home/paperlessngxrolf/   (verschlüsseltes restic-Repo)  │
+└───────────────────────────────────────────────┘
 ```
 
-Lokales Staging → `restic backup` über SFTP ins Repo auf der Box.
+Kein CIFS-Mount, kein LXC-Bind, kein Proxmox-SMB-Datastore nötig für restic.
 
 ```text
 /var/backups/buddy-paperless/staging/
@@ -49,138 +56,141 @@ Lokales Staging → `restic backup` über SFTP ins Repo auf der Box.
     env
     docker-compose.yml
   paperless/
-    media/
-    pgdata/
-    env
+    media/             # /data/paperless/media (PDFs)
+    pgdata/            # postgresql
+    data/              # paperless data/
+    paperless-ai/      # optional: Docker-Volume paperless-ai
     docker-compose.yml
   MANIFEST.txt
 ```
 
 ---
 
-## 3. Storage Box per SFTP vorbereiten
+## 3. Storage Box per SFTP (empfohlen, wenn Port 445 blockiert ist)
 
-### 3.1 Voraussetzungen (Hetzner Robot / Cloud Console)
-
-- Storage Box angelegt (z. B. BX11+)
-- **SSH-/SFTP-Zugang** aktiviert
-- Benutzer `uXXXXX`, Hostname `uXXXXX.your-storagebox.de`
-- **Wichtig:** Hetzner Storage Box SSH/SFTP läuft meist auf **Port 23** (nicht 22)
-
-### 3.2 SSH-Key für restic (nicht interaktiv)
-
-Auf dem Server (als root, wo das Backup läuft):
+### 3.0 Kurzcheck
 
 ```bash
-sudo mkdir -p /root/.ssh
-sudo chmod 700 /root/.ssh
-sudo ssh-keygen -t ed25519 -f /root/.ssh/storagebox_ed25519 -N "" -C "buddy-restic"
-sudo cat /root/.ssh/storagebox_ed25519.pub
+# auf pve01 oder im LXC
+nc -vz u644393.your-storagebox.de 445   # oft: hängt / timeout
+nc -vz u644393.your-storagebox.de 23    # muss: open
 ```
 
-Public Key in der **Hetzner Storage-Box-Oberfläche** hinterlegen (SSH-Keys), oder per Dokumentation der Box in `authorized_keys` auf der Box.
+**Firewall:** Proxmox ist Client — an deinem Router nichts „öffnen“.  
+Bei Hetzner Robot (Storage Box): falls IP-Filter aktiv → deine öffentliche Heim-IP freigeben (`curl -4 -s ifconfig.me`). Für SFTP reicht Port 23 erreichbar.
 
-SSH-Config:
+Proxmox-UI „SMB/CIFS“ mit Share `backup` / Subdir `/mnt/backup` kannst du für restic **ignorieren** (braucht 445). Optional später löschen oder nur nutzen, wenn 445 irgendwann geht.
+
+### 3.1 SSH-Key (im LXC `paperlessngx` — erledigt / Referenz)
+
+Auf diesem Setup: Key-Auth ohne Passwort funktioniert (`sftp storagebox`).
 
 ```bash
-sudo tee /root/.ssh/config >/dev/null <<'EOF'
+mkdir -p /root/.ssh && chmod 700 /root/.ssh
+ssh-keygen -t ed25519 -f /root/.ssh/id_ed25519_storagebox -N "" -C "buddy-restic-lxc"
+```
+
+**Key hinterlegen — nicht die Robot-/Console-UI pasten** (meldet oft „SSH key ist ungültig“). Stattdessen:
+
+```bash
+# Storage-Box-Passwort aus Hetzner (nicht das restic-Passwort!)
+cat /root/.ssh/id_ed25519_storagebox.pub | \
+  ssh -p23 u644393@u644393.your-storagebox.de install-ssh-key
+```
+
+Erwartung: `installed in OpenSSH format` (Port 23). SSH-Support in den Box-Einstellungen muss aktiv sein.
+
+```bash
+cat > /root/.ssh/config <<'EOF'
 Host storagebox
-  HostName u64439.your-storagebox.de
-  User u64439
+  HostName u644393.your-storagebox.de
+  User u644393
   Port 23
-  IdentityFile /root/.ssh/storagebox_ed25519
+  IdentityFile /root/.ssh/id_ed25519_storagebox
   IdentitiesOnly yes
   StrictHostKeyChecking accept-new
 EOF
-sudo chmod 600 /root/.ssh/config
+chmod 600 /root/.ssh/config
 ```
 
-(`u64439` / Host durch deine Werte ersetzen.)
-
-Verbindungstest:
+**Fallen:**
+- `IdentityFile` = **privater** Key (`id_ed25519_storagebox`), nie die `.pub`
+- Dateiname exakt `…_storagebox` (Tippfehler `sotragebox` → „not accessible“)
 
 ```bash
 sftp storagebox
-# oder:
-ssh -p 23 u64439@u64439.your-storagebox.de
-```
-
-Im SFTP-Home Verzeichnis für restic anlegen:
-
-```bash
-sftp storagebox <<'EOF'
-mkdir restic-repo
+# bei Erfolg:
+mkdir paperlessngxrolf
+pwd
+ls
 bye
-EOF
 ```
 
-Pfad auf der Box ist typischerweise `/home/restic-repo` (je nach Box-Layout auch `/home/u64439/restic-repo` — mit `pwd` / `ls` im SFTP prüfen).
-
-### 3.3 Warum nicht CIFS?
-
-In vielen Setups (besonders **LXC**/Proxmox) schlägt `mount -t cifs` fehl mit:
-
-- `permission denied`
-- `Operation not permitted`
-- `bad option` / fehlendes `mount.cifs`
-
-SFTP braucht **keinen Kernel-Mount** und funktioniert im Container wie auf der VM.
-
----
-
-## 4. restic einrichten (einmalig)
-
-### 4.1 Install
+Explizit ohne Config-Alias:
 
 ```bash
-sudo apt update && sudo apt install -y restic openssh-client
-restic version
+sftp -P 23 -i /root/.ssh/id_ed25519_storagebox u644393@u644393.your-storagebox.de
 ```
 
-### 4.2 Passwort-Datei (nie ins Git)
+### 3.2 restic.env
 
 ```bash
 sudo mkdir -p /etc/buddy-backup
 openssl rand -base64 32 | sudo tee /etc/buddy-backup/restic-password >/dev/null
 sudo chmod 600 /etc/buddy-backup/restic-password
-```
 
-**Wichtig:** Passwort offline notieren (Password-Manager). Ohne es ist das Repo wertlos.
-
-### 4.3 Environment-Datei
-
-`/etc/buddy-backup/restic.env`:
-
-```bash
-# Host-Alias aus /root/.ssh/config → Port 23 + Key greifen automatisch
-export RESTIC_REPOSITORY="sftp:storagebox:/home/restic-repo"
+sudo tee /etc/buddy-backup/restic.env >/dev/null <<'EOF'
+export RESTIC_REPOSITORY="sftp:storagebox:paperlessngxrolf"
 export RESTIC_PASSWORD_FILE="/etc/buddy-backup/restic-password"
 export RESTIC_PACK_SIZE=32
-```
-
-Alternative ohne SSH-Alias (Port in der URL):
-
-```bash
-export RESTIC_REPOSITORY="sftp://u64439@u64439.your-storagebox.de:23//home/restic-repo"
-```
-
-```bash
+EOF
 sudo chmod 600 /etc/buddy-backup/restic.env
 ```
 
-### 4.4 Repository initialisieren
+Hetzner: nur unter `/home` schreibbar — relativer Pfad `paperlessngxrolf` = `/home/paperlessngxrolf`. Absolute Form `sftp:storagebox:/home/paperlessngxrolf` geht oft auch; bei Fehlern relative Variante nutzen.
 
 ```bash
 source /etc/buddy-backup/restic.env
 restic init
 restic snapshots
-```
-
-Staging-Verzeichnisse lokal:
-
-```bash
 sudo mkdir -p /var/backups/buddy-paperless/{staging,logs}
 ```
+
+Weiter mit Abschnitt 4–7 (Konsistenz, Backup-Skript, Cron). Im Skript muss `RESTIC_REPOSITORY` mit `sftp:` beginnen; den CIFS-`mountpoint`-Check kannst du weglassen bzw. überspringen, wenn nur SFTP genutzt wird.
+
+---
+
+## 3-CIFS. Optional — nur wenn Port 445 geht
+
+Nur relevant, wenn `nc … 445` und `smbclient -L` vom Host klappen. Sonst diesen Abschnitt überspringen.
+
+Proxmox-Dialog (Heimnetz → Hetzner):
+
+| Feld | Wert |
+|------|------|
+| Server | `u644393.your-storagebox.de` |
+| Username | `u644393` |
+| Share | oft **`u644393`** (nicht `backup`) — per `smbclient -L` prüfen |
+| Subdirectory | **leer** lassen (nicht `/mnt/backup`) |
+| Content | Backup |
+
+Dann Host-Mount `/mnt/pve/Hetzner-Storagebox` → bei LXC per `mp0` binden (früher Abschnitt 3.B). Details: CIFS-fstab nur in **voller VM**; in LXC kein `mount.cifs` (`Operation not permitted`).
+
+---
+
+## 4. restic — Kurz (nach Abschnitt 3)
+
+Abschnitt 3 enthält bereits: SSH-Key, `restic.env` (SFTP), `restic init`, Staging-Verzeichnisse.
+
+Falls noch nicht installiert:
+
+```bash
+sudo apt update && sudo apt install -y restic openssh-client
+source /etc/buddy-backup/restic.env
+restic snapshots
+```
+
+**Repo-Passwort** offline im Password-Manager notieren.
 
 ---
 
@@ -200,6 +210,8 @@ Kein live-`cp` der SQLite-Datei ohne Checkpoint/Stop.
 
 Datei: `/usr/local/sbin/buddy-paperless-backup.sh`
 
+Pfade für LXC `paperlessngx` (Paperless unter `/data/paperless`, **keine** `.env` — Secrets in `docker-compose.yml`; Redis ephemeral → nicht sichern):
+
 ```bash
 #!/usr/bin/env bash
 set -euo pipefail
@@ -208,10 +220,21 @@ source /etc/buddy-backup/restic.env
 
 STAGING=/var/backups/buddy-paperless/staging
 LOG=/var/backups/buddy-paperless/logs/backup-$(date +%F).log
-BUDDY_DIR=/opt/familybrain          # anpassen
-PAPERLESS_DIR=/opt/paperless        # anpassen
-PAPERLESS_MEDIA=/var/lib/docker/volumes/paperless_media/_data   # anpassen!
-PAPERLESS_PGDATA=/var/lib/docker/volumes/paperless_pgdata/_data # anpassen!
+
+# Buddy: Ordner mit docker-compose.yml + data/ (Status-UI → data/backup-status.json)
+BUDDY_DIR=/home/familybrain/familybrain
+
+# Paperless (LXC paperlessngx)
+PAPERLESS_DIR=/data/paperless
+# PDFs / Originaldokumente (Host-Bind; siehe ls /data/paperless/media)
+PAPERLESS_MEDIA=/data/paperless/media
+# Postgres-Datenverzeichnis
+PAPERLESS_PGDATA=/data/paperless/postgresql/_data
+# Paperless Anwendungsdaten
+PAPERLESS_DATA=/data/paperless/data
+# paperless-ai Docker-Volume (nicht mit MEDIA verwechseln!)
+# Pfad prüfen: docker volume inspect paperless_paperless-ai_data -f '{{.Mountpoint}}'
+PAPERLESS_AI=/var/lib/docker/volumes/paperless_paperless-ai_data/_data
 
 mkdir -p "$(dirname "$LOG")"
 exec > >(tee -a "$LOG") 2>&1
@@ -222,15 +245,14 @@ case "${RESTIC_REPOSITORY:-}" in
     echo "OK: SFTP-Repository $RESTIC_REPOSITORY"
     ;;
   *)
-    echo "ERROR: RESTIC_REPOSITORY muss sftp:… sein (siehe docs/backup-restic.md)"
+    echo "ERROR: RESTIC_REPOSITORY muss sftp:… sein (siehe docs/backup-restic.md Abschnitt 3)"
     exit 1
     ;;
 esac
 
-# Kurzer Erreichbarkeitstest (SSH/SFTP)
 if ! restic cat config >/dev/null 2>&1; then
-  echo "ERROR: restic erreicht das Repo nicht (SSH-Key, Port 23, Pfad?)"
-  echo "Test: sftp storagebox   bzw.   source /etc/buddy-backup/restic.env && restic snapshots"
+  echo "ERROR: restic erreicht das Repo nicht (SSH-Key Port 23, Pfad, Passwort?)"
+  echo "Test: sftp storagebox && source /etc/buddy-backup/restic.env && restic snapshots"
   exit 1
 fi
 
@@ -242,14 +264,13 @@ copy_env_file() {
     echo "WARN: keine .env — kopiere .env.local → $dest"
     cp -a .env.local "$dest"
   else
-    echo "WARN: weder .env noch .env.local in $(pwd) — Staging ohne Env-Datei"
+    echo "INFO: keine .env in $(pwd) — Config vermutlich in docker-compose.yml"
   fi
 }
 
 rm -rf "$STAGING"
 mkdir -p "$STAGING"/{buddy,paperless}
 
-# --- Buddy konsistent (ohne qdrant/) ---
 buddy_up() {
   (cd "$BUDDY_DIR" && docker compose start familybrain) || \
     (cd "$BUDDY_DIR" && docker compose up -d familybrain) || true
@@ -270,7 +291,6 @@ buddy_up() {
   buddy_up
 )
 
-# --- Paperless konsistent ---
 paperless_up() {
   (cd "$PAPERLESS_DIR" && docker compose up -d) || true
 }
@@ -279,11 +299,18 @@ paperless_up() {
   cd "$PAPERLESS_DIR"
   docker compose stop
   trap paperless_up EXIT
-  mkdir -p "$STAGING/paperless"/{media,pgdata}
+  mkdir -p "$STAGING/paperless"/{media,pgdata,data,paperless-ai}
   rsync -a --delete "$PAPERLESS_MEDIA"/ "$STAGING/paperless/media/"
   rsync -a --delete "$PAPERLESS_PGDATA"/ "$STAGING/paperless/pgdata/"
+  rsync -a --delete "$PAPERLESS_DATA"/ "$STAGING/paperless/data/"
+  if [[ -d "$PAPERLESS_AI" ]]; then
+    rsync -a --delete "$PAPERLESS_AI"/ "$STAGING/paperless/paperless-ai/"
+  else
+    echo "WARN: PAPERLESS_AI fehlt ($PAPERLESS_AI) — docker volume inspect prüfen"
+  fi
   copy_env_file "$STAGING/paperless/env"
-  cp -a docker-compose.yml "$STAGING/paperless/docker-compose.yml" 2>/dev/null || true
+  cp -a docker-compose.yml "$STAGING/paperless/docker-compose.yml"
+  cp -a backup_complete.sh "$STAGING/paperless/backup_complete.sh" 2>/dev/null || true
   trap - EXIT
   paperless_up
 )
@@ -292,215 +319,324 @@ paperless_up() {
   echo "host=$(hostname)"
   echo "time=$(date -Is)"
   echo "repo=${RESTIC_REPOSITORY}"
-  echo "buddy_image=$(cd "$BUDDY_DIR" && docker compose images -q familybrain 2>/dev/null | head -1)"
   echo "qdrant=excluded"
+  echo "paperless_redis=excluded"
   du -sh "$STAGING"/*/* 2>/dev/null || true
 } > "$STAGING/MANIFEST.txt"
 
+STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+STARTED_EPOCH="$(date +%s)"
+BACKUP_JSON="$(mktemp)"
+BACKUP_OK=1
+CHECK_OK=1
+
+set +e
 restic backup "$STAGING" \
   --tag buddy-paperless \
   --tag "host:$(hostname)" \
-  --exclude '**/qdrant/**'
+  --exclude '**/qdrant/**' \
+  --json >"$BACKUP_JSON"
+BACKUP_RC=$?
+set -e
+if [[ "$BACKUP_RC" -ne 0 ]]; then
+  BACKUP_OK=0
+  echo "ERROR: restic backup exit $BACKUP_RC"
+fi
 
+set +e
 restic forget --tag buddy-paperless \
   --keep-daily 7 \
   --keep-weekly 4 \
   --keep-monthly 6 \
   --prune
-
+FORGET_RC=$?
 restic check --read-data-subset=5%
+CHECK_RC=$?
+set -e
+[[ "$FORGET_RC" -eq 0 ]] || BACKUP_OK=0
+[[ "$CHECK_RC" -eq 0 ]] || CHECK_OK=0
+
+FINISHED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+FINISHED_EPOCH="$(date +%s)"
+DURATION="$((FINISHED_EPOCH - STARTED_EPOCH))"
+LOG_TAIL_FILE="$(mktemp)"
+tail -n 80 "$LOG" >"$LOG_TAIL_FILE" 2>/dev/null || true
 
 STATUS_FILE="${BUDDY_BACKUP_STATUS_FILE:-$BUDDY_DIR/data/backup-status.json}"
 if [[ -d "$(dirname "$STATUS_FILE")" ]]; then
-  cat > "$STATUS_FILE" <<EOF
-{
-  "lastSnapshotAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-  "lastCheckAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-  "lastCheckOk": true,
-  "repository": "${RESTIC_REPOSITORY:-}",
-  "summary": "restic SFTP backup + check ok (qdrant excluded)"
+  export STATUS_FILE STARTED_AT FINISHED_AT DURATION RESTIC_REPOSITORY
+  export BACKUP_JSON BACKUP_OK CHECK_OK LOG_TAIL_FILE
+  python3 - <<'PY'
+import json, os, pathlib
+from datetime import datetime, timezone
+
+status_path = pathlib.Path(os.environ["STATUS_FILE"])
+backup_json = pathlib.Path(os.environ["BACKUP_JSON"])
+started = os.environ["STARTED_AT"]
+finished = os.environ["FINISHED_AT"]
+duration = int(os.environ["DURATION"])
+repo = os.environ.get("RESTIC_REPOSITORY") or ""
+backup_ok = os.environ.get("BACKUP_OK") == "1"
+check_ok = os.environ.get("CHECK_OK") == "1"
+log_tail_path = pathlib.Path(os.environ.get("LOG_TAIL_FILE") or "")
+log_tail = log_tail_path.read_text(errors="replace") if log_tail_path.exists() else ""
+
+summary_msg = {}
+if backup_json.exists():
+    for line in backup_json.read_text(errors="replace").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            obj = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if obj.get("message_type") == "summary":
+            summary_msg = obj
+
+files_new = summary_msg.get("files_new")
+files_changed = summary_msg.get("files_changed")
+files_unmodified = summary_msg.get("files_unmodified")
+data_added = summary_msg.get("data_added")
+data_added_packed = summary_msg.get("data_added_packed")
+total_bytes = summary_msg.get("total_bytes_processed")
+snapshot_id = summary_msg.get("snapshot_id")
+
+ok = backup_ok and check_ok
+summary = (
+    "restic backup + check ok (qdrant excluded)"
+    if ok
+    else "restic backup/check fehlgeschlagen — Log prüfen"
+)
+
+def load_prev():
+    if not status_path.exists():
+        return {}
+    try:
+        return json.loads(status_path.read_text())
+    except Exception:
+        return {}
+
+prev = load_prev()
+recent = prev.get("recentActions") if isinstance(prev.get("recentActions"), list) else []
+
+def push(action):
+    recent.insert(0, action)
+    del recent[20:]
+
+now = finished
+push({
+    "at": now,
+    "kind": "backup",
+    "ok": backup_ok,
+    "summary": summary if backup_ok else "restic backup fehlgeschlagen",
+    "startedAt": started,
+    "finishedAt": finished,
+    "durationSeconds": duration,
+    "snapshotId": snapshot_id,
+    "filesNew": files_new,
+    "filesChanged": files_changed,
+    "filesUnmodified": files_unmodified,
+    "dataAdded": data_added,
+    "dataAddedPacked": data_added_packed,
+    "totalBytesProcessed": total_bytes,
+    "logTail": log_tail[-4000:] if log_tail else None,
+})
+push({
+    "at": now,
+    "kind": "check",
+    "ok": check_ok,
+    "summary": "restic check ok" if check_ok else "restic check fehlgeschlagen",
+    "startedAt": started,
+    "finishedAt": finished,
+    "durationSeconds": None,
+})
+
+payload = {
+    "lastSnapshotAt": finished if backup_ok else prev.get("lastSnapshotAt"),
+    "lastCheckAt": finished,
+    "lastCheckOk": check_ok,
+    "restoreProofAt": prev.get("restoreProofAt"),
+    "repository": repo,
+    "summary": summary,
+    "startedAt": started,
+    "finishedAt": finished,
+    "durationSeconds": duration,
+    "snapshotId": snapshot_id,
+    "filesNew": files_new,
+    "filesChanged": files_changed,
+    "filesUnmodified": files_unmodified,
+    "dataAdded": data_added,
+    "dataAddedPacked": data_added_packed,
+    "totalBytesProcessed": total_bytes,
+    "logTail": log_tail[-8000:] if log_tail else None,
+    "recentActions": recent[:20],
+    "notes": [
+        f"geschrieben {datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}",
+        "paperless: media+postgresql+data+paperless-ai; redis excluded; no .env (compose-only)",
+    ],
 }
-EOF
+status_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n")
+print(f"OK: status → {status_path}")
+print(
+    f"stats: added={data_added} packed={data_added_packed} "
+    f"processed={total_bytes} files_new={files_new} snapshot={snapshot_id}"
+)
+PY
+  rm -f "$BACKUP_JSON" "$LOG_TAIL_FILE"
 fi
 
-echo "=== backup done $(date -Is) ==="
+echo "=== backup done $(date -Is) duration=${DURATION}s ==="
 ```
 
 ```bash
-sudo chmod 750 /usr/local/sbin/buddy-paperless-backup.sh
+chmod 750 /usr/local/sbin/buddy-paperless-backup.sh
 ```
 
-**Pfade anpassen:** `docker volume ls` / `docker volume inspect …`.
-
-**`.env` fehlt?** Skript warnt und läuft weiter; Container starten per `trap` wieder.
+**Hinweis:** Pfade oben = Produktiv-LXC. `PAPERLESS_MEDIA` = **Dokumente** (`/data/paperless/media`). Das Docker-Volume `paperless_paperless-ai_data` ist **paperless-ai**, nicht Media — liegt unter `PAPERLESS_AI`.  
+`PAPERLESS_PGDATA`: falls Restore/rsync meckert, ohne `/_data` testen (`ls /data/paperless/postgresql`).  
+Status-UI: `$BUDDY_DIR/data/backup-status.json`.
 
 ---
 
 ## 7. Zeitsteuerung (cron)
 
-```bash
-sudo crontab -e
-```
-
 ```cron
-# Täglich 03:15 — SFTP zur Storage Box (kein Mount nötig)
 15 3 * * * /usr/local/sbin/buddy-paperless-backup.sh
 ```
 
-```bash
-tail -100 /var/backups/buddy-paperless/logs/backup-$(date +%F).log
-source /etc/buddy-backup/restic.env && restic snapshots
-```
+---
+
+## 8. Retention
+
+7 daily · 4 weekly · 6 monthly. Box ideal ≥ 2–3× Rohdatengröße frei.
 
 ---
 
-## 8. Retention (Vorschlag)
+## 9. Restore
 
-| Regel | Bedeutung |
-|-------|-----------|
-| 7 daily | letzte Woche täglich |
-| 4 weekly | ~1 Monat Wochenstände |
-| 6 monthly | ~halbes Jahr |
+Ziel: Nach Verlust/Neuaufbau wieder denselben Stand wie im gewählten Snapshot.
 
-Auf der Storage Box ideal **≥ 2–3×** Rohdatengröße frei (erstes Full ist groß).
+### 9.1 Voraussetzungen auf der Zielmaschine
 
----
-
-## 9. Restore — Schritt für Schritt (neue Instanz)
-
-### 9.1 Neue Maschine vorbereiten
+- restic + SSH-Key (`id_ed25519_storagebox`) + `~/.ssh/config` Host `storagebox` (Port 23)
+- `/etc/buddy-backup/restic.env` mit **demselben** Repo und Passwort wie beim Backup:
 
 ```bash
-# Docker + Compose, restic, openssh-client
-# SSH-Key + /root/.ssh/config wie Abschnitt 3
-# /etc/buddy-backup/restic-password + restic.env wiederherstellen
+# /etc/buddy-backup/restic.env
+export RESTIC_REPOSITORY="sftp:storagebox:paperlessngxrolf"   # = /home/paperlessngxrolf
+export RESTIC_PASSWORD_FILE="/etc/buddy-backup/restic-password"
 ```
 
-### 9.2 Snapshot wählen
+- Docker + Compose; Buddy- und Paperless-Verzeichnisse angelegt
 
 ```bash
 source /etc/buddy-backup/restic.env
 restic snapshots --tag buddy-paperless
+# ID merken, z. B. a1b2c3d4
 ```
 
-### 9.3 Restore nach Staging
+### 9.2 Snapshot nach Staging holen
 
 ```bash
 RESTORE=/var/backups/buddy-paperless/restore
 rm -rf "$RESTORE"
 mkdir -p "$RESTORE"
-restic restore SNAPSHOT_ID --target "$RESTORE"
-find "$RESTORE" -name MANIFEST.txt
+restic restore a1b2c3d4 --target "$RESTORE"
+# oder: restic restore latest --target "$RESTORE" --tag buddy-paperless
+
+ls -la "$RESTORE"/*/   # erwartet u. a. …/buddy/ …/paperless/ …/MANIFEST.txt
+# Je nach Snapshot-Struktur oft:
+#   $RESTORE/var/backups/buddy-paperless/staging/{buddy,paperless,MANIFEST.txt}
+ST="$RESTORE/var/backups/buddy-paperless/staging"
+# falls flacher: ST="$RESTORE" bzw. per find suchen:
+# find "$RESTORE" -type d -name buddy | head
 ```
 
-### 9.4 Buddy wiederherstellen
+### 9.3 Buddy zurückspielen
+
+Services stoppen, Daten ersetzen, starten:
 
 ```bash
-sudo mkdir -p /opt/familybrain
-cd /opt/familybrain
-curl -fsSLO https://raw.githubusercontent.com/rolfwalker71-commits/familybrain/main/docker-compose.yml
-cp /pfad/zum/restore/buddy/env .env
-sudo rsync -a --delete /pfad/zum/restore/buddy/data/ ./data/
-sudo chown -R 1000:1000 ./data
-docker compose pull
-docker compose up -d
-# Embeddings/Qdrant: in Buddy Sync/Index neu aufbauen
+BUDDY_DIR=/home/familybrain/familybrain
+cd "$BUDDY_DIR"
+docker compose stop familybrain
+
+# Vorsicht: überschreibt lokales data/
+rsync -a --delete "$ST/buddy/data/" "$BUDDY_DIR/data/"
+# Compose/Env nur wenn gewünscht:
+# cp -a "$ST/buddy/docker-compose.yml" "$BUDDY_DIR/"
+# [[ -f $ST/buddy/env ]] && cp -a "$ST/buddy/env" "$BUDDY_DIR/.env"
+
+docker compose up -d familybrain
+# Qdrant-Index fehlt absichtlich → in Buddy neu indexieren / Embeddings neu aufbauen
 ```
 
-### 9.5 Paperless wiederherstellen
+### 9.4 Paperless zurückspielen (dein Layout)
 
 ```bash
-cd /opt/paperless
-cp /pfad/zum/restore/paperless/env .env
-cp /pfad/zum/restore/paperless/docker-compose.yml .
-sudo rsync -a --delete /pfad/zum/restore/paperless/media/   <MEDIA_VOLUME_PATH>/
-sudo rsync -a --delete /pfad/zum/restore/paperless/pgdata/  <PGDATA_VOLUME_PATH>/
+PAPERLESS_DIR=/data/paperless
+PAPERLESS_MEDIA=/data/paperless/media
+PAPERLESS_PGDATA=/data/paperless/postgresql/_data
+PAPERLESS_DATA=/data/paperless/data
+PAPERLESS_AI=/var/lib/docker/volumes/paperless_paperless-ai_data/_data
+
+cd "$PAPERLESS_DIR"
+docker compose stop
+
+rsync -a --delete "$ST/paperless/media/"  "$PAPERLESS_MEDIA/"
+rsync -a --delete "$ST/paperless/pgdata/" "$PAPERLESS_PGDATA/"
+rsync -a --delete "$ST/paperless/data/"   "$PAPERLESS_DATA/"
+if [[ -d "$ST/paperless/paperless-ai" && -d "$PAPERLESS_AI" ]]; then
+  rsync -a --delete "$ST/paperless/paperless-ai/" "$PAPERLESS_AI/"
+fi
+cp -a "$ST/paperless/docker-compose.yml" "$PAPERLESS_DIR/docker-compose.yml"
+# keine .env — Secrets in der Compose-Datei
+
 docker compose up -d
 ```
 
-### 9.6 Nach dem Restore
+### 9.5 Verifikation
 
-1. Paperless: Login, PDF öffnen  
-2. Buddy: Paperless-URL anpassen, Sync, Login  
-3. Stichprobe Trip / Ledger / Dokument  
-4. Qdrant/Chat-Suche: Index neu aufbauen  
+- Buddy: Login, Trips/Finanzen sichtbar
+- Paperless: Dokumente öffnen, Suche
+- Optional Restore-Nachweis: in `data/backup-status.json` `"restoreProofAt": "<ISO-UTC>"` setzen
+
+### 9.6 Nur eine Datei / Stichprobe
+
+```bash
+mkdir -p /tmp/restic-probe
+restic restore latest --target /tmp/restic-probe \
+  --include '*/paperless/docker-compose.yml' \
+  --include '*/buddy/data/familybrain.sqlite'
+find /tmp/restic-probe -type f
+rm -rf /tmp/restic-probe
+```
+
+**Nicht im Backup** → nach Restore neu: Redis (startet leer), Qdrant-Vektoren (neu indexieren).
 
 ---
 
-## 10. Restore-Proof (regelmäßig)
+## 10. Betriebs-Checkliste
 
-Alle ~3 Monate: Snapshot auf Test-Maschine restoren, Checkliste:
-
-```text
-[ ] restic snapshots listet erwartete Tags
-[ ] MANIFEST.txt Datum plausibel
-[ ] Buddy UI + Login ok
-[ ] SQLite/Dokumente nicht leer
-[ ] Paperless PDF öffnet
-[ ] «In Paperless öffnen» (URL ggf. anpassen)
-```
-
----
-
-## 11. Betriebs-Checkliste
-
-| Aktion | Befehl / Ort |
-|--------|----------------|
-| Backup manuell | `sudo /usr/local/sbin/buddy-paperless-backup.sh` |
+| Aktion | Befehl |
+|--------|--------|
+| SFTP | `sftp storagebox` |
 | Snapshots | `source /etc/buddy-backup/restic.env && restic snapshots` |
-| SFTP-Test | `sftp storagebox` |
-| Letztes Log | `ls -lt /var/backups/buddy-paperless/logs \| head` |
-| Repo-Check | `restic check` (monatlich: `--read-data`) |
+| Repo-Pfad | `sftp:storagebox:paperlessngxrolf` (= `/home/paperlessngxrolf`) |
+| Backup manuell | `sudo /usr/local/sbin/buddy-paperless-backup.sh` |
 
 ---
 
-## 12. Geheimnisse & Sicherheit
+## 11. Happy Path (dein Setup: lokal + Port 23)
 
-| Geheimnis | Aufbewahrung |
-|-----------|----------------|
-| restic Repo-Passwort | `/etc/buddy-backup/restic-password` + Password-Manager |
-| Storage-Box SSH-Key | `/root/.ssh/storagebox_ed25519` (600) |
-| Buddy / Paperless `.env` | nur im Staging/Snapshot (durch restic verschlüsselt) |
+| Schritt | Status |
+|---------|--------|
+| Port 445 tot, Port 23 open | erledigt |
+| SSH-Key `id_ed25519_storagebox` + `install-ssh-key` | erledigt |
+| `sftp storagebox` ohne Passwort | erledigt |
+| `mkdir paperlessngxrolf` + `restic.env` + `restic init` | erledigt |
+| Pfade ermitteln + Backup-Skript + erster Lauf | **jetzt** |
+| Cron täglich | danach |
+| Proxmox-SMB-Datastore | optional ignorieren (braucht 445) |
 
-Storage-Box-Zugang möglichst auf Server-IP beschränken.  
-restic verschlüsselt den Repo-Inhalt — Box allein ohne Passwort reicht nicht.
-
----
-
-## 13. Was absichtlich einfach bleibt
-
-- **Ein** Repo per SFTP, Tag `buddy-paperless`, ein Tagesjob  
-- Kein CIFS-Mount  
-- Qdrant bewusst ausgelassen  
-- Kein zweites PDF-Spiegeln in Buddy  
-
----
-
-## 14. Pfad-Platzhalter
-
-```text
-BUDDY_DIR=           /opt/familybrain
-PAPERLESS_DIR=       /opt/paperless
-PAPERLESS_MEDIA=     (docker volume inspect …)
-PAPERLESS_PGDATA=    (docker volume inspect …)
-RESTIC_REPOSITORY=   sftp:storagebox:/home/restic-repo
-SSH Host alias=      storagebox  (Port 23)
-```
-
-```bash
-docker volume ls | grep -i paperless
-docker volume inspect VOLUME_NAME -f '{{ .Mountpoint }}'
-```
-
----
-
-## 15. Kurz: Happy Path
-
-1. SSH-Key + `Host storagebox` (Port **23**)  
-2. `RESTIC_REPOSITORY=sftp:storagebox:/home/restic-repo` + `restic init`  
-3. Skript-Pfade anpassen, einmal manuell laufen lassen  
-4. Cron 03:15  
-5. Quartalsweise Restore-Proof  
-6. Ernstfall: Key + Passwort + `restic restore` + rsync + `compose up` (+ Qdrant neu indexieren)
-
-**Worst Case abgedeckt:** neue Maschine + Docker + Restore = Stand der Sicherung (Buddy-Daten und Paperless-PDFs).
