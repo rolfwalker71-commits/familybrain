@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowDown, ArrowUp, CalendarDays, ChevronRight, Filter, MoreHorizontal, Search, Sparkles } from "lucide-react";
+import { ArrowDown, ArrowUp, CalendarDays, ChevronRight, Filter, MoreHorizontal, Search, Sparkles, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -186,6 +186,7 @@ export function DocumentsClient() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [knowledgeAreas, setKnowledgeAreas] = useState<string[]>([]);
   const [bulkCategoryBusy, setBulkCategoryBusy] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
   const [missingAiIcons, setMissingAiIcons] = useState(0);
   const [iconBusy, setIconBusy] = useState(false);
   const [iconProgress, setIconProgress] = useState<string | null>(null);
@@ -357,6 +358,43 @@ export function DocumentsClient() {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setBulkCategoryBusy(false);
+    }
+  }
+
+  async function deleteDocuments(ids: number[]) {
+    if (ids.length === 0 || deleteBusy) return;
+    const label =
+      ids.length === 1
+        ? "Dieses Dokument wirklich löschen?"
+        : `${ids.length} Dokumente wirklich löschen?`;
+    const ok = window.confirm(
+      `${label}\n\nEs wird in Paperless und in Buddy gelöscht. Das lässt sich nicht rückgängig machen.`
+    );
+    if (!ok) return;
+
+    setDeleteBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/documents/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ documentIds: ids, confirm: true }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.ok === false) {
+        throw new Error(data.error || "Löschen fehlgeschlagen");
+      }
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        for (const id of ids) next.delete(id);
+        return next;
+      });
+      await load();
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDeleteBusy(false);
     }
   }
 
@@ -1003,7 +1041,11 @@ export function DocumentsClient() {
               <select
                 className="h-8 max-w-[12rem] rounded-lg border border-border bg-background px-2 text-sm disabled:opacity-50"
                 disabled={
-                  bulkCategoryBusy || iconBusy || analyzeBusy || isRunning
+                  bulkCategoryBusy ||
+                  iconBusy ||
+                  analyzeBusy ||
+                  isRunning ||
+                  deleteBusy
                 }
                 defaultValue=""
                 onChange={(e) => {
@@ -1025,6 +1067,22 @@ export function DocumentsClient() {
                   </option>
                 ))}
               </select>
+            ) : null}
+            {selectedIds.size > 0 ? (
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                disabled={
+                  deleteBusy || iconBusy || analyzeBusy || isRunning || bulkCategoryBusy
+                }
+                onClick={() => void deleteDocuments(Array.from(selectedIds))}
+              >
+                <Trash2 className="size-3.5" />
+                {deleteBusy
+                  ? "Löschen…"
+                  : `Löschen (${selectedIds.size})`}
+              </Button>
             ) : null}
             {hasOpenAIKey && (documentAiIconsEnabled || errorCount > 0) ? (
               <DropdownMenu>
@@ -1594,6 +1652,16 @@ export function DocumentsClient() {
                     onChange={() => toggleSelected(doc.id)}
                     aria-label="Auswählen"
                   />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="shrink-0 px-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    disabled={deleteBusy}
+                    title="Löschen"
+                    onClick={() => void deleteDocuments([doc.id])}
+                  >
+                    <Trash2 className="size-3.5" />
+                  </Button>
                   {documentAiIconsEnabled ? (
                     <Button
                       size="sm"
@@ -1733,6 +1801,17 @@ export function DocumentsClient() {
                             onClick={() => void analyzeOne(doc.id)}
                           >
                             {analyzingId === doc.id ? "…" : "Analysieren"}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                            disabled={deleteBusy || iconBusy || analyzeBusy || isRunning}
+                            title="In Paperless und Buddy löschen"
+                            onClick={() => void deleteDocuments([doc.id])}
+                          >
+                            <Trash2 className="size-3.5" />
+                            Löschen
                           </Button>
                         </>
                       }

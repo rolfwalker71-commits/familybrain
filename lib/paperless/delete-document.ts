@@ -5,6 +5,47 @@ import { clearDocumentAiIcon } from "@/lib/paperless/document-icon";
 import { deleteVectorPointsBySource } from "@/lib/vectors/client";
 
 /**
+ * Remove local Buddy state for a document (row, icon, vectors).
+ * Does not call Paperless. Related analysis rows cascade via FK.
+ */
+export async function purgeDocumentLocally(localDocumentId: number): Promise<{
+  ok: boolean;
+  error?: string;
+  paperlessId?: number;
+}> {
+  const db = getDb();
+  const row = db
+    .prepare(
+      `SELECT id, paperless_id FROM paperless_documents WHERE id = ?`
+    )
+    .get(localDocumentId) as
+    | { id: number; paperless_id: number }
+    | undefined;
+  if (!row) return { ok: false, error: "Dokument nicht gefunden" };
+
+  try {
+    clearDocumentAiIcon(localDocumentId);
+  } catch {
+    /* ignore */
+  }
+  try {
+    await deleteVectorPointsBySource("paperless", String(localDocumentId));
+  } catch {
+    /* ignore vector cleanup failures */
+  }
+
+  // Detach optional refs without cascade FK
+  db.prepare(
+    `UPDATE trip_events SET document_id = NULL, updated_at = datetime('now')
+     WHERE document_id = ?`
+  ).run(localDocumentId);
+
+  db.prepare(`DELETE FROM paperless_documents WHERE id = ?`).run(localDocumentId);
+
+  return { ok: true, paperlessId: row.paperless_id };
+}
+
+/**
  * Delete document in Paperless (if configured), then remove local row + vectors + icon.
  * Paperless 404 counts as already deleted.
  */
@@ -16,10 +57,10 @@ export async function deleteDocumentFully(localDocumentId: number): Promise<{
   const db = getDb();
   const row = db
     .prepare(
-      `SELECT id, paperless_id, ai_icon_path FROM paperless_documents WHERE id = ?`
+      `SELECT id, paperless_id FROM paperless_documents WHERE id = ?`
     )
     .get(localDocumentId) as
-    | { id: number; paperless_id: number; ai_icon_path: string | null }
+    | { id: number; paperless_id: number }
     | undefined;
   if (!row) return { ok: false, error: "Dokument nicht gefunden" };
 
@@ -43,18 +84,29 @@ export async function deleteDocumentFully(localDocumentId: number): Promise<{
     }
   }
 
-  try {
-    clearDocumentAiIcon(localDocumentId);
-  } catch {
-    /* ignore */
-  }
-  try {
-    await deleteVectorPointsBySource("paperless", String(localDocumentId));
-  } catch {
-    /* ignore vector cleanup failures */
-  }
+  return purgeDocumentLocally(localDocumentId);
+}
 
-  db.prepare(`DELETE FROM paperless_documents WHERE id = ?`).run(localDocumentId);
+/**
+ * Paperless removed these IDs — purge matching Buddy rows (no Paperless DELETE call).
+ */
+export async function purgeLocalDocumentsByPaperlessIds(
+  paperlessIds: number[]
+): Promise<number> {
+  if (paperlessIds.length === 0) return 0;
+  const db = getDb();
+  const placeholders = paperlessIds.map(() => "?").join(",");
+  const rows = db
+    .prepare(
+      `SELECT id FROM paperless_documents
+       WHERE paperless_id IN (${placeholders})`
+    )
+    .all(...paperlessIds) as Array<{ id: number }>;
 
-  return { ok: true, paperlessId: row.paperless_id };
+  let purged = 0;
+  for (const row of rows) {
+    const result = await purgeDocumentLocally(row.id);
+    if (result.ok) purged += 1;
+  }
+  return purged;
 }

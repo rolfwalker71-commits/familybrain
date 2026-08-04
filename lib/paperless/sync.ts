@@ -13,6 +13,7 @@ import {
   upsertDocument,
   backfillPaymentFlagsFromRawMetadata,
 } from "@/lib/db/queries";
+import { getDb } from "@/lib/db/client";
 import { hashContent } from "@/lib/utils/hash";
 import {
   DELTA_OVERLAP_MS,
@@ -24,11 +25,11 @@ import {
   getLastIdReconcileAt,
   getSyncCursor,
   listLocalActivePaperlessIds,
-  markDocumentsMissing,
   setLastFullReconcileAt,
   setLastIdReconcileAt,
   setSyncCursor,
 } from "@/lib/jobs/queries";
+import { purgeLocalDocumentsByPaperlessIds } from "@/lib/paperless/delete-document";
 import { appendPaperlessFieldSyncLogs } from "@/lib/paperless/sync-log";
 
 export type SyncMode = "full" | "delta";
@@ -494,7 +495,19 @@ async function reconcileMissingIds(
   const remoteSet = new Set(remoteIds);
   const localIds = listLocalActivePaperlessIds();
   const missing = localIds.filter((id) => !remoteSet.has(id));
-  result.missing = markDocumentsMissing(missing);
+
+  // Also purge rows already marked missing from older syncs
+  const alreadyMissing = (
+    getDb()
+      .prepare(
+        `SELECT paperless_id FROM paperless_documents
+         WHERE sync_status = 'missing'`
+      )
+      .all() as Array<{ paperless_id: number }>
+  ).map((r) => r.paperless_id);
+
+  const toPurge = [...new Set([...missing, ...alreadyMissing])];
+  result.missing = await purgeLocalDocumentsByPaperlessIds(toPurge);
   result.idReconciled = true;
   setLastIdReconcileAt(new Date().toISOString());
 }
