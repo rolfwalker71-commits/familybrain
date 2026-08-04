@@ -4,7 +4,7 @@ import {
   countDocumentsMissingAiIcon,
   documentAiIconPublicUrl,
 } from "@/lib/paperless/document-icon";
-import { parseSortDir } from "@/lib/utils/list-sort";
+import { parseDocumentSortBy, parseSortDir } from "@/lib/utils/list-sort";
 import {
   backfillDocumentRecipients,
   resolveDocumentRecipients,
@@ -46,6 +46,7 @@ export async function GET(request: Request) {
     limit: Number(searchParams.get("limit") || 100),
     offset: Number(searchParams.get("offset") || 0),
     sortDir: parseSortDir(searchParams.get("sortDir"), "desc"),
+    sortBy: parseDocumentSortBy(searchParams.get("sortBy"), "created"),
   });
 
   const membersById = new Map(

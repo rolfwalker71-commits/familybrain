@@ -1,12 +1,24 @@
 export type SortDir = "asc" | "desc";
 
+/** Documents list: when angelegt vs. Paperless Dokumentdatum */
+export type DocumentSortBy = "created" | "document_date";
+
 const STORAGE_PREFIX = "list-sort:";
+const STORAGE_BY_PREFIX = "list-sort-by:";
 
 export function parseSortDir(
   value: string | null | undefined,
   fallback: SortDir = "desc"
 ): SortDir {
   if (value === "asc" || value === "desc") return value;
+  return fallback;
+}
+
+export function parseDocumentSortBy(
+  value: string | null | undefined,
+  fallback: DocumentSortBy = "created"
+): DocumentSortBy {
+  if (value === "created" || value === "document_date") return value;
   return fallback;
 }
 
@@ -47,6 +59,34 @@ export function writeListSortDir(key: string, dir: SortDir): void {
   }
 }
 
+export function readDocumentSortBy(
+  key: string,
+  fallback: DocumentSortBy = "created"
+): DocumentSortBy {
+  if (typeof window === "undefined") return fallback;
+  try {
+    return parseDocumentSortBy(
+      sessionStorage.getItem(`${STORAGE_BY_PREFIX}${key}`),
+      fallback
+    );
+  } catch {
+    return fallback;
+  }
+}
+
+export function writeDocumentSortBy(key: string, by: DocumentSortBy): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(`${STORAGE_BY_PREFIX}${key}`, by);
+  } catch {
+    // ignore
+  }
+}
+
 export function toggleSortDir(dir: SortDir): SortDir {
   return dir === "asc" ? "desc" : "asc";
+}
+
+export function documentSortByLabel(by: DocumentSortBy): string {
+  return by === "created" ? "Erstellungsdatum" : "Dokumentdatum";
 }

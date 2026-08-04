@@ -100,6 +100,11 @@ export type DocumentFilters = {
   offset?: number;
   /** Document date sort: newest first by default */
   sortDir?: "asc" | "desc";
+  /**
+   * `created` = angelegt (added_at / local created_at) — default.
+   * `document_date` = Paperless Dokumentdatum (created_date).
+   */
+  sortBy?: "created" | "document_date";
 };
 
 export function getPaperlessSettings() {
@@ -265,6 +270,10 @@ export function listDocuments(filters: DocumentFilters = {}) {
   const limit = filters.limit ?? 100;
   const offset = filters.offset ?? 0;
   const sortSql = filters.sortDir === "asc" ? "ASC" : "DESC";
+  const orderExpr =
+    filters.sortBy === "document_date"
+      ? `COALESCE(d.created_date, d.added_at, d.created_at)`
+      : `COALESCE(d.added_at, d.created_at)`;
 
   const rows = db
     .prepare(
@@ -272,7 +281,7 @@ export function listDocuments(filters: DocumentFilters = {}) {
        FROM paperless_documents d
        LEFT JOIN document_summaries s ON s.document_id = d.id
        ${whereSql}
-       ORDER BY COALESCE(d.created_date, d.added_at, d.created_at) ${sortSql}
+       ORDER BY ${orderExpr} ${sortSql}, d.id ${sortSql}
        LIMIT ? OFFSET ?`
     )
     .all(...params, limit, offset) as PaperlessDocumentRow[];

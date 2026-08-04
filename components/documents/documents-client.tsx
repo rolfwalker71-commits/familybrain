@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { CalendarDays, ChevronRight, Filter, MoreHorizontal, Search, Sparkles } from "lucide-react";
+import { ArrowDown, ArrowUp, CalendarDays, ChevronRight, Filter, MoreHorizontal, Search, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -41,10 +41,13 @@ import { UserAvatar } from "@/components/users/user-avatar";
 import { toSwissDate } from "@/lib/utils/dates";
 import { readNdjsonStream } from "@/lib/utils/stream";
 import { withTriageMassPause } from "@/lib/documents/triage-mass-pause-client";
+import { useListSortDir } from "@/components/layout/list-sort-control";
 import {
-  ListSortControl,
-  useListSortDir,
-} from "@/components/layout/list-sort-control";
+  documentSortByLabel,
+  readDocumentSortBy,
+  type DocumentSortBy,
+  writeDocumentSortBy,
+} from "@/lib/utils/list-sort";
 import {
   DocumentInfoButton,
   DocumentTitleLink,
@@ -61,6 +64,8 @@ type DocRow = {
   id: number;
   title: string | null;
   created_date: string | null;
+  added_at?: string | null;
+  created_at?: string | null;
   correspondent_name: string | null;
   document_type_name: string | null;
   category?: string | null;
@@ -114,13 +119,30 @@ function toItemsRecord(
   return Object.fromEntries(entries.map((e) => [e.value, e.label]));
 }
 
+function docSortDate(doc: DocRow, sortBy: DocumentSortBy): string {
+  if (sortBy === "created") {
+    return toSwissDate(doc.added_at || doc.created_at);
+  }
+  return toSwissDate(doc.created_date);
+}
+
 export function DocumentsClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { pendingCount, errorCount, isRunning, refreshStats, startAnalysis, hasOpenAIKey, stopAnalysis } =
     useAnalysis();
   const [sortDir, setSortDir] = useListSortDir("documents", "desc");
+  const [sortBy, setSortByState] = useState<DocumentSortBy>("created");
   const [retryingErrors, setRetryingErrors] = useState(false);
+
+  useEffect(() => {
+    setSortByState(readDocumentSortBy("documents", "created"));
+  }, []);
+
+  function setSortBy(next: DocumentSortBy) {
+    writeDocumentSortBy("documents", next);
+    setSortByState(next);
+  }
 
   const [docs, setDocs] = useState<DocRow[]>([]);
   const [total, setTotal] = useState(0);
@@ -228,6 +250,7 @@ export function DocumentsClient() {
     if (recipient !== "all") params.set("recipient", recipient);
     params.set("limit", "250");
     params.set("sortDir", sortDir);
+    params.set("sortBy", sortBy);
 
     try {
       const res = await fetch(`/api/documents?${params.toString()}`);
@@ -267,6 +290,7 @@ export function DocumentsClient() {
     analysisStatus,
     recipient,
     sortDir,
+    sortBy,
     refreshStats,
   ]);
 
@@ -863,13 +887,64 @@ export function DocumentsClient() {
         tone={pageVisuals.documents.tone}
         actions={
           <div className="flex flex-wrap gap-2">
-            <ListSortControl
-              storageKey="documents"
-              label="Dokumentdatum"
-              defaultDir="desc"
-              dir={sortDir}
-              onDirChange={setSortDir}
-            />
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    title="Sortierung wählen"
+                    aria-label={`Sortierung: ${documentSortByLabel(sortBy)}, ${
+                      sortDir === "asc"
+                        ? "älteste zuerst"
+                        : "neueste zuerst"
+                    }`}
+                  />
+                }
+              >
+                <span>{documentSortByLabel(sortBy)}</span>
+                {sortDir === "asc" ? (
+                  <ArrowUp className="size-3.5 opacity-80" aria-hidden />
+                ) : (
+                  <ArrowDown className="size-3.5 opacity-80" aria-hidden />
+                )}
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-[14rem]">
+                <DropdownMenuItem
+                  onClick={() => {
+                    setSortBy("created");
+                    setSortDir("desc");
+                  }}
+                >
+                  Erstellungsdatum · neueste zuerst
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    setSortBy("created");
+                    setSortDir("asc");
+                  }}
+                >
+                  Erstellungsdatum · älteste zuerst
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    setSortBy("document_date");
+                    setSortDir("desc");
+                  }}
+                >
+                  Dokumentdatum · neueste zuerst
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    setSortBy("document_date");
+                    setSortDir("asc");
+                  }}
+                >
+                  Dokumentdatum · älteste zuerst
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             {isRunning ? (
               <Button
                 size="sm"
@@ -1557,7 +1632,7 @@ export function DocumentsClient() {
                       <div className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
                         <CalendarDays className="size-3.5 shrink-0" />
                         <span className="tabular-nums">
-                          {toSwissDate(doc.created_date)}
+                          {docSortDate(doc, sortBy)}
                         </span>
                       </div>
                     </div>
@@ -1594,7 +1669,7 @@ export function DocumentsClient() {
                       meta={
                         <MetaLine>
                           <span className="tabular-nums">
-                            {toSwissDate(doc.created_date)}
+                            {docSortDate(doc, sortBy)}
                           </span>
                           {doc.correspondent_name ? (
                             <span>{doc.correspondent_name}</span>
