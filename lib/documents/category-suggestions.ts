@@ -199,10 +199,10 @@ export function analyzeSonstigesForCategorySuggestions(): {
   };
 }
 
-export function resolveCategorySuggestion(input: {
+export async function resolveCategorySuggestion(input: {
   id: string;
   action: "accept" | "reject";
-}): { ok: boolean; error?: string; moved?: number; areaName?: string } {
+}): Promise<{ ok: boolean; error?: string; moved?: number; areaName?: string }> {
   const store = loadStore();
   const suggestion = store.suggestions.find((s) => s.id === input.id);
   if (!suggestion) return { ok: false, error: "Vorschlag nicht gefunden." };
@@ -235,7 +235,7 @@ export function resolveCategorySuggestion(input: {
     return { ok: false, error: "Zielrubrik ungültig." };
   }
 
-  const result = updateDocumentsCategory({
+  const result = await updateDocumentsCategory({
     documentIds: suggestion.documentIds,
     category: areaName,
   });

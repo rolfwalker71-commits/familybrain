@@ -363,6 +363,8 @@ export class PaperlessClient {
     paperlessId: number,
     input: {
       title?: string | null;
+      /** Absolute tag id list (replaces). Prefer over addTagIds when set. */
+      tags?: number[];
       addTagIds?: number[];
       documentTypeId?: number | null;
       correspondentId?: number | null;
@@ -376,7 +378,13 @@ export class PaperlessClient {
       body.title = input.title.trim();
     }
 
-    if (input.addTagIds && input.addTagIds.length > 0) {
+    if (input.tags) {
+      body.tags = [
+        ...new Set(
+          input.tags.filter((id) => Number.isFinite(id) && id > 0)
+        ),
+      ];
+    } else if (input.addTagIds && input.addTagIds.length > 0) {
       const existingTags = Array.isArray(doc.tags)
         ? doc.tags.map((t) =>
             typeof t === "number" ? t : Number((t as PaperlessTag).id)

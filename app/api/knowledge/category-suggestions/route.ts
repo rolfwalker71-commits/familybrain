@@ -58,7 +58,7 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Ungültige Eingabe" }, { status: 400 });
   }
 
-  const result = resolveCategorySuggestion(parsed.data);
+  const result = await resolveCategorySuggestion(parsed.data);
   if (!result.ok) {
     return NextResponse.json(
       { error: result.error || "Aktion fehlgeschlagen" },

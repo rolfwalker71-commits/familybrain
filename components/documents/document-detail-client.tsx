@@ -31,6 +31,7 @@ import {
   MoreHorizontal,
   RefreshCw,
   Sparkles,
+  Pencil,
   History,
 } from "lucide-react";
 import {
@@ -185,6 +186,14 @@ function DocumentDetailInner({ detail }: DetailProps) {
   );
   const [iconBusy, setIconBusy] = useState(false);
   const [zoomUrl, setZoomUrl] = useState<string | null>(null);
+  const [titleDraft, setTitleDraft] = useState(document.title || "");
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [metaBusy, setMetaBusy] = useState(false);
+  const [displayTitle, setDisplayTitle] = useState(document.title || "");
+  const [displayCategory, setDisplayCategory] = useState<string | null>(
+    typeof summary?.category === "string" ? summary.category : null
+  );
+  const [knowledgeAreas, setKnowledgeAreas] = useState<string[]>([]);
 
   const activeTab = parseDocumentDetailTab(searchParams.get("tab"));
   const tabItems: DocumentTabItem[] = [
@@ -292,9 +301,74 @@ function DocumentDetailInner({ detail }: DetailProps) {
     String(a.date || "").localeCompare(String(b.date || ""))
   );
 
-  const categoryName =
-    typeof summary?.category === "string" ? summary.category : null;
+  const categoryName = displayCategory;
   const categoryVisual = knowledgeVisual(categoryName || "Sonstiges");
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const res = await fetch("/api/knowledge/areas");
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) return;
+        const names = Array.isArray(data.areas)
+          ? data.areas
+              .map((a: { name?: string }) => a.name)
+              .filter((n: unknown): n is string => typeof n === "string")
+          : [];
+        setKnowledgeAreas(names);
+      } catch {
+        /* ignore */
+      }
+    })();
+  }, []);
+
+  async function saveTitle() {
+    const next = titleDraft.trim();
+    if (!next || next === displayTitle || metaBusy) {
+      setEditingTitle(false);
+      setTitleDraft(displayTitle);
+      return;
+    }
+    setMetaBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/documents/${document.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: next }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Titel speichern fehlgeschlagen");
+      setDisplayTitle(typeof data.title === "string" ? data.title : next);
+      setEditingTitle(false);
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setMetaBusy(false);
+    }
+  }
+
+  async function saveCategory(next: string) {
+    if (!next || next === displayCategory || metaBusy) return;
+    setMetaBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/documents/${document.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ category: next }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Rubrik speichern fehlgeschlagen");
+      setDisplayCategory(next);
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setMetaBusy(false);
+    }
+  }
 
   async function analyze() {
     setAnalyzing(true);
@@ -495,9 +569,27 @@ function DocumentDetailInner({ detail }: DetailProps) {
           <ChevronLeft className="size-5" />
         </button>
         <div className="flex min-w-0 flex-1 items-center gap-2.5">
-          <h1 className="truncate text-base font-semibold tracking-tight">
-            {document.title || `Dokument #${document.id}`}
-          </h1>
+          {editingTitle ? (
+            <input
+              className="min-w-0 flex-1 rounded-lg border border-border bg-background px-2 py-1.5 text-sm font-semibold"
+              value={titleDraft}
+              disabled={metaBusy}
+              autoFocus
+              onChange={(e) => setTitleDraft(e.target.value)}
+              onBlur={() => void saveTitle()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void saveTitle();
+                if (e.key === "Escape") {
+                  setEditingTitle(false);
+                  setTitleDraft(displayTitle);
+                }
+              }}
+            />
+          ) : (
+            <h1 className="truncate text-base font-semibold tracking-tight">
+              {displayTitle || `Dokument #${document.id}`}
+            </h1>
+          )}
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger
@@ -522,6 +614,14 @@ function DocumentDetailInner({ detail }: DetailProps) {
                 In Paperless öffnen
               </DropdownMenuItem>
             ) : null}
+            <DropdownMenuItem
+              onClick={() => {
+                setTitleDraft(displayTitle);
+                setEditingTitle(true);
+              }}
+            >
+              Titel ändern
+            </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => void analyze()}
               disabled={analyzing}
@@ -553,9 +653,60 @@ function DocumentDetailInner({ detail }: DetailProps) {
             ← Zurück
           </button>
           <div className="min-w-0">
-            <h1 className="break-words text-2xl font-semibold tracking-tight">
-              {document.title || `Dokument #${document.id}`}
-            </h1>
+            {editingTitle ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-lg font-semibold"
+                  value={titleDraft}
+                  disabled={metaBusy}
+                  autoFocus
+                  onChange={(e) => setTitleDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") void saveTitle();
+                    if (e.key === "Escape") {
+                      setEditingTitle(false);
+                      setTitleDraft(displayTitle);
+                    }
+                  }}
+                />
+                <Button
+                  size="sm"
+                  disabled={metaBusy}
+                  onClick={() => void saveTitle()}
+                >
+                  {metaBusy ? "…" : "Speichern"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={metaBusy}
+                  onClick={() => {
+                    setEditingTitle(false);
+                    setTitleDraft(displayTitle);
+                  }}
+                >
+                  Abbrechen
+                </Button>
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-start gap-2">
+                <h1 className="break-words text-2xl font-semibold tracking-tight">
+                  {displayTitle || `Dokument #${document.id}`}
+                </h1>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="mt-1 shrink-0"
+                  title="Titel ändern"
+                  onClick={() => {
+                    setTitleDraft(displayTitle);
+                    setEditingTitle(true);
+                  }}
+                >
+                  <Pencil className="size-3.5" />
+                </Button>
+              </div>
+            )}
             <p className="mt-1 text-sm text-muted-foreground">
               Paperless-ID {document.paperless_id} ·{" "}
               {document.correspondent_name || "–"} ·{" "}
@@ -601,13 +752,54 @@ function DocumentDetailInner({ detail }: DetailProps) {
         </Card>
       ) : null}
 
-      <div className="hidden flex-wrap gap-2 md:flex">
+      <div className="flex flex-wrap items-center gap-2 md:hidden">
+        <select
+          className="h-8 max-w-[14rem] rounded-lg border border-border bg-background px-2 text-sm disabled:opacity-50"
+          disabled={metaBusy || knowledgeAreas.length === 0}
+          value={categoryName || ""}
+          onChange={(e) => {
+            const next = e.target.value;
+            if (next) void saveCategory(next);
+          }}
+          aria-label="Rubrik"
+        >
+          <option value="" disabled>
+            Rubrik wählen…
+          </option>
+          {knowledgeAreas.map((name) => (
+            <option key={name} value={name}>
+              {name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="hidden flex-wrap items-center gap-2 md:flex">
         {tags.map((tag, idx) => (
           <Badge key={`${tag.tag_id}-${idx}`} variant="secondary">
             {tag.tag_name}
           </Badge>
         ))}
-        {summary?.category ? <Badge>{String(summary.category)}</Badge> : null}
+        {categoryName ? <Badge>{categoryName}</Badge> : null}
+        <select
+          className="h-8 max-w-[14rem] rounded-lg border border-border bg-background px-2 text-sm disabled:opacity-50"
+          disabled={metaBusy || knowledgeAreas.length === 0}
+          value={categoryName || ""}
+          onChange={(e) => {
+            const next = e.target.value;
+            if (next) void saveCategory(next);
+          }}
+          aria-label="Rubrik"
+        >
+          <option value="" disabled>
+            Rubrik wählen…
+          </option>
+          {knowledgeAreas.map((name) => (
+            <option key={name} value={name}>
+              {name}
+            </option>
+          ))}
+        </select>
         <Badge variant="outline">
           {String(summary?.analysis_status || "pending")}
         </Badge>

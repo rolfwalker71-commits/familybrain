@@ -25,12 +25,16 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Ungültige Eingabe" }, { status: 400 });
   }
 
-  const result = updateDocumentsCategory(parsed.data);
+  const result = await updateDocumentsCategory(parsed.data);
   if (!result.ok) {
     return NextResponse.json(
       { error: result.error || "Umklassifizierung fehlgeschlagen" },
       { status: 400 }
     );
   }
-  return NextResponse.json({ ok: true, updated: result.updated });
+  return NextResponse.json({
+    ok: true,
+    updated: result.updated,
+    writebackErrors: result.writebackErrors,
+  });
 }
