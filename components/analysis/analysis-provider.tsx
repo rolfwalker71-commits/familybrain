@@ -30,6 +30,7 @@ type AnalysisStatus = {
   openDueFinanceCount: number;
   travelDocuments: number;
   knowledgeDocuments: number;
+  triagePendingCount: number;
   hasOpenAIKey: boolean;
   isRunning: boolean;
   mode: AnalysisMode | null;
@@ -72,6 +73,7 @@ const defaultStatus: AnalysisStatus = {
   openDueFinanceCount: 0,
   travelDocuments: 0,
   knowledgeDocuments: 0,
+  triagePendingCount: 0,
   hasOpenAIKey: false,
   isRunning: false,
   mode: null,
@@ -122,6 +124,9 @@ export function AnalysisProvider({ children }: { children: React.ReactNode }) {
         travelDocuments: Number(dash.travelDocuments ?? prev.travelDocuments),
         knowledgeDocuments: Number(
           dash.knowledgeDocuments ?? prev.knowledgeDocuments
+        ),
+        triagePendingCount: Number(
+          dash.triagePending ?? prev.triagePendingCount
         ),
         hasOpenAIKey: Boolean(settings.hasOpenAIKey),
       }));

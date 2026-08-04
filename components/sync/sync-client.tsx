@@ -415,7 +415,7 @@ function SyncClientInner() {
             }
       );
       setMessage(
-        "Sync abgeschlossen. Nächster Schritt: Action-Inbox auf dem Dashboard (Triage) oder Analyse starten."
+        "Sync abgeschlossen. Nächster Schritt: Inbox (Triage) oder Analyse starten."
       );
       setLastSyncAt(new Date().toISOString());
       await refreshStats();
@@ -1081,13 +1081,13 @@ function SyncClientInner() {
           <AlertTitle>Status</AlertTitle>
           <AlertDescription className="space-y-2">
             <p>{message}</p>
-            {message.includes("Action-Inbox") ? (
+            {message.includes("Inbox") ? (
               <p>
                 <Link
-                  href="/dashboard"
+                  href="/inbox"
                   className="font-medium text-foreground underline-offset-2 hover:underline"
                 >
-                  Zur Action-Inbox auf dem Dashboard →
+                  Zur Inbox →
                 </Link>
               </p>
             ) : null}

@@ -19,6 +19,7 @@ import {
   Luggage,
   ArrowLeft,
   LayoutGrid,
+  Inbox,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -41,13 +42,27 @@ type NavItem = {
     | "pendingCount"
     | "urgentDeadlinesCount"
     | "warrantiesExpiringSoon"
-    | "openDueFinanceCount";
+    | "openDueFinanceCount"
+    | "triagePendingCount";
   /** Prefer pending styling when count is the analysis backlog */
   pendingStyle?: boolean;
 };
 
 const myBrainNavItems: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, tone: "teal" },
+  {
+    href: "/dashboard",
+    label: "Übersicht",
+    icon: LayoutDashboard,
+    tone: "teal",
+  },
+  {
+    href: "/inbox",
+    label: "Inbox",
+    icon: Inbox,
+    tone: "teal",
+    countKey: "triagePendingCount",
+    pendingStyle: true,
+  },
   {
     href: "/documents",
     label: "Dokumente",
@@ -131,7 +146,7 @@ const areaEntries: AreaEntry[] = [
     mode: "mybrain",
     label: BRAND.buddy,
     shortLabel: "Buddy",
-    description: "Dokumente, Fristen, Wissen — und die tägliche Inbox",
+    description: "Übersicht, Inbox, Dokumente und Wissen",
     icon: Brain,
     tone: "teal",
     href: "/dashboard",

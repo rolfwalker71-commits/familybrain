@@ -27,6 +27,7 @@ import {
   Luggage,
   CreditCard,
   Monitor,
+  Inbox,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -191,6 +192,7 @@ export const knowledgeAreaVisuals: Record<
 
 export const pageVisuals = {
   dashboard: { icon: LayoutDashboard, tone: "teal" as const },
+  inbox: { icon: Inbox, tone: "teal" as const },
   documents: { icon: Files, tone: "teal" as const },
   chat: { icon: MessageSquare, tone: "teal" as const },
   sync: { icon: RefreshCw, tone: "teal" as const },
@@ -199,7 +201,7 @@ export const pageVisuals = {
   deadlines: { icon: CalendarClock, tone: "teal" as const },
   finance: { icon: Wallet, tone: "green" as const },
   financeBrain: { icon: HandCoins, tone: "green" as const },
-  travel: { icon: Plane, tone: "green" as const },
+  travel: { icon: Plane, tone: "teal" as const },
   trips: { icon: Luggage, tone: "green" as const },
   settings: { icon: Settings, tone: "teal" as const },
   summaries: { icon: Sparkles, tone: "teal" as const },
