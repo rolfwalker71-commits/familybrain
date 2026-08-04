@@ -9,6 +9,7 @@ import { AuthProvider, useAuth } from "@/components/auth/auth-provider";
 import { AdminNavProvider } from "@/components/layout/admin-nav-provider";
 import { RealtimeToasts } from "@/components/realtime/realtime-toasts";
 import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register";
+import { BuddyScene } from "./buddy-scene";
 import { MobileHeader } from "./mobile-header";
 import { Sidebar } from "./sidebar";
 
@@ -61,7 +62,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
           : "min-h-dvh bg-background lg:flex"
       }
     >
-      <div className="sticky top-0 hidden h-dvh shrink-0 lg:block">
+      <div className="sticky top-0 z-20 hidden h-dvh shrink-0 lg:block">
         <Sidebar />
       </div>
       <main
@@ -71,19 +72,22 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
             : "relative min-h-dvh min-w-0 flex-1 lg:h-dvh lg:overflow-y-auto"
         }
       >
-        <MobileHeader />
-        {!isLimitedUser ? <TriageMassPauseBanner /> : null}
-        {!isLimitedUser ? <AnalysisStatusBar /> : null}
-        {me ? <RealtimeToasts /> : null}
-        {me ? <ServiceWorkerRegister /> : null}
-        <div
-          className={
-            isChat
-              ? "mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col px-4 py-3 sm:px-6 lg:px-8 lg:py-4"
-              : "mx-auto w-full max-w-7xl min-w-0 px-4 py-5 pb-[max(2rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-7 lg:px-8 lg:py-8"
-          }
-        >
-          {children}
+        <BuddyScene variant={isChat ? "chat" : "default"} />
+        <div className="relative z-10 flex min-h-0 min-w-0 flex-1 flex-col">
+          <MobileHeader />
+          {!isLimitedUser ? <TriageMassPauseBanner /> : null}
+          {!isLimitedUser ? <AnalysisStatusBar /> : null}
+          {me ? <RealtimeToasts /> : null}
+          {me ? <ServiceWorkerRegister /> : null}
+          <div
+            className={
+              isChat
+                ? "mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col px-4 py-3 sm:px-6 lg:px-8 lg:py-4"
+                : "mx-auto w-full max-w-7xl min-w-0 px-4 py-5 pb-[max(2rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-7 lg:px-8 lg:py-8"
+            }
+          >
+            {children}
+          </div>
         </div>
       </main>
     </div>

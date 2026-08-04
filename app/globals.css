@@ -165,3 +165,48 @@ input[type="time"]:not([data-empty="true"])::-webkit-datetime-edit-text {
   color: var(--muted-foreground);
   opacity: 1;
 }
+
+/* Soft mountain atmosphere behind dashboard chrome content */
+.buddy-scene {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      120% 70% at 12% -10%,
+      color-mix(in oklab, var(--brand-docs-soft) 72%, white) 0%,
+      transparent 55%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--brand-docs-soft) 55%, #eef4f0) 0%,
+      var(--background) 48%,
+      var(--background) 100%
+    );
+}
+
+.buddy-scene__mountains {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: min(42vh, 28rem);
+  color: color-mix(in oklab, var(--brand-docs) 18%, var(--background));
+}
+
+.buddy-scene__mountains--far {
+  color: color-mix(in oklab, var(--brand-docs) 10%, var(--background));
+  height: min(48vh, 32rem);
+  opacity: 0.9;
+}
+
+.buddy-scene--chat {
+  opacity: 0.55;
+}
+
+.buddy-scene--chat .buddy-scene__mountains {
+  height: min(28vh, 16rem);
+}

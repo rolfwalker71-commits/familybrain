@@ -9,7 +9,8 @@ export type AgendaKind =
   | "deadline"
   | "travel"
   | "warranty"
-  | "triage";
+  | "triage"
+  | "ledger";
 
 export type AgendaItem = {
   id: string;
@@ -20,6 +21,8 @@ export type AgendaItem = {
   amount: number | null;
   currency: string | null;
   documentId: number | null;
+  /** Prefer over document link when set (e.g. FinanzBuddy ledger). */
+  href: string | null;
   badge: string;
 };
 
@@ -212,6 +215,7 @@ export function getDashboardOverview(
       amount: row.amount,
       currency: row.currency || "CHF",
       documentId: row.document_id,
+      href: null,
       badge: "Rechnung",
     });
   }
@@ -247,6 +251,7 @@ export function getDashboardOverview(
       amount: null,
       currency: null,
       documentId: row.document_id,
+      href: null,
       badge: "Frist",
     });
   }
@@ -280,47 +285,120 @@ export function getDashboardOverview(
       amount: null,
       currency: null,
       documentId: row.document_id,
+      href: null,
       badge: "Garantie",
     });
   }
 
-  const travels = db
+  const tripEvents = db
     .prepare(
-      `SELECT t.id, t.title, t.travel_type, t.provider, t.start_date, t.end_date,
-              t.origin, t.destination, t.document_id, t.price, t.currency
-       FROM travel_items t
-       WHERE t.start_date IS NOT NULL
-         AND t.start_date >= ?
-         AND t.start_date <= ?`
+      `SELECT e.id, e.trip_id, e.event_type, e.title, e.start_date, e.start_time,
+              e.provider, e.origin_place, e.destination_place,
+              e.departure_airport, e.arrival_airport, e.place_name, e.location,
+              e.flight_number, e.airline, e.document_id,
+              t.title as trip_title
+       FROM trip_events e
+       JOIN trips t ON t.id = e.trip_id
+       WHERE e.start_date IS NOT NULL
+         AND e.start_date >= ?
+         AND e.start_date <= ?
+         AND COALESCE(t.status, 'planned') != 'cancelled'
+       ORDER BY e.start_date ASC, COALESCE(e.start_time, '') ASC, e.sort_key ASC, e.id ASC`
     )
     .all(start, end) as Array<{
     id: number;
-    title: string | null;
-    travel_type: string | null;
-    provider: string | null;
+    trip_id: number;
+    event_type: string;
+    title: string;
     start_date: string;
-    end_date: string | null;
-    origin: string | null;
-    destination: string | null;
+    start_time: string | null;
+    provider: string | null;
+    origin_place: string | null;
+    destination_place: string | null;
+    departure_airport: string | null;
+    arrival_airport: string | null;
+    place_name: string | null;
+    location: string | null;
+    flight_number: string | null;
+    airline: string | null;
     document_id: number | null;
-    price: number | null;
-    currency: string | null;
+    trip_title: string;
   }>;
 
-  for (const row of travels) {
+  for (const row of tripEvents) {
+    const route =
+      (row.origin_place && row.destination_place
+        ? `${row.origin_place} → ${row.destination_place}`
+        : null) ||
+      (row.departure_airport && row.arrival_airport
+        ? `${row.departure_airport} → ${row.arrival_airport}`
+        : null) ||
+      row.place_name ||
+      row.location;
+    const carrier =
+      [row.airline || row.provider, row.flight_number].filter(Boolean).join(" ") ||
+      null;
     agenda.push({
-      id: `tr-${row.id}`,
+      id: `te-${row.id}`,
       kind: "travel",
       date: row.start_date.slice(0, 10),
-      title: row.title || row.travel_type || "Reise",
+      title: row.title || row.event_type || "Reise",
       subtitle:
-        [row.provider, row.origin && row.destination ? `${row.origin} → ${row.destination}` : null]
+        [row.trip_title, carrier, route, row.start_time]
           .filter(Boolean)
           .join(" · ") || null,
-      amount: row.price,
-      currency: row.currency || "CHF",
-      documentId: row.document_id,
+      amount: null,
+      currency: null,
+      documentId: null,
+      href: `/trips/${row.trip_id}`,
       badge: "Reise",
+    });
+  }
+
+  const ledgerExpenses = db
+    .prepare(
+      `SELECT e.id, e.ledger_id, e.amount, e.currency, e.description,
+              e.category_label, e.expense_date, e.amount_base,
+              l.title as ledger_title, l.base_currency,
+              m.display_name as payer_name
+       FROM finance_expenses e
+       JOIN finance_ledgers l ON l.id = e.ledger_id
+       LEFT JOIN finance_ledger_members m ON m.id = e.paid_by_member_id
+       WHERE e.expense_date IS NOT NULL
+         AND e.expense_date >= ?
+         AND e.expense_date <= ?
+         AND COALESCE(e.direction, 'expense') = 'expense'
+         AND (l.archived_at IS NULL OR TRIM(l.archived_at) = '')`
+    )
+    .all(start, end) as Array<{
+    id: number;
+    ledger_id: number;
+    amount: number;
+    currency: string;
+    description: string | null;
+    category_label: string | null;
+    expense_date: string;
+    amount_base: number | null;
+    ledger_title: string;
+    base_currency: string;
+    payer_name: string | null;
+  }>;
+
+  for (const row of ledgerExpenses) {
+    agenda.push({
+      id: `fe-${row.id}`,
+      kind: "ledger",
+      date: row.expense_date.slice(0, 10),
+      title: row.description?.trim() || row.category_label || "Ausgabe",
+      subtitle:
+        [row.ledger_title, row.payer_name ? `Bezahlt von ${row.payer_name}` : null]
+          .filter(Boolean)
+          .join(" · ") || null,
+      amount: row.amount_base ?? row.amount,
+      currency: row.base_currency || row.currency || "CHF",
+      documentId: null,
+      href: `/finance-brain/${row.ledger_id}`,
+      badge: "FinanzBuddy",
     });
   }
 
@@ -351,6 +429,7 @@ export function getDashboardOverview(
       amount: null,
       currency: null,
       documentId: row.id,
+      href: null,
       badge: "Triage",
     });
   }
@@ -396,6 +475,7 @@ export function getDashboardOverview(
       amount: null,
       currency: null,
       documentId: row.document_id,
+      href: null,
       badge: "Frist",
     });
   }

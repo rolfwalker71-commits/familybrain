@@ -10,6 +10,7 @@ import {
   Shield,
   ChartColumnIncreasing,
   Clock3,
+  HandCoins,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -41,6 +42,7 @@ const KIND_ACCENT: Record<AgendaKind, string> = {
   travel: "border-l-sky-600",
   warranty: "border-l-amber-600",
   triage: "border-l-[var(--brand-docs)]",
+  ledger: "border-l-[var(--brand-finance)]",
 };
 
 const KIND_ICON: Record<AgendaKind, typeof FileText> = {
@@ -49,6 +51,7 @@ const KIND_ICON: Record<AgendaKind, typeof FileText> = {
   travel: Briefcase,
   warranty: Shield,
   triage: Mail,
+  ledger: HandCoins,
 };
 
 function weekdayLabel(iso: string): string {
@@ -98,9 +101,12 @@ function AgendaRow({ item }: { item: AgendaItem }) {
     </div>
   );
 
-  if (item.documentId) {
+  const linkHref =
+    item.href ||
+    (item.documentId != null ? `/documents/${item.documentId}` : null);
+  if (linkHref) {
     return (
-      <Link href={`/documents/${item.documentId}`} className="block">
+      <Link href={linkHref} className="block">
         {inner}
       </Link>
     );
