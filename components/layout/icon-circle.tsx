@@ -14,22 +14,12 @@ import {
   Building2,
   GraduationCap,
   FolderOpen,
-  Files,
-  MessageSquare,
-  RefreshCw,
-  Brain,
-  CalendarClock,
-  Settings,
-  Sparkles,
-  LayoutDashboard,
-  BookOpen,
-  HandCoins,
-  Luggage,
   CreditCard,
   Monitor,
-  Inbox,
+  BookOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { APP_ICON_STROKE, appIcons } from "@/lib/branding/app-icons";
 
 export const iconToneClasses = {
   blue: "bg-blue-50 text-blue-600",
@@ -131,17 +121,17 @@ type IconCircleProps = {
   icon: LucideIcon;
   tone?: IconTone;
   size?: "sm" | "md" | "lg";
-  /** soft = pastel (default); solid = saturated fill for dark nav */
-  variant?: "soft" | "solid";
+  /** soft = pastel (default); solid = saturated fill for dark nav; ghost = outline only */
+  variant?: "soft" | "solid" | "ghost";
   /** circle (default) or rounded square like Travel mockup tiles */
   shape?: "circle" | "rounded";
   className?: string;
 };
 
 const sizeClasses = {
-  sm: { wrap: "h-8 w-8", icon: "h-4 w-4" },
+  sm: { wrap: "h-8 w-8", icon: "h-[1.125rem] w-[1.125rem]" },
   md: { wrap: "h-10 w-10", icon: "h-5 w-5" },
-  lg: { wrap: "h-12 w-12", icon: "h-6 w-6" },
+  lg: { wrap: "h-12 w-12", icon: "h-7 w-7" },
 } as const;
 
 export function IconCircle({
@@ -159,11 +149,20 @@ export function IconCircle({
         "flex shrink-0 items-center justify-center",
         shape === "rounded" ? "rounded-2xl" : "rounded-full",
         s.wrap,
-        variant === "solid" ? iconToneSolidClasses[tone] : iconToneClasses[tone],
+        variant === "solid"
+          ? iconToneSolidClasses[tone]
+          : variant === "ghost"
+            ? "bg-transparent text-current"
+            : iconToneClasses[tone],
         className
       )}
     >
-      <Icon className={cn(s.icon, variant === "solid" && "stroke-[2.25]")} />
+      <Icon
+        className={cn(s.icon)}
+        strokeWidth={APP_ICON_STROKE}
+        absoluteStrokeWidth
+        aria-hidden
+      />
     </div>
   );
 }
@@ -188,24 +187,27 @@ export const knowledgeAreaVisuals: Record<
   Behörden: { icon: Building2, tone: "teal" },
   Ausbildung: { icon: GraduationCap, tone: "teal" },
   Sonstiges: { icon: FolderOpen, tone: "teal" },
+  Wissen: { icon: BookOpen, tone: "teal" },
 };
 
+/** Page headers + nav — single source, mockup-aligned outline icons. */
 export const pageVisuals = {
-  dashboard: { icon: LayoutDashboard, tone: "teal" as const },
-  inbox: { icon: Inbox, tone: "teal" as const },
-  documents: { icon: Files, tone: "teal" as const },
-  chat: { icon: MessageSquare, tone: "teal" as const },
-  sync: { icon: RefreshCw, tone: "teal" as const },
-  knowledge: { icon: Brain, tone: "teal" as const },
-  warranties: { icon: Shield, tone: "teal" as const },
-  deadlines: { icon: CalendarClock, tone: "teal" as const },
-  finance: { icon: Wallet, tone: "green" as const },
-  financeBrain: { icon: HandCoins, tone: "green" as const },
-  travel: { icon: Plane, tone: "teal" as const },
-  trips: { icon: Luggage, tone: "green" as const },
-  settings: { icon: Settings, tone: "teal" as const },
-  summaries: { icon: Sparkles, tone: "teal" as const },
-  guides: { icon: BookOpen, tone: "teal" as const },
+  dashboard: appIcons.overview,
+  overview: appIcons.overview,
+  inbox: appIcons.inbox,
+  documents: appIcons.documents,
+  chat: appIcons.chat,
+  sync: appIcons.sync,
+  knowledge: appIcons.knowledge,
+  warranties: appIcons.warranties,
+  deadlines: appIcons.deadlines,
+  finance: appIcons.finance,
+  financeBrain: appIcons.financeBrain,
+  travel: appIcons.travel,
+  trips: appIcons.trips,
+  settings: appIcons.settings,
+  summaries: appIcons.summaries,
+  guides: appIcons.guides,
 } as const;
 
 export function knowledgeVisual(name: string): {

@@ -5,10 +5,10 @@ import Link from "next/link";
 import {
   CalendarDays,
   FileText,
-  Inbox,
-  Plane,
+  Mail,
+  Briefcase,
   Shield,
-  Wallet,
+  ChartColumnIncreasing,
   Clock3,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,7 @@ import { KpiCorrectSheet } from "@/components/dashboard/kpi-correct-sheet";
 import { formatCHF } from "@/lib/utils/format";
 import { toSwissDate } from "@/lib/utils/dates";
 import { cn } from "@/lib/utils";
+import { APP_ICON_STROKE } from "@/lib/branding/app-icons";
 import type {
   AgendaItem,
   AgendaKind,
@@ -45,9 +46,9 @@ const KIND_ACCENT: Record<AgendaKind, string> = {
 const KIND_ICON: Record<AgendaKind, typeof FileText> = {
   invoice: FileText,
   deadline: Clock3,
-  travel: Plane,
+  travel: Briefcase,
   warranty: Shield,
-  triage: Inbox,
+  triage: Mail,
 };
 
 function weekdayLabel(iso: string): string {
@@ -72,7 +73,12 @@ function AgendaRow({ item }: { item: AgendaItem }) {
         KIND_ACCENT[item.kind]
       )}
     >
-      <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+      <Icon
+        className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+        strokeWidth={APP_ICON_STROKE}
+        absoluteStrokeWidth
+        aria-hidden
+      />
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium">{item.title}</p>
         {item.subtitle ? (
@@ -188,28 +194,28 @@ export function OverviewDashboard({
             href="/inbox"
             className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-card px-3 py-1.5 text-sm shadow-sm hover:bg-muted/40"
           >
-            <CalendarDays className="size-3.5 text-muted-foreground" />
+            <CalendarDays className="size-3.5 text-muted-foreground" strokeWidth={APP_ICON_STROKE} absoluteStrokeWidth aria-hidden />
             Heute
           </Link>
           <Link
             href="/inbox"
             className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-card px-3 py-1.5 text-sm shadow-sm hover:bg-muted/40"
           >
-            <Inbox className="size-3.5 text-[var(--brand-docs)]" />
+            <Mail className="size-3.5 text-[var(--brand-docs)]" strokeWidth={APP_ICON_STROKE} absoluteStrokeWidth aria-hidden />
             {data.chips.triagePending} Triage
           </Link>
           <Link
             href="/deadlines"
             className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-card px-3 py-1.5 text-sm shadow-sm hover:bg-muted/40"
           >
-            <Clock3 className="size-3.5 text-teal-700" />
+            <Clock3 className="size-3.5 text-teal-700" strokeWidth={APP_ICON_STROKE} absoluteStrokeWidth aria-hidden />
             {data.chips.urgentDeadlines} Fristen
           </Link>
           <Link
             href="/finance"
             className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-card px-3 py-1.5 text-sm shadow-sm hover:bg-muted/40"
           >
-            <Wallet className="size-3.5 text-[var(--brand-finance)]" />
+            <ChartColumnIncreasing className="size-3.5 text-[var(--brand-finance)]" strokeWidth={APP_ICON_STROKE} absoluteStrokeWidth aria-hidden />
             {formatCHF(data.chips.openDueAmount)} offen
           </Link>
         </div>

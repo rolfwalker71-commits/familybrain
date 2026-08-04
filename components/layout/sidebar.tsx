@@ -2,26 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import {
-  LayoutDashboard,
-  Files,
-  RefreshCw,
-  Brain,
-  Shield,
-  CalendarClock,
-  Wallet,
-  HandCoins,
-  Plane,
-  Settings,
-  MessageSquare,
-  LogOut,
-  BookOpen,
-  Luggage,
-  ArrowLeft,
-  LayoutGrid,
-  Inbox,
-  type LucideIcon,
-} from "lucide-react";
+import { LogOut, ArrowLeft, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAnalysis } from "@/components/analysis/analysis-provider";
 import { useAuth } from "@/components/auth/auth-provider";
@@ -30,7 +11,8 @@ import { UserAvatar } from "@/components/users/user-avatar";
 import { APP_VERSION } from "@/lib/app-version";
 import { BRAND } from "@/lib/branding";
 import { BuddyLogo } from "@/components/brand/buddy-logo";
-import { IconCircle, type IconTone } from "@/components/layout/icon-circle";
+import { pageVisuals, type IconTone } from "@/components/layout/icon-circle";
+import { APP_ICON_STROKE } from "@/lib/branding/app-icons";
 import type { AdminNavMode } from "@/lib/navigation/admin-nav";
 
 type NavItem = {
@@ -44,72 +26,87 @@ type NavItem = {
     | "warrantiesExpiringSoon"
     | "openDueFinanceCount"
     | "triagePendingCount";
-  /** Prefer pending styling when count is the analysis backlog */
   pendingStyle?: boolean;
 };
 
+/** Order + icons match mockup (bold outline). */
 const myBrainNavItems: NavItem[] = [
   {
     href: "/dashboard",
     label: "Übersicht",
-    icon: LayoutDashboard,
-    tone: "teal",
+    icon: pageVisuals.overview.icon,
+    tone: pageVisuals.overview.tone,
   },
   {
     href: "/inbox",
     label: "Inbox",
-    icon: Inbox,
-    tone: "teal",
+    icon: pageVisuals.inbox.icon,
+    tone: pageVisuals.inbox.tone,
     countKey: "triagePendingCount",
     pendingStyle: true,
   },
   {
     href: "/documents",
     label: "Dokumente",
-    icon: Files,
-    tone: "teal",
-  },
-  {
-    href: "/warranties",
-    label: "Garantien",
-    icon: Shield,
-    tone: "teal",
-    countKey: "warrantiesExpiringSoon",
+    icon: pageVisuals.documents.icon,
+    tone: pageVisuals.documents.tone,
   },
   {
     href: "/deadlines",
     label: "Fristen",
-    icon: CalendarClock,
-    tone: "teal",
+    icon: pageVisuals.deadlines.icon,
+    tone: pageVisuals.deadlines.tone,
     countKey: "urgentDeadlinesCount",
   },
   {
     href: "/finance",
     label: BRAND.financeBlick,
-    icon: Wallet,
-    tone: "green",
+    icon: pageVisuals.finance.icon,
+    tone: pageVisuals.finance.tone,
     countKey: "openDueFinanceCount",
   },
   {
     href: "/travel",
     label: BRAND.travelMemory,
-    icon: Plane,
-    tone: "teal",
+    icon: pageVisuals.travel.icon,
+    tone: pageVisuals.travel.tone,
+  },
+  {
+    href: "/warranties",
+    label: "Garantien",
+    icon: pageVisuals.warranties.icon,
+    tone: pageVisuals.warranties.tone,
+    countKey: "warrantiesExpiringSoon",
   },
   {
     href: "/knowledge",
     label: "Wissen",
-    icon: Brain,
-    tone: "teal",
+    icon: pageVisuals.knowledge.icon,
+    tone: pageVisuals.knowledge.tone,
   },
-  { href: "/guides", label: "Guides", icon: BookOpen, tone: "teal" },
-  { href: "/chat", label: "Chat", icon: MessageSquare, tone: "teal" },
-  { href: "/settings", label: "Einstellungen", icon: Settings, tone: "teal" },
+  {
+    href: "/guides",
+    label: "Guides",
+    icon: pageVisuals.guides.icon,
+    tone: pageVisuals.guides.tone,
+  },
+  {
+    href: "/chat",
+    label: "Chat",
+    icon: pageVisuals.chat.icon,
+    tone: pageVisuals.chat.tone,
+  },
+  {
+    href: "/settings",
+    label: "Einstellungen",
+    icon: pageVisuals.settings.icon,
+    tone: pageVisuals.settings.tone,
+  },
   {
     href: "/sync",
     label: "Sync",
-    icon: RefreshCw,
-    tone: "teal",
+    icon: pageVisuals.sync.icon,
+    tone: pageVisuals.sync.tone,
     countKey: "pendingCount",
     pendingStyle: true,
   },
@@ -118,15 +115,15 @@ const myBrainNavItems: NavItem[] = [
 const travelBuddyItem: NavItem = {
   href: "/trips",
   label: BRAND.travel,
-  icon: Luggage,
-  tone: "green",
+  icon: pageVisuals.trips.icon,
+  tone: pageVisuals.trips.tone,
 };
 
 const finanzBuddyItem: NavItem = {
   href: "/finance-brain",
   label: BRAND.finance,
-  icon: HandCoins,
-  tone: "green",
+  icon: pageVisuals.financeBrain.icon,
+  tone: pageVisuals.financeBrain.tone,
 };
 
 const limitedUserNavItems: NavItem[] = [travelBuddyItem, finanzBuddyItem];
@@ -147,8 +144,8 @@ const areaEntries: AreaEntry[] = [
     label: BRAND.buddy,
     shortLabel: "Buddy",
     description: "Übersicht, Inbox, Dokumente und Wissen",
-    icon: Brain,
-    tone: "teal",
+    icon: pageVisuals.overview.icon,
+    tone: pageVisuals.overview.tone,
     href: "/dashboard",
   },
   {
@@ -156,8 +153,8 @@ const areaEntries: AreaEntry[] = [
     label: BRAND.travel,
     shortLabel: "Travel",
     description: "Reisen planen & teilen — nicht nur Belege aus Paperless",
-    icon: Luggage,
-    tone: "green",
+    icon: pageVisuals.trips.icon,
+    tone: pageVisuals.trips.tone,
     href: "/trips",
   },
   {
@@ -165,8 +162,8 @@ const areaEntries: AreaEntry[] = [
     label: BRAND.finance,
     shortLabel: "Finanz",
     description: "Gemeinsame Kasse & Abrechnung — getrennt vom Finanzblick",
-    icon: HandCoins,
-    tone: "green",
+    icon: pageVisuals.financeBrain.icon,
+    tone: pageVisuals.financeBrain.tone,
     href: "/finance-brain",
   },
 ];
@@ -196,24 +193,24 @@ function NavLinkRow({
       ? Number(analysis[item.countKey] || 0)
       : null;
   const showCount = count != null && count > 0;
+  const Icon = item.icon;
 
   return (
     <Link
       href={item.href}
       onClick={onNavigate}
       className={cn(
-        "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+        "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
         active
-          ? "bg-white/10 text-white"
+          ? "bg-white/15 text-white"
           : "text-sidebar-foreground/90 hover:bg-sidebar-accent hover:text-white"
       )}
     >
-      <IconCircle
-        icon={item.icon}
-        tone={item.tone}
-        size="sm"
-        variant="solid"
-        className="rounded-lg shadow-md ring-1 ring-white/25"
+      <Icon
+        className="size-5 shrink-0"
+        strokeWidth={APP_ICON_STROKE}
+        absoluteStrokeWidth
+        aria-hidden
       />
       <span className="flex-1 text-[15px] font-semibold tracking-tight">
         {item.label}
@@ -223,21 +220,25 @@ function NavLinkRow({
           className={cn(
             "min-w-[1.5rem] rounded-full px-1.5 py-0.5 text-center text-[10px] font-semibold tabular-nums",
             active
-              ? "bg-white/25 text-white"
-              : item.pendingStyle && isRunning
-                ? "bg-amber-500 text-white"
-                : "bg-white/15 text-white"
+              ? "bg-red-500 text-white"
+              : item.countKey === "triagePendingCount"
+                ? "bg-red-500 text-white"
+                : item.pendingStyle && isRunning
+                  ? "bg-amber-500 text-white"
+                  : "bg-white/15 text-white"
           )}
           title={
             item.countKey === "pendingCount"
               ? "Ausstehende Analysen"
               : item.countKey === "urgentDeadlinesCount"
-                ? "Dringende Fristen (überfällig ≤30 Tage oder in ≤7 Tagen)"
+                ? "Dringende Fristen"
                 : item.countKey === "warrantiesExpiringSoon"
-                  ? "Garantien in den nächsten 90 Tagen"
+                  ? "Garantien bald ablaufend"
                   : item.countKey === "openDueFinanceCount"
-                    ? "Offene Rechnungen (Paperless Zu bezahlen)"
-                    : undefined
+                    ? "Offene Rechnungen"
+                    : item.countKey === "triagePendingCount"
+                      ? "Inbox / Triage"
+                      : undefined
           }
         >
           {formatCount(count)}
@@ -376,7 +377,12 @@ export function Sidebar({
                       : "text-sidebar-foreground/70 hover:bg-white/10 hover:text-white"
                   )}
                 >
-                  <entry.icon className="size-3.5" />
+                  <entry.icon
+                    className="size-4"
+                    strokeWidth={APP_ICON_STROKE}
+                    absoluteStrokeWidth
+                    aria-hidden
+                  />
                   <span className="truncate">{entry.shortLabel}</span>
                 </button>
               );
@@ -398,12 +404,11 @@ export function Sidebar({
                 onClick={() => selectArea(entry)}
                 className="flex w-full items-start gap-3 rounded-xl bg-white/5 px-3 py-3 text-left transition-colors hover:bg-white/10"
               >
-                <IconCircle
-                  icon={entry.icon}
-                  tone={entry.tone}
-                  size="sm"
-                  variant="solid"
-                  className="mt-0.5 rounded-lg shadow-md ring-1 ring-white/25"
+                <entry.icon
+                  className="mt-0.5 size-5 shrink-0 text-white"
+                  strokeWidth={APP_ICON_STROKE}
+                  absoluteStrokeWidth
+                  aria-hidden
                 />
                 <span className="min-w-0 flex-1">
                   <span className="block text-[15px] font-semibold tracking-tight text-white">

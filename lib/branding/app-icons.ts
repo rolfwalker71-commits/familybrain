@@ -1,0 +1,64 @@
+/**
+ * Canonical Lucide outline icons for Buddy (mockup-aligned).
+ * Keep outline style; stroke is intentionally bold for clarity.
+ */
+import type { LucideIcon } from "lucide-react";
+import {
+  Home,
+  Mail,
+  FileText,
+  Calendar,
+  ChartColumnIncreasing,
+  Briefcase,
+  Shield,
+  BookOpen,
+  MessageCircle,
+  Settings,
+  RefreshCw,
+  Library,
+  HandCoins,
+  Luggage,
+  Sparkles,
+} from "lucide-react";
+
+/** Bold outline stroke (mockup style, maximum readable weight). */
+export const APP_ICON_STROKE = 2.5;
+
+export type AppIconTone =
+  | "blue"
+  | "amber"
+  | "rose"
+  | "orange"
+  | "green"
+  | "teal"
+  | "sky"
+  | "indigo"
+  | "violet"
+  | "slate";
+
+export type AppIconSpec = {
+  icon: LucideIcon;
+  tone: AppIconTone;
+};
+
+export const appIcons = {
+  overview: { icon: Home, tone: "teal" as const },
+  inbox: { icon: Mail, tone: "teal" as const },
+  documents: { icon: FileText, tone: "teal" as const },
+  deadlines: { icon: Calendar, tone: "teal" as const },
+  finance: { icon: ChartColumnIncreasing, tone: "green" as const },
+  travel: { icon: Briefcase, tone: "teal" as const },
+  warranties: { icon: Shield, tone: "teal" as const },
+  knowledge: { icon: BookOpen, tone: "teal" as const },
+  guides: { icon: Library, tone: "teal" as const },
+  chat: { icon: MessageCircle, tone: "teal" as const },
+  settings: { icon: Settings, tone: "teal" as const },
+  sync: { icon: RefreshCw, tone: "teal" as const },
+  dashboard: { icon: Home, tone: "teal" as const },
+  financeBrain: { icon: HandCoins, tone: "green" as const },
+  trips: { icon: Luggage, tone: "green" as const },
+  summaries: { icon: Sparkles, tone: "teal" as const },
+  buddyArea: { icon: Home, tone: "teal" as const },
+} as const satisfies Record<string, AppIconSpec>;
+
+export type AppIconKey = keyof typeof appIcons;
