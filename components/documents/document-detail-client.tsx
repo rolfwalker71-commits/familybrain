@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -616,6 +617,48 @@ function DocumentDetailInner({ detail }: DetailProps) {
 
       {activeTab === "overview" ? (
         <div className="space-y-4">
+          <Card className="border-border/50 bg-[var(--brand-docs-soft)]/40">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-3 text-base">
+                <IconCircle icon={FileSearch} tone="teal" size="sm" />
+                Übersicht
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-sm leading-relaxed text-foreground/90">
+                {String(
+                  summary?.short_summary ||
+                    "Noch nicht analysiert — starte die Analyse, damit Buddy Kategorie, Fristen und Beträge erkennt."
+                )}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {String(summary?.analysis_status || "pending") !==
+                "completed" ? (
+                  <Button
+                    size="sm"
+                    className="bg-[var(--brand-docs)] text-white hover:bg-[var(--brand-docs)]/90"
+                    onClick={() => setTab("more")}
+                  >
+                    Analyse starten (Mehr)
+                  </Button>
+                ) : null}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setTab("extracts")}
+                >
+                  Extrakte ansehen
+                </Button>
+                <Link
+                  href="/dashboard"
+                  className="inline-flex h-8 items-center rounded-md border border-border px-3 text-sm font-medium hover:bg-accent"
+                >
+                  Zur Action-Inbox
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+
           <div className="grid grid-cols-[minmax(7.5rem,10rem)_1fr] items-stretch gap-3 sm:grid-cols-[minmax(9rem,12rem)_1fr] sm:gap-4">
             <div className="relative h-full min-h-[7.5rem] overflow-hidden rounded-xl border border-border/50 bg-muted/30 shadow-sm">
               {aiIconUrl ? (

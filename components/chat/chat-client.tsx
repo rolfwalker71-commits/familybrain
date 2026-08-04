@@ -102,6 +102,8 @@ const SUGGESTIONS = [
   "Welche Versicherungen habe ich und wann sind die Fristen?",
   "Zeige mir grössere Ausgaben aus diesem Jahr.",
   "Welche Reiseunterlagen sind gespeichert?",
+  "Was steht in meinen Steuerdokumenten für dieses Jahr?",
+  "Gibt es offene Rechnungen oder Zahlungserinnerungen?",
 ];
 
 export function ChatClient() {
@@ -442,8 +444,8 @@ export function ChatClient() {
                 <div>
                   <p className="font-medium">Frage deine Dokumentenbasis</p>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Antworten basieren auf Paperless, Trilium, Guides und deinen
-                    gespeicherten Korrekturen.
+                    Tippe eine der Beispiel-Fragen oder formuliere frei —
+                    Antworten kommen aus Paperless, Guides und Korrekturen.
                   </p>
                 </div>
                 <div className="flex max-w-2xl flex-wrap justify-center gap-2">

@@ -119,6 +119,7 @@ export default async function DashboardPage() {
       deadlinesNext30Days: stats.deadlinesNext30Days,
       warrantiesExpiringSoon: stats.warrantiesExpiringSoon,
       pendingAnalysis: stats.pendingAnalysis,
+      triagePending: stats.triagePending,
     },
     {
       topOpenInvoice: topUnpaid
@@ -211,13 +212,24 @@ export default async function DashboardPage() {
       </div>
 
       <PageHeader
-        title="Dashboard"
-        description="Was jetzt zählt — und der Überblick darunter"
+        title="Heute"
+        description="Action-Inbox zuerst — KPIs und Kontext darunter"
         icon={pageVisuals.dashboard.icon}
         tone={pageVisuals.dashboard.tone}
       />
 
+      <ActionInbox />
+
       <MetricGrid>
+        {stats.triagePending > 0 ? (
+          <StatCard
+            title="Triage-Inbox"
+            value={stats.triagePending}
+            icon={AlertCircle}
+            tone="teal"
+            href="/dashboard"
+          />
+        ) : null}
         <StatCard
           title="Offene Beträge"
           value={formatCHF(stats.openDueFinanceAmount)}
@@ -247,7 +259,7 @@ export default async function DashboardPage() {
             tone="teal"
             href="/documents?analysisStatus=pending"
           />
-        ) : (
+        ) : stats.triagePending === 0 ? (
           <StatCard
             title="Dokumente"
             value={stats.totalDocuments}
@@ -255,10 +267,8 @@ export default async function DashboardPage() {
             tone="teal"
             href="/documents"
           />
-        )}
+        ) : null}
       </MetricGrid>
-
-      <ActionInbox />
 
       <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
         <Card tone="teal" className="min-w-0 overflow-hidden shadow-sm">

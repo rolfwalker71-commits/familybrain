@@ -1,12 +1,6 @@
-import { listSummaries } from "@/lib/db/queries";
-import {
-  SummariesClient,
-  type SummaryCardRow,
-} from "@/components/summaries/summaries-grid";
+import { redirect } from "next/navigation";
 
-export const dynamic = "force-dynamic";
-
+/** Legacy route — summaries live in document detail / knowledge now. */
 export default function SummariesPage() {
-  const rows = listSummaries() as SummaryCardRow[];
-  return <SummariesClient rows={rows} />;
+  redirect("/documents");
 }

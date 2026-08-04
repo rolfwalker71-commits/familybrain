@@ -379,9 +379,13 @@ export function GuidesClient() {
         </CardHeader>
         <CardContent className="space-y-3">
           {guides.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Noch keine Guides importiert.
-            </p>
+            <div className="space-y-2 rounded-xl border border-dashed border-border/70 bg-muted/20 px-4 py-8 text-center">
+              <p className="text-sm font-medium">Noch keine Guides</p>
+              <p className="text-xs text-muted-foreground">
+                Lade ein PDF hoch (Handbuch, Police, …) — Buddy indexiert es für
+                den Chat.
+              </p>
+            </div>
           ) : (
             guides.map((guide) => (
               <div

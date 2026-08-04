@@ -1,17 +1,21 @@
-# FamilyBrain
+# Buddy (FamilyBrain)
 
-Local-first MVP: connect Paperless-ngx, sync documents into SQLite, and extract structured household knowledge with AI.
+Local-first household app: **Buddy** (documents & knowledge), **TravelBuddy** (planned trips), **FinanzBuddy** (shared ledgers). Connects Paperless-ngx, syncs into SQLite, extracts structure with AI.
 
 ## Features
 
-- Paperless REST API connection (token auth, read-only)
-- Local SQLite cache with WAL mode
-- Document list + detail views
-- AI summaries (category, dates, amounts, deadlines, warranties, finance, travel)
-- Dashboards for warranties, deadlines, finance and travel
-- TravelBrain: trip planning (`/trips`) with timeline, covers, ICS, chat capture; optional flight/hotel enrichment
-- Single-user login for every page and API route
-- Installable online PWA for iOS, iPadOS and Android
+- Paperless REST sync (token auth) with optional **write-back** of custom fields/tags
+- Local SQLite cache (WAL); optional Qdrant for chat/guides
+- Documents list + detail, warranties, deadlines, knowledge areas
+- AI analysis (category, amounts, deadlines, warranties, finance, travel)
+- **Finanzblick** (`/finance`): Paperless-derived invoice overview
+- **FinanzBuddy** (`/finance-brain`): shared expenses & settlements
+- **Reise-Gedächtnis** (`/travel`): travel items from documents
+- **TravelBuddy** (`/trips`): planned trips, timeline, ICS, share, AI covers
+- Action Inbox / triage on the dashboard; SMTP triage mail; Web Push + desktop toasts
+- Multi-user (admin vs limited Travel/Finance access), family recipients
+- Online PWA (no offline document cache)
+- Disaster recovery via **restic + Hetzner Storage Box** (see `docs/backup-restic.md`) — module JSON export ≠ full DR
 
 ## Stack
 
@@ -228,12 +232,14 @@ Restore-taugliches Konzept mit **restic** und **Hetzner Storage Box per SFTP** (
 
 ## Notes
 
-- Paperless remains source of truth
-- No write-back to Paperless in this MVP
-- PDFs are not downloaded; OCR `content` from the API is used
+- Paperless remains source of truth for PDFs; Buddy caches metadata/OCR text
+- Optional Paperless **write-back** (custom fields / tags) can be enabled in Settings
+- PDFs are streamed from Paperless; OCR `content` from the API is used for AI
 - SQLite file: `data/familybrain.sqlite` (gitignored)
-- One FamilyBrain instance is enough for a home Paperless host
-- Default Docker host port: **3100** (avoids conflicts with other apps on 3000)
-- Travel/finance/deadline labels are normalized semantically on read and on new analyses (e.g. Cruise→Kreuzfahrt); finance overview uses display buckets
-- **TravelBrain** (`/trips`): planned trips with timeline, cover images, ICS export, chat capture (`TRIP_EVENTS` / Quellen / Belege). Optional flight enrichment via AeroDataBox (Settings); hotel/place enrichment via OpenStreetMap/Nominatim + cached map snapshot
-- App version (`YYYYMMDD-HHMM`) is shown at the bottom of the sidebar; enable auto-bump on commit once with `npm run hooks:install`
+- Branding in the UI is **Buddy**; Docker/npm package name remains `familybrain`
+- Default Docker host port: **3100**
+- Travel/finance/deadline labels are normalized on read and analysis
+- **TravelBuddy** (`/trips`) vs **Reise-Gedächtnis** (`/travel`): planned trips vs document-derived memory
+- **FinanzBuddy** (`/finance-brain`) vs **Finanzblick** (`/finance`): shared ledger vs Paperless finance overview
+- App version (`YYYYMMDD-HHMM`) is shown at the bottom of the sidebar; enable auto-bump with `npm run hooks:install`
+- PWA is **online-only** — no offline PDF cache

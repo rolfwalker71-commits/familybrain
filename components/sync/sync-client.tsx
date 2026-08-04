@@ -414,7 +414,9 @@ function SyncClientInner() {
               percent: 100,
             }
       );
-      setMessage("Sync abgeschlossen. Du kannst jetzt die Analyse starten.");
+      setMessage(
+        "Sync abgeschlossen. Nächster Schritt: Action-Inbox auf dem Dashboard (Triage) oder Analyse starten."
+      );
       setLastSyncAt(new Date().toISOString());
       await refreshStats();
     } catch (err) {
@@ -535,7 +537,7 @@ function SyncClientInner() {
     <div className="space-y-6 pb-28 md:space-y-8 md:pb-0">
       <PageHeader
         title="Sync"
-        description="Paperless und Trilium aktuell halten — dann AI-Analyse starten."
+        description="Paperless und Trilium aktuell halten — danach Action-Inbox (Dashboard) und Analyse."
         icon={pageVisuals.sync.icon}
         tone={pageVisuals.sync.tone}
       />
@@ -1077,7 +1079,19 @@ function SyncClientInner() {
       {message ? (
         <Alert>
           <AlertTitle>Status</AlertTitle>
-          <AlertDescription>{message}</AlertDescription>
+          <AlertDescription className="space-y-2">
+            <p>{message}</p>
+            {message.includes("Action-Inbox") ? (
+              <p>
+                <Link
+                  href="/dashboard"
+                  className="font-medium text-foreground underline-offset-2 hover:underline"
+                >
+                  Zur Action-Inbox auf dem Dashboard →
+                </Link>
+              </p>
+            ) : null}
+          </AlertDescription>
         </Alert>
       ) : null}
 

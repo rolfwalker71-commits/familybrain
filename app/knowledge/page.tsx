@@ -23,10 +23,36 @@ export default function KnowledgePage() {
     <div className="min-w-0 space-y-6">
       <PageHeader
         title="Wissen"
-        description="Automatisch klassifizierte Lebensbereiche"
+        description="Automatisch klassifizierte Lebensbereiche aus deinen Dokumenten"
         icon={pageVisuals.knowledge.icon}
         tone={pageVisuals.knowledge.tone}
       />
+
+      {areas.length === 0 || areas.every((a) => a.document_count === 0) ? (
+        <Card className="border-dashed">
+          <CardContent className="space-y-3 p-6 text-center">
+            <p className="text-base font-medium">Noch kein Wissen aufgebaut</p>
+            <p className="text-sm text-muted-foreground">
+              Synchronisiere Paperless und starte die Analyse — danach erscheinen
+              Rubriken wie Steuern, Gesundheit oder Reisen.
+            </p>
+            <div className="flex flex-wrap justify-center gap-2">
+              <Link
+                href="/sync"
+                className="inline-flex h-9 items-center rounded-md border border-border px-4 text-sm font-medium hover:bg-accent"
+              >
+                Zu Sync
+              </Link>
+              <Link
+                href="/documents?analysisStatus=pending"
+                className="inline-flex h-9 items-center rounded-md bg-[var(--brand-docs)] px-4 text-sm font-medium text-white hover:bg-[var(--brand-docs)]/90"
+              >
+                Ausstehende Analysen
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <CardGrid cols={3}>
         {areas.map((area) => {

@@ -46,6 +46,7 @@ import { formatCHF } from "@/lib/utils/format";
 import { compareNullableDate } from "@/lib/utils/list-sort";
 import { toSwissDate } from "@/lib/utils/dates";
 import { cn } from "@/lib/utils";
+import { BRAND } from "@/lib/branding";
 import {
   OverviewTabNav,
   parseOverviewTab,
@@ -461,12 +462,18 @@ function TravelOverviewClientInner({ items, documentTripLinks = {} }: Props) {
   return (
     <div className="min-w-0 space-y-4 pb-28 md:space-y-6 md:pb-0">
       <PageHeader
-        title="Reise-Gedächtnis"
-        description="KPIs zuerst – Details per Drilldown, Termine in den Kalender"
+        title={BRAND.travelMemory}
+        description={`Reise-Belege aus Paperless · geplante Reisen in ${BRAND.travel}`}
         icon={pageVisuals.travel.icon}
         tone={pageVisuals.travel.tone}
         actions={
           <div className="flex flex-wrap gap-2">
+            <Link
+              href="/trips"
+              className="inline-flex h-8 items-center rounded-md border border-border px-3 text-sm font-medium hover:bg-accent"
+            >
+              Zu {BRAND.travel}
+            </Link>
             <ListSortControl
               storageKey="travel"
               label="Startdatum"

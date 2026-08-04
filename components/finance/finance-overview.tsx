@@ -570,10 +570,10 @@ function FinanceOverviewClientInner({
   return (
     <div className="min-w-0 space-y-4 pb-28 md:space-y-6 md:pb-0">
       <PageHeader
-        title="Finanzblick"
+        title={BRAND.financeBlick}
         description={[
-          "Paperless-Finanzblick in Buddy",
-          "KPIs ohne Lieferant «Unbekannt»",
+          "Aus Paperless-Belegen — offene Rechnungen & Übersicht",
+          `Gemeinsame Kasse → ${BRAND.finance}`,
           unknownVendor.count > 0
             ? `${unknownVendor.count} Positionen ohne Lieferant ausgeklammert (${formatCHF(unknownVendor.total)})`
             : null,
@@ -589,7 +589,7 @@ function FinanceOverviewClientInner({
               href="/finance-brain"
               className="inline-flex h-8 items-center rounded-md border border-border px-3 text-sm font-medium hover:bg-accent"
             >
-              {BRAND.finance}
+              Zu {BRAND.finance}
             </Link>
             <ListSortControl
               storageKey="finance-due"

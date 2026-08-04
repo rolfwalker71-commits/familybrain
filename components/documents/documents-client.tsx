@@ -126,6 +126,10 @@ function docSortDate(doc: DocRow, sortBy: DocumentSortBy): string {
   return toSwissDate(doc.created_date);
 }
 
+function docSortDateLabel(sortBy: DocumentSortBy): string {
+  return sortBy === "created" ? "Angelegt" : "Dokumentdatum";
+}
+
 export function DocumentsClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -1632,7 +1636,7 @@ export function DocumentsClient() {
                       <div className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
                         <CalendarDays className="size-3.5 shrink-0" />
                         <span className="tabular-nums">
-                          {docSortDate(doc, sortBy)}
+                          {docSortDateLabel(sortBy)} · {docSortDate(doc, sortBy)}
                         </span>
                       </div>
                     </div>
@@ -1669,7 +1673,7 @@ export function DocumentsClient() {
                       meta={
                         <MetaLine>
                           <span className="tabular-nums">
-                            {docSortDate(doc, sortBy)}
+                            {docSortDateLabel(sortBy)} · {docSortDate(doc, sortBy)}
                           </span>
                           {doc.correspondent_name ? (
                             <span>{doc.correspondent_name}</span>

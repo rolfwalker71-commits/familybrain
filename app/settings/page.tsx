@@ -1094,7 +1094,7 @@ function SettingsPageInner() {
     { id: "paperless", label: "Paperless", icon: Server },
     { id: "travel", label: "Travel", icon: Luggage },
     { id: "mail", label: "Mail", icon: Mail },
-    { id: "notify", label: "Hinweise", icon: Bell },
+    { id: "notify", label: "Backup & Hinweise", icon: Bell },
     { id: "users", label: "User", icon: Users },
     { id: "family", label: "Familie", icon: Heart },
     { id: "more", label: "Mehr", icon: MoreHorizontal },
@@ -1292,7 +1292,7 @@ function SettingsPageInner() {
               className="font-medium text-foreground underline-offset-2 hover:underline"
               onClick={() => setTab("notify")}
             >
-              Hinweise
+              Hinweise & Backup
             </button>{" "}
             ein.
           </div>
@@ -2420,6 +2420,7 @@ function SettingsPageInner() {
 
       {activeTab === "notify" ? (
         <>
+          <BackupStatusPanel />
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-3">
@@ -2431,7 +2432,6 @@ function SettingsPageInner() {
               <NotificationPrefsPanel />
             </CardContent>
           </Card>
-          <BackupStatusPanel />
         </>
       ) : null}
 

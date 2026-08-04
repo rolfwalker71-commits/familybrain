@@ -358,9 +358,21 @@ export function FinanceLedgersListClient() {
 
       {isAdmin ? (
         <ModuleBackupCard
-          title="FinanzBuddy-Backup"
+          title="FinanzBuddy-Backup (Modul-JSON)"
           exportHref="/api/finance-ledgers/backup"
           onImport={importBackup}
+          hint={
+            <>
+              Nur Abrechnungen/Moduldaten — kein Disaster-Recovery. Server-Backup:{" "}
+              <Link
+                href="/settings?tab=notify"
+                className="underline-offset-2 hover:underline"
+              >
+                Einstellungen → Backup & Hinweise
+              </Link>{" "}
+              · <code className="text-[10px]">docs/backup-restic.md</code>
+            </>
+          }
         />
       ) : null}
 
@@ -378,18 +390,28 @@ export function FinanceLedgersListClient() {
           <p className="text-sm text-muted-foreground">Lade Abrechnungen…</p>
         ) : ledgers.length === 0 ? (
           <Card className="border-border/60 bg-card shadow-[0_4px_16px_rgba(20,32,28,0.05)]">
-            <CardContent className="space-y-3 p-4">
+            <CardContent className="space-y-3 p-6 text-center">
+              <p className="text-base font-medium">Noch keine Abrechnung</p>
               <p className="text-sm text-muted-foreground">
-                Noch keine Abrechnungen.
+                Für gemeinsame Ausgaben und Splits. Offene Paperless-Rechnungen
+                siehst du im Finanzblick.
               </p>
               {isAdmin ? (
-                <Button
-                  className="w-full bg-[var(--brand-finance)] text-white hover:bg-[var(--brand-finance)]/90 md:hidden"
-                  onClick={() => setCreateOpen(true)}
-                >
-                  <Plus className="mr-2 size-4" />
-                  Erste Abrechnung anlegen
-                </Button>
+                <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
+                  <Button
+                    className="bg-[var(--brand-finance)] text-white hover:bg-[var(--brand-finance)]/90"
+                    onClick={() => setCreateOpen(true)}
+                  >
+                    <Plus className="mr-2 size-4" />
+                    Erste Abrechnung anlegen
+                  </Button>
+                  <Link
+                    href="/finance"
+                    className="inline-flex h-9 items-center justify-center rounded-md border border-border px-4 text-sm font-medium hover:bg-accent"
+                  >
+                    Zum Finanzblick
+                  </Link>
+                </div>
               ) : null}
             </CardContent>
           </Card>

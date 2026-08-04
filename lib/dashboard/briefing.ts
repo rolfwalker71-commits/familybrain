@@ -8,6 +8,7 @@ export type BriefingStats = {
   deadlinesNext30Days: number;
   warrantiesExpiringSoon: number;
   pendingAnalysis: number;
+  triagePending?: number;
 };
 
 export type BriefingSamples = {
@@ -31,6 +32,14 @@ export function buildDashboardBriefing(
   today = new Date().toISOString().slice(0, 10)
 ): string[] {
   const lines: string[] = [];
+
+  if ((stats.triagePending ?? 0) > 0) {
+    lines.push(
+      stats.triagePending === 1
+        ? "1 Dokument wartet in der Action-Inbox (Triage)"
+        : `${stats.triagePending} Dokumente warten in der Action-Inbox (Triage)`
+    );
+  }
 
   if (stats.overdueDeadlinesCount > 0) {
     lines.push(

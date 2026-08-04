@@ -253,9 +253,21 @@ export function TripsListClient() {
 
       {isAdmin ? (
         <ModuleBackupCard
-          title="TravelBuddy-Backup"
+          title="TravelBuddy-Backup (Modul-JSON)"
           exportHref="/api/trips/backup"
           onImport={importBackup}
+          hint={
+            <>
+              Nur Reisen/Moduldaten — kein Disaster-Recovery. Server-Backup:{" "}
+              <Link
+                href="/settings?tab=notify"
+                className="underline-offset-2 hover:underline"
+              >
+                Einstellungen → Backup & Hinweise
+              </Link>{" "}
+              · <code className="text-[10px]">docs/backup-restic.md</code>
+            </>
+          }
         />
       ) : null}
 
@@ -290,18 +302,28 @@ export function TripsListClient() {
           <p className="text-sm text-muted-foreground">Lädt Reisen…</p>
         ) : trips.length === 0 ? (
           <Card className="border-border shadow-[0_2px_4px_rgba(20,32,28,0.06),0_10px_28px_rgba(20,32,28,0.1)]">
-            <CardContent className="space-y-3 p-4">
+            <CardContent className="space-y-3 p-6 text-center">
+              <p className="text-base font-medium">Noch keine Reise geplant</p>
               <p className="text-sm text-muted-foreground">
-                Noch keine Reisen.
+                Lege die erste Reise an — Timeline, Kosten und Teilen kommen
+                danach. Paperless-Belege findest du unter Reise-Gedächtnis.
               </p>
               {isAdmin ? (
-                <Button
-                  className="w-full bg-[var(--brand-finance)] text-white hover:bg-[var(--brand-finance)]/90 md:hidden"
-                  onClick={() => setCreateOpen(true)}
-                >
-                  <Plus className="mr-2 size-4" />
-                  Erste Reise anlegen
-                </Button>
+                <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
+                  <Button
+                    className="bg-[var(--brand-finance)] text-white hover:bg-[var(--brand-finance)]/90"
+                    onClick={() => setCreateOpen(true)}
+                  >
+                    <Plus className="mr-2 size-4" />
+                    Erste Reise anlegen
+                  </Button>
+                  <Link
+                    href="/travel"
+                    className="inline-flex h-9 items-center justify-center rounded-md border border-border px-4 text-sm font-medium hover:bg-accent"
+                  >
+                    Zum Reise-Gedächtnis
+                  </Link>
+                </div>
               ) : null}
             </CardContent>
           </Card>

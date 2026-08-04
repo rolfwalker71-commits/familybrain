@@ -15,7 +15,6 @@ const MYBRAIN_PREFIXES = [
   "/chat",
   "/settings",
   "/sync",
-  "/summaries",
 ] as const;
 
 export function isMyBrainPath(pathname: string): boolean {

@@ -28,7 +28,7 @@ import {
   boolToSql,
   extractPaymentCustomFlags,
 } from "@/lib/paperless/custom-fields";
-import { listPendingTriageDocuments } from "@/lib/documents/triage";
+import { listPendingTriageDocuments, countPendingTriageDocuments } from "@/lib/documents/triage";
 import { recipientFilterSql } from "@/lib/family/recipients";
 import { withResolvedRecipients } from "@/lib/family/recipients";
 import { appendActivityLog } from "@/lib/activity-log";
@@ -833,6 +833,7 @@ export function getDashboardStats() {
     overdueDeadlinesCount,
     openDueFinanceCount,
     openDueFinanceAmount: openDueFinance.open_amount,
+    triagePending: countPendingTriageDocuments(),
     recentAnalyses,
   };
 }
