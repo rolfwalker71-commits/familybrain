@@ -1,0 +1,12 @@
+---
+description: Always bump sidebar APP_VERSION before every git commit
+alwaysApply: true
+---
+
+# App version bump
+
+Before every `git commit`, run `npm run version:bump` and stage `lib/app-version.ts` in the same commit.
+
+The stamp is `YYYYMMDD-HHMM` (local time) shown under «Abmelden» in the sidebar. Never ship a commit that leaves a stale version.
+
+A repo pre-commit hook in `.githooks/pre-commit` also bumps it when hooks run; still bump explicitly so agent commits stay correct if hooks are skipped.

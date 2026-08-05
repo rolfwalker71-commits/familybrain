@@ -6,10 +6,9 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 ## App version (sidebar)
 
-Before every git commit, bump the sidebar build stamp and include it in the same commit:
+`APP_VERSION` in `lib/app-version.ts` (`YYYYMMDD-HHMM`) is bumped automatically by
+`.githooks/pre-commit` on every commit (`core.hooksPath=.githooks`).
 
-```bash
-npm run version:bump
-```
-
-That writes `lib/app-version.ts` (`APP_VERSION` as `YYYYMMDD-HHMM`). Do not rely on a pre-commit hook.
+Agents: still run `npm run version:bump` and stage `lib/app-version.ts` before
+`git commit` when preparing a commit, so the stamp is correct even if hooks are
+skipped. Never commit with a stale sidebar version.

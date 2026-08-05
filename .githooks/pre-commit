@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Bump sidebar APP_VERSION (YYYYMMDD-HHMM) on every commit.
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
+node scripts/bump-version.js
+git add lib/app-version.ts
