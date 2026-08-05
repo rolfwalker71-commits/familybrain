@@ -6,9 +6,50 @@ export type NormalizedLineItem = {
   currency: string | null;
   quantity: number | null;
   unit: string | null;
+  /** Credit-card statements: booking date of the charge (ISO). */
+  date: string | null;
+  merchant: string | null;
+  foreignAmount: number | null;
+  foreignCurrency: string | null;
 };
 
-/** Pull leading «7x ·» out of description into quantity when the model embedded it. */
+function finiteOrNull(value: unknown): number | null {
+  return value != null && Number.isFinite(Number(value)) ? Number(value) : null;
+}
+
+function trimmedOrNull(value: unknown): string | null {
+  const text = value == null ? "" : String(value).trim();
+  return text || null;
+}
+
+/** Accept ISO, dd.mm.yyyy and dd.mm (year filled in by the caller's statement). */
+function normalizeChargeDate(value: unknown): string | null {
+  const raw = trimmedOrNull(value);
+  if (!raw) return null;
+  const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(raw);
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  const swiss = /^(\d{1,2})\.(\d{1,2})\.(\d{2,4})$/.exec(raw);
+  if (swiss) {
+    const year = Number(swiss[3]);
+    const full = year < 100 ? 2000 + year : year;
+    return `${full}-${String(Number(swiss[2])).padStart(2, "0")}-${String(
+      Number(swiss[1])
+    ).padStart(2, "0")}`;
+  }
+  const dayMonth = /^(\d{1,2})\.(\d{1,2})\.?$/.exec(raw);
+  if (dayMonth) {
+    return `--${String(Number(dayMonth[2])).padStart(2, "0")}-${String(
+      Number(dayMonth[1])
+    ).padStart(2, "0")}`;
+  }
+  return null;
+}
+
+/**
+ * Pull leading «7x ·» out of description into quantity when the model embedded it.
+ * Accepts both the AI shape (snake_case) and already normalized rows read back
+ * from `document_summaries.line_items`.
+ */
 export function normalizeLineItem(
   raw: {
     description?: string | null;
@@ -16,6 +57,12 @@ export function normalizeLineItem(
     currency?: string | null;
     quantity?: number | null;
     unit?: string | null;
+    date?: string | null;
+    merchant?: string | null;
+    foreign_amount?: number | null;
+    foreign_currency?: string | null;
+    foreignAmount?: number | null;
+    foreignCurrency?: string | null;
   }
 ): NormalizedLineItem {
   let description = String(raw.description || "").trim();
@@ -41,13 +88,17 @@ export function normalizeLineItem(
 
   return {
     description: description || "Position",
-    amount:
-      raw.amount != null && Number.isFinite(Number(raw.amount))
-        ? Number(raw.amount)
-        : null,
+    amount: finiteOrNull(raw.amount),
     currency: raw.currency ?? null,
     quantity,
     unit,
+    date: normalizeChargeDate(raw.date),
+    merchant: trimmedOrNull(raw.merchant),
+    foreignAmount: finiteOrNull(raw.foreign_amount ?? raw.foreignAmount),
+    foreignCurrency:
+      trimmedOrNull(
+        raw.foreign_currency ?? raw.foreignCurrency
+      )?.toUpperCase() ?? null,
   };
 }
 

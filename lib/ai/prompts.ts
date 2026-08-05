@@ -29,7 +29,7 @@ Rules:
 - Always set document_reference when the OCR shows a Belegnummer, Rechnungsnummer, Dokumentennummer, Policennummer, Vertragsnummer, Kundennummer, Auftragsnummer, Referenz, Nr./No./Invoice # (prefer the invoice/document number over phone numbers or amounts). Also put the same value into financial_items[].invoice_number for invoices.
 - short_summary MUST uniquely identify this document instance in one German sentence: include document type/subject, organization, AND whenever present (1) Beleg-/Rechnungsnummer (Nr. …) and (2) Beleg-/Rechnungsdatum (dd.mm.yyyy). Never write a generic summary that could apply to every monthly invoice from the same vendor (bad: «Prämienrechnung für Rolf Walker von CONCORDIA.» — good: «Prämienrechnung Nr. 615284766 vom 01.09.2026 von CONCORDIA.»).
 - Bank documents (Kontoauszug, Bankauszug, Depotauszug, Zins- und Kapitalausweis, Vermögensausweis, account/bank statement): set category «Steuern», set tax_year when the statement period year is known, extract bank_name and account_number (Kontonummer preferred, else IBAN). Short bank names (e.g. «Raiffeisen»). Append account in short_summary as «(…)».
-- Credit-card statements (Kreditkartenabrechnung, Visa/Mastercard bill): set category «Kreditkarten» (NOT Steuern). Extract card number (masked ok) into account_number; append as «(•••• 4291)» in short_summary.
+- Credit-card statements (Kreditkartenabrechnung, Visa/Mastercard bill): set category «Kreditkarten» (NOT Steuern). Extract card number (masked ok) into account_number; append as «(•••• 4291)» in short_summary. Extract EVERY booked charge into line_items[] (see «Kreditkartenabrechnungen» below).
 - Computer / IT (software licenses, Microsoft 365, Adobe, hardware invoices for PC/laptop/monitor): set category «Computer».
 - Swiss tax documents for the Steuererklärung (Steuererklärung, Veranlagung, Steuerrechnung/-bescheid, Quellensteuer, Lohnausweis / Lohnmeldeschein, Belege die typischerweise der Steuererklärung beigelegt werden): set category to «Steuern». For Lohnausweis/Lohnmeldeschein also set also_in_arbeit=true (or also_categories including «Arbeit»). Set tax_year to the Steuerperiode / Steuerjahr as an integer (e.g. Lohnausweis 2025 → 2025), not the scan date unless no period is visible.
 - Monthly payslips (Lohnabrechnung, Gehaltsabrechnung, Verdienstabrechnung, payslip) are NOT Steuern — set category «Arbeit». Only the annual Lohnausweis / Lohnmeldeschein belongs in Steuern.
@@ -121,7 +121,11 @@ Required JSON shape:
     "amount": 12.5,
     "currency": "CHF",
     "quantity": 1,
-    "unit": null
+    "unit": null,
+    "date": null,
+    "merchant": null,
+    "foreign_amount": null,
+    "foreign_currency": null
   }],
   "travel_items": [{
     "travel_type": null,
@@ -183,7 +187,16 @@ Line items (Rechnungen / Lieferscheine / Belege):
 - quantity = Stückzahl/Menge as a number when shown (e.g. 7 for «7x» or «7 Stk»); null if unknown.
 - amount is the line total (inkl. or excl. MwSt as shown for that line); currency defaults to CHF when Swiss.
 - Always add the final payable/invoice total to amounts with label exactly «Gesamtbetrag» when a total is visible (Endbetrag / Total / Zu zahlen / Rechnungsbetrag).
-- financial_items holds the invoice as a whole (vendor, due date, total); line_items holds the individual positions.`;
+- financial_items holds the invoice as a whole (vendor, due date, total); line_items holds the individual positions.
+
+Kreditkartenabrechnungen (Belastungspositionen):
+- Extract EVERY booked charge of the statement into line_items[] — one entry per Belastung/Transaktion, in printed order. Never summarize or skip repeated merchants.
+- date = Buchungs-/Transaktionsdatum of that charge as ISO (YYYY-MM-DD). Use the statement period year when the row prints only «dd.mm».
+- merchant = the merchant string exactly as printed (e.g. «GOOGLE *WORKSPACE», «SBB MOBILE», «OPENAI *CHATGPT»); description may add location/details.
+- amount = the CHF amount that was booked to the card; currency «CHF».
+- foreign_amount / foreign_currency = the original amount and its currency when the row shows a foreign-currency purchase (e.g. USD 24.00 → CHF 22.00). Leave null for domestic charges.
+- Credits / Gutschriften / Rückerstattungen: negative amount.
+- Do NOT put Saldovortrag, Zwischentotal, Jahresgebühr-Total, Zinsen-Total or the final Total into line_items — the statement total belongs in amounts[] «Gesamtbetrag» and financial_items[].amount.`;
 }
 
 export function buildRepairPrompt(invalidJson: string, validationError: string): string {

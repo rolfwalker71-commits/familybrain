@@ -69,6 +69,13 @@ export const LineItemSchema = z.object({
   currency: z.string().nullable().optional(),
   quantity: z.number().nullable().optional(),
   unit: z.string().nullable().optional(),
+  /** Credit-card statements: Buchungs-/Transaktionsdatum der Belastung. */
+  date: z.string().nullable().optional(),
+  /** Credit-card statements: Händlername wie auf der Abrechnung gedruckt. */
+  merchant: z.string().nullable().optional(),
+  /** Credit-card statements: Originalbetrag vor Umrechnung. */
+  foreign_amount: z.number().nullable().optional(),
+  foreign_currency: z.string().nullable().optional(),
 });
 
 export const TravelItineraryStopSchema = z.object({
