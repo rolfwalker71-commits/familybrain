@@ -80,7 +80,7 @@ function AgendaRow({ item }: { item: AgendaItem }) {
       )}
     >
       <Icon
-        className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+        className="size-8 shrink-0 self-center text-muted-foreground"
         strokeWidth={APP_ICON_STROKE}
         absoluteStrokeWidth
         aria-hidden
