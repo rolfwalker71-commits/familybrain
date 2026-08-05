@@ -98,9 +98,13 @@ type InvoiceRow = {
 type Dimension = "year" | "vendor" | "category";
 
 type Props = {
+  statsYear: number;
+  yearRangeLabel: string;
   byYear: AggRow[];
   byVendor: AggRow[];
   byCategory: AggRow[];
+  historyByYear: AggRow[];
+  historyByCategory: AggRow[];
   totals: { count: number; total: number };
   recurring: InvoiceRow[];
   topInvoices: InvoiceRow[];
@@ -259,9 +263,12 @@ export function FinanceOverviewClient(props: Parameters<typeof FinanceOverviewCl
 }
 
 function FinanceOverviewClientInner({
-  byYear,
+  statsYear,
+  yearRangeLabel,
   byVendor,
   byCategory,
+  historyByYear,
+  historyByCategory,
   totals,
   recurring,
   topInvoices,
@@ -275,6 +282,10 @@ function FinanceOverviewClientInner({
 
   const [dimension, setDimension] = useState<Dimension | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
+  /** current = Kennzahlen laufendes Jahr; history = Andere Jahre / Rubriken */
+  const [statsScope, setStatsScope] = useState<"current" | "history">(
+    "current"
+  );
   const [breakdownSearch, setBreakdownSearch] = useState("");
   const [breakdownSort, setBreakdownSort] = useState<"amount" | "name">(
     "amount"
@@ -358,9 +369,9 @@ function FinanceOverviewClientInner({
       title: "Nach Jahr",
       icon: CalendarDays,
       tone: "green" as IconTone,
-      items: byYear,
+      items: historyByYear,
       empty: "Keine Jahresdaten",
-      hint: "Jahre mit erkannten Beträgen",
+      hint: "Alle Jahre mit erkannten Beträgen",
     },
     vendor: {
       title: "Nach Lieferant",
@@ -368,7 +379,7 @@ function FinanceOverviewClientInner({
       tone: "green" as IconTone,
       items: byVendor,
       empty: "Keine Lieferanten",
-      hint: "Höchste Ausgaben zuerst",
+      hint: `Höchste Ausgaben ${statsYear}`,
     },
     category: {
       title: "Nach Kategorie",
@@ -376,17 +387,31 @@ function FinanceOverviewClientInner({
       tone: "green" as IconTone,
       items: byCategory,
       empty: "Keine Kategorien",
-      hint: "Semantisch gruppiert",
+      hint: `Semantisch gruppiert · ${statsYear}`,
     },
   } as const;
+
+  const currentYearDimensions: Dimension[] = ["vendor", "category"];
 
   const topVendor = useMemo(
     () => byVendor.find((v) => v.label !== "Unbekannt") || byVendor[0] || null,
     [byVendor]
   );
 
-  const activeItems = dimension ? dimensionMeta[dimension].items : [];
-  const activeTotal = totals.total;
+  const activeItems =
+    dimension === "year"
+      ? historyByYear
+      : dimension === "category" && statsScope === "history"
+        ? historyByCategory
+        : dimension
+          ? dimensionMeta[dimension].items
+          : [];
+  const activeTotal =
+    statsScope === "history" && dimension === "category"
+      ? historyByCategory.reduce((s, i) => s + i.total, 0)
+      : dimension === "year"
+        ? historyByYear.reduce((s, i) => s + i.total, 0)
+        : totals.total;
 
   const filteredBreakdownItems = useMemo(() => {
     const q = breakdownSearch.trim().toLowerCase();
@@ -414,9 +439,12 @@ function FinanceOverviewClientInner({
   const selectedInvoices = useMemo(() => {
     if (!dimension || !selected) return [];
     return allInvoices.filter((row) => {
+      const rowYear = (row.invoice_date || row.due_date || "").slice(0, 4);
       if (dimension === "year") {
-        const y = (row.invoice_date || row.due_date || "").slice(0, 4);
-        return y === selected;
+        return rowYear === selected;
+      }
+      if (statsScope === "current" && rowYear !== String(statsYear)) {
+        return false;
       }
       if (dimension === "vendor") {
         const v = row.vendor?.trim() || "Unbekannt";
@@ -424,7 +452,7 @@ function FinanceOverviewClientInner({
       }
       return financeBucket(row.category) === selected;
     });
-  }, [dimension, selected, allInvoices]);
+  }, [dimension, selected, allInvoices, statsScope, statsYear]);
 
   // How the receipts are grouped inside the detail panel:
   //  - vendor  → grouped by year (newest first)
@@ -556,9 +584,14 @@ function FinanceOverviewClientInner({
     return [...ids];
   }, [recentDueInvoices]);
 
-  function openDimension(next: Dimension) {
+  function openDimension(
+    next: Dimension,
+    scope: "current" | "history" = "current"
+  ) {
+    setStatsScope(scope);
     setDimension((prev) => {
-      const nextDim = prev === next ? null : next;
+      const same = prev === next && statsScope === scope;
+      const nextDim = same ? null : next;
       if (nextDim) setTab("breakdown");
       return nextDim;
     });
@@ -567,17 +600,38 @@ function FinanceOverviewClientInner({
     setBreakdownSort("amount");
   }
 
+  function openHistoryYear(year: string) {
+    setStatsScope("history");
+    setDimension("year");
+    setSelected(year);
+    setBreakdownSearch("");
+    setBreakdownSort("amount");
+    setTab("breakdown");
+  }
+
+  function openHistoryCategory(category: string) {
+    setStatsScope("history");
+    setDimension("category");
+    setSelected(category);
+    setBreakdownSearch("");
+    setBreakdownSort("amount");
+    setTab("breakdown");
+  }
+
   return (
     <div className="min-w-0 space-y-4 pb-28 md:space-y-6 md:pb-0">
       <PageHeader
         title={BRAND.financeBlick}
         description={[
-          "Aus Paperless-Belegen — offene Rechnungen & Übersicht",
+          `Kennzahlen ${statsYear} · ${yearRangeLabel}`,
+          "Offene Rechnungen aus Paperless",
           `Gemeinsame Kasse → ${BRAND.finance}`,
           unknownVendor.count > 0
-            ? `${unknownVendor.count} Positionen ohne Lieferant ausgeklammert (${formatCHF(unknownVendor.total)})`
+            ? `${unknownVendor.count} Positionen ohne Lieferant ${statsYear} ausgeklammert (${formatCHF(unknownVendor.total)})`
             : null,
-          excludedCount > 0 ? `${excludedCount} manuell ohne Statistik` : null,
+          excludedCount > 0
+            ? `${excludedCount} manuell ohne Statistik (${statsYear})`
+            : null,
         ]
           .filter(Boolean)
           .join(" · ")}
@@ -779,13 +833,22 @@ function FinanceOverviewClientInner({
         </Card>
       ) : null}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="space-y-3">
+        <div>
+          <h2 className="text-base font-semibold tracking-tight">
+            Kennzahlen {statsYear}
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Nur Belege vom {yearRangeLabel} (Rechnungs- bzw. Fälligkeitsdatum)
+          </p>
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricTile
           title={
             <>
               Gesamtausgaben{" "}
               <span className="text-sm font-normal opacity-70">
-                (ohne Unbekannt)
+                {statsYear}
               </span>
             </>
           }
@@ -798,7 +861,7 @@ function FinanceOverviewClientInner({
             <>
               Positionen{" "}
               <span className="text-sm font-normal opacity-70">
-                (ohne Unbekannt)
+                {statsYear}
               </span>
             </>
           }
@@ -819,14 +882,15 @@ function FinanceOverviewClientInner({
           icon={Repeat}
           tone="green"
         />
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        {(Object.keys(dimensionMeta) as Dimension[]).map((key) => {
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {currentYearDimensions.map((key) => {
           const meta = dimensionMeta[key];
           const Icon = meta.icon;
           const items = meta.items;
-          const active = dimension === key;
+          const active = dimension === key && statsScope === "current";
           const top = items[0];
           const dimTotal = items.reduce((sum, i) => sum + (i.total || 0), 0);
           const surface = toneSurface(meta.tone);
@@ -835,7 +899,7 @@ function FinanceOverviewClientInner({
             <button
               key={key}
               type="button"
-              onClick={() => openDimension(key)}
+              onClick={() => openDimension(key, "current")}
               className={cn(
                 "min-w-0 overflow-hidden rounded-xl border text-left shadow-[0_4px_16px_rgba(20,32,28,0.05)] transition-all",
                 surface.body,
@@ -865,7 +929,7 @@ function FinanceOverviewClientInner({
                   {formatCHF(dimTotal)}
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  {items.length} Einträge · ohne Unbekannt · {meta.hint}
+                  {items.length} Einträge · {yearRangeLabel} · {meta.hint}
                 </p>
                 {top ? (
                   <div className="mt-4 rounded-lg bg-muted px-3 py-2">
@@ -887,6 +951,102 @@ function FinanceOverviewClientInner({
           );
         })}
       </div>
+
+      <div className="space-y-3">
+        <div>
+          <h2 className="text-base font-semibold tracking-tight">
+            Andere Jahre & Rubriken
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Übersicht über alle erkannten Jahre und Kategorien (inkl. Historie)
+          </p>
+        </div>
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <Card tone="green" className="min-w-0 overflow-hidden shadow-sm">
+            <CardHeader tone="green">
+              <CardTitle className="flex items-center gap-3 text-base">
+                <IconCircle icon={CalendarDays} tone="green" size="sm" />
+                Nach Jahr
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-1 p-3 pt-0">
+              {historyByYear.length === 0 ? (
+                <p className="px-2 py-3 text-sm text-muted-foreground">
+                  Keine Jahresdaten
+                </p>
+              ) : (
+                historyByYear.map((row) => {
+                  const isCurrent = row.label === String(statsYear);
+                  return (
+                    <button
+                      key={row.label}
+                      type="button"
+                      onClick={() => openHistoryYear(row.label)}
+                      className={cn(
+                        "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors hover:bg-muted/60",
+                        isCurrent && "bg-[var(--brand-finance-soft)]/50"
+                      )}
+                    >
+                      <span className="font-medium">
+                        {row.label}
+                        {isCurrent ? (
+                          <span className="ml-2 text-xs font-normal text-muted-foreground">
+                            laufend
+                          </span>
+                        ) : null}
+                      </span>
+                      <span className="shrink-0 tabular-nums text-muted-foreground">
+                        {row.count} · {formatCHF(row.total)}
+                      </span>
+                    </button>
+                  );
+                })
+              )}
+            </CardContent>
+          </Card>
+
+          <Card tone="green" className="min-w-0 overflow-hidden shadow-sm">
+            <CardHeader tone="green">
+              <CardTitle className="flex items-center gap-3 text-base">
+                <IconCircle icon={Tags} tone="green" size="sm" />
+                Rubriken (alle Jahre)
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-1 p-3 pt-0">
+              {historyByCategory.length === 0 ? (
+                <p className="px-2 py-3 text-sm text-muted-foreground">
+                  Keine Kategorien
+                </p>
+              ) : (
+                historyByCategory.slice(0, 12).map((row) => (
+                  <button
+                    key={row.label}
+                    type="button"
+                    onClick={() => openHistoryCategory(row.label)}
+                    className="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors hover:bg-muted/60"
+                  >
+                    <span className="min-w-0 truncate font-medium">
+                      {row.label}
+                    </span>
+                    <span className="shrink-0 tabular-nums text-muted-foreground">
+                      {row.count} · {formatCHF(row.total)}
+                    </span>
+                  </button>
+                ))
+              )}
+              {historyByCategory.length > 12 ? (
+                <button
+                  type="button"
+                  onClick={() => openDimension("category", "history")}
+                  className="w-full rounded-lg px-3 py-2 text-left text-xs font-medium text-[var(--brand-finance)] hover:bg-muted/60"
+                >
+                  Alle {historyByCategory.length} Rubriken anzeigen…
+                </button>
+              ) : null}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
         </>
       ) : null}
 
@@ -904,10 +1064,16 @@ function FinanceOverviewClientInner({
             <div className="min-w-0">
               <CardTitle className="text-base">
                 {dimensionMeta[dimension].title}
+                {statsScope === "current"
+                  ? ` · ${statsYear}`
+                  : dimension === "category"
+                    ? " · alle Jahre"
+                    : ""}
               </CardTitle>
               <p className="mt-1 text-sm text-muted-foreground">
-                Tippen öffnet die Details im Seitenpanel — Suche findet Einträge
-                sofort.
+                {statsScope === "current"
+                  ? `Nur ${yearRangeLabel}. Tippen öffnet Details im Seitenpanel.`
+                  : "Historie über alle Jahre. Tippen öffnet Details im Seitenpanel."}
               </p>
             </div>
             <Button

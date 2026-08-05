@@ -1642,11 +1642,18 @@ const FINANCE_STATS_FILTER = `COALESCE(counts_in_stats, 1) = 1
 const FINANCE_UNKNOWN_VENDOR = `COALESCE(counts_in_stats, 1) = 1
   AND NULLIF(TRIM(vendor), '') IS NULL`;
 
+/** Calendar year of invoice_date (fallback due_date). */
+const FINANCE_YEAR_EXPR = `substr(COALESCE(invoice_date, due_date), 1, 4)`;
+
 export function getFinanceOverview() {
   const db = getDb();
-  const byYear = db
+  const statsYear = new Date().getFullYear();
+  const yearStr = String(statsYear);
+  const yearFilter = `${FINANCE_YEAR_EXPR} = ?`;
+
+  const historyByYear = db
     .prepare(
-      `SELECT substr(COALESCE(invoice_date, due_date), 1, 4) as year,
+      `SELECT ${FINANCE_YEAR_EXPR} as year,
               COUNT(*) as count,
               COALESCE(SUM(amount), 0) as total
        FROM financial_items
@@ -1657,19 +1664,7 @@ export function getFinanceOverview() {
     )
     .all();
 
-  const byVendor = db
-    .prepare(
-      `SELECT TRIM(vendor) as vendor,
-              COUNT(*) as count,
-              COALESCE(SUM(amount), 0) as total
-       FROM financial_items
-       WHERE ${FINANCE_STATS_FILTER}
-       GROUP BY TRIM(vendor)
-       ORDER BY total DESC`
-    )
-    .all();
-
-  const byCategoryRaw = db
+  const historyByCategoryRaw = db
     .prepare(
       `SELECT COALESCE(NULLIF(TRIM(category), ''), 'Sonstiges') as category,
               COUNT(*) as count,
@@ -1681,6 +1676,41 @@ export function getFinanceOverview() {
     )
     .all() as { category: string; count: number; total: number }[];
 
+  const historyByCategory = aggregateByMappedLabel(
+    historyByCategoryRaw,
+    (r) => financeBucket(r.category)
+  ).map((r) => ({
+    category: r.label,
+    count: r.count,
+    total: r.total,
+  }));
+
+  const byVendor = db
+    .prepare(
+      `SELECT TRIM(vendor) as vendor,
+              COUNT(*) as count,
+              COALESCE(SUM(amount), 0) as total
+       FROM financial_items
+       WHERE ${FINANCE_STATS_FILTER}
+         AND ${yearFilter}
+       GROUP BY TRIM(vendor)
+       ORDER BY total DESC`
+    )
+    .all(yearStr);
+
+  const byCategoryRaw = db
+    .prepare(
+      `SELECT COALESCE(NULLIF(TRIM(category), ''), 'Sonstiges') as category,
+              COUNT(*) as count,
+              COALESCE(SUM(amount), 0) as total
+       FROM financial_items
+       WHERE ${FINANCE_STATS_FILTER}
+         AND ${yearFilter}
+       GROUP BY COALESCE(NULLIF(TRIM(category), ''), 'Sonstiges')
+       ORDER BY total DESC`
+    )
+    .all(yearStr) as { category: string; count: number; total: number }[];
+
   const byCategory = aggregateByMappedLabel(byCategoryRaw, (r) =>
     financeBucket(r.category)
   ).map((r) => ({
@@ -1689,29 +1719,37 @@ export function getFinanceOverview() {
     total: r.total,
   }));
 
+  // Current year only — for the "Nach Jahr" tile if still shown (single row)
+  const byYear = (
+    historyByYear as { year: string; count: number; total: number }[]
+  ).filter((r) => r.year === yearStr);
+
   const totals = db
     .prepare(
       `SELECT COUNT(*) as count, COALESCE(SUM(amount), 0) as total
        FROM financial_items
-       WHERE ${FINANCE_STATS_FILTER}`
+       WHERE ${FINANCE_STATS_FILTER}
+         AND ${yearFilter}`
     )
-    .get() as { count: number; total: number };
+    .get(yearStr) as { count: number; total: number };
 
   const unknownVendor = db
     .prepare(
       `SELECT COUNT(*) as count, COALESCE(SUM(amount), 0) as total
        FROM financial_items
-       WHERE ${FINANCE_UNKNOWN_VENDOR}`
+       WHERE ${FINANCE_UNKNOWN_VENDOR}
+         AND ${yearFilter}`
     )
-    .get() as { count: number; total: number };
+    .get(yearStr) as { count: number; total: number };
 
   const excludedCount = (
     db
       .prepare(
         `SELECT COUNT(*) as c FROM financial_items
-         WHERE COALESCE(counts_in_stats, 1) = 0`
+         WHERE COALESCE(counts_in_stats, 1) = 0
+           AND ${yearFilter}`
       )
-      .get() as { c: number }
+      .get(yearStr) as { c: number }
   ).c;
 
   const recurring = db
@@ -1724,9 +1762,10 @@ export function getFinanceOverview() {
        WHERE f.is_recurring = 1
          AND COALESCE(f.counts_in_stats, 1) = 1
          AND NULLIF(TRIM(f.vendor), '') IS NOT NULL
+         AND substr(COALESCE(f.invoice_date, f.due_date), 1, 4) = ?
        ORDER BY f.amount DESC`
     )
-    .all();
+    .all(yearStr);
 
   const topInvoices = db
     .prepare(
@@ -1735,10 +1774,13 @@ export function getFinanceOverview() {
               (SELECT s.category FROM document_summaries s WHERE s.document_id = d.id LIMIT 1) AS category
        FROM financial_items f
        JOIN paperless_documents d ON d.id = f.document_id
-       ORDER BY COALESCE(f.counts_in_stats, 1) DESC, COALESCE(f.amount, 0) DESC
+       WHERE COALESCE(f.counts_in_stats, 1) = 1
+         AND NULLIF(TRIM(f.vendor), '') IS NOT NULL
+         AND substr(COALESCE(f.invoice_date, f.due_date), 1, 4) = ?
+       ORDER BY COALESCE(f.amount, 0) DESC
        LIMIT 80`
     )
-    .all();
+    .all(yearStr);
 
   const dueInvoices = db
     .prepare(
@@ -1788,8 +1830,7 @@ export function getFinanceOverview() {
     )
     .all();
 
-  // Full set of counted positions with a known vendor, for grouped drilldowns
-  // (vendor → by year, year → by vendor). Kept client-side; ~hundreds of rows.
+  // All counted positions (all years) for history drilldowns + current-year filters client-side
   const detailInvoices = db
     .prepare(
       `SELECT f.*, d.title as document_title, d.id as document_local_id,
@@ -1811,9 +1852,13 @@ export function getFinanceOverview() {
     );
 
   return {
+    statsYear,
+    yearRangeLabel: `01.01.–31.12.${statsYear}`,
     byYear,
     byVendor,
     byCategory,
+    historyByYear,
+    historyByCategory,
     recurring: withIcons(recurring),
     topInvoices: withIcons(topInvoices),
     dueInvoices: withIcons(dueInvoices),
