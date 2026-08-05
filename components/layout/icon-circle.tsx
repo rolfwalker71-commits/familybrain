@@ -128,10 +128,11 @@ type IconCircleProps = {
   className?: string;
 };
 
+/** Wrap sizes stay fixed; glyphs fill ~75% so soft wells look fuller without overflow. */
 const sizeClasses = {
-  sm: { wrap: "h-8 w-8", icon: "h-[1.125rem] w-[1.125rem]" },
-  md: { wrap: "h-10 w-10", icon: "h-5 w-5" },
-  lg: { wrap: "h-12 w-12", icon: "h-7 w-7" },
+  sm: { wrap: "h-8 w-8", icon: "h-6 w-6" },
+  md: { wrap: "h-10 w-10", icon: "h-7 w-7" },
+  lg: { wrap: "h-12 w-12", icon: "h-9 w-9" },
 } as const;
 
 export function IconCircle({
