@@ -36,6 +36,18 @@ import {
   type InboxTriagePayload,
 } from "@/lib/inbox/types";
 import { toSwissDate } from "@/lib/utils/dates";
+import {
+  PAYMENT_METHODS,
+  type PaymentMethodId,
+} from "@/lib/finance/payment-methods";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 type BoardTab = "open" | "snoozed" | "completed";
 
@@ -72,6 +84,12 @@ export function ActionInbox() {
     () => new Set()
   );
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [markPaidTask, setMarkPaidTask] = useState<InboxTask | null>(null);
+  const [paidOn, setPaidOn] = useState(() =>
+    new Date().toISOString().slice(0, 10)
+  );
+  const [paymentMethod, setPaymentMethod] =
+    useState<PaymentMethodId>("telebanking");
 
   const load = useCallback(async () => {
     try {
@@ -109,7 +127,11 @@ export function ActionInbox() {
   async function runTaskAction(
     task: InboxTask,
     action: InboxTaskAction,
-    snoozeDays?: number
+    opts?: {
+      snoozeDays?: number;
+      paidOn?: string;
+      paymentMethod?: PaymentMethodId;
+    }
   ) {
     setBusyKey(`${task.id}:${action}`);
     setActionError(null);
@@ -121,7 +143,9 @@ export function ActionInbox() {
           sourceKind: task.sourceKind,
           sourceId: task.sourceId,
           action,
-          snoozeDays,
+          snoozeDays: opts?.snoozeDays,
+          paidOn: opts?.paidOn,
+          paymentMethod: opts?.paymentMethod,
         }),
       });
       const json = await res.json().catch(() => ({}));
@@ -135,11 +159,29 @@ export function ActionInbox() {
       } else {
         await load();
       }
+      setMarkPaidTask(null);
     } catch (err) {
       setActionError(err instanceof Error ? err.message : String(err));
     } finally {
       setBusyKey(null);
     }
+  }
+
+  function openMarkPaid(task: InboxTask) {
+    setPaidOn(
+      task.paymentPipeline?.plannedDate ||
+        new Date().toISOString().slice(0, 10)
+    );
+    const method = task.paymentPipeline?.method;
+    setPaymentMethod(
+      method === "telebanking" ||
+        method === "ebill" ||
+        method === "cash" ||
+        method === "other"
+        ? method
+        : "telebanking"
+    );
+    setMarkPaidTask(task);
   }
 
   async function resolveTriage(input: {
@@ -416,15 +458,83 @@ export function ActionInbox() {
                       }
                     : undefined
                 }
-                onAction={(action, snoozeDays) =>
-                  void runTaskAction(task, action, snoozeDays)
+                onAction={(action, opts) =>
+                  void runTaskAction(task, action, opts)
                 }
+                onMarkPaid={() => openMarkPaid(task)}
                 onTriage={(payload) => void resolveTriage(payload)}
               />
             ))}
           </ul>
         )}
       </CardContent>
+
+      <Dialog
+        open={markPaidTask != null}
+        onOpenChange={(open) => {
+          if (!open) setMarkPaidTask(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Rechnung beglichen</DialogTitle>
+            <DialogDescription>
+              {markPaidTask
+                ? `«${markPaidTask.title}» — Zahldatum und Art festlegen. Bis zum Zahldatum bleibt die Rechnung in der Inbox mit Pipeline-Hinweis.`
+                : null}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-1">
+            <label className="block space-y-1.5 text-sm">
+              <span className="font-medium">Zahldatum</span>
+              <Input
+                type="date"
+                value={paidOn}
+                onChange={(e) => setPaidOn(e.target.value)}
+              />
+            </label>
+            <fieldset className="space-y-1.5">
+              <legend className="text-sm font-medium">Zahlungsart</legend>
+              <div className="flex flex-wrap gap-1.5">
+                {PAYMENT_METHODS.map((m) => (
+                  <Button
+                    key={m.id}
+                    type="button"
+                    size="sm"
+                    variant={paymentMethod === m.id ? "default" : "outline"}
+                    onClick={() => setPaymentMethod(m.id)}
+                  >
+                    {m.label}
+                  </Button>
+                ))}
+              </div>
+            </fieldset>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setMarkPaidTask(null)}
+            >
+              Abbrechen
+            </Button>
+            <Button
+              type="button"
+              disabled={!markPaidTask || Boolean(busyKey)}
+              className="bg-[var(--brand-finance)] text-white hover:bg-[var(--brand-finance)]/90"
+              onClick={() => {
+                if (!markPaidTask) return;
+                void runTaskAction(markPaidTask, "mark_paid", {
+                  paidOn,
+                  paymentMethod,
+                });
+              }}
+            >
+              Speichern
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
@@ -436,6 +546,7 @@ function TaskRow({
   selected,
   onToggleSelect,
   onAction,
+  onMarkPaid,
   onTriage,
 }: {
   task: InboxTask;
@@ -443,7 +554,11 @@ function TaskRow({
   busyKey: string | null;
   selected?: boolean;
   onToggleSelect?: () => void;
-  onAction: (action: InboxTaskAction, snoozeDays?: number) => void;
+  onAction: (
+    action: InboxTaskAction,
+    opts?: { snoozeDays?: number }
+  ) => void;
+  onMarkPaid: () => void;
   onTriage: (payload: {
     documentLocalId: number;
     action: TriageAction;
@@ -483,6 +598,11 @@ function TaskRow({
                 bis {toSwissDate(task.snoozedUntil)}
               </Badge>
             ) : null}
+            {task.paymentPipeline ? (
+              <Badge className="bg-sky-100 text-[10px] text-sky-900 hover:bg-sky-100">
+                Zahlungspipeline
+              </Badge>
+            ) : null}
             {task.status === "done" || task.status === "dismissed" ? (
               <Badge variant="outline" className="text-[10px]">
                 {task.status === "dismissed" ? "Ausgeblendet" : "Erledigt"}
@@ -507,6 +627,16 @@ function TaskRow({
               {task.subtitle ? (
                 <span className="mt-0.5 block text-xs text-muted-foreground line-clamp-2">
                   {task.subtitle}
+                </span>
+              ) : null}
+              {task.paymentPipeline ? (
+                <span className="mt-1.5 block rounded-md border border-sky-200 bg-sky-50 px-2 py-1.5 text-xs text-sky-950">
+                  In der Zahlungspipeline · Zahlung am{" "}
+                  {toSwissDate(task.paymentPipeline.plannedDate)}
+                  {task.paymentPipeline.methodLabel
+                    ? ` · ${task.paymentPipeline.methodLabel}`
+                    : ""}
+                  . Bleibt in der Inbox, bis das Zahldatum vorbei ist.
                 </span>
               ) : null}
               <span className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-xs text-muted-foreground">
@@ -554,10 +684,10 @@ function TaskRow({
                 size="sm"
                 disabled={Boolean(busy)}
                 className="bg-[var(--brand-finance)] text-white hover:bg-[var(--brand-finance)]/90"
-                onClick={() => onAction("mark_paid")}
+                onClick={() => onMarkPaid()}
               >
                 <CheckCircle2 className="size-3.5" />
-                Beglichen
+                {task.paymentPipeline ? "Zahlung ändern" : "Beglichen"}
               </Button>
             ) : null}
             <Button
@@ -565,7 +695,7 @@ function TaskRow({
               size="sm"
               variant="outline"
               disabled={Boolean(busy)}
-              onClick={() => onAction("snooze", 7)}
+              onClick={() => onAction("snooze", { snoozeDays: 7 })}
             >
               <Clock3 className="size-3.5" />
               +7 Tage

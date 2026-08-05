@@ -262,9 +262,21 @@ function ensurePaymentCustomFieldColumns(db: Database.Database): void {
   if (!names.has("bezahlt")) {
     db.exec(`ALTER TABLE paperless_documents ADD COLUMN bezahlt INTEGER`);
   }
+  if (!names.has("payment_planned_date")) {
+    db.exec(
+      `ALTER TABLE paperless_documents ADD COLUMN payment_planned_date TEXT`
+    );
+  }
+  if (!names.has("payment_method")) {
+    db.exec(`ALTER TABLE paperless_documents ADD COLUMN payment_method TEXT`);
+  }
   db.exec(
     `CREATE INDEX IF NOT EXISTS idx_docs_payment_flags
      ON paperless_documents(zu_bezahlen, bezahlt)`
+  );
+  db.exec(
+    `CREATE INDEX IF NOT EXISTS idx_docs_payment_planned
+     ON paperless_documents(payment_planned_date)`
   );
 }
 

@@ -14,6 +14,11 @@ export async function GET(request: Request) {
   const auth = await requireAdmin();
   if (isAuthError(auth)) return auth;
 
+  const { finalizeDuePaymentPlans } = await import(
+    "@/lib/finance/payment-pipeline"
+  );
+  await finalizeDuePaymentPlans().catch(() => undefined);
+
   const { searchParams } = new URL(request.url);
   const period = parseOverviewPeriod(searchParams.get("period"));
   const anchor = searchParams.get("anchor");

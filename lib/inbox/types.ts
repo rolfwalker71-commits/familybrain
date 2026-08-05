@@ -54,6 +54,12 @@ export type InboxTask = {
   triage: InboxTriagePayload | null;
   analysisBucket: "pending" | "error" | "stale" | null;
   analysisCount: number | null;
+  /** Planned payment still in pipeline (Zahldatum ≥ heute). */
+  paymentPipeline: {
+    plannedDate: string;
+    method: string | null;
+    methodLabel: string | null;
+  } | null;
 };
 
 export type InboxTaskBoard = {

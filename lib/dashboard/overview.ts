@@ -1,6 +1,7 @@
 import { getDb } from "@/lib/db/client";
 import { countPendingTriageDocuments } from "@/lib/documents/triage";
-import { daysFromNow } from "@/lib/utils/dates";
+import { paymentMethodLabel } from "@/lib/finance/payment-methods";
+import { daysFromNow, toSwissDate } from "@/lib/utils/dates";
 
 export type OverviewPeriod = "week" | "month" | "quarter" | "half" | "year";
 
@@ -167,6 +168,7 @@ export function getDashboardOverview(
   const invoices = db
     .prepare(
       `SELECT d.id as document_id, d.title, d.correspondent_name,
+              d.payment_planned_date, d.payment_method,
               f.id as finance_id, f.amount, f.currency, f.vendor,
               f.invoice_date, f.due_date, f.category
        FROM paperless_documents d
@@ -183,6 +185,8 @@ export function getDashboardOverview(
     document_id: number;
     title: string | null;
     correspondent_name: string | null;
+    payment_planned_date: string | null;
+    payment_method: string | null;
     finance_id: number | null;
     amount: number | null;
     currency: string | null;
@@ -194,29 +198,45 @@ export function getDashboardOverview(
 
   let openDueAmount = 0;
   for (const row of invoices) {
-    const rawDate = (row.due_date || row.invoice_date || today).slice(0, 10);
-    // In period, or overdue (before today) still open — show on range start day
+    const planned =
+      row.payment_planned_date && row.payment_planned_date.trim()
+        ? row.payment_planned_date.slice(0, 10)
+        : null;
+    const inPipeline = Boolean(planned && planned >= today);
+    const dueRaw = (row.due_date || row.invoice_date || today).slice(0, 10);
+    // Pipeline → show on planned payment day; otherwise due/invoice date
+    const rawDate = inPipeline ? planned! : dueRaw;
     let useDate: string | null = null;
     if (inRange(rawDate, start, end)) {
       useDate = rawDate;
-    } else if (rawDate < today && rawDate < start) {
+    } else if (!inPipeline && rawDate < today && rawDate < start) {
       useDate = start;
     }
     if (!useDate) continue;
     if (row.amount != null) openDueAmount += Number(row.amount);
+    const methodLabel = paymentMethodLabel(row.payment_method);
     agenda.push({
       id: `inv-${row.document_id}`,
       kind: "invoice",
       date: useDate,
       title: row.vendor || row.title || `Rechnung #${row.document_id}`,
-      subtitle:
-        [row.correspondent_name, row.category].filter(Boolean).join(" · ") ||
-        null,
+      subtitle: inPipeline
+        ? [
+            "In Zahlungspipeline",
+            methodLabel,
+            dueRaw !== planned
+              ? `Fällig gewesen: ${toSwissDate(dueRaw)}`
+              : null,
+          ]
+            .filter(Boolean)
+            .join(" · ")
+        : [row.correspondent_name, row.category].filter(Boolean).join(" · ") ||
+          null,
       amount: row.amount,
       currency: row.currency || "CHF",
       documentId: row.document_id,
       href: null,
-      badge: "Rechnung",
+      badge: inPipeline ? "Zahlung" : "Rechnung",
     });
   }
 

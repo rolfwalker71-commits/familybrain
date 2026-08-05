@@ -18,12 +18,19 @@ const BodySchema = z.object({
   sourceId: z.string().min(1).max(64),
   action: z.enum(["snooze", "done", "dismiss", "reopen", "mark_paid"]),
   snoozeDays: z.number().int().positive().max(90).optional(),
+  paidOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  paymentMethod: z.enum(["telebanking", "ebill", "cash", "other"]).optional(),
 });
 
 export async function POST(request: Request) {
   ensureInitialized();
   const auth = await requireAdmin();
   if (isAuthError(auth)) return auth;
+
+  const { finalizeDuePaymentPlans } = await import(
+    "@/lib/finance/payment-pipeline"
+  );
+  await finalizeDuePaymentPlans().catch(() => undefined);
 
   const body = await request.json().catch(() => null);
   const parsed = BodySchema.safeParse(body);

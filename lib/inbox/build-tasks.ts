@@ -4,6 +4,7 @@ import {
   countPendingTriageDocuments,
   listPendingTriageDocuments,
 } from "@/lib/documents/triage";
+import { paymentMethodLabel } from "@/lib/finance/payment-methods";
 import {
   ACTION_OVERDUE_LOOKBACK_DAYS,
   ACTION_WARRANTY_AHEAD_DAYS,
@@ -101,6 +102,7 @@ function hydrateCompletedFromState(
         ? (state.source_id as "pending" | "error" | "stale")
         : null,
       analysisCount: null,
+      paymentPipeline: null,
     });
   }
   return out;
@@ -193,6 +195,7 @@ export function buildInboxTaskBoard(limits = { each: 12 }): InboxTaskBoard {
       triage,
       analysisBucket: null,
       analysisCount: null,
+      paymentPipeline: null,
     });
   }
 
@@ -244,13 +247,19 @@ export function buildInboxTaskBoard(limits = { each: 12 }): InboxTaskBoard {
       triage: null,
       analysisBucket: null,
       analysisCount: null,
+      paymentPipeline: null,
     });
   }
 
   const openUnpaid = listOpenUnpaidInvoices(Math.max(limit, 12));
   for (const row of openUnpaid) {
+    const planned =
+      row.payment_planned_date && row.payment_planned_date.trim()
+        ? row.payment_planned_date.slice(0, 10)
+        : null;
+    const inPipeline = Boolean(planned && planned >= today);
     const overdue =
-      row.due_date != null && row.due_date < today ? 95 : 75;
+      !inPipeline && row.due_date != null && row.due_date < today ? 95 : 75;
     candidates.push({
       id: inboxTaskId("invoice", row.id),
       sourceKind: "invoice",
@@ -262,8 +271,8 @@ export function buildInboxTaskBoard(limits = { each: 12 }): InboxTaskBoard {
         "Offene Rechnung",
       subtitle: row.title,
       href: `/documents/${row.id}`,
-      dueDate: row.due_date,
-      priority: overdue,
+      dueDate: inPipeline ? planned : row.due_date,
+      priority: inPipeline ? 70 : overdue,
       status: "open",
       snoozedUntil: null,
       completedAt: null,
@@ -276,6 +285,13 @@ export function buildInboxTaskBoard(limits = { each: 12 }): InboxTaskBoard {
       triage: null,
       analysisBucket: null,
       analysisCount: null,
+      paymentPipeline: inPipeline
+        ? {
+            plannedDate: planned!,
+            method: row.payment_method ?? null,
+            methodLabel: paymentMethodLabel(row.payment_method),
+          }
+        : null,
     });
   }
 
@@ -326,6 +342,7 @@ export function buildInboxTaskBoard(limits = { each: 12 }): InboxTaskBoard {
       triage: null,
       analysisBucket: null,
       analysisCount: null,
+      paymentPipeline: null,
     });
   }
 
@@ -411,6 +428,7 @@ export function buildInboxTaskBoard(limits = { each: 12 }): InboxTaskBoard {
       triage: null,
       analysisBucket: bucket.bucket,
       analysisCount: bucket.count,
+      paymentPipeline: null,
     });
   }
 

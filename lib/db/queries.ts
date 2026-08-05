@@ -1292,6 +1292,8 @@ export type OpenUnpaidInvoice = {
   currency: string | null;
   due_date: string | null;
   vendor: string | null;
+  payment_planned_date?: string | null;
+  payment_method?: string | null;
   tags: string[];
   ai_icon_path?: string | null;
   ai_icon_url?: string | null;
@@ -1310,6 +1312,7 @@ export function listOpenUnpaidInvoices(limit = 12): OpenUnpaidInvoice[] {
               d.document_type_name, d.created_date, d.modified_at,
               d.zu_bezahlen, d.bezahlt, d.paperless_url, d.ai_icon_path,
               d.recipient_status, d.recipient_member_ids,
+              d.payment_planned_date, d.payment_method,
               (
                 SELECT s.category FROM document_summaries s
                 WHERE s.document_id = d.id LIMIT 1
@@ -1339,7 +1342,12 @@ export function listOpenUnpaidInvoices(limit = 12): OpenUnpaidInvoice[] {
        WHERE COALESCE(d.sync_status, 'synced') != 'missing'
          AND d.zu_bezahlen = 1
          AND COALESCE(d.bezahlt, 0) = 0
-       ORDER BY COALESCE(due_date, d.created_date, '0001-01-01') DESC
+       ORDER BY
+         CASE
+           WHEN d.payment_planned_date IS NOT NULL AND TRIM(d.payment_planned_date) != ''
+             THEN d.payment_planned_date
+           ELSE COALESCE(due_date, d.created_date, '0001-01-01')
+         END DESC
        LIMIT ?`
     )
     .all(limit) as Array<
@@ -1426,6 +1434,8 @@ export function setDocumentsPaidLocally(localIds: number[]): number {
     `UPDATE paperless_documents
      SET bezahlt = 1,
          zu_bezahlen = 0,
+         payment_planned_date = NULL,
+         payment_method = NULL,
          updated_at = ?
      WHERE id = ?`
   );

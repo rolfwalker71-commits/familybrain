@@ -60,6 +60,10 @@ export async function GET() {
   ensureInitialized();
   const auth = await requireAdmin();
   if (isAuthError(auth)) return auth;
+  const { finalizeDuePaymentPlans } = await import(
+    "@/lib/finance/payment-pipeline"
+  );
+  await finalizeDuePaymentPlans().catch(() => undefined);
   await ensurePaymentFlagsPopulated();
   return NextResponse.json(buildInboxTaskBoard());
 }

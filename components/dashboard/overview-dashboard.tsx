@@ -69,11 +69,14 @@ function weekdayLabel(iso: string): string {
 
 function AgendaRow({ item }: { item: AgendaItem }) {
   const Icon = KIND_ICON[item.kind];
+  const isPaymentPipeline = item.badge === "Zahlung";
   const inner = (
     <div
       className={cn(
         "flex items-start gap-3 rounded-xl border border-border/60 border-l-4 bg-card px-3 py-2.5 shadow-[0_2px_10px_rgba(20,32,28,0.04)]",
-        KIND_ACCENT[item.kind]
+        isPaymentPipeline
+          ? "border-l-sky-500 bg-sky-50/40"
+          : KIND_ACCENT[item.kind]
       )}
     >
       <Icon
@@ -87,6 +90,11 @@ function AgendaRow({ item }: { item: AgendaItem }) {
         {item.subtitle ? (
           <p className="truncate text-xs text-muted-foreground">{item.subtitle}</p>
         ) : null}
+        {isPaymentPipeline ? (
+          <p className="mt-1 text-[11px] font-medium text-sky-800">
+            Zahlung geplant — noch in der Pipeline
+          </p>
+        ) : null}
       </div>
       <div className="flex shrink-0 flex-col items-end gap-1">
         {item.amount != null ? (
@@ -94,7 +102,13 @@ function AgendaRow({ item }: { item: AgendaItem }) {
             {formatCHF(item.amount, item.currency || "CHF")}
           </span>
         ) : null}
-        <Badge variant="secondary" className="text-[10px]">
+        <Badge
+          variant="secondary"
+          className={cn(
+            "text-[10px]",
+            isPaymentPipeline && "bg-sky-100 text-sky-900"
+          )}
+        >
           {item.badge}
         </Badge>
       </div>

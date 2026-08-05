@@ -2,6 +2,11 @@ import { getDb } from "@/lib/db/client";
 import { updateDeadline, updateDeadlineStatus } from "@/lib/db/queries";
 import { resolveDocumentTriage } from "@/lib/documents/triage";
 import { markDocumentsPaid } from "@/lib/finance/mark-paid";
+import {
+  isPaymentMethodId,
+  type PaymentMethodId,
+} from "@/lib/finance/payment-methods";
+import { scheduleDocumentPayment } from "@/lib/finance/payment-pipeline";
 import { buildInboxTaskBoard } from "@/lib/inbox/build-tasks";
 import {
   addDaysIso,
@@ -27,6 +32,8 @@ export async function applyInboxTaskAction(input: {
   sourceId: string;
   action: InboxTaskAction;
   snoozeDays?: number;
+  paidOn?: string;
+  paymentMethod?: string;
 }): Promise<{ ok: boolean; error?: string; board?: InboxTaskBoard }> {
   const { sourceKind, sourceId, action } = input;
   const days = Math.min(Math.max(input.snoozeDays ?? 7, 1), 90);
@@ -146,9 +153,31 @@ export async function applyInboxTaskAction(input: {
       if (!Number.isInteger(id) || id <= 0) {
         return { ok: false, error: "Ungültiges Dokument" };
       }
-      if (sourceKind === "triage") {
-        await markDocumentsPaid([id]);
-        if (triageStillPending(id)) {
+      const paidOn = (input.paidOn || new Date().toISOString().slice(0, 10)).slice(
+        0,
+        10
+      );
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(paidOn)) {
+        return { ok: false, error: "Ungültiges Zahldatum" };
+      }
+      const methodRaw = input.paymentMethod || "telebanking";
+      if (!isPaymentMethodId(methodRaw)) {
+        return { ok: false, error: "Ungültige Zahlungsart" };
+      }
+      const method: PaymentMethodId = methodRaw;
+      const today = new Date().toISOString().slice(0, 10);
+
+      if (paidOn >= today) {
+        // Pipeline: stay open until planned date has passed
+        const scheduled = scheduleDocumentPayment({
+          documentLocalId: id,
+          paidOn,
+          method,
+        });
+        if (!scheduled.ok) {
+          return { ok: false, error: scheduled.error };
+        }
+        if (sourceKind === "triage" && triageStillPending(id)) {
           const result = await resolveDocumentTriage({
             documentLocalId: id,
             action: "done",
@@ -157,20 +186,48 @@ export async function applyInboxTaskAction(input: {
           });
           if (!result.ok) return result;
         }
+        upsertInboxTaskState({
+          sourceKind,
+          sourceId,
+          status: "open",
+          snoozedUntil: null,
+          completedAt: null,
+        });
+        recordInboxTaskEvent({
+          sourceKind,
+          sourceId,
+          action: "mark_paid",
+          detail: JSON.stringify({ paidOn, method, pipeline: true }),
+        });
       } else {
-        await markDocumentsPaid([id]);
+        // Past date → immediately paid
+        if (sourceKind === "triage") {
+          await markDocumentsPaid([id]);
+          if (triageStillPending(id)) {
+            const result = await resolveDocumentTriage({
+              documentLocalId: id,
+              action: "done",
+              taxRelevant: false,
+              taxYear: null,
+            });
+            if (!result.ok) return result;
+          }
+        } else {
+          await markDocumentsPaid([id]);
+        }
+        upsertInboxTaskState({
+          sourceKind,
+          sourceId,
+          status: "done",
+          snoozedUntil: null,
+        });
+        recordInboxTaskEvent({
+          sourceKind,
+          sourceId,
+          action: "mark_paid",
+          detail: JSON.stringify({ paidOn, method, pipeline: false }),
+        });
       }
-      upsertInboxTaskState({
-        sourceKind,
-        sourceId,
-        status: "done",
-        snoozedUntil: null,
-      });
-      recordInboxTaskEvent({
-        sourceKind,
-        sourceId,
-        action: "mark_paid",
-      });
     } else {
       return { ok: false, error: "Unbekannte Aktion" };
     }
