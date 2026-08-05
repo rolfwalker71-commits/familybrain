@@ -192,6 +192,42 @@ const BRANDS: Array<{
     match: /\blinkedin\b/,
   },
   {
+    key: "royal-caribbean",
+    label: "Royal Caribbean",
+    domain: "royalcaribbean.com",
+    match: /\broyal\s*caribbean\b/,
+  },
+  {
+    key: "readly",
+    label: "Readly",
+    domain: "readly.com",
+    match: /\breadly\b/,
+  },
+  {
+    key: "tenorshare",
+    label: "Tenorshare",
+    domain: "tenorshare.com",
+    match: /\btenorshare\b/,
+  },
+  {
+    key: "wondershare",
+    label: "Wondershare",
+    domain: "wondershare.com",
+    match: /\bwondershare\b/,
+  },
+  {
+    key: "hume-health",
+    label: "Hume Health",
+    domain: "humehealth.com",
+    match: /\bhume\s*health\b/,
+  },
+  {
+    key: "recommerce",
+    label: "Recommerce",
+    domain: "recommerce.com",
+    match: /\brecommerce\b/,
+  },
+  {
     key: "steam",
     label: "Steam",
     domain: "steampowered.com",
@@ -281,7 +317,6 @@ export function canonicalMerchant(
 }
 
 export function merchantLogoUrl(merchant: CanonicalMerchant): string | null {
-  if (!merchant.domain) return null;
   return `/api/merchants/logo/${encodeURIComponent(merchant.key)}`;
 }
 
@@ -289,4 +324,18 @@ export function merchantLogoUrl(merchant: CanonicalMerchant): string | null {
 export function merchantDomainForKey(key: string): string | null {
   const brand = BRANDS.find((b) => b.key === key);
   return brand?.domain ?? null;
+}
+
+const NON_SPEND_LINE =
+  /^(ihre\s+zahlung|zahlung|zahlungseingang|payment(\s+received)?|card\s+payment|lastschriftzahlung|einzahlung|saldo(vortrag)?|übertrag)$/i;
+
+/** Obvious settlement/balance rows are hidden by default, but remain reversible. */
+export function shouldAutoExcludeCreditCardLine(
+  description: string,
+  merchantLabel: string
+): boolean {
+  return (
+    NON_SPEND_LINE.test(description.trim()) ||
+    NON_SPEND_LINE.test(merchantLabel.trim())
+  );
 }

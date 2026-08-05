@@ -2,7 +2,15 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ChevronDown, CreditCard, Receipt, Store } from "lucide-react";
+import {
+  ChevronDown,
+  CreditCard,
+  Eye,
+  EyeOff,
+  Receipt,
+  Sparkles,
+  Store,
+} from "lucide-react";
 import type {
   CreditCardOverview,
   CreditCardStatement,
@@ -23,10 +31,12 @@ function MerchantLogo({
   label,
   logoUrl,
   size = "sm",
+  refresh = 0,
 }: {
   label: string;
   logoUrl: string | null;
   size?: "sm" | "md";
+  refresh?: number;
 }) {
   const [failed, setFailed] = useState(false);
   const box = size === "md" ? "size-8" : "size-6";
@@ -46,7 +56,7 @@ function MerchantLogo({
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={logoUrl}
+      src={`${logoUrl}?v=${refresh}`}
       alt=""
       className={cn(box, "shrink-0 rounded-md object-contain")}
       onError={() => setFailed(true)}
@@ -54,9 +64,82 @@ function MerchantLogo({
   );
 }
 
-function StatementRow({ statement }: { statement: CreditCardStatement }) {
+function StatementRow({
+  statement,
+  onDecision,
+  busyKey,
+  logoRefresh,
+}: {
+  statement: CreditCardStatement;
+  onDecision: (
+    scope: "merchant" | "charge",
+    key: string,
+    excluded: boolean
+  ) => Promise<void>;
+  busyKey: string | null;
+  logoRefresh: number;
+}) {
   const [open, setOpen] = useState(false);
+  const [hiddenOpen, setHiddenOpen] = useState(false);
   const missingCharges = statement.charges.length === 0;
+  const visibleCharges = statement.charges.filter((charge) => !charge.excluded);
+  const hiddenCharges = statement.charges.filter((charge) => charge.excluded);
+
+  function renderCharge(
+    charge: CreditCardStatement["charges"][number],
+    excluded: boolean
+  ) {
+    return (
+      <li
+        key={charge.key}
+        className={cn(
+          "flex items-center gap-2.5 py-1.5",
+          excluded && "text-muted-foreground"
+        )}
+      >
+        <span className="w-14 shrink-0 text-xs tabular-nums text-muted-foreground">
+          {charge.date ? toSwissDate(charge.date).slice(0, 6) : "—"}
+        </span>
+        <MerchantLogo
+          key={`${charge.merchantKey}:${logoRefresh}`}
+          label={charge.merchantLabel}
+          logoUrl={charge.merchantLogoUrl}
+          refresh={logoRefresh}
+        />
+        <span className="min-w-0 flex-1">
+          <span className={cn("block truncate text-sm", excluded && "line-through")}>
+            {charge.description}
+          </span>
+          {charge.foreignAmount != null && charge.foreignCurrency ? (
+            <span className="text-xs text-muted-foreground tabular-nums">
+              {chf(charge.foreignAmount, charge.foreignCurrency)}
+            </span>
+          ) : null}
+        </span>
+        <span className="shrink-0 text-sm tabular-nums">
+          {chf(charge.amount, charge.currency)}
+        </span>
+        <button
+          type="button"
+          className="flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
+          disabled={
+            busyKey === `charge:${charge.key}` || charge.excludedByMerchant
+          }
+          title={
+            charge.excludedByMerchant
+              ? "Dieser Händler ist vollständig ausgeblendet"
+              : excluded
+                ? "Wieder in Auswertung aufnehmen"
+                : "Aus Auswertung ausblenden"
+          }
+          aria-label={excluded ? "Wieder einblenden" : "Ausblenden"}
+          onClick={() => void onDecision("charge", charge.key, !excluded)}
+        >
+          {excluded ? <Eye className="size-3.5" /> : <EyeOff className="size-3.5" />}
+        </button>
+      </li>
+    );
+  }
 
   return (
     <li className="border-b border-border/50 last:border-0">
@@ -76,7 +159,11 @@ function StatementRow({ statement }: { statement: CreditCardStatement }) {
             {" · "}
             {missingCharges
               ? "keine Positionen erkannt"
-              : `${statement.charges.length} Positionen`}
+              : `${visibleCharges.length} Positionen${
+                  hiddenCharges.length > 0
+                    ? ` · ${hiddenCharges.length} ausgeblendet`
+                    : ""
+                }`}
           </span>
         </span>
         <span className="shrink-0 text-sm font-semibold tabular-nums">
@@ -100,35 +187,37 @@ function StatementRow({ statement }: { statement: CreditCardStatement }) {
               Buchungen erscheinen.
             </p>
           ) : (
-            <ul className="divide-y divide-border/40">
-              {statement.charges.map((charge, i) => (
-                <li
-                  key={`${statement.documentId}-${i}`}
-                  className="flex items-center gap-2.5 py-1.5"
-                >
-                  <span className="w-14 shrink-0 text-xs tabular-nums text-muted-foreground">
-                    {charge.date ? toSwissDate(charge.date).slice(0, 6) : "—"}
-                  </span>
-                  <MerchantLogo
-                    label={charge.merchantLabel}
-                    logoUrl={charge.merchantLogoUrl}
-                  />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm">
-                      {charge.description}
+            <>
+              <ul className="divide-y divide-border/40">
+                {visibleCharges.map((charge) => renderCharge(charge, false))}
+              </ul>
+              {hiddenCharges.length > 0 ? (
+                <div className="mt-2 overflow-hidden rounded-lg border border-border/50 bg-muted/20">
+                  <button
+                    type="button"
+                    className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs font-medium text-muted-foreground"
+                    aria-expanded={hiddenOpen}
+                    onClick={() => setHiddenOpen((value) => !value)}
+                  >
+                    <span className="flex items-center gap-2">
+                      <EyeOff className="size-3.5" />
+                      Ausgeblendet ({hiddenCharges.length})
                     </span>
-                    {charge.foreignAmount != null && charge.foreignCurrency ? (
-                      <span className="text-xs text-muted-foreground tabular-nums">
-                        {chf(charge.foreignAmount, charge.foreignCurrency)}
-                      </span>
-                    ) : null}
-                  </span>
-                  <span className="shrink-0 text-sm tabular-nums">
-                    {chf(charge.amount, charge.currency)}
-                  </span>
-                </li>
-              ))}
-            </ul>
+                    <ChevronDown
+                      className={cn(
+                        "size-3.5 transition-transform",
+                        hiddenOpen && "rotate-180"
+                      )}
+                    />
+                  </button>
+                  {hiddenOpen ? (
+                    <ul className="divide-y divide-border/40 border-t border-border/40 px-2">
+                      {hiddenCharges.map((charge) => renderCharge(charge, true))}
+                    </ul>
+                  ) : null}
+                </div>
+              ) : null}
+            </>
           )}
           <div className="mt-2 flex items-center justify-between gap-3 border-t border-border/40 pt-2 text-xs">
             <Link
@@ -138,7 +227,7 @@ function StatementRow({ statement }: { statement: CreditCardStatement }) {
               Beleg öffnen
             </Link>
             <span className="tabular-nums text-muted-foreground">
-              Summe Positionen {chf(statement.chargeSum, statement.currency)}
+              Auswertung {chf(statement.includedTotal, statement.currency)}
             </span>
           </div>
         </div>
@@ -147,8 +236,25 @@ function StatementRow({ statement }: { statement: CreditCardStatement }) {
   );
 }
 
-function MerchantList({ merchants }: { merchants: MerchantTotal[] }) {
-  const max = merchants[0]?.total ?? 0;
+function MerchantList({
+  merchants,
+  onDecision,
+  busyKey,
+  logoRefresh,
+}: {
+  merchants: MerchantTotal[];
+  onDecision: (
+    scope: "merchant" | "charge",
+    key: string,
+    excluded: boolean
+  ) => Promise<void>;
+  busyKey: string | null;
+  logoRefresh: number;
+}) {
+  const [hiddenOpen, setHiddenOpen] = useState(false);
+  const visible = merchants.filter((merchant) => !merchant.excluded);
+  const hidden = merchants.filter((merchant) => merchant.excluded);
+  const max = visible[0]?.total ?? 0;
   if (merchants.length === 0) {
     return (
       <p className="text-xs text-muted-foreground">
@@ -157,33 +263,83 @@ function MerchantList({ merchants }: { merchants: MerchantTotal[] }) {
       </p>
     );
   }
-  return (
-    <ul className="space-y-2.5">
-      {merchants.map((m) => (
-        <li key={m.key} className="space-y-1">
-          <div className="flex items-center gap-2">
-            <MerchantLogo label={m.label} logoUrl={m.logoUrl} />
-            <span className="min-w-0 flex-1 truncate text-sm">{m.label}</span>
-            <span className="shrink-0 text-sm font-semibold tabular-nums">
-              {chf(m.total)}
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+  function renderMerchant(m: MerchantTotal, excluded: boolean) {
+    const amount = excluded ? m.rawTotal : m.total;
+    const count = excluded ? m.rawCount : m.count;
+    return (
+      <li key={m.key} className={cn("space-y-1", excluded && "opacity-70")}>
+        <div className="flex items-center gap-2">
+          <MerchantLogo
+            key={`${m.key}:${logoRefresh}`}
+            label={m.label}
+            logoUrl={m.logoUrl}
+            refresh={logoRefresh}
+          />
+          <span className={cn("min-w-0 flex-1 truncate text-sm", excluded && "line-through")}>
+            {m.label}
+          </span>
+          <span className="shrink-0 text-sm font-semibold tabular-nums">
+            {chf(amount)}
+          </span>
+          <button
+            type="button"
+            className="flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
+            disabled={busyKey === `merchant:${m.key}`}
+            title={excluded ? "Händler wieder einbeziehen" : "Händler aus Auswertung ausblenden"}
+            aria-label={excluded ? "Händler wieder einblenden" : "Händler ausblenden"}
+            onClick={() => void onDecision("merchant", m.key, !excluded)}
+          >
+            {excluded ? <Eye className="size-3.5" /> : <EyeOff className="size-3.5" />}
+          </button>
+        </div>
+        <div className="flex items-center gap-2 pr-7">
+          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+            {!excluded ? (
               <div
                 className="h-full rounded-full bg-[var(--brand-finance)]"
                 style={{
                   width: `${max > 0 ? Math.max(2, (m.total / max) * 100) : 0}%`,
                 }}
               />
-            </div>
-            <span className="w-8 shrink-0 text-right text-[11px] tabular-nums text-muted-foreground">
-              {m.count}×
-            </span>
+            ) : null}
           </div>
-        </li>
-      ))}
-    </ul>
+          <span className="w-8 shrink-0 text-right text-[11px] tabular-nums text-muted-foreground">
+            {count}×
+          </span>
+        </div>
+      </li>
+    );
+  }
+  return (
+    <div className="space-y-3">
+      <ul className="space-y-2.5">{visible.map((m) => renderMerchant(m, false))}</ul>
+      {hidden.length > 0 ? (
+        <div className="overflow-hidden rounded-lg border border-border/50 bg-muted/20">
+          <button
+            type="button"
+            className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs font-medium text-muted-foreground"
+            aria-expanded={hiddenOpen}
+            onClick={() => setHiddenOpen((value) => !value)}
+          >
+            <span className="flex items-center gap-2">
+              <EyeOff className="size-3.5" />
+              Ausgeblendet ({hidden.length})
+            </span>
+            <ChevronDown
+              className={cn(
+                "size-3.5 transition-transform",
+                hiddenOpen && "rotate-180"
+              )}
+            />
+          </button>
+          {hiddenOpen ? (
+            <ul className="space-y-2.5 border-t border-border/40 p-2">
+              {hidden.map((m) => renderMerchant(m, true))}
+            </ul>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -194,16 +350,91 @@ export function CreditCardsClient({
   overview: CreditCardOverview;
   description?: string | null;
 }) {
+  const [model, setModel] = useState(overview);
   const [year, setYear] = useState<number | null>(
     overview.years[0] ?? null
   );
   const [openCards, setOpenCards] = useState<Set<string>>(
     () => new Set(overview.groups.slice(0, 1).map((g) => g.cardKey))
   );
+  const [decisionBusy, setDecisionBusy] = useState<string | null>(null);
+  const [logoBusy, setLogoBusy] = useState(false);
+  const [logoProgress, setLogoProgress] = useState<string | null>(null);
+  const [logoRefresh, setLogoRefresh] = useState(0);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  async function updateDecision(
+    scope: "merchant" | "charge",
+    key: string,
+    excluded: boolean
+  ) {
+    const busy = `${scope}:${key}`;
+    setDecisionBusy(busy);
+    setActionError(null);
+    try {
+      const response = await fetch("/api/knowledge/credit-cards/decision", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scope, key, excluded }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || "Speichern fehlgeschlagen");
+      if (body.overview) setModel(body.overview as CreditCardOverview);
+    } catch (error) {
+      setActionError(
+        error instanceof Error ? error.message : "Speichern fehlgeschlagen"
+      );
+    } finally {
+      setDecisionBusy(null);
+    }
+  }
+
+  async function generateAllLogos() {
+    const unique = new Map<string, string>();
+    for (const merchant of model.merchants) {
+      unique.set(merchant.key, merchant.label);
+    }
+    for (const group of model.groups) {
+      for (const statement of group.statements) {
+        for (const charge of statement.charges) {
+          unique.set(charge.merchantKey, charge.merchantLabel);
+        }
+      }
+    }
+    const entries = [...unique.entries()];
+    setLogoBusy(true);
+    setActionError(null);
+    try {
+      for (let index = 0; index < entries.length; index += 1) {
+        const [key, label] = entries[index]!;
+        setLogoProgress(`${index + 1}/${entries.length} · ${label}`);
+        const response = await fetch(
+          `/api/merchants/logo/${encodeURIComponent(key)}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ label }),
+          }
+        );
+        if (!response.ok) {
+          const body = await response.json().catch(() => ({}));
+          throw new Error(body.error || `Logo für ${label} fehlgeschlagen`);
+        }
+      }
+    } catch (error) {
+      setActionError(
+        error instanceof Error ? error.message : "AI-Logo fehlgeschlagen"
+      );
+    } finally {
+      setLogoRefresh((value) => value + 1);
+      setLogoBusy(false);
+      setLogoProgress(null);
+    }
+  }
 
   const filtered = useMemo(() => {
-    if (year == null) return overview.groups;
-    return overview.groups
+    if (year == null) return model.groups;
+    return model.groups
       .map((g) => {
         const statements = g.statements.filter((s) => s.year === year);
         return {
@@ -215,10 +446,10 @@ export function CreditCardsClient({
       })
       .filter((g) => g.statements.length > 0)
       .sort((a, b) => b.total - a.total);
-  }, [overview.groups, year]);
+  }, [model.groups, year]);
 
   const merchants = useMemo(() => {
-    if (year == null) return overview.merchants;
+    if (year == null) return model.merchants;
     const byKey = new Map<string, MerchantTotal>();
     for (const group of filtered) {
       for (const statement of group.statements) {
@@ -230,15 +461,23 @@ export function CreditCardsClient({
             logoUrl: charge.merchantLogoUrl,
             total: 0,
             count: 0,
+            rawTotal: 0,
+            rawCount: 0,
+            excluded: true,
           };
-          entry.total += charge.amount;
-          entry.count += 1;
+          entry.rawTotal += charge.amount;
+          entry.rawCount += 1;
+          if (!charge.excluded) {
+            entry.total += charge.amount;
+            entry.count += 1;
+            entry.excluded = false;
+          }
           byKey.set(charge.merchantKey, entry);
         }
       }
     }
     return [...byKey.values()].sort((a, b) => b.total - a.total);
-  }, [filtered, overview.merchants, year]);
+  }, [filtered, model.merchants, year]);
 
   const yearTotal = filtered.reduce((sum, g) => sum + g.total, 0);
   const statementCount = filtered.reduce(
@@ -278,9 +517,9 @@ export function CreditCardsClient({
         </Link>
       </div>
 
-      {overview.years.length > 0 ? (
+      {model.years.length > 0 ? (
         <div className="flex flex-wrap gap-2">
-          {overview.years.map((y) => (
+          {model.years.map((y) => (
             <button
               key={y}
               type="button"
@@ -311,6 +550,9 @@ export function CreditCardsClient({
       ) : null}
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        {actionError ? (
+          <p className="text-sm text-destructive lg:col-span-2">{actionError}</p>
+        ) : null}
         <div className="min-w-0 space-y-3">
           {filtered.length === 0 ? (
             <p className="text-sm text-muted-foreground">
@@ -380,6 +622,9 @@ export function CreditCardsClient({
                         <StatementRow
                           key={statement.documentId}
                           statement={statement}
+                          onDecision={updateDecision}
+                          busyKey={decisionBusy}
+                          logoRefresh={logoRefresh}
                         />
                       ))}
                     </ul>
@@ -415,9 +660,9 @@ export function CreditCardsClient({
           </div>
 
           <div className="rounded-2xl border border-border/70 bg-card p-4">
-            <div className="mb-3 flex items-center gap-2">
+            <div className="mb-3 flex items-start gap-2">
               <IconCircle icon={Store} tone="green" size="sm" />
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold">
                   Händler · {year ?? "alle Jahre"}
                 </p>
@@ -425,15 +670,36 @@ export function CreditCardsClient({
                   Summiert über alle Karten
                 </p>
               </div>
+              <button
+                type="button"
+                className="flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-md px-2 text-xs font-medium text-[var(--brand-finance)] hover:bg-[var(--brand-finance-soft)] disabled:opacity-50"
+                disabled={logoBusy || merchants.length === 0}
+                title="Alle Händlerlogos konsistent mit AI erzeugen"
+                aria-label="AI-Logos erzeugen"
+                onClick={() => void generateAllLogos()}
+              >
+                <Sparkles className={cn("size-4", logoBusy && "animate-pulse")} />
+                <span>{logoBusy ? "Erzeuge…" : "AI-Logos"}</span>
+              </button>
             </div>
-            <MerchantList merchants={merchants.slice(0, 20)} />
+            {logoProgress ? (
+              <p className="mb-3 text-xs text-muted-foreground">
+                AI-Logos: {logoProgress}
+              </p>
+            ) : null}
+            <MerchantList
+              merchants={merchants}
+              onDecision={updateDecision}
+              busyKey={decisionBusy}
+              logoRefresh={logoRefresh}
+            />
           </div>
 
-          {overview.yearTotals.length > 1 ? (
+          {model.yearTotals.length > 1 ? (
             <div className="rounded-2xl border border-border/70 bg-card p-4">
               <p className="mb-2 text-sm font-semibold">Jahresvergleich</p>
               <ul className="space-y-1.5">
-                {overview.yearTotals.map((yt) => (
+                {model.yearTotals.map((yt) => (
                   <li
                     key={yt.year}
                     className="flex items-center justify-between gap-3 text-sm"

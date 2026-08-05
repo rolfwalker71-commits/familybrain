@@ -1,7 +1,15 @@
 import fs from "fs";
 import { NextResponse } from "next/server";
-import { isAuthError, requireAuth } from "@/lib/auth/current-user";
-import { resolveMerchantLogoFile } from "@/lib/finance/merchant-logo";
+import { z } from "zod";
+import {
+  isAuthError,
+  requireAdmin,
+  requireAuth,
+} from "@/lib/auth/current-user";
+import {
+  generateMerchantAiLogo,
+  resolveMerchantLogoFile,
+} from "@/lib/finance/merchant-logo";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,4 +30,37 @@ export async function GET(_request: Request, context: Ctx) {
       "Cache-Control": "private, max-age=604800",
     },
   });
+}
+
+const GenerateSchema = z.object({
+  label: z.string().min(1).max(100),
+  force: z.boolean().optional(),
+});
+
+export async function POST(request: Request, context: Ctx) {
+  const auth = await requireAdmin();
+  if (isAuthError(auth)) return auth;
+  const parsed = GenerateSchema.safeParse(
+    await request.json().catch(() => null)
+  );
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Ungültige Eingabe" }, { status: 400 });
+  }
+  const { key } = await context.params;
+  try {
+    await generateMerchantAiLogo({
+      key: decodeURIComponent(key),
+      label: parsed.data.label,
+      force: parsed.data.force,
+    });
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error ? error.message : "Logo konnte nicht erzeugt werden",
+      },
+      { status: 400 }
+    );
+  }
 }

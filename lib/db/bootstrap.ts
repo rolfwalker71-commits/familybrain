@@ -142,6 +142,19 @@ export function bootstrapDatabase(db: Database.Database): void {
   ensureInboxTaskTables(db);
   ensureActivityLogTable(db);
   ensurePushSubscriptionsTable(db);
+  ensureCreditCardStatDecisionsTable(db);
+}
+
+function ensureCreditCardStatDecisionsTable(db: Database.Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS credit_card_stat_decisions (
+      scope TEXT NOT NULL CHECK(scope IN ('merchant', 'charge')),
+      decision_key TEXT NOT NULL,
+      excluded INTEGER NOT NULL CHECK(excluded IN (0, 1)),
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (scope, decision_key)
+    )
+  `);
 }
 
 function ensurePushSubscriptionsTable(db: Database.Database): void {

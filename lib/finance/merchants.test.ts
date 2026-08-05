@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { canonicalMerchant, cleanMerchantText } from "./merchants.ts";
+import {
+  canonicalMerchant,
+  cleanMerchantText,
+  merchantLogoUrl,
+  shouldAutoExcludeCreditCardLine,
+} from "./merchants.ts";
 
 test("canonicalMerchant maps acquirer-prefixed brands to one key", () => {
   const a = canonicalMerchant("GOOGLE *WORKSPACE_BUDDY");
@@ -40,4 +45,24 @@ test("canonicalMerchant falls back to Unbekannt for empty input", () => {
   const merchant = canonicalMerchant("   ");
   assert.equal(merchant.key, "unbekannt");
   assert.equal(merchant.domain, null);
+});
+
+test("all merchants use the same AI-logo route, including unknown names", () => {
+  const unknown = canonicalMerchant("Apfelcast Luzern");
+  assert.match(merchantLogoUrl(unknown) || "", /\/api\/merchants\/logo\//);
+});
+
+test("settlement rows are excluded by default, purchases are not", () => {
+  assert.equal(
+    shouldAutoExcludeCreditCardLine("Ihre Zahlung", "Ihre Zahlung"),
+    true
+  );
+  assert.equal(
+    shouldAutoExcludeCreditCardLine("Zahlungseingang", "Zahlungseingang"),
+    true
+  );
+  assert.equal(
+    shouldAutoExcludeCreditCardLine("Zahlung Google Workspace", "Google"),
+    false
+  );
 });

@@ -1,4 +1,5 @@
 import { getDb } from "@/lib/db/client";
+import { createHash } from "crypto";
 import { documentAiIconPublicUrl } from "@/lib/paperless/document-icon";
 import {
   formatBankAccountHeading,
@@ -9,9 +10,12 @@ import { resolveInvoiceTotal } from "@/lib/extraction/line-items";
 import {
   canonicalMerchant,
   merchantLogoUrl,
+  shouldAutoExcludeCreditCardLine,
 } from "@/lib/finance/merchants";
 
 export type CreditCardCharge = {
+  /** Stable fingerprint across re-analysis while the printed row stays equal. */
+  key: string;
   /** ISO date; «--MM-DD» when the statement printed no year. */
   date: string | null;
   description: string;
@@ -22,6 +26,9 @@ export type CreditCardCharge = {
   currency: string;
   foreignAmount: number | null;
   foreignCurrency: string | null;
+  excluded: boolean;
+  autoExcluded: boolean;
+  excludedByMerchant: boolean;
 };
 
 export type CreditCardStatement = {
@@ -37,6 +44,9 @@ export type CreditCardStatement = {
   charges: CreditCardCharge[];
   /** Sum of extracted charges — differs from total when extraction is partial. */
   chargeSum: number;
+  /** Sum used by totals/statistics after exclusions. */
+  includedTotal: number;
+  excludedChargeCount: number;
 };
 
 export type CreditCardGroup = {
@@ -47,6 +57,7 @@ export type CreditCardGroup = {
   statements: CreditCardStatement[];
   total: number;
   chargeCount: number;
+  excludedChargeCount: number;
 };
 
 export type MerchantTotal = {
@@ -55,6 +66,10 @@ export type MerchantTotal = {
   logoUrl: string | null;
   total: number;
   count: number;
+  /** Sum/count before exclusions; displayed in the hidden section. */
+  rawTotal: number;
+  rawCount: number;
+  excluded: boolean;
 };
 
 export type CreditCardOverview = {
@@ -85,6 +100,71 @@ type StatementRow = {
   amounts: string | null;
   line_items: string | null;
 };
+
+type DecisionScope = "merchant" | "charge";
+
+type StatDecision = {
+  scope: DecisionScope;
+  decision_key: string;
+  excluded: number;
+};
+
+function chargeFingerprint(input: {
+  documentId: number;
+  occurrence: number;
+  date: string | null;
+  description: string;
+  merchantKey: string;
+  amount: number | null;
+  currency: string;
+  foreignAmount: number | null;
+  foreignCurrency: string | null;
+}): string {
+  const value = [
+    input.documentId,
+    input.date || "",
+    input.description.trim().toLowerCase(),
+    input.merchantKey,
+    input.amount ?? "",
+    input.currency,
+    input.foreignAmount ?? "",
+    input.foreignCurrency || "",
+    input.occurrence,
+  ].join("|");
+  return `${input.documentId}:${createHash("sha256").update(value).digest("hex").slice(0, 20)}`;
+}
+
+function listStatDecisions(): Map<string, boolean> {
+  const rows = getDb()
+    .prepare(
+      `SELECT scope, decision_key, excluded
+       FROM credit_card_stat_decisions`
+    )
+    .all() as StatDecision[];
+  return new Map(
+    rows.map((row) => [
+      `${row.scope}:${row.decision_key}`,
+      row.excluded === 1,
+    ])
+  );
+}
+
+export function setCreditCardStatDecision(input: {
+  scope: DecisionScope;
+  key: string;
+  excluded: boolean;
+}): void {
+  getDb()
+    .prepare(
+      `INSERT INTO credit_card_stat_decisions
+        (scope, decision_key, excluded, updated_at)
+       VALUES (?, ?, ?, datetime('now'))
+       ON CONFLICT(scope, decision_key) DO UPDATE SET
+         excluded = excluded.excluded,
+         updated_at = excluded.updated_at`
+    )
+    .run(input.scope, input.key, input.excluded ? 1 : 0);
+}
 
 function parseJsonArray<T>(raw: string | null): T[] {
   if (!raw) return [];
@@ -118,24 +198,67 @@ function resolveChargeDate(
 
 function buildCharges(
   row: StatementRow,
-  statementYear: number | null
+  statementYear: number | null,
+  decisions: Map<string, boolean>
 ): CreditCardCharge[] {
   const raw = parseJsonArray<Record<string, unknown>>(row.line_items);
+  const occurrences = new Map<string, number>();
   return raw.map((item) => {
     const normalized = normalizeLineItem(item);
     const merchant = canonicalMerchant(
       normalized.merchant || normalized.description
     );
+    const date = resolveChargeDate(normalized.date, statementYear);
+    const currency = (normalized.currency || "CHF").toUpperCase();
+    const baseFingerprint = [
+      date || "",
+      normalized.description.trim().toLowerCase(),
+      merchant.key,
+      normalized.amount ?? "",
+      currency,
+      normalized.foreignAmount ?? "",
+      normalized.foreignCurrency || "",
+    ].join("|");
+    const occurrence = occurrences.get(baseFingerprint) || 0;
+    occurrences.set(baseFingerprint, occurrence + 1);
+    const key = chargeFingerprint({
+      documentId: row.id,
+      occurrence,
+      date,
+      description: normalized.description,
+      merchantKey: merchant.key,
+      amount: normalized.amount,
+      currency,
+      foreignAmount: normalized.foreignAmount,
+      foreignCurrency: normalized.foreignCurrency,
+    });
+    const autoExcluded = shouldAutoExcludeCreditCardLine(
+      normalized.description,
+      merchant.label
+    );
+    const merchantDecision = decisions.get(`merchant:${merchant.key}`);
+    const chargeDecision = decisions.get(`charge:${key}`);
+    const excludedByMerchant = merchantDecision === true;
+    const excluded =
+      merchantDecision === true
+        ? true
+        : merchantDecision === false
+          ? (chargeDecision ?? false)
+          : (chargeDecision ?? autoExcluded);
     return {
-      date: resolveChargeDate(normalized.date, statementYear),
+      key,
+      date,
       description: normalized.description,
       merchantKey: merchant.key,
       merchantLabel: merchant.label,
       merchantLogoUrl: merchantLogoUrl(merchant),
       amount: normalized.amount,
-      currency: (normalized.currency || "CHF").toUpperCase(),
+      currency,
       foreignAmount: normalized.foreignAmount,
       foreignCurrency: normalized.foreignCurrency,
+      excluded,
+      autoExcluded,
+      excludedByMerchant,
     };
   });
 }
@@ -155,6 +278,7 @@ export function getCreditCardOverview(input?: {
   year?: number | null;
 }): CreditCardOverview {
   const db = getDb();
+  const decisions = listStatDecisions();
   const rows = db
     .prepare(
       `SELECT d.id, d.paperless_id, d.title, d.created_date, d.correspondent_name,
@@ -174,7 +298,7 @@ export function getCreditCardOverview(input?: {
 
   for (const row of rows) {
     const year = yearOf(row.created_date);
-    const charges = buildCharges(row, year);
+    const charges = buildCharges(row, year, decisions);
     const amounts = parseJsonArray<{
       amount?: number | null;
       currency?: string | null;
@@ -182,6 +306,10 @@ export function getCreditCardOverview(input?: {
     }>(row.amounts);
     const total = resolveInvoiceTotal({ amounts, financialItems: [] });
     const chargeSum = charges.reduce((sum, c) => sum + (c.amount ?? 0), 0);
+    const includedTotal = charges.reduce(
+      (sum, c) => sum + (c.excluded ? 0 : (c.amount ?? 0)),
+      0
+    );
 
     allStatements.push({
       row,
@@ -191,12 +319,17 @@ export function getCreditCardOverview(input?: {
         title: row.title?.trim() || `Abrechnung #${row.paperless_id}`,
         date: row.created_date,
         year,
-        total: total?.amount ?? (charges.length > 0 ? chargeSum : null),
+        total:
+          charges.length > 0
+            ? includedTotal
+            : (total?.amount ?? null),
         currency: total?.currency?.toUpperCase() || "CHF",
         aiIconUrl: documentAiIconPublicUrl(row.ai_icon_path),
         correspondentName: row.correspondent_name,
         charges,
         chargeSum,
+        includedTotal,
+        excludedChargeCount: charges.filter((c) => c.excluded).length,
       },
     });
   }
@@ -236,12 +369,14 @@ export function getCreditCardOverview(input?: {
       bankName: row.bank_name,
       accountNumber: row.account_number,
       statements: [],
-      total: 0,
+    total: 0,
       chargeCount: 0,
+      excludedChargeCount: 0,
     };
     group.statements.push(st);
     group.total += st.total ?? 0;
     group.chargeCount += st.charges.length;
+    group.excludedChargeCount += st.excludedChargeCount;
     byCard.set(key, group);
   }
 
@@ -264,9 +399,17 @@ export function getCreditCardOverview(input?: {
         logoUrl: charge.merchantLogoUrl,
         total: 0,
         count: 0,
+        rawTotal: 0,
+        rawCount: 0,
+        excluded: true,
       };
-      entry.total += charge.amount;
-      entry.count += 1;
+      entry.rawTotal += charge.amount;
+      entry.rawCount += 1;
+      if (!charge.excluded) {
+        entry.total += charge.amount;
+        entry.count += 1;
+        entry.excluded = false;
+      }
       byMerchant.set(charge.merchantKey, entry);
     }
   }

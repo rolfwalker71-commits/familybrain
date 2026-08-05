@@ -112,6 +112,14 @@ CREATE TABLE IF NOT EXISTS knowledge_areas (
   description TEXT
 );
 
+CREATE TABLE IF NOT EXISTS credit_card_stat_decisions (
+  scope TEXT NOT NULL CHECK(scope IN ('merchant', 'charge')),
+  decision_key TEXT NOT NULL,
+  excluded INTEGER NOT NULL CHECK(excluded IN (0, 1)),
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (scope, decision_key)
+);
+
 CREATE TABLE IF NOT EXISTS devices_and_warranties (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   document_id INTEGER NOT NULL,
