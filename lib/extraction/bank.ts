@@ -4,7 +4,18 @@ const BANK_DOC_RE =
   /kontoauszug|bankauszug|bankbeleg|depotauszug|saldoausweis|verm[oö]gensausweis|zins-?\s*und\s*kapitalausweis|zinsausweis|kapitalausweis|account\s*statement|bank\s*statement|portfolio\s*statement|verm[oö]gensaufstellung/i;
 
 const CREDIT_CARD_DOC_RE =
-  /kreditkarten?abrechnung|kreditkarten?auszug|kartenabrechnung|kartenauszug|credit\s*card\s*(?:statement|bill)|visa[-\s]?abrechnung|mastercard[-\s]?abrechnung|amex[-\s]?abrechnung|american\s*express/i;
+  /kreditkarten?abrechnung|kreditkarten?auszug|kreditkarten?rechnung|kartenabrechnung|kartenauszug|kartenrechnung|credit\s*card\s*(?:statement|bill)|visa[-\s]?(?:abrechnung|rechnung)|mastercard[-\s]?(?:abrechnung|rechnung)|amex[-\s]?(?:abrechnung|rechnung)|american\s*express/i;
+
+/** Swiss / common card issuers (statement senders — not merchants). */
+const CREDIT_CARD_ISSUER_RE =
+  /swisscard|aecs|migros\s*bank|cumulus|cembra|bonus\s*card|viseca|corner(?:card)?|ubs\s*(?:visa|mastercard|karte)|credit\s*suisse\s*(?:visa|mastercard)|postfinance\s*(?:visa|mastercard|karte)|american\s*express|amex|kartenzentrum/i;
+
+/**
+ * Vendor invoices / bookings that mention a card as payment method only —
+ * must not appear as top-level «Abrechnungen» in the Kreditkarten view.
+ */
+const CREDIT_CARD_FALSE_POSITIVE_RE =
+  /buchungsbest(?:ä|ae)tigung|booking\s*confirmation|reservierungsbest(?:ä|ae)tigung|hotel\s*best(?:ä|ae)tigung|\brechnung\b|\binvoice\b|copilot|saas|abonnement|subscription/i;
 
 /** Local account numbers (not IBAN): 0020-16608-4A, masked ****1234, etc. */
 const LOCAL_ACCOUNT_RE =
@@ -28,6 +39,63 @@ export function looksLikeBankDocument(text: string): boolean {
 
 export function looksLikeCreditCardStatement(text: string): boolean {
   return CREDIT_CARD_DOC_RE.test(text || "");
+}
+
+export function looksLikeCreditCardIssuer(text: string): boolean {
+  return CREDIT_CARD_ISSUER_RE.test(text || "");
+}
+
+/**
+ * Gate for the Kreditkarten overview: keep monthly issuer statements,
+ * drop miscategorized invoices/bookings that only mention a card.
+ */
+export function isCreditCardOverviewDocument(input: {
+  title?: string | null;
+  summary?: string | null;
+  correspondentName?: string | null;
+  bankName?: string | null;
+  accountNumber?: string | null;
+  lineItemCount?: number;
+}): boolean {
+  const hay = [
+    input.title,
+    input.summary,
+    input.correspondentName,
+    input.bankName,
+  ]
+    .filter(Boolean)
+    .join("\n");
+  const lineItems = Math.max(0, Number(input.lineItemCount) || 0);
+  const hasAccount = Boolean(
+    input.accountNumber && String(input.accountNumber).trim()
+  );
+
+  // Strong positive: classic statement wording
+  if (looksLikeCreditCardStatement(hay)) return true;
+
+  // Known issuer + card/account or enough extracted charges
+  if (looksLikeCreditCardIssuer(hay)) {
+    if (hasAccount || lineItems >= 3) return true;
+  }
+
+  // Many charge lines usually means a real statement extract succeeded
+  if (lineItems >= 8 && (hasAccount || looksLikeCreditCardIssuer(hay))) {
+    return true;
+  }
+
+  // Clear false positives without statement keywords
+  if (CREDIT_CARD_FALSE_POSITIVE_RE.test(hay)) {
+    return false;
+  }
+
+  // Remaining category=Kreditkarten docs: keep if we have a card/account key
+  if (hasAccount && lineItems >= 1) return true;
+
+  // Soft keep: issuer name alone with at least one charge
+  if (looksLikeCreditCardIssuer(hay) && lineItems >= 1) return true;
+
+  // Otherwise do not trust the category alone
+  return false;
 }
 
 /** Bank or card statements that should carry (account/card) in the summary. */

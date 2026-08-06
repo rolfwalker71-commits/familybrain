@@ -9,6 +9,7 @@ import {
   shortenInstitutionName,
   recoverIbanDisplay,
   ensureAccountInParens,
+  isCreditCardOverviewDocument,
 } from "./bank.ts";
 
 test("extractLocalAccountNumber ignores statement period dates", () => {
@@ -45,6 +46,44 @@ test("extractCardNumber finds masked card", () => {
   assert.equal(
     extractCardNumber("Kartennummer **** **** **** 4291"),
     "•••• 4291"
+  );
+});
+
+test("isCreditCardOverviewDocument keeps issuer statements", () => {
+  assert.equal(
+    isCreditCardOverviewDocument({
+      title: "Kreditkartenabrechnung Swisscard AECS Juni 2026",
+      correspondentName: "Swisscard AECS GmbH",
+      accountNumber: "•••• 4291",
+      lineItemCount: 40,
+    }),
+    true
+  );
+  assert.equal(
+    isCreditCardOverviewDocument({
+      title: "Cumulus Mastercard Abrechnung",
+      bankName: "Migros Bank AG",
+      accountNumber: "****1234",
+      lineItemCount: 12,
+    }),
+    true
+  );
+});
+
+test("isCreditCardOverviewDocument drops invoices and hotel bookings", () => {
+  assert.equal(
+    isCreditCardOverviewDocument({
+      title: "Buchungsbestätigung Hotel Negresco Princess 4* Sup Nr. 888,52",
+      lineItemCount: 0,
+    }),
+    false
+  );
+  assert.equal(
+    isCreditCardOverviewDocument({
+      title: "Rechnung GitHub Copilot Nutzung Mai 2026 Nr. 3463",
+      lineItemCount: 1,
+    }),
+    false
   );
 });
 

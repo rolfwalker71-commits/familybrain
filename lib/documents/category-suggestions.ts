@@ -40,7 +40,7 @@ const CLUSTER_RULES: ClusterRule[] = [
     description: "Kreditkartenabrechnungen",
     mapToExisting: "Kreditkarten",
     pattern:
-      /kreditkarte|kartenabrechnung|credit\s*card|visa|mastercard|amex/i,
+      /kreditkarten?abrechnung|kreditkarten?auszug|kartenabrechnung|kartenauszug|credit\s*card\s*(?:statement|bill)|visa[-\s]?abrechnung|mastercard[-\s]?abrechnung|amex[-\s]?abrechnung/i,
   },
   {
     proposedName: "Computer",

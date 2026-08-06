@@ -6,7 +6,7 @@ export const KNOWLEDGE_AREAS = [
   { name: "Steuern", description: "Steuererklärungen, Veranlagungen, Steuerbelege" },
   {
     name: "Kreditkarten",
-    description: "Kreditkartenabrechnungen und Kartenbelege",
+    description: "Kreditkartenabrechnungen (Monatsauszüge der Kartenherausgeber)",
   },
   { name: "Finanzen", description: "Rechnungen, Kontobewegungen, Ausgaben" },
   { name: "Reisen", description: "Flüge, Hotels, Tickets, Reiseunterlagen" },

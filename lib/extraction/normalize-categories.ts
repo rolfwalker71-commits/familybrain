@@ -367,11 +367,15 @@ export function normalizeKnowledgeCategory(
     return "Arbeit";
   if (
     includesAny(key, [
-      "kreditkarte",
+      "kreditkartenabrechnung",
+      "kreditkartenauszug",
       "kartenabrechnung",
-      "credit card",
+      "kartenauszug",
+      "credit card statement",
+      "credit card bill",
       "visa abrechnung",
-      "mastercard",
+      "mastercard abrechnung",
+      "amex abrechnung",
     ])
   ) {
     return "Kreditkarten";

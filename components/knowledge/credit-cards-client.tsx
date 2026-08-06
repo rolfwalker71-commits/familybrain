@@ -35,11 +35,12 @@ function MerchantLogo({
 }: {
   label: string;
   logoUrl: string | null;
-  size?: "sm" | "md";
+  size?: "sm" | "md" | "lg";
   refresh?: number;
 }) {
   const [failed, setFailed] = useState(false);
-  const box = size === "md" ? "size-8" : "size-6";
+  const box =
+    size === "lg" ? "size-12" : size === "md" ? "size-8" : "size-6";
   if (!logoUrl || failed) {
     return (
       <span
@@ -273,6 +274,7 @@ function MerchantList({
             key={`${m.key}:${logoRefresh}`}
             label={m.label}
             logoUrl={m.logoUrl}
+            size="lg"
             refresh={logoRefresh}
           />
           <span className={cn("min-w-0 flex-1 truncate text-sm", excluded && "line-through")}>
@@ -661,7 +663,12 @@ export function CreditCardsClient({
 
           <div className="rounded-2xl border border-border/70 bg-card p-4">
             <div className="mb-3 flex items-start gap-2">
-              <IconCircle icon={Store} tone="green" size="sm" />
+              <IconCircle
+                icon={Store}
+                tone="green"
+                size="sm"
+                className="h-16 w-16 [&_svg]:h-12 [&_svg]:w-12"
+              />
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold">
                   Händler · {year ?? "alle Jahre"}

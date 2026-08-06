@@ -24,6 +24,7 @@ import { updateDocumentEmbeddingStatus } from "@/lib/db/queries";
 import {
   looksLikeCreditCardStatement,
   looksLikeBankDocument,
+  isCreditCardOverviewDocument,
 } from "@/lib/extraction/bank";
 import { looksLikeComputerDocument } from "@/lib/extraction/computer";
 import {
@@ -179,6 +180,30 @@ export function saveAnalysis(
     category = "Arbeit";
   } else if (looksLikeCreditCardStatement(taxText)) {
     category = "Kreditkarten";
+  } else if (
+    category === "Kreditkarten" &&
+    !isCreditCardOverviewDocument({
+      title: enriched.suggested_title || docMeta?.title,
+      summary: enriched.short_summary,
+      correspondentName: docMeta?.correspondent_name,
+      bankName: enriched.bank_name,
+      accountNumber: enriched.account_number,
+      lineItemCount: Array.isArray(enriched.line_items)
+        ? enriched.line_items.length
+        : 0,
+    })
+  ) {
+    // AI often maps hotel bookings / SaaS invoices to Kreditkarten because a
+    // card was used for payment — demote unless it looks like a real statement.
+    if (looksLikeComputerDocument(taxText)) {
+      category = "Computer";
+    } else if (
+      /hotel|buchungsbest|booking|reservier|flug|reise/i.test(taxText)
+    ) {
+      category = "Reisen";
+    } else {
+      category = "Sonstiges";
+    }
   } else if (looksLikeBankDocument(taxText)) {
     category = "Steuern";
   } else if (looksLikeComputerDocument(taxText)) {

@@ -3,6 +3,7 @@ import { createHash } from "crypto";
 import { documentAiIconPublicUrl } from "@/lib/paperless/document-icon";
 import {
   formatBankAccountHeading,
+  isCreditCardOverviewDocument,
   normalizeAccountKey,
 } from "@/lib/extraction/bank";
 import { normalizeLineItem } from "@/lib/extraction/line-items";
@@ -299,6 +300,18 @@ export function getCreditCardOverview(input?: {
   for (const row of rows) {
     const year = yearOf(row.created_date);
     const charges = buildCharges(row, year, decisions);
+    if (
+      !isCreditCardOverviewDocument({
+        title: row.title,
+        summary: row.short_summary,
+        correspondentName: row.correspondent_name,
+        bankName: row.bank_name,
+        accountNumber: row.account_number,
+        lineItemCount: charges.length,
+      })
+    ) {
+      continue;
+    }
     const amounts = parseJsonArray<{
       amount?: number | null;
       currency?: string | null;
