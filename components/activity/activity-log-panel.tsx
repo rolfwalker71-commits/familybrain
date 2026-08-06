@@ -11,6 +11,7 @@ import {
   type ActivityLogRow,
 } from "@/lib/activity-log-shared";
 import { toSwissDate } from "@/lib/utils/dates";
+import { readResponseJson } from "@/lib/utils/fetch-json";
 import { cn } from "@/lib/utils";
 
 function formatWhen(iso: string): string {
@@ -54,7 +55,11 @@ export function ActivityLogPanel({
         limit: compact ? "30" : "80",
       });
       const res = await fetch(`/api/activity-log?${params}`);
-      const json = await res.json();
+      const json = await readResponseJson<{
+        error?: string;
+        rows?: ActivityLogRow[];
+        total?: number;
+      }>(res);
       if (!res.ok) throw new Error(json.error || "Laden fehlgeschlagen");
       setRows((json.rows || []) as ActivityLogRow[]);
       setTotal(Number(json.total) || 0);

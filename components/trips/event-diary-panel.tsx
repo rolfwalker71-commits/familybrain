@@ -16,6 +16,7 @@ import { UserAvatar } from "@/components/users/user-avatar";
 import { AiImageZoom } from "@/components/layout/ai-image-zoom";
 import { formatDateDe } from "@/lib/finance-brain/format";
 import { isWeatherCommentBody } from "@/lib/trips/map-context";
+import { readResponseJson } from "@/lib/utils/fetch-json";
 import { cn } from "@/lib/utils";
 
 export type EventComment = {
@@ -86,7 +87,10 @@ export function EventDiaryPanel({
     setError(null);
     try {
       const res = await fetch(listUrl);
-      const data = await res.json();
+      const data = await readResponseJson<{
+        error?: string;
+        comments?: EventComment[];
+      }>(res);
       if (!res.ok) throw new Error(data.error || "Kommentare laden fehlgeschlagen");
       const list = (data.comments || []) as EventComment[];
       setComments(list);

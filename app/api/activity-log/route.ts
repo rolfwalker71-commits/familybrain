@@ -21,26 +21,31 @@ const QuerySchema = z.object({
 });
 
 export async function GET(request: Request) {
-  ensureInitialized();
-  const auth = await requireAuth();
-  if (isAuthError(auth)) return auth;
+  try {
+    ensureInitialized();
+    const auth = await requireAuth();
+    if (isAuthError(auth)) return auth;
 
-  const url = new URL(request.url);
-  const parsed = QuerySchema.safeParse({
-    entityType: url.searchParams.get("entityType"),
-    entityId: url.searchParams.get("entityId"),
-    limit: url.searchParams.get("limit") ?? undefined,
-    offset: url.searchParams.get("offset") ?? undefined,
-  });
-  if (!parsed.success) {
-    return NextResponse.json({ error: "Ungültige Anfrage" }, { status: 400 });
+    const url = new URL(request.url);
+    const parsed = QuerySchema.safeParse({
+      entityType: url.searchParams.get("entityType"),
+      entityId: url.searchParams.get("entityId"),
+      limit: url.searchParams.get("limit") ?? undefined,
+      offset: url.searchParams.get("offset") ?? undefined,
+    });
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Ungültige Anfrage" }, { status: 400 });
+    }
+
+    // Document activity is admin-oriented; trip/expense ok for shared users.
+    if (parsed.data.entityType === "document" && !auth.isAdmin) {
+      return NextResponse.json({ error: "Keine Berechtigung." }, { status: 403 });
+    }
+
+    const data = listActivityLog(parsed.data);
+    return NextResponse.json(data);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
-
-  // Document activity is admin-oriented; trip/expense ok for shared users.
-  if (parsed.data.entityType === "document" && !auth.isAdmin) {
-    return NextResponse.json({ error: "Keine Berechtigung." }, { status: 403 });
-  }
-
-  const data = listActivityLog(parsed.data);
-  return NextResponse.json(data);
 }

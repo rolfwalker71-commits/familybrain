@@ -385,11 +385,16 @@ export async function enrichFlightEvent(
     arrivalLat: arrCoords?.lat ?? null,
     arrivalLon: arrCoords?.lon ?? null,
     location: formatAirportRoute(depAirport, arrAirport) || event.location,
+    // Do not store the raw AeroDataBox flight object — it can be huge and
+    // break later JSON APIs (proxies return HTML error pages → client JSON parse errors).
     enrichmentJson: JSON.stringify({
       status: "complete",
       source: "aerodatabox",
       provider,
-      flight,
+      flightNumber: number,
+      departureAirport: depAirport,
+      arrivalAirport: arrAirport,
+      lookedUpAt: nowIso(),
     }),
     enrichedAt: nowIso(),
   });

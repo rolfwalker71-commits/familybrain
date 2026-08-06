@@ -12,6 +12,7 @@ import { formatAirportRoute, normalizeIataCode } from "@/lib/trips/iata";
 import { unlinkTripEventAttachmentFile } from "@/lib/trips/attachments";
 import { unlinkTripEventCommentImageFile } from "@/lib/trips/comment-images";
 import { appendActivityLog, logFieldChange } from "@/lib/activity-log";
+import { pruneStoredEnrichmentJsonIfNeeded } from "@/lib/trips/enrichment-json";
 
 export type TripRow = {
   id: number;
@@ -253,13 +254,14 @@ export function deleteTrip(id: number): void {
 export function listTripEvents(tripId: number): TripEventRow[] {
   ensureTripEventDataMigrations();
   const db = getDb();
-  return db
+  const rows = db
     .prepare(
       `SELECT * FROM trip_events
        WHERE trip_id = ?
        ORDER BY sort_key ASC, id ASC`
     )
     .all(tripId) as TripEventRow[];
+  return rows.map(withPrunedEnrichmentJson);
 }
 
 function ensureTripEventDataMigrations(): void {
@@ -351,12 +353,28 @@ export function migrateCruisePortEventTypes(): number {
   return result.changes;
 }
 
+function persistPrunedEnrichmentJson(eventId: number, slim: string): void {
+  getDb()
+    .prepare(`UPDATE trip_events SET enrichment_json = ? WHERE id = ?`)
+    .run(slim, eventId);
+}
+
+function withPrunedEnrichmentJson(row: TripEventRow): TripEventRow {
+  const slim = pruneStoredEnrichmentJsonIfNeeded(
+    row.id,
+    row.enrichment_json,
+    persistPrunedEnrichmentJson
+  );
+  if (slim === row.enrichment_json) return row;
+  return { ...row, enrichment_json: slim };
+}
+
 export function getTripEventById(eventId: number): TripEventRow | null {
   const db = getDb();
   const row = db
     .prepare(`SELECT * FROM trip_events WHERE id = ?`)
     .get(eventId) as TripEventRow | undefined;
-  return row ?? null;
+  return row ? withPrunedEnrichmentJson(row) : null;
 }
 
 function normalizeEventType(raw: string): TripEventType {

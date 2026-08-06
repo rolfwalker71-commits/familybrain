@@ -16,6 +16,7 @@ import {
   type TripEventAttachmentRow,
   type TripEventRow,
 } from "@/lib/trips/queries";
+import { slimEnrichmentJson } from "@/lib/trips/enrichment-json";
 
 export type TripEventDocumentRef = {
   id: number;
@@ -130,6 +131,7 @@ export function serializeTripEvent(event: TripEventRow): SerializedTripEvent {
   const commentCount = countCommentsForEvents([event.id]).get(event.id) || 0;
   return {
     ...event,
+    enrichment_json: slimEnrichmentJson(event.enrichment_json),
     aircraft_image_url: aircraftPublicUrl(event.aircraft_image_path),
     map_image_url: mapPublicUrl(event.map_image_path),
     ai_image_url: eventAiImagePublicUrl(event.ai_image_path),
@@ -171,6 +173,7 @@ export function serializeTripEvents(
       .filter((a): a is TripEventAttachmentRef => Boolean(a));
     return {
       ...event,
+      enrichment_json: slimEnrichmentJson(event.enrichment_json),
       aircraft_image_url: aircraftPublicUrl(event.aircraft_image_path),
       map_image_url: mapPublicUrl(event.map_image_path),
       ai_image_url: eventAiImagePublicUrl(event.ai_image_path),

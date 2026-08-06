@@ -52,6 +52,10 @@ function isLimitedUserAllowedPath(pathname: string): boolean {
   if (pathname === "/api/home/agenda") {
     return true;
   }
+  // Trip/finance overlays (ActivityLogPanel) — route still enforces entity ACL.
+  if (pathname === "/api/activity-log") {
+    return true;
+  }
   if (pathname.startsWith("/api/users/media/avatar/")) {
     return true;
   }
