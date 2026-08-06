@@ -8,6 +8,17 @@ import {
   getUpcomingHockeyGames,
   type HockeyGame,
 } from "@/lib/hockey/games";
+import {
+  getSwissHolidays,
+  holidayBadge,
+  holidaySubtitle,
+  holidaysInRange,
+} from "@/lib/calendar/swiss-holidays";
+import {
+  enrichAgendaWithWeather,
+  fetchHomeWeather,
+} from "@/lib/dashboard/agenda-weather";
+import { weatherConditionIcon } from "@/lib/trips/weather";
 import { daysFromNow, toSwissDate } from "@/lib/utils/dates";
 
 export type OverviewPeriod = "week" | "month" | "quarter" | "half" | "year";
@@ -19,7 +30,15 @@ export type AgendaKind =
   | "warranty"
   | "triage"
   | "ledger"
-  | "hockey";
+  | "hockey"
+  | "holiday";
+
+export type AgendaWeatherChip = {
+  icon: string;
+  temperatureC: number;
+  labelDe: string;
+  placeLabel: string;
+};
 
 export type AgendaItem = {
   id: string;
@@ -44,10 +63,21 @@ export type AgendaItem = {
   score?: string | null;
   /** Hockey goal scorers (short names) */
   scorers?: string[] | null;
-  /** Hockey kickoff time (Europe/Zurich), e.g. "19:00" */
+  /** Kickoff / start time (Europe/Zurich), e.g. "19:00" */
   time?: string | null;
-  /** Hockey venue */
+  /** Venue / place for weather enrichment */
   location?: string | null;
+  /** Forecast chip when location + date resolve */
+  weather?: AgendaWeatherChip | null;
+};
+
+export type HomeWeatherCard = {
+  placeLabel: string;
+  temperatureC: number;
+  weatherCode: number;
+  weatherLabelDe: string;
+  icon: string;
+  observedAt: string | null;
 };
 
 export type HockeyGameCard = {
@@ -106,6 +136,8 @@ export type OverviewPayload = {
     nextGame: HockeyGameCard | null;
     upcoming: HockeyGameCard[];
   };
+  /** Current weather at home (Altdorf UR). */
+  homeWeather: HomeWeatherCard | null;
 };
 
 function isoDate(d: Date): string {
@@ -458,6 +490,13 @@ export async function getDashboardOverview(
       documentId: null,
       href: `/trips/${row.trip_id}`,
       badge: "Reise",
+      time: row.start_time,
+      location:
+        row.place_name ||
+        row.location ||
+        row.destination_place ||
+        row.arrival_airport ||
+        null,
     });
   }
 
@@ -577,6 +616,41 @@ export async function getDashboardOverview(
     });
   }
 
+  const holidayYears = [
+    ...new Set([
+      Number(start.slice(0, 4)),
+      Number(end.slice(0, 4)),
+      Number(today.slice(0, 4)),
+      Number(daysFromNow(14).slice(0, 4)),
+    ].filter((y) => Number.isFinite(y))),
+  ];
+  let swissHolidays: Awaited<ReturnType<typeof getSwissHolidays>> = [];
+  try {
+    swissHolidays = await getSwissHolidays({ years: holidayYears });
+  } catch {
+    swissHolidays = [];
+  }
+  for (const h of holidaysInRange(swissHolidays, start, end)) {
+    agenda.push({
+      id: `hol-${h.date}-${h.canton}-${h.name}`,
+      kind: "holiday",
+      date: h.date,
+      title: h.name,
+      subtitle: holidaySubtitle(h.canton),
+      amount: null,
+      currency: null,
+      documentId: null,
+      href: null,
+      badge: holidayBadge(h.canton),
+      location:
+        h.canton === "UR"
+          ? "Altdorf"
+          : h.canton === "ZH"
+            ? "Regensdorf"
+            : "Schweiz",
+    });
+  }
+
   agenda.sort((a, b) => {
     const c = a.date.localeCompare(b.date);
     if (c !== 0) return c;
@@ -646,6 +720,27 @@ export async function getDashboardOverview(
         leftLabel: game.homeTeam.label,
         rightLabel: game.awayTeam.label,
       },
+    });
+  }
+
+  for (const h of holidaysInRange(swissHolidays, today, upcomingEnd)) {
+    upcoming14.push({
+      id: `u-hol-${h.date}-${h.canton}-${h.name}`,
+      kind: "holiday",
+      date: h.date,
+      title: h.name,
+      subtitle: holidaySubtitle(h.canton),
+      amount: null,
+      currency: null,
+      documentId: null,
+      href: null,
+      badge: holidayBadge(h.canton),
+      location:
+        h.canton === "UR"
+          ? "Altdorf"
+          : h.canton === "ZH"
+            ? "Regensdorf"
+            : "Schweiz",
     });
   }
   upcoming14.sort((a, b) => a.date.localeCompare(b.date));
@@ -725,6 +820,24 @@ export async function getDashboardOverview(
     toHockeyCard
   );
 
+  const [agendaWithWeather, upcomingWithWeather, homeWeatherRaw] =
+    await Promise.all([
+      enrichAgendaWithWeather(agenda),
+      enrichAgendaWithWeather(upcoming14),
+      fetchHomeWeather(),
+    ]);
+
+  const homeWeather: HomeWeatherCard | null = homeWeatherRaw
+    ? {
+        placeLabel: homeWeatherRaw.placeLabel,
+        temperatureC: Math.round(homeWeatherRaw.current.temperatureC),
+        weatherCode: homeWeatherRaw.current.weatherCode,
+        weatherLabelDe: homeWeatherRaw.current.weatherLabelDe,
+        icon: weatherConditionIcon(homeWeatherRaw.current.weatherCode),
+        observedAt: homeWeatherRaw.current.observedAt,
+      }
+    : null;
+
   return {
     period,
     rangeStart: start,
@@ -736,8 +849,8 @@ export async function getDashboardOverview(
       openDueAmount,
       openDueCount,
     },
-    agenda,
-    upcoming14,
+    agenda: agendaWithWeather,
+    upcoming14: upcomingWithWeather,
     kpi: { total: kpiTotal, byCategory },
     financeItems,
     hockey: {
@@ -745,5 +858,6 @@ export async function getDashboardOverview(
       nextGame: next ? toHockeyCard(next) : null,
       upcoming: upcomingHockey,
     },
+    homeWeather,
   };
 }

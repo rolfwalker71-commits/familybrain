@@ -13,6 +13,7 @@ import {
   HandCoins,
   Goal,
   Trophy,
+  PartyPopper,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,7 +27,9 @@ import { APP_ICON_STROKE } from "@/lib/branding/app-icons";
 import type {
   AgendaItem,
   AgendaKind,
+  AgendaWeatherChip,
   HockeyGameCard,
+  HomeWeatherCard,
   OverviewPayload,
   OverviewPeriod,
 } from "@/lib/dashboard/overview";
@@ -47,6 +50,7 @@ const KIND_ACCENT: Record<AgendaKind, string> = {
   triage: "border-l-[var(--brand-docs)]",
   ledger: "border-l-[var(--brand-finance)]",
   hockey: "border-l-rose-600",
+  holiday: "border-l-violet-600",
 };
 
 const KIND_ICON: Record<AgendaKind, typeof FileText> = {
@@ -57,6 +61,7 @@ const KIND_ICON: Record<AgendaKind, typeof FileText> = {
   triage: Mail,
   ledger: HandCoins,
   hockey: Goal,
+  holiday: PartyPopper,
 };
 
 function TeamLogo({
@@ -110,6 +115,49 @@ function weekdayLabel(iso: string): string {
   }
 }
 
+function WeatherChip({ weather }: { weather: AgendaWeatherChip }) {
+  return (
+    <div
+      className="flex w-11 shrink-0 flex-col items-center justify-center self-start rounded-lg bg-sky-50/90 px-0.5 py-1 text-center leading-tight"
+      title={`${weather.labelDe} · ${weather.placeLabel}`}
+    >
+      <span className="text-base leading-none" aria-hidden>
+        {weather.icon}
+      </span>
+      <span className="mt-0.5 text-[11px] font-semibold tabular-nums text-sky-950">
+        {weather.temperatureC}°
+      </span>
+      <span className="mt-0.5 max-w-full truncate text-[9px] font-medium text-sky-800/80">
+        {weather.placeLabel}
+      </span>
+    </div>
+  );
+}
+
+function HomeWeatherWidget({ weather }: { weather: HomeWeatherCard }) {
+  return (
+    <Card className="border-border/70">
+      <CardContent className="flex items-center gap-3 p-4">
+        <span className="text-3xl leading-none" aria-hidden>
+          {weather.icon}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-medium text-muted-foreground">Wetter jetzt</p>
+          <p className="text-lg font-semibold tabular-nums tracking-tight">
+            {weather.temperatureC} °C
+            <span className="ml-1.5 text-sm font-medium text-muted-foreground">
+              {weather.placeLabel}
+            </span>
+          </p>
+          <p className="truncate text-xs text-muted-foreground">
+            {weather.weatherLabelDe}
+          </p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function AgendaRow({
   item,
   variant = "agenda",
@@ -123,6 +171,7 @@ function AgendaRow({
   const isHockey = item.kind === "hockey";
   const hasLogos = Boolean(item.logos?.left || item.logos?.right);
   const upcomingHockey = isHockey && hasLogos && variant === "upcoming";
+  const weather = item.weather || null;
 
   let hockeyDateLabel = item.date;
   try {
@@ -153,6 +202,7 @@ function AgendaRow({
           : KIND_ACCENT[item.kind]
       )}
     >
+      {weather ? <WeatherChip weather={weather} /> : null}
       <Icon
         className="size-8 shrink-0 text-muted-foreground"
         strokeWidth={APP_ICON_STROKE}
@@ -227,7 +277,8 @@ function AgendaRow({
           className={cn(
             "text-[10px]",
             isPaymentPipeline && "bg-sky-100 text-sky-900",
-            isHockey && "bg-rose-50 text-rose-800"
+            isHockey && "bg-rose-50 text-rose-800",
+            item.kind === "holiday" && "bg-violet-50 text-violet-900"
           )}
         >
           {item.badge}
@@ -475,6 +526,9 @@ export function OverviewDashboard({
           </section>
 
           <aside className="min-w-0 space-y-4">
+            {data.homeWeather ? (
+              <HomeWeatherWidget weather={data.homeWeather} />
+            ) : null}
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">
