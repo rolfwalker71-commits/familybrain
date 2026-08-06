@@ -119,16 +119,19 @@ function weekdayLabel(iso: string): string {
 function WeatherChip({ weather }: { weather: AgendaWeatherChip }) {
   return (
     <div
-      className="pointer-events-none absolute -left-2 -top-2 z-10 flex min-w-[2.75rem] flex-col items-center justify-center rounded-full border border-sky-200/80 bg-sky-50 px-1.5 py-1 text-center shadow-sm ring-2 ring-white leading-tight"
+      className="pointer-events-none absolute left-2 top-0 z-10 flex -translate-y-1/2 items-center gap-1.5 rounded-full border border-sky-200/90 bg-sky-50 py-0.5 pl-1.5 pr-2.5 shadow-sm ring-2 ring-white"
       title={`${weather.labelDe} · ${weather.placeLabel}`}
     >
-      <span className="text-sm leading-none" aria-hidden>
-        {weather.icon}
+      <span className="flex items-center gap-1">
+        <span className="text-sm leading-none" aria-hidden>
+          {weather.icon}
+        </span>
+        <span className="text-xs font-bold tabular-nums text-sky-950">
+          {weather.temperatureC}°
+        </span>
       </span>
-      <span className="mt-0.5 text-[10px] font-bold tabular-nums text-sky-950">
-        {weather.temperatureC}°
-      </span>
-      <span className="max-w-[3.25rem] truncate text-[8px] font-medium text-sky-800/85">
+      <span className="h-3 w-px shrink-0 bg-sky-200/90" aria-hidden />
+      <span className="max-w-[7rem] truncate text-[11px] font-medium text-sky-900/85">
         {weather.placeLabel}
       </span>
     </div>
@@ -268,7 +271,7 @@ function AgendaRow({
     <div
       className={cn(
         "relative flex items-center gap-3 rounded-xl border border-border/60 border-l-4 bg-card px-3 py-2.5 shadow-[0_2px_10px_rgba(20,32,28,0.04)]",
-        weather && "mt-2",
+        weather && "mt-3 pt-4",
         isPaymentPipeline
           ? "border-l-sky-500 bg-sky-50/40"
           : KIND_ACCENT[item.kind]
