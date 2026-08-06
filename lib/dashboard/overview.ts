@@ -2,31 +2,16 @@ import { getDb } from "@/lib/db/client";
 import { countPendingTriageDocuments } from "@/lib/documents/triage";
 import { paymentMethodLabel } from "@/lib/finance/payment-methods";
 import {
-  formatHockeyScoreLine,
-  getHockeyGames,
-  getNextHockeyGame,
-  getUpcomingHockeyGames,
-  type HockeyGame,
-} from "@/lib/hockey/games";
-import {
-  AMBRI_CALENDAR_ID,
-  getEnabledIcsCalendars,
-  ICS_TYPE_META,
-  type IcsCalendarType,
-} from "@/lib/calendar/ics-calendars";
-import { getGenericCalendarEvents } from "@/lib/calendar/ics-generic";
-import {
-  getSwissHolidays,
-  holidayBadge,
-  holidaySubtitle,
-  holidaysInRange,
-} from "@/lib/calendar/swiss-holidays";
+  getOverviewHockeyBundle,
+  getTodayCalendarExcerpt,
+} from "@/lib/calendar/agenda-feed";
 import {
   enrichAgendaWithWeather,
   fetchHomeWeather,
 } from "@/lib/dashboard/agenda-weather";
 import { weatherConditionIcon } from "@/lib/trips/weather";
 import { daysFromNow, toSwissDate } from "@/lib/utils/dates";
+import type { IcsCalendarType } from "@/lib/calendar/ics-calendars";
 
 export type OverviewPeriod = "week" | "month" | "quarter" | "half" | "year";
 
@@ -81,6 +66,8 @@ export type AgendaItem = {
   accentColor?: string | null;
   /** ICS semantic type when kind is calendar / hockey */
   calendarType?: IcsCalendarType | null;
+  /** Source id for Kalender-Filter (ICS id, swiss-holidays, deadlines, …) */
+  calendarId?: string | null;
 };
 
 export type HomeWeatherCard = {
@@ -143,7 +130,8 @@ export type OverviewPayload = {
     openDueCount: number;
   };
   agenda: AgendaItem[];
-  upcoming14: AgendaItem[];
+  /** Heute (+ optional nächste 24h), max 5 — Link zu /calendar */
+  todayCalendar: AgendaItem[];
   kpi: {
     total: number;
     byCategory: KpiCategorySlice[];
@@ -243,46 +231,6 @@ function inRange(date: string | null | undefined, start: string, end: string) {
   if (!date) return false;
   const d = date.slice(0, 10);
   return d >= start && d <= end;
-}
-
-function toHockeyCard(game: HockeyGame): HockeyGameCard {
-  return {
-    uid: game.uid,
-    date: game.date,
-    time: game.time,
-    title: game.summary,
-    location: game.location,
-    isHome: game.isHome,
-    homeTeam: game.homeTeam,
-    awayTeam: game.awayTeam,
-    opponent: game.opponent,
-    score: game.result ? formatHockeyScoreLine(game.result) : null,
-    scorers: game.result?.scorers || [],
-  };
-}
-
-function hockeyAgendaMeta(game: HockeyGame): {
-  subtitle: string | null;
-  badge: string;
-  score: string | null;
-  scorers: string[] | null;
-} {
-  const score = game.result ? formatHockeyScoreLine(game.result) : null;
-  // Date lives in the day group header (left agenda) — not repeated here.
-  const parts = [score, game.time, game.location].filter(Boolean);
-  const scorers =
-    game.result?.scorers && game.result.scorers.length > 0
-      ? game.result.scorers
-      : null;
-  if (scorers) {
-    parts.push(scorers.slice(0, 4).join(", "));
-  }
-  return {
-    subtitle: parts.join(" · ") || null,
-    badge: score || "Hockey",
-    score,
-    scorers,
-  };
 }
 
 export async function getDashboardOverview(
@@ -597,259 +545,13 @@ export async function getDashboardOverview(
     });
   }
 
-  const enabledCalendars = getEnabledIcsCalendars();
-  const hockeyCalendars = enabledCalendars.filter((c) => c.type === "hockey");
-  const genericCalendars = enabledCalendars.filter((c) => c.type !== "hockey");
-
-  type TaggedHockey = HockeyGame & {
-    calendarId: string;
-    calendarName: string;
-    color: string;
-  };
-  const hockeyGames: TaggedHockey[] = [];
-  let hockeyCalendarName = hockeyCalendars[0]?.name || "Hockey";
-
-  for (const cal of hockeyCalendars) {
-    try {
-      const hockey = await getHockeyGames({
-        icsUrl: cal.url,
-        cacheKey:
-          cal.id === AMBRI_CALENDAR_ID
-            ? "hockey_ambri_ics_cache"
-            : `hockey_ics_cache_${cal.id}`,
-        calendarName: cal.name,
-      });
-      if (cal.id === AMBRI_CALENDAR_ID || !hockeyCalendars.some((c) => c.id === AMBRI_CALENDAR_ID)) {
-        hockeyCalendarName = hockey.calendarName || cal.name;
-      }
-      for (const game of hockey.games) {
-        hockeyGames.push({
-          ...game,
-          calendarId: cal.id,
-          calendarName: cal.name,
-          color: cal.color,
-        });
-      }
-    } catch {
-      /* skip calendar on fetch/parse failure */
-    }
-  }
-
-  hockeyGames.sort((a, b) => a.startAt.localeCompare(b.startAt));
-
-  for (const game of hockeyGames) {
-    if (!inRange(game.date, start, end)) continue;
-    const meta = hockeyAgendaMeta(game);
-    agenda.push({
-      id: `hk-${game.calendarId}-${game.uid}`,
-      kind: "hockey",
-      date: game.date,
-      title: game.isHome ? "Heim" : "Auswärts",
-      subtitle: meta.subtitle,
-      amount: null,
-      currency: null,
-      documentId: null,
-      href: null,
-      badge: meta.badge,
-      score: meta.score,
-      scorers: meta.scorers,
-      time: game.time,
-      location: game.location,
-      accentColor: game.color,
-      calendarType: "hockey",
-      logos: {
-        left: game.homeTeam.logoUrl || null,
-        right: game.awayTeam.logoUrl || null,
-        leftLabel: game.homeTeam.label,
-        rightLabel: game.awayTeam.label,
-      },
-    });
-  }
-
-  for (const cal of genericCalendars) {
-    try {
-      const events = await getGenericCalendarEvents(cal);
-      for (const ev of events) {
-        if (!inRange(ev.date, start, end)) continue;
-        agenda.push({
-          id: `ics-${cal.id}-${ev.uid}`,
-          kind: "calendar",
-          date: ev.date,
-          title: ev.summary,
-          subtitle: ev.location || cal.name,
-          amount: null,
-          currency: null,
-          documentId: null,
-          href: null,
-          badge: ICS_TYPE_META[cal.type].label,
-          time: ev.time,
-          location: ev.location,
-          accentColor: cal.color,
-          calendarType: cal.type,
-        });
-      }
-    } catch {
-      /* skip */
-    }
-  }
-
-  const holidayYears = [
-    ...new Set([
-      Number(start.slice(0, 4)),
-      Number(end.slice(0, 4)),
-      Number(today.slice(0, 4)),
-      Number(daysFromNow(14).slice(0, 4)),
-    ].filter((y) => Number.isFinite(y))),
-  ];
-  let swissHolidays: Awaited<ReturnType<typeof getSwissHolidays>> = [];
-  try {
-    swissHolidays = await getSwissHolidays({ years: holidayYears });
-  } catch {
-    swissHolidays = [];
-  }
-  for (const h of holidaysInRange(swissHolidays, start, end)) {
-    agenda.push({
-      id: `hol-${h.date}-${h.canton}-${h.name}`,
-      kind: "holiday",
-      date: h.date,
-      title: h.name,
-      subtitle: holidaySubtitle(h.canton),
-      amount: null,
-      currency: null,
-      documentId: null,
-      href: null,
-      badge: holidayBadge(h.canton),
-      location:
-        h.canton === "UR"
-          ? "Altdorf"
-          : h.canton === "ZH"
-            ? "Regensdorf"
-            : "Schweiz",
-    });
-  }
+  // Kalender/Hockey/Feiertage: not in period agenda — see todayCalendar + /calendar
 
   agenda.sort((a, b) => {
     const c = a.date.localeCompare(b.date);
     if (c !== 0) return c;
     return a.title.localeCompare(b.title, "de");
   });
-
-  const upcomingEnd = daysFromNow(14);
-  const upcoming14: AgendaItem[] = [];
-  const upcomingDeadlines = db
-    .prepare(
-      `SELECT dl.id, dl.title, dl.deadline_date, dl.deadline_type,
-              d.id as document_id, d.correspondent_name
-       FROM deadlines dl
-       JOIN paperless_documents d ON d.id = dl.document_id
-       WHERE dl.status = 'open'
-         AND dl.deadline_date IS NOT NULL
-         AND dl.deadline_date >= ?
-         AND dl.deadline_date <= ?
-         AND (dl.snoozed_until IS NULL OR TRIM(dl.snoozed_until) = '' OR dl.snoozed_until < ?)
-       ORDER BY dl.deadline_date ASC
-       LIMIT 8`
-    )
-    .all(today, upcomingEnd, today) as Array<{
-    id: number;
-    title: string | null;
-    deadline_date: string;
-    deadline_type: string | null;
-    document_id: number;
-    correspondent_name: string | null;
-  }>;
-
-  for (const row of upcomingDeadlines) {
-    upcoming14.push({
-      id: `u-dl-${row.id}`,
-      kind: "deadline",
-      date: row.deadline_date.slice(0, 10),
-      title: row.title || "Frist",
-      subtitle: row.correspondent_name,
-      amount: null,
-      currency: null,
-      documentId: row.document_id,
-      href: null,
-      badge: "Frist",
-    });
-  }
-
-  for (const game of getUpcomingHockeyGames(hockeyGames, new Date(), 6)) {
-    const meta = hockeyAgendaMeta(game);
-    upcoming14.push({
-      id: `u-hk-${game.calendarId}-${game.uid}`,
-      kind: "hockey",
-      date: game.date,
-      title: game.isHome ? "Heim" : "Auswärts",
-      subtitle: meta.subtitle,
-      amount: null,
-      currency: null,
-      documentId: null,
-      href: null,
-      badge: meta.badge,
-      score: meta.score,
-      scorers: meta.scorers,
-      time: game.time,
-      location: game.location,
-      accentColor: game.color,
-      calendarType: "hockey",
-      logos: {
-        left: game.homeTeam.logoUrl || null,
-        right: game.awayTeam.logoUrl || null,
-        leftLabel: game.homeTeam.label,
-        rightLabel: game.awayTeam.label,
-      },
-    });
-  }
-
-  for (const cal of genericCalendars) {
-    try {
-      const events = await getGenericCalendarEvents(cal);
-      for (const ev of events) {
-        if (ev.date < today || ev.date > upcomingEnd) continue;
-        upcoming14.push({
-          id: `u-ics-${cal.id}-${ev.uid}`,
-          kind: "calendar",
-          date: ev.date,
-          title: ev.summary,
-          subtitle: ev.location || cal.name,
-          amount: null,
-          currency: null,
-          documentId: null,
-          href: null,
-          badge: ICS_TYPE_META[cal.type].label,
-          time: ev.time,
-          location: ev.location,
-          accentColor: cal.color,
-          calendarType: cal.type,
-        });
-      }
-    } catch {
-      /* skip */
-    }
-  }
-
-  for (const h of holidaysInRange(swissHolidays, today, upcomingEnd)) {
-    upcoming14.push({
-      id: `u-hol-${h.date}-${h.canton}-${h.name}`,
-      kind: "holiday",
-      date: h.date,
-      title: h.name,
-      subtitle: holidaySubtitle(h.canton),
-      amount: null,
-      currency: null,
-      documentId: null,
-      href: null,
-      badge: holidayBadge(h.canton),
-      location:
-        h.canton === "UR"
-          ? "Altdorf"
-          : h.canton === "ZH"
-            ? "Regensdorf"
-            : "Schweiz",
-    });
-  }
-  upcoming14.sort((a, b) => a.date.localeCompare(b.date));
 
   const financeRows = db
     .prepare(
@@ -921,17 +623,11 @@ export async function getDashboardOverview(
       .get(daysFromNow(7)) as { c: number }
   ).c;
 
-  const next =
-    hockeyCalendars.length > 0 ? getNextHockeyGame(hockeyGames) : null;
-  const upcomingHockey =
-    hockeyCalendars.length > 0
-      ? getUpcomingHockeyGames(hockeyGames, new Date(), 5).map(toHockeyCard)
-      : [];
-
-  const [agendaWithWeather, upcomingWithWeather, homeWeatherRaw] =
+  const [agendaWithWeather, todayCalendar, hockey, homeWeatherRaw] =
     await Promise.all([
       enrichAgendaWithWeather(agenda),
-      enrichAgendaWithWeather(upcoming14),
+      getTodayCalendarExcerpt(5),
+      getOverviewHockeyBundle(),
       fetchHomeWeather(),
     ]);
 
@@ -976,16 +672,13 @@ export async function getDashboardOverview(
       openDueCount,
     },
     agenda: agendaWithWeather,
-    upcoming14: upcomingWithWeather,
+    todayCalendar,
     kpi: { total: kpiTotal, byCategory },
     financeItems,
     hockey: {
-      calendarName:
-        (next
-          ? hockeyGames.find((g) => g.uid === next.uid)?.calendarName
-          : null) || hockeyCalendarName,
-      nextGame: next ? toHockeyCard(next) : null,
-      upcoming: upcomingHockey,
+      calendarName: hockey.calendarName,
+      nextGame: hockey.nextGame,
+      upcoming: hockey.upcoming,
     },
     homeWeather,
   };

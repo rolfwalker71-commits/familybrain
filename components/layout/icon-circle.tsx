@@ -197,6 +197,7 @@ export const pageVisuals = {
   overview: appIcons.overview,
   inbox: appIcons.inbox,
   documents: appIcons.documents,
+  calendar: appIcons.calendar,
   chat: appIcons.chat,
   sync: appIcons.sync,
   knowledge: appIcons.knowledge,

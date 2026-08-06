@@ -38,6 +38,12 @@ const myBrainNavItems: NavItem[] = [
     tone: pageVisuals.overview.tone,
   },
   {
+    href: "/calendar",
+    label: "Kalender / Termine",
+    icon: pageVisuals.calendar.icon,
+    tone: pageVisuals.calendar.tone,
+  },
+  {
     href: "/inbox",
     label: "Inbox",
     icon: pageVisuals.inbox.icon,

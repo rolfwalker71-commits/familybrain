@@ -1,0 +1,441 @@
+import { getDb } from "@/lib/db/client";
+import {
+  AMBRI_CALENDAR_ID,
+  getEnabledIcsCalendars,
+  ICS_TYPE_META,
+  listIcsCalendars,
+  type IcsCalendar,
+  type IcsCalendarType,
+} from "@/lib/calendar/ics-calendars";
+import { getGenericCalendarEvents } from "@/lib/calendar/ics-generic";
+import {
+  getSwissHolidays,
+  holidayBadge,
+  holidaySubtitle,
+  holidaysInRange,
+} from "@/lib/calendar/swiss-holidays";
+import { enrichAgendaWithWeather } from "@/lib/dashboard/agenda-weather";
+import type {
+  AgendaItem,
+  HockeyGameCard,
+} from "@/lib/dashboard/overview";
+import {
+  formatHockeyScoreLine,
+  getHockeyGames,
+  getNextHockeyGame,
+  getUpcomingHockeyGames,
+  type HockeyGame,
+} from "@/lib/hockey/games";
+
+export const CALENDAR_SOURCE_HOLIDAYS = "swiss-holidays";
+export const CALENDAR_SOURCE_DEADLINES = "deadlines";
+
+export type CalendarAgendaRange = "today" | "week" | "14d";
+
+export type CalendarSource = {
+  id: string;
+  name: string;
+  color: string;
+  type: IcsCalendarType | "holiday" | "deadline";
+  builtin?: boolean;
+  /** From settings — only ICS rows use this for enablement. */
+  enabled: boolean;
+};
+
+export type CalendarAgendaPayload = {
+  range: CalendarAgendaRange;
+  rangeStart: string;
+  rangeEnd: string;
+  items: AgendaItem[];
+  sources: CalendarSource[];
+};
+
+function zurichIsoDate(d = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Zurich",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
+}
+
+function addDaysIso(iso: string, days: number): string {
+  const d = new Date(`${iso}T12:00:00`);
+  d.setDate(d.getDate() + days);
+  return zurichIsoDate(d);
+}
+
+export function resolveCalendarRange(
+  range: CalendarAgendaRange,
+  now = new Date()
+): { start: string; end: string } {
+  const start = zurichIsoDate(now);
+  if (range === "today") {
+    // Optional next-24h: include tomorrow so late evening still sees next morning
+    return { start, end: addDaysIso(start, 1) };
+  }
+  if (range === "week") {
+    return { start, end: addDaysIso(start, 6) };
+  }
+  return { start, end: addDaysIso(start, 13) };
+}
+
+function inRange(date: string | null | undefined, start: string, end: string) {
+  if (!date) return false;
+  const d = date.slice(0, 10);
+  return d >= start && d <= end;
+}
+
+function hockeyAgendaMeta(game: HockeyGame): {
+  subtitle: string | null;
+  badge: string;
+  score: string | null;
+  scorers: string[] | null;
+} {
+  const score = game.result ? formatHockeyScoreLine(game.result) : null;
+  const parts = [score, game.time, game.location].filter(Boolean);
+  const scorers =
+    game.result?.scorers && game.result.scorers.length > 0
+      ? game.result.scorers
+      : null;
+  if (scorers) {
+    parts.push(scorers.slice(0, 4).join(", "));
+  }
+  return {
+    subtitle: parts.join(" · ") || null,
+    badge: score || "Hockey",
+    score,
+    scorers,
+  };
+}
+
+function toHockeyCard(game: HockeyGame): HockeyGameCard {
+  return {
+    uid: game.uid,
+    date: game.date,
+    time: game.time,
+    title: game.summary,
+    location: game.location,
+    isHome: game.isHome,
+    homeTeam: game.homeTeam,
+    awayTeam: game.awayTeam,
+    opponent: game.opponent,
+    score: game.result ? formatHockeyScoreLine(game.result) : null,
+    scorers: game.result?.scorers || [],
+  };
+}
+
+export function listCalendarSources(): CalendarSource[] {
+  const ics = listIcsCalendars().map((c) => ({
+    id: c.id,
+    name: c.name,
+    color: c.color,
+    type: c.type as CalendarSource["type"],
+    builtin: c.builtin,
+    enabled: c.enabled,
+  }));
+  return [
+    ...ics,
+    {
+      id: CALENDAR_SOURCE_HOLIDAYS,
+      name: "Feiertage UR/ZH",
+      color: "#8b5cf6",
+      type: "holiday",
+      builtin: true,
+      enabled: true,
+    },
+    {
+      id: CALENDAR_SOURCE_DEADLINES,
+      name: "Fristen",
+      color: "#0d9488",
+      type: "deadline",
+      builtin: true,
+      enabled: true,
+    },
+  ];
+}
+
+type TaggedHockey = HockeyGame & {
+  calendarId: string;
+  calendarName: string;
+  color: string;
+};
+
+async function loadHockeyGames(
+  calendars: IcsCalendar[]
+): Promise<TaggedHockey[]> {
+  const hockeyCalendars = calendars.filter((c) => c.type === "hockey");
+  const hockeyGames: TaggedHockey[] = [];
+  for (const cal of hockeyCalendars) {
+    try {
+      const hockey = await getHockeyGames({
+        icsUrl: cal.url,
+        cacheKey:
+          cal.id === AMBRI_CALENDAR_ID
+            ? "hockey_ambri_ics_cache"
+            : `hockey_ics_cache_${cal.id}`,
+        calendarName: cal.name,
+      });
+      for (const game of hockey.games) {
+        hockeyGames.push({
+          ...game,
+          calendarId: cal.id,
+          calendarName: cal.name,
+          color: cal.color,
+        });
+      }
+    } catch {
+      /* skip */
+    }
+  }
+  hockeyGames.sort((a, b) => a.startAt.localeCompare(b.startAt));
+  return hockeyGames;
+}
+
+function sourceAllowed(
+  sourceId: string,
+  filterIds: Set<string> | null
+): boolean {
+  if (filterIds == null) return true;
+  if (filterIds.size === 0) return false;
+  return filterIds.has(sourceId);
+}
+
+/**
+ * Calendar / Termine feed: ICS (incl. hockey), Swiss holidays, open deadlines.
+ */
+export async function getCalendarAgenda(options: {
+  range: CalendarAgendaRange;
+  /** If set, only these source ids. Empty/omit = all enabled ICS + holidays + deadlines. */
+  sourceIds?: string[] | null;
+  includeWeather?: boolean;
+}): Promise<CalendarAgendaPayload> {
+  const { start, end } = resolveCalendarRange(options.range);
+  const filterIds =
+    options.sourceIds == null ? null : new Set(options.sourceIds);
+
+  const sources = listCalendarSources();
+  const enabledIcs = getEnabledIcsCalendars().filter((c) =>
+    sourceAllowed(c.id, filterIds)
+  );
+
+  const items: AgendaItem[] = [];
+  const today = zurichIsoDate();
+
+  const hockeyGames = await loadHockeyGames(
+    enabledIcs.filter((c) => c.type === "hockey")
+  );
+  for (const game of hockeyGames) {
+    if (!inRange(game.date, start, end)) continue;
+    if (!sourceAllowed(game.calendarId, filterIds)) continue;
+    const meta = hockeyAgendaMeta(game);
+    items.push({
+      id: `hk-${game.calendarId}-${game.uid}`,
+      kind: "hockey",
+      date: game.date,
+      title: game.isHome ? "Heim" : "Auswärts",
+      subtitle: meta.subtitle,
+      amount: null,
+      currency: null,
+      documentId: null,
+      href: null,
+      badge: meta.badge,
+      score: meta.score,
+      scorers: meta.scorers,
+      time: game.time,
+      location: game.location,
+      accentColor: game.color,
+      calendarType: "hockey",
+      calendarId: game.calendarId,
+      logos: {
+        left: game.homeTeam.logoUrl || null,
+        right: game.awayTeam.logoUrl || null,
+        leftLabel: game.homeTeam.label,
+        rightLabel: game.awayTeam.label,
+      },
+    });
+  }
+
+  for (const cal of enabledIcs.filter((c) => c.type !== "hockey")) {
+    try {
+      const events = await getGenericCalendarEvents(cal);
+      for (const ev of events) {
+        if (!inRange(ev.date, start, end)) continue;
+        items.push({
+          id: `ics-${cal.id}-${ev.uid}`,
+          kind: "calendar",
+          date: ev.date,
+          title: ev.summary,
+          subtitle: ev.location || cal.name,
+          amount: null,
+          currency: null,
+          documentId: null,
+          href: null,
+          badge: ICS_TYPE_META[cal.type].label,
+          time: ev.time,
+          location: ev.location,
+          accentColor: cal.color,
+          calendarType: cal.type,
+          calendarId: cal.id,
+        });
+      }
+    } catch {
+      /* skip */
+    }
+  }
+
+  if (sourceAllowed(CALENDAR_SOURCE_HOLIDAYS, filterIds)) {
+    const years = [
+      ...new Set(
+        [start, end, today]
+          .map((d) => Number(d.slice(0, 4)))
+          .filter((y) => Number.isFinite(y))
+      ),
+    ];
+    try {
+      const swissHolidays = await getSwissHolidays({ years });
+      for (const h of holidaysInRange(swissHolidays, start, end)) {
+        items.push({
+          id: `hol-${h.date}-${h.canton}-${h.name}`,
+          kind: "holiday",
+          date: h.date,
+          title: h.name,
+          subtitle: holidaySubtitle(h.canton),
+          amount: null,
+          currency: null,
+          documentId: null,
+          href: null,
+          badge: holidayBadge(h.canton),
+          location:
+            h.canton === "UR"
+              ? "Altdorf"
+              : h.canton === "ZH"
+                ? "Regensdorf"
+                : "Schweiz",
+          accentColor: "#8b5cf6",
+          calendarType: "holiday",
+          calendarId: CALENDAR_SOURCE_HOLIDAYS,
+        });
+      }
+    } catch {
+      /* skip */
+    }
+  }
+
+  if (sourceAllowed(CALENDAR_SOURCE_DEADLINES, filterIds)) {
+    const db = getDb();
+    const deadlines = db
+      .prepare(
+        `SELECT dl.id, dl.title, dl.deadline_date, dl.deadline_type,
+                d.id as document_id, d.correspondent_name
+         FROM deadlines dl
+         JOIN paperless_documents d ON d.id = dl.document_id
+         WHERE dl.status = 'open'
+           AND dl.deadline_date IS NOT NULL
+           AND dl.deadline_date >= ?
+           AND dl.deadline_date <= ?
+           AND (dl.snoozed_until IS NULL OR TRIM(dl.snoozed_until) = '' OR dl.snoozed_until < ?)`
+      )
+      .all(start, end, today) as Array<{
+      id: number;
+      title: string | null;
+      deadline_date: string;
+      deadline_type: string | null;
+      document_id: number;
+      correspondent_name: string | null;
+    }>;
+
+    for (const row of deadlines) {
+      items.push({
+        id: `dl-${row.id}`,
+        kind: "deadline",
+        date: row.deadline_date.slice(0, 10),
+        title: row.title || "Frist",
+        subtitle:
+          [row.correspondent_name, row.deadline_type]
+            .filter(Boolean)
+            .join(" · ") || null,
+        amount: null,
+        currency: null,
+        documentId: row.document_id,
+        href: null,
+        badge: "Frist",
+        accentColor: "#0d9488",
+        calendarId: CALENDAR_SOURCE_DEADLINES,
+      });
+    }
+  }
+
+  items.sort((a, b) => {
+    const c = a.date.localeCompare(b.date);
+    if (c !== 0) return c;
+    const ta = a.time || "99:99";
+    const tb = b.time || "99:99";
+    const t = ta.localeCompare(tb);
+    if (t !== 0) return t;
+    return a.title.localeCompare(b.title, "de");
+  });
+
+  const withWeather = options.includeWeather
+    ? await enrichAgendaWithWeather(items)
+    : items;
+
+  return {
+    range: options.range,
+    rangeStart: start,
+    rangeEnd: end,
+    items: withWeather,
+    sources,
+  };
+}
+
+/** Overview aside: heute + optional morgen (24h), max 5. */
+export async function getTodayCalendarExcerpt(
+  limit = 5
+): Promise<AgendaItem[]> {
+  const feed = await getCalendarAgenda({
+    range: "today",
+    includeWeather: true,
+  });
+  const today = zurichIsoDate();
+  const nowMs = Date.now();
+  const horizonMs = nowMs + 24 * 60 * 60 * 1000;
+
+  const ranked = feed.items.filter((item) => {
+    if (item.date === today) return true;
+    if (item.date > today && item.date <= feed.rangeEnd) {
+      if (item.time) {
+        const start = new Date(`${item.date}T${item.time}:00`).getTime();
+        return Number.isFinite(start) && start <= horizonMs;
+      }
+      return true;
+    }
+    return false;
+  });
+
+  return ranked.slice(0, limit);
+}
+
+/** Hockey widget data for overview (enabled hockey calendars only). */
+export async function getOverviewHockeyBundle(): Promise<{
+  calendarName: string;
+  nextGame: HockeyGameCard | null;
+  upcoming: HockeyGameCard[];
+}> {
+  const enabled = getEnabledIcsCalendars().filter((c) => c.type === "hockey");
+  const games = await loadHockeyGames(enabled);
+  const next = enabled.length > 0 ? getNextHockeyGame(games) : null;
+  const upcoming =
+    enabled.length > 0 ? getUpcomingHockeyGames(games, new Date(), 5) : [];
+
+  return {
+    calendarName:
+      (next
+        ? games.find((g) => g.uid === next.uid)?.calendarName
+        : null) ||
+      enabled[0]?.name ||
+      "Hockey",
+    nextGame: next ? toHockeyCard(next) : null,
+    upcoming: upcoming.map(toHockeyCard),
+  };
+}
