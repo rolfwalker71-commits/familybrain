@@ -125,6 +125,14 @@ function SettingsPageInner() {
   const [aerodataboxProvider, setAerodataboxProvider] = useState<
     "apimarket" | "rapidapi"
   >("apimarket");
+  const [sofascoreKey, setSofascoreKey] = useState("");
+  const [sofascoreKeyMasked, setSofascoreKeyMasked] = useState<string | null>(
+    null
+  );
+  const [hasSofascoreKey, setHasSofascoreKey] = useState(false);
+  const [sofascoreUsage, setSofascoreUsage] = useState(0);
+  const [sofascoreLimit, setSofascoreLimit] = useState(50);
+  const [sofascoreRemaining, setSofascoreRemaining] = useState(50);
   const [ojpApiToken, setOjpApiToken] = useState("");
   const [ojpApiTokenMasked, setOjpApiTokenMasked] = useState<string | null>(null);
   const [hasOjpApiToken, setHasOjpApiToken] = useState(false);
@@ -289,6 +297,11 @@ function SettingsPageInner() {
       setAerodataboxProvider(
         data.aerodataboxProvider === "rapidapi" ? "rapidapi" : "apimarket"
       );
+      setSofascoreKeyMasked(data.sofascoreApiKeyMasked || null);
+      setHasSofascoreKey(Boolean(data.hasSofascoreApiKey));
+      setSofascoreUsage(Number(data.sofascoreUsageThisMonth || 0));
+      setSofascoreLimit(Number(data.sofascoreMonthlyLimit || 50));
+      setSofascoreRemaining(Number(data.sofascoreRemainingQuota ?? 50));
       setOjpApiTokenMasked(data.ojpApiTokenMasked || null);
       setHasOjpApiToken(Boolean(data.hasOjpApiToken));
       setOjpTokenHashMasked(data.ojpTokenHashMasked || null);
@@ -645,6 +658,9 @@ function SettingsPageInner() {
       if (aerodataboxKey.trim()) {
         payload.aerodataboxApiKey = aerodataboxKey.trim();
       }
+      if (sofascoreKey.trim()) {
+        payload.sofascoreApiKey = sofascoreKey.trim();
+      }
       if (ojpApiToken.trim()) {
         payload.ojpApiToken = ojpApiToken.trim();
       }
@@ -664,6 +680,12 @@ function SettingsPageInner() {
         data.aerodataboxProvider === "rapidapi" ? "rapidapi" : "apimarket"
       );
       setAerodataboxKey("");
+      setSofascoreKeyMasked(data.sofascoreApiKeyMasked || null);
+      setHasSofascoreKey(Boolean(data.hasSofascoreApiKey));
+      setSofascoreUsage(Number(data.sofascoreUsageThisMonth || 0));
+      setSofascoreLimit(Number(data.sofascoreMonthlyLimit || 50));
+      setSofascoreRemaining(Number(data.sofascoreRemainingQuota ?? 50));
+      setSofascoreKey("");
       setOjpApiTokenMasked(data.ojpApiTokenMasked || null);
       setHasOjpApiToken(Boolean(data.hasOjpApiToken));
       setOjpTokenHashMasked(data.ojpTokenHashMasked || null);
@@ -939,6 +961,31 @@ function SettingsPageInner() {
       setHasAerodataboxKey(Boolean(data.hasAerodataboxKey));
       setAerodataboxKey("");
       setMessage("AeroDataBox-Key entfernt.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  async function clearSofascoreKey() {
+    setSaving("travelbrain");
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clearSofascoreApiKey: true }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Löschen fehlgeschlagen");
+      setSofascoreKeyMasked(data.sofascoreApiKeyMasked || null);
+      setHasSofascoreKey(Boolean(data.hasSofascoreApiKey));
+      setSofascoreUsage(Number(data.sofascoreUsageThisMonth || 0));
+      setSofascoreRemaining(Number(data.sofascoreRemainingQuota ?? 50));
+      setSofascoreKey("");
+      setMessage("Sofascore-Key entfernt.");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -1546,6 +1593,25 @@ function SettingsPageInner() {
             />
           </div>
           <div className="space-y-2 rounded-lg border border-border/60 bg-muted/10 p-3">
+            <Label htmlFor="sofascoreKey">Sofascore RapidAPI-Key (Hockey)</Label>
+            <Input
+              id="sofascoreKey"
+              type="password"
+              value={sofascoreKey}
+              onChange={(e) => setSofascoreKey(e.target.value)}
+              placeholder={
+                hasSofascoreKey
+                  ? `Gespeichert: ${sofascoreKeyMasked || "••••"}`
+                  : "RapidAPI-Key für Sofascore"
+              }
+            />
+            <p className="text-xs text-muted-foreground">
+              Logos (einmalig) und Resultate ca. 23:00 Zürich nach Ambri-Spielen.
+              Free-Plan: {sofascoreUsage}/{sofascoreLimit} Requests diesen Monat
+              ({sofascoreRemaining} übrig). Torschützen nur bei genug Kontingent.
+            </p>
+          </div>
+          <div className="space-y-2 rounded-lg border border-border/60 bg-muted/10 p-3">
             <Label htmlFor="ojpToken">ÖV-CH Token (opentransportdata.swiss)</Label>
             <Input
               id="ojpToken"
@@ -1690,6 +1756,17 @@ function SettingsPageInner() {
                 onClick={() => void clearAerodataboxKey()}
               >
                 Flug-API-Key entfernen
+              </Button>
+            ) : null}
+            {hasSofascoreKey ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                disabled={saving !== null}
+                onClick={() => void clearSofascoreKey()}
+              >
+                Sofascore-Key entfernen
               </Button>
             ) : null}
           </div>

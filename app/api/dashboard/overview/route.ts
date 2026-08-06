@@ -19,6 +19,23 @@ export async function GET(request: Request) {
   );
   await finalizeDuePaymentPlans().catch(() => undefined);
 
+  const { ensureSofascoreLogosMigrated } = await import("@/lib/hockey/logo");
+  const { syncHockeyResultsIfDue } = await import(
+    "@/lib/hockey/sync-results"
+  );
+  await ensureSofascoreLogosMigrated().catch((error) => {
+    console.warn(
+      "[hockey] Sofascore logo migration:",
+      error instanceof Error ? error.message : error
+    );
+  });
+  await syncHockeyResultsIfDue().catch((error) => {
+    console.warn(
+      "[hockey] Sofascore result sync:",
+      error instanceof Error ? error.message : error
+    );
+  });
+
   const { searchParams } = new URL(request.url);
   const period = parseOverviewPeriod(searchParams.get("period"));
   const anchor = searchParams.get("anchor");

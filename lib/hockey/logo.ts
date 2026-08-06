@@ -1,7 +1,15 @@
 import fs from "fs";
 import path from "path";
+import { getSetting, setSetting } from "@/lib/db/migrations";
 import { getTripsDataRoot } from "@/lib/trips/paths";
 import { hockeyTeamByKey, HOCKEY_TEAMS } from "@/lib/hockey/teams";
+import {
+  getSofascoreRemainingQuota,
+  hasSofascoreApiKey,
+  sofascoreGetTeamLogoPng,
+} from "@/lib/hockey/sofascore";
+
+export const HOCKEY_LOGOS_SOFASCORE_FLAG = "hockey_logos_sofascore_v1";
 
 export function getHockeyLogoDir(): string {
   return path.join(getTripsDataRoot(), "hockey-logos");
@@ -78,14 +86,29 @@ async function fetchWikipediaThumbnail(
   return null;
 }
 
+async function writeLogoPng(file: string, downloaded: Buffer): Promise<string> {
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const sharp = (await import("sharp")).default;
+  const png = await sharp(downloaded)
+    .resize(128, 128, {
+      fit: "contain",
+      background: { r: 255, g: 255, b: 255, alpha: 0 },
+    })
+    .png()
+    .toBuffer();
+  fs.writeFileSync(file, png);
+  return file;
+}
+
 /**
  * Cache the official club mark as PNG.
- * Prefers curated Wikimedia URLs; falls back to Wikipedia pageimages.
+ * Prefers Sofascore when a team id + API key are available; else Wikimedia / Wikipedia.
  */
 export async function ensureHockeyLogo(input: {
   key: string;
   label?: string;
   force?: boolean;
+  preferSofascore?: boolean;
 }): Promise<string | null> {
   const key = safeKey(input.key);
   if (!key) return null;
@@ -101,7 +124,18 @@ export async function ensureHockeyLogo(input: {
     null;
 
   let downloaded: Buffer | null = null;
-  if (team?.logoSourceUrl) {
+
+  const useSofascore =
+    (input.preferSofascore !== false) &&
+    team?.sofascoreTeamId != null &&
+    hasSofascoreApiKey() &&
+    getSofascoreRemainingQuota() > 0;
+
+  if (useSofascore && team?.sofascoreTeamId != null) {
+    downloaded = await sofascoreGetTeamLogoPng(team.sofascoreTeamId);
+  }
+
+  if (!downloaded && team?.logoSourceUrl) {
     downloaded = await downloadImage(team.logoSourceUrl);
   }
   if (!downloaded && team?.wikipediaTitle) {
@@ -109,15 +143,81 @@ export async function ensureHockeyLogo(input: {
   }
   if (!downloaded) return fs.existsSync(file) ? file : null;
 
-  fs.mkdirSync(dir, { recursive: true });
-  const sharp = (await import("sharp")).default;
-  const png = await sharp(downloaded)
-    .resize(128, 128, {
-      fit: "contain",
-      background: { r: 255, g: 255, b: 255, alpha: 0 },
-    })
-    .png()
-    .toBuffer();
-  fs.writeFileSync(file, png);
-  return file;
+  return writeLogoPng(file, downloaded);
+}
+
+/**
+ * Gradually replace cached NL logos with Sofascore PNGs (2 per call to stay snappy).
+ */
+export async function ensureSofascoreLogosMigrated(): Promise<{
+  refreshed: number;
+  skipped: string;
+}> {
+  if (!hasSofascoreApiKey()) {
+    return { refreshed: 0, skipped: "no-key" };
+  }
+  if (getSetting(HOCKEY_LOGOS_SOFASCORE_FLAG) === "1") {
+    return { refreshed: 0, skipped: "done" };
+  }
+
+  const withIds = HOCKEY_TEAMS.filter((t) => t.sofascoreTeamId != null);
+  const dir = getHockeyLogoDir();
+  const pending = withIds.filter((team) => {
+    // Always replace until flag is set — check a sidecar marker per team
+    const marker = path.join(dir, `${team.key}.sofascore`);
+    return !fs.existsSync(marker);
+  });
+
+  if (pending.length === 0) {
+    setSetting(HOCKEY_LOGOS_SOFASCORE_FLAG, "1");
+    return { refreshed: 0, skipped: "done" };
+  }
+
+  if (getSofascoreRemainingQuota() < 1) {
+    return { refreshed: 0, skipped: "quota" };
+  }
+
+  const batch = pending.slice(0, 2);
+  let refreshed = 0;
+  for (const team of batch) {
+    const file = await ensureHockeyLogo({
+      key: team.key,
+      label: team.label,
+      force: true,
+      preferSofascore: true,
+    }).catch(() => null);
+    if (file) {
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, `${team.key}.sofascore`), "1");
+      refreshed += 1;
+    }
+  }
+
+  const stillPending = withIds.some(
+    (team) => !fs.existsSync(path.join(dir, `${team.key}.sofascore`))
+  );
+  if (!stillPending) {
+    setSetting(HOCKEY_LOGOS_SOFASCORE_FLAG, "1");
+  }
+
+  return {
+    refreshed,
+    skipped: stillPending ? "partial" : "ok",
+  };
+}
+
+/** Reset migration flag so logos are re-pulled on next overview load. */
+export function resetSofascoreLogoMigration(): void {
+  setSetting(HOCKEY_LOGOS_SOFASCORE_FLAG, null);
+  const dir = getHockeyLogoDir();
+  if (!fs.existsSync(dir)) return;
+  for (const name of fs.readdirSync(dir)) {
+    if (name.endsWith(".sofascore")) {
+      try {
+        fs.unlinkSync(path.join(dir, name));
+      } catch {
+        /* ignore */
+      }
+    }
+  }
 }

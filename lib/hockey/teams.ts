@@ -11,6 +11,8 @@ export type HockeyTeam = {
   logoSourceUrl: string | null;
   /** English/German Wikipedia page title for API fallback. */
   wikipediaTitle: string | null;
+  /** Sofascore team id (NL / known clubs) for logos + results. */
+  sofascoreTeamId: number | null;
   aliases: string[];
 };
 
@@ -23,6 +25,7 @@ export const HOCKEY_TEAMS: HockeyTeam[] = [
     logoSourceUrl:
       "https://upload.wikimedia.org/wikipedia/commons/thumb/5/54/HC_Ambr%C3%AC-Piotta_svg_logo.svg/500px-HC_Ambr%C3%AC-Piotta_svg_logo.svg.png",
     wikipediaTitle: "HC Ambrì-Piotta",
+    sofascoreTeamId: 3896,
     aliases: ["hc ambri-piotta", "hc ambri piotta", "ambri-piotta", "ambri"],
   },
   {
@@ -31,6 +34,7 @@ export const HOCKEY_TEAMS: HockeyTeam[] = [
     logoSourceUrl:
       "https://upload.wikimedia.org/wikipedia/en/thumb/0/04/HC_Davos_logo.svg/500px-HC_Davos_logo.svg.png",
     wikipediaTitle: "HC Davos",
+    sofascoreTeamId: 3895,
     aliases: ["hc davos", "davos", "hcd"],
   },
   {
@@ -39,6 +43,7 @@ export const HOCKEY_TEAMS: HockeyTeam[] = [
     logoSourceUrl:
       "https://upload.wikimedia.org/wikipedia/en/thumb/f/f9/ZSC_Lions_logo.svg/500px-ZSC_Lions_logo.svg.png",
     wikipediaTitle: "ZSC Lions",
+    sofascoreTeamId: 3899,
     aliases: ["zsc lions", "zsc", "zürich", "zurich lions"],
   },
   {
@@ -47,6 +52,7 @@ export const HOCKEY_TEAMS: HockeyTeam[] = [
     logoSourceUrl:
       "https://upload.wikimedia.org/wikipedia/en/thumb/7/70/SC_Bern_logo.svg/500px-SC_Bern_logo.svg.png",
     wikipediaTitle: "SC Bern",
+    sofascoreTeamId: 3902,
     aliases: ["sc bern", "scb", "bern"],
   },
   {
@@ -55,6 +61,7 @@ export const HOCKEY_TEAMS: HockeyTeam[] = [
     logoSourceUrl:
       "https://upload.wikimedia.org/wikipedia/en/thumb/c/cc/EV_Zug_logo.svg/500px-EV_Zug_logo.svg.png",
     wikipediaTitle: "EV Zug",
+    sofascoreTeamId: 3893,
     aliases: ["ev zug", "evz", "zug"],
   },
   {
@@ -63,6 +70,7 @@ export const HOCKEY_TEAMS: HockeyTeam[] = [
     logoSourceUrl:
       "https://upload.wikimedia.org/wikipedia/en/thumb/d/d4/Lausanne_HC_logo.svg/500px-Lausanne_HC_logo.svg.png",
     wikipediaTitle: "Lausanne HC",
+    sofascoreTeamId: 3900,
     aliases: ["lausanne hc", "lhc", "lausanne"],
   },
   {
@@ -71,6 +79,7 @@ export const HOCKEY_TEAMS: HockeyTeam[] = [
     logoSourceUrl:
       "https://upload.wikimedia.org/wikipedia/en/thumb/4/4a/Gen%C3%A8ve-Servette_HC_logo.svg/500px-Gen%C3%A8ve-Servette_HC_logo.svg.png",
     wikipediaTitle: "Genève-Servette HC",
+    sofascoreTeamId: 3903,
     aliases: [
       "genève-servette hc",
       "geneve-servette hc",
@@ -85,6 +94,7 @@ export const HOCKEY_TEAMS: HockeyTeam[] = [
     label: "Fribourg-Gottéron",
     logoSourceUrl: "https://image.pngaaa.com/993/5487993-middle.png",
     wikipediaTitle: "Fribourg-Gottéron",
+    sofascoreTeamId: 3894,
     aliases: [
       "fribourg-gottéron",
       "fribourg-gotteron",
@@ -99,6 +109,7 @@ export const HOCKEY_TEAMS: HockeyTeam[] = [
     logoSourceUrl:
       "https://p7.hiclipart.com/preview/489/520/904/tissot-arena-ehc-biel-national-league-eisstadion-biel-hc-red-ice-others.jpg",
     wikipediaTitle: "EHC Biel",
+    sofascoreTeamId: 3906,
     aliases: ["ehc biel-bienne", "ehc biel", "biel-bienne", "biel"],
   },
   {
@@ -107,6 +118,7 @@ export const HOCKEY_TEAMS: HockeyTeam[] = [
     logoSourceUrl:
       "https://planetehockey.com/wp-content/uploads/2023/03/logo-HC-Kloten.png",
     wikipediaTitle: "EHC Kloten",
+    sofascoreTeamId: 3898,
     aliases: ["ehc kloten", "kloten", "kloten flyers"],
   },
   {
@@ -115,6 +127,7 @@ export const HOCKEY_TEAMS: HockeyTeam[] = [
     logoSourceUrl:
       "https://upload.wikimedia.org/wikipedia/commons/e/e9/HCL_Black_Logo_No_BG.png",
     wikipediaTitle: "HC Lugano",
+    sofascoreTeamId: 3891,
     aliases: ["hc lugano", "lugano", "hcl"],
   },
   {
@@ -122,6 +135,7 @@ export const HOCKEY_TEAMS: HockeyTeam[] = [
     label: "SCL Tigers",
     logoSourceUrl: "https://image.pngaaa.com/743/1148743-middle.png",
     wikipediaTitle: "SCL Tigers",
+    sofascoreTeamId: 3901,
     aliases: ["scl tigers", "langnau", "tigers"],
   },
   {
@@ -130,6 +144,7 @@ export const HOCKEY_TEAMS: HockeyTeam[] = [
     logoSourceUrl:
       "https://backend.soul.media/sites/default/files/2025-09/lakers.png",
     wikipediaTitle: "Rapperswil-Jona Lakers",
+    sofascoreTeamId: 3897,
     aliases: [
       "sc rapperswil-jona lakers",
       "rapperswil-jona lakers",
@@ -144,6 +159,7 @@ export const HOCKEY_TEAMS: HockeyTeam[] = [
     logoSourceUrl:
       "https://www.eishockey.net/admin/files/pictures/42204/42204_29211_900_ajoie.png",
     wikipediaTitle: "HC Ajoie",
+    sofascoreTeamId: 5575,
     aliases: ["hc ajoie", "ajoie"],
   },
   {
@@ -152,6 +168,7 @@ export const HOCKEY_TEAMS: HockeyTeam[] = [
     logoSourceUrl:
       "https://www.eishockey.net/admin/files/pictures/42211/42211_35948_800_ehc_visp-logo-wbm-rgb.png",
     wikipediaTitle: "EHC Visp",
+    sofascoreTeamId: null,
     aliases: ["ehc visp", "visp"],
   },
   {
@@ -161,6 +178,7 @@ export const HOCKEY_TEAMS: HockeyTeam[] = [
     logoSourceUrl:
       "https://upload.wikimedia.org/wikipedia/en/9/93/HCB_Ticino_Rockets_logo.png",
     wikipediaTitle: "GDT Bellinzona Snakes",
+    sofascoreTeamId: null,
     aliases: [
       "gdt bellinzona snakes",
       "bellinzona snakes",
@@ -174,6 +192,7 @@ export const HOCKEY_TEAMS: HockeyTeam[] = [
     logoSourceUrl:
       "https://cdn.imgbin.com/17/23/17/imgbin-logo-schwenninger-wild-wings-brand-product-design-transparent-buffalo-wild-wings-logo-aX7wyfyfxnf0hwHUSJhgLc2Ya.jpg",
     wikipediaTitle: "Schwenninger Wild Wings",
+    sofascoreTeamId: null,
     aliases: [
       "schwenninger wild wings",
       "schwenningen",
@@ -187,6 +206,7 @@ export const HOCKEY_TEAMS: HockeyTeam[] = [
     logoSourceUrl:
       "https://upload.wikimedia.org/wikipedia/en/5/51/2021_Belfast_Giants_logo.png",
     wikipediaTitle: "Belfast Giants",
+    sofascoreTeamId: null,
     aliases: ["belfast giants", "belfast", "giants"],
   },
 ];
@@ -255,7 +275,7 @@ export function resolveHockeyTeam(raw: string | null | undefined): {
 }
 
 export function hockeyTeamLogoUrl(key: string): string {
-  return `/api/hockey/logo/${encodeURIComponent(key)}`;
+  return `/api/hockey/logo/${encodeURIComponent(key)}?v=sofa1`;
 }
 
 export function hockeyTeamByKey(key: string): HockeyTeam | null {

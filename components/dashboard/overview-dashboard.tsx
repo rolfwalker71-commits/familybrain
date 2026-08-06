@@ -231,7 +231,20 @@ function NextHockeyCard({ game }: { game: HockeyGameCard }) {
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               {game.isHome ? "Heim" : "Auswärts"}
             </p>
-            <p className="text-sm font-bold tabular-nums">{game.time || "—"}</p>
+            {game.score ? (
+              <p className="text-lg font-bold tabular-nums tracking-tight">
+                {game.score}
+              </p>
+            ) : (
+              <p className="text-sm font-bold tabular-nums">
+                {game.time || "—"}
+              </p>
+            )}
+            {game.score && game.time ? (
+              <p className="text-[11px] text-muted-foreground tabular-nums">
+                {game.time}
+              </p>
+            ) : null}
           </div>
           <div className="flex min-w-0 flex-1 flex-col items-center gap-1.5 text-center">
             <TeamLogo
@@ -244,6 +257,11 @@ function NextHockeyCard({ game }: { game: HockeyGameCard }) {
             </p>
           </div>
         </div>
+        {game.scorers.length > 0 ? (
+          <p className="text-center text-[11px] leading-snug text-muted-foreground">
+            {game.scorers.slice(0, 6).join(" · ")}
+          </p>
+        ) : null}
         <p className="text-center text-xs text-muted-foreground">
           {weekdayLabel(game.date)}
           {game.location ? ` · ${game.location}` : ""}

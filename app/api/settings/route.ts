@@ -38,6 +38,14 @@ import {
   MAP_STYLES,
 } from "@/lib/trips/settings";
 import {
+  getSofascoreApiKey,
+  getSofascoreRemainingQuota,
+  getSofascoreUsageThisMonth,
+  saveSofascoreApiKey,
+  SOFASCORE_MONTHLY_LIMIT,
+} from "@/lib/hockey/sofascore";
+import { resetSofascoreLogoMigration } from "@/lib/hockey/logo";
+import {
   DEFAULT_EVENT_AI_IMAGE_PROMPT,
   EVENT_AI_IMAGE_PROMPT_PLACEHOLDERS,
 } from "@/lib/trips/event-image-prompt";
@@ -163,6 +171,11 @@ export async function GET(request: Request) {
     aerodataboxApiKeyMasked: maskToken(aeroKey),
     hasAerodataboxKey: Boolean(aeroKey),
     aerodataboxProvider: getAeroDataBoxProvider(),
+    sofascoreApiKeyMasked: maskToken(getSofascoreApiKey()),
+    hasSofascoreApiKey: Boolean(getSofascoreApiKey()),
+    sofascoreUsageThisMonth: getSofascoreUsageThisMonth(),
+    sofascoreMonthlyLimit: SOFASCORE_MONTHLY_LIMIT,
+    sofascoreRemainingQuota: getSofascoreRemainingQuota(),
     ojpApiTokenMasked: maskToken(ojpToken),
     hasOjpApiToken: Boolean(ojpToken),
     ojpTokenHashMasked: maskToken(ojpTokenHash),
@@ -212,6 +225,8 @@ const PutSchema = z.object({
   aerodataboxApiKey: z.string().optional(),
   clearAerodataboxApiKey: z.boolean().optional(),
   aerodataboxProvider: z.enum(AERODATABOX_PROVIDERS).optional(),
+  sofascoreApiKey: z.string().optional(),
+  clearSofascoreApiKey: z.boolean().optional(),
   ojpApiToken: z.string().optional(),
   ojpTokenHash: z.string().optional(),
   clearOjpCredentials: z.boolean().optional(),
@@ -355,6 +370,15 @@ export async function PUT(request: Request) {
     saveAeroDataBoxProvider(parsed.data.aerodataboxProvider);
   }
 
+  if (parsed.data.clearSofascoreApiKey) {
+    saveSofascoreApiKey(null);
+  } else if (parsed.data.sofascoreApiKey !== undefined) {
+    saveSofascoreApiKey(parsed.data.sofascoreApiKey || null);
+    if (parsed.data.sofascoreApiKey?.trim()) {
+      resetSofascoreLogoMigration();
+    }
+  }
+
   if (parsed.data.clearOjpCredentials) {
     saveOjpApiToken(null);
     saveOjpTokenHash(null);
@@ -486,6 +510,11 @@ export async function PUT(request: Request) {
     aerodataboxApiKeyMasked: maskToken(aeroKey),
     hasAerodataboxKey: Boolean(aeroKey),
     aerodataboxProvider: getAeroDataBoxProvider(),
+    sofascoreApiKeyMasked: maskToken(getSofascoreApiKey()),
+    hasSofascoreApiKey: Boolean(getSofascoreApiKey()),
+    sofascoreUsageThisMonth: getSofascoreUsageThisMonth(),
+    sofascoreMonthlyLimit: SOFASCORE_MONTHLY_LIMIT,
+    sofascoreRemainingQuota: getSofascoreRemainingQuota(),
     ojpApiTokenMasked: maskToken(ojpToken),
     hasOjpApiToken: Boolean(ojpToken),
     ojpTokenHashMasked: maskToken(ojpTokenHash),

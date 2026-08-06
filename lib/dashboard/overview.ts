@@ -2,6 +2,7 @@ import { getDb } from "@/lib/db/client";
 import { countPendingTriageDocuments } from "@/lib/documents/triage";
 import { paymentMethodLabel } from "@/lib/finance/payment-methods";
 import {
+  formatHockeyScoreLine,
   getHockeyGames,
   getNextHockeyGame,
   getUpcomingHockeyGames,
@@ -39,6 +40,10 @@ export type AgendaItem = {
     leftLabel?: string | null;
     rightLabel?: string | null;
   } | null;
+  /** Hockey final score line e.g. "4:0" */
+  score?: string | null;
+  /** Hockey goal scorers (short names) */
+  scorers?: string[] | null;
 };
 
 export type HockeyGameCard = {
@@ -51,6 +56,8 @@ export type HockeyGameCard = {
   homeTeam: { key: string; label: string; logoUrl: string };
   awayTeam: { key: string; label: string; logoUrl: string };
   opponent: { key: string; label: string; logoUrl: string };
+  score: string | null;
+  scorers: string[];
 };
 
 export type KpiCategorySlice = {
@@ -195,6 +202,35 @@ function toHockeyCard(game: HockeyGame): HockeyGameCard {
     homeTeam: game.homeTeam,
     awayTeam: game.awayTeam,
     opponent: game.opponent,
+    score: game.result ? formatHockeyScoreLine(game.result) : null,
+    scorers: game.result?.scorers || [],
+  };
+}
+
+function hockeyAgendaMeta(game: HockeyGame): {
+  subtitle: string | null;
+  badge: string;
+  score: string | null;
+  scorers: string[] | null;
+} {
+  const score = game.result ? formatHockeyScoreLine(game.result) : null;
+  const parts = [
+    score,
+    game.time,
+    game.location,
+  ].filter(Boolean);
+  const scorers =
+    game.result?.scorers && game.result.scorers.length > 0
+      ? game.result.scorers
+      : null;
+  if (scorers) {
+    parts.push(scorers.slice(0, 4).join(", "));
+  }
+  return {
+    subtitle: parts.join(" · ") || null,
+    badge: score || "Hockey",
+    score,
+    scorers,
   };
 }
 
@@ -515,17 +551,20 @@ export async function getDashboardOverview(
 
   for (const game of hockeyGames) {
     if (!inRange(game.date, start, end)) continue;
+    const meta = hockeyAgendaMeta(game);
     agenda.push({
       id: `hk-${game.uid}`,
       kind: "hockey",
       date: game.date,
       title: game.isHome ? "Heim" : "Auswärts",
-      subtitle: [game.time, game.location].filter(Boolean).join(" · ") || null,
+      subtitle: meta.subtitle,
       amount: null,
       currency: null,
       documentId: null,
       href: null,
-      badge: "Hockey",
+      badge: meta.badge,
+      score: meta.score,
+      scorers: meta.scorers,
       logos: {
         left: game.homeTeam.logoUrl || null,
         right: game.awayTeam.logoUrl || null,
@@ -582,17 +621,20 @@ export async function getDashboardOverview(
   }
 
   for (const game of getUpcomingHockeyGames(hockeyGames, new Date(), 6)) {
+    const meta = hockeyAgendaMeta(game);
     upcoming14.push({
       id: `u-hk-${game.uid}`,
       kind: "hockey",
       date: game.date,
       title: game.isHome ? "Heim" : "Auswärts",
-      subtitle: [game.time, game.location].filter(Boolean).join(" · ") || null,
+      subtitle: meta.subtitle,
       amount: null,
       currency: null,
       documentId: null,
       href: null,
-      badge: "Hockey",
+      badge: meta.badge,
+      score: meta.score,
+      scorers: meta.scorers,
       logos: {
         left: game.homeTeam.logoUrl || null,
         right: game.awayTeam.logoUrl || null,

@@ -5,6 +5,10 @@ import {
   resolveHockeyTeam,
 } from "@/lib/hockey/teams";
 import { ensureHockeyLogo } from "@/lib/hockey/logo";
+import {
+  getHockeyResultForUid,
+  type HockeyGameResult,
+} from "@/lib/hockey/sofascore";
 
 const ICS_URL =
   "https://calendar.google.com/calendar/ical/c_f974949164df4b0605b30aa319f918570bb7b00ebb7514e06558dad73706f8cd%40group.calendar.google.com/public/basic.ics";
@@ -24,6 +28,8 @@ export type HockeyGame = {
   awayTeam: { key: string; label: string; logoUrl: string };
   opponent: { key: string; label: string; logoUrl: string };
   isHome: boolean;
+  /** Final score from Sofascore evening sync, if available. */
+  result: HockeyGameResult | null;
 };
 
 type CachePayload = {
@@ -160,10 +166,15 @@ export function parseHockeyGamesFromIcs(ics: string): HockeyGame[] {
       awayTeam,
       opponent,
       isHome,
+      result: getHockeyResultForUid(uid),
     });
   }
 
   return games.sort((a, b) => a.startAt.localeCompare(b.startAt));
+}
+
+export function formatHockeyScoreLine(result: HockeyGameResult): string {
+  return `${result.homeScore}:${result.awayScore}`;
 }
 
 async function fetchIcs(): Promise<string> {
