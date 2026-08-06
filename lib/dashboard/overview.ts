@@ -1,6 +1,12 @@
 import { getDb } from "@/lib/db/client";
 import { countPendingTriageDocuments } from "@/lib/documents/triage";
 import { paymentMethodLabel } from "@/lib/finance/payment-methods";
+import {
+  getHockeyGames,
+  getNextHockeyGame,
+  getUpcomingHockeyGames,
+  type HockeyGame,
+} from "@/lib/hockey/games";
 import { daysFromNow, toSwissDate } from "@/lib/utils/dates";
 
 export type OverviewPeriod = "week" | "month" | "quarter" | "half" | "year";
@@ -11,7 +17,8 @@ export type AgendaKind =
   | "travel"
   | "warranty"
   | "triage"
-  | "ledger";
+  | "ledger"
+  | "hockey";
 
 export type AgendaItem = {
   id: string;
@@ -25,6 +32,20 @@ export type AgendaItem = {
   /** Prefer over document link when set (e.g. FinanzBuddy ledger). */
   href: string | null;
   badge: string;
+  /** Optional logos for hockey matchups. */
+  logos?: { left: string | null; right: string | null } | null;
+};
+
+export type HockeyGameCard = {
+  uid: string;
+  date: string;
+  time: string | null;
+  title: string;
+  location: string | null;
+  isHome: boolean;
+  homeTeam: { key: string; label: string; logoUrl: string };
+  awayTeam: { key: string; label: string; logoUrl: string };
+  opponent: { key: string; label: string; logoUrl: string };
 };
 
 export type KpiCategorySlice = {
@@ -64,6 +85,11 @@ export type OverviewPayload = {
     byCategory: KpiCategorySlice[];
   };
   financeItems: FinanceEditableItem[];
+  hockey: {
+    calendarName: string;
+    nextGame: HockeyGameCard | null;
+    upcoming: HockeyGameCard[];
+  };
 };
 
 function isoDate(d: Date): string {
@@ -153,10 +179,24 @@ function inRange(date: string | null | undefined, start: string, end: string) {
   return d >= start && d <= end;
 }
 
-export function getDashboardOverview(
+function toHockeyCard(game: HockeyGame): HockeyGameCard {
+  return {
+    uid: game.uid,
+    date: game.date,
+    time: game.time,
+    title: game.summary,
+    location: game.location,
+    isHome: game.isHome,
+    homeTeam: game.homeTeam,
+    awayTeam: game.awayTeam,
+    opponent: game.opponent,
+  };
+}
+
+export async function getDashboardOverview(
   period: OverviewPeriod,
   anchorIso?: string | null
-): OverviewPayload {
+): Promise<OverviewPayload> {
   const anchor = anchorIso ? new Date(anchorIso) : new Date();
   const { start, end, label } = resolvePeriodRange(period, anchor);
   const today = isoDate(new Date());
@@ -454,6 +494,40 @@ export function getDashboardOverview(
     });
   }
 
+  let hockeyGames: HockeyGame[] = [];
+  let hockeyCalendarName = "HC Ambri-Piotta";
+  try {
+    const hockey = await getHockeyGames();
+    hockeyGames = hockey.games;
+    hockeyCalendarName = hockey.calendarName;
+  } catch {
+    hockeyGames = [];
+  }
+
+  for (const game of hockeyGames) {
+    if (!inRange(game.date, start, end)) continue;
+    agenda.push({
+      id: `hk-${game.uid}`,
+      kind: "hockey",
+      date: game.date,
+      title: game.isHome
+        ? `vs ${game.opponent.label}`
+        : `@ ${game.opponent.label}`,
+      subtitle: [game.time, game.location, game.isHome ? "Heim" : "Auswärts"]
+        .filter(Boolean)
+        .join(" · "),
+      amount: null,
+      currency: null,
+      documentId: null,
+      href: null,
+      badge: "Hockey",
+      logos: {
+        left: game.homeTeam.logoUrl,
+        right: game.awayTeam.logoUrl,
+      },
+    });
+  }
+
   agenda.sort((a, b) => {
     const c = a.date.localeCompare(b.date);
     if (c !== 0) return c;
@@ -499,6 +573,28 @@ export function getDashboardOverview(
       badge: "Frist",
     });
   }
+
+  for (const game of getUpcomingHockeyGames(hockeyGames, new Date(), 6)) {
+    upcoming14.push({
+      id: `u-hk-${game.uid}`,
+      kind: "hockey",
+      date: game.date,
+      title: game.isHome
+        ? `vs ${game.opponent.label}`
+        : `@ ${game.opponent.label}`,
+      subtitle: [game.time, game.location].filter(Boolean).join(" · "),
+      amount: null,
+      currency: null,
+      documentId: null,
+      href: null,
+      badge: "Hockey",
+      logos: {
+        left: game.homeTeam.logoUrl,
+        right: game.awayTeam.logoUrl,
+      },
+    });
+  }
+  upcoming14.sort((a, b) => a.date.localeCompare(b.date));
 
   const financeRows = db
     .prepare(
@@ -570,6 +666,11 @@ export function getDashboardOverview(
       .get(daysFromNow(7)) as { c: number }
   ).c;
 
+  const next = getNextHockeyGame(hockeyGames);
+  const upcomingHockey = getUpcomingHockeyGames(hockeyGames, new Date(), 5).map(
+    toHockeyCard
+  );
+
   return {
     period,
     rangeStart: start,
@@ -585,5 +686,10 @@ export function getDashboardOverview(
     upcoming14,
     kpi: { total: kpiTotal, byCategory },
     financeItems,
+    hockey: {
+      calendarName: hockeyCalendarName,
+      nextGame: next ? toHockeyCard(next) : null,
+      upcoming: upcomingHockey,
+    },
   };
 }

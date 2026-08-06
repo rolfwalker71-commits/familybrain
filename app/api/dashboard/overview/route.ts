@@ -22,5 +22,5 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const period = parseOverviewPeriod(searchParams.get("period"));
   const anchor = searchParams.get("anchor");
-  return NextResponse.json(getDashboardOverview(period, anchor));
+  return NextResponse.json(await getDashboardOverview(period, anchor));
 }

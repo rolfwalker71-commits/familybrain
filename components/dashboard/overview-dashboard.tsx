@@ -11,6 +11,7 @@ import {
   ChartColumnIncreasing,
   Clock3,
   HandCoins,
+  Trophy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,6 +25,7 @@ import { APP_ICON_STROKE } from "@/lib/branding/app-icons";
 import type {
   AgendaItem,
   AgendaKind,
+  HockeyGameCard,
   OverviewPayload,
   OverviewPeriod,
 } from "@/lib/dashboard/overview";
@@ -43,6 +45,7 @@ const KIND_ACCENT: Record<AgendaKind, string> = {
   warranty: "border-l-amber-600",
   triage: "border-l-[var(--brand-docs)]",
   ledger: "border-l-[var(--brand-finance)]",
+  hockey: "border-l-rose-600",
 };
 
 const KIND_ICON: Record<AgendaKind, typeof FileText> = {
@@ -52,7 +55,43 @@ const KIND_ICON: Record<AgendaKind, typeof FileText> = {
   warranty: Shield,
   triage: Mail,
   ledger: HandCoins,
+  hockey: Trophy,
 };
+
+function TeamLogo({
+  label,
+  src,
+  size = "sm",
+}: {
+  label: string;
+  src: string | null | undefined;
+  size?: "sm" | "md";
+}) {
+  const [failed, setFailed] = useState(false);
+  const box = size === "md" ? "size-10" : "size-8";
+  if (!src || failed) {
+    return (
+      <span
+        className={cn(
+          box,
+          "flex shrink-0 items-center justify-center rounded-full bg-rose-50 text-[10px] font-bold uppercase text-rose-700"
+        )}
+        aria-hidden
+      >
+        {label.slice(0, 2)}
+      </span>
+    );
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt=""
+      className={cn(box, "shrink-0 rounded-full bg-white object-contain p-0.5")}
+      onError={() => setFailed(true)}
+    />
+  );
+}
 
 function weekdayLabel(iso: string): string {
   try {
@@ -70,6 +109,7 @@ function weekdayLabel(iso: string): string {
 function AgendaRow({ item }: { item: AgendaItem }) {
   const Icon = KIND_ICON[item.kind];
   const isPaymentPipeline = item.badge === "Zahlung";
+  const isHockey = item.kind === "hockey";
   const inner = (
     <div
       className={cn(
@@ -79,12 +119,20 @@ function AgendaRow({ item }: { item: AgendaItem }) {
           : KIND_ACCENT[item.kind]
       )}
     >
-      <Icon
-        className="size-8 shrink-0 self-center text-muted-foreground"
-        strokeWidth={APP_ICON_STROKE}
-        absoluteStrokeWidth
-        aria-hidden
-      />
+      {isHockey && item.logos ? (
+        <span className="flex shrink-0 items-center gap-1 self-center">
+          <TeamLogo label="Heim" src={item.logos.left} />
+          <span className="text-[10px] text-muted-foreground">vs</span>
+          <TeamLogo label="Gast" src={item.logos.right} />
+        </span>
+      ) : (
+        <Icon
+          className="size-8 shrink-0 self-center text-muted-foreground"
+          strokeWidth={APP_ICON_STROKE}
+          absoluteStrokeWidth
+          aria-hidden
+        />
+      )}
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium">{item.title}</p>
         {item.subtitle ? (
@@ -106,7 +154,8 @@ function AgendaRow({ item }: { item: AgendaItem }) {
           variant="secondary"
           className={cn(
             "text-[10px]",
-            isPaymentPipeline && "bg-sky-100 text-sky-900"
+            isPaymentPipeline && "bg-sky-100 text-sky-900",
+            isHockey && "bg-rose-50 text-rose-800"
           )}
         >
           {item.badge}
@@ -126,6 +175,49 @@ function AgendaRow({ item }: { item: AgendaItem }) {
     );
   }
   return inner;
+}
+
+function NextHockeyCard({ game }: { game: HockeyGameCard }) {
+  return (
+    <Card className="border-border/70">
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Trophy className="size-4 text-rose-700" />
+          Nächstes Spiel
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex min-w-0 flex-1 flex-col items-center gap-1 text-center">
+            <TeamLogo
+              label={game.homeTeam.label}
+              src={game.homeTeam.logoUrl}
+              size="md"
+            />
+            <p className="line-clamp-2 text-xs font-medium">{game.homeTeam.label}</p>
+          </div>
+          <div className="shrink-0 text-center">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              {game.isHome ? "Heim" : "Auswärts"}
+            </p>
+            <p className="text-sm font-bold tabular-nums">{game.time || "—"}</p>
+          </div>
+          <div className="flex min-w-0 flex-1 flex-col items-center gap-1 text-center">
+            <TeamLogo
+              label={game.awayTeam.label}
+              src={game.awayTeam.logoUrl}
+              size="md"
+            />
+            <p className="line-clamp-2 text-xs font-medium">{game.awayTeam.label}</p>
+          </div>
+        </div>
+        <p className="text-center text-xs text-muted-foreground">
+          {weekdayLabel(game.date)}
+          {game.location ? ` · ${game.location}` : ""}
+        </p>
+      </CardContent>
+    </Card>
+  );
 }
 
 export function OverviewDashboard({
@@ -335,6 +427,10 @@ export function OverviewDashboard({
                 </div>
               </CardContent>
             </Card>
+
+            {data.hockey.nextGame ? (
+              <NextHockeyCard game={data.hockey.nextGame} />
+            ) : null}
 
             <Card>
               <CardHeader className="pb-2">
