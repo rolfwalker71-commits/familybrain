@@ -242,12 +242,17 @@ export async function getDashboardOverview(
   }>;
 
   let openDueAmount = 0;
+  let openDueCount = 0;
   for (const row of invoices) {
     const planned =
       row.payment_planned_date && row.payment_planned_date.trim()
         ? row.payment_planned_date.slice(0, 10)
         : null;
     const inPipeline = Boolean(planned && planned >= today);
+    if (!inPipeline) {
+      openDueCount += 1;
+      if (row.amount != null) openDueAmount += Number(row.amount);
+    }
     const dueRaw = (row.due_date || row.invoice_date || today).slice(0, 10);
     // Pipeline → show on planned payment day; otherwise due/invoice date
     const rawDate = inPipeline ? planned! : dueRaw;
@@ -258,7 +263,6 @@ export async function getDashboardOverview(
       useDate = start;
     }
     if (!useDate) continue;
-    if (row.amount != null) openDueAmount += Number(row.amount);
     const methodLabel = paymentMethodLabel(row.payment_method);
     agenda.push({
       id: `inv-${row.document_id}`,
@@ -683,7 +687,7 @@ export async function getDashboardOverview(
       triagePending: countPendingTriageDocuments(),
       urgentDeadlines,
       openDueAmount,
-      openDueCount: invoices.length,
+      openDueCount,
     },
     agenda,
     upcoming14,

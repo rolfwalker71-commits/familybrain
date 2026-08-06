@@ -8,6 +8,19 @@ function todayIso(): string {
 }
 
 /**
+ * Active pipeline: planned payment date is today or in the future.
+ * Bind `today` (YYYY-MM-DD) as the sole `?` placeholder.
+ */
+export const SQL_DOC_IN_PAYMENT_PIPELINE = `(
+  d.payment_planned_date IS NOT NULL
+  AND TRIM(d.payment_planned_date) != ''
+  AND substr(TRIM(d.payment_planned_date), 1, 10) >= ?
+)`;
+
+/** Negation of {@link SQL_DOC_IN_PAYMENT_PIPELINE} (same `?` bind for today). */
+export const SQL_DOC_NOT_IN_PAYMENT_PIPELINE = `NOT ${SQL_DOC_IN_PAYMENT_PIPELINE}`;
+
+/**
  * Schedule a payment in the pipeline (stays open until planned date has passed).
  */
 export function scheduleDocumentPayment(input: {

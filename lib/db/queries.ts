@@ -37,6 +37,10 @@ import {
   UNKNOWN_RECIPIENT_LABEL,
 } from "@/lib/family/queries";
 import { looksLikeLohnabrechnung, resolveTaxYear } from "@/lib/extraction/tax";
+import {
+  SQL_DOC_IN_PAYMENT_PIPELINE,
+  SQL_DOC_NOT_IN_PAYMENT_PIPELINE,
+} from "@/lib/finance/payment-pipeline";
 
 function aiIconPublicUrl(aiIconPath: string | null | undefined): string | null {
   if (!aiIconPath) return null;
@@ -770,7 +774,8 @@ export function getDashboardStats() {
       .get(daysAgo(ACTION_OVERDUE_LOOKBACK_DAYS)) as { c: number }
   ).c;
 
-  /** Same source as Action-Inbox «Offene Rechnungen»: Paperless Zu bezahlen & not Bezahlt. */
+  /** Same source as Finance «Offene Rechnungen»: Zu bezahlen, not Bezahlt, not in payment pipeline. */
+  const today = new Date().toISOString().slice(0, 10);
   const openDueFinance = db
     .prepare(
       `SELECT
@@ -785,9 +790,10 @@ export function getDashboardStats() {
        FROM paperless_documents d
        WHERE COALESCE(d.sync_status, 'synced') != 'missing'
          AND d.zu_bezahlen = 1
-         AND COALESCE(d.bezahlt, 0) = 0`
+         AND COALESCE(d.bezahlt, 0) = 0
+         AND ${SQL_DOC_NOT_IN_PAYMENT_PIPELINE}`
     )
-    .get() as {
+    .get(today) as {
     open_unpaid_count: number;
     open_amount: number;
   };
@@ -1197,10 +1203,11 @@ export function getDashboardInbox(limits = { each: 5 }) {
          AND d.zu_bezahlen = 1
          AND COALESCE(d.bezahlt, 0) = 0
          AND COALESCE(d.sync_status, 'synced') != 'missing'
+         AND ${SQL_DOC_NOT_IN_PAYMENT_PIPELINE}
        ORDER BY f.due_date ASC
        LIMIT ?`
     )
-    .all(dueUntil, overdueSince, limit);
+    .all(dueUntil, overdueSince, today, limit);
 
   const openUnpaidInvoices = listOpenUnpaidInvoices(Math.max(limit, 8));
 
@@ -1792,9 +1799,9 @@ export function getFinanceOverview() {
     )
     .all(yearStr);
 
-  const dueInvoices = db
-    .prepare(
-      `SELECT
+  const financeToday = new Date().toISOString().slice(0, 10);
+
+  const openInvoiceSelect = `
           COALESCE(f.id, d.id) AS id,
           f.id AS financial_item_id,
           COALESCE(NULLIF(TRIM(f.vendor), ''), d.correspondent_name) AS vendor,
@@ -1809,6 +1816,8 @@ export function getFinanceOverview() {
           d.paperless_id,
           d.zu_bezahlen,
           d.bezahlt,
+          d.payment_planned_date,
+          d.payment_method,
           d.ai_icon_path,
           d.recipient_status,
           d.recipient_member_ids,
@@ -1829,7 +1838,12 @@ export function getFinanceOverview() {
        )
        WHERE COALESCE(d.sync_status, 'synced') != 'missing'
          AND d.zu_bezahlen = 1
-         AND COALESCE(d.bezahlt, 0) = 0
+         AND COALESCE(d.bezahlt, 0) = 0`;
+
+  const dueInvoices = db
+    .prepare(
+      `SELECT ${openInvoiceSelect}
+         AND ${SQL_DOC_NOT_IN_PAYMENT_PIPELINE}
        ORDER BY
          CASE
            WHEN f.due_date IS NOT NULL AND TRIM(f.due_date) != '' THEN 0
@@ -1838,7 +1852,17 @@ export function getFinanceOverview() {
          f.due_date ASC,
          d.id ASC`
     )
-    .all();
+    .all(financeToday);
+
+  const plannedPaymentInvoices = db
+    .prepare(
+      `SELECT ${openInvoiceSelect}
+         AND ${SQL_DOC_IN_PAYMENT_PIPELINE}
+       ORDER BY
+         substr(TRIM(d.payment_planned_date), 1, 10) ASC,
+         d.id ASC`
+    )
+    .all(financeToday);
 
   // All counted positions (all years) for history drilldowns + current-year filters client-side
   const detailInvoices = db
@@ -1872,6 +1896,7 @@ export function getFinanceOverview() {
     recurring: withIcons(recurring),
     topInvoices: withIcons(topInvoices),
     dueInvoices: withIcons(dueInvoices),
+    plannedPaymentInvoices: withIcons(plannedPaymentInvoices),
     detailInvoices: withIcons(detailInvoices),
     totals,
     excludedCount,

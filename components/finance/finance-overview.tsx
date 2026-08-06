@@ -16,6 +16,7 @@ import {
   List,
   PieChart,
   Search,
+  HandCoins,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -71,6 +72,7 @@ import type { CalendarEvent } from "@/lib/utils/ics";
 import { financeBucket } from "@/lib/extraction/normalize-categories";
 import { RecipientAvatars } from "@/components/family/recipient-avatars";
 import type { RecipientAvatarInfo } from "@/components/family/recipient-avatars";
+import { paymentMethodLabel } from "@/lib/finance/payment-methods";
 
 const DUE_VISIBILITY_DAYS = 180;
 
@@ -93,6 +95,8 @@ type InvoiceRow = {
   paperless_id?: number | null;
   ai_icon_url?: string | null;
   recipients?: RecipientAvatarInfo;
+  payment_planned_date?: string | null;
+  payment_method?: string | null;
 };
 
 type Dimension = "year" | "vendor" | "category";
@@ -109,6 +113,7 @@ type Props = {
   recurring: InvoiceRow[];
   topInvoices: InvoiceRow[];
   dueInvoices: InvoiceRow[];
+  plannedPaymentInvoices: InvoiceRow[];
   detailInvoices: InvoiceRow[];
   excludedCount: number;
   unknownVendor: { count: number; total: number };
@@ -273,6 +278,7 @@ function FinanceOverviewClientInner({
   recurring,
   topInvoices,
   dueInvoices,
+  plannedPaymentInvoices,
   detailInvoices: allInvoices,
   excludedCount,
   unknownVendor,
@@ -291,6 +297,7 @@ function FinanceOverviewClientInner({
     "amount"
   );
   const [dueOpen, setDueOpen] = useState(true);
+  const [plannedOpen, setPlannedOpen] = useState(true);
   const [olderDueOpen, setOlderDueOpen] = useState(false);
   const [sortDir, setSortDir] = useListSortDir("finance-due", "desc");
   const [selectedDocIds, setSelectedDocIds] = useState<Set<number>>(
@@ -341,6 +348,11 @@ function FinanceOverviewClientInner({
   const recentDueTotal = useMemo(
     () => sumAmount(recentDueInvoices),
     [recentDueInvoices]
+  );
+
+  const plannedPaymentTotal = useMemo(
+    () => sumAmount(plannedPaymentInvoices),
+    [plannedPaymentInvoices]
   );
 
   const olderDueTotal = useMemo(
@@ -701,8 +713,7 @@ function FinanceOverviewClientInner({
                   Offene Rechnungen (Zu bezahlen)
                 </div>
                 <p className="mt-1 text-sm opacity-80">
-                  Paperless «Zu bezahlen» und nicht «Bezahlt» ·{" "}
-                  {recentDueInvoices.length} offen
+                  Ohne geplante Zahlung · {recentDueInvoices.length} offen
                   {recentDueInvoices.length !== sortedDueInvoices.length
                     ? ` von ${sortedDueInvoices.length}`
                     : ""}{" "}
@@ -771,8 +782,7 @@ function FinanceOverviewClientInner({
             <CardContent className="space-y-0 p-0">
               {recentDueInvoices.length === 0 ? (
                 <div className="px-6 py-4 text-sm text-muted-foreground">
-                  Keine offenen Rechnungen (Paperless «Zu bezahlen» / nicht
-                  «Bezahlt»).
+                  Keine offenen Rechnungen ohne geplante Zahlung.
                 </div>
               ) : (
                 <div className="space-y-4 p-4">
@@ -828,6 +838,65 @@ function FinanceOverviewClientInner({
                   ) : null}
                 </div>
               ) : null}
+            </CardContent>
+          ) : null}
+        </Card>
+      ) : null}
+
+      {plannedPaymentInvoices.length > 0 ? (
+        <Card
+          tone="sky"
+          className="min-w-0 overflow-hidden border-sky-300/80 p-0 shadow-[0_4px_16px_rgba(20,32,28,0.05)] [--card-spacing:0px]"
+        >
+          <div
+            className={cn(
+              "flex flex-wrap items-center justify-between gap-3 border-b px-4 py-1.5",
+              toneSurface("sky").title
+            )}
+          >
+            <button
+              type="button"
+              onClick={() => setPlannedOpen((v) => !v)}
+              className="flex min-w-0 flex-1 items-start gap-2 text-left"
+              aria-expanded={plannedOpen}
+            >
+              <ChevronDown
+                className={cn(
+                  "mt-1.5 h-4 w-4 shrink-0 text-sky-700 transition-transform",
+                  !plannedOpen && "-rotate-90"
+                )}
+              />
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 text-[16px] font-bold">
+                  <IconCircle icon={HandCoins} tone="sky" size="sm" />
+                  Geplante Zahlungen
+                </div>
+                <p className="mt-1 text-sm opacity-80">
+                  Beglichen mit künftigem Zahldatum ·{" "}
+                  {plannedPaymentInvoices.length}{" "}
+                  {plannedPaymentInvoices.length === 1
+                    ? "Rechnung"
+                    : "Rechnungen"}{" "}
+                  · {formatCHF(plannedPaymentTotal)}
+                </p>
+              </div>
+            </button>
+          </div>
+          {plannedOpen ? (
+            <CardContent className="space-y-0 p-0">
+              <div className="grid grid-cols-1 gap-2.5 p-4 sm:grid-cols-2 xl:grid-cols-3">
+                {plannedPaymentInvoices.map((row) => (
+                  <DueInvoiceCard
+                    key={`planned-${row.document_local_id}`}
+                    row={row}
+                    today={today}
+                    selected={false}
+                    onToggle={() => undefined}
+                    mode="planned"
+                    hideSelect
+                  />
+                ))}
+              </div>
             </CardContent>
           ) : null}
         </Card>
@@ -1353,34 +1422,48 @@ function DueInvoiceCard({
   today,
   selected,
   onToggle,
+  mode = "open",
+  hideSelect = false,
 }: {
   row: InvoiceRow;
   today: string;
   selected: boolean;
   onToggle: (documentLocalId: number) => void;
+  mode?: "open" | "planned";
+  hideSelect?: boolean;
 }) {
   const urgency = dueUrgency(row.due_date, today);
   const vendor = row.vendor?.trim() || "Unbekannt";
   const subtitle =
     row.description || row.document_title || row.category || null;
+  const plannedDate = row.payment_planned_date?.slice(0, 10) || null;
+  const method = paymentMethodLabel(row.payment_method);
 
   return (
     <article
       className={cn(
         "relative flex min-w-0 flex-col gap-1.5 rounded-xl border border-border/70 bg-card p-3.5 shadow-[0_4px_16px_rgba(20,32,28,0.05)]",
         !isCountedInStats(row) && "opacity-60",
-        selected && "border-[var(--brand-finance)] ring-2 ring-[var(--brand-finance)]/25"
+        selected && "border-[var(--brand-finance)] ring-2 ring-[var(--brand-finance)]/25",
+        mode === "planned" && "border-sky-200/80 bg-sky-50/30"
       )}
     >
       <div className="flex items-start justify-between gap-2">
-        <label className="flex min-w-0 flex-1 cursor-pointer items-start gap-2.5">
-          <input
-            type="checkbox"
-            className="mt-1 size-4 shrink-0 accent-[var(--brand-finance)]"
-            checked={selected}
-            onChange={() => onToggle(row.document_local_id)}
-            aria-label={`${vendor} auswählen`}
-          />
+        <label
+          className={cn(
+            "flex min-w-0 flex-1 items-start gap-2.5",
+            hideSelect ? "" : "cursor-pointer"
+          )}
+        >
+          {hideSelect ? null : (
+            <input
+              type="checkbox"
+              className="mt-1 size-4 shrink-0 accent-[var(--brand-finance)]"
+              checked={selected}
+              onChange={() => onToggle(row.document_local_id)}
+              aria-label={`${vendor} auswählen`}
+            />
+          )}
           <Link
             href={`/documents/${row.document_local_id}`}
             className="min-w-0 flex-1"
@@ -1396,14 +1479,21 @@ function DueInvoiceCard({
         </label>
         <DocumentInfoButton documentId={row.document_local_id} size="icon-sm" />
       </div>
-      <p
-        className={cn(
-          "text-xs font-semibold",
-          dueUrgencyTextClass(urgency)
-        )}
-      >
-        {formatDueRelative(row.due_date, today)}
-      </p>
+      {mode === "planned" && plannedDate ? (
+        <p className="text-xs font-semibold text-sky-900">
+          Zahlung geplant {toSwissDate(plannedDate)}
+          {method ? ` · ${method}` : ""}
+        </p>
+      ) : (
+        <p
+          className={cn(
+            "text-xs font-semibold",
+            dueUrgencyTextClass(urgency)
+          )}
+        >
+          {formatDueRelative(row.due_date, today)}
+        </p>
+      )}
       {subtitle ? (
         <p className="line-clamp-2 text-xs text-muted-foreground">{subtitle}</p>
       ) : null}
