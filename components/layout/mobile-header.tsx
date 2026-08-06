@@ -153,12 +153,12 @@ export function MobileHeader() {
         <span
           className={
             useBuddyMark
-              ? "flex size-9 items-center justify-center overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-border/50"
+              ? "flex size-10 items-center justify-center"
               : `flex size-9 items-center justify-center rounded-full ${brand.iconWrapClass}`
           }
         >
           {useBuddyMark ? (
-            <BuddyLogo size={32} className="size-8" />
+            <BuddyLogo size={40} className="size-10 drop-shadow-sm" />
           ) : (
             <BrandIcon className="size-5 stroke-[2.25]" />
           )}

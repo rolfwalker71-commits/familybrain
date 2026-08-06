@@ -49,8 +49,8 @@ export function LoginForm({ nextPath }: { nextPath: string }) {
     <Card className="mx-auto w-full max-w-md border-white/50 bg-white/95 shadow-2xl shadow-slate-950/20 backdrop-blur">
       <CardHeader className="space-y-5 px-6 pb-2 pt-7 sm:px-8">
         <div className="flex items-center gap-4">
-          <span className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white shadow-lg shadow-slate-950/10 ring-1 ring-border/60">
-            <BuddyLogo size={52} className="size-[52px]" priority />
+          <span className="flex size-16 shrink-0 items-center justify-center">
+            <BuddyLogo size={64} className="size-16 drop-shadow-md" priority />
           </span>
           <div>
             <p className="text-sm font-medium text-primary">{BRAND.app}</p>

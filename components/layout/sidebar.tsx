@@ -321,8 +321,8 @@ export function Sidebar({
             onNavigate?.();
           }}
         >
-          <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white shadow-sm">
-            <BuddyLogo size={44} className="h-11 w-11" priority />
+          <span className="flex h-14 w-14 shrink-0 items-center justify-center">
+            <BuddyLogo size={56} className="h-14 w-14 drop-shadow-md" priority />
           </span>
           <span className="text-3xl font-extrabold leading-none tracking-tight text-white">
             {brandTitle}
