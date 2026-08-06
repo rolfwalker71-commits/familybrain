@@ -24,6 +24,7 @@ import { formatCHF } from "@/lib/utils/format";
 import { toSwissDate } from "@/lib/utils/dates";
 import { cn } from "@/lib/utils";
 import { APP_ICON_STROKE } from "@/lib/branding/app-icons";
+import { windDirectionDe } from "@/lib/trips/weather";
 import type {
   AgendaItem,
   AgendaKind,
@@ -135,23 +136,93 @@ function WeatherChip({ weather }: { weather: AgendaWeatherChip }) {
 }
 
 function HomeWeatherWidget({ weather }: { weather: HomeWeatherCard }) {
+  const windDir =
+    weather.windDirectionDeg != null &&
+    Number.isFinite(weather.windDirectionDeg)
+      ? windDirectionDe(weather.windDirectionDeg)
+      : null;
+  const precip =
+    weather.precipitationMm != null && weather.precipitationMm > 0
+      ? `${weather.precipitationMm.toFixed(1).replace(".", ",")} mm`
+      : "0 mm";
+
   return (
-    <Card className="border-border/70">
-      <CardContent className="flex items-center gap-3 p-4">
-        <span className="text-3xl leading-none" aria-hidden>
-          {weather.icon}
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-xs font-medium text-muted-foreground">Wetter jetzt</p>
-          <p className="text-lg font-semibold tabular-nums tracking-tight">
-            {weather.temperatureC} °C
-            <span className="ml-1.5 text-sm font-medium text-muted-foreground">
-              {weather.placeLabel}
+    <Card className="border-border/70 overflow-hidden">
+      <CardContent className="p-0">
+        <div className="flex items-stretch gap-0">
+          <div className="flex w-[5.5rem] shrink-0 flex-col items-center justify-center bg-sky-50/90 px-2 py-4">
+            <span className="text-5xl leading-none" aria-hidden>
+              {weather.icon}
             </span>
-          </p>
-          <p className="truncate text-xs text-muted-foreground">
-            {weather.weatherLabelDe}
-          </p>
+            <p className="mt-2 text-center text-[11px] font-semibold uppercase tracking-wide text-sky-900/70">
+              Jetzt
+            </p>
+          </div>
+          <div className="min-w-0 flex-1 space-y-3 px-4 py-3.5">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold tracking-tight text-foreground">
+                  {weather.placeLabel}
+                </p>
+                <p className="text-xs capitalize text-muted-foreground">
+                  {weather.weatherLabelDe}
+                </p>
+              </div>
+              <p className="shrink-0 text-3xl font-bold tabular-nums tracking-tight">
+                {weather.temperatureC}°
+              </p>
+            </div>
+            {(weather.temperatureMinC != null ||
+              weather.temperatureMaxC != null) && (
+              <p className="text-xs tabular-nums text-muted-foreground">
+                Heute{" "}
+                <span className="font-medium text-foreground">
+                  {weather.temperatureMinC ?? "—"}°
+                </span>
+                {" – "}
+                <span className="font-medium text-foreground">
+                  {weather.temperatureMaxC ?? "—"}°
+                </span>
+              </p>
+            )}
+            <div className="grid grid-cols-3 gap-2 border-t border-border/50 pt-2.5">
+              <div className="min-w-0">
+                <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Wind
+                </p>
+                <p className="truncate text-sm font-semibold tabular-nums">
+                  {weather.windSpeedKmh != null
+                    ? `${weather.windSpeedKmh}`
+                    : "—"}
+                  <span className="ml-0.5 text-[11px] font-medium text-muted-foreground">
+                    km/h
+                  </span>
+                </p>
+                {windDir ? (
+                  <p className="text-[10px] text-muted-foreground">{windDir}</p>
+                ) : null}
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Feuchte
+                </p>
+                <p className="truncate text-sm font-semibold tabular-nums">
+                  {weather.humidityPct != null ? weather.humidityPct : "—"}
+                  <span className="ml-0.5 text-[11px] font-medium text-muted-foreground">
+                    %
+                  </span>
+                </p>
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Regen
+                </p>
+                <p className="truncate text-sm font-semibold tabular-nums">
+                  {precip}
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       </CardContent>
     </Card>

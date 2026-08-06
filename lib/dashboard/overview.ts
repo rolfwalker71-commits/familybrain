@@ -74,9 +74,15 @@ export type AgendaItem = {
 export type HomeWeatherCard = {
   placeLabel: string;
   temperatureC: number;
+  temperatureMaxC: number | null;
+  temperatureMinC: number | null;
   weatherCode: number;
   weatherLabelDe: string;
   icon: string;
+  windSpeedKmh: number | null;
+  windDirectionDeg: number | null;
+  humidityPct: number | null;
+  precipitationMm: number | null;
   observedAt: string | null;
 };
 
@@ -831,9 +837,27 @@ export async function getDashboardOverview(
     ? {
         placeLabel: homeWeatherRaw.placeLabel,
         temperatureC: Math.round(homeWeatherRaw.current.temperatureC),
+        temperatureMaxC:
+          homeWeatherRaw.today != null
+            ? Math.round(homeWeatherRaw.today.temperatureMaxC)
+            : null,
+        temperatureMinC:
+          homeWeatherRaw.today != null
+            ? Math.round(homeWeatherRaw.today.temperatureMinC)
+            : null,
         weatherCode: homeWeatherRaw.current.weatherCode,
         weatherLabelDe: homeWeatherRaw.current.weatherLabelDe,
         icon: weatherConditionIcon(homeWeatherRaw.current.weatherCode),
+        windSpeedKmh:
+          homeWeatherRaw.current.windSpeedKmh != null
+            ? Math.round(homeWeatherRaw.current.windSpeedKmh)
+            : null,
+        windDirectionDeg: homeWeatherRaw.current.windDirectionDeg,
+        humidityPct:
+          homeWeatherRaw.current.humidityPct != null
+            ? Math.round(homeWeatherRaw.current.humidityPct)
+            : null,
+        precipitationMm: homeWeatherRaw.current.precipitationMm,
         observedAt: homeWeatherRaw.current.observedAt,
       }
     : null;

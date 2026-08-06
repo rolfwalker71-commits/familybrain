@@ -190,13 +190,23 @@ export async function fetchDailyForecast(
 export async function fetchHomeWeather(): Promise<{
   placeLabel: string;
   current: CurrentWeather;
+  today: DayWeather | null;
 } | null> {
   try {
-    const current = await fetchCurrentWeather(
-      HOME_WEATHER.lat,
-      HOME_WEATHER.lon
-    );
-    return { placeLabel: HOME_WEATHER.label, current };
+    const [current, days] = await Promise.all([
+      fetchCurrentWeather(HOME_WEATHER.lat, HOME_WEATHER.lon),
+      fetchDailyForecast(HOME_WEATHER.lat, HOME_WEATHER.lon, 2).catch(
+        () => [] as DayWeather[]
+      ),
+    ]);
+    const todayIso = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Europe/Zurich",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date());
+    const today = days.find((d) => d.date === todayIso) || days[0] || null;
+    return { placeLabel: HOME_WEATHER.label, current, today };
   } catch (error) {
     console.warn(
       "[weather] home fetch failed:",
