@@ -44,6 +44,10 @@ export type AgendaItem = {
   score?: string | null;
   /** Hockey goal scorers (short names) */
   scorers?: string[] | null;
+  /** Hockey kickoff time (Europe/Zurich), e.g. "19:00" */
+  time?: string | null;
+  /** Hockey venue */
+  location?: string | null;
 };
 
 export type HockeyGameCard = {
@@ -214,17 +218,8 @@ function hockeyAgendaMeta(game: HockeyGame): {
   scorers: string[] | null;
 } {
   const score = game.result ? formatHockeyScoreLine(game.result) : null;
-  let dateLabel = game.date;
-  try {
-    dateLabel = new Date(`${game.date}T12:00:00`).toLocaleDateString("de-CH", {
-      weekday: "short",
-      day: "numeric",
-      month: "short",
-    });
-  } catch {
-    /* keep iso */
-  }
-  const parts = [dateLabel, score, game.time, game.location].filter(Boolean);
+  // Date lives in the day group header (left agenda) — not repeated here.
+  const parts = [score, game.time, game.location].filter(Boolean);
   const scorers =
     game.result?.scorers && game.result.scorers.length > 0
       ? game.result.scorers
@@ -571,6 +566,8 @@ export async function getDashboardOverview(
       badge: meta.badge,
       score: meta.score,
       scorers: meta.scorers,
+      time: game.time,
+      location: game.location,
       logos: {
         left: game.homeTeam.logoUrl || null,
         right: game.awayTeam.logoUrl || null,
@@ -641,6 +638,8 @@ export async function getDashboardOverview(
       badge: meta.badge,
       score: meta.score,
       scorers: meta.scorers,
+      time: game.time,
+      location: game.location,
       logos: {
         left: game.homeTeam.logoUrl || null,
         right: game.awayTeam.logoUrl || null,

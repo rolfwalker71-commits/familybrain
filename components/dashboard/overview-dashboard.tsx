@@ -110,11 +110,40 @@ function weekdayLabel(iso: string): string {
   }
 }
 
-function AgendaRow({ item }: { item: AgendaItem }) {
+function AgendaRow({
+  item,
+  variant = "agenda",
+}: {
+  item: AgendaItem;
+  /** upcoming: hockey shows date+time / location / Heim|Auswärts on three lines */
+  variant?: "agenda" | "upcoming";
+}) {
   const Icon = KIND_ICON[item.kind];
   const isPaymentPipeline = item.badge === "Zahlung";
   const isHockey = item.kind === "hockey";
   const hasLogos = Boolean(item.logos?.left || item.logos?.right);
+  const upcomingHockey = isHockey && hasLogos && variant === "upcoming";
+
+  let hockeyDateLabel = item.date;
+  try {
+    hockeyDateLabel = new Date(`${item.date}T12:00:00`).toLocaleDateString(
+      "de-CH",
+      {
+        weekday: "short",
+        day: "numeric",
+        month: "short",
+      }
+    );
+  } catch {
+    /* keep iso */
+  }
+
+  const upcomingLine1 = [hockeyDateLabel, item.time, item.score]
+    .filter(Boolean)
+    .join(" · ");
+  const upcomingLine2 = item.location || null;
+  const upcomingLine3 = item.title;
+
   const inner = (
     <div
       className={cn(
@@ -148,7 +177,21 @@ function AgendaRow({ item }: { item: AgendaItem }) {
         </div>
       ) : null}
       <div className="min-w-0 flex-1">
-        {isHockey && hasLogos ? (
+        {upcomingHockey ? (
+          <>
+            <p className="truncate text-sm font-medium text-foreground">
+              {upcomingLine1}
+            </p>
+            {upcomingLine2 ? (
+              <p className="truncate text-xs text-muted-foreground">
+                {upcomingLine2}
+              </p>
+            ) : null}
+            <p className="truncate text-xs text-muted-foreground">
+              {upcomingLine3}
+            </p>
+          </>
+        ) : isHockey && hasLogos ? (
           <>
             {item.subtitle ? (
               <p className="truncate text-sm font-medium text-foreground">
@@ -510,7 +553,11 @@ export function OverviewDashboard({
                       </p>
                       <div className="space-y-2">
                         {items.map((item) => (
-                          <AgendaRow key={item.id} item={item} />
+                          <AgendaRow
+                            key={item.id}
+                            item={item}
+                            variant="upcoming"
+                          />
                         ))}
                       </div>
                     </div>
