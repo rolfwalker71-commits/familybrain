@@ -66,10 +66,11 @@ function TeamLogo({
 }: {
   label: string;
   src: string | null | undefined;
-  size?: "sm" | "md";
+  size?: "sm" | "md" | "lg";
 }) {
   const [failed, setFailed] = useState(false);
-  const box = size === "md" ? "size-10" : "size-8";
+  const box =
+    size === "lg" ? "size-14" : size === "md" ? "size-11" : "size-8";
   if (!src || failed) {
     return (
       <span
@@ -78,6 +79,7 @@ function TeamLogo({
           "flex shrink-0 items-center justify-center rounded-full bg-rose-50 text-[10px] font-bold uppercase text-rose-700"
         )}
         aria-hidden
+        title={label}
       >
         {label.slice(0, 2)}
       </span>
@@ -87,7 +89,8 @@ function TeamLogo({
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src={src}
-      alt=""
+      alt={label}
+      title={label}
       className={cn(box, "shrink-0 rounded-full bg-white object-contain p-0.5")}
       onError={() => setFailed(true)}
     />
@@ -111,26 +114,56 @@ function AgendaRow({ item }: { item: AgendaItem }) {
   const Icon = KIND_ICON[item.kind];
   const isPaymentPipeline = item.badge === "Zahlung";
   const isHockey = item.kind === "hockey";
+  const hasLogos = Boolean(item.logos?.left || item.logos?.right);
   const inner = (
     <div
       className={cn(
-        "flex items-start gap-3 rounded-xl border border-border/60 border-l-4 bg-card px-3 py-2.5 shadow-[0_2px_10px_rgba(20,32,28,0.04)]",
+        "flex items-center gap-3 rounded-xl border border-border/60 border-l-4 bg-card px-3 py-2.5 shadow-[0_2px_10px_rgba(20,32,28,0.04)]",
         isPaymentPipeline
           ? "border-l-sky-500 bg-sky-50/40"
           : KIND_ACCENT[item.kind]
       )}
     >
       <Icon
-        className="size-8 shrink-0 self-center text-muted-foreground"
+        className="size-8 shrink-0 text-muted-foreground"
         strokeWidth={APP_ICON_STROKE}
         absoluteStrokeWidth
         aria-hidden
       />
+      {isHockey && hasLogos ? (
+        <div className="flex shrink-0 items-center gap-1.5" aria-hidden>
+          <TeamLogo
+            label={item.logos?.leftLabel || "Heim"}
+            src={item.logos?.left}
+            size="md"
+          />
+          <TeamLogo
+            label={item.logos?.rightLabel || "Gast"}
+            src={item.logos?.right}
+            size="md"
+          />
+        </div>
+      ) : null}
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium">{item.title}</p>
-        {item.subtitle ? (
-          <p className="truncate text-xs text-muted-foreground">{item.subtitle}</p>
-        ) : null}
+        {isHockey && hasLogos ? (
+          <>
+            {item.subtitle ? (
+              <p className="truncate text-sm font-medium text-foreground">
+                {item.subtitle}
+              </p>
+            ) : null}
+            <p className="truncate text-xs text-muted-foreground">{item.title}</p>
+          </>
+        ) : (
+          <>
+            <p className="truncate text-sm font-medium">{item.title}</p>
+            {item.subtitle ? (
+              <p className="truncate text-xs text-muted-foreground">
+                {item.subtitle}
+              </p>
+            ) : null}
+          </>
+        )}
         {isPaymentPipeline ? (
           <p className="mt-1 text-[11px] font-medium text-sky-800">
             Zahlung geplant — noch in der Pipeline
@@ -181,13 +214,12 @@ function NextHockeyCard({ game }: { game: HockeyGameCard }) {
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="flex items-center justify-between gap-3">
-          <div className="flex min-w-0 flex-1 flex-col items-center gap-1 text-center">
+          <div className="flex min-w-0 flex-1 justify-center">
             <TeamLogo
               label={game.homeTeam.label}
               src={game.homeTeam.logoUrl}
-              size="md"
+              size="lg"
             />
-            <p className="line-clamp-2 text-xs font-medium">{game.homeTeam.label}</p>
           </div>
           <div className="shrink-0 text-center">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -195,13 +227,12 @@ function NextHockeyCard({ game }: { game: HockeyGameCard }) {
             </p>
             <p className="text-sm font-bold tabular-nums">{game.time || "—"}</p>
           </div>
-          <div className="flex min-w-0 flex-1 flex-col items-center gap-1 text-center">
+          <div className="flex min-w-0 flex-1 justify-center">
             <TeamLogo
               label={game.awayTeam.label}
               src={game.awayTeam.logoUrl}
-              size="md"
+              size="lg"
             />
-            <p className="line-clamp-2 text-xs font-medium">{game.awayTeam.label}</p>
           </div>
         </div>
         <p className="text-center text-xs text-muted-foreground">

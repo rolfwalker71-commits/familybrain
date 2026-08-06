@@ -7,10 +7,6 @@ import {
   getUpcomingHockeyGames,
   type HockeyGame,
 } from "@/lib/hockey/games";
-import {
-  HOME_TEAM_KEY,
-  hockeyTeamLogoUrl,
-} from "@/lib/hockey/teams";
 import { daysFromNow, toSwissDate } from "@/lib/utils/dates";
 
 export type OverviewPeriod = "week" | "month" | "quarter" | "half" | "year";
@@ -36,8 +32,13 @@ export type AgendaItem = {
   /** Prefer over document link when set (e.g. FinanzBuddy ledger). */
   href: string | null;
   badge: string;
-  /** Optional logos: for hockey, left = own team (Ambri), right = opponent. */
-  logos?: { left: string | null; right: string | null } | null;
+  /** Optional logos: for hockey, home (left) vs away (right). */
+  logos?: {
+    left: string | null;
+    right: string | null;
+    leftLabel?: string | null;
+    rightLabel?: string | null;
+  } | null;
 };
 
 export type HockeyGameCard = {
@@ -510,26 +511,22 @@ export async function getDashboardOverview(
 
   for (const game of hockeyGames) {
     if (!inRange(game.date, start, end)) continue;
-    const own =
-      game.homeTeam.key === HOME_TEAM_KEY ? game.homeTeam : game.awayTeam;
     agenda.push({
       id: `hk-${game.uid}`,
       kind: "hockey",
       date: game.date,
-      title: game.isHome
-        ? `vs ${game.opponent.label}`
-        : `@ ${game.opponent.label}`,
-      subtitle: [game.time, game.location, game.isHome ? "Heim" : "Auswärts"]
-        .filter(Boolean)
-        .join(" · "),
+      title: game.isHome ? "Heim" : "Auswärts",
+      subtitle: [game.time, game.location].filter(Boolean).join(" · ") || null,
       amount: null,
       currency: null,
       documentId: null,
       href: null,
       badge: "Hockey",
       logos: {
-        left: own.logoUrl || hockeyTeamLogoUrl(HOME_TEAM_KEY),
-        right: game.opponent.logoUrl,
+        left: game.homeTeam.logoUrl || null,
+        right: game.awayTeam.logoUrl || null,
+        leftLabel: game.homeTeam.label,
+        rightLabel: game.awayTeam.label,
       },
     });
   }
@@ -581,24 +578,22 @@ export async function getDashboardOverview(
   }
 
   for (const game of getUpcomingHockeyGames(hockeyGames, new Date(), 6)) {
-    const own =
-      game.homeTeam.key === HOME_TEAM_KEY ? game.homeTeam : game.awayTeam;
     upcoming14.push({
       id: `u-hk-${game.uid}`,
       kind: "hockey",
       date: game.date,
-      title: game.isHome
-        ? `vs ${game.opponent.label}`
-        : `@ ${game.opponent.label}`,
-      subtitle: [game.time, game.location].filter(Boolean).join(" · "),
+      title: game.isHome ? "Heim" : "Auswärts",
+      subtitle: [game.time, game.location].filter(Boolean).join(" · ") || null,
       amount: null,
       currency: null,
       documentId: null,
       href: null,
       badge: "Hockey",
       logos: {
-        left: own.logoUrl || hockeyTeamLogoUrl(HOME_TEAM_KEY),
-        right: game.opponent.logoUrl,
+        left: game.homeTeam.logoUrl || null,
+        right: game.awayTeam.logoUrl || null,
+        leftLabel: game.homeTeam.label,
+        rightLabel: game.awayTeam.label,
       },
     });
   }
