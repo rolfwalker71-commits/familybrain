@@ -152,9 +152,14 @@ function StatementRow({
       >
         <IconCircle icon={Receipt} tone="green" size="sm" shape="rounded" />
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-semibold">
+          <Link
+            href={`/documents/${statement.documentId}`}
+            className="block truncate text-sm font-semibold text-foreground underline-offset-2 hover:underline"
+            title="Beleg öffnen"
+            onClick={(event) => event.stopPropagation()}
+          >
             {statement.title}
-          </span>
+          </Link>
           <span className="text-xs text-muted-foreground">
             {statement.date ? toSwissDate(statement.date.slice(0, 10)) : "Ohne Datum"}
             {" · "}
