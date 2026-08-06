@@ -314,6 +314,16 @@ export function OverviewDashboard({
     return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
   }, [data?.agenda]);
 
+  const upcomingGrouped = useMemo(() => {
+    const map = new Map<string, AgendaItem[]>();
+    for (const item of data?.upcoming14 || []) {
+      const list = map.get(item.date) || [];
+      list.push(item);
+      map.set(item.date, list);
+    }
+    return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
+  }, [data?.upcoming14]);
+
   const hour = new Date().getHours();
   const greeting =
     hour < 11 ? "Guten Morgen" : hour < 18 ? "Guten Tag" : "Guten Abend";
@@ -487,14 +497,23 @@ export function OverviewDashboard({
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">Kommende 14 Tage</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2">
-                {data.upcoming14.length === 0 ? (
+              <CardContent className="space-y-3">
+                {upcomingGrouped.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
                     Keine anstehenden Fristen.
                   </p>
                 ) : (
-                  data.upcoming14.map((item) => (
-                    <AgendaRow key={item.id} item={item} />
+                  upcomingGrouped.map(([date, items]) => (
+                    <div key={date} className="space-y-2">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        {weekdayLabel(date)}
+                      </p>
+                      <div className="space-y-2">
+                        {items.map((item) => (
+                          <AgendaRow key={item.id} item={item} />
+                        ))}
+                      </div>
+                    </div>
                   ))
                 )}
                 <Link

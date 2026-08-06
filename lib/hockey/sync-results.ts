@@ -16,11 +16,14 @@ import {
   writeHockeyResultsStore,
   zurichDateIso,
   zurichHour,
+  zurichMinutesOfDay,
 } from "@/lib/hockey/sofascore";
 import { getSetting, setSetting } from "@/lib/db/migrations";
 
 const LAST_ATTEMPT_KEY = "hockey_sofascore_last_attempt_at";
 const MIN_ATTEMPT_GAP_MS = 45 * 60 * 1000;
+/** Result sync starts at 23:30 Zurich (games usually still ongoing at 22:00). */
+const EVENING_SYNC_FROM_MINUTES = 23 * 60 + 30;
 
 export type HockeyResultSyncSummary = {
   attempted: boolean;
@@ -99,13 +102,13 @@ function gamesNeedingResult(games: HockeyGame[], now: Date): HockeyGame[] {
 }
 
 function shouldRunEveningWindow(now: Date): boolean {
-  const hour = zurichHour(now);
-  // ~23:00 window + overnight catch-up
-  return hour >= 22 || hour < 6;
+  const minutes = zurichMinutesOfDay(now);
+  // From ~23:30 Zurich through overnight catch-up until 06:00
+  return minutes >= EVENING_SYNC_FROM_MINUTES || minutes < 6 * 60;
 }
 
 /**
- * After Ambri match day (~23:00 Zurich), pull final score (+ scorers if quota allows).
+ * After Ambri match day (~23:30 Zurich), pull final score (+ scorers if quota allows).
  * Uses ~1 request (last matches); +1 for incidents when remaining quota is comfortable.
  */
 export async function syncHockeyResultsIfDue(

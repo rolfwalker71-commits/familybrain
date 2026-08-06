@@ -220,6 +220,10 @@ function SettingsPageInner() {
   const [flightTestDate, setFlightTestDate] = useState("2026-10-23");
   const [flightTestBusy, setFlightTestBusy] = useState(false);
   const [flightTestResult, setFlightTestResult] = useState<string | null>(null);
+  const [sofascoreTestBusy, setSofascoreTestBusy] = useState(false);
+  const [sofascoreTestResult, setSofascoreTestResult] = useState<string | null>(
+    null
+  );
   const [ojpTestOrigin, setOjpTestOrigin] = useState("Altdorf UR");
   const [ojpTestDestination, setOjpTestDestination] = useState(
     "Zürich Flughafen"
@@ -1055,6 +1059,48 @@ function SettingsPageInner() {
     }
   }
 
+  async function testSofascoreApi() {
+    setSofascoreTestBusy(true);
+    setSofascoreTestResult(null);
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/hockey/test-sofascore", {
+        method: "POST",
+      });
+      const data = await res.json();
+      setSofascoreTestResult(JSON.stringify(data, null, 2));
+      if (typeof data.sofascoreUsageThisMonth === "number") {
+        setSofascoreUsage(data.sofascoreUsageThisMonth);
+      }
+      if (typeof data.usageThisMonth === "number") {
+        setSofascoreUsage(data.usageThisMonth);
+      }
+      if (typeof data.remainingQuota === "number") {
+        setSofascoreRemaining(data.remainingQuota);
+      }
+      if (typeof data.monthlyLimit === "number") {
+        setSofascoreLimit(data.monthlyLimit);
+      }
+      if (!res.ok || data.ok === false) {
+        setError(data.error || data.hint || `Sofascore-Test: HTTP ${res.status}`);
+      } else {
+        setMessage(
+          data.hint ||
+            `Sofascore ok — ${data.team?.name || "Team geladen"} (${data.remainingQuota ?? "?"} Requests übrig).`
+        );
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message);
+      setSofascoreTestResult(
+        JSON.stringify({ ok: false, error: message }, null, 2)
+      );
+    } finally {
+      setSofascoreTestBusy(false);
+    }
+  }
+
   async function testOjpApi(mode: "trip" | "location") {
     setOjpTestBusy(true);
     setOjpTestResult(null);
@@ -1606,10 +1652,32 @@ function SettingsPageInner() {
               }
             />
             <p className="text-xs text-muted-foreground">
-              Logos (einmalig) und Resultate ca. 23:00 Zürich nach Ambri-Spielen.
+              Logos (einmalig) und Resultate ca. 23:30 Zürich nach Ambri-Spielen.
               Free-Plan: {sofascoreUsage}/{sofascoreLimit} Requests diesen Monat
               ({sofascoreRemaining} übrig). Torschützen nur bei genug Kontingent.
             </p>
+            <div className="space-y-2 rounded-md border border-border/50 bg-[var(--brand-docs-soft)]/40 p-2.5">
+              <p className="text-xs text-muted-foreground">
+                Prüft den gespeicherten Key mit einem Request (Ambri
+                Team-Detail). Zählt zum Monatskontingent — Key zuerst speichern.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={
+                  sofascoreTestBusy || saving !== null || !hasSofascoreKey
+                }
+                onClick={() => void testSofascoreApi()}
+              >
+                {sofascoreTestBusy ? "Fragt API…" : "Sofascore-Key testen"}
+              </Button>
+              {sofascoreTestResult ? (
+                <pre className="max-h-48 overflow-auto rounded-md border border-border/70 bg-background p-2 text-[11px] leading-relaxed whitespace-pre-wrap break-all">
+                  {sofascoreTestResult}
+                </pre>
+              ) : null}
+            </div>
           </div>
           <div className="space-y-2 rounded-lg border border-border/60 bg-muted/10 p-3">
             <Label htmlFor="ojpToken">ÖV-CH Token (opentransportdata.swiss)</Label>

@@ -214,11 +214,17 @@ function hockeyAgendaMeta(game: HockeyGame): {
   scorers: string[] | null;
 } {
   const score = game.result ? formatHockeyScoreLine(game.result) : null;
-  const parts = [
-    score,
-    game.time,
-    game.location,
-  ].filter(Boolean);
+  let dateLabel = game.date;
+  try {
+    dateLabel = new Date(`${game.date}T12:00:00`).toLocaleDateString("de-CH", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+    });
+  } catch {
+    /* keep iso */
+  }
+  const parts = [dateLabel, score, game.time, game.location].filter(Boolean);
   const scorers =
     game.result?.scorers && game.result.scorers.length > 0
       ? game.result.scorers

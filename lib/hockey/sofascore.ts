@@ -247,5 +247,18 @@ export function zurichHour(d = new Date()): number {
     hour: "numeric",
     hour12: false,
   }).formatToParts(d);
-  return Number(parts.find((p) => p.type === "hour")?.value || 0);
+  return Number(parts.find((p) => p.type === "hour")?.value || 0) % 24;
+}
+
+/** Minutes since midnight in Europe/Zurich (0–1439). */
+export function zurichMinutesOfDay(d = new Date()): number {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/Zurich",
+    hour: "numeric",
+    minute: "numeric",
+    hour12: false,
+  }).formatToParts(d);
+  const hour = Number(parts.find((p) => p.type === "hour")?.value || 0) % 24;
+  const minute = Number(parts.find((p) => p.type === "minute")?.value || 0);
+  return hour * 60 + minute;
 }
