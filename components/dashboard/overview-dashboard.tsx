@@ -119,16 +119,16 @@ function weekdayLabel(iso: string): string {
 function WeatherChip({ weather }: { weather: AgendaWeatherChip }) {
   return (
     <div
-      className="flex w-11 shrink-0 flex-col items-center justify-center self-start rounded-lg bg-sky-50/90 px-0.5 py-1 text-center leading-tight"
+      className="pointer-events-none absolute -left-2 -top-2 z-10 flex min-w-[2.75rem] flex-col items-center justify-center rounded-full border border-sky-200/80 bg-sky-50 px-1.5 py-1 text-center shadow-sm ring-2 ring-white leading-tight"
       title={`${weather.labelDe} · ${weather.placeLabel}`}
     >
-      <span className="text-base leading-none" aria-hidden>
+      <span className="text-sm leading-none" aria-hidden>
         {weather.icon}
       </span>
-      <span className="mt-0.5 text-[11px] font-semibold tabular-nums text-sky-950">
+      <span className="mt-0.5 text-[10px] font-bold tabular-nums text-sky-950">
         {weather.temperatureC}°
       </span>
-      <span className="mt-0.5 max-w-full truncate text-[9px] font-medium text-sky-800/80">
+      <span className="max-w-[3.25rem] truncate text-[8px] font-medium text-sky-800/85">
         {weather.placeLabel}
       </span>
     </div>
@@ -267,7 +267,8 @@ function AgendaRow({
   const inner = (
     <div
       className={cn(
-        "flex items-center gap-3 rounded-xl border border-border/60 border-l-4 bg-card px-3 py-2.5 shadow-[0_2px_10px_rgba(20,32,28,0.04)]",
+        "relative flex items-center gap-3 rounded-xl border border-border/60 border-l-4 bg-card px-3 py-2.5 shadow-[0_2px_10px_rgba(20,32,28,0.04)]",
+        weather && "mt-2",
         isPaymentPipeline
           ? "border-l-sky-500 bg-sky-50/40"
           : KIND_ACCENT[item.kind]
