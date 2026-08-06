@@ -70,7 +70,7 @@ function TeamLogo({
 }) {
   const [failed, setFailed] = useState(false);
   const box =
-    size === "lg" ? "size-14" : size === "md" ? "size-11" : "size-8";
+    size === "lg" ? "size-16" : size === "md" ? "size-11" : "size-8";
   if (!src || failed) {
     return (
       <span
@@ -131,12 +131,15 @@ function AgendaRow({ item }: { item: AgendaItem }) {
         aria-hidden
       />
       {isHockey && hasLogos ? (
-        <div className="flex shrink-0 items-center gap-1.5" aria-hidden>
+        <div className="flex shrink-0 items-center gap-1" aria-hidden>
           <TeamLogo
             label={item.logos?.leftLabel || "Heim"}
             src={item.logos?.left}
             size="md"
           />
+          <span className="px-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            vs.
+          </span>
           <TeamLogo
             label={item.logos?.rightLabel || "Gast"}
             src={item.logos?.right}
@@ -214,12 +217,15 @@ function NextHockeyCard({ game }: { game: HockeyGameCard }) {
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="flex items-center justify-between gap-3">
-          <div className="flex min-w-0 flex-1 justify-center">
+          <div className="flex min-w-0 flex-1 flex-col items-center gap-1.5 text-center">
             <TeamLogo
               label={game.homeTeam.label}
               src={game.homeTeam.logoUrl}
               size="lg"
             />
+            <p className="line-clamp-2 text-xs font-medium leading-snug">
+              {game.homeTeam.label}
+            </p>
           </div>
           <div className="shrink-0 text-center">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -227,12 +233,15 @@ function NextHockeyCard({ game }: { game: HockeyGameCard }) {
             </p>
             <p className="text-sm font-bold tabular-nums">{game.time || "—"}</p>
           </div>
-          <div className="flex min-w-0 flex-1 justify-center">
+          <div className="flex min-w-0 flex-1 flex-col items-center gap-1.5 text-center">
             <TeamLogo
               label={game.awayTeam.label}
               src={game.awayTeam.logoUrl}
               size="lg"
             />
+            <p className="line-clamp-2 text-xs font-medium leading-snug">
+              {game.awayTeam.label}
+            </p>
           </div>
         </div>
         <p className="text-center text-xs text-muted-foreground">
