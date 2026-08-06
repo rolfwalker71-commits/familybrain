@@ -9,9 +9,10 @@ import {
   getHockeyResultForUid,
   type HockeyGameResult,
 } from "@/lib/hockey/sofascore";
+import { AMBRI_ICS_URL } from "@/lib/calendar/ics-calendars";
 
-const ICS_URL =
-  "https://calendar.google.com/calendar/ical/c_f974949164df4b0605b30aa319f918570bb7b00ebb7514e06558dad73706f8cd%40group.calendar.google.com/public/basic.ics";
+/** @deprecated Prefer calendar settings URL; kept as default for Ambri. */
+const ICS_URL = AMBRI_ICS_URL;
 
 const CACHE_KEY = "hockey_ambri_ics_cache";
 const CACHE_TTL_MS = 30 * 60 * 1000;
@@ -177,8 +178,8 @@ export function formatHockeyScoreLine(result: HockeyGameResult): string {
   return `${result.homeScore}:${result.awayScore}`;
 }
 
-async function fetchIcs(): Promise<string> {
-  const res = await fetch(ICS_URL, {
+async function fetchIcs(url: string): Promise<string> {
+  const res = await fetch(url, {
     headers: {
       "User-Agent": "BuddyHockey/1.0 (familybrain; local household app)",
       Accept: "text/calendar, text/plain, */*",
@@ -196,8 +197,8 @@ async function fetchIcs(): Promise<string> {
   return text;
 }
 
-function readCache(): CachePayload | null {
-  const raw = getSetting(CACHE_KEY);
+function readCache(cacheKey: string): CachePayload | null {
+  const raw = getSetting(cacheKey);
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw) as CachePayload;
@@ -210,12 +211,17 @@ function readCache(): CachePayload | null {
 
 export async function getHockeyGames(options?: {
   forceRefresh?: boolean;
+  icsUrl?: string;
+  cacheKey?: string;
+  calendarName?: string;
 }): Promise<{
   games: HockeyGame[];
   fetchedAt: string;
   calendarName: string;
 }> {
-  const cached = readCache();
+  const url = options?.icsUrl?.trim() || ICS_URL;
+  const cacheKey = options?.cacheKey || CACHE_KEY;
+  const cached = readCache(cacheKey);
   const age = cached
     ? Date.now() - new Date(cached.fetchedAt).getTime()
     : Number.POSITIVE_INFINITY;
@@ -224,10 +230,10 @@ export async function getHockeyGames(options?: {
 
   if (options?.forceRefresh || !cached || age > CACHE_TTL_MS) {
     try {
-      ics = await fetchIcs();
+      ics = await fetchIcs(url);
       fetchedAt = new Date().toISOString();
       setSetting(
-        CACHE_KEY,
+        cacheKey,
         JSON.stringify({ fetchedAt, ics } satisfies CachePayload)
       );
     } catch (error) {
@@ -241,25 +247,28 @@ export async function getHockeyGames(options?: {
   return {
     games: parseHockeyGamesFromIcs(ics),
     fetchedAt,
-    calendarName: nameMatch?.[1]?.trim() || "HC Ambri-Piotta",
+    calendarName:
+      options?.calendarName?.trim() ||
+      nameMatch?.[1]?.trim() ||
+      "HC Ambri-Piotta",
   };
 }
 
-export function getUpcomingHockeyGames(
-  games: HockeyGame[],
+export function getUpcomingHockeyGames<T extends HockeyGame>(
+  games: T[],
   now = new Date(),
   limit = 8
-): HockeyGame[] {
+): T[] {
   const threshold = now.getTime() - 3 * 60 * 60 * 1000;
   return games
     .filter((g) => new Date(g.startAt).getTime() >= threshold)
     .slice(0, limit);
 }
 
-export function getNextHockeyGame(
-  games: HockeyGame[],
+export function getNextHockeyGame<T extends HockeyGame>(
+  games: T[],
   now = new Date()
-): HockeyGame | null {
+): T | null {
   return getUpcomingHockeyGames(games, now, 1)[0] || null;
 }
 

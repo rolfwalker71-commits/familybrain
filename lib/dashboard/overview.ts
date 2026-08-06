@@ -9,6 +9,13 @@ import {
   type HockeyGame,
 } from "@/lib/hockey/games";
 import {
+  AMBRI_CALENDAR_ID,
+  getEnabledIcsCalendars,
+  ICS_TYPE_META,
+  type IcsCalendarType,
+} from "@/lib/calendar/ics-calendars";
+import { getGenericCalendarEvents } from "@/lib/calendar/ics-generic";
+import {
   getSwissHolidays,
   holidayBadge,
   holidaySubtitle,
@@ -31,7 +38,8 @@ export type AgendaKind =
   | "triage"
   | "ledger"
   | "hockey"
-  | "holiday";
+  | "holiday"
+  | "calendar";
 
 export type AgendaWeatherChip = {
   icon: string;
@@ -69,6 +77,10 @@ export type AgendaItem = {
   location?: string | null;
   /** Forecast chip when location + date resolve */
   weather?: AgendaWeatherChip | null;
+  /** Per-calendar accent (ICS feeds) */
+  accentColor?: string | null;
+  /** ICS semantic type when kind is calendar / hockey */
+  calendarType?: IcsCalendarType | null;
 };
 
 export type HomeWeatherCard = {
@@ -585,21 +597,51 @@ export async function getDashboardOverview(
     });
   }
 
-  let hockeyGames: HockeyGame[] = [];
-  let hockeyCalendarName = "HC Ambri-Piotta";
-  try {
-    const hockey = await getHockeyGames();
-    hockeyGames = hockey.games;
-    hockeyCalendarName = hockey.calendarName;
-  } catch {
-    hockeyGames = [];
+  const enabledCalendars = getEnabledIcsCalendars();
+  const hockeyCalendars = enabledCalendars.filter((c) => c.type === "hockey");
+  const genericCalendars = enabledCalendars.filter((c) => c.type !== "hockey");
+
+  type TaggedHockey = HockeyGame & {
+    calendarId: string;
+    calendarName: string;
+    color: string;
+  };
+  const hockeyGames: TaggedHockey[] = [];
+  let hockeyCalendarName = hockeyCalendars[0]?.name || "Hockey";
+
+  for (const cal of hockeyCalendars) {
+    try {
+      const hockey = await getHockeyGames({
+        icsUrl: cal.url,
+        cacheKey:
+          cal.id === AMBRI_CALENDAR_ID
+            ? "hockey_ambri_ics_cache"
+            : `hockey_ics_cache_${cal.id}`,
+        calendarName: cal.name,
+      });
+      if (cal.id === AMBRI_CALENDAR_ID || !hockeyCalendars.some((c) => c.id === AMBRI_CALENDAR_ID)) {
+        hockeyCalendarName = hockey.calendarName || cal.name;
+      }
+      for (const game of hockey.games) {
+        hockeyGames.push({
+          ...game,
+          calendarId: cal.id,
+          calendarName: cal.name,
+          color: cal.color,
+        });
+      }
+    } catch {
+      /* skip calendar on fetch/parse failure */
+    }
   }
+
+  hockeyGames.sort((a, b) => a.startAt.localeCompare(b.startAt));
 
   for (const game of hockeyGames) {
     if (!inRange(game.date, start, end)) continue;
     const meta = hockeyAgendaMeta(game);
     agenda.push({
-      id: `hk-${game.uid}`,
+      id: `hk-${game.calendarId}-${game.uid}`,
       kind: "hockey",
       date: game.date,
       title: game.isHome ? "Heim" : "Auswärts",
@@ -613,6 +655,8 @@ export async function getDashboardOverview(
       scorers: meta.scorers,
       time: game.time,
       location: game.location,
+      accentColor: game.color,
+      calendarType: "hockey",
       logos: {
         left: game.homeTeam.logoUrl || null,
         right: game.awayTeam.logoUrl || null,
@@ -620,6 +664,33 @@ export async function getDashboardOverview(
         rightLabel: game.awayTeam.label,
       },
     });
+  }
+
+  for (const cal of genericCalendars) {
+    try {
+      const events = await getGenericCalendarEvents(cal);
+      for (const ev of events) {
+        if (!inRange(ev.date, start, end)) continue;
+        agenda.push({
+          id: `ics-${cal.id}-${ev.uid}`,
+          kind: "calendar",
+          date: ev.date,
+          title: ev.summary,
+          subtitle: ev.location || cal.name,
+          amount: null,
+          currency: null,
+          documentId: null,
+          href: null,
+          badge: ICS_TYPE_META[cal.type].label,
+          time: ev.time,
+          location: ev.location,
+          accentColor: cal.color,
+          calendarType: cal.type,
+        });
+      }
+    } catch {
+      /* skip */
+    }
   }
 
   const holidayYears = [
@@ -706,7 +777,7 @@ export async function getDashboardOverview(
   for (const game of getUpcomingHockeyGames(hockeyGames, new Date(), 6)) {
     const meta = hockeyAgendaMeta(game);
     upcoming14.push({
-      id: `u-hk-${game.uid}`,
+      id: `u-hk-${game.calendarId}-${game.uid}`,
       kind: "hockey",
       date: game.date,
       title: game.isHome ? "Heim" : "Auswärts",
@@ -720,6 +791,8 @@ export async function getDashboardOverview(
       scorers: meta.scorers,
       time: game.time,
       location: game.location,
+      accentColor: game.color,
+      calendarType: "hockey",
       logos: {
         left: game.homeTeam.logoUrl || null,
         right: game.awayTeam.logoUrl || null,
@@ -727,6 +800,33 @@ export async function getDashboardOverview(
         rightLabel: game.awayTeam.label,
       },
     });
+  }
+
+  for (const cal of genericCalendars) {
+    try {
+      const events = await getGenericCalendarEvents(cal);
+      for (const ev of events) {
+        if (ev.date < today || ev.date > upcomingEnd) continue;
+        upcoming14.push({
+          id: `u-ics-${cal.id}-${ev.uid}`,
+          kind: "calendar",
+          date: ev.date,
+          title: ev.summary,
+          subtitle: ev.location || cal.name,
+          amount: null,
+          currency: null,
+          documentId: null,
+          href: null,
+          badge: ICS_TYPE_META[cal.type].label,
+          time: ev.time,
+          location: ev.location,
+          accentColor: cal.color,
+          calendarType: cal.type,
+        });
+      }
+    } catch {
+      /* skip */
+    }
   }
 
   for (const h of holidaysInRange(swissHolidays, today, upcomingEnd)) {
@@ -821,10 +921,12 @@ export async function getDashboardOverview(
       .get(daysFromNow(7)) as { c: number }
   ).c;
 
-  const next = getNextHockeyGame(hockeyGames);
-  const upcomingHockey = getUpcomingHockeyGames(hockeyGames, new Date(), 5).map(
-    toHockeyCard
-  );
+  const next =
+    hockeyCalendars.length > 0 ? getNextHockeyGame(hockeyGames) : null;
+  const upcomingHockey =
+    hockeyCalendars.length > 0
+      ? getUpcomingHockeyGames(hockeyGames, new Date(), 5).map(toHockeyCard)
+      : [];
 
   const [agendaWithWeather, upcomingWithWeather, homeWeatherRaw] =
     await Promise.all([
@@ -878,7 +980,10 @@ export async function getDashboardOverview(
     kpi: { total: kpiTotal, byCategory },
     financeItems,
     hockey: {
-      calendarName: hockeyCalendarName,
+      calendarName:
+        (next
+          ? hockeyGames.find((g) => g.uid === next.uid)?.calendarName
+          : null) || hockeyCalendarName,
       nextGame: next ? toHockeyCard(next) : null,
       upcoming: upcomingHockey,
     },

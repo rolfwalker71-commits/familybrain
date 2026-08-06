@@ -14,6 +14,14 @@ import {
   Goal,
   Trophy,
   PartyPopper,
+  GraduationCap,
+  Trash2,
+  Church,
+  Dumbbell,
+  Heart,
+  BriefcaseBusiness,
+  Palmtree,
+  Calendar,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,6 +42,7 @@ import type {
   OverviewPayload,
   OverviewPeriod,
 } from "@/lib/dashboard/overview";
+import type { IcsCalendarType } from "@/lib/calendar/ics-calendars";
 
 const PERIODS: { id: OverviewPeriod; label: string }[] = [
   { id: "week", label: "Woche" },
@@ -52,6 +61,7 @@ const KIND_ACCENT: Record<AgendaKind, string> = {
   ledger: "border-l-[var(--brand-finance)]",
   hockey: "border-l-rose-600",
   holiday: "border-l-violet-600",
+  calendar: "border-l-slate-500",
 };
 
 const KIND_ICON: Record<AgendaKind, typeof FileText> = {
@@ -63,6 +73,19 @@ const KIND_ICON: Record<AgendaKind, typeof FileText> = {
   ledger: HandCoins,
   hockey: Goal,
   holiday: PartyPopper,
+  calendar: CalendarDays,
+};
+
+const CALENDAR_TYPE_ICON: Record<IcsCalendarType, typeof FileText> = {
+  hockey: Goal,
+  school: GraduationCap,
+  waste: Trash2,
+  church: Church,
+  sports: Dumbbell,
+  family: Heart,
+  work: BriefcaseBusiness,
+  holiday: Palmtree,
+  other: Calendar,
 };
 
 function TeamLogo({
@@ -240,12 +263,18 @@ function AgendaRow({
   /** upcoming: hockey shows date+time / location / Heim|Auswärts on three lines */
   variant?: "agenda" | "upcoming";
 }) {
-  const Icon = KIND_ICON[item.kind];
+  const Icon =
+    item.calendarType && CALENDAR_TYPE_ICON[item.calendarType]
+      ? CALENDAR_TYPE_ICON[item.calendarType]
+      : KIND_ICON[item.kind];
   const isPaymentPipeline = item.badge === "Zahlung";
   const isHockey = item.kind === "hockey";
   const hasLogos = Boolean(item.logos?.left || item.logos?.right);
   const upcomingHockey = isHockey && hasLogos && variant === "upcoming";
   const weather = item.weather || null;
+  const accentStyle = item.accentColor
+    ? { borderLeftColor: item.accentColor }
+    : undefined;
 
   let hockeyDateLabel = item.date;
   try {
@@ -274,8 +303,9 @@ function AgendaRow({
         weather && "mt-3 pt-4",
         isPaymentPipeline
           ? "border-l-sky-500 bg-sky-50/40"
-          : KIND_ACCENT[item.kind]
+          : !item.accentColor && KIND_ACCENT[item.kind]
       )}
+      style={isPaymentPipeline ? undefined : accentStyle}
     >
       {weather ? <WeatherChip weather={weather} /> : null}
       <Icon
@@ -333,6 +363,11 @@ function AgendaRow({
                 {item.subtitle}
               </p>
             ) : null}
+            {item.kind === "calendar" && item.time ? (
+              <p className="truncate text-xs text-muted-foreground tabular-nums">
+                {item.time}
+              </p>
+            ) : null}
           </>
         )}
         {isPaymentPipeline ? (
@@ -355,6 +390,14 @@ function AgendaRow({
             isHockey && "bg-rose-50 text-rose-800",
             item.kind === "holiday" && "bg-violet-50 text-violet-900"
           )}
+          style={
+            item.accentColor && !isHockey
+              ? {
+                  backgroundColor: `${item.accentColor}18`,
+                  color: item.accentColor,
+                }
+              : undefined
+          }
         >
           {item.badge}
         </Badge>

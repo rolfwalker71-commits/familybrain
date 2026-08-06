@@ -9,6 +9,7 @@ export type SettingsTab =
   | "mail"
   | "users"
   | "family"
+  | "calendars"
   | "notify"
   | "more";
 
@@ -24,6 +25,7 @@ export function parseSettingsTab(
     raw === "mail" ||
     raw === "users" ||
     raw === "family" ||
+    raw === "calendars" ||
     raw === "notify" ||
     raw === "more"
   ) {
