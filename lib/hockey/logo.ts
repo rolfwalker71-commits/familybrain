@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { getTripsDataRoot } from "@/lib/trips/paths";
-import { HOCKEY_TEAMS, resolveHockeyTeam } from "@/lib/hockey/teams";
+import { hockeyTeamByKey, HOCKEY_TEAMS } from "@/lib/hockey/teams";
 
 export function getHockeyLogoDir(): string {
   return path.join(getTripsDataRoot(), "hockey-logos");
@@ -20,12 +20,29 @@ export function resolveHockeyLogoFile(rawKey: string): string | null {
   return fs.existsSync(file) ? file : null;
 }
 
-function wikipediaTitleForKey(key: string, labelHint?: string): string | null {
-  const known = HOCKEY_TEAMS.find((t) => t.key === key);
-  if (known?.wikipediaTitle) return known.wikipediaTitle;
-  if (labelHint) {
-    const resolved = resolveHockeyTeam(labelHint);
-    if (resolved.wikipediaTitle) return resolved.wikipediaTitle;
+async function downloadImage(url: string): Promise<Buffer | null> {
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    try {
+      const res = await fetch(url, {
+        headers: {
+          "User-Agent": "BuddyHockey/1.0 (familybrain; local household app)",
+          Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+        },
+        signal: AbortSignal.timeout(20000),
+      });
+      if (res.status === 429 || res.status >= 500) {
+        await new Promise((r) => setTimeout(r, 800 * (attempt + 1)));
+        continue;
+      }
+      if (!res.ok) return null;
+      const buffer = Buffer.from(await res.arrayBuffer());
+      if (buffer.byteLength < 200) return null;
+      const head = buffer.slice(0, 32).toString("utf8");
+      if (head.includes("<!DOCTYPE") || head.includes("<html")) return null;
+      return buffer;
+    } catch {
+      await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
+    }
   }
   return null;
 }
@@ -33,45 +50,37 @@ function wikipediaTitleForKey(key: string, labelHint?: string): string | null {
 async function fetchWikipediaThumbnail(
   title: string
 ): Promise<Buffer | null> {
-  const url = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(
-    title
-  )}`;
-  try {
-    const res = await fetch(url, {
-      headers: {
-        "User-Agent": "BuddyHockey/1.0 (familybrain; local household app)",
-        Accept: "application/json",
-      },
-      signal: AbortSignal.timeout(12000),
-    });
-    if (!res.ok) return null;
-    const json = (await res.json()) as {
-      thumbnail?: { source?: string };
-      originalimage?: { source?: string };
-    };
-    const source =
-      json.originalimage?.source ||
-      json.thumbnail?.source?.replace(/\/\d+px-/, "/500px-") ||
-      json.thumbnail?.source;
-    if (!source) return null;
-    const img = await fetch(source, {
-      headers: {
-        "User-Agent": "BuddyHockey/1.0 (familybrain; local household app)",
-      },
-      signal: AbortSignal.timeout(15000),
-    });
-    if (!img.ok) return null;
-    const buffer = Buffer.from(await img.arrayBuffer());
-    if (buffer.byteLength < 200) return null;
-    return buffer;
-  } catch {
-    return null;
+  for (const lang of ["en", "de"] as const) {
+    const api = `https://${lang}.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(
+      title
+    )}&prop=pageimages&format=json&pithumbsize=500&pilicense=any`;
+    try {
+      const res = await fetch(api, {
+        headers: {
+          "User-Agent": "BuddyHockey/1.0 (familybrain; local household app)",
+          Accept: "application/json",
+        },
+        signal: AbortSignal.timeout(12000),
+      });
+      if (!res.ok) continue;
+      const json = (await res.json()) as {
+        query?: { pages?: Record<string, { thumbnail?: { source?: string } }> };
+      };
+      const pages = Object.values(json.query?.pages || {});
+      const source = pages[0]?.thumbnail?.source;
+      if (!source) continue;
+      const img = await downloadImage(source.split("?")[0]!);
+      if (img) return img;
+    } catch {
+      /* try next language */
+    }
   }
+  return null;
 }
 
 /**
- * Download the official club mark from Wikipedia/Wikimedia and cache as PNG.
- * Returns null when no page/logo is available.
+ * Cache the official club mark as PNG.
+ * Prefers curated Wikimedia URLs; falls back to Wikipedia pageimages.
  */
 export async function ensureHockeyLogo(input: {
   key: string;
@@ -84,10 +93,20 @@ export async function ensureHockeyLogo(input: {
   const file = path.join(dir, `${key}.png`);
   if (!input.force && fs.existsSync(file)) return file;
 
-  const title = wikipediaTitleForKey(key, input.label);
-  if (!title) return fs.existsSync(file) ? file : null;
+  const team =
+    hockeyTeamByKey(key) ||
+    HOCKEY_TEAMS.find(
+      (t) => t.label.toLowerCase() === (input.label || "").toLowerCase()
+    ) ||
+    null;
 
-  const downloaded = await fetchWikipediaThumbnail(title);
+  let downloaded: Buffer | null = null;
+  if (team?.logoSourceUrl) {
+    downloaded = await downloadImage(team.logoSourceUrl);
+  }
+  if (!downloaded && team?.wikipediaTitle) {
+    downloaded = await fetchWikipediaThumbnail(team.wikipediaTitle);
+  }
   if (!downloaded) return fs.existsSync(file) ? file : null;
 
   fs.mkdirSync(dir, { recursive: true });

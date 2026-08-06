@@ -11,6 +11,7 @@ import {
   ChartColumnIncreasing,
   Clock3,
   HandCoins,
+  Goal,
   Trophy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -55,7 +56,7 @@ const KIND_ICON: Record<AgendaKind, typeof FileText> = {
   warranty: Shield,
   triage: Mail,
   ledger: HandCoins,
-  hockey: Trophy,
+  hockey: Goal,
 };
 
 function TeamLogo({
@@ -119,20 +120,12 @@ function AgendaRow({ item }: { item: AgendaItem }) {
           : KIND_ACCENT[item.kind]
       )}
     >
-      {isHockey && item.logos ? (
-        <span className="flex shrink-0 items-center gap-1 self-center">
-          <TeamLogo label="Heim" src={item.logos.left} />
-          <span className="text-[10px] text-muted-foreground">vs</span>
-          <TeamLogo label="Gast" src={item.logos.right} />
-        </span>
-      ) : (
-        <Icon
-          className="size-8 shrink-0 self-center text-muted-foreground"
-          strokeWidth={APP_ICON_STROKE}
-          absoluteStrokeWidth
-          aria-hidden
-        />
-      )}
+      <Icon
+        className="size-8 shrink-0 self-center text-muted-foreground"
+        strokeWidth={APP_ICON_STROKE}
+        absoluteStrokeWidth
+        aria-hidden
+      />
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium">{item.title}</p>
         {item.subtitle ? (
