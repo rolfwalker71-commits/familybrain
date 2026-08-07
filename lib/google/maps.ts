@@ -237,47 +237,50 @@ export type GoogleStaticMapResult =
   | { ok: true; buffer: Buffer; bytes: number }
   | { ok: false; error: string; httpStatus?: number };
 
-/**
- * Google Maps Static API — Kartenausschnitt mit Marker.
- * Braucht «Maps Static API» im Cloud-Projekt (zusätzlich zu Geocoding/Routes).
- */
-export async function fetchGoogleStaticMapPng(input: {
+export type GoogleStaticMapMarker = {
   lat: number;
   lon: number;
-  zoom?: number;
-  width?: number;
-  height?: number;
-  scale?: 1 | 2;
-  maptype?: GoogleStaticMapType;
-  withMarker?: boolean;
-}): Promise<Buffer | null> {
-  const result = await fetchGoogleStaticMapDetailed(input);
-  return result.ok ? result.buffer : null;
-}
+  /** Named color, e.g. red / green / blue */
+  color?: string;
+  /** Single A–Z / 0–9 label on the pin */
+  label?: string;
+};
 
-export async function fetchGoogleStaticMapDetailed(input: {
-  lat: number;
-  lon: number;
-  zoom?: number;
+export type GoogleStaticMapPath = {
+  points: Array<{ lat: number; lon: number }>;
+  /** Great-circle between consecutive points (Flüge). */
+  geodesic?: boolean;
+  color?: string;
+  weight?: number;
+};
+
+async function fetchGoogleStaticMapRequest(input: {
   width?: number;
   height?: number;
   scale?: 1 | 2;
   maptype?: GoogleStaticMapType;
-  withMarker?: boolean;
+  /** Wenn gesetzt: fester Ausschnitt. Sonst fit über Marker/Pfad. */
+  center?: { lat: number; lon: number };
+  zoom?: number;
+  markers?: GoogleStaticMapMarker[];
+  paths?: GoogleStaticMapPath[];
 }): Promise<GoogleStaticMapResult> {
   const key = getGoogleMapsApiKey();
   if (!key) return { ok: false, error: "no_api_key" };
 
-  const zoom = Math.min(20, Math.max(1, input.zoom ?? 15));
   const width = Math.min(640, Math.max(64, input.width ?? 640));
   const height = Math.min(640, Math.max(64, input.height ?? 400));
   const scale = input.scale ?? 2;
   const maptype = input.maptype ?? "roadmap";
-  const expectedMinBytes = 8_000; // Fehlerbilder von Google sind oft winzig
+  const expectedMinBytes = 8_000;
+  const markers = input.markers ?? [];
+  const paths = input.paths ?? [];
+
+  if (!input.center && markers.length === 0 && paths.length === 0) {
+    return { ok: false, error: "no_geometry" };
+  }
 
   const url = new URL("https://maps.googleapis.com/maps/api/staticmap");
-  url.searchParams.set("center", `${input.lat},${input.lon}`);
-  url.searchParams.set("zoom", String(zoom));
   url.searchParams.set("size", `${width}x${height}`);
   url.searchParams.set("scale", String(scale));
   url.searchParams.set("maptype", maptype);
@@ -285,11 +288,36 @@ export async function fetchGoogleStaticMapDetailed(input: {
   url.searchParams.set("language", "de");
   url.searchParams.set("region", "CH");
   url.searchParams.set("key", key);
-  if (input.withMarker !== false) {
-    // Named color ist robuster als 0x… je nach Key/Account
-    url.searchParams.set(
+
+  if (input.center) {
+    const zoom = Math.min(20, Math.max(1, input.zoom ?? 15));
+    url.searchParams.set("center", `${input.center.lat},${input.center.lon}`);
+    url.searchParams.set("zoom", String(zoom));
+  }
+
+  for (const m of markers) {
+    const color = m.color || "red";
+    const label =
+      m.label && /^[A-Za-z0-9]$/.test(m.label)
+        ? `|label:${m.label.toUpperCase()}`
+        : "";
+    url.searchParams.append(
       "markers",
-      `color:red|${input.lat},${input.lon}`
+      `color:${color}${label}|${m.lat},${m.lon}`
+    );
+  }
+
+  for (const p of paths) {
+    if (p.points.length < 2) continue;
+    const color = p.color || "0x0F766EFF";
+    const weight = Math.min(10, Math.max(1, p.weight ?? 4));
+    const geo = p.geodesic ? "|geodesic:true" : "";
+    // Zu viele Punkte → URL-Limit; für Flüge reichen 2 + geodesic.
+    const pts = p.points.slice(0, 80);
+    const coords = pts.map((pt) => `${pt.lat},${pt.lon}`).join("|");
+    url.searchParams.append(
+      "path",
+      `color:${color}|weight:${weight}${geo}|${coords}`
     );
   }
 
@@ -337,6 +365,95 @@ export async function fetchGoogleStaticMapDetailed(input: {
     console.warn("[google-maps] Static Map failed:", message);
     return { ok: false, error: message };
   }
+}
+
+/**
+ * Google Maps Static API — Kartenausschnitt mit Marker.
+ * Braucht «Maps Static API» im Cloud-Projekt (zusätzlich zu Geocoding/Routes).
+ */
+export async function fetchGoogleStaticMapPng(input: {
+  lat: number;
+  lon: number;
+  zoom?: number;
+  width?: number;
+  height?: number;
+  scale?: 1 | 2;
+  maptype?: GoogleStaticMapType;
+  withMarker?: boolean;
+}): Promise<Buffer | null> {
+  const result = await fetchGoogleStaticMapDetailed(input);
+  return result.ok ? result.buffer : null;
+}
+
+export async function fetchGoogleStaticMapDetailed(input: {
+  lat: number;
+  lon: number;
+  zoom?: number;
+  width?: number;
+  height?: number;
+  scale?: 1 | 2;
+  maptype?: GoogleStaticMapType;
+  withMarker?: boolean;
+}): Promise<GoogleStaticMapResult> {
+  return fetchGoogleStaticMapRequest({
+    center: { lat: input.lat, lon: input.lon },
+    zoom: input.zoom,
+    width: input.width,
+    height: input.height,
+    scale: input.scale,
+    maptype: input.maptype,
+    markers:
+      input.withMarker === false
+        ? []
+        : [{ lat: input.lat, lon: input.lon, color: "red" }],
+  });
+}
+
+/** Von/Nach-Route (Flug geodesic oder Transfer/Zug gerade bzw. Pfadpunkte). */
+export async function fetchGoogleStaticRouteMapDetailed(input: {
+  from: { lat: number; lon: number; label?: string };
+  to: { lat: number; lon: number; label?: string };
+  geodesic?: boolean;
+  /** Optional Zwischenpunkte (z. B. OJP-Geometrie), sonst nur from→to. */
+  pathPoints?: Array<{ lat: number; lon: number }>;
+  width?: number;
+  height?: number;
+  scale?: 1 | 2;
+  maptype?: GoogleStaticMapType;
+}): Promise<GoogleStaticMapResult> {
+  const pathPoints =
+    input.pathPoints && input.pathPoints.length >= 2
+      ? input.pathPoints
+      : [input.from, input.to];
+
+  return fetchGoogleStaticMapRequest({
+    width: input.width,
+    height: input.height,
+    scale: input.scale,
+    maptype: input.maptype,
+    markers: [
+      {
+        lat: input.from.lat,
+        lon: input.from.lon,
+        color: "green",
+        label: "A",
+      },
+      {
+        lat: input.to.lat,
+        lon: input.to.lon,
+        color: "red",
+        label: "B",
+      },
+    ],
+    paths: [
+      {
+        points: pathPoints,
+        geodesic: Boolean(input.geodesic) && pathPoints.length === 2,
+        color: "0x0F766EFF",
+        weight: 4,
+      },
+    ],
+  });
 }
 
 /** Kurzer Connectivity-Check für Einstellungen. */

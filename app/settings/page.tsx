@@ -1904,10 +1904,10 @@ function SettingsPageInner() {
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              Nur für zoom-/klickbare <span className="font-medium">Routen</span>{" "}
-              in TravelBuddy (Flug/Transfer, Leaflet). Einzelne Orte und die
-              Startseiten-Ausschnitte nutzen Google Static Maps über den Key
-              oben — nicht diese Liste.
+              Nur für die grosse zoom-/klickbare{" "}
+              <span className="font-medium">Reise-Übersichtskarte</span>{" "}
+              (Leaflet). Alle Event-Ausschnitte inkl. Flug/Transfer Von→Nach
+              nutzen Google Static Maps über den Key oben.
             </p>
           </div>
           <div className="space-y-2">

@@ -1,35 +1,28 @@
 import { NextResponse } from "next/server";
 import { isAuthError, requireAuth } from "@/lib/auth/current-user";
 import { ensureInitialized } from "@/lib/db/migrations";
-import { fetchStaticMapPngDetailed } from "@/lib/trips/static-map";
+import {
+  fetchStaticMapPngDetailed,
+  fetchStaticRouteMapPngDetailed,
+} from "@/lib/trips/static-map";
 import { hasGoogleMapsApiKey } from "@/lib/google/maps";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** Static map snippet (Google Static Maps if key works, else OSM). */
-export async function GET(request: Request) {
-  ensureInitialized();
-  const auth = await requireAuth();
-  if (isAuthError(auth)) return auth;
+function parseCoord(raw: string | null): number | null {
+  if (raw == null || raw === "") return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
 
-  const { searchParams } = new URL(request.url);
-  const lat = Number(searchParams.get("lat"));
-  const lon = Number(searchParams.get("lon"));
-  const zoom = Math.min(16, Math.max(10, Number(searchParams.get("z") || 14)));
-  if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-    return NextResponse.json({ error: "lat/lon required" }, { status: 400 });
-  }
-  if (Math.abs(lat) > 90 || Math.abs(lon) > 180) {
-    return NextResponse.json({ error: "invalid coordinates" }, { status: 400 });
-  }
+function isValidLatLon(lat: number, lon: number): boolean {
+  return Math.abs(lat) <= 90 && Math.abs(lon) <= 180;
+}
 
-  const result = await fetchStaticMapPngDetailed({
-    lat,
-    lon,
-    zoom,
-    withMarker: true,
-  });
+function mapResponse(
+  result: Awaited<ReturnType<typeof fetchStaticMapPngDetailed>>
+) {
   if (!result.buffer) {
     return NextResponse.json(
       {
@@ -46,7 +39,6 @@ export async function GET(request: Request) {
     status: 200,
     headers: {
       "Content-Type": "image/png",
-      // Kurz cachen — sonst bleibt alte OSM-Kachel nach Key-Aktivierung hängen
       "Cache-Control": "private, max-age=120, must-revalidate",
       "X-Buddy-Map-Source": result.source,
       ...(result.googleError
@@ -58,4 +50,85 @@ export async function GET(request: Request) {
         : {}),
     },
   });
+}
+
+/**
+ * Static map snippet:
+ * - ?lat=&lon= — einzelner Ort
+ * - ?fromLat=&fromLon=&toLat=&toLon=&route=geodesic|straight — Flug/Transfer
+ */
+export async function GET(request: Request) {
+  ensureInitialized();
+  const auth = await requireAuth();
+  if (isAuthError(auth)) return auth;
+
+  const { searchParams } = new URL(request.url);
+
+  const fromLat = parseCoord(searchParams.get("fromLat"));
+  const fromLon = parseCoord(searchParams.get("fromLon"));
+  const toLat = parseCoord(searchParams.get("toLat"));
+  const toLon = parseCoord(searchParams.get("toLon"));
+
+  if (
+    fromLat != null &&
+    fromLon != null &&
+    toLat != null &&
+    toLon != null
+  ) {
+    if (
+      !isValidLatLon(fromLat, fromLon) ||
+      !isValidLatLon(toLat, toLon)
+    ) {
+      return NextResponse.json({ error: "invalid coordinates" }, { status: 400 });
+    }
+    const route = (searchParams.get("route") || "straight").toLowerCase();
+    const geodesic = route === "geodesic" || route === "greatcircle";
+
+    // Optional: kompakte Pfadpunkte "lat,lon|lat,lon|…" (z. B. Zug-Geometrie)
+    const pathRaw = searchParams.get("path");
+    let pathPoints: Array<{ lat: number; lon: number }> | undefined;
+    if (pathRaw) {
+      const parsed: Array<{ lat: number; lon: number }> = [];
+      for (const part of pathRaw.split("|").slice(0, 60)) {
+        const [a, b] = part.split(",");
+        const lat = Number(a);
+        const lon = Number(b);
+        if (Number.isFinite(lat) && Number.isFinite(lon) && isValidLatLon(lat, lon)) {
+          parsed.push({ lat, lon });
+        }
+      }
+      if (parsed.length >= 2) pathPoints = parsed;
+    }
+
+    return mapResponse(
+      await fetchStaticRouteMapPngDetailed({
+        from: { lat: fromLat, lon: fromLon },
+        to: { lat: toLat, lon: toLon },
+        geodesic: geodesic && !pathPoints,
+        pathPoints,
+      })
+    );
+  }
+
+  const lat = parseCoord(searchParams.get("lat"));
+  const lon = parseCoord(searchParams.get("lon"));
+  const zoom = Math.min(16, Math.max(10, Number(searchParams.get("z") || 14)));
+  if (lat == null || lon == null) {
+    return NextResponse.json(
+      { error: "lat/lon or fromLat/fromLon/toLat/toLon required" },
+      { status: 400 }
+    );
+  }
+  if (!isValidLatLon(lat, lon)) {
+    return NextResponse.json({ error: "invalid coordinates" }, { status: 400 });
+  }
+
+  return mapResponse(
+    await fetchStaticMapPngDetailed({
+      lat,
+      lon,
+      zoom,
+      withMarker: true,
+    })
+  );
 }

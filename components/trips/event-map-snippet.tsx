@@ -1,12 +1,16 @@
 "use client";
 
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { coerceTripEventType } from "@/lib/trips/constants";
 import { trainEnrichmentRoutePath } from "@/lib/trips/train-enrichment";
-import { placeMapImageSrc } from "@/lib/maps/place-map-src";
+import {
+  placeMapImageSrc,
+  routeMapImageSrc,
+} from "@/lib/maps/place-map-src";
 import { TripMap, type TripMapPoint } from "@/components/trips/trip-map";
 
-export { placeMapImageSrc } from "@/lib/maps/place-map-src";
+export { placeMapImageSrc, routeMapImageSrc } from "@/lib/maps/place-map-src";
 
 /** Minimal geo/context fields needed to derive a map snippet for an event. */
 export type EventMapGeoFields = {
@@ -213,6 +217,64 @@ function StaticPlaceMapImage({
   );
 }
 
+function StaticRouteMapImage({
+  model,
+  heightClassName,
+  className,
+  compact,
+}: {
+  model: EventMapModel;
+  heightClassName: string;
+  className?: string;
+  compact: boolean;
+}) {
+  const [fallback, setFallback] = useState(false);
+  const a = model.points[0];
+  const b = model.points[1];
+  if (!a || !b) return null;
+
+  if (fallback) {
+    return (
+      <TripMap
+        points={model.points}
+        drawRoute={model.drawRoute}
+        routeStyle={model.routeStyle}
+        routePath={model.routePath}
+        heightClassName={heightClassName}
+        className={className}
+        compact={compact}
+      />
+    );
+  }
+
+  const src = routeMapImageSrc({
+    fromLat: a.lat,
+    fromLon: a.lon,
+    toLat: b.lat,
+    toLon: b.lon,
+    route: model.routeStyle === "greatCircle" ? "geodesic" : "straight",
+    pathPoints: model.routePath,
+  });
+
+  return (
+    <div
+      className={cn(
+        "overflow-hidden rounded-md border border-border/70 bg-muted/30",
+        className
+      )}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt={`Route: ${a.label || "Von"} → ${b.label || "Nach"}`}
+        className={cn("w-full object-cover", heightClassName)}
+        loading="lazy"
+        onError={() => setFallback(true)}
+      />
+    </div>
+  );
+}
+
 /** Small map snippet ("Kartenausschnitt") for a trip event, or a static fallback image. */
 export function EventMapSnippet({
   event,
@@ -228,8 +290,17 @@ export function EventMapSnippet({
   const model = getEventMapModel(event);
   if (!model) return null;
 
-  // Orts-/Endpunkt-Ausschnitte: Google Static Maps (wie Dashboard), nicht Leaflet/OSM.
-  // Routen (Flug/Transfer) bleiben interaktiv (Leaflet) wegen Pfadzeichnung.
+  if (model.kind === "route" && model.points.length >= 2) {
+    return (
+      <StaticRouteMapImage
+        model={model}
+        heightClassName={heightClassName}
+        className={className}
+        compact={compact}
+      />
+    );
+  }
+
   if (model.kind === "place" || model.kind === "endpoint") {
     const point = model.points[0];
     if (point) {

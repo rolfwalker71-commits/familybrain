@@ -1,6 +1,7 @@
 import sharp from "sharp";
 import {
   fetchGoogleStaticMapDetailed,
+  fetchGoogleStaticRouteMapDetailed,
   hasGoogleMapsApiKey,
 } from "@/lib/google/maps";
 
@@ -143,4 +144,40 @@ export async function fetchStaticMapPng(input: {
 }): Promise<Buffer | null> {
   const r = await fetchStaticMapPngDetailed(input);
   return r.buffer;
+}
+
+/**
+ * Von/Nach-Route als Static Map (Google). Ohne Key / bei Fehler: kein OSM-Stitch,
+ * caller kann auf Leaflet zurückfallen.
+ */
+export async function fetchStaticRouteMapPngDetailed(input: {
+  from: { lat: number; lon: number };
+  to: { lat: number; lon: number };
+  geodesic?: boolean;
+  pathPoints?: Array<{ lat: number; lon: number }>;
+}): Promise<StaticMapFetchResult> {
+  if (!hasGoogleMapsApiKey()) {
+    return { buffer: null, source: "none", googleError: "no_api_key" };
+  }
+
+  const google = await fetchGoogleStaticRouteMapDetailed({
+    from: input.from,
+    to: input.to,
+    geodesic: input.geodesic,
+    pathPoints: input.pathPoints,
+    width: 640,
+    height: 400,
+    scale: 2,
+    maptype: "roadmap",
+  });
+
+  if (google.ok) {
+    return { buffer: google.buffer, source: "google", googleError: null };
+  }
+
+  console.warn(
+    "[static-map] Google Static Route fehlgeschlagen:",
+    google.error
+  );
+  return { buffer: null, source: "none", googleError: google.error };
 }
