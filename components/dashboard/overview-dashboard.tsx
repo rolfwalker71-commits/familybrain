@@ -22,7 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BackupStatusPanel } from "@/components/settings/backup-status-panel";
 import { KpiCorrectSheet } from "@/components/dashboard/kpi-correct-sheet";
-import { TeamLogo, weekdayLabel, resolveAgendaItemIcon } from "@/components/calendar/agenda-row";
+import { TeamLogo, weekdayLabel, AgendaTypeRail } from "@/components/calendar/agenda-row";
 import { formatCHF } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
 import { APP_ICON_STROKE } from "@/lib/branding/app-icons";
@@ -374,7 +374,6 @@ function DayTimeline({
         const isTomorrow = item.date > today;
         const hm = item.time || "—";
         const isLast = index === items.length - 1;
-        const TypeIcon = resolveAgendaItemIcon(item);
         const showMap = active && item.coords;
 
         return (
@@ -425,23 +424,23 @@ function DayTimeline({
             </div>
             <div
               className={cn(
-                "mb-5 min-w-0 rounded-xl border border-border/60 bg-card px-3 py-2.5 transition-colors last:mb-1",
-                active && "border-emerald-200/90 bg-emerald-50/50"
+                "mb-5 min-w-0 overflow-hidden rounded-xl border border-border/60 bg-card last:mb-1",
+                active && "border-emerald-200/90"
               )}
             >
-              <div className="flex items-start gap-3">
-                <TypeIcon
+              <div className="flex items-stretch">
+                <AgendaTypeRail item={item} />
+                <div
                   className={cn(
-                    "mt-0.5 size-7 shrink-0",
-                    active ? "text-emerald-800" : "text-muted-foreground"
+                    "min-w-0 flex-1 px-3 py-2.5 transition-colors",
+                    active && "bg-emerald-50/60"
                   )}
-                  strokeWidth={APP_ICON_STROKE}
-                  absoluteStrokeWidth
-                  aria-hidden
-                />
-                <div className="min-w-0 flex-1">
+                >
                   <div className="flex items-start justify-between gap-2">
-                    <Link href={itemHref(item)} className="min-w-0 flex-1 hover:opacity-90">
+                    <Link
+                      href={itemHref(item)}
+                      className="min-w-0 flex-1 hover:opacity-90"
+                    >
                       <p className="truncate text-sm font-semibold tracking-tight">
                         {item.title}
                       </p>

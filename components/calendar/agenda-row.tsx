@@ -33,17 +33,75 @@ import type {
 } from "@/lib/dashboard/overview";
 import type { IcsCalendarType } from "@/lib/calendar/ics-calendars";
 
-const KIND_ACCENT: Record<AgendaKind, string> = {
-  invoice: "border-l-[var(--brand-finance)]",
-  deadline: "border-l-teal-600",
-  travel: "border-l-sky-600",
-  warranty: "border-l-amber-600",
-  triage: "border-l-[var(--brand-docs)]",
-  ledger: "border-l-[var(--brand-finance)]",
-  hockey: "border-l-rose-600",
-  holiday: "border-l-violet-600",
-  calendar: "border-l-slate-500",
+/** Solid accent for left rail (calendar color or kind fallback). */
+const KIND_ACCENT_HEX: Record<AgendaKind, string> = {
+  invoice: "#0f766e",
+  deadline: "#0d9488",
+  travel: "#0284c7",
+  warranty: "#d97706",
+  triage: "#0f766e",
+  ledger: "#0f766e",
+  hockey: "#e11d48",
+  holiday: "#8b5cf6",
+  calendar: "#64748b",
 };
+
+export function agendaItemAccentColor(item: AgendaItem): string {
+  const raw = item.accentColor?.trim();
+  if (raw && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(raw)) return raw;
+  if (raw && raw.startsWith("#")) return raw;
+  if (raw && !raw.startsWith("var(")) return raw;
+  return KIND_ACCENT_HEX[item.kind] || KIND_ACCENT_HEX.calendar;
+}
+
+function hexToRgba(hex: string, alpha: number): string {
+  const h = hex.replace("#", "");
+  const full =
+    h.length === 3
+      ? h
+          .split("")
+          .map((c) => c + c)
+          .join("")
+      : h;
+  if (full.length !== 6) return `rgba(100, 116, 139, ${alpha})`;
+  const n = Number.parseInt(full, 16);
+  if (!Number.isFinite(n)) return `rgba(100, 116, 139, ${alpha})`;
+  const r = (n >> 16) & 255;
+  const g = (n >> 8) & 255;
+  const b = n & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+/** Left calendar-color rail with type icon (weather-widget style). */
+export function AgendaTypeRail({
+  item,
+  className,
+  iconClassName,
+}: {
+  item: AgendaItem;
+  className?: string;
+  iconClassName?: string;
+}) {
+  const Icon = resolveAgendaItemIcon(item);
+  const accent = agendaItemAccentColor(item);
+  return (
+    <div
+      className={cn(
+        "flex w-[3.25rem] shrink-0 flex-col items-center justify-center self-stretch px-1.5",
+        className
+      )}
+      style={{ backgroundColor: hexToRgba(accent, 0.22) }}
+      aria-hidden
+    >
+      <Icon
+        className={cn("size-6", iconClassName)}
+        style={iconClassName ? undefined : { color: accent }}
+        strokeWidth={APP_ICON_STROKE}
+        absoluteStrokeWidth
+      />
+    </div>
+  );
+}
 
 const KIND_ICON: Record<AgendaKind, typeof FileText> = {
   invoice: FileText,
@@ -158,15 +216,12 @@ export function AgendaRow({
   /** upcoming: hockey shows date+time / location / Heim|Auswärts on three lines */
   variant?: "agenda" | "upcoming";
 }) {
-  const Icon = resolveAgendaItemIcon(item);
   const isPaymentPipeline = item.badge === "Zahlung";
   const isHockey = item.kind === "hockey";
   const hasLogos = Boolean(item.logos?.left || item.logos?.right);
   const upcomingHockey = isHockey && hasLogos && variant === "upcoming";
   const weather = item.weather || null;
-  const accentStyle = item.accentColor
-    ? { borderLeftColor: item.accentColor }
-    : undefined;
+  const accent = agendaItemAccentColor(item);
 
   let hockeyDateLabel = item.date;
   try {
@@ -191,108 +246,115 @@ export function AgendaRow({
   const inner = (
     <div
       className={cn(
-        "relative flex items-center gap-3 rounded-xl border border-border/60 border-l-4 bg-card px-3 py-2.5 shadow-[0_2px_10px_rgba(20,32,28,0.04)]",
-        weather && "mt-3 pt-4",
-        isPaymentPipeline
-          ? "border-l-sky-500 bg-sky-50/40"
-          : !item.accentColor && KIND_ACCENT[item.kind]
+        "relative overflow-hidden rounded-xl border border-border/60 bg-card shadow-[0_2px_10px_rgba(20,32,28,0.04)]",
+        weather && "mt-3",
+        isPaymentPipeline && "border-sky-300/80"
       )}
-      style={isPaymentPipeline ? undefined : accentStyle}
     >
       {weather ? <WeatherChip weather={weather} /> : null}
-      <Icon
-        className="size-8 shrink-0 text-muted-foreground"
-        strokeWidth={APP_ICON_STROKE}
-        absoluteStrokeWidth
-        aria-hidden
-      />
-      {isHockey && hasLogos ? (
-        <div className="flex shrink-0 items-center gap-1" aria-hidden>
-          <TeamLogo
-            label={item.logos?.leftLabel || "Heim"}
-            src={item.logos?.left}
-            size="md"
-          />
-          <span className="px-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-            vs.
-          </span>
-          <TeamLogo
-            label={item.logos?.rightLabel || "Gast"}
-            src={item.logos?.right}
-            size="md"
-          />
-        </div>
-      ) : null}
-      <div className="min-w-0 flex-1">
-        {upcomingHockey ? (
-          <>
-            <p className="truncate text-sm font-medium text-foreground">
-              {upcomingLine1}
-            </p>
-            {upcomingLine2 ? (
-              <p className="truncate text-xs text-muted-foreground">
-                {upcomingLine2}
-              </p>
-            ) : null}
-            <p className="truncate text-xs text-muted-foreground">
-              {upcomingLine3}
-            </p>
-          </>
-        ) : isHockey && hasLogos ? (
-          <>
-            {item.subtitle ? (
-              <p className="truncate text-sm font-medium text-foreground">
-                {item.subtitle}
-              </p>
-            ) : null}
-            <p className="truncate text-xs text-muted-foreground">{item.title}</p>
-          </>
-        ) : (
-          <>
-            <p className="truncate text-sm font-medium">{item.title}</p>
-            {item.subtitle ? (
-              <p className="truncate text-xs text-muted-foreground">
-                {item.subtitle}
-              </p>
-            ) : null}
-            {item.kind === "calendar" && item.time ? (
-              <p className="truncate text-xs text-muted-foreground tabular-nums">
-                {item.time}
-              </p>
-            ) : null}
-          </>
-        )}
-        {isPaymentPipeline ? (
-          <p className="mt-1 text-[11px] font-medium text-sky-800">
-            Zahlung geplant — noch in der Pipeline
-          </p>
-        ) : null}
-      </div>
-      <div className="flex shrink-0 flex-col items-end gap-1">
-        {item.amount != null ? (
-          <span className="text-sm font-semibold tabular-nums">
-            {formatCHF(item.amount, item.currency || "CHF")}
-          </span>
-        ) : null}
-        <Badge
-          variant="secondary"
+      <div className={cn("flex items-stretch", weather && "pt-3")}>
+        <AgendaTypeRail
+          item={item}
+          className={cn(isPaymentPipeline && "bg-sky-100/80")}
+          iconClassName={isPaymentPipeline ? "text-sky-800" : undefined}
+        />
+        <div
           className={cn(
-            "text-[10px]",
-            isPaymentPipeline && "bg-sky-100 text-sky-900",
-            isHockey && "bg-rose-50 text-rose-800",
-            item.kind === "holiday" && "bg-violet-50 text-violet-900"
+            "flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5",
+            isPaymentPipeline && "bg-sky-50/40"
           )}
-          style={
-            item.accentColor && !isHockey
-              ? {
-                  backgroundColor: `${item.accentColor}18`,
-                  color: item.accentColor,
-                }
-              : undefined
-          }
         >
-          {item.badge}
-        </Badge>
+          {isHockey && hasLogos ? (
+            <div className="flex shrink-0 items-center gap-1" aria-hidden>
+              <TeamLogo
+                label={item.logos?.leftLabel || "Heim"}
+                src={item.logos?.left}
+                size="md"
+              />
+              <span className="px-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                vs.
+              </span>
+              <TeamLogo
+                label={item.logos?.rightLabel || "Gast"}
+                src={item.logos?.right}
+                size="md"
+              />
+            </div>
+          ) : null}
+          <div className="min-w-0 flex-1">
+            {upcomingHockey ? (
+              <>
+                <p className="truncate text-sm font-medium text-foreground">
+                  {upcomingLine1}
+                </p>
+                {upcomingLine2 ? (
+                  <p className="truncate text-xs text-muted-foreground">
+                    {upcomingLine2}
+                  </p>
+                ) : null}
+                <p className="truncate text-xs text-muted-foreground">
+                  {upcomingLine3}
+                </p>
+              </>
+            ) : isHockey && hasLogos ? (
+              <>
+                {item.subtitle ? (
+                  <p className="truncate text-sm font-medium text-foreground">
+                    {item.subtitle}
+                  </p>
+                ) : null}
+                <p className="truncate text-xs text-muted-foreground">
+                  {item.title}
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="truncate text-sm font-medium">{item.title}</p>
+                {item.subtitle ? (
+                  <p className="truncate text-xs text-muted-foreground">
+                    {item.subtitle}
+                  </p>
+                ) : null}
+                {item.kind === "calendar" && item.time ? (
+                  <p className="truncate text-xs text-muted-foreground tabular-nums">
+                    {item.time}
+                  </p>
+                ) : null}
+              </>
+            )}
+            {isPaymentPipeline ? (
+              <p className="mt-1 text-[11px] font-medium text-sky-800">
+                Zahlung geplant — noch in der Pipeline
+              </p>
+            ) : null}
+          </div>
+          <div className="flex shrink-0 flex-col items-end gap-1">
+            {item.amount != null ? (
+              <span className="text-sm font-semibold tabular-nums">
+                {formatCHF(item.amount, item.currency || "CHF")}
+              </span>
+            ) : null}
+            <Badge
+              variant="secondary"
+              className={cn(
+                "text-[10px]",
+                isPaymentPipeline && "bg-sky-100 text-sky-900",
+                isHockey && "bg-rose-50 text-rose-800",
+                item.kind === "holiday" && "bg-violet-50 text-violet-900"
+              )}
+              style={
+                item.accentColor && !isHockey
+                  ? {
+                      backgroundColor: hexToRgba(accent, 0.12),
+                      color: accent,
+                    }
+                  : undefined
+              }
+            >
+              {item.badge}
+            </Badge>
+          </div>
+        </div>
       </div>
     </div>
   );
