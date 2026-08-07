@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { isAuthError, requireAuth } from "@/lib/auth/current-user";
 import { ensureInitialized } from "@/lib/db/migrations";
-import { analyzeMicrosoftMailDay } from "@/lib/microsoft/analyze-mail-day";
+import {
+  analyzeMicrosoftMailDay,
+  emptyMailDayAnalysis,
+} from "@/lib/microsoft/analyze-mail-day";
 import { listMicrosoftMailToday } from "@/lib/microsoft/mail-day";
 import {
   isMicrosoftConnected,
@@ -28,12 +31,9 @@ export async function POST() {
       return NextResponse.json({
         ok: true,
         mail,
-        analysis: {
-          daySummary: "Keine Outlook-Mails für heute gefunden.",
-          highlights: [],
-          openLoops: [],
-          tasks: [],
-        },
+        analysis: emptyMailDayAnalysis(
+          "Keine Outlook-Mails für heute gefunden."
+        ),
       });
     }
     const analysis = await analyzeMicrosoftMailDay(mail);

@@ -48,19 +48,75 @@ type MsMail = {
   receivedOrSentAt: string | null;
 };
 
+type DayTask = {
+  title: string;
+  notes?: string | null;
+  dueDate?: string | null;
+  sourceMailId?: string | null;
+  sourceSubject?: string | null;
+  folder?: "inbox" | "sent" | null;
+  company?: string | null;
+  counterpartEmail?: string | null;
+  theme?: string | null;
+  reason?: string;
+};
+
+type DayEventSug = {
+  title: string;
+  date: string;
+  startTime?: string | null;
+  endTime?: string | null;
+  allDay?: boolean;
+  location?: string | null;
+  notes?: string | null;
+  sourceMailId?: string | null;
+  sourceSubject?: string | null;
+  company?: string | null;
+  counterpartEmail?: string | null;
+  theme?: string | null;
+  reason?: string;
+};
+
+type DayReply = {
+  to: string;
+  subject: string;
+  body: string;
+  sourceMailId?: string | null;
+  company?: string | null;
+  theme?: string | null;
+  reason?: string;
+};
+
+type DayCluster = {
+  company: string;
+  counterpartEmail?: string | null;
+  theme: string;
+  summary: string;
+  status?: "open" | "waiting" | "done" | "fyi";
+  tasks: DayTask[];
+  events: DayEventSug[];
+  replies: DayReply[];
+};
+
 type DayAnalysis = {
   daySummary: string;
-  highlights: string[];
-  openLoops: string[];
-  tasks: Array<{
-    title: string;
-    notes?: string | null;
-    dueDate?: string | null;
-    sourceMailId?: string | null;
-    sourceSubject?: string | null;
-    folder?: "inbox" | "sent" | null;
-    reason?: string;
-  }>;
+  clusters: DayCluster[];
+  tasks: DayTask[];
+  events: DayEventSug[];
+  replies: DayReply[];
+};
+
+type PickState = {
+  tasks: Record<number, boolean>;
+  events: Record<number, boolean>;
+  replies: Record<number, boolean>;
+};
+
+const STATUS_LABEL: Record<string, string> = {
+  open: "Offen",
+  waiting: "Wartet",
+  done: "Erledigt",
+  fyi: "Info",
 };
 
 export function MicrosoftDayClient() {
@@ -82,7 +138,11 @@ export function MicrosoftDayClient() {
   const [mailLoading, setMailLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [analysis, setAnalysis] = useState<DayAnalysis | null>(null);
-  const [taskPick, setTaskPick] = useState<Record<number, boolean>>({});
+  const [picks, setPicks] = useState<PickState>({
+    tasks: {},
+    events: {},
+    replies: {},
+  });
   const [applying, setApplying] = useState(false);
 
   const loadConnection = useCallback(async () => {
@@ -236,12 +296,24 @@ export function MicrosoftDayClient() {
         setSent((json.mail.sent || []) as MsMail[]);
       }
       const a = json.analysis as DayAnalysis;
-      setAnalysis(a);
-      const picks: Record<number, boolean> = {};
-      (a.tasks || []).forEach((_, i) => {
-        picks[i] = true;
+      setAnalysis({
+        daySummary: a.daySummary || "",
+        clusters: a.clusters || [],
+        tasks: a.tasks || [],
+        events: a.events || [],
+        replies: a.replies || [],
       });
-      setTaskPick(picks);
+      const next: PickState = { tasks: {}, events: {}, replies: {} };
+      (a.tasks || []).forEach((_, i) => {
+        next.tasks[i] = true;
+      });
+      (a.events || []).forEach((_, i) => {
+        next.events[i] = true;
+      });
+      (a.replies || []).forEach((_, i) => {
+        next.replies[i] = false;
+      });
+      setPicks(next);
       setStatus("Tagesanalyse fertig.");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -250,29 +322,63 @@ export function MicrosoftDayClient() {
     }
   }
 
-  async function applyTasks() {
+  async function applySelected() {
     if (!analysis) return;
-    const tasks = analysis.tasks.filter((_, i) => taskPick[i]);
-    if (tasks.length === 0) return;
+    const tasks = analysis.tasks.filter((_, i) => picks.tasks[i]);
+    const eventsSel = analysis.events.filter((_, i) => picks.events[i]);
+    const replies = analysis.replies.filter((_, i) => picks.replies[i]);
+    if (tasks.length + eventsSel.length + replies.length === 0) return;
     setApplying(true);
     setError(null);
     try {
       const res = await fetch("/api/microsoft/mail/apply", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tasks }),
+        body: JSON.stringify({ tasks, events: eventsSel, replies }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Übernehmen fehlgeschlagen");
-      const target = json.preferGoogleTasks
-        ? "Google Tasks"
-        : "Buddy-Notizen";
-      setStatus(`${json.okCount} Aufgabe(n) → ${target}`);
+      const parts = [
+        json.taskOk
+          ? `${json.taskOk} Aufgabe(n) → ${json.preferGoogleTasks ? "Google Tasks" : "Buddy-Notiz"}`
+          : null,
+        json.eventOk ? `${json.eventOk} Termin(e) → Outlook` : null,
+        json.replyOk ? `${json.replyOk} Entwurf(e) → Outlook` : null,
+      ].filter(Boolean);
+      setStatus(parts.join(" · ") || `${json.okCount} übernommen`);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setApplying(false);
     }
+  }
+
+  const selectedCount = useMemo(() => {
+    if (!analysis) return 0;
+    return (
+      analysis.tasks.filter((_, i) => picks.tasks[i]).length +
+      analysis.events.filter((_, i) => picks.events[i]).length +
+      analysis.replies.filter((_, i) => picks.replies[i]).length
+    );
+  }, [analysis, picks]);
+
+  function flatTaskIndex(clusterIdx: number, localIdx: number): number {
+    if (!analysis) return -1;
+    let n = 0;
+    for (let c = 0; c < clusterIdx; c++) n += analysis.clusters[c]?.tasks.length || 0;
+    return n + localIdx;
+  }
+  function flatEventIndex(clusterIdx: number, localIdx: number): number {
+    if (!analysis) return -1;
+    let n = 0;
+    for (let c = 0; c < clusterIdx; c++) n += analysis.clusters[c]?.events.length || 0;
+    return n + localIdx;
+  }
+  function flatReplyIndex(clusterIdx: number, localIdx: number): number {
+    if (!analysis) return -1;
+    let n = 0;
+    for (let c = 0; c < clusterIdx; c++) n += analysis.clusters[c]?.replies.length || 0;
+    return n + localIdx;
   }
 
   return (
@@ -571,84 +677,206 @@ export function MicrosoftDayClient() {
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <p className="text-sm leading-relaxed">{analysis.daySummary}</p>
-                    {analysis.highlights.length > 0 ? (
-                      <div>
-                        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                          Highlights
-                        </p>
-                        <ul className="mt-1 list-disc space-y-0.5 pl-4 text-sm">
-                          {analysis.highlights.map((h) => (
-                            <li key={h}>{h}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    ) : null}
-                    {analysis.openLoops.length > 0 ? (
-                      <div>
-                        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                          Offene Schleifen
-                        </p>
-                        <ul className="mt-1 list-disc space-y-0.5 pl-4 text-sm">
-                          {analysis.openLoops.map((h) => (
-                            <li key={h}>{h}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    ) : null}
-                    {analysis.tasks.length > 0 ? (
-                      <div className="space-y-2">
-                        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                          Aufgaben-Vorschläge
-                        </p>
-                        <ul className="space-y-2">
-                          {analysis.tasks.map((t, i) => (
-                            <li
-                              key={`${t.title}-${i}`}
-                              className="flex items-start gap-2 rounded-lg border border-border/50 px-2.5 py-2"
-                            >
-                              <input
-                                type="checkbox"
-                                className="mt-1"
-                                checked={Boolean(taskPick[i])}
-                                onChange={(e) =>
-                                  setTaskPick((prev) => ({
-                                    ...prev,
-                                    [i]: e.target.checked,
-                                  }))
-                                }
-                              />
+
+                    {analysis.clusters.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">
+                        Keine Cluster / Handlungsvorschläge.
+                      </p>
+                    ) : (
+                      <ul className="space-y-3">
+                        {analysis.clusters.map((cluster, ci) => (
+                          <li
+                            key={`${cluster.company}-${cluster.theme}-${ci}`}
+                            className="rounded-lg border border-border/60 bg-muted/20 p-3"
+                          >
+                            <div className="flex flex-wrap items-start justify-between gap-2">
                               <div className="min-w-0">
-                                <p className="text-sm font-medium">{t.title}</p>
-                                <p className="text-[11px] text-muted-foreground">
-                                  {[
-                                    t.dueDate
-                                      ? `fällig ${toSwissDate(t.dueDate)}`
-                                      : null,
-                                    t.sourceSubject,
-                                    t.reason,
-                                  ]
-                                    .filter(Boolean)
-                                    .join(" · ")}
+                                <p className="text-sm font-semibold leading-snug">
+                                  {cluster.company}
+                                  <span className="font-normal text-muted-foreground">
+                                    {" "}
+                                    · {cluster.theme}
+                                  </span>
                                 </p>
+                                {cluster.counterpartEmail ? (
+                                  <p className="text-[11px] text-muted-foreground">
+                                    {cluster.counterpartEmail}
+                                  </p>
+                                ) : null}
                               </div>
-                            </li>
-                          ))}
-                        </ul>
+                              {cluster.status ? (
+                                <Badge variant="secondary" className="text-[10px]">
+                                  {STATUS_LABEL[cluster.status] || cluster.status}
+                                </Badge>
+                              ) : null}
+                            </div>
+                            <p className="mt-1.5 text-sm leading-snug text-foreground/90">
+                              {cluster.summary}
+                            </p>
+
+                            {cluster.tasks.length > 0 ? (
+                              <div className="mt-3 space-y-1.5">
+                                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                  Aufgaben
+                                </p>
+                                {cluster.tasks.map((t, li) => {
+                                  const i = flatTaskIndex(ci, li);
+                                  return (
+                                    <label
+                                      key={`t-${ci}-${li}`}
+                                      className="flex items-start gap-2 rounded-md border border-border/40 bg-background px-2 py-1.5"
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        className="mt-1"
+                                        checked={Boolean(picks.tasks[i])}
+                                        onChange={(e) =>
+                                          setPicks((prev) => ({
+                                            ...prev,
+                                            tasks: {
+                                              ...prev.tasks,
+                                              [i]: e.target.checked,
+                                            },
+                                          }))
+                                        }
+                                      />
+                                      <span className="min-w-0">
+                                        <span className="block text-sm font-medium">
+                                          {t.title}
+                                        </span>
+                                        <span className="block text-[11px] text-muted-foreground">
+                                          {[
+                                            t.dueDate
+                                              ? `fällig ${toSwissDate(t.dueDate)}`
+                                              : null,
+                                            t.reason,
+                                          ]
+                                            .filter(Boolean)
+                                            .join(" · ")}
+                                        </span>
+                                      </span>
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            ) : null}
+
+                            {cluster.events.length > 0 ? (
+                              <div className="mt-3 space-y-1.5">
+                                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                  Termine
+                                </p>
+                                {cluster.events.map((ev, li) => {
+                                  const i = flatEventIndex(ci, li);
+                                  return (
+                                    <label
+                                      key={`e-${ci}-${li}`}
+                                      className="flex items-start gap-2 rounded-md border border-border/40 bg-background px-2 py-1.5"
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        className="mt-1"
+                                        checked={Boolean(picks.events[i])}
+                                        onChange={(e) =>
+                                          setPicks((prev) => ({
+                                            ...prev,
+                                            events: {
+                                              ...prev.events,
+                                              [i]: e.target.checked,
+                                            },
+                                          }))
+                                        }
+                                      />
+                                      <span className="min-w-0">
+                                        <span className="block text-sm font-medium">
+                                          {ev.title}
+                                        </span>
+                                        <span className="block text-[11px] text-muted-foreground">
+                                          {[
+                                            toSwissDate(ev.date),
+                                            ev.allDay || !ev.startTime
+                                              ? "ganztags"
+                                              : `${ev.startTime}${ev.endTime ? `–${ev.endTime}` : ""}`,
+                                            ev.location,
+                                            ev.reason,
+                                          ]
+                                            .filter(Boolean)
+                                            .join(" · ")}
+                                        </span>
+                                      </span>
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            ) : null}
+
+                            {cluster.replies.length > 0 ? (
+                              <div className="mt-3 space-y-1.5">
+                                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                  Antwort-Entwürfe
+                                </p>
+                                {cluster.replies.map((r, li) => {
+                                  const i = flatReplyIndex(ci, li);
+                                  return (
+                                    <label
+                                      key={`r-${ci}-${li}`}
+                                      className="flex items-start gap-2 rounded-md border border-border/40 bg-background px-2 py-1.5"
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        className="mt-1"
+                                        checked={Boolean(picks.replies[i])}
+                                        onChange={(e) =>
+                                          setPicks((prev) => ({
+                                            ...prev,
+                                            replies: {
+                                              ...prev.replies,
+                                              [i]: e.target.checked,
+                                            },
+                                          }))
+                                        }
+                                      />
+                                      <span className="min-w-0">
+                                        <span className="block text-sm font-medium">
+                                          {r.subject}
+                                        </span>
+                                        <span className="block text-[11px] text-muted-foreground">
+                                          An {r.to}
+                                          {r.reason ? ` · ${r.reason}` : ""}
+                                        </span>
+                                        <span className="mt-1 block whitespace-pre-wrap text-xs text-foreground/80">
+                                          {r.body}
+                                        </span>
+                                      </span>
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            ) : null}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+
+                    {selectedCount > 0 ||
+                    analysis.tasks.length +
+                      analysis.events.length +
+                      analysis.replies.length >
+                      0 ? (
+                      <div className="space-y-2 border-t border-border/50 pt-3">
                         <Button
                           type="button"
                           size="sm"
-                          disabled={
-                            applying ||
-                            !analysis.tasks.some((_, i) => taskPick[i])
-                          }
-                          onClick={() => void applyTasks()}
+                          disabled={applying || selectedCount === 0}
+                          onClick={() => void applySelected()}
                         >
                           {applying
                             ? "Speichere…"
-                            : "Ausgewählte übernehmen"}
+                            : `Ausgewählte übernehmen (${selectedCount})`}
                         </Button>
                         <p className="text-[11px] text-muted-foreground">
-                          Ziel: Google Tasks falls verbunden, sonst Buddy-Notiz.
+                          Aufgaben → Google Tasks (falls verbunden) oder Buddy-Notiz.
+                          Termine & Antwort-Entwürfe → Outlook.
                         </p>
                       </div>
                     ) : null}

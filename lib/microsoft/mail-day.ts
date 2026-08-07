@@ -10,6 +10,8 @@ export type MsMailItem = {
   from: string;
   fromEmail: string | null;
   toPreview: string | null;
+  /** Empfänger-Adressen (für Firmen-Kontext bei Gesendet). */
+  toEmails: string[];
   receivedOrSentAt: string | null;
   preview: string;
   bodyText: string;
@@ -54,8 +56,17 @@ function mapMessage(m: GraphMessage, folder: MsMailFolder): MsMailItem | null {
   if (!m.id) return null;
   const fromName = m.from?.emailAddress?.name?.trim();
   const fromEmail = m.from?.emailAddress?.address?.trim() || null;
+  const toEmails = (m.toRecipients || [])
+    .map((r) => r.emailAddress?.address?.trim())
+    .filter((a): a is string => Boolean(a))
+    .slice(0, 5);
   const to = (m.toRecipients || [])
-    .map((r) => r.emailAddress?.name || r.emailAddress?.address)
+    .map((r) => {
+      const name = r.emailAddress?.name?.trim();
+      const addr = r.emailAddress?.address?.trim();
+      if (name && addr) return `${name} <${addr}>`;
+      return name || addr || null;
+    })
     .filter(Boolean)
     .slice(0, 3)
     .join(", ");
@@ -71,6 +82,7 @@ function mapMessage(m: GraphMessage, folder: MsMailFolder): MsMailItem | null {
     from: fromName || fromEmail || "—",
     fromEmail,
     toPreview: to || null,
+    toEmails,
     receivedOrSentAt:
       folder === "sent" ? m.sentDateTime || null : m.receivedDateTime || null,
     preview: (m.bodyPreview || "").trim().slice(0, 280),
