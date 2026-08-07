@@ -245,19 +245,16 @@ function DayTimeline({
   }
 
   return (
-    <ol className="relative">
-      <span
-        className="absolute bottom-3 left-[4.35rem] top-3 w-px bg-border/70"
-        aria-hidden
-      />
-      {items.map((item) => {
+    <ol className="relative grid grid-cols-[3.5rem_1.25rem_minmax(0,1fr)] gap-x-3">
+      {items.map((item, index) => {
         const active = item.id === activeId;
         const isTomorrow = item.date > today;
         const hm = item.time || "—";
+        const isLast = index === items.length - 1;
 
         return (
-          <li key={item.id} className="relative flex gap-3 pb-5 last:pb-1">
-            <div className="flex w-14 shrink-0 flex-col items-end justify-start pt-2 text-right">
+          <li key={item.id} className="contents">
+            <div className="flex flex-col items-end justify-start pt-2 text-right">
               {isTomorrow ? (
                 <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                   Morgen
@@ -272,10 +269,22 @@ function DayTimeline({
                 {hm}
               </span>
             </div>
-            <div className="relative z-[1] flex w-5 shrink-0 justify-center pt-2.5">
+            <div className="relative flex justify-center pt-2.5 pb-5">
+              {!isLast ? (
+                <span
+                  className="absolute left-1/2 top-5 bottom-0 w-px -translate-x-1/2 bg-border/70"
+                  aria-hidden
+                />
+              ) : null}
+              {index > 0 ? (
+                <span
+                  className="absolute left-1/2 top-0 h-2.5 w-px -translate-x-1/2 bg-border/70"
+                  aria-hidden
+                />
+              ) : null}
               <span
                 className={cn(
-                  "size-3 rounded-full border-2",
+                  "relative z-[1] size-3 shrink-0 rounded-full border-2",
                   active
                     ? "border-emerald-600 bg-emerald-600 shadow-[0_0_0_4px_rgba(5,150,105,0.2)]"
                     : "border-muted-foreground/35 bg-background"
@@ -287,7 +296,7 @@ function DayTimeline({
             <Link
               href={itemHref(item)}
               className={cn(
-                "min-w-0 flex-1 rounded-xl border border-border/60 bg-card px-3 py-2.5 transition-colors hover:bg-muted/40",
+                "mb-5 min-w-0 rounded-xl border border-border/60 bg-card px-3 py-2.5 transition-colors hover:bg-muted/40 last:mb-1",
                 active && "border-emerald-200/90 bg-emerald-50/50"
               )}
             >
