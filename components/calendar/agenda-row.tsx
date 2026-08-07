@@ -273,7 +273,7 @@ export function AgendaRow({
           <div className="min-w-0 flex-1">
             {upcomingHockey ? (
               <>
-                <p className="truncate text-[15px] font-black text-foreground">
+                <p className="truncate text-[14px] font-black text-foreground">
                   {upcomingLine1}
                 </p>
                 {upcomingLine2 ? (
@@ -288,7 +288,7 @@ export function AgendaRow({
             ) : isHockey && hasLogos ? (
               <>
                 {item.subtitle ? (
-                  <p className="truncate text-[15px] font-black text-foreground">
+                  <p className="truncate text-[14px] font-black text-foreground">
                     {item.subtitle}
                   </p>
                 ) : null}
@@ -298,7 +298,7 @@ export function AgendaRow({
               </>
             ) : (
               <>
-                <p className="truncate text-[15px] font-black">{item.title}</p>
+                <p className="truncate text-[14px] font-black">{item.title}</p>
                 {item.subtitle ? (
                   <p className="truncate text-[13px] text-muted-foreground">
                     {item.subtitle}

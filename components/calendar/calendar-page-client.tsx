@@ -175,7 +175,7 @@ export function CalendarPageClient() {
         description="Deine ICS-Kalender, Feiertage und Fristen — gefiltert nach Quelle."
         icon={pageVisuals.calendar.icon}
         tone={pageVisuals.calendar.tone}
-        titleClassName="text-[25px] font-black tracking-tight sm:text-[31px]"
+        titleClassName="text-[24px] font-black tracking-tight sm:text-[30px]"
         descriptionClassName="text-[15px]"
         actions={
           <div className="flex flex-wrap gap-1.5">
@@ -269,7 +269,7 @@ export function CalendarPageClient() {
         <div className="space-y-4">
           {grouped.map(([date, dayItems]) => (
             <div key={date} className="space-y-2">
-              <p className="text-[13px] font-black uppercase tracking-wide text-muted-foreground">
+              <p className="text-[12px] font-black uppercase tracking-wide text-muted-foreground">
                 {weekdayLabel(date)}
               </p>
               <div className="space-y-3">

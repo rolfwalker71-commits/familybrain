@@ -315,7 +315,7 @@ function NextHockeyCard({ game }: { game: HockeyGameCard }) {
   return (
     <Card className="border-border/70">
       <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2 text-[17px] font-black">
+        <CardTitle className="flex items-center gap-2 text-[16px] font-black">
           <Trophy className="size-4 text-rose-700" />
           Nächstes Spiel
         </CardTitle>
@@ -465,7 +465,7 @@ function DayTimeline({
                     onClick={() => onSelect(item)}
                   >
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-[15px] font-black tracking-tight">
+                      <p className="truncate text-[14px] font-black tracking-tight">
                         {item.title}
                       </p>
                       {item.subtitle ? (
@@ -594,7 +594,7 @@ function FocusTile({
         <p className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">
           {eyebrow}
         </p>
-        <p className="truncate text-[17px] font-black tracking-tight">
+        <p className="truncate text-[16px] font-black tracking-tight">
           {title}
         </p>
         <p className="truncate text-[13px] text-muted-foreground">{detail}</p>
@@ -856,7 +856,7 @@ export function OverviewDashboard({
     <div className="min-w-0 space-y-6 pb-10">
       <header className="space-y-1">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h1 className="text-[31px] font-black tracking-tight">
+          <h1 className="text-[30px] font-black tracking-tight">
             {greeting}
             {greetingName ? `, ${greetingName}` : ""}
           </h1>
@@ -880,7 +880,7 @@ export function OverviewDashboard({
       {data ? (
         <>
           <section className="space-y-3">
-            <h2 className="text-[15px] font-black tracking-tight text-foreground">
+            <h2 className="text-[14px] font-black tracking-tight text-foreground">
               Heute im Fokus
             </h2>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -977,7 +977,7 @@ export function OverviewDashboard({
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(17rem,0.85fr)]">
             <section className="min-w-0 space-y-3">
               <div className="flex items-baseline justify-between gap-2">
-                <h2 className="text-[15px] font-black tracking-tight">
+                <h2 className="text-[14px] font-black tracking-tight">
                   Heute · Ablauf
                 </h2>
                 <Link
@@ -1041,7 +1041,7 @@ export function OverviewDashboard({
 
               <Card className="border-border/70">
                 <CardHeader className="pb-2">
-                  <CardTitle className="flex items-center gap-2 text-[17px] font-black">
+                  <CardTitle className="flex items-center gap-2 text-[16px] font-black">
                     <CheckSquare
                       className="size-4 text-muted-foreground"
                       strokeWidth={APP_ICON_STROKE}
@@ -1089,7 +1089,7 @@ export function OverviewDashboard({
                               aria-hidden
                             />
                             <div className="min-w-0 flex-1">
-                              <p className="truncate text-[15px] font-black leading-snug">
+                              <p className="truncate text-[14px] font-black leading-snug">
                                 {t.title}
                               </p>
                               <p className="text-[12px] text-muted-foreground">
@@ -1114,7 +1114,7 @@ export function OverviewDashboard({
               {data.referenceNotes && data.referenceNotes.length > 0 ? (
                 <Card className="border-border/70">
                   <CardHeader className="pb-2">
-                    <CardTitle className="flex items-center gap-2 text-[17px] font-black">
+                    <CardTitle className="flex items-center gap-2 text-[16px] font-black">
                       <StickyNote
                         className="size-4 text-muted-foreground"
                         strokeWidth={APP_ICON_STROKE}
@@ -1132,7 +1132,7 @@ export function OverviewDashboard({
                           className="flex min-w-0 items-start gap-2 px-1"
                         >
                           <div className="min-w-0 flex-1">
-                            <p className="truncate text-[15px] font-black">
+                            <p className="truncate text-[14px] font-black">
                               {n.title}
                             </p>
                             <p className="truncate font-mono text-[12px] text-muted-foreground">
@@ -1163,7 +1163,7 @@ export function OverviewDashboard({
               <Card className="border-border/70">
                 <CardHeader className="space-y-3 pb-2">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <CardTitle className="text-[17px] font-black">Kennzahlen</CardTitle>
+                    <CardTitle className="text-[16px] font-black">Kennzahlen</CardTitle>
                     <div className="flex flex-wrap gap-1">
                       {PERIODS.map((p) => (
                         <Button
@@ -1238,7 +1238,7 @@ export function OverviewDashboard({
           </div>
 
           <section className="space-y-3">
-            <h2 className="text-[15px] font-black tracking-tight">
+            <h2 className="text-[14px] font-black tracking-tight">
               Später im Monat
             </h2>
             <div className="grid gap-2 sm:grid-cols-3">
@@ -1248,7 +1248,7 @@ export function OverviewDashboard({
               >
                 <Plane className="mt-0.5 size-4 shrink-0 text-sky-700" />
                 <div className="min-w-0">
-                  <p className="text-[15px] font-black">
+                  <p className="text-[14px] font-black">
                     Reisen · {laterCounts.travel}
                   </p>
                   <p className="truncate text-[13px] text-muted-foreground">
@@ -1262,7 +1262,7 @@ export function OverviewDashboard({
               >
                 <Clock3 className="mt-0.5 size-4 shrink-0 text-teal-700" />
                 <div className="min-w-0">
-                  <p className="text-[15px] font-black">
+                  <p className="text-[14px] font-black">
                     Fristen · {laterCounts.deadlines || data.chips.urgentDeadlines}
                   </p>
                   <p className="truncate text-[13px] text-muted-foreground">
@@ -1276,7 +1276,7 @@ export function OverviewDashboard({
               >
                 <ListChecks className="mt-0.5 size-4 shrink-0 text-[var(--brand-finance)]" />
                 <div className="min-w-0">
-                  <p className="text-[15px] font-black">
+                  <p className="text-[14px] font-black">
                     Pipeline · {laterCounts.pipeline}
                   </p>
                   <p className="truncate text-[13px] text-muted-foreground">

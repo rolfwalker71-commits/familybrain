@@ -121,7 +121,7 @@ export function AgendaEventDialog({
             <div className="flex items-stretch border-b border-border/60">
               <AgendaTypeRail item={item} className="w-14" />
               <DialogHeader className="min-w-0 flex-1 space-y-1 px-4 py-3 text-left">
-                <DialogTitle className="pr-8 text-[17px] font-black leading-snug">
+                <DialogTitle className="pr-8 text-[16px] font-black leading-snug">
                   {item.title}
                 </DialogTitle>
                 <DialogDescription className="text-[13px]">
