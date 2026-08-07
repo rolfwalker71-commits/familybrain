@@ -175,6 +175,8 @@ export function CalendarPageClient() {
         description="Deine ICS-Kalender, Feiertage und Fristen — gefiltert nach Quelle."
         icon={pageVisuals.calendar.icon}
         tone={pageVisuals.calendar.tone}
+        titleClassName="text-[25px] font-black tracking-tight sm:text-[31px]"
+        descriptionClassName="text-[15px]"
         actions={
           <div className="flex flex-wrap gap-1.5">
             {RANGES.map((r) => (
@@ -196,7 +198,7 @@ export function CalendarPageClient() {
         }
       />
 
-      <p className="text-xs text-muted-foreground">
+      <p className="text-[13px] text-muted-foreground">
         {rangeStart && rangeEnd
           ? `${toSwissDate(rangeStart)} – ${toSwissDate(rangeEnd)}`
           : "…"}
@@ -221,7 +223,7 @@ export function CalendarPageClient() {
                 type="button"
                 onClick={() => toggleSource(s.id)}
                 className={cn(
-                  "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition-colors",
+                  "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[15px] transition-colors",
                   on
                     ? "border-border/80 bg-card shadow-sm"
                     : "border-transparent bg-muted/50 text-muted-foreground line-through opacity-70"
@@ -234,7 +236,7 @@ export function CalendarPageClient() {
                 />
                 {s.name}
                 {!s.enabled && s.type !== "holiday" && s.type !== "deadline" ? (
-                  <span className="text-[10px] uppercase tracking-wide opacity-70">
+                  <span className="text-[11px] uppercase tracking-wide opacity-70">
                     aus
                   </span>
                 ) : null}
@@ -254,12 +256,12 @@ export function CalendarPageClient() {
       ) : null}
 
       {error ? (
-        <p className="text-sm text-destructive">{error}</p>
+        <p className="text-[15px] text-destructive">{error}</p>
       ) : loading && items.length === 0 ? (
         <AgendaSkeleton />
       ) : grouped.length === 0 ? (
         <Card>
-          <CardContent className="p-6 text-center text-sm text-muted-foreground">
+          <CardContent className="p-6 text-center text-[15px] text-muted-foreground">
             Keine Termine in diesem Zeitraum.
           </CardContent>
         </Card>
@@ -267,7 +269,7 @@ export function CalendarPageClient() {
         <div className="space-y-4">
           {grouped.map(([date, dayItems]) => (
             <div key={date} className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <p className="text-[13px] font-black uppercase tracking-wide text-muted-foreground">
                 {weekdayLabel(date)}
               </p>
               <div className="space-y-3">

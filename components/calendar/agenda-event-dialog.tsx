@@ -81,10 +81,10 @@ function DetailRow({
 }) {
   return (
     <div className="space-y-0.5">
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
         {label}
       </p>
-      <div className="text-sm text-foreground">{children}</div>
+      <div className="text-[15px] text-foreground">{children}</div>
     </div>
   );
 }
@@ -121,18 +121,18 @@ export function AgendaEventDialog({
             <div className="flex items-stretch border-b border-border/60">
               <AgendaTypeRail item={item} className="w-14" />
               <DialogHeader className="min-w-0 flex-1 space-y-1 px-4 py-3 text-left">
-                <DialogTitle className="pr-8 text-base leading-snug">
+                <DialogTitle className="pr-8 text-[17px] font-black leading-snug">
                   {item.title}
                 </DialogTitle>
-                <DialogDescription className="text-xs">
+                <DialogDescription className="text-[13px]">
                   {when}
                 </DialogDescription>
                 <div className="flex flex-wrap gap-1.5 pt-1">
-                  <Badge variant="secondary" className="text-[10px]">
+                  <Badge variant="secondary" className="text-[11px]">
                     {typeLabel(item)}
                   </Badge>
                   {item.calendarType && item.badge !== typeLabel(item) ? (
-                    <Badge variant="outline" className="text-[10px]">
+                    <Badge variant="outline" className="text-[11px]">
                       {item.badge}
                     </Badge>
                   ) : null}
@@ -233,7 +233,7 @@ export function AgendaEventDialog({
 
               {description ? (
                 <DetailRow label="Beschreibung">
-                  <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
+                  <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-foreground/90">
                     {description}
                   </p>
                 </DetailRow>
@@ -252,7 +252,7 @@ export function AgendaEventDialog({
               !item.weather &&
               !item.driveLabel &&
               !item.score ? (
-                <p className="text-xs text-muted-foreground">
+                <p className="text-[13px] text-muted-foreground">
                   Keine weiteren Details in der Quelle.
                 </p>
               ) : null}

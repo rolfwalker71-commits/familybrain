@@ -236,27 +236,27 @@ function HomeWeatherWidget({ weather }: { weather: HomeWeatherCard }) {
             <span className="text-5xl leading-none" aria-hidden>
               {weather.icon}
             </span>
-            <p className="mt-2 text-center text-[11px] font-semibold uppercase tracking-wide text-sky-900/70">
+            <p className="mt-2 text-center text-[12px] font-semibold uppercase tracking-wide text-sky-900/70">
               Jetzt
             </p>
           </div>
           <div className="min-w-0 flex-1 space-y-3 px-4 py-3.5">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <p className="text-sm font-semibold tracking-tight text-foreground">
+                <p className="text-[15px] font-semibold tracking-tight text-foreground">
                   {weather.placeLabel}
                 </p>
-                <p className="text-xs capitalize text-muted-foreground">
+                <p className="text-[13px] capitalize text-muted-foreground">
                   {weather.weatherLabelDe}
                 </p>
               </div>
-              <p className="shrink-0 text-3xl font-bold tabular-nums tracking-tight">
+              <p className="shrink-0 text-[31px] font-bold tabular-nums tracking-tight">
                 {weather.temperatureC}°
               </p>
             </div>
             {(weather.temperatureMinC != null ||
               weather.temperatureMaxC != null) && (
-              <p className="text-xs tabular-nums text-muted-foreground">
+              <p className="text-[13px] tabular-nums text-muted-foreground">
                 Heute{" "}
                 <span className="font-medium text-foreground">
                   {weather.temperatureMinC ?? "—"}°
@@ -269,37 +269,37 @@ function HomeWeatherWidget({ weather }: { weather: HomeWeatherCard }) {
             )}
             <div className="grid grid-cols-3 gap-2 border-t border-border/50 pt-2.5">
               <div className="min-w-0">
-                <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                   Wind
                 </p>
-                <p className="truncate text-sm font-semibold tabular-nums">
+                <p className="truncate text-[15px] font-semibold tabular-nums">
                   {weather.windSpeedKmh != null
                     ? `${weather.windSpeedKmh}`
                     : "—"}
-                  <span className="ml-0.5 text-[11px] font-medium text-muted-foreground">
+                  <span className="ml-0.5 text-[12px] font-medium text-muted-foreground">
                     km/h
                   </span>
                 </p>
                 {windDir ? (
-                  <p className="text-[10px] text-muted-foreground">{windDir}</p>
+                  <p className="text-[11px] text-muted-foreground">{windDir}</p>
                 ) : null}
               </div>
               <div className="min-w-0">
-                <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                   Feuchte
                 </p>
-                <p className="truncate text-sm font-semibold tabular-nums">
+                <p className="truncate text-[15px] font-semibold tabular-nums">
                   {weather.humidityPct != null ? weather.humidityPct : "—"}
-                  <span className="ml-0.5 text-[11px] font-medium text-muted-foreground">
+                  <span className="ml-0.5 text-[12px] font-medium text-muted-foreground">
                     %
                   </span>
                 </p>
               </div>
               <div className="min-w-0">
-                <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                   Regen
                 </p>
-                <p className="truncate text-sm font-semibold tabular-nums">
+                <p className="truncate text-[15px] font-semibold tabular-nums">
                   {precip}
                 </p>
               </div>
@@ -315,7 +315,7 @@ function NextHockeyCard({ game }: { game: HockeyGameCard }) {
   return (
     <Card className="border-border/70">
       <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2 text-base">
+        <CardTitle className="flex items-center gap-2 text-[17px] font-black">
           <Trophy className="size-4 text-rose-700" />
           Nächstes Spiel
         </CardTitle>
@@ -328,25 +328,25 @@ function NextHockeyCard({ game }: { game: HockeyGameCard }) {
               src={game.homeTeam.logoUrl}
               size="lg"
             />
-            <p className="line-clamp-2 text-xs font-medium leading-snug">
+            <p className="line-clamp-2 text-[13px] font-medium leading-snug">
               {game.homeTeam.label}
             </p>
           </div>
           <div className="shrink-0 text-center">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            <p className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">
               {game.isHome ? "Heim" : "Auswärts"}
             </p>
             {game.score ? (
-              <p className="text-lg font-bold tabular-nums tracking-tight">
+              <p className="text-[19px] font-bold tabular-nums tracking-tight">
                 {game.score}
               </p>
             ) : (
-              <p className="text-sm font-bold tabular-nums">
+              <p className="text-[15px] font-bold tabular-nums">
                 {game.time || "—"}
               </p>
             )}
             {game.score && game.time ? (
-              <p className="text-[11px] tabular-nums text-muted-foreground">
+              <p className="text-[12px] tabular-nums text-muted-foreground">
                 {game.time}
               </p>
             ) : null}
@@ -357,12 +357,12 @@ function NextHockeyCard({ game }: { game: HockeyGameCard }) {
               src={game.awayTeam.logoUrl}
               size="lg"
             />
-            <p className="line-clamp-2 text-xs font-medium leading-snug">
+            <p className="line-clamp-2 text-[13px] font-medium leading-snug">
               {game.awayTeam.label}
             </p>
           </div>
         </div>
-        <p className="text-center text-xs text-muted-foreground">
+        <p className="text-center text-[13px] text-muted-foreground">
           {weekdayLabel(game.date)}
           {game.location ? ` · ${game.location}` : ""}
         </p>
@@ -384,7 +384,7 @@ function DayTimeline({
 }) {
   if (items.length === 0) {
     return (
-      <p className="px-1 py-6 text-sm text-muted-foreground">
+      <p className="px-1 py-6 text-[15px] text-muted-foreground">
         Keine Termine für heute — der Tag ist frei.
       </p>
     );
@@ -403,20 +403,20 @@ function DayTimeline({
           <li key={item.id} className="contents">
             <div className="flex flex-col items-end justify-start pt-2 text-right">
               {isTomorrow ? (
-                <span className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground sm:text-[10px]">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:text-[11px]">
                   Morgen
                 </span>
               ) : null}
               <span
                 className={cn(
-                  "text-[11px] font-semibold tabular-nums leading-tight sm:text-xs",
+                  "text-[12px] font-semibold tabular-nums leading-tight sm:text-[13px]",
                   active ? "text-emerald-800" : "text-muted-foreground"
                 )}
               >
                 {hm}
               </span>
               {item.endTime && item.time ? (
-                <span className="text-[9px] tabular-nums text-muted-foreground/80 sm:text-[10px]">
+                <span className="text-[10px] tabular-nums text-muted-foreground/80 sm:text-[11px]">
                   –{item.endTime}
                 </span>
               ) : null}
@@ -465,16 +465,16 @@ function DayTimeline({
                     onClick={() => onSelect(item)}
                   >
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold tracking-tight">
+                      <p className="truncate text-[15px] font-black tracking-tight">
                         {item.title}
                       </p>
                       {item.subtitle ? (
-                        <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                        <p className="mt-0.5 truncate text-[13px] text-muted-foreground">
                           {item.subtitle}
                         </p>
                       ) : null}
                       {item.weather ? (
-                        <p className="mt-1 text-[11px] text-muted-foreground">
+                        <p className="mt-1 text-[12px] text-muted-foreground">
                           {item.weather.icon} {item.weather.temperatureC}°
                           {item.weather.labelDe
                             ? ` · ${item.weather.labelDe}`
@@ -482,7 +482,7 @@ function DayTimeline({
                         </p>
                       ) : null}
                       {active && item.driveLabel ? (
-                        <p className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground">
+                        <p className="mt-1 flex items-center gap-1 text-[12px] text-muted-foreground">
                           <Car className="size-3 shrink-0" aria-hidden />
                           {item.driveLabel}
                         </p>
@@ -502,7 +502,7 @@ function DayTimeline({
                             href={item.meetUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex h-7 items-center gap-1.5 rounded-md border border-border/70 bg-background px-2 text-[11px] font-medium text-foreground hover:bg-muted/50"
+                            className="inline-flex h-7 items-center gap-1.5 rounded-md border border-border/70 bg-background px-2 text-[12px] font-medium text-foreground hover:bg-muted/50"
                           >
                             <Video className="size-3.5" aria-hidden />
                             Meet
@@ -513,7 +513,7 @@ function DayTimeline({
                             href={item.mapsUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex h-7 items-center gap-1.5 rounded-md border border-border/70 bg-background px-2 text-[11px] font-medium text-foreground hover:bg-muted/50"
+                            className="inline-flex h-7 items-center gap-1.5 rounded-md border border-border/70 bg-background px-2 text-[12px] font-medium text-foreground hover:bg-muted/50"
                           >
                             <MapPin className="size-3.5" aria-hidden />
                             Route
@@ -591,13 +591,13 @@ function FocusTile({
         aria-hidden
       />
       <div className="min-w-0">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        <p className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">
           {eyebrow}
         </p>
-        <p className="truncate text-base font-semibold tracking-tight">
+        <p className="truncate text-[17px] font-black tracking-tight">
           {title}
         </p>
-        <p className="truncate text-xs text-muted-foreground">{detail}</p>
+        <p className="truncate text-[13px] text-muted-foreground">{detail}</p>
       </div>
     </Link>
   );
@@ -856,23 +856,23 @@ export function OverviewDashboard({
     <div className="min-w-0 space-y-6 pb-10">
       <header className="space-y-1">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h1 className="text-3xl font-semibold tracking-tight">
+          <h1 className="text-[31px] font-black tracking-tight">
             {greeting}
             {greetingName ? `, ${greetingName}` : ""}
           </h1>
           {refreshing || fromCache ? (
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-[12px] text-muted-foreground">
               {refreshing ? "Aktualisiere…" : "Zwischengespeicherte Ansicht"}
             </p>
           ) : null}
         </div>
-        <p className="text-sm capitalize text-muted-foreground">
+        <p className="text-[15px] capitalize text-muted-foreground">
           {formatLongDeDate()}
         </p>
       </header>
 
       {error ? (
-        <p className="text-sm text-destructive">{error}</p>
+        <p className="text-[15px] text-destructive">{error}</p>
       ) : null}
 
       {loading && !data ? <OverviewSkeleton /> : null}
@@ -880,7 +880,7 @@ export function OverviewDashboard({
       {data ? (
         <>
           <section className="space-y-3">
-            <h2 className="text-sm font-semibold tracking-tight text-foreground">
+            <h2 className="text-[15px] font-black tracking-tight text-foreground">
               Heute im Fokus
             </h2>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -977,18 +977,18 @@ export function OverviewDashboard({
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(17rem,0.85fr)]">
             <section className="min-w-0 space-y-3">
               <div className="flex items-baseline justify-between gap-2">
-                <h2 className="text-sm font-semibold tracking-tight">
+                <h2 className="text-[15px] font-black tracking-tight">
                   Heute · Ablauf
                 </h2>
                 <Link
                   href="/calendar"
-                  className="text-xs font-medium text-muted-foreground underline-offset-2 hover:underline"
+                  className="text-[13px] font-medium text-muted-foreground underline-offset-2 hover:underline"
                 >
                   Alle Termine →
                 </Link>
               </div>
               {nextStepLine ? (
-                <p className="flex items-start gap-2 text-sm text-foreground/90">
+                <p className="flex items-start gap-2 text-[15px] text-foreground/90">
                   <Clock3
                     className="mt-0.5 size-4 shrink-0 text-emerald-700"
                     strokeWidth={APP_ICON_STROKE}
@@ -1003,7 +1003,7 @@ export function OverviewDashboard({
               ) : null}
               {conflicts.length > 0 ? (
                 <div
-                  className="flex items-start gap-2 rounded-xl border border-amber-200/80 bg-amber-50/70 px-3 py-2 text-xs text-amber-950"
+                  className="flex items-start gap-2 rounded-xl border border-amber-200/80 bg-amber-50/70 px-3 py-2 text-[13px] text-amber-950"
                   role="status"
                 >
                   <AlertTriangle
@@ -1041,7 +1041,7 @@ export function OverviewDashboard({
 
               <Card className="border-border/70">
                 <CardHeader className="pb-2">
-                  <CardTitle className="flex items-center gap-2 text-base">
+                  <CardTitle className="flex items-center gap-2 text-[17px] font-black">
                     <CheckSquare
                       className="size-4 text-muted-foreground"
                       strokeWidth={APP_ICON_STROKE}
@@ -1053,7 +1053,7 @@ export function OverviewDashboard({
                 </CardHeader>
                 <CardContent className="space-y-2">
                   {!data.tasks?.hasScope ? (
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-[13px] text-muted-foreground">
                       Google Tasks noch nicht verbunden — unter{" "}
                       <Link
                         href="/account"
@@ -1064,7 +1064,7 @@ export function OverviewDashboard({
                       neu verbinden (Tasks-API + Consent).
                     </p>
                   ) : data.tasks.items.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-[13px] text-muted-foreground">
                       Keine offenen Aufgaben in den nächsten 7 Tagen.
                     </p>
                   ) : (
@@ -1089,10 +1089,10 @@ export function OverviewDashboard({
                               aria-hidden
                             />
                             <div className="min-w-0 flex-1">
-                              <p className="truncate text-sm font-medium leading-snug">
+                              <p className="truncate text-[15px] font-black leading-snug">
                                 {t.title}
                               </p>
-                              <p className="text-[11px] text-muted-foreground">
+                              <p className="text-[12px] text-muted-foreground">
                                 {t.overdue
                                   ? "Überfällig"
                                   : t.dueDate
@@ -1114,7 +1114,7 @@ export function OverviewDashboard({
               {data.referenceNotes && data.referenceNotes.length > 0 ? (
                 <Card className="border-border/70">
                   <CardHeader className="pb-2">
-                    <CardTitle className="flex items-center gap-2 text-base">
+                    <CardTitle className="flex items-center gap-2 text-[17px] font-black">
                       <StickyNote
                         className="size-4 text-muted-foreground"
                         strokeWidth={APP_ICON_STROKE}
@@ -1132,10 +1132,10 @@ export function OverviewDashboard({
                           className="flex min-w-0 items-start gap-2 px-1"
                         >
                           <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-medium">
+                            <p className="truncate text-[15px] font-black">
                               {n.title}
                             </p>
-                            <p className="truncate font-mono text-[11px] text-muted-foreground">
+                            <p className="truncate font-mono text-[12px] text-muted-foreground">
                               {n.reference || "—"}
                             </p>
                           </div>
@@ -1163,7 +1163,7 @@ export function OverviewDashboard({
               <Card className="border-border/70">
                 <CardHeader className="space-y-3 pb-2">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <CardTitle className="text-base">Kennzahlen</CardTitle>
+                    <CardTitle className="text-[17px] font-black">Kennzahlen</CardTitle>
                     <div className="flex flex-wrap gap-1">
                       {PERIODS.map((p) => (
                         <Button
@@ -1172,7 +1172,7 @@ export function OverviewDashboard({
                           size="sm"
                           variant={period === p.id ? "default" : "ghost"}
                           className={cn(
-                            "h-7 px-2 text-xs",
+                            "h-7 px-2 text-[13px]",
                             period === p.id &&
                               "bg-[var(--brand-docs)] text-white hover:bg-[var(--brand-docs)]/90"
                           )}
@@ -1185,16 +1185,16 @@ export function OverviewDashboard({
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <p className="text-2xl font-semibold tabular-nums">
+                  <p className="text-[25px] font-semibold tabular-nums">
                     {formatCHF(data.kpi.total)}
                   </p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-[13px] text-muted-foreground">
                     Ausgaben · {PERIODS.find((p) => p.id === period)?.label}
                   </p>
                   <div className="space-y-2">
                     {data.kpi.byCategory.slice(0, 5).map((slice) => (
                       <div key={slice.category} className="space-y-1">
-                        <div className="flex justify-between text-xs">
+                        <div className="flex justify-between text-[13px]">
                           <span className="truncate">{slice.category}</span>
                           <span className="tabular-nums text-muted-foreground">
                             {formatCHF(slice.total)}
@@ -1211,7 +1211,7 @@ export function OverviewDashboard({
                       </div>
                     ))}
                     {data.kpi.byCategory.length === 0 ? (
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-[13px] text-muted-foreground">
                         Keine Ausgaben in diesem Zeitraum.
                       </p>
                     ) : null}
@@ -1227,7 +1227,7 @@ export function OverviewDashboard({
                     </Button>
                     <Link
                       href="/finance"
-                      className="inline-flex h-8 items-center text-xs font-medium text-[var(--brand-finance)] underline-offset-2 hover:underline"
+                      className="inline-flex h-8 items-center text-[13px] font-medium text-[var(--brand-finance)] underline-offset-2 hover:underline"
                     >
                       Analyse →
                     </Link>
@@ -1238,7 +1238,7 @@ export function OverviewDashboard({
           </div>
 
           <section className="space-y-3">
-            <h2 className="text-sm font-semibold tracking-tight">
+            <h2 className="text-[15px] font-black tracking-tight">
               Später im Monat
             </h2>
             <div className="grid gap-2 sm:grid-cols-3">
@@ -1248,10 +1248,10 @@ export function OverviewDashboard({
               >
                 <Plane className="mt-0.5 size-4 shrink-0 text-sky-700" />
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold">
+                  <p className="text-[15px] font-black">
                     Reisen · {laterCounts.travel}
                   </p>
-                  <p className="truncate text-xs text-muted-foreground">
+                  <p className="truncate text-[13px] text-muted-foreground">
                     {laterCounts.travelSample || "Keine Reisen geplant"}
                   </p>
                 </div>
@@ -1262,10 +1262,10 @@ export function OverviewDashboard({
               >
                 <Clock3 className="mt-0.5 size-4 shrink-0 text-teal-700" />
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold">
+                  <p className="text-[15px] font-black">
                     Fristen · {laterCounts.deadlines || data.chips.urgentDeadlines}
                   </p>
-                  <p className="truncate text-xs text-muted-foreground">
+                  <p className="truncate text-[13px] text-muted-foreground">
                     {laterCounts.deadlineSample || "Keine offenen Fristen"}
                   </p>
                 </div>
@@ -1276,10 +1276,10 @@ export function OverviewDashboard({
               >
                 <ListChecks className="mt-0.5 size-4 shrink-0 text-[var(--brand-finance)]" />
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold">
+                  <p className="text-[15px] font-black">
                     Pipeline · {laterCounts.pipeline}
                   </p>
-                  <p className="truncate text-xs text-muted-foreground">
+                  <p className="truncate text-[13px] text-muted-foreground">
                     {laterCounts.pipelineSample || "Keine geplanten Zahlungen"}
                   </p>
                 </div>
@@ -1288,7 +1288,7 @@ export function OverviewDashboard({
             {data.chips.triagePending > 0 ? (
               <Link
                 href="/inbox"
-                className="inline-flex items-center gap-2 text-xs font-medium text-[var(--brand-docs)] underline-offset-2 hover:underline"
+                className="inline-flex items-center gap-2 text-[13px] font-medium text-[var(--brand-docs)] underline-offset-2 hover:underline"
               >
                 <Mail className="size-3.5" />
                 {data.chips.triagePending} Triage in der Inbox →

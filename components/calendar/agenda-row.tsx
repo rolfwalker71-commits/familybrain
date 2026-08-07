@@ -152,7 +152,7 @@ export function TeamLogo({
       <span
         className={cn(
           box,
-          "flex shrink-0 items-center justify-center rounded-full bg-rose-50 text-[10px] font-bold uppercase text-rose-700"
+          "flex shrink-0 items-center justify-center rounded-full bg-rose-50 text-[11px] font-bold uppercase text-rose-700"
         )}
         aria-hidden
         title={label}
@@ -188,7 +188,7 @@ export function weekdayLabel(iso: string): string {
 
 function AgendaWeatherLine({ weather }: { weather: AgendaWeatherChip }) {
   return (
-    <p className="mt-1 truncate text-[11px] text-muted-foreground">
+    <p className="mt-1 truncate text-[12px] text-muted-foreground">
       <span aria-hidden>{weather.icon}</span>{" "}
       <span className="tabular-nums">{weather.temperatureC}°</span>
       {weather.labelDe?.trim() ? ` · ${weather.labelDe.trim()}` : ""}
@@ -260,7 +260,7 @@ export function AgendaRow({
                 src={item.logos?.left}
                 size="md"
               />
-              <span className="px-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <span className="px-0.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                 vs.
               </span>
               <TeamLogo
@@ -273,39 +273,39 @@ export function AgendaRow({
           <div className="min-w-0 flex-1">
             {upcomingHockey ? (
               <>
-                <p className="truncate text-sm font-medium text-foreground">
+                <p className="truncate text-[15px] font-black text-foreground">
                   {upcomingLine1}
                 </p>
                 {upcomingLine2 ? (
-                  <p className="truncate text-xs text-muted-foreground">
+                  <p className="truncate text-[13px] text-muted-foreground">
                     {upcomingLine2}
                   </p>
                 ) : null}
-                <p className="truncate text-xs text-muted-foreground">
+                <p className="truncate text-[13px] text-muted-foreground">
                   {upcomingLine3}
                 </p>
               </>
             ) : isHockey && hasLogos ? (
               <>
                 {item.subtitle ? (
-                  <p className="truncate text-sm font-medium text-foreground">
+                  <p className="truncate text-[15px] font-black text-foreground">
                     {item.subtitle}
                   </p>
                 ) : null}
-                <p className="truncate text-xs text-muted-foreground">
+                <p className="truncate text-[13px] text-muted-foreground">
                   {item.title}
                 </p>
               </>
             ) : (
               <>
-                <p className="truncate text-sm font-medium">{item.title}</p>
+                <p className="truncate text-[15px] font-black">{item.title}</p>
                 {item.subtitle ? (
-                  <p className="truncate text-xs text-muted-foreground">
+                  <p className="truncate text-[13px] text-muted-foreground">
                     {item.subtitle}
                   </p>
                 ) : null}
                 {item.kind === "calendar" && item.time ? (
-                  <p className="truncate text-xs text-muted-foreground tabular-nums">
+                  <p className="truncate text-[13px] text-muted-foreground tabular-nums">
                     {item.time}
                   </p>
                 ) : null}
@@ -313,21 +313,21 @@ export function AgendaRow({
             )}
             {weather ? <AgendaWeatherLine weather={weather} /> : null}
             {isPaymentPipeline ? (
-              <p className="mt-1 text-[11px] font-medium text-sky-800">
+              <p className="mt-1 text-[12px] font-medium text-sky-800">
                 Zahlung geplant — noch in der Pipeline
               </p>
             ) : null}
           </div>
           <div className="flex shrink-0 flex-col items-end gap-1">
             {item.amount != null ? (
-              <span className="text-sm font-semibold tabular-nums">
+              <span className="text-[15px] font-semibold tabular-nums">
                 {formatCHF(item.amount, item.currency || "CHF")}
               </span>
             ) : null}
             <Badge
               variant="secondary"
               className={cn(
-                "text-[10px]",
+                "text-[11px]",
                 isPaymentPipeline && "bg-sky-100 text-sky-900",
                 isHockey && "bg-rose-50 text-rose-800",
                 item.kind === "holiday" && "bg-violet-50 text-violet-900"

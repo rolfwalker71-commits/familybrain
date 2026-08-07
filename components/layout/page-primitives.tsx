@@ -35,12 +35,16 @@ export function PageHeader({
   actions,
   icon,
   tone = "teal",
+  titleClassName,
+  descriptionClassName,
 }: {
   title: string;
   description?: string;
   actions?: ReactNode;
   icon?: LucideIcon;
   tone?: IconTone;
+  titleClassName?: string;
+  descriptionClassName?: string;
 }) {
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -53,13 +57,21 @@ export function PageHeader({
             className={cn(
               "break-words text-2xl font-semibold tracking-tight sm:text-3xl",
               tone === "green" && "text-[var(--brand-finance)]",
-              tone === "teal" && "text-[var(--brand-docs)]"
+              tone === "teal" && "text-[var(--brand-docs)]",
+              titleClassName
             )}
           >
             {title}
           </h1>
           {description ? (
-            <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+            <p
+              className={cn(
+                "mt-1 text-sm text-muted-foreground",
+                descriptionClassName
+              )}
+            >
+              {description}
+            </p>
           ) : null}
         </div>
       </div>
