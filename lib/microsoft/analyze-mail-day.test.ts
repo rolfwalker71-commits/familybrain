@@ -4,9 +4,9 @@ import {
   flattenAnalysis,
   guessCompanyLabel,
   packMailsForPrompt,
-  senderInitials,
+  senderDisplayName,
   sortClusters,
-  withSenderInitials,
+  withSenderLabel,
   type MsDayCluster,
 } from "@/lib/microsoft/analyze-mail-day";
 import type { MsMailItem } from "@/lib/microsoft/mail-day";
@@ -41,20 +41,22 @@ test("guessCompanyLabel uses company domain, not gmail", () => {
   );
 });
 
-test("senderInitials from name and email", () => {
+test("senderDisplayName and full name suffix on tasks", () => {
   assert.equal(
-    senderInitials("Marita Köpper", "marita.koepper@s-peers.com"),
-    "MK"
-  );
-  assert.equal(senderInitials("Nicole Rengstorf", null), "NR");
-  assert.equal(senderInitials(null, "n.rengstorf@scalepharm.com"), "NR");
-  assert.equal(
-    withSenderInitials("Zugänge einrichten", "NR"),
-    "Zugänge einrichten (NR)"
+    senderDisplayName("Raphael Altenberger", "raphael.altenberger@an-group.one"),
+    "Raphael Altenberger"
   );
   assert.equal(
-    withSenderInitials("Zugänge einrichten (NR)", "XX"),
-    "Zugänge einrichten (NR)"
+    senderDisplayName(null, "raphael.altenberger@an-group.one"),
+    "Raphael Altenberger"
+  );
+  assert.equal(
+    withSenderLabel("ELO Sync Problem beheben (DV)", "Raphael Altenberger"),
+    "ELO Sync Problem beheben (Raphael Altenberger)"
+  );
+  assert.equal(
+    withSenderLabel("Zugriff auf SAP HANA bereitstellen (RW)", "Nawazish Rasool"),
+    "Zugriff auf SAP HANA bereitstellen (Nawazish Rasool)"
   );
 });
 

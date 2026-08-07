@@ -16,7 +16,7 @@ export const MsDayTaskSuggestionSchema = z.object({
   folder: z.enum(["inbox", "sent"]).nullable().optional(),
   company: z.string().max(120).nullable().optional(),
   counterpartEmail: z.string().max(200).nullable().optional(),
-  senderInitials: z.string().max(4).nullable().optional(),
+  senderInitials: z.string().max(80).nullable().optional(),
   theme: z.string().max(200).nullable().optional(),
   reason: z.string().max(400).optional(),
 });
@@ -99,47 +99,87 @@ function stripDiacritics(s: string): string {
   return s.normalize("NFD").replace(/\p{M}/gu, "");
 }
 
-/** Absender-Kürzel z. B. Marita Köpper → MK */
+function titleCaseWord(w: string): string {
+  if (!w) return w;
+  return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+}
+
+/** Lesbarer Absendername (nicht Kürzel). */
+export function senderDisplayName(
+  displayName?: string | null,
+  email?: string | null
+): string | null {
+  let name = (displayName || "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  // "Raphael Altenberger · AN Group" → Name
+  name = name.replace(/\s*[·|].*$/, "").trim();
+  if (name.includes("@")) {
+    const before = name.split("@")[0]?.trim() || "";
+    name = before;
+  }
+  if (name && name !== "—" && !/^[^a-zA-ZÀ-ÿ]*$/.test(name) && name.length >= 2) {
+    // "raphael.altenberger" aus Anzeige → schön formatieren
+    if (/^[a-z0-9._+-]+$/i.test(name) && /[._+-]/.test(name)) {
+      return name
+        .split(/[._+-]+/)
+        .filter(Boolean)
+        .map(titleCaseWord)
+        .join(" ")
+        .slice(0, 80);
+    }
+    return name.slice(0, 80);
+  }
+  const local = ((email || "").split("@")[0] || "").trim();
+  if (!local) return null;
+  return local
+    .split(/[._+-]+/)
+    .filter(Boolean)
+    .map(titleCaseWord)
+    .join(" ")
+    .slice(0, 80) || null;
+}
+
+/** @deprecated Kürzel nur noch intern/Tests — UI nutzt vollen Namen. */
 export function senderInitials(
   displayName?: string | null,
   email?: string | null
 ): string | null {
-  const name = (displayName || "")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-  const parts = name
-    .split(" ")
-    .map((p) => p.replace(/[^a-zA-ZÀ-ÿ]/g, ""))
-    .filter((p) => p.length > 0 && !p.includes("@"));
+  const full = senderDisplayName(displayName, email);
+  if (!full) return null;
+  const parts = full.split(/\s+/).filter(Boolean);
   if (parts.length >= 2) {
     const a = stripDiacritics(parts[0]![0] || "");
     const b = stripDiacritics(parts[parts.length - 1]![0] || "");
     if (a && b) return (a + b).toUpperCase();
   }
-  if (parts.length === 1 && parts[0]!.length >= 2) {
-    return stripDiacritics(parts[0]!.slice(0, 2)).toUpperCase();
-  }
-  const local = ((email || "").split("@")[0] || "").trim();
-  const segs = local.split(/[._+-]+/).filter(Boolean);
-  if (segs.length >= 2) {
-    const a = stripDiacritics(segs[0]![0] || "");
-    const b = stripDiacritics(segs[1]![0] || "");
-    if (a && b) return (a + b).toUpperCase();
-  }
-  if (local.length >= 2) return stripDiacritics(local.slice(0, 2)).toUpperCase();
-  return null;
+  return stripDiacritics(full.slice(0, 2)).toUpperCase() || null;
 }
 
-/** Titel mit (XX) Absender-Kürzel am Ende. */
+/** Trailing (Kürzel) oder alten Absender-Suffix entfernen. */
+export function stripTrailingSenderSuffix(title: string): string {
+  return title
+    .replace(/\s*\([A-Za-zÀ-ÿÄÖÜäöü .'-]{1,60}\)\s*$/u, "")
+    .trim();
+}
+
+/** Titel mit (Voller Absendername) am Ende. */
+export function withSenderLabel(
+  title: string,
+  senderName: string | null | undefined
+): string {
+  const base = stripTrailingSenderSuffix(title);
+  if (!senderName?.trim()) return base;
+  return `${base} (${senderName.trim()})`;
+}
+
+/** @deprecated use withSenderLabel */
 export function withSenderInitials(
   title: string,
   initials: string | null | undefined
 ): string {
-  const t = title.trim();
-  if (!initials) return t;
-  if (/\([A-ZÄÖÜ]{1,4}\)\s*$/i.test(t)) return t;
-  return `${t} (${initials})`;
+  return withSenderLabel(title, initials);
 }
 
 export function guessCompanyLabel(input: {
@@ -187,40 +227,50 @@ export function counterpartForMail(m: MsMailItem): {
   };
 }
 
-/** Ursprünglicher Absender (Inbox bevorzugen). */
+/** Ursprünglicher Absender (Inbox bevorzugen — nie „ich selbst“ aus Gesendet). */
 export function originalSenderForCluster(mails: MsMailItem[]): {
   name: string | null;
   email: string | null;
   initials: string | null;
 } {
-  const inbox = mails.find((m) => m.folder === "inbox");
+  const inbox =
+    mails.find((m) => m.folder === "inbox") ||
+    [...mails]
+      .filter((m) => m.folder === "inbox")
+      .sort((a, b) =>
+        (b.receivedOrSentAt || "").localeCompare(a.receivedOrSentAt || "")
+      )[0] ||
+    null;
   if (inbox) {
+    const name = senderDisplayName(inbox.from, inbox.fromEmail);
     return {
-      name: inbox.from,
+      name,
       email: inbox.fromEmail,
       initials: senderInitials(inbox.from, inbox.fromEmail),
     };
   }
-  const sent = mails[0];
+  // Nur Gesendet: Gegenstelle = Empfänger
+  const sent = mails.find((m) => m.folder === "sent") || mails[0];
   if (!sent) return { name: null, email: null, initials: null };
   const email = sent.toEmails?.[0] || null;
-  const name = sent.toPreview || email;
+  const name = senderDisplayName(sent.toPreview, email);
   return {
     name,
     email,
-    initials: senderInitials(name, email),
+    initials: senderInitials(sent.toPreview, email),
   };
 }
 
 function formatMailBlock(m: MsMailItem, indexLabel: string): string {
   const body = (m.bodyText || m.preview || "").slice(0, 900);
   const { email, company } = counterpartForMail(m);
-  const initials = senderInitials(
-    m.folder === "inbox" ? m.from : m.toPreview,
-    m.folder === "inbox" ? m.fromEmail : m.toEmails?.[0]
-  );
+  const absender =
+    m.folder === "inbox"
+      ? senderDisplayName(m.from, m.fromEmail)
+      : senderDisplayName(m.toPreview, m.toEmails?.[0]);
   return `[${indexLabel}|${m.folder}|id=${m.id}|conv=${m.conversationId || "—"}]
-Gegenstelle: ${company || "unbekannt"}${email ? ` <${email}>` : ""}${initials ? ` (${initials})` : ""}
+Gegenstelle: ${company || "unbekannt"}${email ? ` <${email}>` : ""}
+Absender-Name für Aufgaben: ${absender || "—"}
 Von: ${m.from}${m.fromEmail ? ` <${m.fromEmail}>` : ""}
 An: ${m.toPreview || "—"}
 Betreff: ${m.subject}
@@ -359,13 +409,12 @@ function enrichCluster(
     .map((t) => {
       const mail = resolveMail(t.sourceMailId, t.sourceSubject, byId);
       const c = mail ? counterpartForMail(mail) : null;
-      const initials =
-        t.senderInitials?.trim() ||
-        (mail ? originalSenderForCluster([mail]).initials : null) ||
-        sender.initials;
+      // Immer aus Mail ableiten — AI-Kürzel (DV)/(RW) nicht übernehmen
+      const senderName =
+        (mail ? originalSenderForCluster([mail]).name : null) || sender.name;
       return {
         ...t,
-        title: withSenderInitials(t.title, initials),
+        title: withSenderLabel(t.title, senderName),
         dueDate: t.dueDate || defaultDue,
         sourceMailId:
           t.sourceMailId && idSet.has(t.sourceMailId)
@@ -376,7 +425,7 @@ function enrichCluster(
         company: t.company?.trim() || company,
         counterpartEmail:
           t.counterpartEmail?.trim() || counterpartEmail || c?.email || null,
-        senderInitials: initials,
+        senderInitials: senderName,
         theme,
       };
     });
@@ -502,10 +551,11 @@ Analysiere die Mails des gewählten Tages (Posteingang + Gesendet).
 Ablauf:
 1) Gruppiere nach Kunde/Firma und Thema/Thread. Gleiche conv=… = derselbe Thread.
 2) Pro Cluster: kurze Zusammenfassung.
-3) Nächste Schritte:
-   - tasks: IMMER wenn Handlung nötig ist (auch wenn du eine Antwort vorschlägst). Titel handlungsnah, am Ende Absender-Kürzel in Klammern z. B. «Zugänge einrichten (NR)». dueDate Default ${defaultDue} (Folgetag) wenn keine Frist genannt.
+3) Nächste Schritte — Aufgabe und Antwort dürfen ZUSAMMEN vorkommen:
+   - tasks: wenn DU etwas tun/nachfassen musst. Titel handlungsnah OHNE Absender-Suffix (wird serverseitig ergänzt). dueDate Default ${defaultDue}.
+   - replies: wenn eine Antwort an den Absender sinnvoll ist (Status, Zusage, Rückfrage). Darf parallel zu tasks stehen — z. B. kurze Zwischenantwort + Aufgabe «Problem beheben».
    - events: nur bei klarem Datum/Zeit.
-   - replies: nur wenn Antwort sinnvoll. WICHTIG: Sprache der Antwort = Sprache der ursprünglichen Kunden-Anfrage (Englisch→Englisch mit Re:, Deutsch→Deutsch mit AW:). Nie auf Deutsch antworten wenn die Anfrage Englisch war.
+WICHTIG replies: Sprache = Sprache der Kunden-Anfrage (EN→EN mit Re:, DE→DE mit AW:).
 Newsletter/Werbung weglassen. Keine erfundenen Fakten. NUR JSON.`;
 
   const user = `Analysetag: ${input.todayIso}
@@ -527,7 +577,7 @@ JSON-Schema:
       "status": "open"|"waiting"|"done"|"fyi",
       "tasks": [
         {
-          "title": "Handlung (XX)",
+          "title": "Handlung ohne Absender-Klammern",
           "notes": "…"|null,
           "dueDate": "${defaultDue}"|null,
           "sourceMailId": "id"|null,
@@ -535,7 +585,6 @@ JSON-Schema:
           "folder": "inbox"|"sent"|null,
           "company": "Firma"|null,
           "counterpartEmail": "…"|null,
-          "senderInitials": "XX"|null,
           "reason": "…"
         }
       ],
