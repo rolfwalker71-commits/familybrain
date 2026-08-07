@@ -13,6 +13,7 @@ import { MailActionsBodySchema } from "@/lib/mail/mail-action-schema";
 import { getGmailMessage } from "@/lib/mail/gmail";
 import { updateMailAnalysisStatus } from "@/lib/mail/mail-analysis-store";
 import { createReferenceNote } from "@/lib/mail/reference-notes";
+import { appendMailSubjectToNotes } from "@/lib/mail/subject-notes";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -48,12 +49,15 @@ export async function POST(request: Request, context: Ctx) {
     );
   }
 
-  let mailNote = "";
+  let mailSubject = "";
+  let mailFrom = "";
   try {
     const message = await getGmailMessage(userId, id, request);
-    mailNote = `Aus Mail: ${message.subject}\nVon: ${message.fromName}`;
+    mailSubject = message.subject;
+    mailFrom = message.fromName;
   } catch {
-    mailNote = `Aus Mail-ID ${id}`;
+    mailSubject = "";
+    mailFrom = "";
   }
 
   const created: Array<{
@@ -65,7 +69,10 @@ export async function POST(request: Request, context: Ctx) {
   }> = [];
 
   for (const action of body.actions) {
-    const notes = [action.notes, mailNote].filter(Boolean).join("\n\n");
+    const withSubject = appendMailSubjectToNotes(action.notes, mailSubject);
+    const notes = [withSubject, mailFrom ? `Von: ${mailFrom}` : null]
+      .filter(Boolean)
+      .join("\n\n");
 
     if (action.kind === "note") {
       try {

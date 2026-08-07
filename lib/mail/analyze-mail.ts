@@ -5,6 +5,7 @@ import {
 } from "@/lib/mail/mail-action-schema";
 import type { MailMessageDetail } from "@/lib/mail/gmail";
 import { enrichMailAnalysisTitles } from "@/lib/mail/enrich-shipping-titles";
+import { appendMailSubjectToNotes } from "@/lib/mail/subject-notes";
 
 function htmlToPlain(html: string): string {
   return html
@@ -127,10 +128,18 @@ JSON-Schema:
     suggestions,
   };
 
-  return enrichMailAnalysisTitles(analysis, {
+  const enriched = enrichMailAnalysisTitles(analysis, {
     from: message.from,
     fromName: message.fromName,
     subject: message.subject,
     body,
   });
+
+  return {
+    ...enriched,
+    suggestions: enriched.suggestions.map((s) => ({
+      ...s,
+      notes: appendMailSubjectToNotes(s.notes, message.subject),
+    })),
+  };
 }
