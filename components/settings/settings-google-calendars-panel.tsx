@@ -218,8 +218,9 @@ export function SettingsGoogleCalendarsPanel() {
       <CardContent className="space-y-4">
         <p className="text-sm text-muted-foreground">
           Kalender aus deinem Google-Konto anhaken und Typ/Farbe setzen.
-          Typ «Hockey» (z. B. Ambri) aktiviert Logos und Resultate. ICS-Feeds
-          weiterhin darunter möglich.
+          Typ «Hockey» (z. B. Ambri) aktiviert Logos und Resultate. Mit
+          Schreibrecht schreibt Buddy Resultat + Torschützen nach dem Sync in
+          den Google-Termin (Titel / Beschreibung).
         </p>
 
         {loading ? (

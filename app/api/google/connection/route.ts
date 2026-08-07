@@ -4,6 +4,7 @@ import { ensureInitialized } from "@/lib/db/migrations";
 import {
   getConnectedGoogleEmail,
   getGoogleOauthRedirectUri,
+  hasGoogleCalendarEventsWriteScope,
   hasGoogleCalendarScope,
   isGoogleMailConnected,
   isGoogleOauthConfigured,
@@ -27,5 +28,8 @@ export async function GET(request: Request) {
     connected,
     connectedEmail: getConnectedGoogleEmail(userId),
     hasCalendarScope: connected ? hasGoogleCalendarScope(userId) : false,
+    hasCalendarEventsWrite: connected
+      ? hasGoogleCalendarEventsWriteScope(userId)
+      : false,
   });
 }

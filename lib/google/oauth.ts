@@ -11,6 +11,8 @@ export const GOOGLE_OAUTH_SCOPES = [
   "https://www.googleapis.com/auth/gmail.readonly",
   "https://www.googleapis.com/auth/userinfo.email",
   "https://www.googleapis.com/auth/calendar.readonly",
+  /** Needed to write Ambri results back into owned Google events */
+  "https://www.googleapis.com/auth/calendar.events",
 ] as const;
 
 export const GOOGLE_OAUTH_CALLBACK_PATH = "/api/google/oauth/callback";
@@ -115,11 +117,27 @@ export function isGoogleMailConnected(userId: number | null): boolean {
   return Boolean(readGoogleUserTokens(userId)?.refreshToken);
 }
 
-/** True if stored token scopes include Calendar read (birthdays). */
+/** True if stored token scopes include Calendar read. */
 export function hasGoogleCalendarScope(userId: number | null): boolean {
   if (userId == null) return false;
   const scope = readGoogleUserTokens(userId)?.scope || "";
-  return scope.includes("https://www.googleapis.com/auth/calendar.readonly");
+  return (
+    scope.includes("https://www.googleapis.com/auth/calendar.readonly") ||
+    scope.includes("https://www.googleapis.com/auth/calendar") ||
+    scope.includes("https://www.googleapis.com/auth/calendar.events")
+  );
+}
+
+/** True if Buddy may patch event title/description (Resultat zurückschreiben). */
+export function hasGoogleCalendarEventsWriteScope(
+  userId: number | null
+): boolean {
+  if (userId == null) return false;
+  const scope = readGoogleUserTokens(userId)?.scope || "";
+  return (
+    scope.includes("https://www.googleapis.com/auth/calendar.events") ||
+    scope.includes("https://www.googleapis.com/auth/calendar")
+  );
 }
 
 export function getConnectedGoogleEmail(

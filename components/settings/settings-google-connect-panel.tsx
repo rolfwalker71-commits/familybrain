@@ -13,6 +13,7 @@ type Connection = {
   connected: boolean;
   connectedEmail: string | null;
   hasCalendarScope: boolean;
+  hasCalendarEventsWrite: boolean;
 };
 
 export function SettingsGoogleConnectPanel() {
@@ -98,41 +99,53 @@ export function SettingsGoogleConnectPanel() {
                 Kein App-User — Verbindung nicht möglich.
               </p>
             ) : data.connected ? (
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="text-sm">
-                  Verbunden als{" "}
-                  <span className="font-medium">
-                    {data.connectedEmail || "Google"}
-                  </span>
-                  {!data.hasCalendarScope ? (
-                    <span className="text-amber-800">
-                      {" "}
-                      — ohne Kalender-Recht, bitte neu verbinden.
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-sm">
+                    Verbunden als{" "}
+                    <span className="font-medium">
+                      {data.connectedEmail || "Google"}
                     </span>
-                  ) : null}
-                </p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={busy}
-                  onClick={() => void disconnect()}
-                >
-                  <Unlink className="size-3.5" />
-                  Trennen
-                </Button>
-                {!data.hasCalendarScope ? (
-                  <a
-                    href="/api/google/oauth/start"
-                    className={cn(
-                      buttonVariants({ variant: "outline", size: "sm" }),
-                      "gap-1.5"
-                    )}
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={busy}
+                    onClick={() => void disconnect()}
                   >
-                    <Link2 className="size-3.5" />
-                    Neu verbinden
-                  </a>
-                ) : null}
+                    <Unlink className="size-3.5" />
+                    Trennen
+                  </Button>
+                  {!data.hasCalendarScope || !data.hasCalendarEventsWrite ? (
+                    <a
+                      href="/api/google/oauth/start"
+                      className={cn(
+                        buttonVariants({ variant: "outline", size: "sm" }),
+                        "gap-1.5"
+                      )}
+                    >
+                      <Link2 className="size-3.5" />
+                      Neu verbinden
+                    </a>
+                  ) : null}
+                </div>
+                {!data.hasCalendarScope ? (
+                  <p className="text-xs text-amber-800">
+                    Ohne Kalender-Recht — bitte neu verbinden.
+                  </p>
+                ) : !data.hasCalendarEventsWrite ? (
+                  <p className="text-xs text-amber-800">
+                    Kalender lesen ok, aber ohne Schreibrecht — bitte neu
+                    verbinden, damit Ambri-Resultate (und Torschützen) in deine
+                    Google-Termine zurückgeschrieben werden.
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Schreibrecht aktiv: Resultate können in Hockey-Termine
+                    zurückgeschrieben werden.
+                  </p>
+                )}
               </div>
             ) : (
               <a

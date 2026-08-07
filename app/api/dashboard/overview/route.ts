@@ -29,18 +29,35 @@ export async function GET(request: Request) {
       error instanceof Error ? error.message : error
     );
   });
-  await syncHockeyResultsIfDue().catch((error) => {
+  const syncSummary = await syncHockeyResultsIfDue().catch((error) => {
     console.warn(
       "[hockey] Sofascore result sync:",
       error instanceof Error ? error.message : error
     );
+    return null;
   });
+
+  const { resolveCalendarUserId } = await import("@/lib/calendar/ics-calendars");
+  const calendarUserId = resolveCalendarUserId(auth);
+
+  if (calendarUserId != null) {
+    const { writeHockeyResultsToGoogleCalendars } = await import(
+      "@/lib/google/hockey-writeback"
+    );
+    await writeHockeyResultsToGoogleCalendars(calendarUserId, {
+      force: Boolean(syncSummary && syncSummary.updated > 0),
+      request,
+    }).catch((error) => {
+      console.warn(
+        "[hockey] Google result writeback:",
+        error instanceof Error ? error.message : error
+      );
+    });
+  }
 
   const { searchParams } = new URL(request.url);
   const period = parseOverviewPeriod(searchParams.get("period"));
   const anchor = searchParams.get("anchor");
-  const { resolveCalendarUserId } = await import("@/lib/calendar/ics-calendars");
-  const calendarUserId = resolveCalendarUserId(auth);
   return NextResponse.json(
     await getDashboardOverview(period, anchor, calendarUserId)
   );
