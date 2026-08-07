@@ -214,7 +214,7 @@ function findConflicts(
 }
 
 function placeMapSrc(coords: { lat: number; lon: number }): string {
-  return `/api/dashboard/place-map?lat=${coords.lat}&lon=${coords.lon}&z=14`;
+  return `/api/dashboard/place-map?lat=${coords.lat}&lon=${coords.lon}&z=16`;
 }
 
 function HomeWeatherWidget({ weather }: { weather: HomeWeatherCard }) {

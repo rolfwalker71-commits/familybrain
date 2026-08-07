@@ -7,12 +7,21 @@ import {
   isGoogleMailConnected,
   resolveGoogleUserId,
 } from "@/lib/google/oauth";
-import { createGoogleCalendarEvent } from "@/lib/google/calendar-write";
+import {
+  createGoogleCalendarEvent,
+  updateGoogleCalendarEvent,
+} from "@/lib/google/calendar-write";
 import { createGoogleTask } from "@/lib/google/tasks";
 import { MailActionsBodySchema } from "@/lib/mail/mail-action-schema";
 import { getGmailMessage } from "@/lib/mail/gmail";
-import { updateMailAnalysisStatus } from "@/lib/mail/mail-analysis-store";
+import {
+  getMailAnalysis,
+  updateMailAnalysisStatus,
+} from "@/lib/mail/mail-analysis-store";
 import { createReferenceNote } from "@/lib/mail/reference-notes";
+import { collectApplyWarnings } from "@/lib/mail/apply-checks";
+import { insertMailAppliedLink } from "@/lib/mail/mail-applied-links";
+import { recordMailSenderApplied } from "@/lib/mail/mail-sender-prefs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -48,12 +57,43 @@ export async function POST(request: Request, context: Ctx) {
     );
   }
 
+  const stored = getMailAnalysis(userId, id);
   let mailFrom = "";
+  let threadId = stored?.threadId || null;
+  let fromEmail = stored?.fromEmail || null;
   try {
     const message = await getGmailMessage(userId, id, request);
     mailFrom = message.fromName;
+    threadId = message.threadId || threadId;
+    fromEmail = message.from || fromEmail;
   } catch {
-    mailFrom = "";
+    mailFrom = stored?.fromName || "";
+  }
+
+  if (!body.confirmDuplicates) {
+    const warnings = await collectApplyWarnings(
+      userId,
+      threadId,
+      body.actions.map((a) => ({
+        kind: a.kind,
+        title: a.title,
+        reference: a.reference,
+        startDate: a.startDate,
+        startTime: a.startTime,
+        endTime: a.endTime,
+        patchEventId: a.patchEventId,
+      }))
+    );
+    if (warnings.length > 0) {
+      return NextResponse.json(
+        {
+          error: "Bitte Konflikte/Dubletten bestätigen.",
+          warnings,
+          needsConfirm: true,
+        },
+        { status: 422 }
+      );
+    }
   }
 
   const created: Array<{
@@ -71,6 +111,7 @@ export async function POST(request: Request, context: Ctx) {
     allDay?: boolean | null;
     location?: string | null;
     dueDate?: string | null;
+    patched?: boolean;
   }> = [];
 
   for (const action of body.actions) {
@@ -89,6 +130,14 @@ export async function POST(request: Request, context: Ctx) {
           body: notes,
           reference: action.reference,
           sourceMessageId: id,
+        });
+        insertMailAppliedLink({
+          userId,
+          messageId: id,
+          threadId,
+          kind: "note",
+          title: note.title,
+          reference: action.reference,
         });
         created.push({
           kind: "note",
@@ -131,21 +180,53 @@ export async function POST(request: Request, context: Ctx) {
         continue;
       }
       try {
-        const ev = await createGoogleCalendarEvent(
+        const patchId = action.patchEventId?.trim();
+        const ev = patchId
+          ? await updateGoogleCalendarEvent(
+              userId,
+              {
+                eventId: patchId,
+                calendarId: action.calendarId,
+                title: action.title,
+                description: notes,
+                location: action.location,
+                startDate: action.startDate,
+                startTime: action.startTime,
+                endDate: action.endDate || action.startDate,
+                endTime: action.endTime,
+                allDay: action.allDay,
+              },
+              request
+            )
+          : await createGoogleCalendarEvent(
+              userId,
+              {
+                calendarId: action.calendarId,
+                title: action.title,
+                description: notes,
+                location: action.location,
+                startDate: action.startDate,
+                startTime: action.startTime,
+                endDate: action.endDate || action.startDate,
+                endTime: action.endTime,
+                allDay: action.allDay,
+              },
+              request
+            );
+        insertMailAppliedLink({
           userId,
-          {
-            calendarId: action.calendarId,
-            title: action.title,
-            description: notes,
-            location: action.location,
-            startDate: action.startDate,
-            startTime: action.startTime,
-            endDate: action.endDate || action.startDate,
-            endTime: action.endTime,
-            allDay: action.allDay,
-          },
-          request
-        );
+          messageId: id,
+          threadId,
+          kind: "event",
+          title: ev.summary,
+          googleEventId: ev.id,
+          calendarId: ev.calendarId,
+          startDate: action.startDate,
+          startTime: action.startTime,
+          endDate: action.endDate || action.startDate,
+          endTime: action.endTime,
+          reference: action.reference,
+        });
         created.push({
           kind: "event",
           title: ev.summary,
@@ -158,6 +239,7 @@ export async function POST(request: Request, context: Ctx) {
           endTime: action.endTime,
           allDay: action.allDay,
           location: action.location,
+          patched: Boolean(patchId),
         });
       } catch (error) {
         created.push({
@@ -190,6 +272,15 @@ export async function POST(request: Request, context: Ctx) {
         },
         request
       );
+      insertMailAppliedLink({
+        userId,
+        messageId: id,
+        threadId,
+        kind: "task",
+        title: task.title,
+        taskId: task.id,
+        reference: action.reference,
+      });
       created.push({
         kind: "task",
         title: task.title,
@@ -213,6 +304,7 @@ export async function POST(request: Request, context: Ctx) {
     null;
   if (okCount > 0) {
     updateMailAnalysisStatus(userId, id, "applied");
+    recordMailSenderApplied(userId, fromEmail);
     const { applyGmailStatusLabel } = await import("@/lib/mail/gmail-labels");
     await applyGmailStatusLabel(userId, id, "applied", request).catch(
       () => undefined

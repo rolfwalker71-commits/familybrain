@@ -10,7 +10,16 @@ import { applyGmailStatusLabel } from "@/lib/mail/gmail-labels";
 import { analyzeMailForActions } from "@/lib/mail/analyze-mail";
 import { hasOpenAIKey } from "@/lib/ai/client";
 import { resolveStatusFromAnalysis } from "@/lib/mail/mail-heuristic";
-import { upsertMailAnalysis } from "@/lib/mail/mail-analysis-store";
+import {
+  listMailAnalysesByThread,
+  upsertMailAnalysis,
+} from "@/lib/mail/mail-analysis-store";
+import {
+  emailDomain,
+  getMailSenderPref,
+  senderPrefPromptLine,
+} from "@/lib/mail/mail-sender-prefs";
+import { findPatchableEventInThread } from "@/lib/mail/mail-applied-links";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -49,7 +58,31 @@ export async function POST(request: Request, context: Ctx) {
   }
   try {
     const message = await getGmailMessage(userId, id, request);
-    const analysis = await analyzeMailForActions(message, zurichToday());
+    const domain = emailDomain(message.from);
+    const pref = domain ? getMailSenderPref(userId, domain) : null;
+    const siblings = listMailAnalysesByThread(
+      userId,
+      message.threadId || "",
+      6
+    ).filter((r) => r.messageId !== id);
+    const threadContext =
+      siblings.length > 0
+        ? `Frühere Mails in diesem Thread:\n${siblings
+            .map(
+              (r) =>
+                `- [${r.status}] ${r.subject || "(kein Betreff)"}: ${(r.summary || r.snippet || "—").slice(0, 160)}`
+            )
+            .join("\n")}`
+        : null;
+    const analysis = await analyzeMailForActions(message, zurichToday(), {
+      threadContext,
+      senderPrefLine: senderPrefPromptLine(pref),
+      patchableEvent: findPatchableEventInThread(
+        userId,
+        message.threadId,
+        message.subject
+      ),
+    });
     const status = resolveStatusFromAnalysis(analysis);
     const stored = upsertMailAnalysis({
       userId,

@@ -9,18 +9,41 @@ const SKIP_RE =
 
 /**
  * Cheap gate before OpenAI. True → run AI (or at least store a skipped row if false).
+ * Soft sender prefs: applied domains lean true; heavily dismissed lean false.
  */
-export function shouldAnalyzeMail(input: {
-  from: string;
-  fromName: string;
-  subject: string;
-  snippet: string;
-}): boolean {
+export function shouldAnalyzeMail(
+  input: {
+    from: string;
+    fromName: string;
+    subject: string;
+    snippet: string;
+  },
+  prefs?: { appliedCount: number; dismissedCount: number } | null
+): boolean {
   const subject = (input.subject || "").trim();
   if (/^(wg|aw|fwd?|fw)\s*:/i.test(subject)) return true;
 
   const hay = `${input.fromName} ${input.from} ${subject} ${input.snippet}`;
   if (INTEREST_RE.test(hay)) return true;
+
+  if (
+    prefs &&
+    prefs.dismissedCount >= 2 &&
+    prefs.appliedCount === 0 &&
+    SKIP_RE.test(hay)
+  ) {
+    return false;
+  }
+  if (prefs && prefs.appliedCount >= 1) return true;
+  if (
+    prefs &&
+    prefs.dismissedCount >= 2 &&
+    prefs.appliedCount === 0 &&
+    !INTEREST_RE.test(hay)
+  ) {
+    return false;
+  }
+
   if (SKIP_RE.test(hay)) return false;
   // Unknown: still analyze unread-looking short operational mails lightly —
   // prefer skip to save tokens unless subject looks actionable.

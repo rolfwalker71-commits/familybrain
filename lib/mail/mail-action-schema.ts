@@ -21,22 +21,35 @@ export const MailSuggestionSchema = z.object({
     .optional(),
   allDay: z.boolean().optional(),
   location: z.string().max(400).nullable().optional(),
+  /** When set, update this Google Calendar event instead of creating a new one. */
+  patchEventId: z.string().max(200).nullable().optional(),
+  /** Calendar that owns patchEventId (required for patch). */
+  calendarId: z.string().max(200).nullable().optional(),
   /** task */
   dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
   /** note — e.g. tracking number */
   reference: z.string().max(200).nullable().optional(),
 });
 
+export const MailReplyDraftSchema = z.object({
+  subject: z.string().max(200).nullable().optional(),
+  body: z.string().min(1).max(4000),
+  tone: z.string().max(80).nullable().optional(),
+});
+
 export const MailAnalysisSchema = z.object({
   summary: z.string().max(500),
   relevance: z.enum(["none", "low", "medium", "high"]),
   suggestions: z.array(MailSuggestionSchema).max(8),
+  replyDraft: MailReplyDraftSchema.nullable().optional(),
 });
 
 export type MailSuggestion = z.infer<typeof MailSuggestionSchema>;
 export type MailAnalysis = z.infer<typeof MailAnalysisSchema>;
+export type MailReplyDraft = z.infer<typeof MailReplyDraftSchema>;
 
 export const MailActionsBodySchema = z.object({
+  confirmDuplicates: z.boolean().optional(),
   actions: z
     .array(
       z.object({
@@ -53,6 +66,7 @@ export const MailActionsBodySchema = z.object({
         reference: z.string().optional().nullable(),
         calendarId: z.string().optional().nullable(),
         tasklistId: z.string().optional().nullable(),
+        patchEventId: z.string().optional().nullable(),
       })
     )
     .min(1)

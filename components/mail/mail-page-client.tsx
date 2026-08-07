@@ -277,7 +277,7 @@ export function MailPageClient() {
       .filter(({ s, i }) => selected[suggestionKey(s, i)]);
   }, [analysis, selected]);
 
-  async function applySelected() {
+  async function applySelected(opts?: { confirmDuplicates?: boolean }) {
     if (!openId || selectedSuggestions.length === 0) return;
     setApplying(true);
     setApplyMsg(null);
@@ -294,19 +294,55 @@ export function MailPageClient() {
         location: s.location ?? null,
         dueDate: s.dueDate ?? null,
         reference: s.reference ?? null,
-        calendarId: s.kind === "event" ? calendarId || null : null,
+        calendarId:
+          s.kind === "event" ? s.calendarId || calendarId || null : null,
         tasklistId: s.kind === "task" ? tasklistId || null : null,
+        patchEventId: s.patchEventId ?? null,
       }));
       const res = await fetch(
         `/api/mail/${encodeURIComponent(openId)}/actions`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ actions }),
+          body: JSON.stringify({
+            actions,
+            confirmDuplicates: opts?.confirmDuplicates === true,
+          }),
         }
       );
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Speichern fehlgeschlagen");
+      if (
+        res.status === 422 &&
+        data.needsConfirm &&
+        Array.isArray(data.warnings) &&
+        !opts?.confirmDuplicates
+      ) {
+        const ok = window.confirm(
+          `Hinweise:\n${(data.warnings as Array<{ message: string }>).map((w) => `• ${w.message}`).join("\n")}\n\nTrotzdem übernehmen?`
+        );
+        if (!ok) {
+          setApplyMsg("Übernehmen abgebrochen.");
+          return;
+        }
+        const retry = await fetch(
+          `/api/mail/${encodeURIComponent(openId)}/actions`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              actions,
+              confirmDuplicates: true,
+            }),
+          }
+        );
+        const retryData = await retry.json();
+        if (!retry.ok) {
+          throw new Error(retryData.error || "Speichern fehlgeschlagen");
+        }
+        Object.assign(data, retryData);
+      } else if (!res.ok) {
+        throw new Error(data.error || "Speichern fehlgeschlagen");
+      }
       const fails = (data.created || []).filter(
         (c: { ok: boolean }) => !c.ok
       ) as Array<{ title: string; error?: string }>;

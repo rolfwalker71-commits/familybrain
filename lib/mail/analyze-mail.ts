@@ -2,10 +2,12 @@ import { getOpenAIClient, getOpenAIModel, hasOpenAIKey } from "@/lib/ai/client";
 import {
   MailAnalysisSchema,
   type MailAnalysis,
+  type MailSuggestion,
 } from "@/lib/mail/mail-action-schema";
 import type { MailMessageDetail } from "@/lib/mail/gmail";
 import { enrichMailAnalysisTitles } from "@/lib/mail/enrich-shipping-titles";
 import { enrichSuggestionNotes } from "@/lib/mail/subject-notes";
+import type { MailAppliedLink } from "@/lib/mail/mail-applied-links";
 
 function htmlToPlain(html: string): string {
   return html
@@ -51,25 +53,60 @@ WICHTIG:
 - Keine Dubletten. Keine erfundenen Daten — wenn unsicher, weglassen oder allDay/nur Datum.
 - Zeiten als HH:mm (24h). Datumsangaben relativ («morgen», «Montag») in absolute YYYY-MM-DD anhand «Heute» auflösen.
 - kind "event": startDate Pflicht wenn möglich. Wenn ein Zustell-/Termin-Zeitfenster im Mail steht (z.B. «zwischen 9 und 13 Uhr», «9:00 AM – 1:00 PM»), IMMER startTime und endTime als HH:mm setzen — nicht nur das Datum. location setzen wenn Adresse/Ort genannt. In notes KEINE Adresse, KEINE Uhrzeiten, KEINE Dauer wiederholen.
+- Wenn im Thread-Kontext bereits ein Google-Event mit ID genannt ist und das Mail eine Änderung (neues Zeitfenster/Ort) ist: dasselbe Event aktualisieren — setze patchEventId und calendarId auf die vorhandenen Werte (kein zweites Event).
 - kind "task": dueDate wenn Frist/Tag bekannt, sonst null.
 - kind "note": «reference» = Tracking/Code, «notes» = kontextuelle Beschreibung wie oben.
+- replyDraft: nur wenn eine kurze Antwort an den Absender sinnvoll ist (Termin zusagen, Lieferadresse bestätigen, Rückfrage). Sonst weglassen oder null. body auf Deutsch, höflich und knapp.
 - Antworte NUR als JSON-Objekt.`;
+
+export type AnalyzeMailContext = {
+  threadContext?: string | null;
+  senderPrefLine?: string | null;
+  patchableEvent?: MailAppliedLink | null;
+};
+
+function attachPatchHints(
+  suggestions: MailSuggestion[],
+  patchable: MailAppliedLink | null | undefined
+): MailSuggestion[] {
+  if (!patchable?.googleEventId || !patchable.calendarId) return suggestions;
+  return suggestions.map((s) => {
+    if (s.kind !== "event") return s;
+    if (s.patchEventId) return s;
+    return {
+      ...s,
+      patchEventId: patchable.googleEventId,
+      calendarId: patchable.calendarId,
+    };
+  });
+}
 
 export async function analyzeMailForActions(
   message: MailMessageDetail,
-  todayIso: string
+  todayIso: string,
+  context?: AnalyzeMailContext
 ): Promise<MailAnalysis> {
   if (!hasOpenAIKey()) {
     throw new Error("OpenAI API-Key fehlt (Einstellungen).");
   }
 
   const body = mailBodyForAi(message);
+  const extraBlocks = [
+    context?.senderPrefLine?.trim() || null,
+    context?.threadContext?.trim() || null,
+    context?.patchableEvent?.googleEventId
+      ? `Bereits übernommener Termin in diesem Thread (bei Änderung patchen):\n- title: ${context.patchableEvent.title}\n- patchEventId: ${context.patchableEvent.googleEventId}\n- calendarId: ${context.patchableEvent.calendarId}\n- start: ${context.patchableEvent.startDate || "—"} ${context.patchableEvent.startTime || ""}`
+      : null,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+
   const userPrompt = `Heute (Europe/Zurich): ${todayIso}
 
 Von: ${message.fromName} <${message.from}>
 Betreff: ${message.subject}
 Datum-Header: ${message.date || "—"}
-
+${extraBlocks ? `\n${extraBlocks}\n` : ""}
 Inhalt:
 ${body || "(leer)"}
 
@@ -77,6 +114,7 @@ JSON-Schema:
 {
   "summary": "1 Satz worum es geht",
   "relevance": "none"|"low"|"medium"|"high",
+  "replyDraft": { "subject": "Re: …"|null, "body": "kurze Antwort DE", "tone": "kurz"|null }|null,
   "suggestions": [
     {
       "kind": "event"|"task"|"note",
@@ -91,7 +129,9 @@ JSON-Schema:
       "endTime": "HH:mm"|null,
       "allDay": false,
       "location": "string"|null,
-      "dueDate": "YYYY-MM-DD"|null
+      "dueDate": "YYYY-MM-DD"|null,
+      "patchEventId": "googleEventId oder null",
+      "calendarId": "calendarId bei patch oder null"
     }
   ]
 }`;
@@ -129,9 +169,14 @@ JSON-Schema:
     return Boolean(s.title.trim());
   });
 
+  const withPatch = attachPatchHints(suggestions, context?.patchableEvent);
+
   const analysis: MailAnalysis = {
     ...result.data,
-    suggestions,
+    suggestions: withPatch,
+    replyDraft: result.data.replyDraft?.body?.trim()
+      ? result.data.replyDraft
+      : null,
   };
 
   const enriched = enrichMailAnalysisTitles(analysis, {
@@ -150,6 +195,7 @@ JSON-Schema:
 
   return {
     ...enriched,
+    replyDraft: analysis.replyDraft,
     suggestions: enriched.suggestions.map((s) =>
       enrichSuggestionNotes(s, ctx)
     ),

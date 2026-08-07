@@ -141,6 +141,8 @@ export function bootstrapDatabase(db: Database.Database): void {
   ensureUserAccessTables(db);
   ensureInboxTaskTables(db);
   ensureMailAnalysesTable(db);
+  ensureMailSenderPrefsTable(db);
+  ensureMailAppliedLinksTable(db);
   ensureReferenceNotesTable(db);
   ensureActivityLogTable(db);
   ensurePushSubscriptionsTable(db);
@@ -239,6 +241,49 @@ function ensureMailAnalysesTable(db: Database.Database): void {
     );
     CREATE INDEX IF NOT EXISTS idx_mail_analyses_status
       ON mail_analyses(user_id, status, analyzed_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_mail_analyses_thread
+      ON mail_analyses(user_id, thread_id);
+  `);
+}
+
+function ensureMailSenderPrefsTable(db: Database.Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS mail_sender_prefs (
+      user_id INTEGER NOT NULL,
+      from_domain TEXT NOT NULL,
+      applied_count INTEGER NOT NULL DEFAULT 0,
+      dismissed_count INTEGER NOT NULL DEFAULT 0,
+      last_applied_at TEXT,
+      last_dismissed_at TEXT,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (user_id, from_domain)
+    );
+  `);
+}
+
+function ensureMailAppliedLinksTable(db: Database.Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS mail_applied_links (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      message_id TEXT NOT NULL,
+      thread_id TEXT,
+      kind TEXT NOT NULL,
+      title TEXT NOT NULL,
+      google_event_id TEXT,
+      calendar_id TEXT,
+      task_id TEXT,
+      reference TEXT,
+      start_date TEXT,
+      start_time TEXT,
+      end_date TEXT,
+      end_time TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_mail_applied_links_thread
+      ON mail_applied_links(user_id, thread_id);
+    CREATE INDEX IF NOT EXISTS idx_mail_applied_links_ref
+      ON mail_applied_links(user_id, reference);
   `);
 }
 

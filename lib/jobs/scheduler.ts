@@ -63,6 +63,17 @@ async function tick(): Promise<void> {
     } else {
       state.lastResult = `success:run-${result.runId}`;
     }
+
+    const { syncMailAnalysesIfDue } = await import(
+      "@/lib/mail/sync-mail-if-due"
+    );
+    const mailSync = await syncMailAnalysesIfDue().catch((error) => {
+      console.warn("[scheduler] mail sync:", error);
+      return null;
+    });
+    if (mailSync?.attempted && mailSync.sync) {
+      state.lastResult = `${state.lastResult}|mail:ai${mailSync.sync.analyzed}`;
+    }
   } catch (error) {
     state.lastResult =
       error instanceof Error ? error.message : String(error);

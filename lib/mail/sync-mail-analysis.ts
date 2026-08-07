@@ -9,8 +9,15 @@ import {
 } from "@/lib/mail/mail-heuristic";
 import {
   getMailAnalysesForMessages,
+  listMailAnalysesByThread,
   upsertMailAnalysis,
 } from "@/lib/mail/mail-analysis-store";
+import {
+  emailDomain,
+  getMailSenderPref,
+  senderPrefPromptLine,
+} from "@/lib/mail/mail-sender-prefs";
+import { findPatchableEventInThread } from "@/lib/mail/mail-applied-links";
 
 function zurichToday(): string {
   return new Intl.DateTimeFormat("en-CA", {
@@ -30,6 +37,24 @@ async function tagGmail(
   await applyGmailStatusLabel(userId, messageId, status, request).catch(
     () => undefined
   );
+}
+
+function buildThreadContext(
+  userId: number,
+  threadId: string | null | undefined,
+  currentMessageId: string
+): string | null {
+  if (!threadId?.trim()) return null;
+  const siblings = listMailAnalysesByThread(userId, threadId, 6).filter(
+    (r) => r.messageId !== currentMessageId
+  );
+  if (siblings.length === 0) return null;
+  const lines = siblings.map((r) => {
+    const st = r.status;
+    const sum = r.summary || r.snippet || "—";
+    return `- [${st}] ${r.subject || "(kein Betreff)"}: ${sum.slice(0, 160)}`;
+  });
+  return `Frühere Mails in diesem Thread:\n${lines.join("\n")}`;
 }
 
 export type MailSyncResult = {
@@ -71,15 +96,26 @@ export async function syncMailAnalysesForItems(
   const candidates = items.filter((i) => {
     if (!i.id) return false;
     const ex = existing.get(i.id);
+    const domain = emailDomain(i.from);
+    const pref = domain ? getMailSenderPref(userId, domain) : null;
+    const prefCounts = pref
+      ? {
+          appliedCount: pref.appliedCount,
+          dismissedCount: pref.dismissedCount,
+        }
+      : null;
     if (!ex) return true;
     if (ex.status === "error") return true;
     if (ex.status === "skipped") {
-      return shouldAnalyzeMail({
-        from: i.from,
-        fromName: i.fromName,
-        subject: i.subject,
-        snippet: i.snippet,
-      });
+      return shouldAnalyzeMail(
+        {
+          from: i.from,
+          fromName: i.fromName,
+          subject: i.subject,
+          snippet: i.snippet,
+        },
+        prefCounts
+      );
     }
     return false;
   });
@@ -90,12 +126,23 @@ export async function syncMailAnalysesForItems(
 
   for (const item of candidates) {
     result.examined += 1;
-    const interesting = shouldAnalyzeMail({
-      from: item.from,
-      fromName: item.fromName,
-      subject: item.subject,
-      snippet: item.snippet,
-    });
+    const domain = emailDomain(item.from);
+    const pref = domain ? getMailSenderPref(userId, domain) : null;
+    const prefCounts = pref
+      ? {
+          appliedCount: pref.appliedCount,
+          dismissedCount: pref.dismissedCount,
+        }
+      : null;
+    const interesting = shouldAnalyzeMail(
+      {
+        from: item.from,
+        fromName: item.fromName,
+        subject: item.subject,
+        snippet: item.snippet,
+      },
+      prefCounts
+    );
 
     if (!interesting) {
       upsertMailAnalysis({
@@ -127,12 +174,17 @@ export async function syncMailAnalysesForItems(
         item.id,
         options?.request
       );
-      const analysis = await analyzeMailForActions(detail, zurichToday());
+      const threadId = item.threadId || detail.threadId;
+      const analysis = await analyzeMailForActions(detail, zurichToday(), {
+        threadContext: buildThreadContext(userId, threadId, item.id),
+        senderPrefLine: senderPrefPromptLine(pref),
+        patchableEvent: findPatchableEventInThread(userId, threadId),
+      });
       const status = resolveStatusFromAnalysis(analysis);
       upsertMailAnalysis({
         userId,
         messageId: item.id,
-        threadId: item.threadId || detail.threadId,
+        threadId,
         subject: detail.subject,
         fromName: detail.fromName,
         fromEmail: detail.from,

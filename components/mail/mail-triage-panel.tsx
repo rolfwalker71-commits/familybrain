@@ -34,6 +34,11 @@ export function MailTriagePanel({
     Record<string, Record<number, string>>
   >({});
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
+  const [pendingWarnings, setPendingWarnings] = useState<{
+    messageId: string;
+    warnings: Array<{ code: string; message: string }>;
+  } | null>(null);
 
   const loadTargets = useCallback(async () => {
     setTargetsError(null);
@@ -119,6 +124,14 @@ export function MailTriagePanel({
       setSelected(next);
       setNotesDraft(drafts);
       setTitleDraft(titles);
+      const replies: Record<string, string> = {};
+      for (const row of list) {
+        if (row.analysis?.replyDraft?.body) {
+          replies[row.messageId] = row.analysis.replyDraft.body;
+        }
+      }
+      setReplyDrafts(replies);
+      setPendingWarnings(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -179,7 +192,10 @@ export function MailTriagePanel({
     }
   }
 
-  async function apply(row: StoredMailAnalysis) {
+  async function apply(
+    row: StoredMailAnalysis,
+    opts?: { confirmDuplicates?: boolean }
+  ) {
     const suggestions = row.analysis?.suggestions || [];
     const picks = suggestions
       .map((s, i) => ({ s, i }))
@@ -208,24 +224,77 @@ export function MailTriagePanel({
         location: s.location ?? null,
         dueDate: s.dueDate ?? null,
         reference: s.reference ?? null,
-        calendarId: s.kind === "event" ? calendarId || null : null,
+        calendarId:
+          s.kind === "event"
+            ? s.calendarId || calendarId || null
+            : null,
         tasklistId: s.kind === "task" ? tasklistId || null : null,
+        patchEventId: s.patchEventId ?? null,
       }));
       const res = await fetch(
         `/api/mail/${encodeURIComponent(row.messageId)}/actions`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ actions }),
+          body: JSON.stringify({
+            actions,
+            confirmDuplicates: opts?.confirmDuplicates === true,
+          }),
         }
       );
       const data = await res.json();
+      if (res.status === 422 && data.needsConfirm && Array.isArray(data.warnings)) {
+        setPendingWarnings({
+          messageId: row.messageId,
+          warnings: data.warnings,
+        });
+        setError(null);
+        return;
+      }
       if (!res.ok) throw new Error(data.error || "Übernehmen fehlgeschlagen");
       if (!data.okCount) {
         throw new Error("Nichts angelegt");
       }
+      setPendingWarnings(null);
       await load();
       onChanged?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function saveReplyDraft(row: StoredMailAnalysis) {
+    const body = (replyDrafts[row.messageId] || "").trim();
+    if (!body) {
+      setError("Antwort-Entwurf ist leer.");
+      return;
+    }
+    setBusyId(row.messageId);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/mail/${encodeURIComponent(row.messageId)}/draft`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            body,
+            subject: row.analysis?.replyDraft?.subject ?? null,
+          }),
+        }
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Entwurf fehlgeschlagen");
+      setError(null);
+      // reuse error slot as soft success via targets? keep quiet — brief status
+      setTargetsError((prev) => prev || "Gmail-Entwurf gespeichert.");
+      window.setTimeout(() => {
+        setTargetsError((prev) =>
+          prev === "Gmail-Entwurf gespeichert." ? null : prev
+        );
+      }, 2500);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -403,6 +472,7 @@ export function MailTriagePanel({
                           </div>
                           <p className="text-[11px] text-muted-foreground">
                             {formatMailSuggestionDetail(s)}
+                            {s.patchEventId ? " · aktualisiert bestehenden Termin" : ""}
                           </p>
                           <label className="block space-y-0.5">
                             <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
@@ -433,6 +503,69 @@ export function MailTriagePanel({
                       </li>
                     ))}
                   </ul>
+                  {row.analysis?.replyDraft?.body ||
+                  replyDrafts[row.messageId] ? (
+                    <div className="space-y-1.5 rounded-lg border border-sky-200/70 bg-sky-50/40 px-2.5 py-2">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-sky-900/80">
+                        Antwort-Entwurf
+                      </p>
+                      <textarea
+                        className="min-h-[3.5rem] w-full resize-y rounded-md border border-input bg-background px-2 py-1.5 text-xs leading-snug"
+                        rows={3}
+                        value={replyDrafts[row.messageId] || ""}
+                        disabled={busy}
+                        onChange={(e) =>
+                          setReplyDrafts((prev) => ({
+                            ...prev,
+                            [row.messageId]: e.target.value,
+                          }))
+                        }
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={busy}
+                        onClick={() => void saveReplyDraft(row)}
+                      >
+                        Als Gmail-Entwurf
+                      </Button>
+                    </div>
+                  ) : null}
+                  {pendingWarnings?.messageId === row.messageId ? (
+                    <div
+                      className="space-y-2 rounded-lg border border-amber-300/80 bg-amber-50/80 px-2.5 py-2 text-xs text-amber-950"
+                      role="alert"
+                    >
+                      <p className="font-semibold">Hinweise vor Übernehmen</p>
+                      <ul className="list-disc space-y-1 pl-4">
+                        {pendingWarnings.warnings.map((w, wi) => (
+                          <li key={`${w.code}-${wi}`}>{w.message}</li>
+                        ))}
+                      </ul>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          disabled={busy}
+                          onClick={() =>
+                            void apply(row, { confirmDuplicates: true })
+                          }
+                        >
+                          Trotzdem übernehmen
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={busy}
+                          onClick={() => setPendingWarnings(null)}
+                        >
+                          Abbrechen
+                        </Button>
+                      </div>
+                    </div>
+                  ) : null}
                   <div className="flex flex-wrap gap-2">
                     <Button
                       type="button"

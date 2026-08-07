@@ -169,6 +169,24 @@ export function listPendingMailTriage(
   return rows.map(mapRow);
 }
 
+export function listMailAnalysesByThread(
+  userId: number,
+  threadId: string,
+  limit = 8
+): StoredMailAnalysis[] {
+  const tid = threadId.trim();
+  if (!tid) return [];
+  const rows = getDb()
+    .prepare(
+      `SELECT * FROM mail_analyses
+       WHERE user_id = ? AND thread_id = ?
+       ORDER BY analyzed_at DESC
+       LIMIT ?`
+    )
+    .all(userId, tid, limit) as Row[];
+  return rows.map(mapRow);
+}
+
 export function countPendingMailTriage(userId: number): number {
   const row = getDb()
     .prepare(
