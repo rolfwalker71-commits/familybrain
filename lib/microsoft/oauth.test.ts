@@ -6,10 +6,12 @@ import {
   parseMicrosoftOauthState,
 } from "./oauth.ts";
 
-test("Microsoft scopes include mail + calendar + offline", () => {
+test("Microsoft scopes include mail + calendar + offline + teams", () => {
   assert.ok(MICROSOFT_OAUTH_SCOPES.includes("Mail.ReadWrite"));
   assert.ok(MICROSOFT_OAUTH_SCOPES.includes("Calendars.ReadWrite"));
   assert.ok(MICROSOFT_OAUTH_SCOPES.includes("offline_access"));
+  assert.ok(MICROSOFT_OAUTH_SCOPES.includes("Chat.ReadWrite"));
+  assert.ok(MICROSOFT_OAUTH_SCOPES.includes("ChatMessage.Send"));
   assert.equal(
     MICROSOFT_OAUTH_CALLBACK_PATH,
     "/api/microsoft/oauth/callback"

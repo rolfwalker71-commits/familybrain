@@ -26,6 +26,7 @@ import {
 } from "@/lib/microsoft/oauth";
 import { formatTokenUsageLine } from "@/lib/ai/usage-cost";
 import { notifyAppChange } from "@/lib/realtime/notify";
+import { notifyTeamsSelfMessage } from "@/lib/microsoft/teams-chat";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,20 +40,27 @@ const BodySchema = z.object({
     .nullable(),
 });
 
-function notifyDone(dayIso: string, analysis: MsDayMailAnalysis) {
+function notifyDone(
+  userId: number,
+  dayIso: string,
+  analysis: MsDayMailAnalysis
+) {
   const usageLine = formatTokenUsageLine(analysis.usage);
+  const detail = [
+    `${analysis.clusters.length} Cluster`,
+    `${analysis.tasks.length} Aufgabe(n)`,
+    `${analysis.replies.length} Antwort(en)`,
+    dayIso,
+    usageLine,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
   notifyAppChange({
     domain: "documents",
     reason: "buddy_status",
     headline: "Mail-Tagesanalyse fertig",
-    detail: [
-      `${analysis.clusters.length} Cluster`,
-      `${analysis.tasks.length} Aufgabe(n)`,
-      dayIso,
-      usageLine,
-    ]
-      .filter(Boolean)
-      .join(" · "),
+    detail,
     title: null,
     href: "/microsoft",
     aiIconUrl: null,
@@ -60,20 +68,32 @@ function notifyDone(dayIso: string, analysis: MsDayMailAnalysis) {
     meta: null,
     source: "buddy",
   });
+
+  notifyTeamsSelfMessage(userId, {
+    headline: "Mail-Tagesanalyse fertig",
+    detail,
+    href: "/microsoft",
+  });
 }
 
-function notifyError(dayIso: string, message: string) {
+function notifyError(userId: number, dayIso: string, message: string) {
+  const detail = `${dayIso}: ${message.slice(0, 180)}`;
   notifyAppChange({
     domain: "documents",
     reason: "buddy_status",
     headline: "Mail-Tagesanalyse fehlgeschlagen",
-    detail: `${dayIso}: ${message.slice(0, 180)}`,
+    detail,
     title: null,
     href: "/microsoft",
     aiIconUrl: null,
     category: null,
     meta: null,
     source: "buddy",
+  });
+  notifyTeamsSelfMessage(userId, {
+    headline: "Mail-Tagesanalyse fehlgeschlagen",
+    detail,
+    href: "/microsoft",
   });
 }
 
@@ -90,7 +110,7 @@ async function runAnalysisJob(userId: number, day: string) {
         { inbox: mail.inbox, sent: mail.sent, dayIso: mail.dayIso },
         analysis
       );
-      notifyDone(mail.dayIso, analysis);
+      notifyDone(userId, mail.dayIso, analysis);
       return;
     }
     const analysis = await analyzeMicrosoftMailDay({
@@ -104,11 +124,11 @@ async function runAnalysisJob(userId: number, day: string) {
       { inbox: mail.inbox, sent: mail.sent, dayIso: mail.dayIso },
       analysis
     );
-    notifyDone(mail.dayIso, analysis);
+    notifyDone(userId, mail.dayIso, analysis);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     finishMsMailDayJobError(userId, day, message);
-    notifyError(day, message);
+    notifyError(userId, day, message);
   }
 }
 

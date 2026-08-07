@@ -22,6 +22,8 @@ export const MICROSOFT_OAUTH_SCOPES = [
   "Mail.Send",
   "Calendars.ReadWrite",
   "Tasks.ReadWrite",
+  "Chat.ReadWrite",
+  "ChatMessage.Send",
 ] as const;
 
 export type MicrosoftUserTokens = {
@@ -177,6 +179,16 @@ export function hasMicrosoftTasksScope(userId: number | null): boolean {
     s.has("Tasks.Read") ||
     s.has("https://graph.microsoft.com/Tasks.ReadWrite") ||
     s.has("https://graph.microsoft.com/Tasks.Read")
+  );
+}
+
+export function hasMicrosoftTeamsChatScope(userId: number | null): boolean {
+  const s = scopeSet(userId);
+  return (
+    s.has("ChatMessage.Send") ||
+    s.has("Chat.ReadWrite") ||
+    s.has("https://graph.microsoft.com/ChatMessage.Send") ||
+    s.has("https://graph.microsoft.com/Chat.ReadWrite")
   );
 }
 

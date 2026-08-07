@@ -17,6 +17,8 @@ type Connection = {
   hasMailScope: boolean;
   hasMailSendScope: boolean;
   hasCalendarScope: boolean;
+  hasTasksScope?: boolean;
+  hasTeamsChatScope?: boolean;
 };
 
 type Probe = {
@@ -196,13 +198,19 @@ export function SettingsMicrosoftConnectPanel() {
                 {!data.hasCalendarScope || !data.hasMailScope ? (
                   <p className="text-xs text-amber-800">
                     Scopes unvollständig — bitte neu verbinden (Mail +
-                    Kalender + Tasks).
+                    Kalender + Tasks + Teams-Chat).
                   </p>
                 ) : (
                   <p className="text-xs text-muted-foreground">
                     Mail und Kalender aktiv
-                    {data.hasMailSendScope ? " (inkl. Senden)" : ""}. Für
-                    To‑Do-Aufgaben ggf. neu verbinden (Tasks.ReadWrite).
+                    {data.hasMailSendScope ? " (inkl. Senden)" : ""}
+                    {data.hasTasksScope ? " · To Do" : ""}
+                    {data.hasTeamsChatScope
+                      ? " · Teams-Selbstchat"
+                      : ""}.
+                    {!data.hasTasksScope || !data.hasTeamsChatScope
+                      ? " Fehlende Rechte: Microsoft 365 neu verbinden."
+                      : ""}
                   </p>
                 )}
                 {probe?.ok ? (
