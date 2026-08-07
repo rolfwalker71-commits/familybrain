@@ -84,6 +84,11 @@ export type AgendaItem = {
   calendarType?: IcsCalendarType | null;
   /** Source id for Kalender-Filter (ICS id, swiss-holidays, deadlines, …) */
   calendarId?: string | null;
+  /**
+   * false = Referenzkalender (z. B. Partner-Dienstplan): anzeigen, aber nicht
+   * für «nächster Termin» / Fokus / Konflikte.
+   */
+  planningRelevant?: boolean;
 };
 
 export type HomeWeatherCard = {

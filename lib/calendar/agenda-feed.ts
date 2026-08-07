@@ -184,6 +184,7 @@ type TaggedHockey = HockeyGame & {
   calendarId: string;
   calendarName: string;
   color: string;
+  planningRelevant: boolean;
 };
 
 async function loadHockeyGames(
@@ -208,6 +209,7 @@ async function loadHockeyGames(
               calendarId: cal.id,
               calendarName: cal.name,
               color: cal.color,
+              planningRelevant: cal.planningRelevant !== false,
             }) satisfies TaggedHockey
         );
       } catch {
@@ -321,6 +323,7 @@ export async function getCalendarAgenda(options: {
       accentColor: ev.color,
       calendarType: ev.type,
       calendarId: sourceId,
+      planningRelevant: ev.planningRelevant !== false,
     });
   }
 
@@ -334,6 +337,7 @@ export async function getCalendarAgenda(options: {
         calendarId: sourceId,
         calendarName: bundle.calendarName,
         color: bundle.color,
+        planningRelevant: bundle.planningRelevant !== false,
       });
     }
   }
@@ -361,6 +365,7 @@ export async function getCalendarAgenda(options: {
       accentColor: game.color,
       calendarType: "hockey",
       calendarId: game.calendarId,
+      planningRelevant: game.planningRelevant !== false,
       logos: {
         left: game.homeTeam.logoUrl || null,
         right: game.awayTeam.logoUrl || null,
@@ -399,6 +404,7 @@ export async function getCalendarAgenda(options: {
         accentColor: cal.color,
         calendarType: cal.type,
         calendarId: cal.id,
+        planningRelevant: cal.planningRelevant !== false,
       });
     }
   }
@@ -425,6 +431,7 @@ export async function getCalendarAgenda(options: {
         accentColor: "#8b5cf6",
         calendarType: "holiday",
         calendarId: CALENDAR_SOURCE_HOLIDAYS,
+        planningRelevant: true,
       });
     }
   }
@@ -469,6 +476,7 @@ export async function getCalendarAgenda(options: {
         badge: "Frist",
         accentColor: "#0d9488",
         calendarId: CALENDAR_SOURCE_DEADLINES,
+        planningRelevant: true,
       });
     }
   }
@@ -561,6 +569,7 @@ export async function getOverviewHockeyBundle(
             calendarId: googleCalendarSourceId(bundle.calendarId),
             calendarName: bundle.calendarName,
             color: bundle.color,
+            planningRelevant: bundle.planningRelevant !== false,
           });
         }
       }

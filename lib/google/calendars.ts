@@ -25,6 +25,11 @@ export type GoogleCalendarSelection = {
   type?: IcsCalendarType;
   /** Optional color override (#rrggbb) */
   color?: string;
+  /**
+   * When false: still shown in agenda, ignored for next/focus/conflicts.
+   * Default true.
+   */
+  planningRelevant?: boolean;
 };
 
 export type GoogleCalendarListItem = {
@@ -40,6 +45,7 @@ export type GoogleCalendarListItem = {
   selected: boolean;
   enabled: boolean;
   type: IcsCalendarType;
+  planningRelevant: boolean;
 };
 
 export type GoogleCalendarEvent = {
@@ -63,6 +69,7 @@ export type GoogleCalendarEvent = {
   /** Google Meet / Zoom / Teams URL when present */
   meetUrl: string | null;
   isBirthday: boolean;
+  planningRelevant: boolean;
 };
 
 function selectionsKey(userId: number): string {
@@ -149,6 +156,7 @@ function readSelections(userId: number): GoogleCalendarSelection[] {
         ...(name ? { name } : {}),
         ...(type ? { type } : {}),
         ...(color ? { color } : {}),
+        planningRelevant: r.planningRelevant !== false,
       });
     }
     return out;
@@ -165,6 +173,7 @@ export function saveGoogleCalendarSelections(
     .map((s) => ({
       id: String(s.id || "").trim(),
       enabled: s.enabled !== false,
+      planningRelevant: s.planningRelevant !== false,
       ...(typeof s.name === "string" && s.name.trim()
         ? { name: s.name.trim().slice(0, 120) }
         : {}),
@@ -235,6 +244,7 @@ export async function listGoogleCalendarsForUser(
         selected: Boolean(sel),
         enabled: sel ? sel.enabled !== false : false,
         type: sel?.type || suggestedType,
+        planningRelevant: sel ? sel.planningRelevant !== false : true,
       });
     }
     pageToken = res.data.nextPageToken || undefined;
@@ -322,6 +332,7 @@ export async function listGoogleCalendarEventsInRange(
       const type = sel.type || meta?.type || "other";
       const color =
         sel.color || meta?.color || ICS_TYPE_META[type].defaultColor;
+      const planningRelevant = sel.planningRelevant !== false;
       const isBirthdayCal = type === "birthday";
       const out: GoogleCalendarEvent[] = [];
 
@@ -400,6 +411,7 @@ export async function listGoogleCalendarEventsInRange(
               description: ev.description?.trim() || null,
               meetUrl,
               isBirthday,
+              planningRelevant,
             });
           }
           pageToken = res.data.nextPageToken || undefined;
@@ -422,6 +434,7 @@ export type GoogleHockeyBundle = {
   calendarId: string;
   calendarName: string;
   color: string;
+  planningRelevant: boolean;
   games: HockeyGame[];
 };
 
@@ -522,6 +535,7 @@ export async function listGoogleHockeyGamesInRange(
         calendarId: sel.id,
         calendarName: name,
         color,
+        planningRelevant: sel.planningRelevant !== false,
         games,
       } satisfies GoogleHockeyBundle;
     })

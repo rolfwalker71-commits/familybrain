@@ -147,13 +147,18 @@ function buildNextStepLine(
 }
 
 /** Next upcoming today, else currently ongoing, else first later day — never a finished past slot. */
+function isPlanningRelevant(item: AgendaItem): boolean {
+  return item.planningRelevant !== false;
+}
+
 function pickFocusAgendaItem(
   items: AgendaItem[],
   today: string,
   nowHm: string
 ): AgendaItem | null {
-  if (!items.length) return null;
-  const todayTimed = items.filter((i) => i.date === today && i.time);
+  const pool = items.filter(isPlanningRelevant);
+  if (!pool.length) return null;
+  const todayTimed = pool.filter((i) => i.date === today && i.time);
   const now = hmToMinutes(nowHm) ?? 0;
 
   const ongoing =
@@ -170,17 +175,19 @@ function pickFocusAgendaItem(
     }) || null;
   if (upcoming) return upcoming;
 
-  const later = items.find((i) => i.date > today);
+  const later = pool.find((i) => i.date > today);
   if (later) return later;
 
-  return todayTimed[todayTimed.length - 1] || items[0] || null;
+  return todayTimed[todayTimed.length - 1] || pool[0] || null;
 }
 
 function findConflicts(
   items: AgendaItem[],
   today: string
 ): Array<{ id: string; label: string }> {
-  const timed = items.filter((i) => i.date === today && i.time);
+  const timed = items.filter(
+    (i) => i.date === today && i.time && isPlanningRelevant(i)
+  );
   const out: Array<{ id: string; label: string }> = [];
   const seen = new Set<string>();
   for (let i = 0; i < timed.length; i += 1) {

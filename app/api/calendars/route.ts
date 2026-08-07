@@ -21,6 +21,7 @@ const UpsertSchema = z.object({
   name: z.string().min(1).max(80),
   url: z.string().url().max(2000),
   enabled: z.boolean().optional(),
+  planningRelevant: z.boolean().optional(),
   color: z
     .string()
     .regex(/^#[0-9a-fA-F]{6}$/)
@@ -87,15 +88,34 @@ export async function PATCH(request: Request) {
     const body = (await request.json()) as {
       id?: string;
       enabled?: boolean;
+      planningRelevant?: boolean;
     };
-    if (!body.id || typeof body.enabled !== "boolean") {
-      return NextResponse.json(
-        { error: "id und enabled erforderlich." },
-        { status: 400 }
-      );
+    if (!body.id) {
+      return NextResponse.json({ error: "id erforderlich." }, { status: 400 });
     }
-    const calendars = setIcsCalendarEnabled(userId, body.id, body.enabled);
-    return NextResponse.json({ ok: true, calendars, ownerUserId: userId });
+    if (typeof body.enabled === "boolean") {
+      const calendars = setIcsCalendarEnabled(userId, body.id, body.enabled);
+      return NextResponse.json({ ok: true, calendars, ownerUserId: userId });
+    }
+    if (typeof body.planningRelevant === "boolean") {
+      const list = listIcsCalendarsForOwner(userId);
+      const row = list.find((c) => c.id === body.id);
+      if (!row) {
+        return NextResponse.json(
+          { error: "Kalender nicht gefunden." },
+          { status: 404 }
+        );
+      }
+      const calendars = upsertIcsCalendar(userId, {
+        ...row,
+        planningRelevant: body.planningRelevant,
+      });
+      return NextResponse.json({ ok: true, calendars, ownerUserId: userId });
+    }
+    return NextResponse.json(
+      { error: "enabled oder planningRelevant erforderlich." },
+      { status: 400 }
+    );
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : String(error) },

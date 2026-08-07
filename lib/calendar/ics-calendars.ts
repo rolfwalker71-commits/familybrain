@@ -34,6 +34,11 @@ export type IcsCalendar = {
   enabled: boolean;
   color: string;
   type: IcsCalendarType;
+  /**
+   * When false: still shown in agenda, but ignored for «nächster Termin»,
+   * Fokus-Highlight und Konflikt-Erkennung (z. B. Partner-Arbeitsplan).
+   */
+  planningRelevant: boolean;
   /** Built-in Ambri row — URL editable but type locked to hockey. */
   builtin?: boolean;
 };
@@ -46,6 +51,7 @@ function ambriSeed(): IcsCalendar {
     enabled: true,
     color: ICS_TYPE_META.hockey.defaultColor,
     type: "hockey",
+    planningRelevant: true,
     builtin: true,
   };
 }
@@ -70,6 +76,7 @@ function normalizeCalendar(raw: Partial<IcsCalendar>): IcsCalendar | null {
     enabled: raw.enabled !== false,
     color,
     type: isAmbri ? "hockey" : type,
+    planningRelevant: raw.planningRelevant !== false,
     builtin: isAmbri || Boolean(raw.builtin),
   };
 }
@@ -222,6 +229,8 @@ export function upsertIcsCalendar(
     enabled: input.enabled ?? existing?.enabled ?? true,
     color: input.color || existing?.color || ICS_TYPE_META[type].defaultColor,
     type,
+    planningRelevant:
+      input.planningRelevant ?? existing?.planningRelevant ?? true,
     builtin: id === AMBRI_CALENDAR_ID,
   });
   if (!row) return list;

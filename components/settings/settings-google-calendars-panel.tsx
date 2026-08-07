@@ -40,6 +40,7 @@ type GoogleCal = {
   selected: boolean;
   enabled: boolean;
   type: string;
+  planningRelevant?: boolean;
 };
 
 type TypeMeta = { id: CalType; label: string; defaultColor: string };
@@ -75,6 +76,7 @@ type DraftRow = {
   on: boolean;
   type: CalType;
   color: string;
+  planningRelevant: boolean;
 };
 
 export function SettingsGoogleCalendarsPanel() {
@@ -115,6 +117,7 @@ export function SettingsGoogleCalendarsPanel() {
           on: Boolean(c.selected && c.enabled),
           type,
           color: c.color || "#64748b",
+          planningRelevant: c.planningRelevant !== false,
         };
       }
       setDraft(next);
@@ -136,6 +139,7 @@ export function SettingsGoogleCalendarsPanel() {
         on: false,
         type: "other" as CalType,
         color: "#64748b",
+        planningRelevant: true,
       };
       const next = { ...cur, ...patch };
       if (patch.type && !patch.color) {
@@ -162,6 +166,7 @@ export function SettingsGoogleCalendarsPanel() {
             name: c.name,
             type: d.type,
             color: d.color,
+            planningRelevant: d.planningRelevant,
           };
         });
       const res = await fetch("/api/google/calendars", {
@@ -180,6 +185,7 @@ export function SettingsGoogleCalendarsPanel() {
           on: Boolean(c.selected && c.enabled),
           type,
           color: c.color || "#64748b",
+          planningRelevant: c.planningRelevant !== false,
         };
       }
       setDraft(next);
@@ -200,9 +206,13 @@ export function SettingsGoogleCalendarsPanel() {
       const wasOn = Boolean(c.selected && c.enabled);
       const wasType = (c.type || c.suggestedType || "other") as string;
       const wasColor = c.color || "#64748b";
+      const wasPlanning = c.planningRelevant !== false;
       return (
         d.on !== wasOn ||
-        (d.on && (d.type !== wasType || d.color !== wasColor))
+        (d.on &&
+          (d.type !== wasType ||
+            d.color !== wasColor ||
+            d.planningRelevant !== wasPlanning))
       );
     });
   }, [calendars, draft]);
@@ -218,7 +228,9 @@ export function SettingsGoogleCalendarsPanel() {
       <CardContent className="space-y-4">
         <p className="text-sm text-muted-foreground">
           Kalender aus deinem Google-Konto anhaken und Typ/Farbe setzen.
-          Typ «Hockey» (z. B. Ambri) aktiviert Logos und Resultate. Mit
+          «Relevant für Terminplanung» steuert, ob Termine den Fokus «nächster
+          Termin» und Konflikte beeinflussen (z.&nbsp;B. Partner-Dienstplan =
+          aus). Typ «Hockey» (z. B. Ambri) aktiviert Logos und Resultate. Mit
           Schreibrecht schreibt Buddy Resultat + Torschützen nach dem Sync in
           den Google-Termin (Titel / Beschreibung).
         </p>
@@ -275,6 +287,7 @@ export function SettingsGoogleCalendarsPanel() {
                     on: false,
                     type: "other" as CalType,
                     color: c.color,
+                    planningRelevant: true,
                   };
                   return (
                     <li
@@ -307,9 +320,15 @@ export function SettingsGoogleCalendarsPanel() {
                                 Primär
                               </Badge>
                             ) : null}
+                            {d.on && !d.planningRelevant ? (
+                              <Badge variant="outline" className="text-[10px]">
+                                Nur Referenz
+                              </Badge>
+                            ) : null}
                           </div>
                           {d.on ? (
-                            <div className="grid gap-3 sm:grid-cols-2">
+                            <div className="space-y-3">
+                              <div className="grid gap-3 sm:grid-cols-2">
                               <div className="space-y-1">
                                 <Label className="text-xs">Typ</Label>
                                 <Select
@@ -365,6 +384,27 @@ export function SettingsGoogleCalendarsPanel() {
                                   />
                                 </div>
                               </div>
+                              </div>
+                              <label className="flex items-start gap-2 text-xs text-muted-foreground">
+                                <input
+                                  type="checkbox"
+                                  className="mt-0.5 size-4 rounded border"
+                                  checked={d.planningRelevant}
+                                  disabled={saving}
+                                  onChange={(e) =>
+                                    patchDraft(c.id, {
+                                      planningRelevant: e.target.checked,
+                                    })
+                                  }
+                                />
+                                <span>
+                                  Relevant für Terminplanung
+                                  <span className="mt-0.5 block text-[11px] text-muted-foreground/90">
+                                    Aus = nur Referenz: sichtbar, ohne Fokus /
+                                    Konflikte
+                                  </span>
+                                </span>
+                              </label>
                             </div>
                           ) : null}
                           {d.on && d.type === "hockey" ? (

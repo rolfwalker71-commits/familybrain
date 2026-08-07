@@ -28,6 +28,7 @@ const PutSchema = z.object({
         .string()
         .regex(/^#[0-9a-fA-F]{6}$/)
         .optional(),
+      planningRelevant: z.boolean().optional(),
     })
   ),
 });

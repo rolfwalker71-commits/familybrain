@@ -35,6 +35,7 @@ type IcsCalendar = {
   enabled: boolean;
   color: string;
   type: CalType;
+  planningRelevant?: boolean;
   builtin?: boolean;
 };
 
@@ -72,6 +73,8 @@ export function SettingsCalendarsPanel() {
   const [editUrl, setEditUrl] = useState("");
   const [editType, setEditType] = useState<CalType>("other");
   const [editColor, setEditColor] = useState("#64748b");
+  const [editPlanningRelevant, setEditPlanningRelevant] = useState(true);
+  const [newPlanningRelevant, setNewPlanningRelevant] = useState(true);
 
   async function load() {
     setLoading(true);
@@ -115,7 +118,14 @@ export function SettingsCalendarsPanel() {
       const res = await fetch("/api/calendars", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, url, type, color, enabled: true }),
+        body: JSON.stringify({
+          name,
+          url,
+          type,
+          color,
+          enabled: true,
+          planningRelevant: newPlanningRelevant,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Anlegen fehlgeschlagen");
@@ -124,6 +134,7 @@ export function SettingsCalendarsPanel() {
       setUrl("");
       setType("other");
       setColor("#64748b");
+      setNewPlanningRelevant(true);
       setStatus("Kalender hinzugefügt.");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -172,6 +183,7 @@ export function SettingsCalendarsPanel() {
           type: existing?.builtin ? "hockey" : editType,
           color: editColor,
           enabled: existing?.enabled ?? true,
+          planningRelevant: editPlanningRelevant,
         }),
       });
       const data = await res.json();
@@ -194,6 +206,25 @@ export function SettingsCalendarsPanel() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, enabled }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Umschalten fehlgeschlagen");
+      setCalendars(data.calendars || []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function togglePlanningRelevant(id: string, planningRelevant: boolean) {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/calendars", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, planningRelevant }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Umschalten fehlgeschlagen");
@@ -235,6 +266,7 @@ export function SettingsCalendarsPanel() {
     setEditUrl(c.url);
     setEditType(c.type);
     setEditColor(c.color);
+    setEditPlanningRelevant(c.planningRelevant !== false);
     setStatus(null);
     setError(null);
   }
@@ -344,6 +376,24 @@ export function SettingsCalendarsPanel() {
                         />
                       </div>
                     </div>
+                    <label className="flex items-start gap-2 text-xs text-muted-foreground">
+                      <input
+                        type="checkbox"
+                        className="mt-0.5 size-4 rounded border"
+                        checked={editPlanningRelevant}
+                        disabled={busy}
+                        onChange={(e) =>
+                          setEditPlanningRelevant(e.target.checked)
+                        }
+                      />
+                      <span>
+                        Relevant für Terminplanung
+                        <span className="mt-0.5 block text-[11px] text-muted-foreground/90">
+                          Aus = nur Referenz (z.&nbsp;B. Partner-Dienstplan):
+                          anzeigen, aber nicht als nächster Termin / Konflikt
+                        </span>
+                      </span>
+                    </label>
                     <div className="flex flex-wrap gap-2">
                       <Button
                         type="button"
@@ -380,6 +430,11 @@ export function SettingsCalendarsPanel() {
                             Ausgeblendet
                           </Badge>
                         ) : null}
+                        {c.planningRelevant === false ? (
+                          <Badge variant="outline" className="text-[10px]">
+                            Nur Referenz
+                          </Badge>
+                        ) : null}
                       </div>
                       <p className="mt-1 truncate font-mono text-[11px] text-muted-foreground">
                         {c.url}
@@ -397,6 +452,18 @@ export function SettingsCalendarsPanel() {
                           }
                         />
                         Sichtbar
+                      </label>
+                      <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <input
+                          type="checkbox"
+                          className="size-4 rounded border"
+                          checked={c.planningRelevant !== false}
+                          disabled={busy}
+                          onChange={(e) =>
+                            void togglePlanningRelevant(c.id, e.target.checked)
+                          }
+                        />
+                        Planung
                       </label>
                       <Button
                         type="button"
@@ -511,6 +578,21 @@ export function SettingsCalendarsPanel() {
               />
             </div>
           </div>
+          <label className="flex items-start gap-2 text-xs text-muted-foreground">
+            <input
+              type="checkbox"
+              className="mt-0.5 size-4 rounded border"
+              checked={newPlanningRelevant}
+              disabled={busy}
+              onChange={(e) => setNewPlanningRelevant(e.target.checked)}
+            />
+            <span>
+              Relevant für Terminplanung
+              <span className="mt-0.5 block text-[11px] text-muted-foreground/90">
+                Aus = nur Referenz (anzeigen, ohne Fokus/Konflikte)
+              </span>
+            </span>
+          </label>
           <Button
             type="button"
             disabled={busy || !name.trim() || !url.trim()}
