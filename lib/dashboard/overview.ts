@@ -62,6 +62,8 @@ export type AgendaItem = {
   time?: string | null;
   /** Venue / place for weather enrichment */
   location?: string | null;
+  /** ICS/Google DESCRIPTION body when available */
+  description?: string | null;
   /** End time HH:mm when known */
   endTime?: string | null;
   /** Google Meet / Zoom / Teams */

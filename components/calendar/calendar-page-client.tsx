@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/layout/page-primitives";
 import { pageVisuals } from "@/components/layout/icon-circle";
 import { AgendaRow, weekdayLabel } from "@/components/calendar/agenda-row";
+import { AgendaEventDialog } from "@/components/calendar/agenda-event-dialog";
 import { cn } from "@/lib/utils";
 import { toSwissDate } from "@/lib/utils/dates";
 import type { AgendaItem } from "@/lib/dashboard/overview";
@@ -51,6 +52,7 @@ export function CalendarPageClient() {
   const [loading, setLoading] = useState(true);
   const [enriching, setEnriching] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [eventDetail, setEventDetail] = useState<AgendaItem | null>(null);
   const enrichGen = useRef(0);
 
   const enrichItems = useCallback(async (agendaItems: AgendaItem[]) => {
@@ -274,6 +276,7 @@ export function CalendarPageClient() {
                     key={item.id}
                     item={item}
                     variant={item.kind === "hockey" ? "upcoming" : "agenda"}
+                    onOpen={setEventDetail}
                   />
                 ))}
               </div>
@@ -281,6 +284,14 @@ export function CalendarPageClient() {
           ))}
         </div>
       )}
+
+      <AgendaEventDialog
+        item={eventDetail}
+        open={Boolean(eventDetail)}
+        onOpenChange={(open) => {
+          if (!open) setEventDetail(null);
+        }}
+      />
     </div>
   );
 }

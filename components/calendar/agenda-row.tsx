@@ -187,10 +187,11 @@ export function weekdayLabel(iso: string): string {
 }
 
 function WeatherChip({ weather }: { weather: AgendaWeatherChip }) {
+  const detail = weather.labelDe?.trim() || null;
   return (
     <div
       className="pointer-events-none absolute left-2 top-0 z-10 flex -translate-y-1/2 items-center gap-1.5 rounded-full border border-sky-200/90 bg-sky-50 py-0.5 pl-1.5 pr-2.5 shadow-sm ring-2 ring-white"
-      title={`${weather.labelDe} · ${weather.placeLabel}`}
+      title={detail || `${weather.temperatureC}°`}
     >
       <span className="flex items-center gap-1">
         <span className="text-sm leading-none" aria-hidden>
@@ -200,10 +201,14 @@ function WeatherChip({ weather }: { weather: AgendaWeatherChip }) {
           {weather.temperatureC}°
         </span>
       </span>
-      <span className="h-3 w-px shrink-0 bg-sky-200/90" aria-hidden />
-      <span className="max-w-[7rem] truncate text-[11px] font-medium text-sky-900/85">
-        {weather.placeLabel}
-      </span>
+      {detail ? (
+        <>
+          <span className="h-3 w-px shrink-0 bg-sky-200/90" aria-hidden />
+          <span className="max-w-[7rem] truncate text-[11px] font-medium text-sky-900/85">
+            {detail}
+          </span>
+        </>
+      ) : null}
     </div>
   );
 }
@@ -211,10 +216,13 @@ function WeatherChip({ weather }: { weather: AgendaWeatherChip }) {
 export function AgendaRow({
   item,
   variant = "agenda",
+  onOpen,
 }: {
   item: AgendaItem;
   /** upcoming: hockey shows date+time / location / Heim|Auswärts on three lines */
   variant?: "agenda" | "upcoming";
+  /** When set, click opens detail instead of navigating */
+  onOpen?: (item: AgendaItem) => void;
 }) {
   const isPaymentPipeline = item.badge === "Zahlung";
   const isHockey = item.kind === "hockey";
@@ -362,6 +370,17 @@ export function AgendaRow({
   const linkHref =
     item.href ||
     (item.documentId != null ? `/documents/${item.documentId}` : null);
+  if (onOpen) {
+    return (
+      <button
+        type="button"
+        className="block w-full cursor-pointer text-left"
+        onClick={() => onOpen(item)}
+      >
+        {inner}
+      </button>
+    );
+  }
   if (linkHref) {
     return (
       <Link href={linkHref} className="block">

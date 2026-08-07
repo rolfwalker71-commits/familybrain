@@ -24,6 +24,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BackupStatusPanel } from "@/components/settings/backup-status-panel";
 import { KpiCorrectSheet } from "@/components/dashboard/kpi-correct-sheet";
 import { TeamLogo, weekdayLabel, AgendaTypeRail } from "@/components/calendar/agenda-row";
+import { AgendaEventDialog } from "@/components/calendar/agenda-event-dialog";
 import { formatCHF } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
 import { APP_ICON_STROKE } from "@/lib/branding/app-icons";
@@ -355,10 +356,12 @@ function DayTimeline({
   items,
   activeId,
   today,
+  onSelect,
 }: {
   items: AgendaItem[];
   activeId: string | null;
   today: string;
+  onSelect: (item: AgendaItem) => void;
 }) {
   if (items.length === 0) {
     return (
@@ -437,11 +440,12 @@ function DayTimeline({
                     active && "bg-emerald-50/60"
                   )}
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <Link
-                      href={itemHref(item)}
-                      className="min-w-0 flex-1 hover:opacity-90"
-                    >
+                  <button
+                    type="button"
+                    className="flex w-full items-start justify-between gap-2 text-left hover:opacity-90"
+                    onClick={() => onSelect(item)}
+                  >
+                    <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold tracking-tight">
                         {item.title}
                       </p>
@@ -452,8 +456,10 @@ function DayTimeline({
                       ) : null}
                       {item.weather ? (
                         <p className="mt-1 text-[11px] text-muted-foreground">
-                          {item.weather.icon} {item.weather.temperatureC}° ·{" "}
-                          {item.weather.placeLabel}
+                          {item.weather.icon} {item.weather.temperatureC}°
+                          {item.weather.labelDe
+                            ? ` · ${item.weather.labelDe}`
+                            : ""}
                         </p>
                       ) : null}
                       {active && item.driveLabel ? (
@@ -462,12 +468,12 @@ function DayTimeline({
                           {item.driveLabel}
                         </p>
                       ) : null}
-                    </Link>
+                    </div>
                     <ChevronRight
                       className="mt-0.5 size-4 shrink-0 text-muted-foreground/70"
                       aria-hidden
                     />
-                  </div>
+                  </button>
 
                   {active && (item.meetUrl || item.mapsUrl || showMap) ? (
                     <div className="mt-2.5 space-y-2">
@@ -645,6 +651,7 @@ export function OverviewDashboard({
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [correctOpen, setCorrectOpen] = useState(false);
+  const [eventDetail, setEventDetail] = useState<AgendaItem | null>(null);
   const [fromCache, setFromCache] = useState(false);
   const dataRef = useRef<OverviewPayload | null>(null);
   dataRef.current = data;
@@ -968,6 +975,7 @@ export function OverviewDashboard({
                     items={timelineItems}
                     activeId={activeId}
                     today={today}
+                    onSelect={setEventDetail}
                   />
                 </CardContent>
               </Card>
@@ -1246,6 +1254,13 @@ export function OverviewDashboard({
         onOpenChange={setCorrectOpen}
         items={data?.financeItems || []}
         onSaved={() => void load({ fresh: true })}
+      />
+      <AgendaEventDialog
+        item={eventDetail}
+        open={Boolean(eventDetail)}
+        onOpenChange={(open) => {
+          if (!open) setEventDetail(null);
+        }}
       />
     </div>
   );

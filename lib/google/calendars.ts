@@ -58,6 +58,8 @@ export type GoogleCalendarEvent = {
   endAt: string | null;
   summary: string;
   location: string | null;
+  /** Event description / notes when present */
+  description: string | null;
   /** Google Meet / Zoom / Teams URL when present */
   meetUrl: string | null;
   isBirthday: boolean;
@@ -395,6 +397,7 @@ export async function listGoogleCalendarEventsInRange(
               endAt: ev.end?.dateTime || null,
               summary,
               location: ev.location?.trim() || null,
+              description: ev.description?.trim() || null,
               meetUrl,
               isBirthday,
             });
