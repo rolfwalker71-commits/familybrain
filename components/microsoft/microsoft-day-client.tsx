@@ -177,7 +177,7 @@ export function MicrosoftDayClient() {
   const [draftTasks, setDraftTasks] = useState<DayTask[]>([]);
   const [draftEvents, setDraftEvents] = useState<DayEventSug[]>([]);
   const [draftReplies, setDraftReplies] = useState<DayReply[]>([]);
-  const analyzeGen = useRef(0);
+  const pollRef = useRef<number | null>(null);
 
   const loadConnection = useCallback(async () => {
     try {
@@ -322,11 +322,123 @@ export function MicrosoftDayClient() {
     }
   }
 
+  const applyAnalysisPayload = useCallback((a: DayAnalysis, dayLabel: string) => {
+    setAnalysis({
+      daySummary: a.daySummary || "",
+      clusters: a.clusters || [],
+      tasks: a.tasks || [],
+      events: a.events || [],
+      replies: a.replies || [],
+    });
+    const next: PickState = { tasks: {}, events: {}, replies: {} };
+    (a.tasks || []).forEach((_, i) => {
+      next.tasks[i] = true;
+    });
+    (a.events || []).forEach((_, i) => {
+      next.events[i] = true;
+    });
+    (a.replies || []).forEach((_, i) => {
+      next.replies[i] = false;
+    });
+    setPicks(next);
+    setAnalyzeNotice(
+      `Analyse fertig (${toSwissDate(dayLabel)}): ${(a.clusters || []).length} Cluster, ${(a.tasks || []).length} Aufgabe(n).`
+    );
+    setTab("mail");
+  }, []);
+
+  const stopPoll = useCallback(() => {
+    if (pollRef.current != null) {
+      window.clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  }, []);
+
+  const hydrateFromJob = useCallback(
+    (job: {
+      status: string;
+      dayIso: string;
+      error?: string | null;
+      mail?: { inbox?: MsMail[]; sent?: MsMail[]; dayIso?: string } | null;
+      analysis?: DayAnalysis | null;
+    }) => {
+      if (job.mail) {
+        setInbox((job.mail.inbox || []) as MsMail[]);
+        setSent((job.mail.sent || []) as MsMail[]);
+        if (job.mail.dayIso || job.dayIso) {
+          setMailDay(job.mail.dayIso || job.dayIso);
+        }
+      }
+      if (job.status === "running") {
+        setAnalyzing(true);
+        setAnalyzeNotice(
+          `Analyse für ${toSwissDate(job.dayIso)} läuft im Hintergrund…`
+        );
+        return;
+      }
+      if (job.status === "done" && job.analysis) {
+        setAnalyzing(false);
+        applyAnalysisPayload(job.analysis, job.dayIso);
+        return;
+      }
+      if (job.status === "error") {
+        setAnalyzing(false);
+        setError(job.error || "Analyse fehlgeschlagen");
+        setAnalyzeNotice(null);
+      }
+    },
+    [applyAnalysisPayload]
+  );
+
+  const pollJobOnce = useCallback(async () => {
+    try {
+      const res = await fetch(
+        `/api/microsoft/mail/analyze?date=${encodeURIComponent(mailDay)}`
+      );
+      const json = await res.json();
+      if (!res.ok) return json.status as string | undefined;
+      if (json.job) hydrateFromJob(json.job);
+      if (json.status === "done" || json.status === "error" || json.status === "idle") {
+        stopPoll();
+        if (json.status !== "running") setAnalyzing(false);
+      }
+      return json.status as string;
+    } catch {
+      return undefined;
+    }
+  }, [hydrateFromJob, mailDay, stopPoll]);
+
+  const startPolling = useCallback(() => {
+    stopPoll();
+    void pollJobOnce();
+    pollRef.current = window.setInterval(() => {
+      void pollJobOnce();
+    }, 2500);
+  }, [pollJobOnce, stopPoll]);
+
+  useEffect(() => {
+    return () => stopPoll();
+  }, [stopPoll]);
+
+  useEffect(() => {
+    if (!connected) return;
+    void (async () => {
+      try {
+        const res = await fetch("/api/microsoft/mail/analyze");
+        const json = await res.json();
+        if (!res.ok || !json.job) return;
+        hydrateFromJob(json.job);
+        if (json.status === "running") startPolling();
+      } catch {
+        /* ignore */
+      }
+    })();
+  }, [connected, hydrateFromJob, startPolling]);
+
   function startAnalyze() {
-    const gen = ++analyzeGen.current;
-    setAnalyzing(true);
     setError(null);
     setStatus(null);
+    setAnalyzing(true);
     setAnalyzeNotice(
       `Analyse für ${toSwissDate(mailDay)} läuft im Hintergrund…`
     );
@@ -338,43 +450,13 @@ export function MicrosoftDayClient() {
           body: JSON.stringify({ date: mailDay }),
         });
         const json = await res.json();
-        if (gen !== analyzeGen.current) return;
-        if (!res.ok) throw new Error(json.error || "Analyse fehlgeschlagen");
-        if (json.mail) {
-          setInbox((json.mail.inbox || []) as MsMail[]);
-          setSent((json.mail.sent || []) as MsMail[]);
-          if (json.mail.dayIso) setMailDay(json.mail.dayIso);
-        }
-        const a = json.analysis as DayAnalysis;
-        setAnalysis({
-          daySummary: a.daySummary || "",
-          clusters: a.clusters || [],
-          tasks: a.tasks || [],
-          events: a.events || [],
-          replies: a.replies || [],
-        });
-        const next: PickState = { tasks: {}, events: {}, replies: {} };
-        (a.tasks || []).forEach((_, i) => {
-          next.tasks[i] = true;
-        });
-        (a.events || []).forEach((_, i) => {
-          next.events[i] = true;
-        });
-        (a.replies || []).forEach((_, i) => {
-          next.replies[i] = false;
-        });
-        setPicks(next);
-        setAnalyzeNotice(
-          `Analyse fertig (${toSwissDate(mailDay)}): ${(a.clusters || []).length} Cluster, ${(a.tasks || []).length} Aufgabe(n).`
-        );
-        setStatus(null);
-        setTab("mail");
+        if (!res.ok) throw new Error(json.error || "Analyse starten fehlgeschlagen");
+        if (json.job) hydrateFromJob(json.job);
+        startPolling();
       } catch (err) {
-        if (gen !== analyzeGen.current) return;
-        setError(err instanceof Error ? err.message : String(err));
+        setAnalyzing(false);
         setAnalyzeNotice(null);
-      } finally {
-        if (gen === analyzeGen.current) setAnalyzing(false);
+        setError(err instanceof Error ? err.message : String(err));
       }
     })();
   }
@@ -569,7 +651,16 @@ export function MicrosoftDayClient() {
               role="status"
             >
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <p>{analyzeNotice}</p>
+                <div>
+                  <p>{analyzeNotice}</p>
+                  {analyzing ? (
+                    <p className="mt-0.5 text-[11px] opacity-80">
+                      Läuft serverseitig — du kannst die Seite verlassen. Bei
+                      Rückkehr erscheinen die Resultate automatisch; zusätzlich
+                      kommt ein Toast wenn fertig.
+                    </p>
+                  ) : null}
+                </div>
                 {!analyzing ? (
                   <Button
                     type="button"
