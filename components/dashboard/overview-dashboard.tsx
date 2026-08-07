@@ -17,6 +17,7 @@ import {
   Car,
   CheckSquare,
   StickyNote,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -687,6 +688,35 @@ export function OverviewDashboard({
     }
   }, [period]);
 
+  const removeReferenceNote = useCallback(
+    async (id: number) => {
+      setData((prev) =>
+        prev
+          ? {
+              ...prev,
+              referenceNotes: (prev.referenceNotes || []).filter(
+                (n) => n.id !== id
+              ),
+            }
+          : prev
+      );
+      try {
+        const res = await fetch(`/api/reference-notes/${id}`, {
+          method: "DELETE",
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(json.error || "Löschen fehlgeschlagen");
+        }
+        void load({ fresh: true });
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+        void load({ fresh: true });
+      }
+    },
+    [load]
+  );
+
   useEffect(() => {
     void load();
   }, [load]);
@@ -1036,13 +1066,28 @@ export function OverviewDashboard({
                   <CardContent>
                     <ul className="space-y-2">
                       {data.referenceNotes.map((n) => (
-                        <li key={n.id} className="min-w-0 px-1">
-                          <p className="truncate text-sm font-medium">
-                            {n.title}
-                          </p>
-                          <p className="truncate font-mono text-[11px] text-muted-foreground">
-                            {n.reference || "—"}
-                          </p>
+                        <li
+                          key={n.id}
+                          className="flex min-w-0 items-start gap-2 px-1"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium">
+                              {n.title}
+                            </p>
+                            <p className="truncate font-mono text-[11px] text-muted-foreground">
+                              {n.reference || "—"}
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            className="size-7 shrink-0 p-0 text-muted-foreground hover:text-destructive"
+                            aria-label={`${n.title} entfernen`}
+                            onClick={() => void removeReferenceNote(n.id)}
+                          >
+                            <X className="size-3.5" aria-hidden />
+                          </Button>
                         </li>
                       ))}
                     </ul>

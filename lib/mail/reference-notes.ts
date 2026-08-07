@@ -136,3 +136,37 @@ export async function createReferenceNote(input: {
     createdAt,
   };
 }
+
+/** Remove from Buddy DB; best-effort delete of mirrored Trilium note. */
+export async function deleteReferenceNote(
+  userId: number,
+  noteId: number
+): Promise<boolean> {
+  const row = getDb()
+    .prepare(
+      `SELECT id, trilium_note_id FROM reference_notes WHERE id = ? AND user_id = ?`
+    )
+    .get(noteId, userId) as
+    | { id: number; trilium_note_id: string | null }
+    | undefined;
+  if (!row) return false;
+
+  if (row.trilium_note_id) {
+    const trilium = getTriliumClient();
+    if (trilium) {
+      try {
+        await trilium.client.deleteNote(row.trilium_note_id);
+      } catch (error) {
+        console.warn(
+          "[reference-notes] Trilium delete failed:",
+          error instanceof Error ? error.message : error
+        );
+      }
+    }
+  }
+
+  getDb()
+    .prepare(`DELETE FROM reference_notes WHERE id = ? AND user_id = ?`)
+    .run(noteId, userId);
+  return true;
+}

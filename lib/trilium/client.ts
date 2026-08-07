@@ -190,4 +190,11 @@ export class TriliumClient {
       title: created.note?.title || input.title,
     };
   }
+
+  /** Soft-delete / remove a note via ETAPI. */
+  async deleteNote(noteId: string): Promise<void> {
+    await this.request<unknown>(`/notes/${encodeURIComponent(noteId)}`, {
+      method: "DELETE",
+    });
+  }
 }
