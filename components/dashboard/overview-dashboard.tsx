@@ -107,48 +107,6 @@ function shortPlace(item: AgendaItem): string | null {
   return first.length > 28 ? `${first.slice(0, 26)}…` : first;
 }
 
-function minutesUntilStart(item: AgendaItem, today: string, nowHm: string): number | null {
-  if (!item.time || item.date !== today) return null;
-  const start = hmToMinutes(item.time);
-  const now = hmToMinutes(nowHm);
-  if (start == null || now == null) return null;
-  return start - now;
-}
-
-function formatCountdown(mins: number | null, ongoing: boolean): string | null {
-  if (ongoing) return "Jetzt";
-  if (mins == null) return null;
-  if (mins <= 0) return "Jetzt";
-  if (mins < 60) return `In ${mins} Min`;
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  return m === 0 ? `In ${h} Std` : `In ${h} Std ${m} Min`;
-}
-
-function buildNextStepLine(
-  items: AgendaItem[],
-  today: string,
-  nowHm: string
-): string | null {
-  const focus = pickFocusAgendaItem(items, today, nowHm);
-  if (!focus) return null;
-
-  const now = hmToMinutes(nowHm) ?? 0;
-  const w = eventWindowMinutes(focus);
-  const ongoing = Boolean(w && now >= w.start && now < w.end);
-  const countdown = formatCountdown(
-    minutesUntilStart(focus, today, nowHm),
-    ongoing
-  );
-  const place = shortPlace(focus);
-  const drive = focus.driveLabel || null;
-  const parts = [countdown, place, drive].filter(Boolean);
-  if (parts.length === 0) {
-    return [focus.time, focus.title].filter(Boolean).join(" · ") || null;
-  }
-  return parts.join(" · ");
-}
-
 function isBirthdayItem(item: AgendaItem): boolean {
   return (
     item.badge === "Geburtstag" ||
@@ -158,12 +116,37 @@ function isBirthdayItem(item: AgendaItem): boolean {
   );
 }
 
-/** Next upcoming today, else currently ongoing, else first later day — never a finished past slot. */
 function isPlanningRelevant(item: AgendaItem): boolean {
   return item.planningRelevant !== false;
 }
 
-function pickFocusAgendaItem(
+/**
+ * KPI «Nächster Termin»: nur heutige Termine, die noch nicht begonnen haben.
+ * Laufende Termine gehören in die Timeline, nicht in die Kachel.
+ */
+function pickNextUpcomingAgendaItem(
+  items: AgendaItem[],
+  today: string,
+  nowHm: string
+): AgendaItem | null {
+  const pool = items.filter(
+    (i) => isPlanningRelevant(i) && !isBirthdayItem(i)
+  );
+  if (!pool.length) return null;
+  const now = hmToMinutes(nowHm) ?? 0;
+
+  return (
+    pool
+      .filter((i) => i.date === today && i.time)
+      .find((i) => {
+        const w = eventWindowMinutes(i);
+        return w != null && w.start > now;
+      }) || null
+  );
+}
+
+/** Timeline-Highlight: laufender Termin, sonst nächster heute, sonst morgen. */
+function pickActiveTimelineItem(
   items: AgendaItem[],
   today: string,
   nowHm: string
@@ -182,17 +165,10 @@ function pickFocusAgendaItem(
     }) || null;
   if (ongoing) return ongoing;
 
-  const upcoming =
-    todayTimed.find((i) => {
-      const w = eventWindowMinutes(i);
-      return w && w.start > now;
-    }) || null;
-  if (upcoming) return upcoming;
+  const upcomingToday = pickNextUpcomingAgendaItem(items, today, nowHm);
+  if (upcomingToday) return upcomingToday;
 
-  const later = pool.find((i) => i.date > today);
-  if (later) return later;
-
-  return todayTimed[todayTimed.length - 1] || pool[0] || null;
+  return pool.find((i) => i.date > today) || null;
 }
 
 function collectUpcomingBirthdays(
@@ -231,11 +207,17 @@ function birthdayDayLabel(date: string, today: string): string {
 
 function findConflicts(
   items: AgendaItem[],
-  today: string
+  today: string,
+  nowHm: string
 ): Array<{ id: string; label: string }> {
   const timed = items.filter(
-    (i) => i.date === today && i.time && isPlanningRelevant(i)
+    (i) =>
+      i.date === today &&
+      i.time &&
+      isPlanningRelevant(i) &&
+      !isBirthdayItem(i)
   );
+  const now = hmToMinutes(nowHm) ?? 0;
   const out: Array<{ id: string; label: string }> = [];
   const seen = new Set<string>();
   for (let i = 0; i < timed.length; i += 1) {
@@ -246,15 +228,17 @@ function findConflicts(
       const b = timed[j]!;
       const wb = eventWindowMinutes(b);
       if (!wb) continue;
-      if (wa.start < wb.end && wb.start < wa.end) {
-        const key = [a.id, b.id].sort().join("|");
-        if (seen.has(key)) continue;
-        seen.add(key);
-        out.push({
-          id: key,
-          label: `${a.time} ${a.title} ↔ ${b.time} ${b.title}`,
-        });
-      }
+      if (!(wa.start < wb.end && wb.start < wa.end)) continue;
+      // Konflikt-Hinweis nur bis Ende der Überschneidung
+      const overlapEnd = Math.min(wa.end, wb.end);
+      if (now >= overlapEnd) continue;
+      const key = [a.id, b.id].sort().join("|");
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({
+        id: key,
+        label: `${a.time} ${a.title} ↔ ${b.time} ${b.title}`,
+      });
     }
   }
   return out;
@@ -1044,20 +1028,19 @@ export function OverviewDashboard({
   }, [data, today]);
 
   const nextFocusEvent = useMemo(
-    () => pickFocusAgendaItem(timelineItems, today, nowHm),
+    () => pickNextUpcomingAgendaItem(timelineItems, today, nowHm),
     [timelineItems, today, nowHm]
   );
 
-  const activeId = nextFocusEvent?.id ?? null;
-
-  const nextStepLine = useMemo(
-    () => buildNextStepLine(timelineItems, today, nowHm),
-    [timelineItems, today, nowHm]
-  );
+  const activeId =
+    useMemo(
+      () => pickActiveTimelineItem(timelineItems, today, nowHm)?.id ?? null,
+      [timelineItems, today, nowHm]
+    );
 
   const conflicts = useMemo(
-    () => findConflicts(timelineItems, today),
-    [timelineItems, today]
+    () => findConflicts(timelineItems, today, nowHm),
+    [timelineItems, today, nowHm]
   );
 
   const upcomingBirthdays = useMemo(
@@ -1238,20 +1221,6 @@ export function OverviewDashboard({
                   Alle Termine →
                 </Link>
               </div>
-              {nextStepLine ? (
-                <p className="flex items-start gap-2 text-[15px] text-foreground/90">
-                  <Clock3
-                    className="mt-0.5 size-4 shrink-0 text-emerald-700"
-                    strokeWidth={APP_ICON_STROKE}
-                    absoluteStrokeWidth
-                    aria-hidden
-                  />
-                  <span>
-                    <span className="font-medium">Nächster Schritt · </span>
-                    {nextStepLine}
-                  </span>
-                </p>
-              ) : null}
               {conflicts.length > 0 ? (
                 <div
                   className="flex items-start gap-2 rounded-xl border border-amber-200/80 bg-amber-50/70 px-3 py-2 text-[13px] text-amber-950"
@@ -1290,8 +1259,6 @@ export function OverviewDashboard({
               {data.homeWeather ? (
                 <HomeWeatherWidget weather={data.homeWeather} />
               ) : null}
-
-              <SystemStatusCard data={data} />
 
               <BirthdaysAsideCard items={upcomingBirthdays} today={today} />
 
@@ -1552,8 +1519,9 @@ export function OverviewDashboard({
             ) : null}
           </section>
 
-          <div className="pt-2">
+          <div className="grid gap-4 pt-2 md:grid-cols-2">
             <BackupStatusPanel />
+            <SystemStatusCard data={data} />
           </div>
         </>
       ) : null}
