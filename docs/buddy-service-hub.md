@@ -97,7 +97,7 @@ Nach Paperless-Import (und einmalige Migration aller bestehenden Docs):
 | A Quellen-Links | `buddy_source_links`, Write bei Paperless-Sync + Mail-Apply, Chips am Dokument |
 | B Drive-Spiegel | Ordner `BUDDY/{Jahr}/{Rubrik}/…`, Job `drive_mirror`, Status-Panel unter Konto (auch bei 100 %) |
 | C People | OAuth `contacts.readonly`; Geburtstage → Agenda (Lückenfüller); Home-Adresse Cache; Mail → `suggestedMember` |
-| D Tageskarte | Verdichtete Karte auf Übersicht (Aside nach Wetter): Termine, Triage-Chips, Referenzen |
+| D Zustand | Übersicht-Aside: Drive-Spiegel-Fortschritt (+ kurze Triage-Hinweise), keine doppelte Tageskarte |
 | E Travel + Push | Mail-kind `trip` → `adoptDraftsToTrip` + `trip_leg`-Link; Push `mail_triage` / `mail_calendar_patch` |
 
 **Wichtig:** Google unter Konto **neu verbinden** (Drive + Kontakte). Dann «Migration starten» — läuft in Batches weiter, bis `pending = 0`; der Fortschrittsbalken bleibt sichtbar.

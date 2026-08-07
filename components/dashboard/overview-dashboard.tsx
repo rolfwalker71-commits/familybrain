@@ -19,6 +19,7 @@ import {
   StickyNote,
   X,
   Sparkles,
+  HardDrive,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -311,106 +312,123 @@ function HomeWeatherWidget({ weather }: { weather: HomeWeatherCard }) {
   );
 }
 
-/** Verdichtete Tageskarte: Termine + offene Punkte, eine Karte. */
-function DayBriefCard({
+/** Zustand: Drive-Spiegel und kurze System-Hinweise (keine doppelten Listen). */
+function SystemStatusCard({
   data,
-  onSelectEvent,
 }: {
   data: OverviewPayload;
-  onSelectEvent?: (item: AgendaItem) => void;
 }) {
-  const events = data.todayCalendar.slice(0, 4);
-  const overdueTasks = data.tasks.items.filter((t) => t.overdue).length;
-  const openTasks = data.tasks.items.length;
+  const drive = data.driveMirror;
   const mailPending = data.chips.mailSuggestionsPending;
   const docTriage = data.chips.triagePending;
-  const notes = data.referenceNotes.slice(0, 2);
 
-  const chips: string[] = [];
-  if (mailPending > 0) chips.push(`${mailPending} Mail-Triage`);
-  if (docTriage > 0) chips.push(`${docTriage} Belege`);
-  if (overdueTasks > 0) chips.push(`${overdueTasks} überfällig`);
-  else if (openTasks > 0) chips.push(`${openTasks} Aufgaben`);
+  let driveLine = "Drive-Spiegel: Status unbekannt";
+  let driveTone: "ok" | "warn" | "muted" = "muted";
+  if (drive) {
+    if (!drive.connected) {
+      driveLine = "Google nicht verbunden";
+      driveTone = "warn";
+    } else if (!drive.hasDriveScope) {
+      driveLine = "Drive-Recht fehlt — unter Konto neu verbinden";
+      driveTone = "warn";
+    } else if (!drive.enabled) {
+      driveLine = "Drive-Spiegel aus";
+      driveTone = "muted";
+    } else if (drive.complete) {
+      driveLine = `Drive synchron · ${drive.mirrored}/${drive.totalDocuments}`;
+      driveTone = "ok";
+    } else {
+      driveLine = `Drive ${drive.percent}% · ${drive.pending} ausstehend`;
+      driveTone = "warn";
+    }
+  }
+
+  const extras: string[] = [];
+  if (mailPending > 0) extras.push(`${mailPending} Mail zur Triage`);
+  if (docTriage > 0) extras.push(`${docTriage} Belege offen`);
+  if (drive?.lastError) extras.push(`Drive-Fehler: ${drive.lastError}`);
 
   return (
     <Card className="border-border/70">
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2 text-[16px] font-black">
-          <Sparkles
+          <HardDrive
             className="size-4 text-muted-foreground"
             strokeWidth={APP_ICON_STROKE}
             absoluteStrokeWidth
             aria-hidden
           />
-          Tageskarte
+          Zustand
         </CardTitle>
-        {chips.length > 0 ? (
-          <p className="text-[12px] text-muted-foreground">
-            {chips.join(" · ")}
-          </p>
-        ) : (
-          <p className="text-[12px] text-muted-foreground">
-            Heute im Überblick
-          </p>
-        )}
       </CardHeader>
       <CardContent className="space-y-3">
-        {events.length === 0 ? (
-          <p className="text-[13px] text-muted-foreground">
-            Keine Termine in den nächsten Stunden.
-          </p>
+        {drive ? (
+          <div className="space-y-1.5">
+            <div className="flex items-baseline justify-between gap-2">
+              <p
+                className={cn(
+                  "text-[13px] font-semibold",
+                  driveTone === "warn" && "text-amber-900",
+                  driveTone === "ok" && "text-emerald-900",
+                  driveTone === "muted" && "text-muted-foreground"
+                )}
+              >
+                {driveLine}
+              </p>
+              <span className="tabular-nums text-[12px] text-muted-foreground">
+                {drive.percent}%
+              </span>
+            </div>
+            <div
+              className="h-2 overflow-hidden rounded-full bg-muted"
+              role="progressbar"
+              aria-valuenow={drive.percent}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label="Drive-Spiegel Fortschritt"
+            >
+              <div
+                className={cn(
+                  "h-full rounded-full transition-[width]",
+                  drive.complete
+                    ? "bg-emerald-600/80"
+                    : "bg-[var(--brand-docs)]"
+                )}
+                style={{ width: `${drive.percent}%` }}
+              />
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              {drive.mirrored}/{drive.totalDocuments} Dokumente
+              {drive.lastRunAt
+                ? ` · zuletzt ${new Date(drive.lastRunAt).toLocaleString("de-CH", {
+                    day: "2-digit",
+                    month: "2-digit",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}`
+                : " · noch kein Lauf"}
+            </p>
+          </div>
         ) : (
-          <ul className="space-y-1.5">
-            {events.map((ev) => (
-              <li key={ev.id}>
-                <button
-                  type="button"
-                  className="flex w-full items-start gap-2 rounded-lg px-1 py-0.5 text-left hover:bg-muted/40"
-                  onClick={() => onSelectEvent?.(ev)}
-                >
-                  <span className="w-10 shrink-0 text-[12px] font-medium tabular-nums text-muted-foreground">
-                    {ev.time || "–"}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[13px] font-semibold">
-                      {ev.title}
-                    </span>
-                    {ev.badge ? (
-                      <span className="text-[11px] text-muted-foreground">
-                        {ev.badge}
-                        {ev.location ? ` · ${ev.location}` : ""}
-                      </span>
-                    ) : null}
-                  </span>
-                </button>
+          <p className="text-[13px] text-muted-foreground">{driveLine}</p>
+        )}
+
+        {extras.length > 0 ? (
+          <ul className="space-y-1 border-t border-border/50 pt-2 text-[12px] text-muted-foreground">
+            {extras.map((line) => (
+              <li key={line} className="truncate">
+                {line}
               </li>
             ))}
           </ul>
-        )}
-        {notes.length > 0 ? (
-          <div className="border-t border-border/50 pt-2">
-            <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-              Referenzen
-            </p>
-            <ul className="space-y-1">
-              {notes.map((n) => (
-                <li
-                  key={n.id}
-                  className="truncate text-[12px] text-muted-foreground"
-                >
-                  {n.title}
-                  {n.reference ? ` · ${n.reference}` : ""}
-                </li>
-              ))}
-            </ul>
-          </div>
         ) : null}
+
         <div className="flex flex-wrap gap-x-3 gap-y-1 border-t border-border/50 pt-2 text-[12px]">
           <Link
-            href="/calendar"
+            href="/account"
             className="font-medium text-foreground underline-offset-2 hover:underline"
           >
-            Kalender
+            Konto · Drive
           </Link>
           {mailPending > 0 ? (
             <Link
@@ -419,14 +437,7 @@ function DayBriefCard({
             >
               Mail-Triage
             </Link>
-          ) : (
-            <Link
-              href="/mail"
-              className="text-muted-foreground underline-offset-2 hover:underline"
-            >
-              Mail
-            </Link>
-          )}
+          ) : null}
           {docTriage > 0 ? (
             <Link
               href="/inbox"
@@ -1169,10 +1180,7 @@ export function OverviewDashboard({
                 <HomeWeatherWidget weather={data.homeWeather} />
               ) : null}
 
-              <DayBriefCard
-                data={data}
-                onSelectEvent={(item) => setEventDetail(item)}
-              />
+              <SystemStatusCard data={data} />
 
               <Card className="border-border/70">
                 <CardHeader className="pb-2">

@@ -8,6 +8,8 @@ export type GoogleBirthdayEvent = {
   id: string;
   date: string;
   summary: string;
+  /** Birth year from contact, if known — for age display. */
+  birthYear?: number | null;
 };
 
 /**

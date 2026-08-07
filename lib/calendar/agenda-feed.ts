@@ -42,13 +42,13 @@ export const CALENDAR_SOURCE_HOLIDAYS = "swiss-holidays";
 export const CALENDAR_SOURCE_DEADLINES = "deadlines";
 export const CALENDAR_SOURCE_PEOPLE_BIRTHDAYS = "people-birthdays";
 
-function normalizeBirthdayName(raw: string): string {
-  return raw
-    .replace(/^Geburtstag\s*[·•\-–]\s*/i, "")
-    .trim()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/\p{M}/gu, "");
+function looksLikeBirthdayTitle(title: string): boolean {
+  const t = title.trim();
+  if (!t) return false;
+  if (/^Geburtstag\b/i.test(t)) return true;
+  if (/\bhat\s+Geburtstag\b/i.test(t)) return true;
+  if (/\bBirthday\b/i.test(t)) return true;
+  return false;
 }
 
 export type CalendarAgendaRange = "today" | "week" | "14d";
@@ -291,7 +291,12 @@ export async function getCalendarAgenda(options: {
       ]
     : [];
 
-  const [googleBundle, icsHockey, genericBatches, swissHolidays] =
+  const wantPeopleBirthdays =
+    options.userId != null &&
+    isGoogleMailConnected(options.userId) &&
+    sourceAllowed(CALENDAR_SOURCE_PEOPLE_BIRTHDAYS, filterIds);
+
+  const [googleBundle, icsHockey, genericBatches, swissHolidays, peopleBirthdays] =
     await Promise.all([
       googleReady
         ? listGoogleAgendaInRange(options.userId!, start, end).catch(() => ({
@@ -315,11 +320,46 @@ export async function getCalendarAgenda(options: {
       wantHolidays
         ? getSwissHolidays({ years: holidayYears }).catch(() => [])
         : Promise.resolve([] as Awaited<ReturnType<typeof getSwissHolidays>>),
+      (async () => {
+        if (!wantPeopleBirthdays || options.userId == null) return null;
+        try {
+          const { hasGoogleContactsScope } = await import("@/lib/google/oauth");
+          if (!hasGoogleContactsScope(options.userId)) return null;
+          const {
+            listPeopleBirthdaysInRange,
+            getCachedPeopleHomeAddress,
+            listPeopleHomeAddresses,
+          } = await import("@/lib/google/people");
+          const events = await listPeopleBirthdaysInRange(
+            options.userId,
+            start,
+            end
+          );
+          if (!getCachedPeopleHomeAddress()) {
+            void listPeopleHomeAddresses(options.userId).catch(() => undefined);
+          }
+          // Scope + successful call → Kontakte sind Quelle der Wahrheit für Geburtstage
+          return events;
+        } catch {
+          return null;
+        }
+      })(),
     ]);
+
+  /** Kontakte aktiv → Google-/Privat-Geburtstage ausblenden (keine Doppelung). */
+  const preferPeopleBirthdays = peopleBirthdays != null;
 
   for (const ev of googleBundle.events) {
     const sourceId = googleCalendarSourceId(ev.calendarId);
     if (!sourceAllowed(sourceId, filterIds)) continue;
+    if (
+      preferPeopleBirthdays &&
+      (ev.isBirthday ||
+        ev.type === "birthday" ||
+        looksLikeBirthdayTitle(ev.summary))
+    ) {
+      continue;
+    }
     items.push({
       id: `gcal-${ev.calendarId}-${ev.id}`,
       kind: "calendar",
@@ -394,8 +434,15 @@ export async function getCalendarAgenda(options: {
   }
 
   for (const { cal, events } of genericBatches) {
+    if (preferPeopleBirthdays && cal.type === "birthday") continue;
     for (const ev of events) {
       if (!inRange(ev.date, start, end)) continue;
+      if (
+        preferPeopleBirthdays &&
+        looksLikeBirthdayTitle(ev.summary)
+      ) {
+        continue;
+      }
       items.push({
         id: `ics-${cal.id}-${ev.uid}`,
         kind: "calendar",
@@ -454,54 +501,25 @@ export async function getCalendarAgenda(options: {
     }
   }
 
-  // People contacts birthdays — fill gaps not already on a Google birthday calendar.
-  if (
-    options.userId != null &&
-    isGoogleMailConnected(options.userId) &&
-    sourceAllowed(CALENDAR_SOURCE_PEOPLE_BIRTHDAYS, filterIds)
-  ) {
-    try {
-      const { hasGoogleContactsScope } = await import("@/lib/google/oauth");
-      if (hasGoogleContactsScope(options.userId)) {
-        const { listPeopleBirthdaysInRange, getCachedPeopleHomeAddress, listPeopleHomeAddresses } =
-          await import("@/lib/google/people");
-        const peopleBdays = await listPeopleBirthdaysInRange(
-          options.userId,
-          start,
-          end
-        );
-        const existingBirthdayKeys = new Set(
-          items
-            .filter((i) => i.badge === "Geburtstag" || i.calendarType === "birthday")
-            .map((i) => `${i.date}|${normalizeBirthdayName(i.title)}`)
-        );
-        for (const b of peopleBdays) {
-          const key = `${b.date}|${normalizeBirthdayName(b.summary)}`;
-          if (existingBirthdayKeys.has(key)) continue;
-          existingBirthdayKeys.add(key);
-          items.push({
-            id: `people-${b.id}`,
-            kind: "calendar",
-            date: b.date,
-            title: b.summary,
-            subtitle: "Kontakte",
-            amount: null,
-            currency: null,
-            documentId: null,
-            href: null,
-            badge: "Geburtstag",
-            accentColor: "#db2777",
-            calendarType: "birthday",
-            calendarId: CALENDAR_SOURCE_PEOPLE_BIRTHDAYS,
-            planningRelevant: true,
-          });
-        }
-        if (!getCachedPeopleHomeAddress()) {
-          void listPeopleHomeAddresses(options.userId).catch(() => undefined);
-        }
-      }
-    } catch {
-      /* contacts optional */
+  // People contacts birthdays — preferred over Google birthday calendar / «hat Geburtstag».
+  if (preferPeopleBirthdays && peopleBirthdays) {
+    for (const b of peopleBirthdays) {
+      items.push({
+        id: `people-${b.id}`,
+        kind: "calendar",
+        date: b.date,
+        title: b.summary,
+        subtitle: "Kontakte",
+        amount: null,
+        currency: null,
+        documentId: null,
+        href: null,
+        badge: "Geburtstag",
+        accentColor: "#db2777",
+        calendarType: "birthday",
+        calendarId: CALENDAR_SOURCE_PEOPLE_BIRTHDAYS,
+        planningRelevant: true,
+      });
     }
   }
 

@@ -14,6 +14,7 @@ import {
 import { weatherConditionIcon } from "@/lib/trips/weather";
 import { daysFromNow, toSwissDate } from "@/lib/utils/dates";
 import type { IcsCalendarType } from "@/lib/calendar/ics-types";
+import { getDriveMirrorStatus } from "@/lib/buddy/drive-mirror";
 
 export type OverviewPeriod = "week" | "month" | "quarter" | "half" | "year";
 
@@ -190,6 +191,19 @@ export type OverviewPayload = {
     reference: string | null;
     createdAt: string;
   }>;
+  /** Google Drive mirror progress (Paperless → BUDDY/…). */
+  driveMirror: {
+    enabled: boolean;
+    hasDriveScope: boolean;
+    connected: boolean;
+    mirrored: number;
+    pending: number;
+    totalDocuments: number;
+    percent: number;
+    complete: boolean;
+    lastRunAt: string | null;
+    lastError: string | null;
+  } | null;
 };
 
 function isoDate(d: Date): string {
@@ -802,5 +816,24 @@ export async function getDashboardOverview(
       items: [...tasksBundle.items],
     },
     referenceNotes: [...referenceNotes],
+    driveMirror: (() => {
+      try {
+        const st = getDriveMirrorStatus();
+        return {
+          enabled: st.enabled,
+          hasDriveScope: st.hasDriveScope,
+          connected: st.connected,
+          mirrored: st.mirrored,
+          pending: st.pending,
+          totalDocuments: st.totalDocuments,
+          percent: st.percent,
+          complete: st.complete,
+          lastRunAt: st.lastRunAt,
+          lastError: st.lastError,
+        };
+      } catch {
+        return null;
+      }
+    })(),
   };
 }

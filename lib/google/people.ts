@@ -75,6 +75,28 @@ function displayName(
   );
 }
 
+function ageOnOccurrence(
+  birthYear: number | null | undefined,
+  occurrenceIso: string
+): number | null {
+  if (birthYear == null || !Number.isFinite(birthYear)) return null;
+  const y = Number(occurrenceIso.slice(0, 4));
+  if (!Number.isFinite(y) || birthYear < 1900 || birthYear > y) return null;
+  const age = y - birthYear;
+  if (age < 0 || age > 130) return null;
+  return age;
+}
+
+function formatPeopleBirthdayTitle(
+  name: string,
+  occurrenceIso: string,
+  birthYear?: number | null
+): string {
+  const age = ageOnOccurrence(birthYear, occurrenceIso);
+  const base = `Geburtstag ${name}`.trim();
+  return age != null ? `${base} (${age})` : base;
+}
+
 /** Birthdays from Google Contacts (People API), mapped into a calendar year range. */
 export async function listPeopleBirthdaysInRange(
   userId: number,
@@ -106,13 +128,16 @@ export async function listPeopleBirthdaysInRange(
         for (const b of person.birthdays || []) {
           const d = b.date;
           if (!d?.month || !d?.day) continue;
+          const birthYear =
+            typeof d.year === "number" && d.year > 0 ? d.year : null;
           for (const year of years) {
             const iso = `${year}-${String(d.month).padStart(2, "0")}-${String(d.day).padStart(2, "0")}`;
             if (iso < start || iso > end) continue;
             out.push({
               id: `people-bday-${name}-${iso}`,
               date: iso,
-              summary: `Geburtstag · ${name}`,
+              summary: formatPeopleBirthdayTitle(name, iso, birthYear),
+              birthYear,
             });
           }
         }
@@ -126,7 +151,7 @@ export async function listPeopleBirthdaysInRange(
       "[people] birthdays:",
       error instanceof Error ? error.message : error
     );
-    return [];
+    throw error;
   }
 }
 
