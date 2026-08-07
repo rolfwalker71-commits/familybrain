@@ -3,13 +3,21 @@ import { Input as InputPrimitive } from "@base-ui/react/input"
 
 import { cn } from "@/lib/utils"
 
+type InputProps = React.ComponentProps<"input"> & {
+  onValueChange?: (value: string, eventDetails?: unknown) => void
+}
+
 function Input({
   className,
   type,
   autoComplete,
+  onChange,
+  onValueChange,
+  value,
+  defaultValue,
   ...props
-}: React.ComponentProps<"input">) {
-  const rawValue = props.value
+}: InputProps) {
+  const rawValue = value
   const isEmptyDateOrTime =
     (type === "date" || type === "time") &&
     (rawValue === undefined || rawValue === null || rawValue === "")
@@ -27,6 +35,20 @@ function Input({
         isEmptyDateOrTime && "font-normal text-muted-foreground",
         className
       )}
+      value={value as string | number | readonly string[] | undefined}
+      defaultValue={
+        defaultValue as string | number | readonly string[] | undefined
+      }
+      onValueChange={(next) => {
+        const str = String(next ?? "")
+        onValueChange?.(str)
+        if (onChange) {
+          onChange({
+            target: { value: str },
+            currentTarget: { value: str },
+          } as React.ChangeEvent<HTMLInputElement>)
+        }
+      }}
       {...props}
     />
   )

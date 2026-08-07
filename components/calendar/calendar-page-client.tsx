@@ -214,7 +214,7 @@ export function CalendarPageClient() {
       </p>
 
       {sources.length > 0 ? (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-1">
           {sources.map((s) => {
             const on = activeSelected?.has(s.id) ?? s.enabled;
             return (
@@ -223,20 +223,20 @@ export function CalendarPageClient() {
                 type="button"
                 onClick={() => toggleSource(s.id)}
                 className={cn(
-                  "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[15px] transition-colors",
+                  "inline-flex max-w-full items-center gap-1 rounded-full border px-1.5 py-0.5 text-[11px] leading-tight transition-colors",
                   on
-                    ? "border-border/80 bg-card shadow-sm"
+                    ? "border-border/70 bg-card"
                     : "border-transparent bg-muted/50 text-muted-foreground line-through opacity-70"
                 )}
               >
                 <span
-                  className="size-2.5 shrink-0 rounded-full"
+                  className="size-1.5 shrink-0 rounded-full"
                   style={{ backgroundColor: s.color }}
                   aria-hidden
                 />
-                {s.name}
+                <span className="truncate">{s.name}</span>
                 {!s.enabled && s.type !== "holiday" && s.type !== "deadline" ? (
-                  <span className="text-[11px] uppercase tracking-wide opacity-70">
+                  <span className="text-[9px] uppercase tracking-wide opacity-70">
                     aus
                   </span>
                 ) : null}
@@ -245,11 +245,11 @@ export function CalendarPageClient() {
           })}
         </div>
       ) : loading ? (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-1">
           {[0, 1, 2, 3].map((i) => (
             <div
               key={i}
-              className="h-8 w-24 animate-pulse rounded-full bg-muted"
+              className="h-5 w-16 animate-pulse rounded-full bg-muted"
             />
           ))}
         </div>

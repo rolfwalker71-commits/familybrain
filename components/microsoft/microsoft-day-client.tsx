@@ -365,19 +365,19 @@ export function MicrosoftDayClient() {
       if (job.mail) {
         setInbox((job.mail.inbox || []) as MsMail[]);
         setSent((job.mail.sent || []) as MsMail[]);
-        if (job.mail.dayIso || job.dayIso) {
-          setMailDay(job.mail.dayIso || job.dayIso);
-        }
       }
       if (job.status === "running") {
         setAnalyzing(true);
         setAnalyzeNotice(
           `Analyse für ${toSwissDate(job.dayIso)} läuft im Hintergrund…`
         );
+        // Analysedatum an laufenden Job anpassen, aber Picker bleibt bedienbar
+        if (job.dayIso) setMailDay(job.dayIso);
         return;
       }
       if (job.status === "done" && job.analysis) {
         setAnalyzing(false);
+        if (job.dayIso) setMailDay(job.dayIso);
         applyAnalysisPayload(job.analysis, job.dayIso);
         return;
       }
@@ -820,9 +820,16 @@ export function MicrosoftDayClient() {
                     <Input
                       id="ms-mail-day"
                       type="date"
-                      className="h-8 w-auto"
+                      className="h-8 w-auto min-w-[9.5rem]"
                       value={mailDay}
-                      onChange={(e) => setMailDay(e.target.value)}
+                      max={zurichYmdClient()}
+                      onValueChange={(v) => {
+                        if (/^\d{4}-\d{2}-\d{2}$/.test(v)) setMailDay(v);
+                      }}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        if (/^\d{4}-\d{2}-\d{2}$/.test(v)) setMailDay(v);
+                      }}
                     />
                     <Button
                       type="button"
