@@ -6,7 +6,7 @@ import {
 } from "@/lib/google/oauth";
 
 export type ThreadNoteAction = {
-  kind: "event" | "task" | "note" | "trip";
+  kind: "event" | "task" | "note" | "trip" | "finance";
   title: string;
   notes?: string | null;
   reference?: string | null;
@@ -104,6 +104,9 @@ function kindMeta(kind: ThreadNoteAction["kind"]): {
   }
   if (kind === "trip") {
     return { label: "Reise", icon: "✈️", color: BRAND.accent };
+  }
+  if (kind === "finance") {
+    return { label: "Finanzen", icon: "💳", color: BRAND.accent };
   }
   return { label: "Referenz", icon: "📌", color: BRAND.note };
 }

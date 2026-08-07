@@ -15,6 +15,8 @@ export type NotifyReason =
   | "document_triage"
   | "mail_triage"
   | "mail_calendar_patch"
+  | "day_briefing"
+  | "evening_digest"
   | "trip_comment"
   | "trip_event_updated"
   | "trip_event_ai_image"

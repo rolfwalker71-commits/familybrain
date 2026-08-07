@@ -99,5 +99,7 @@ Nach Paperless-Import (und einmalige Migration aller bestehenden Docs):
 | C People | OAuth `contacts.readonly`; Geburtstage → Agenda (Lückenfüller); Home-Adresse Cache; Mail → `suggestedMember` |
 | D Zustand | Übersicht-Aside: Drive-Spiegel-Fortschritt (+ kurze Triage-Hinweise), keine doppelte Tageskarte |
 | E Travel + Push | Mail-kind `trip` → `adoptDraftsToTrip` + `trip_leg`-Link; Push `mail_triage` / `mail_calendar_patch` |
+| Briefing | Context-Pulse + AI-Prose auf Übersicht; Push `day_briefing` / `evening_digest` |
+| Mail Hub | kind `finance` + Doc-Match; Member in Apply-Notes; Trip-Picker; Source-Links |
 
 **Wichtig:** Google unter Konto **neu verbinden** (Drive + Kontakte). Dann «Migration starten» — läuft in Batches weiter, bis `pending = 0`; der Fortschrittsbalken bleibt sichtbar.

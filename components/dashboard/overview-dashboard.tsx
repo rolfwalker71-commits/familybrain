@@ -1103,6 +1103,47 @@ export function OverviewDashboard({
         <p className="text-[15px] capitalize text-muted-foreground">
           {formatLongDeDate()}
         </p>
+        {data?.briefing ? (
+          <div className="space-y-1.5 pt-1">
+            <p className="text-[15px] font-medium leading-snug text-foreground/90">
+              {data.briefing.headline}
+            </p>
+            {data.briefing.prose ? (
+              <p className="max-w-2xl text-[14px] leading-relaxed text-muted-foreground">
+                {data.briefing.prose}
+              </p>
+            ) : data.briefing.detail ? (
+              <p className="max-w-2xl text-[14px] leading-relaxed text-muted-foreground">
+                {data.briefing.detail}
+              </p>
+            ) : null}
+            {data.briefing.mode === "evening" &&
+            (data.briefing.done.length > 0 || data.briefing.open.length > 0) ? (
+              <div className="grid max-w-2xl gap-3 pt-1 sm:grid-cols-2">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Erledigt
+                  </p>
+                  <ul className="mt-1 space-y-0.5 text-[13px] text-foreground/85">
+                    {data.briefing.done.map((line) => (
+                      <li key={`done-${line}`}>{line}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Offen
+                  </p>
+                  <ul className="mt-1 space-y-0.5 text-[13px] text-foreground/85">
+                    {data.briefing.open.map((line) => (
+                      <li key={`open-${line}`}>{line}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </header>
 
       {error ? (

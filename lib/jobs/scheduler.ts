@@ -75,6 +75,21 @@ async function tick(): Promise<void> {
       state.lastResult = `${state.lastResult}|mail:ai${mailSync.sync.analyzed}`;
     }
 
+    try {
+      const { findRolfAppUserId } = await import(
+        "@/lib/calendar/ics-calendars"
+      );
+      const { maybeDispatchBriefingPushes } = await import(
+        "@/lib/dashboard/briefing-push"
+      );
+      const pushed = await maybeDispatchBriefingPushes(findRolfAppUserId());
+      if (pushed.morning || pushed.evening) {
+        state.lastResult = `${state.lastResult}|briefing:${pushed.morning ? "am" : ""}${pushed.evening ? "pm" : ""}`;
+      }
+    } catch (error) {
+      console.warn("[scheduler] briefing push:", error);
+    }
+
     // Drive mirror: continue migration while pending (throttled by job lease)
     try {
       const { getDriveMirrorStatus, isDriveMirrorEnabled } = await import(

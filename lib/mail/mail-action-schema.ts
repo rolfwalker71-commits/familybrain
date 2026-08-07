@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const MailSuggestionSchema = z.object({
-  kind: z.enum(["event", "task", "note", "trip"]),
+  kind: z.enum(["event", "task", "note", "trip", "finance"]),
   title: z.string().min(1).max(200),
   notes: z.string().max(2000).nullable().optional(),
   reason: z.string().max(400).optional(),
@@ -33,6 +33,12 @@ export const MailSuggestionSchema = z.object({
   tripType: z.string().max(40).nullable().optional(),
   provider: z.string().max(120).nullable().optional(),
   bookingReference: z.string().max(120).nullable().optional(),
+  /** finance — invoice / mahnung */
+  amount: z.number().finite().nullable().optional(),
+  currency: z.string().max(8).nullable().optional(),
+  vendor: z.string().max(200).nullable().optional(),
+  /** Matched open Paperless document (Buddy local id). */
+  documentId: z.number().int().positive().nullable().optional(),
 });
 
 export const MailReplyDraftSchema = z.object({
@@ -60,10 +66,13 @@ export type MailReplyDraft = z.infer<typeof MailReplyDraftSchema>;
 
 export const MailActionsBodySchema = z.object({
   confirmDuplicates: z.boolean().optional(),
+  /** Family member from analysis — persisted into notes / doc recipients. */
+  memberId: z.number().int().positive().optional().nullable(),
+  memberDisplayName: z.string().max(120).optional().nullable(),
   actions: z
     .array(
       z.object({
-        kind: z.enum(["event", "task", "note", "trip"]),
+        kind: z.enum(["event", "task", "note", "trip", "finance"]),
         title: z.string().min(1).max(200),
         notes: z.string().max(2000).nullable().optional(),
         startDate: z.string().optional().nullable(),
@@ -82,6 +91,10 @@ export const MailActionsBodySchema = z.object({
         bookingReference: z.string().optional().nullable(),
         tripId: z.number().int().positive().optional().nullable(),
         newTripTitle: z.string().max(200).optional().nullable(),
+        amount: z.number().finite().optional().nullable(),
+        currency: z.string().max(8).optional().nullable(),
+        vendor: z.string().max(200).optional().nullable(),
+        documentId: z.number().int().positive().optional().nullable(),
       })
     )
     .min(1)

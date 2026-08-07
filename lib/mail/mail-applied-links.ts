@@ -5,7 +5,7 @@ export type MailAppliedLink = {
   userId: number;
   messageId: string;
   threadId: string | null;
-  kind: "event" | "task" | "note" | "trip";
+  kind: "event" | "task" | "note" | "trip" | "finance";
   title: string;
   googleEventId: string | null;
   calendarId: string | null;
@@ -60,7 +60,7 @@ export function insertMailAppliedLink(input: {
   userId: number;
   messageId: string;
   threadId?: string | null;
-  kind: "event" | "task" | "note" | "trip";
+  kind: "event" | "task" | "note" | "trip" | "finance";
   title: string;
   googleEventId?: string | null;
   calendarId?: string | null;
@@ -137,6 +137,22 @@ export function findMailAppliedLinkByReference(
     )
     .get(userId, ref) as Row | undefined;
   return row ? mapRow(row) : null;
+}
+
+/** Applied mail actions created today (Europe/Zurich date as YYYY-MM-DD). */
+export function countMailAppliedToday(
+  userId: number,
+  todayIso: string
+): number {
+  const day = todayIso.slice(0, 10);
+  const row = getDb()
+    .prepare(
+      `SELECT COUNT(*) as c FROM mail_applied_links
+       WHERE user_id = ?
+         AND substr(created_at, 1, 10) = ?`
+    )
+    .get(userId, day) as { c: number } | undefined;
+  return row?.c ?? 0;
 }
 
 export function findPatchableEventInThread(

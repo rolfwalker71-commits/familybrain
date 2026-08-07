@@ -16,6 +16,7 @@ import { weatherConditionIcon } from "@/lib/trips/weather";
 import { daysFromNow, toSwissDate } from "@/lib/utils/dates";
 import type { IcsCalendarType } from "@/lib/calendar/ics-types";
 import { getDriveMirrorStatus } from "@/lib/buddy/drive-mirror";
+import type { DayBriefingPayload } from "@/lib/dashboard/day-briefing";
 
 export type OverviewPeriod = "week" | "month" | "quarter" | "half" | "year";
 
@@ -207,6 +208,8 @@ export type OverviewPayload = {
     lastRunAt: string | null;
     lastError: string | null;
   } | null;
+  /** Context pulse + optional AI prose (Morgen / Tag / Abend). */
+  briefing: DayBriefingPayload | null;
 };
 
 function isoDate(d: Date): string {
@@ -791,7 +794,7 @@ export async function getDashboardOverview(
       }
     : null;
 
-  return {
+  const resultShell: OverviewPayload = {
     period,
     rangeStart: start,
     rangeEnd: end,
@@ -840,5 +843,44 @@ export async function getDashboardOverview(
         return null;
       }
     })(),
+    briefing: null,
   };
+
+  try {
+    const {
+      buildDayBriefingFacts,
+      buildDayBriefingPayload,
+      zurichNowParts,
+    } = await import("@/lib/dashboard/day-briefing");
+    const { countMailAppliedToday } = await import(
+      "@/lib/mail/mail-applied-links"
+    );
+    const zurich = zurichNowParts();
+    const drive = resultShell.driveMirror;
+    const facts = buildDayBriefingFacts({
+      todayIso: zurich.todayIso,
+      hour: zurich.hour,
+      nowHm: zurich.hm,
+      todayCalendar: resultShell.todayCalendar,
+      chips: resultShell.chips,
+      driveMirror: drive
+        ? { percent: drive.percent, pending: drive.pending }
+        : null,
+      upcomingBirthdays: resultShell.upcomingBirthdays,
+      mailAppliedToday:
+        calendarUserId != null
+          ? countMailAppliedToday(calendarUserId, zurich.todayIso)
+          : 0,
+      tasksOverdue: (resultShell.tasks.items || []).filter((t) => t.overdue)
+        .length,
+    });
+    resultShell.briefing = await buildDayBriefingPayload(facts, {
+      withAi: true,
+      aiTimeoutMs: 2200,
+    });
+  } catch {
+    resultShell.briefing = null;
+  }
+
+  return resultShell;
 }

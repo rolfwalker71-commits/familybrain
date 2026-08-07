@@ -22,6 +22,8 @@ import { createReferenceNote } from "@/lib/mail/reference-notes";
 import { collectApplyWarnings } from "@/lib/mail/apply-checks";
 import { insertMailAppliedLink } from "@/lib/mail/mail-applied-links";
 import { recordMailSenderApplied } from "@/lib/mail/mail-sender-prefs";
+import { notesWithMember, titleWithMember } from "@/lib/mail/member-notes";
+import { formatCHF } from "@/lib/utils/format";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -70,6 +72,13 @@ export async function POST(request: Request, context: Ctx) {
     mailFrom = stored?.fromName || "";
   }
 
+  const memberId =
+    body.memberId ?? stored?.analysis?.suggestedMember?.memberId ?? null;
+  const memberDisplayName =
+    body.memberDisplayName?.trim() ||
+    stored?.analysis?.suggestedMember?.displayName ||
+    null;
+
   if (!body.confirmDuplicates) {
     const warnings = await collectApplyWarnings(
       userId,
@@ -97,7 +106,7 @@ export async function POST(request: Request, context: Ctx) {
   }
 
   const created: Array<{
-    kind: "event" | "task" | "note" | "trip";
+    kind: "event" | "task" | "note" | "trip" | "finance";
     title: string;
     ok: boolean;
     error?: string;
@@ -116,18 +125,135 @@ export async function POST(request: Request, context: Ctx) {
   }> = [];
 
   for (const action of body.actions) {
-    const base = (action.notes || "").trim();
+    const base = notesWithMember(action.notes, memberDisplayName);
     const fromLine =
       mailFrom && !base.toLowerCase().includes(`von: ${mailFrom}`.toLowerCase())
         ? `Von: ${mailFrom}`
         : null;
     const notes = [base || null, fromLine].filter(Boolean).join("\n\n");
+    const actionTitle = titleWithMember(action.title, memberDisplayName);
+
+    if (action.kind === "finance") {
+      try {
+        const { upsertBuddySourceLink } = await import(
+          "@/lib/buddy/source-links"
+        );
+        let documentId = action.documentId ?? null;
+        if (documentId == null && (action.vendor || action.amount != null)) {
+          const { matchOpenInvoiceFromMail } = await import(
+            "@/lib/mail/match-finance"
+          );
+          const match = matchOpenInvoiceFromMail({
+            vendor: action.vendor,
+            amount: action.amount,
+            currency: action.currency,
+          });
+          if (match) documentId = match.documentId;
+        }
+
+        let link: string | null = null;
+        if (documentId != null) {
+          upsertBuddySourceLink({
+            entityType: "document",
+            entityId: String(documentId),
+            sourceKind: "gmail_message",
+            sourceId: id,
+            label: "Gmail",
+            role: "related",
+          });
+          upsertBuddySourceLink({
+            entityType: "mail_message",
+            entityId: id,
+            sourceKind: "url",
+            sourceId: `document:${documentId}`,
+            url: `/documents/${documentId}`,
+            label: "Beleg",
+            role: "related",
+          });
+          link = `/documents/${documentId}`;
+          if (memberId != null) {
+            const { updateDocumentRecipientsManual } = await import(
+              "@/lib/family/recipients"
+            );
+            updateDocumentRecipientsManual(documentId, [memberId]);
+          }
+        }
+
+        // Always create a payment reminder task when Tasks scope exists
+        let taskHref: string | null = null;
+        if (hasGoogleTasksScope(userId)) {
+          const amt =
+            action.amount != null
+              ? formatCHF(action.amount, action.currency || "CHF")
+              : null;
+          const taskTitle =
+            actionTitle ||
+            [action.vendor, amt, "bezahlt"].filter(Boolean).join(" · ") ||
+            "Zahlung vormerken";
+          const task = await createGoogleTask(
+            userId,
+            {
+              title: taskTitle.startsWith("Rechnung")
+                ? taskTitle
+                : `Zahlung: ${taskTitle}`,
+              notes: [
+                notes,
+                documentId ? `Buddy-Dokument: /documents/${documentId}` : null,
+              ]
+                .filter(Boolean)
+                .join("\n\n"),
+              dueDate: action.dueDate,
+              tasklistId: action.tasklistId,
+            },
+            request
+          );
+          taskHref = task.href;
+          insertMailAppliedLink({
+            userId,
+            messageId: id,
+            threadId,
+            kind: "task",
+            title: task.title,
+            taskId: task.id,
+            reference: action.reference,
+          });
+        }
+
+        insertMailAppliedLink({
+          userId,
+          messageId: id,
+          threadId,
+          kind: "finance",
+          title: actionTitle,
+          reference: action.reference || (documentId ? `doc:${documentId}` : null),
+          startDate: action.dueDate,
+        });
+
+        created.push({
+          kind: "finance",
+          title: actionTitle,
+          ok: true,
+          link: link || taskHref,
+          notes,
+          dueDate: action.dueDate,
+          reference: action.reference,
+        });
+      } catch (error) {
+        created.push({
+          kind: "finance",
+          title: action.title,
+          ok: false,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+      continue;
+    }
 
     if (action.kind === "note") {
       try {
         const note = await createReferenceNote({
           userId,
-          title: action.title,
+          title: actionTitle,
           body: notes,
           reference: action.reference,
           sourceMessageId: id,
@@ -139,6 +265,17 @@ export async function POST(request: Request, context: Ctx) {
           kind: "note",
           title: note.title,
           reference: action.reference,
+        });
+        const { upsertBuddySourceLink } = await import(
+          "@/lib/buddy/source-links"
+        );
+        upsertBuddySourceLink({
+          entityType: "mail_message",
+          entityId: id,
+          sourceKind: "gmail_message",
+          sourceId: id,
+          label: "Gmail",
+          role: "related",
         });
         created.push({
           kind: "note",
@@ -184,7 +321,7 @@ export async function POST(request: Request, context: Ctx) {
           drafts: [
             {
               type: coerceTripEventType(action.tripType),
-              title: action.title.trim(),
+              title: actionTitle,
               start_date: action.startDate,
               end_date: action.endDate || action.startDate,
               start_time: action.startTime || null,
@@ -204,7 +341,7 @@ export async function POST(request: Request, context: Ctx) {
           messageId: id,
           threadId,
           kind: "trip",
-          title: action.title,
+          title: actionTitle,
           reference: action.bookingReference || action.reference,
           startDate: action.startDate,
           startTime: action.startTime,
@@ -235,7 +372,7 @@ export async function POST(request: Request, context: Ctx) {
         });
         created.push({
           kind: "trip",
-          title: action.title,
+          title: actionTitle,
           ok: true,
           link: `/trips/${result.trip.id}`,
           notes,
@@ -285,7 +422,7 @@ export async function POST(request: Request, context: Ctx) {
               {
                 eventId: patchId,
                 calendarId: action.calendarId,
-                title: action.title,
+                title: actionTitle,
                 description: notes,
                 location: action.location,
                 startDate: action.startDate,
@@ -300,7 +437,7 @@ export async function POST(request: Request, context: Ctx) {
               userId,
               {
                 calendarId: action.calendarId,
-                title: action.title,
+                title: actionTitle,
                 description: notes,
                 location: action.location,
                 startDate: action.startDate,
@@ -383,7 +520,7 @@ export async function POST(request: Request, context: Ctx) {
       const task = await createGoogleTask(
         userId,
         {
-          title: action.title,
+          title: actionTitle,
           notes,
           dueDate: action.dueDate,
           tasklistId: action.tasklistId,
@@ -398,6 +535,18 @@ export async function POST(request: Request, context: Ctx) {
         title: task.title,
         taskId: task.id,
         reference: action.reference,
+      });
+      const { upsertBuddySourceLink } = await import(
+        "@/lib/buddy/source-links"
+      );
+      upsertBuddySourceLink({
+        entityType: "mail_message",
+        entityId: id,
+        sourceKind: "google_task",
+        sourceId: task.id,
+        url: task.href,
+        label: "Task",
+        role: "related",
       });
       created.push({
         kind: "task",
@@ -441,6 +590,7 @@ export async function POST(request: Request, context: Ctx) {
       const { notifyAppChange } = await import("@/lib/realtime/notify");
       const patched = created.some((c) => c.ok && c.patched);
       const tripOk = created.find((c) => c.ok && c.kind === "trip");
+      const financeOk = created.find((c) => c.ok && c.kind === "finance");
       if (patched) {
         notifyAppChange({
           domain: "documents",
@@ -470,6 +620,19 @@ export async function POST(request: Request, context: Ctx) {
           category: "mail",
           meta: mailFrom || null,
           tripId: tripOk.tripId ?? null,
+        });
+      } else if (financeOk) {
+        notifyAppChange({
+          domain: "finance",
+          reason: "buddy_status",
+          headline: "Zahlung aus Mail verknüpft",
+          detail: financeOk.title,
+          title: financeOk.title,
+          href: financeOk.link || "/finance",
+          source: "buddy",
+          aiIconUrl: null,
+          category: "mail",
+          meta: memberDisplayName || mailFrom || null,
         });
       }
     } catch {

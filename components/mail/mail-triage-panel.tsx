@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CalendarDays, CheckSquare, Plane, StickyNote, X } from "lucide-react";
+import { CalendarDays, CheckSquare, Plane, StickyNote, Wallet, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import type { MailSuggestion } from "@/lib/mail/mail-action-schema";
@@ -10,6 +10,7 @@ import { formatMailSuggestionDetail } from "@/lib/mail/format-suggestion";
 
 type CalOption = { id: string; name: string; primary: boolean };
 type TaskListOption = { id: string; title: string };
+type TripOption = { id: number; title: string; start_date: string | null };
 
 export function MailTriagePanel({
   onChanged,
@@ -33,6 +34,10 @@ export function MailTriagePanel({
   const [titleDraft, setTitleDraft] = useState<
     Record<string, Record<number, string>>
   >({});
+  const [trips, setTrips] = useState<TripOption[]>([]);
+  const [tripPick, setTripPick] = useState<
+    Record<string, Record<number, string>>
+  >({});
   const [busyId, setBusyId] = useState<string | null>(null);
   const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
   const [pendingWarnings, setPendingWarnings] = useState<{
@@ -43,12 +48,14 @@ export function MailTriagePanel({
   const loadTargets = useCallback(async () => {
     setTargetsError(null);
     try {
-      const [calRes, taskRes] = await Promise.all([
+      const [calRes, taskRes, tripRes] = await Promise.all([
         fetch("/api/google/calendars"),
         fetch("/api/google/tasks"),
+        fetch("/api/trips?sortDir=desc"),
       ]);
       const calJson = await calRes.json();
       const taskJson = await taskRes.json();
+      const tripJson = await tripRes.json().catch(() => ({}));
       if (!calRes.ok && calJson.error) {
         setTargetsError(String(calJson.error));
       }
@@ -88,6 +95,18 @@ export function MailTriagePanel({
       const lists = (taskJson.lists || []) as TaskListOption[];
       setTasklists(lists);
       if (lists[0]) setTasklistId((p) => p || lists[0]!.id);
+
+      const tripList = (tripJson.trips || []) as TripOption[];
+      setTrips(
+        tripList
+          .filter((t) => t.id && t.title)
+          .slice(0, 40)
+          .map((t) => ({
+            id: t.id,
+            title: t.title,
+            start_date: t.start_date ?? null,
+          }))
+      );
     } catch (err) {
       setTargetsError(
         err instanceof Error ? err.message : "Kalender/Tasks laden fehlgeschlagen"
@@ -108,22 +127,27 @@ export function MailTriagePanel({
       const next: Record<string, Record<number, boolean>> = {};
       const drafts: Record<string, Record<number, string>> = {};
       const titles: Record<string, Record<number, string>> = {};
+      const tripsSel: Record<string, Record<number, string>> = {};
       for (const row of list) {
         const map: Record<number, boolean> = {};
         const noteMap: Record<number, string> = {};
         const titleMap: Record<number, string> = {};
+        const tripMap: Record<number, string> = {};
         (row.analysis?.suggestions || []).forEach((s, i) => {
           map[i] = true;
           noteMap[i] = s.notes?.trim() || "";
           titleMap[i] = s.title;
+          if (s.kind === "trip") tripMap[i] = "new";
         });
         next[row.messageId] = map;
         drafts[row.messageId] = noteMap;
         titles[row.messageId] = titleMap;
+        tripsSel[row.messageId] = tripMap;
       }
       setSelected(next);
       setNotesDraft(drafts);
       setTitleDraft(titles);
+      setTripPick(tripsSel);
       const replies: Record<string, string> = {};
       for (const row of list) {
         if (row.analysis?.replyDraft?.body) {
@@ -163,10 +187,12 @@ export function MailTriagePanel({
       const suggestions = row.analysis?.suggestions || [];
       for (let i = 0; i < suggestions.length; i += 1) {
         if (
-          suggestions[i]?.kind === "task" &&
-          selected[row.messageId]?.[i]
+          suggestions[i]?.kind === "task" ||
+          suggestions[i]?.kind === "finance"
         ) {
-          return true;
+          if (selected[row.messageId]?.[i]) {
+            return true;
+          }
         }
       }
     }
@@ -208,33 +234,49 @@ export function MailTriagePanel({
     setBusyId(row.messageId);
     setError(null);
     try {
-      const actions = picks.map(({ s, i }) => ({
-        kind: s.kind,
-        title:
-          (titleDraft[row.messageId]?.[i] ?? s.title).trim() || s.title,
-        notes:
-          notesDraft[row.messageId]?.[i] ??
-          s.notes ??
-          null,
-        startDate: s.startDate ?? null,
-        startTime: s.startTime ?? null,
-        endDate: s.endDate ?? null,
-        endTime: s.endTime ?? null,
-        allDay: s.allDay ?? !s.startTime,
-        location: s.location ?? null,
-        dueDate: s.dueDate ?? null,
-        reference: s.reference ?? null,
-        calendarId:
-          s.kind === "event"
-            ? s.calendarId || calendarId || null
-            : null,
-        tasklistId: s.kind === "task" ? tasklistId || null : null,
-        patchEventId: s.patchEventId ?? null,
-        tripType: s.tripType ?? null,
-        provider: s.provider ?? null,
-        bookingReference: s.bookingReference ?? null,
-        newTripTitle: s.kind === "trip" ? s.title : null,
-      }));
+      const actions = picks.map(({ s, i }) => {
+        const tripSel = tripPick[row.messageId]?.[i] || "new";
+        const tripId =
+          s.kind === "trip" && tripSel !== "new" ? Number(tripSel) : null;
+        return {
+          kind: s.kind,
+          title:
+            (titleDraft[row.messageId]?.[i] ?? s.title).trim() || s.title,
+          notes:
+            notesDraft[row.messageId]?.[i] ??
+            s.notes ??
+            null,
+          startDate: s.startDate ?? null,
+          startTime: s.startTime ?? null,
+          endDate: s.endDate ?? null,
+          endTime: s.endTime ?? null,
+          allDay: s.allDay ?? !s.startTime,
+          location: s.location ?? null,
+          dueDate: s.dueDate ?? null,
+          reference: s.reference ?? null,
+          calendarId:
+            s.kind === "event"
+              ? s.calendarId || calendarId || null
+              : null,
+          tasklistId:
+            s.kind === "task" || s.kind === "finance"
+              ? tasklistId || null
+              : null,
+          patchEventId: s.patchEventId ?? null,
+          tripType: s.tripType ?? null,
+          provider: s.provider ?? null,
+          bookingReference: s.bookingReference ?? null,
+          tripId: Number.isFinite(tripId) && tripId! > 0 ? tripId : null,
+          newTripTitle:
+            s.kind === "trip" && (!tripId || tripSel === "new")
+              ? titleDraft[row.messageId]?.[i] ?? s.title
+              : null,
+          amount: s.amount ?? null,
+          currency: s.currency ?? null,
+          vendor: s.vendor ?? null,
+          documentId: s.documentId ?? null,
+        };
+      });
       const res = await fetch(
         `/api/mail/${encodeURIComponent(row.messageId)}/actions`,
         {
@@ -243,6 +285,9 @@ export function MailTriagePanel({
           body: JSON.stringify({
             actions,
             confirmDuplicates: opts?.confirmDuplicates === true,
+            memberId: row.analysis?.suggestedMember?.memberId ?? null,
+            memberDisplayName:
+              row.analysis?.suggestedMember?.displayName ?? null,
           }),
         }
       );
@@ -456,6 +501,11 @@ export function MailTriagePanel({
                                 className="mt-1.5 size-3.5 text-violet-700"
                                 aria-hidden
                               />
+                            ) : s.kind === "finance" ? (
+                              <Wallet
+                                className="mt-1.5 size-3.5 text-rose-700"
+                                aria-hidden
+                              />
                             ) : (
                               <CheckSquare
                                 className="mt-1.5 size-3.5 text-sky-700"
@@ -513,6 +563,41 @@ export function MailTriagePanel({
                               placeholder="Beschreibung für Kalender / Aufgabe / Reise / Notiz"
                             />
                           </label>
+                          {s.kind === "trip" ? (
+                            <label className="block space-y-0.5">
+                              <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                                Reise zuordnen
+                              </span>
+                              <select
+                                className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs"
+                                value={tripPick[row.messageId]?.[i] || "new"}
+                                disabled={busy}
+                                onChange={(e) =>
+                                  setTripPick((prev) => ({
+                                    ...prev,
+                                    [row.messageId]: {
+                                      ...prev[row.messageId],
+                                      [i]: e.target.value,
+                                    },
+                                  }))
+                                }
+                              >
+                                <option value="new">Neue Reise anlegen</option>
+                                {trips.map((t) => (
+                                  <option key={t.id} value={String(t.id)}>
+                                    {t.title}
+                                    {t.start_date ? ` · ${t.start_date}` : ""}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                          ) : null}
+                          {s.kind === "finance" && s.documentId ? (
+                            <p className="text-[11px] text-rose-800/90">
+                              Verknüpft mit offener Rechnung · Doc #
+                              {s.documentId}
+                            </p>
+                          ) : null}
                         </div>
                       </li>
                     ))}

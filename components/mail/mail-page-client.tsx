@@ -12,6 +12,7 @@ import {
   CheckSquare,
   StickyNote,
   Plane,
+  Wallet,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -51,6 +52,7 @@ type EnrichedMail = MailListItem & {
 
 type CalOption = { id: string; name: string; primary: boolean };
 type TaskListOption = { id: string; title: string };
+type TripOption = { id: number; title: string; start_date: string | null };
 
 function formatMailWhen(item: MailListItem): string {
   if (item.internalDate) {
@@ -122,6 +124,8 @@ export function MailPageClient() {
   const [calendars, setCalendars] = useState<CalOption[]>([]);
   const [tasklistId, setTasklistId] = useState("");
   const [tasklists, setTasklists] = useState<TaskListOption[]>([]);
+  const [trips, setTrips] = useState<TripOption[]>([]);
+  const [tripPick, setTripPick] = useState<Record<string, string>>({});
   const [applying, setApplying] = useState(false);
   const [applyMsg, setApplyMsg] = useState<string | null>(null);
 
@@ -202,12 +206,14 @@ export function MailPageClient() {
 
   async function loadTargets() {
     try {
-      const [calRes, taskRes] = await Promise.all([
+      const [calRes, taskRes, tripRes] = await Promise.all([
         fetch("/api/google/calendars"),
         fetch("/api/google/tasks"),
+        fetch("/api/trips?sortDir=desc"),
       ]);
       const calJson = await calRes.json();
       const taskJson = await taskRes.json();
+      const tripJson = await tripRes.json().catch(() => ({}));
       const cals = (calJson.calendars || []) as Array<{
         id: string;
         name: string;
@@ -231,6 +237,18 @@ export function MailPageClient() {
       const lists = (taskJson.lists || []) as TaskListOption[];
       setTasklists(lists);
       if (lists[0]) setTasklistId((prev) => prev || lists[0]!.id);
+
+      const tripList = (tripJson.trips || []) as TripOption[];
+      setTrips(
+        tripList
+          .filter((t) => t.id && t.title)
+          .slice(0, 40)
+          .map((t) => ({
+            id: t.id,
+            title: t.title,
+            start_date: t.start_date ?? null,
+          }))
+      );
     } catch {
       /* optional */
     }
@@ -254,15 +272,18 @@ export function MailPageClient() {
       const next: Record<string, boolean> = {};
       const drafts: Record<string, string> = {};
       const titles: Record<string, string> = {};
+      const tripsSel: Record<string, string> = {};
       a.suggestions.forEach((s, i) => {
         const key = suggestionKey(s, i);
         next[key] = true;
         drafts[key] = s.notes?.trim() || "";
         titles[key] = s.title;
+        if (s.kind === "trip") tripsSel[key] = "new";
       });
       setSelected(next);
       setNotesDraft(drafts);
       setTitleDraft(titles);
+      setTripPick(tripsSel);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -283,27 +304,44 @@ export function MailPageClient() {
     setApplying(true);
     setApplyMsg(null);
     try {
-      const actions = selectedSuggestions.map(({ s, i }) => ({
-        kind: s.kind,
-        title: (titleDraft[suggestionKey(s, i)] ?? s.title).trim() || s.title,
-        notes: notesDraft[suggestionKey(s, i)] ?? s.notes ?? null,
-        startDate: s.startDate ?? null,
-        startTime: s.startTime ?? null,
-        endDate: s.endDate ?? null,
-        endTime: s.endTime ?? null,
-        allDay: s.allDay ?? !s.startTime,
-        location: s.location ?? null,
-        dueDate: s.dueDate ?? null,
-        reference: s.reference ?? null,
-        calendarId:
-          s.kind === "event" ? s.calendarId || calendarId || null : null,
-        tasklistId: s.kind === "task" ? tasklistId || null : null,
-        patchEventId: s.patchEventId ?? null,
-        tripType: s.tripType ?? null,
-        provider: s.provider ?? null,
-        bookingReference: s.bookingReference ?? null,
-        newTripTitle: s.kind === "trip" ? s.title : null,
-      }));
+      const actions = selectedSuggestions.map(({ s, i }) => {
+        const key = suggestionKey(s, i);
+        const tripSel = tripPick[key] || "new";
+        const tripId =
+          s.kind === "trip" && tripSel !== "new" ? Number(tripSel) : null;
+        return {
+          kind: s.kind,
+          title: (titleDraft[key] ?? s.title).trim() || s.title,
+          notes: notesDraft[key] ?? s.notes ?? null,
+          startDate: s.startDate ?? null,
+          startTime: s.startTime ?? null,
+          endDate: s.endDate ?? null,
+          endTime: s.endTime ?? null,
+          allDay: s.allDay ?? !s.startTime,
+          location: s.location ?? null,
+          dueDate: s.dueDate ?? null,
+          reference: s.reference ?? null,
+          calendarId:
+            s.kind === "event" ? s.calendarId || calendarId || null : null,
+          tasklistId:
+            s.kind === "task" || s.kind === "finance"
+              ? tasklistId || null
+              : null,
+          patchEventId: s.patchEventId ?? null,
+          tripType: s.tripType ?? null,
+          provider: s.provider ?? null,
+          bookingReference: s.bookingReference ?? null,
+          tripId: Number.isFinite(tripId) && tripId! > 0 ? tripId : null,
+          newTripTitle:
+            s.kind === "trip" && (!tripId || tripSel === "new")
+              ? (titleDraft[key] ?? s.title)
+              : null,
+          amount: s.amount ?? null,
+          currency: s.currency ?? null,
+          vendor: s.vendor ?? null,
+          documentId: s.documentId ?? null,
+        };
+      });
       const res = await fetch(
         `/api/mail/${encodeURIComponent(openId)}/actions`,
         {
@@ -312,6 +350,9 @@ export function MailPageClient() {
           body: JSON.stringify({
             actions,
             confirmDuplicates: opts?.confirmDuplicates === true,
+            memberId: analysis?.suggestedMember?.memberId ?? null,
+            memberDisplayName:
+              analysis?.suggestedMember?.displayName ?? null,
           }),
         }
       );
@@ -337,6 +378,9 @@ export function MailPageClient() {
             body: JSON.stringify({
               actions,
               confirmDuplicates: true,
+              memberId: analysis?.suggestedMember?.memberId ?? null,
+              memberDisplayName:
+                analysis?.suggestedMember?.displayName ?? null,
             }),
           }
         );
@@ -706,6 +750,11 @@ export function MailPageClient() {
                                         className="mt-1.5 size-3.5 shrink-0 text-violet-700"
                                         aria-hidden
                                       />
+                                    ) : s.kind === "finance" ? (
+                                      <Wallet
+                                        className="mt-1.5 size-3.5 shrink-0 text-rose-700"
+                                        aria-hidden
+                                      />
                                     ) : (
                                       <CheckSquare
                                         className="mt-1.5 size-3.5 shrink-0 text-sky-700"
@@ -751,6 +800,42 @@ export function MailPageClient() {
                                       placeholder="Beschreibung für Kalender / Aufgabe / Reise / Notiz"
                                     />
                                   </label>
+                                  {s.kind === "trip" ? (
+                                    <label className="block space-y-0.5">
+                                      <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                                        Reise zuordnen
+                                      </span>
+                                      <select
+                                        className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs"
+                                        value={tripPick[key] || "new"}
+                                        disabled={applying}
+                                        onChange={(e) =>
+                                          setTripPick((prev) => ({
+                                            ...prev,
+                                            [key]: e.target.value,
+                                          }))
+                                        }
+                                      >
+                                        <option value="new">
+                                          Neue Reise anlegen
+                                        </option>
+                                        {trips.map((t) => (
+                                          <option key={t.id} value={String(t.id)}>
+                                            {t.title}
+                                            {t.start_date
+                                              ? ` · ${t.start_date}`
+                                              : ""}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </label>
+                                  ) : null}
+                                  {s.kind === "finance" && s.documentId ? (
+                                    <p className="text-[11px] text-rose-800/90">
+                                      Verknüpft mit offener Rechnung · Doc #
+                                      {s.documentId}
+                                    </p>
+                                  ) : null}
                                 </div>
                               </li>
                             );
@@ -781,7 +866,9 @@ export function MailPageClient() {
                           </label>
                         ) : null}
 
-                        {selectedSuggestions.some(({ s }) => s.kind === "task") ? (
+                        {selectedSuggestions.some(
+                          ({ s }) => s.kind === "task" || s.kind === "finance"
+                        ) ? (
                           <label className="block space-y-1 text-xs">
                             <span className="font-medium text-muted-foreground">
                               Taskliste

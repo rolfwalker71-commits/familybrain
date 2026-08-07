@@ -57,6 +57,7 @@ WICHTIG:
 - kind "task": dueDate wenn Frist/Tag bekannt, sonst null.
 - kind "note": «reference» = Tracking/Code, «notes» = kontextuelle Beschreibung wie oben.
 - kind "trip": nur bei klarer Reise (Flug, Hotel, Zug, Mietwagen). tripType eines von Flug|Zugreisen|Hotel|Mietauto|Transfer|Ausflug. startDate Pflicht. bookingReference/provider wenn erkennbar. Kein paralleles Kalender-event für dieselbe Reise — trip reicht.
+- kind "finance": bei Rechnung, Mahnung, Zahlungsaufforderung (auch ohne PDF). title z.B. «Rechnung Swisscom». amount/currency/vendor/dueDate wenn erkennbar. Kein paralleles event nur wegen Fälligkeit — finance reicht; optional zusätzlich task wenn Mahnung.
 - replyDraft: nur wenn eine kurze Antwort an den Absender sinnvoll ist (Termin zusagen, Lieferadresse bestätigen, Rückfrage). Sonst weglassen oder null. body auf Deutsch, höflich und knapp.
 - Antworte NUR als JSON-Objekt.`;
 
@@ -118,13 +119,16 @@ JSON-Schema:
   "replyDraft": { "subject": "Re: …"|null, "body": "kurze Antwort DE", "tone": "kurz"|null }|null,
   "suggestions": [
     {
-      "kind": "event"|"task"|"note"|"trip",
-      "title": "z.B. UPS Paketlieferung - irugs.ch oder LX80 ZRH-LHR",
+      "kind": "event"|"task"|"note"|"trip"|"finance",
+      "title": "z.B. UPS Paketlieferung - irugs.ch oder LX80 ZRH-LHR oder Rechnung Swisscom",
       "notes": "Kontext …",
       "reference": "Tracking/Code oder null",
       "tripType": "Flug|Hotel|Zugreisen|… oder null",
       "provider": "Airline/Hotel oder null",
       "bookingReference": "PNR oder null",
+      "amount": 49.90|null,
+      "currency": "CHF"|null,
+      "vendor": "Swisscom"|null,
       "reason": "warum speichern",
       "confidence": 0.0-1.0,
       "startDate": "YYYY-MM-DD"|null,
@@ -168,6 +172,11 @@ JSON-Schema:
   const suggestions = result.data.suggestions.filter((s) => {
     if (s.kind === "event") return Boolean(s.startDate);
     if (s.kind === "trip") return Boolean(s.startDate && s.title.trim());
+    if (s.kind === "finance") {
+      return Boolean(
+        s.title.trim() && (s.amount != null || s.vendor?.trim() || s.dueDate)
+      );
+    }
     if (s.kind === "note") {
       return Boolean(s.title.trim() && (s.reference?.trim() || s.notes?.trim()));
     }
@@ -185,9 +194,41 @@ JSON-Schema:
     body,
   });
 
+  const { matchOpenInvoiceFromMail } = await import(
+    "@/lib/mail/match-finance"
+  );
+  const withFinance = withPatch.map((s) => {
+    if (s.kind !== "finance") return s;
+    const match = matchOpenInvoiceFromMail({
+      vendor: s.vendor || message.fromName || null,
+      amount: s.amount ?? null,
+      currency: s.currency ?? null,
+    });
+    if (!match) return s;
+    return {
+      ...s,
+      documentId: match.documentId,
+      vendor: s.vendor || match.vendor,
+      amount: s.amount ?? match.amount,
+      currency: s.currency || match.currency,
+      dueDate: s.dueDate || match.dueDate,
+      notes: [
+        s.notes?.trim() || null,
+        match.title
+          ? `Treffer offene Rechnung: ${match.title} (#${match.documentId})`
+          : `Treffer Dokument #${match.documentId}`,
+      ]
+        .filter(Boolean)
+        .join("\n"),
+      reason:
+        s.reason ||
+        `Passt zu offener Rechnung (${Math.round(match.score * 100)} %)`,
+    };
+  });
+
   const analysis: MailAnalysis = {
     ...result.data,
-    suggestions: withPatch,
+    suggestions: withFinance,
     replyDraft: result.data.replyDraft?.body?.trim()
       ? result.data.replyDraft
       : null,

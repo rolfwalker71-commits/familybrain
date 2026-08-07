@@ -24,6 +24,17 @@ export function formatMailSuggestionDetail(s: MailSuggestion): string {
     ];
     return bits.filter(Boolean).join(" · ");
   }
+  if (s.kind === "finance") {
+    const bits = [
+      s.vendor?.trim() || null,
+      s.amount != null
+        ? `${s.amount.toFixed(2)} ${s.currency || "CHF"}`
+        : null,
+      s.dueDate ? `fällig ${toSwissDate(s.dueDate)}` : null,
+      s.documentId ? `Doc #${s.documentId}` : null,
+    ];
+    return bits.filter(Boolean).join(" · ") || "Zahlung";
+  }
   if (s.kind === "note") {
     const ref = s.reference?.trim();
     if (ref) return `Ref. ${ref}`;
