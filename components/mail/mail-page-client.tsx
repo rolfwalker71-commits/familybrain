@@ -10,6 +10,7 @@ import {
   Sparkles,
   CalendarDays,
   CheckSquare,
+  StickyNote,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -27,12 +28,24 @@ import { cn } from "@/lib/utils";
 import { APP_ICON_STROKE } from "@/lib/branding/app-icons";
 import type { MailListFilter, MailListItem, MailMessageDetail } from "@/lib/mail/gmail";
 import type { MailAnalysis, MailSuggestion } from "@/lib/mail/mail-action-schema";
+import type { MailAnalysisChip } from "@/lib/mail/mail-heuristic";
+import { formatMailSuggestionDetail } from "@/lib/mail/format-suggestion";
+import { MailTriagePanel } from "@/components/mail/mail-triage-panel";
 
 const FILTERS: { id: MailListFilter; label: string }[] = [
   { id: "today", label: "Heute" },
   { id: "week", label: "Diese Woche" },
   { id: "unread", label: "Ungelesen" },
 ];
+
+type MailTab = "inbox" | "triage";
+
+type EnrichedMail = MailListItem & {
+  analysisChip?: MailAnalysisChip;
+  analysisChipLabel?: string | null;
+  analysisStatus?: string | null;
+  suggestionCount?: number;
+};
 
 type CalOption = { id: string; name: string; primary: boolean };
 type TaskListOption = { id: string; title: string };
@@ -56,20 +69,25 @@ function suggestionKey(s: MailSuggestion, index: number): string {
   return `${s.kind}-${index}-${s.title}`;
 }
 
-function suggestionDetail(s: MailSuggestion): string {
-  if (s.kind === "event") {
-    const when = [s.startDate, s.startTime, s.endTime ? `–${s.endTime}` : null]
-      .filter(Boolean)
-      .join(" ");
-    return [when, s.location].filter(Boolean).join(" · ");
+function chipClass(chip: MailAnalysisChip): string {
+  if (chip === "suggestion") {
+    return "bg-amber-100 text-amber-900 border-amber-200";
   }
-  return s.dueDate ? `fällig ${s.dueDate}` : "ohne Fälligkeit";
+  if (chip === "applied") {
+    return "bg-emerald-100 text-emerald-900 border-emerald-200";
+  }
+  if (chip === "dismissed") {
+    return "bg-muted text-muted-foreground";
+  }
+  return "bg-sky-50 text-sky-900 border-sky-200";
 }
 
 export function MailPageClient() {
   const searchParams = useSearchParams();
+  const [tab, setTab] = useState<MailTab>("inbox");
   const [filter, setFilter] = useState<MailListFilter>("today");
-  const [items, setItems] = useState<MailListItem[]>([]);
+  const [items, setItems] = useState<EnrichedMail[]>([]);
+  const [pendingTriage, setPendingTriage] = useState(0);
   const [connected, setConnected] = useState(false);
   const [configured, setConfigured] = useState(false);
   const [connectedEmail, setConnectedEmail] = useState<string | null>(null);
@@ -119,6 +137,9 @@ export function MailPageClient() {
         `Google-Verbindung fehlgeschlagen: ${searchParams.get("reason") || "unbekannt"}`
       );
     }
+    if (searchParams.get("tab") === "triage") {
+      setTab("triage");
+    }
     const open = searchParams.get("open");
     if (open) {
       void openMail(open);
@@ -130,7 +151,7 @@ export function MailPageClient() {
     setError(null);
     try {
       const res = await fetch(
-        `/api/mail/list?filter=${encodeURIComponent(filter)}&limit=30`
+        `/api/mail/list?filter=${encodeURIComponent(filter)}&limit=30&refresh=1`
       );
       const data = await res.json();
       if (!res.ok && data.error) {
@@ -139,7 +160,8 @@ export function MailPageClient() {
       setConfigured(Boolean(data.configured));
       setConnected(Boolean(data.connected));
       setConnectedEmail(data.connectedEmail || null);
-      setItems(data.items || []);
+      setItems((data.items || []) as EnrichedMail[]);
+      setPendingTriage(Number(data.pendingTriage) || 0);
     } catch (err) {
       setItems([]);
       setError(err instanceof Error ? err.message : String(err));
@@ -171,7 +193,6 @@ export function MailPageClient() {
         id: string;
         name: string;
         primary: boolean;
-        enabled?: boolean;
         accessRole?: string | null;
       }>;
       const writable = cals.filter((c) => {
@@ -216,6 +237,7 @@ export function MailPageClient() {
         next[suggestionKey(s, i)] = true;
       });
       setSelected(next);
+      await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -246,6 +268,7 @@ export function MailPageClient() {
         allDay: s.allDay ?? !s.startTime,
         location: s.location ?? null,
         dueDate: s.dueDate ?? null,
+        reference: s.reference ?? null,
         calendarId: s.kind === "event" ? calendarId || null : null,
         tasklistId: s.kind === "task" ? tasklistId || null : null,
       }));
@@ -273,6 +296,7 @@ export function MailPageClient() {
           fails.map((f) => f.error || f.title).join("; ") || "Nichts angelegt"
         );
       }
+      await load();
     } catch (err) {
       setApplyMsg(err instanceof Error ? err.message : String(err));
     } finally {
@@ -284,26 +308,57 @@ export function MailPageClient() {
     <div className="min-w-0 space-y-5 pb-8">
       <PageHeader
         title="Mail"
-        description="Gmail — und Buddy prüft, ob Termin oder Aufgabe drin steckt."
+        description="Neue Mails werden automatisch geprüft — Vorschläge in der Triage."
         icon={pageVisuals.mail.icon}
         tone={pageVisuals.mail.tone}
         actions={
           <div className="flex flex-wrap gap-1.5">
-            {FILTERS.map((f) => (
-              <Button
-                key={f.id}
-                type="button"
-                size="sm"
-                variant={filter === f.id ? "default" : "outline"}
-                className={cn(
-                  filter === f.id &&
-                    "bg-[var(--brand-docs)] text-white hover:bg-[var(--brand-docs)]/90"
-                )}
-                onClick={() => setFilter(f.id)}
-              >
-                {f.label}
-              </Button>
-            ))}
+            <Button
+              type="button"
+              size="sm"
+              variant={tab === "inbox" ? "default" : "outline"}
+              className={cn(
+                tab === "inbox" &&
+                  "bg-[var(--brand-docs)] text-white hover:bg-[var(--brand-docs)]/90"
+              )}
+              onClick={() => setTab("inbox")}
+            >
+              Posteingang
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={tab === "triage" ? "default" : "outline"}
+              className={cn(
+                tab === "triage" &&
+                  "bg-[var(--brand-docs)] text-white hover:bg-[var(--brand-docs)]/90"
+              )}
+              onClick={() => setTab("triage")}
+            >
+              Vorschläge
+              {pendingTriage > 0 ? (
+                <Badge variant="secondary" className="ml-1 text-[10px]">
+                  {pendingTriage}
+                </Badge>
+              ) : null}
+            </Button>
+            {tab === "inbox"
+              ? FILTERS.map((f) => (
+                  <Button
+                    key={f.id}
+                    type="button"
+                    size="sm"
+                    variant={filter === f.id ? "default" : "outline"}
+                    className={cn(
+                      filter === f.id &&
+                        "bg-[var(--brand-docs)] text-white hover:bg-[var(--brand-docs)]/90"
+                    )}
+                    onClick={() => setFilter(f.id)}
+                  >
+                    {f.label}
+                  </Button>
+                ))
+              : null}
             <Button
               type="button"
               size="sm"
@@ -379,9 +434,19 @@ export function MailPageClient() {
         </div>
       )}
 
-      {connected ? (
+      {connected && tab === "triage" ? (
+        <MailTriagePanel
+          onChanged={() => {
+            void load();
+          }}
+        />
+      ) : null}
+
+      {connected && tab === "inbox" ? (
         loading ? (
-          <p className="text-sm text-muted-foreground">Lade Mails…</p>
+          <p className="text-sm text-muted-foreground">
+            Lade Mails und prüfe neue Eingänge…
+          </p>
         ) : items.length === 0 ? (
           <Card>
             <CardContent className="p-6 text-center text-sm text-muted-foreground">
@@ -417,6 +482,17 @@ export function MailPageClient() {
                       <span className="text-[11px] tabular-nums text-muted-foreground">
                         {formatMailWhen(item)}
                       </span>
+                      {item.analysisChip && item.analysisChipLabel ? (
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "text-[10px]",
+                            chipClass(item.analysisChip)
+                          )}
+                        >
+                          {item.analysisChipLabel}
+                        </Badge>
+                      ) : null}
                     </div>
                     <p className="truncate text-sm text-foreground">
                       {item.subject}
@@ -478,7 +554,19 @@ export function MailPageClient() {
                     className="ml-auto gap-1.5"
                   >
                     <Sparkles className="size-3.5" />
-                    {analyzing ? "Prüfe…" : "Buddy prüfen"}
+                    {analyzing ? "Prüfe…" : "Erneut prüfen"}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setOpenId(null);
+                      setDetail(null);
+                      setTab("triage");
+                    }}
+                  >
+                    Zur Triage
                   </Button>
                 </div>
 
@@ -522,6 +610,11 @@ export function MailPageClient() {
                                         className="size-3.5 shrink-0 text-emerald-700"
                                         aria-hidden
                                       />
+                                    ) : s.kind === "note" ? (
+                                      <StickyNote
+                                        className="size-3.5 shrink-0 text-amber-700"
+                                        aria-hidden
+                                      />
                                     ) : (
                                       <CheckSquare
                                         className="size-3.5 shrink-0 text-sky-700"
@@ -531,7 +624,7 @@ export function MailPageClient() {
                                     {s.title}
                                   </p>
                                   <p className="text-[11px] text-muted-foreground">
-                                    {suggestionDetail(s)}
+                                    {formatMailSuggestionDetail(s)}
                                     {s.reason ? ` · ${s.reason}` : ""}
                                   </p>
                                 </div>

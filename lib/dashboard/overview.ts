@@ -142,6 +142,8 @@ export type OverviewPayload = {
     urgentDeadlines: number;
     openDueAmount: number;
     openDueCount: number;
+    /** Open mail AI suggestions awaiting triage */
+    mailSuggestionsPending: number;
   };
   agenda: AgendaItem[];
   /** Heute (+ optional nächste 24h), max 5 — Link zu /calendar */
@@ -172,6 +174,13 @@ export type OverviewPayload = {
       href: string;
     }>;
   };
+  /** Recent reference notes (tracking etc. from mail). */
+  referenceNotes: Array<{
+    id: number;
+    title: string;
+    reference: string | null;
+    createdAt: string;
+  }>;
 };
 
 function isoDate(d: Date): string {
@@ -652,11 +661,26 @@ export async function getDashboardOverview(
       .get(daysFromNow(7)) as { c: number }
   ).c;
 
-  const [agendaWithWeather, todayCalendar, todayMail, hockey, homeWeatherRaw, tasksBundle] =
+  const [agendaWithWeather, todayCalendar, todayMail, hockey, homeWeatherRaw, tasksBundle, mailSuggestionsPending, referenceNotes] =
     await Promise.all([
       enrichAgendaWithWeather(agenda),
       getTodayCalendarExcerpt(calendarUserId, 12),
-      getTodayMailExcerpt(calendarUserId, 5),
+      (async () => {
+        const mails = await getTodayMailExcerpt(calendarUserId, 8);
+        if (calendarUserId != null && mails.length > 0) {
+          try {
+            const { syncMailAnalysesForItems } = await import(
+              "@/lib/mail/sync-mail-analysis"
+            );
+            await syncMailAnalysesForItems(calendarUserId, mails, {
+              maxAi: 2,
+            });
+          } catch {
+            /* non-blocking */
+          }
+        }
+        return mails;
+      })(),
       getOverviewHockeyBundle(calendarUserId),
       fetchHomeWeather(),
       (async () => {
@@ -687,6 +711,33 @@ export async function getDashboardOverview(
           };
         } catch {
           return { hasScope: true, items: [] as const };
+        }
+      })(),
+      (async () => {
+        if (calendarUserId == null) return 0;
+        try {
+          const { countPendingMailTriage } = await import(
+            "@/lib/mail/mail-analysis-store"
+          );
+          return countPendingMailTriage(calendarUserId);
+        } catch {
+          return 0;
+        }
+      })(),
+      (async () => {
+        if (calendarUserId == null) return [] as const;
+        try {
+          const { listRecentReferenceNotes } = await import(
+            "@/lib/mail/reference-notes"
+          );
+          return listRecentReferenceNotes(calendarUserId, 6).map((n) => ({
+            id: n.id,
+            title: n.title,
+            reference: n.reference,
+            createdAt: n.createdAt,
+          }));
+        } catch {
+          return [] as const;
         }
       })(),
     ]);
@@ -730,6 +781,7 @@ export async function getDashboardOverview(
       urgentDeadlines,
       openDueAmount,
       openDueCount,
+      mailSuggestionsPending,
     },
     agenda: agendaWithWeather,
     todayCalendar,
@@ -746,5 +798,6 @@ export async function getDashboardOverview(
       hasScope: tasksBundle.hasScope,
       items: [...tasksBundle.items],
     },
+    referenceNotes: [...referenceNotes],
   };
 }

@@ -31,15 +31,19 @@ function mailBodyForAi(message: MailMessageDetail): string {
 }
 
 const SYSTEM = `Du bist Buddy, ein Haushalt-Assistent in der Schweiz (Zeitzone Europe/Zurich, Datumformat YYYY-MM-DD).
-Analysiere E-Mails und erkenne, ob daraus Kalendertermine und/oder Aufgaben entstehen sollten.
+Analysiere E-Mails und erkenne, ob daraus Kalendertermine, Aufgaben und/oder Notizen entstehen sollten.
 
 WICHTIG:
-- Ein Mail kann MEHRERE Vorschläge brauchen (z.B. UPS: 1× event für Zustellfenster + 1× task «Paket annehmen»).
+- Ein Mail kann MEHRERE Vorschläge brauchen. Typisches UPS-Beispiel:
+  1) kind "event" — Zustellfenster im Kalender
+  2) kind "task" — «Paket annehmen»
+  3) kind "note" — Tracking-Nummer / Referenz zur Ablage
 - Nur vorschlagen, was wirklich speicherwürdig ist. Newsletter/Werbung → suggestions: [].
 - Keine Dubletten. Keine erfundenen Daten — wenn unsicher, weglassen oder allDay/nur Datum.
 - Zeiten als HH:mm (24h). Datumsangaben relativ («morgen», «Montag») in absolute YYYY-MM-DD anhand «Heute» auflösen.
 - kind "event": startDate Pflicht wenn möglich; startTime wenn Zeitfenster/Uhrzeit bekannt; endTime wenn Ende bekannt.
 - kind "task": dueDate wenn Frist/Tag bekannt, sonst null.
+- kind "note": für Tracking-Nummern, Buchungs-/Referenzcodes, IBAN-Hinweise o.ä. — «reference» = der Code selbst, «notes» = kurzer Kontext, «title» z.B. «UPS Tracking».
 - Antworte NUR als JSON-Objekt.`;
 
 export async function analyzeMailForActions(
@@ -66,9 +70,10 @@ JSON-Schema:
   "relevance": "none"|"low"|"medium"|"high",
   "suggestions": [
     {
-      "kind": "event"|"task",
+      "kind": "event"|"task"|"note",
       "title": "kurz",
-      "notes": "optional Tracking/Details oder null",
+      "notes": "Kontext oder null",
+      "reference": "Tracking/Code oder null (vor allem bei note)",
       "reason": "warum speichern",
       "confidence": 0.0-1.0,
       "startDate": "YYYY-MM-DD"|null,
@@ -107,9 +112,11 @@ JSON-Schema:
     throw new Error(`AI-Schema ungültig: ${result.error.message}`);
   }
 
-  // Drop events without date
   const suggestions = result.data.suggestions.filter((s) => {
     if (s.kind === "event") return Boolean(s.startDate);
+    if (s.kind === "note") {
+      return Boolean(s.title.trim() && (s.reference?.trim() || s.notes?.trim()));
+    }
     return Boolean(s.title.trim());
   });
 

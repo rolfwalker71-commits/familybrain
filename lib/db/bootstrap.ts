@@ -140,6 +140,8 @@ export function bootstrapDatabase(db: Database.Database): void {
   ensureFinanceBrainTables(db);
   ensureUserAccessTables(db);
   ensureInboxTaskTables(db);
+  ensureMailAnalysesTable(db);
+  ensureReferenceNotesTable(db);
   ensureActivityLogTable(db);
   ensurePushSubscriptionsTable(db);
   ensureCreditCardStatDecisionsTable(db);
@@ -195,6 +197,48 @@ function ensureActivityLogTable(db: Database.Database): void {
       ON activity_log(entity_type, entity_id, id DESC);
     CREATE INDEX IF NOT EXISTS idx_activity_log_created
       ON activity_log(created_at DESC);
+  `);
+}
+
+function ensureReferenceNotesTable(db: Database.Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS reference_notes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      title TEXT NOT NULL,
+      body TEXT,
+      reference TEXT,
+      source_message_id TEXT,
+      trilium_note_id TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_reference_notes_user
+      ON reference_notes(user_id, created_at DESC);
+  `);
+}
+
+function ensureMailAnalysesTable(db: Database.Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS mail_analyses (
+      user_id INTEGER NOT NULL,
+      message_id TEXT NOT NULL,
+      thread_id TEXT,
+      subject TEXT,
+      from_name TEXT,
+      from_email TEXT,
+      snippet TEXT,
+      status TEXT NOT NULL,
+      relevance TEXT,
+      summary TEXT,
+      analysis_json TEXT,
+      suggestion_count INTEGER NOT NULL DEFAULT 0,
+      error TEXT,
+      analyzed_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (user_id, message_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_mail_analyses_status
+      ON mail_analyses(user_id, status, analyzed_at DESC);
   `);
 }
 

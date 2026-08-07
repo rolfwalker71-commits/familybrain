@@ -163,4 +163,31 @@ export class TriliumClient {
       accept: "text/html",
     });
   }
+
+  /** Create a text note under a parent (ETAPI). */
+  async createTextNote(input: {
+    parentNoteId: string;
+    title: string;
+    contentHtml: string;
+  }): Promise<{ noteId: string; title: string }> {
+    const created = await this.request<{
+      note?: { noteId?: string; title?: string };
+      noteId?: string;
+    }>("/create-note", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        parentNoteId: input.parentNoteId,
+        title: input.title,
+        type: "text",
+        content: input.contentHtml,
+      }),
+    });
+    const noteId = created.note?.noteId || created.noteId;
+    if (!noteId) throw new TriliumError("Trilium lieferte keine noteId.", 502);
+    return {
+      noteId,
+      title: created.note?.title || input.title,
+    };
+  }
 }

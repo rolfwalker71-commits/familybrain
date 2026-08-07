@@ -16,6 +16,7 @@ import {
   AlertTriangle,
   Car,
   CheckSquare,
+  StickyNote,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -765,22 +766,28 @@ export function OverviewDashboard({
               />
               <FocusTile
                 href={
-                  mailSample
-                    ? `/mail?open=${encodeURIComponent(mailSample.id)}`
-                    : "/mail"
+                  data.chips.mailSuggestionsPending > 0
+                    ? "/mail?tab=triage"
+                    : mailSample
+                      ? `/mail?open=${encodeURIComponent(mailSample.id)}`
+                      : "/mail"
                 }
                 tone="amber"
                 icon={Mail}
                 eyebrow="Heute · Mail"
                 title={
-                  mailSample
-                    ? `${unreadMail.length || mailFocus.length} ${unreadMail.length ? "neu" : "heute"}`
-                    : "Keine Mails"
+                  data.chips.mailSuggestionsPending > 0
+                    ? `${data.chips.mailSuggestionsPending} Vorschlag${data.chips.mailSuggestionsPending === 1 ? "" : "e"}`
+                    : mailSample
+                      ? `${unreadMail.length || mailFocus.length} ${unreadMail.length ? "neu" : "heute"}`
+                      : "Keine Mails"
                 }
                 detail={
-                  mailSample
-                    ? `${mailSample.fromName} · ${mailSample.subject}`
-                    : "Posteingang"
+                  data.chips.mailSuggestionsPending > 0
+                    ? "Zur Triage"
+                    : mailSample
+                      ? `${mailSample.fromName} · ${mailSample.subject}`
+                      : "Posteingang"
                 }
               />
             </div>
@@ -921,6 +928,36 @@ export function OverviewDashboard({
                   )}
                 </CardContent>
               </Card>
+
+              {data.referenceNotes && data.referenceNotes.length > 0 ? (
+                <Card className="border-border/70">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <StickyNote
+                        className="size-4 text-muted-foreground"
+                        strokeWidth={APP_ICON_STROKE}
+                        absoluteStrokeWidth
+                        aria-hidden
+                      />
+                      Referenzen
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ul className="space-y-2">
+                      {data.referenceNotes.map((n) => (
+                        <li key={n.id} className="min-w-0 px-1">
+                          <p className="truncate text-sm font-medium">
+                            {n.title}
+                          </p>
+                          <p className="truncate font-mono text-[11px] text-muted-foreground">
+                            {n.reference || "—"}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  </CardContent>
+                </Card>
+              ) : null}
 
               {data.hockey.nextGame ? (
                 <NextHockeyCard game={data.hockey.nextGame} />

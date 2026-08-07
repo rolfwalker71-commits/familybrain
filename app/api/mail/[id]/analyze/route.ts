@@ -8,6 +8,8 @@ import {
 import { getGmailMessage } from "@/lib/mail/gmail";
 import { analyzeMailForActions } from "@/lib/mail/analyze-mail";
 import { hasOpenAIKey } from "@/lib/ai/client";
+import { resolveStatusFromAnalysis } from "@/lib/mail/mail-heuristic";
+import { upsertMailAnalysis } from "@/lib/mail/mail-analysis-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -47,7 +49,22 @@ export async function POST(request: Request, context: Ctx) {
   try {
     const message = await getGmailMessage(userId, id, request);
     const analysis = await analyzeMailForActions(message, zurichToday());
-    return NextResponse.json({ analysis, messageId: id });
+    const status = resolveStatusFromAnalysis(analysis);
+    const stored = upsertMailAnalysis({
+      userId,
+      messageId: id,
+      threadId: message.threadId,
+      subject: message.subject,
+      fromName: message.fromName,
+      fromEmail: message.from,
+      snippet: message.snippet,
+      status,
+      relevance: analysis.relevance,
+      summary: analysis.summary,
+      analysis,
+      suggestionCount: analysis.suggestions.length,
+    });
+    return NextResponse.json({ analysis, messageId: id, stored });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : String(error) },

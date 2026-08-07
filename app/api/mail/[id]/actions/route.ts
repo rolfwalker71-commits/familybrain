@@ -11,6 +11,8 @@ import { createGoogleCalendarEvent } from "@/lib/google/calendar-write";
 import { createGoogleTask } from "@/lib/google/tasks";
 import { MailActionsBodySchema } from "@/lib/mail/mail-action-schema";
 import { getGmailMessage } from "@/lib/mail/gmail";
+import { updateMailAnalysisStatus } from "@/lib/mail/mail-analysis-store";
+import { createReferenceNote } from "@/lib/mail/reference-notes";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -55,7 +57,7 @@ export async function POST(request: Request, context: Ctx) {
   }
 
   const created: Array<{
-    kind: "event" | "task";
+    kind: "event" | "task" | "note";
     title: string;
     ok: boolean;
     error?: string;
@@ -64,6 +66,35 @@ export async function POST(request: Request, context: Ctx) {
 
   for (const action of body.actions) {
     const notes = [action.notes, mailNote].filter(Boolean).join("\n\n");
+
+    if (action.kind === "note") {
+      try {
+        const note = await createReferenceNote({
+          userId,
+          title: action.title,
+          body: notes,
+          reference: action.reference,
+          sourceMessageId: id,
+        });
+        created.push({
+          kind: "note",
+          title: note.title,
+          ok: true,
+          link: note.triliumNoteId
+            ? `trilium:${note.triliumNoteId}`
+            : null,
+        });
+      } catch (error) {
+        created.push({
+          kind: "note",
+          title: action.title,
+          ok: false,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+      continue;
+    }
+
     if (action.kind === "event") {
       if (!hasGoogleCalendarEventsWriteScope(userId)) {
         created.push({
@@ -153,6 +184,9 @@ export async function POST(request: Request, context: Ctx) {
   }
 
   const okCount = created.filter((c) => c.ok).length;
+  if (okCount > 0) {
+    updateMailAnalysisStatus(userId, id, "applied");
+  }
   return NextResponse.json({
     created,
     okCount,

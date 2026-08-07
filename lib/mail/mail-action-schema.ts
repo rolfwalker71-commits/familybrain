@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const MailSuggestionSchema = z.object({
-  kind: z.enum(["event", "task"]),
+  kind: z.enum(["event", "task", "note"]),
   title: z.string().min(1).max(200),
   notes: z.string().max(2000).nullable().optional(),
   reason: z.string().max(400).optional(),
@@ -23,6 +23,8 @@ export const MailSuggestionSchema = z.object({
   location: z.string().max(400).nullable().optional(),
   /** task */
   dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  /** note — e.g. tracking number */
+  reference: z.string().max(200).nullable().optional(),
 });
 
 export const MailAnalysisSchema = z.object({
@@ -38,7 +40,7 @@ export const MailActionsBodySchema = z.object({
   actions: z
     .array(
       z.object({
-        kind: z.enum(["event", "task"]),
+        kind: z.enum(["event", "task", "note"]),
         title: z.string().min(1).max(200),
         notes: z.string().max(2000).nullable().optional(),
         startDate: z.string().optional().nullable(),
@@ -48,6 +50,7 @@ export const MailActionsBodySchema = z.object({
         allDay: z.boolean().optional(),
         location: z.string().optional().nullable(),
         dueDate: z.string().optional().nullable(),
+        reference: z.string().optional().nullable(),
         calendarId: z.string().optional().nullable(),
         tasklistId: z.string().optional().nullable(),
       })
