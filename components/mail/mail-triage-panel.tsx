@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { CalendarDays, CheckSquare, StickyNote, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -23,12 +23,14 @@ export function MailTriagePanel({
   const [tasklists, setTasklists] = useState<TaskListOption[]>([]);
   const [calendarId, setCalendarId] = useState("");
   const [tasklistId, setTasklistId] = useState("");
-  const [selected, setSelected] = useState<Record<string, Record<number, boolean>>>(
-    {}
-  );
+  const [targetsError, setTargetsError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<
+    Record<string, Record<number, boolean>>
+  >({});
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const loadTargets = useCallback(async () => {
+    setTargetsError(null);
     try {
       const [calRes, taskRes] = await Promise.all([
         fetch("/api/google/calendars"),
@@ -36,6 +38,9 @@ export function MailTriagePanel({
       ]);
       const calJson = await calRes.json();
       const taskJson = await taskRes.json();
+      if (!calRes.ok && calJson.error) {
+        setTargetsError(String(calJson.error));
+      }
       const cals = (calJson.calendars || []) as Array<{
         id: string;
         name: string;
@@ -44,9 +49,15 @@ export function MailTriagePanel({
       }>;
       const writable = cals.filter((c) => {
         const role = (c.accessRole || "").toLowerCase();
-        return !role || role === "owner" || role === "writer";
+        return (
+          !role ||
+          role === "owner" ||
+          role === "writer" ||
+          role === "primary"
+        );
       });
-      const pool = writable.length > 0 ? writable : cals;
+      // Prefer writable; if filter empties everything, fall back to all listed
+      const pool = (writable.length > 0 ? writable : cals).filter((c) => c.id);
       const options = pool.map((c) => ({
         id: c.id,
         name: c.name,
@@ -55,11 +66,21 @@ export function MailTriagePanel({
       setCalendars(options);
       const primary = options.find((c) => c.primary) || options[0];
       if (primary) setCalendarId((p) => p || primary.id);
+      else if (options.length === 0) {
+        setTargetsError(
+          (prev) =>
+            prev ||
+            "Keine schreibbaren Google-Kalender gefunden — unter Konto Kalender-Rechte prüfen."
+        );
+      }
+
       const lists = (taskJson.lists || []) as TaskListOption[];
       setTasklists(lists);
       if (lists[0]) setTasklistId((p) => p || lists[0]!.id);
-    } catch {
-      /* optional */
+    } catch (err) {
+      setTargetsError(
+        err instanceof Error ? err.message : "Kalender/Tasks laden fehlgeschlagen"
+      );
     }
   }, []);
 
@@ -93,6 +114,36 @@ export function MailTriagePanel({
     void load();
   }, [load]);
 
+  const anyEventSelected = useMemo(() => {
+    for (const row of pending) {
+      const suggestions = row.analysis?.suggestions || [];
+      for (let i = 0; i < suggestions.length; i += 1) {
+        if (
+          suggestions[i]?.kind === "event" &&
+          selected[row.messageId]?.[i]
+        ) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }, [pending, selected]);
+
+  const anyTaskSelected = useMemo(() => {
+    for (const row of pending) {
+      const suggestions = row.analysis?.suggestions || [];
+      for (let i = 0; i < suggestions.length; i += 1) {
+        if (
+          suggestions[i]?.kind === "task" &&
+          selected[row.messageId]?.[i]
+        ) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }, [pending, selected]);
+
   async function dismiss(messageId: string) {
     setBusyId(messageId);
     try {
@@ -118,6 +169,10 @@ export function MailTriagePanel({
       .map((s, i) => ({ s, i }))
       .filter(({ i }) => selected[row.messageId]?.[i]);
     if (picks.length === 0) return;
+    if (picks.some(({ s }) => s.kind === "event") && !calendarId.trim()) {
+      setError("Bitte einen Kalender für den Termin wählen.");
+      return;
+    }
     setBusyId(row.messageId);
     setError(null);
     try {
@@ -180,44 +235,62 @@ export function MailTriagePanel({
           {error}
         </p>
       ) : null}
+      {targetsError ? (
+        <p className="text-sm text-amber-800" role="status">
+          {targetsError}
+        </p>
+      ) : null}
 
-      {(calendars.length > 0 || tasklists.length > 0) && (
-        <div className="flex flex-wrap gap-3 rounded-xl border border-border/60 bg-muted/20 px-3 py-2 text-xs">
-          {calendars.length > 0 ? (
-            <label className="flex min-w-[12rem] flex-1 flex-col gap-1">
-              <span className="font-medium text-muted-foreground">Kalender</span>
-              <select
-                className="h-8 rounded-md border border-input bg-background px-2 text-sm"
-                value={calendarId}
-                onChange={(e) => setCalendarId(e.target.value)}
-              >
-                {calendars.map((c) => (
+      <div className="flex flex-wrap gap-3 rounded-xl border border-border/60 bg-muted/20 px-3 py-2.5 text-xs">
+        {anyEventSelected ? (
+          <label className="flex min-w-[14rem] flex-1 flex-col gap-1">
+            <span className="font-medium text-foreground">
+              Kalender für Termine
+            </span>
+            <select
+              className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+              value={calendarId}
+              onChange={(e) => setCalendarId(e.target.value)}
+            >
+              {calendars.length === 0 ? (
+                <option value="">— Keine Kalender —</option>
+              ) : (
+                calendars.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
                     {c.primary ? " (primär)" : ""}
                   </option>
-                ))}
-              </select>
-            </label>
-          ) : null}
-          {tasklists.length > 0 ? (
-            <label className="flex min-w-[12rem] flex-1 flex-col gap-1">
-              <span className="font-medium text-muted-foreground">Taskliste</span>
-              <select
-                className="h-8 rounded-md border border-input bg-background px-2 text-sm"
-                value={tasklistId}
-                onChange={(e) => setTasklistId(e.target.value)}
-              >
-                {tasklists.map((t) => (
+                ))
+              )}
+            </select>
+          </label>
+        ) : null}
+        {anyTaskSelected ? (
+          <label className="flex min-w-[14rem] flex-1 flex-col gap-1">
+            <span className="font-medium text-foreground">Taskliste</span>
+            <select
+              className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+              value={tasklistId}
+              onChange={(e) => setTasklistId(e.target.value)}
+            >
+              {tasklists.length === 0 ? (
+                <option value="">— Standard / Tasks verbinden —</option>
+              ) : (
+                tasklists.map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.title}
                   </option>
-                ))}
-              </select>
-            </label>
-          ) : null}
-        </div>
-      )}
+                ))
+              )}
+            </select>
+          </label>
+        ) : null}
+        {!anyEventSelected && !anyTaskSelected ? (
+          <p className="text-muted-foreground">
+            Wähle Termin oder Aufgabe, um Zielkalender bzw. Taskliste zu sehen.
+          </p>
+        ) : null}
+      </div>
 
       <ul className="space-y-3">
         {pending.map((row) => {

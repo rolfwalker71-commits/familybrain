@@ -4,6 +4,7 @@ import {
   type MailAnalysis,
 } from "@/lib/mail/mail-action-schema";
 import type { MailMessageDetail } from "@/lib/mail/gmail";
+import { enrichMailAnalysisTitles } from "@/lib/mail/enrich-shipping-titles";
 
 function htmlToPlain(html: string): string {
   return html
@@ -34,16 +35,17 @@ const SYSTEM = `Du bist Buddy, ein Haushalt-Assistent in der Schweiz (Zeitzone E
 Analysiere E-Mails und erkenne, ob daraus Kalendertermine, Aufgaben und/oder Notizen entstehen sollten.
 
 WICHTIG:
-- Ein Mail kann MEHRERE Vorschläge brauchen. Typisches UPS-Beispiel:
-  1) kind "event" — Zustellfenster im Kalender
-  2) kind "task" — «Paket annehmen»
-  3) kind "note" — Tracking-Nummer / Referenz zur Ablage
+- Ein Mail kann MEHRERE Vorschläge brauchen. Typisches UPS/DHL-Beispiel:
+  1) kind "event" — Titel MUSS Carrier + Shop enthalten, z.B. «UPS Paketlieferung - irugs.ch» (nicht nur «Paketlieferung»)
+  2) kind "task" — z.B. «Paket annehmen (UPS · irugs.ch)»
+  3) kind "note" — Tracking-Nummer; title z.B. «UPS Tracking - irugs.ch», reference = Tracking-Code
+- Carrier (UPS, DHL, Die Post, …) und Lieferant/Shop (Domain oder Markenname aus dem Mail) immer in den Titeln, wenn erkennbar.
 - Nur vorschlagen, was wirklich speicherwürdig ist. Newsletter/Werbung → suggestions: [].
 - Keine Dubletten. Keine erfundenen Daten — wenn unsicher, weglassen oder allDay/nur Datum.
 - Zeiten als HH:mm (24h). Datumsangaben relativ («morgen», «Montag») in absolute YYYY-MM-DD anhand «Heute» auflösen.
-- kind "event": startDate Pflicht wenn möglich; startTime wenn Zeitfenster/Uhrzeit bekannt; endTime wenn Ende bekannt.
+- kind "event": startDate Pflicht wenn möglich. Wenn ein Zustell-/Termin-Zeitfenster im Mail steht (z.B. «zwischen 9 und 13 Uhr», «9:00 AM – 1:00 PM»), IMMER startTime und endTime als HH:mm setzen — nicht nur das Datum.
 - kind "task": dueDate wenn Frist/Tag bekannt, sonst null.
-- kind "note": für Tracking-Nummern, Buchungs-/Referenzcodes, IBAN-Hinweise o.ä. — «reference» = der Code selbst, «notes» = kurzer Kontext, «title» z.B. «UPS Tracking».
+- kind "note": «reference» = Tracking/Code, «notes» = kurzer Kontext.
 - Antworte NUR als JSON-Objekt.`;
 
 export async function analyzeMailForActions(
@@ -71,7 +73,7 @@ JSON-Schema:
   "suggestions": [
     {
       "kind": "event"|"task"|"note",
-      "title": "kurz",
+      "title": "z.B. UPS Paketlieferung - irugs.ch",
       "notes": "Kontext oder null",
       "reference": "Tracking/Code oder null (vor allem bei note)",
       "reason": "warum speichern",
@@ -120,8 +122,15 @@ JSON-Schema:
     return Boolean(s.title.trim());
   });
 
-  return {
+  const analysis: MailAnalysis = {
     ...result.data,
     suggestions,
   };
+
+  return enrichMailAnalysisTitles(analysis, {
+    from: message.from,
+    fromName: message.fromName,
+    subject: message.subject,
+    body,
+  });
 }
