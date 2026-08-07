@@ -13,7 +13,6 @@ import { MailActionsBodySchema } from "@/lib/mail/mail-action-schema";
 import { getGmailMessage } from "@/lib/mail/gmail";
 import { updateMailAnalysisStatus } from "@/lib/mail/mail-analysis-store";
 import { createReferenceNote } from "@/lib/mail/reference-notes";
-import { appendMailSubjectToNotes } from "@/lib/mail/subject-notes";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -49,14 +48,11 @@ export async function POST(request: Request, context: Ctx) {
     );
   }
 
-  let mailSubject = "";
   let mailFrom = "";
   try {
     const message = await getGmailMessage(userId, id, request);
-    mailSubject = message.subject;
     mailFrom = message.fromName;
   } catch {
-    mailSubject = "";
     mailFrom = "";
   }
 
@@ -69,10 +65,12 @@ export async function POST(request: Request, context: Ctx) {
   }> = [];
 
   for (const action of body.actions) {
-    const withSubject = appendMailSubjectToNotes(action.notes, mailSubject);
-    const notes = [withSubject, mailFrom ? `Von: ${mailFrom}` : null]
-      .filter(Boolean)
-      .join("\n\n");
+    const base = (action.notes || "").trim();
+    const fromLine =
+      mailFrom && !base.toLowerCase().includes(`von: ${mailFrom}`.toLowerCase())
+        ? `Von: ${mailFrom}`
+        : null;
+    const notes = [base || null, fromLine].filter(Boolean).join("\n\n");
 
     if (action.kind === "note") {
       try {

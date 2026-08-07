@@ -5,7 +5,7 @@ import {
 } from "@/lib/mail/mail-action-schema";
 import type { MailMessageDetail } from "@/lib/mail/gmail";
 import { enrichMailAnalysisTitles } from "@/lib/mail/enrich-shipping-titles";
-import { appendMailSubjectToNotes } from "@/lib/mail/subject-notes";
+import { enrichSuggestionNotes } from "@/lib/mail/subject-notes";
 
 function htmlToPlain(html: string): string {
   return html
@@ -41,12 +41,17 @@ WICHTIG:
   2) kind "task" — z.B. «Paket annehmen (UPS · irugs.ch)»
   3) kind "note" — Tracking-Nummer; title z.B. «UPS Tracking - irugs.ch», reference = Tracking-Code
 - Carrier (UPS, DHL, Die Post, …) und Lieferant/Shop (Domain oder Markenname aus dem Mail) immer in den Titeln, wenn erkennbar.
+- «notes» = Beschreibungstext für Kalender/Task/Notiz. Baue ihn dynamisch aus dem Mail-Kontext (individuell je Mail), Bausteine mit « - »:
+  Absender/Carrier/Lieferant · Worüber · Wen betrifft (Empfänger) · Tracking/Referenz · ggf. Ort/Zeitfenster.
+  Beispiel Versand: «UPS Paketlieferung - irugs.ch - Trackingnummer 1Z…»
+  Beispiel Termin: «Zahnarzt - Kontrolle - Praxis Müller»
+  Keine leeren Platzhalter. Nicht den rohen Mail-Betreff nur in Klammern anhängen.
 - Nur vorschlagen, was wirklich speicherwürdig ist. Newsletter/Werbung → suggestions: [].
 - Keine Dubletten. Keine erfundenen Daten — wenn unsicher, weglassen oder allDay/nur Datum.
 - Zeiten als HH:mm (24h). Datumsangaben relativ («morgen», «Montag») in absolute YYYY-MM-DD anhand «Heute» auflösen.
 - kind "event": startDate Pflicht wenn möglich. Wenn ein Zustell-/Termin-Zeitfenster im Mail steht (z.B. «zwischen 9 und 13 Uhr», «9:00 AM – 1:00 PM»), IMMER startTime und endTime als HH:mm setzen — nicht nur das Datum.
 - kind "task": dueDate wenn Frist/Tag bekannt, sonst null.
-- kind "note": «reference» = Tracking/Code, «notes» = kurzer Kontext.
+- kind "note": «reference» = Tracking/Code, «notes» = kontextuelle Beschreibung wie oben.
 - Antworte NUR als JSON-Objekt.`;
 
 export async function analyzeMailForActions(
@@ -75,7 +80,7 @@ JSON-Schema:
     {
       "kind": "event"|"task"|"note",
       "title": "z.B. UPS Paketlieferung - irugs.ch",
-      "notes": "Kontext oder null",
+      "notes": "z.B. UPS Paketlieferung - irugs.ch - Trackingnummer 1Z…",
       "reference": "Tracking/Code oder null (vor allem bei note)",
       "reason": "warum speichern",
       "confidence": 0.0-1.0,
@@ -135,11 +140,17 @@ JSON-Schema:
     body,
   });
 
+  const ctx = {
+    from: message.from,
+    fromName: message.fromName,
+    subject: message.subject,
+    body,
+  };
+
   return {
     ...enriched,
-    suggestions: enriched.suggestions.map((s) => ({
-      ...s,
-      notes: appendMailSubjectToNotes(s.notes, message.subject),
-    })),
+    suggestions: enriched.suggestions.map((s) =>
+      enrichSuggestionNotes(s, ctx)
+    ),
   };
 }

@@ -25,6 +25,58 @@ function detectCarrier(hay: string): string | null {
   return null;
 }
 
+export { detectCarrier };
+
+/**
+ * Common tracking / shipment ids from mail text.
+ */
+export function detectTracking(hay: string): string | null {
+  const ups = /\b(1Z[A-Z0-9]{16})\b/i.exec(hay);
+  if (ups?.[1]) return ups[1].toUpperCase();
+
+  const labeled =
+    /(?:tracking(?:\s*(?:number|nr\.?|#|nummer))?|sendungs(?:nummer|nr\.?)|sendung(?:s)?(?:nummer|nr\.?)|trackingcode)\s*[:#]?\s*([A-Z0-9][A-Z0-9_-]{5,34})/i.exec(
+      hay
+    );
+  if (labeled?.[1]) {
+    const code = labeled[1].replace(/[.,;]+$/, "");
+    if (code.length >= 6) return code.toUpperCase();
+  }
+
+  const dhl = /\b(\d{10,22})\b/.exec(hay);
+  if (dhl?.[1] && /dhl/i.test(hay) && dhl[1].length >= 10) {
+    return dhl[1];
+  }
+
+  return null;
+}
+
+/** Optional recipient hint («für Rolf», delivered to …). */
+export function detectRecipientHint(hay: string): string | null {
+  const fuer =
+    /(?:\bfür\b|\bdelivered\s+to\b|\bempfänger\b|\brecipient\b)\s*[:\s]+([A-Za-zÄÖÜäöü][\wÄÖÜäöü.'-]{1,40})/i.exec(
+      hay
+    );
+  if (fuer?.[1]) {
+    const name = fuer[1].trim().replace(/[.,;:]+$/, "");
+    if (
+      name.length >= 2 &&
+      !/^(you|sie|ihnen|package|paket|shipment|sendung)$/i.test(name) &&
+      !/\.(ch|com|de|at|shop)$/i.test(name) &&
+      !/\d{5,}/.test(name)
+    ) {
+      return name;
+    }
+  }
+  // «for First Last» only when two capitalized words (avoid «for irugs.ch»)
+  const forPerson =
+    /\bfor\s+([A-ZÄÖÜ][a-zäöü]+(?:\s+[A-ZÄÖÜ][a-zäöü]+)+)\b/.exec(hay);
+  if (forPerson?.[1]) {
+    return forPerson[1].trim();
+  }
+  return null;
+}
+
 /**
  * Guess merchant/shop from mail text: irugs.ch, "from irugs", order for X, etc.
  */

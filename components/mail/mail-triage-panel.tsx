@@ -27,6 +27,9 @@ export function MailTriagePanel({
   const [selected, setSelected] = useState<
     Record<string, Record<number, boolean>>
   >({});
+  const [notesDraft, setNotesDraft] = useState<
+    Record<string, Record<number, string>>
+  >({});
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const loadTargets = useCallback(async () => {
@@ -95,14 +98,19 @@ export function MailTriagePanel({
       const list = (data.pending || []) as StoredMailAnalysis[];
       setPending(list);
       const next: Record<string, Record<number, boolean>> = {};
+      const drafts: Record<string, Record<number, string>> = {};
       for (const row of list) {
         const map: Record<number, boolean> = {};
-        (row.analysis?.suggestions || []).forEach((_, i) => {
+        const noteMap: Record<number, string> = {};
+        (row.analysis?.suggestions || []).forEach((s, i) => {
           map[i] = true;
+          noteMap[i] = s.notes?.trim() || "";
         });
         next[row.messageId] = map;
+        drafts[row.messageId] = noteMap;
       }
       setSelected(next);
+      setNotesDraft(drafts);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -176,10 +184,13 @@ export function MailTriagePanel({
     setBusyId(row.messageId);
     setError(null);
     try {
-      const actions = picks.map(({ s }) => ({
+      const actions = picks.map(({ s, i }) => ({
         kind: s.kind,
         title: s.title,
-        notes: s.notes ?? null,
+        notes:
+          notesDraft[row.messageId]?.[i] ??
+          s.notes ??
+          null,
         startDate: s.startDate ?? null,
         startTime: s.startTime ?? null,
         endDate: s.endDate ?? null,
@@ -341,7 +352,7 @@ export function MailTriagePanel({
                             }))
                           }
                         />
-                        <div className="min-w-0 flex-1">
+                        <div className="min-w-0 flex-1 space-y-1.5">
                           <p className="flex items-center gap-1.5 text-sm font-medium">
                             {s.kind === "event" ? (
                               <CalendarDays
@@ -364,6 +375,31 @@ export function MailTriagePanel({
                           <p className="text-[11px] text-muted-foreground">
                             {formatMailSuggestionDetail(s)}
                           </p>
+                          <label className="block space-y-0.5">
+                            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                              Beschreibung
+                            </span>
+                            <textarea
+                              className="min-h-[2.75rem] w-full resize-y rounded-md border border-input bg-background px-2 py-1.5 text-xs leading-snug"
+                              rows={2}
+                              value={
+                                notesDraft[row.messageId]?.[i] ??
+                                s.notes ??
+                                ""
+                              }
+                              disabled={busy}
+                              onChange={(e) =>
+                                setNotesDraft((prev) => ({
+                                  ...prev,
+                                  [row.messageId]: {
+                                    ...prev[row.messageId],
+                                    [i]: e.target.value,
+                                  },
+                                }))
+                              }
+                              placeholder="Beschreibung für Kalender / Aufgabe / Notiz"
+                            />
+                          </label>
                         </div>
                       </li>
                     ))}

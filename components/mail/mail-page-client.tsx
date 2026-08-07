@@ -101,6 +101,7 @@ export function MailPageClient() {
   const [analysis, setAnalysis] = useState<MailAnalysis | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
+  const [notesDraft, setNotesDraft] = useState<Record<string, string>>({});
   const [calendarId, setCalendarId] = useState("");
   const [calendars, setCalendars] = useState<CalOption[]>([]);
   const [tasklistId, setTasklistId] = useState("");
@@ -113,6 +114,7 @@ export function MailPageClient() {
     setDetail(null);
     setAnalysis(null);
     setSelected({});
+    setNotesDraft({});
     setApplyMsg(null);
     setDetailLoading(true);
     try {
@@ -233,10 +235,14 @@ export function MailPageClient() {
       const a = data.analysis as MailAnalysis;
       setAnalysis(a);
       const next: Record<string, boolean> = {};
+      const drafts: Record<string, string> = {};
       a.suggestions.forEach((s, i) => {
-        next[suggestionKey(s, i)] = true;
+        const key = suggestionKey(s, i);
+        next[key] = true;
+        drafts[key] = s.notes?.trim() || "";
       });
       setSelected(next);
+      setNotesDraft(drafts);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -257,10 +263,10 @@ export function MailPageClient() {
     setApplying(true);
     setApplyMsg(null);
     try {
-      const actions = selectedSuggestions.map(({ s }) => ({
+      const actions = selectedSuggestions.map(({ s, i }) => ({
         kind: s.kind,
         title: s.title,
-        notes: s.notes ?? null,
+        notes: notesDraft[suggestionKey(s, i)] ?? s.notes ?? null,
         startDate: s.startDate ?? null,
         startTime: s.startTime ?? null,
         endDate: s.endDate ?? null,
@@ -603,7 +609,7 @@ export function MailPageClient() {
                                     }))
                                   }
                                 />
-                                <div className="min-w-0 flex-1">
+                                <div className="min-w-0 flex-1 space-y-1.5">
                                   <p className="flex items-center gap-1.5 text-sm font-medium">
                                     {s.kind === "event" ? (
                                       <CalendarDays
@@ -627,6 +633,24 @@ export function MailPageClient() {
                                     {formatMailSuggestionDetail(s)}
                                     {s.reason ? ` · ${s.reason}` : ""}
                                   </p>
+                                  <label className="block space-y-0.5">
+                                    <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                                      Beschreibung
+                                    </span>
+                                    <textarea
+                                      className="min-h-[2.75rem] w-full resize-y rounded-md border border-input bg-background px-2 py-1.5 text-xs leading-snug"
+                                      rows={2}
+                                      value={notesDraft[key] ?? s.notes ?? ""}
+                                      disabled={applying}
+                                      onChange={(e) =>
+                                        setNotesDraft((prev) => ({
+                                          ...prev,
+                                          [key]: e.target.value,
+                                        }))
+                                      }
+                                      placeholder="Beschreibung für Kalender / Aufgabe / Notiz"
+                                    />
+                                  </label>
                                 </div>
                               </li>
                             );
