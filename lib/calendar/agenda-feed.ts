@@ -8,8 +8,15 @@ import {
   type IcsCalendarType,
 } from "@/lib/calendar/ics-calendars";
 import { getGenericCalendarEvents } from "@/lib/calendar/ics-generic";
-import { listGoogleBirthdaysInRange } from "@/lib/google/birthdays";
-import { isGoogleMailConnected } from "@/lib/google/oauth";
+import {
+  getEnabledGoogleCalendarSelections,
+  googleCalendarSourceId,
+  listGoogleCalendarEventsInRange,
+} from "@/lib/google/calendars";
+import {
+  hasGoogleCalendarScope,
+  isGoogleMailConnected,
+} from "@/lib/google/oauth";
 import {
   getSwissHolidays,
   holidayBadge,
@@ -31,9 +38,6 @@ import {
 
 export const CALENDAR_SOURCE_HOLIDAYS = "swiss-holidays";
 export const CALENDAR_SOURCE_DEADLINES = "deadlines";
-export const CALENDAR_SOURCE_GOOGLE_BIRTHDAYS = "google-birthdays";
-
-const GOOGLE_BIRTHDAY_COLOR = "#ec4899";
 
 export type CalendarAgendaRange = "today" | "week" | "14d";
 
@@ -139,21 +143,22 @@ export function listCalendarSources(userId: number | null): CalendarSource[] {
     builtin: c.builtin,
     enabled: c.enabled,
   }));
-  const googleBirthdays: CalendarSource[] = isGoogleMailConnected(userId)
-    ? [
-        {
-          id: CALENDAR_SOURCE_GOOGLE_BIRTHDAYS,
-          name: "Geburtstage (Google)",
-          color: GOOGLE_BIRTHDAY_COLOR,
-          type: "birthday",
+  const googleSelected =
+    userId != null &&
+    isGoogleMailConnected(userId) &&
+    hasGoogleCalendarScope(userId)
+      ? getEnabledGoogleCalendarSelections(userId).map((s) => ({
+          id: googleCalendarSourceId(s.id),
+          name: s.name || (s.id.includes("@") ? s.id.split("@")[0]! : s.id),
+          color: s.color || ICS_TYPE_META[s.type || "other"].defaultColor,
+          type: (s.type || "other") as CalendarSource["type"],
           builtin: true,
           enabled: true,
-        },
-      ]
-    : [];
+        }))
+      : [];
   return [
     ...ics,
-    ...googleBirthdays,
+    ...googleSelected,
     {
       id: CALENDAR_SOURCE_HOLIDAYS,
       name: "Feiertage UR/ZH",
@@ -244,34 +249,40 @@ export async function getCalendarAgenda(options: {
 
   if (
     options.userId != null &&
-    sourceAllowed(CALENDAR_SOURCE_GOOGLE_BIRTHDAYS, filterIds) &&
-    isGoogleMailConnected(options.userId)
+    isGoogleMailConnected(options.userId) &&
+    hasGoogleCalendarScope(options.userId)
   ) {
     try {
-      const birthdays = await listGoogleBirthdaysInRange(
+      const gEvents = await listGoogleCalendarEventsInRange(
         options.userId,
         start,
         end
       );
-      for (const b of birthdays) {
+      for (const ev of gEvents) {
+        const sourceId = googleCalendarSourceId(ev.calendarId);
+        if (!sourceAllowed(sourceId, filterIds)) continue;
         items.push({
-          id: `gbd-${b.id}`,
+          id: `gcal-${ev.calendarId}-${ev.id}`,
           kind: "calendar",
-          date: b.date,
-          title: b.summary,
-          subtitle: "Google · Geburtstag",
+          date: ev.date,
+          title: ev.summary,
+          subtitle: ev.location || ev.calendarName,
           amount: null,
           currency: null,
           documentId: null,
           href: null,
-          badge: "Geburtstag",
-          accentColor: GOOGLE_BIRTHDAY_COLOR,
-          calendarType: "birthday",
-          calendarId: CALENDAR_SOURCE_GOOGLE_BIRTHDAYS,
+          badge: ev.isBirthday
+            ? "Geburtstag"
+            : ICS_TYPE_META[ev.type]?.label || "Google",
+          time: ev.time,
+          location: ev.location,
+          accentColor: ev.color,
+          calendarType: ev.type,
+          calendarId: sourceId,
         });
       }
     } catch {
-      /* missing calendar scope or API error — skip */
+      /* missing scope or API error — skip */
     }
   }
 

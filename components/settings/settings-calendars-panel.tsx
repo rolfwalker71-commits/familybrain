@@ -249,10 +249,9 @@ export function SettingsCalendarsPanel() {
       </CardHeader>
       <CardContent className="space-y-6">
         <p className="text-sm text-muted-foreground">
-          Hier trägst <span className="font-medium text-foreground">du</span>{" "}
-          deine eigenen ICS-Feeds ein (Name, URL, Typ, Farbe) — kein gemeinsames
-          Vordefinieren für alle. Die Filter-Chips im Kalender blenden nur aus,
-          was du hier angelegt hast. Ambri/Hockey ist optional (Vorlage unten).
+          Zusätzliche öffentliche ICS-URLs (z.&nbsp;B. Schulen, Gemeinden) —
+          unabhängig von Google. Google-Kalender oben anhaken, statt sie hier
+          nochmals als ICS einzutragen.
         </p>
 
         {error ? (

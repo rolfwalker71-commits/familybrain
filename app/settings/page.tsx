@@ -27,7 +27,6 @@ import {
 } from "@/components/settings/settings-tab-nav";
 import { SettingsUsersPanel } from "@/components/settings/settings-users-panel";
 import { SettingsFamilyPanel } from "@/components/settings/settings-family-panel";
-import { SettingsCalendarsPanel } from "@/components/settings/settings-calendars-panel";
 import { SettingsGooglePanel } from "@/components/settings/settings-google-panel";
 import { NotificationPrefsPanel } from "@/components/settings/notification-prefs-panel";
 import { SettingsCategorySuggestionsPanel } from "@/components/settings/settings-category-suggestions-panel";
@@ -2569,13 +2568,13 @@ function SettingsPageInner() {
       {activeTab === "calendars" ? (
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            Persönliche ICS-Feeds verwalten die User unter{" "}
+            Persönliche Kalender:{" "}
             <a href="/account" className="underline underline-offset-2">
-              Konto → Meine Kalender
-            </a>
-            . Hier zusätzlich Google OAuth (App-weit Client-ID/Secret).
+              Konto
+            </a>{" "}
+            (Google-Auswahl + ICS). Hier Google OAuth Client-ID/Secret
+            (app-weit).
           </p>
-          <SettingsCalendarsPanel />
           <SettingsGooglePanel />
         </div>
       ) : null}

@@ -1,4 +1,5 @@
 import { SettingsCalendarsPanel } from "@/components/settings/settings-calendars-panel";
+import { SettingsGoogleCalendarsPanel } from "@/components/settings/settings-google-calendars-panel";
 import { PageHeader } from "@/components/layout/page-primitives";
 import { pageVisuals } from "@/components/layout/icon-circle";
 
@@ -13,6 +14,7 @@ export default function AccountPage() {
         icon={pageVisuals.account.icon}
         tone={pageVisuals.account.tone}
       />
+      <SettingsGoogleCalendarsPanel />
       <SettingsCalendarsPanel />
     </div>
   );
