@@ -467,7 +467,7 @@ export function MailPageClient() {
               >
                 Google neu verbinden
               </a>
-              , damit Buddy Status-Labels (Buddy/Zur Triage, …) zurückschreibt.
+              , damit Buddy Status-Labels (BUDDY - Zur Triage, …) zurückschreibt.
             </p>
           ) : null}
         </div>

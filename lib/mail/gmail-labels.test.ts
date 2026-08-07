@@ -3,7 +3,7 @@ import test from "node:test";
 import { GMAIL_STATUS_LABELS } from "@/lib/mail/gmail-labels";
 import type { MailAnalysisStatus } from "@/lib/mail/mail-heuristic";
 
-test("every analysis status has a Buddy/ Gmail label", () => {
+test("every analysis status has a BUDDY - Gmail label", () => {
   const statuses: MailAnalysisStatus[] = [
     "pending_triage",
     "analyzed",
@@ -13,9 +13,9 @@ test("every analysis status has a Buddy/ Gmail label", () => {
     "dismissed",
   ];
   for (const s of statuses) {
-    assert.match(GMAIL_STATUS_LABELS[s], /^Buddy\//);
+    assert.match(GMAIL_STATUS_LABELS[s], /^BUDDY - /);
   }
-  assert.equal(GMAIL_STATUS_LABELS.pending_triage, "Buddy/Zur Triage");
-  assert.equal(GMAIL_STATUS_LABELS.analyzed, "Buddy/Kein Extrakt");
-  assert.equal(GMAIL_STATUS_LABELS.skipped, "Buddy/Übersprungen");
+  assert.equal(GMAIL_STATUS_LABELS.pending_triage, "BUDDY - Zur Triage");
+  assert.equal(GMAIL_STATUS_LABELS.analyzed, "BUDDY - Kein Extrakt");
+  assert.equal(GMAIL_STATUS_LABELS.skipped, "BUDDY - Übersprungen");
 });

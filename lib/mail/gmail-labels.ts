@@ -5,20 +5,35 @@ import {
 } from "@/lib/google/oauth";
 import type { MailAnalysisStatus } from "@/lib/mail/mail-heuristic";
 
-/** Gmail label names (nested under Buddy/) matching Buddy analysis chips. */
+/** Gmail label names matching Buddy analysis chips (flat «BUDDY - …»). */
 export const GMAIL_STATUS_LABELS: Record<
   MailAnalysisStatus,
   string
 > = {
-  pending_triage: "Buddy/Zur Triage",
-  analyzed: "Buddy/Kein Extrakt",
-  skipped: "Buddy/Übersprungen",
-  error: "Buddy/Fehler",
-  applied: "Buddy/Übernommen",
-  dismissed: "Buddy/Verworfen",
+  pending_triage: "BUDDY - Zur Triage",
+  analyzed: "BUDDY - Kein Extrakt",
+  skipped: "BUDDY - Übersprungen",
+  error: "BUDDY - Fehler",
+  applied: "BUDDY - Übernommen",
+  dismissed: "BUDDY - Verworfen",
 };
 
 const ALL_BUDDY_LABEL_NAMES = Object.values(GMAIL_STATUS_LABELS);
+
+/** Previous nested names — still removed when updating a message. */
+const LEGACY_BUDDY_LABEL_NAMES = [
+  "Buddy/Zur Triage",
+  "Buddy/Kein Extrakt",
+  "Buddy/Übersprungen",
+  "Buddy/Fehler",
+  "Buddy/Übernommen",
+  "Buddy/Verworfen",
+] as const;
+
+const LABEL_NAMES_TO_TRACK = new Set<string>([
+  ...ALL_BUDDY_LABEL_NAMES,
+  ...LEGACY_BUDDY_LABEL_NAMES,
+]);
 
 /** In-process cache: userId → label name → gmail label id */
 const labelIdCache = new Map<number, Map<string, string>>();
@@ -57,7 +72,7 @@ async function ensureLabelId(
     const name = lab.name?.trim();
     const id = lab.id?.trim();
     if (!name || !id) continue;
-    if (ALL_BUDDY_LABEL_NAMES.includes(name) || name === labelName) {
+    if (LABEL_NAMES_TO_TRACK.has(name) || name === labelName) {
       cache.set(name, id);
     }
   }
@@ -80,7 +95,7 @@ async function ensureLabelId(
 }
 
 /**
- * Set the Buddy status label on a Gmail message (removes other Buddy/* status labels).
+ * Set the Buddy status label on a Gmail message (removes other BUDDY - / legacy labels).
  * No-op if gmail.modify scope is missing.
  */
 export async function applyGmailStatusLabel(
@@ -105,7 +120,7 @@ export async function applyGmailStatusLabel(
 
     const cache = cacheFor(userId);
     const removeIds: string[] = [];
-    for (const name of ALL_BUDDY_LABEL_NAMES) {
+    for (const name of LABEL_NAMES_TO_TRACK) {
       if (name === targetName) continue;
       const id = cache.get(name);
       if (id) removeIds.push(id);
