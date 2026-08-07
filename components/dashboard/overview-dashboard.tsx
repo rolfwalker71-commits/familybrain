@@ -125,31 +125,12 @@ function shortPlace(item: AgendaItem): string | null {
 function buildNextStepLine(
   items: AgendaItem[],
   today: string,
-  nowHm: string,
-  activeId: string | null
+  nowHm: string
 ): string | null {
-  const todayTimed = items.filter((i) => i.date === today && i.time);
-  const now = hmToMinutes(nowHm) ?? 0;
-
-  let focus =
-    todayTimed.find((i) => {
-      const w = eventWindowMinutes(i);
-      return w && w.start > now;
-    }) || null;
-
-  if (!focus) {
-    focus =
-      todayTimed.find((i) => {
-        const w = eventWindowMinutes(i);
-        return w && now >= w.start && now < w.end;
-      }) || null;
-  }
-
-  if (!focus) {
-    focus = items.find((i) => i.id === activeId) || items[0] || null;
-  }
+  const focus = pickFocusAgendaItem(items, today, nowHm);
   if (!focus) return null;
 
+  const now = hmToMinutes(nowHm) ?? 0;
   const w = eventWindowMinutes(focus);
   const ongoing = Boolean(w && now >= w.start && now < w.end);
   const countdown = formatCountdown(
@@ -163,6 +144,36 @@ function buildNextStepLine(
     return [focus.time, focus.title].filter(Boolean).join(" · ") || null;
   }
   return parts.join(" · ");
+}
+
+/** Next upcoming today, else currently ongoing, else first later day — never a finished past slot. */
+function pickFocusAgendaItem(
+  items: AgendaItem[],
+  today: string,
+  nowHm: string
+): AgendaItem | null {
+  if (!items.length) return null;
+  const todayTimed = items.filter((i) => i.date === today && i.time);
+  const now = hmToMinutes(nowHm) ?? 0;
+
+  const ongoing =
+    todayTimed.find((i) => {
+      const w = eventWindowMinutes(i);
+      return w && now >= w.start && now < w.end;
+    }) || null;
+  if (ongoing) return ongoing;
+
+  const upcoming =
+    todayTimed.find((i) => {
+      const w = eventWindowMinutes(i);
+      return w && w.start > now;
+    }) || null;
+  if (upcoming) return upcoming;
+
+  const later = items.find((i) => i.date > today);
+  if (later) return later;
+
+  return todayTimed[todayTimed.length - 1] || items[0] || null;
 }
 
 function findConflicts(
@@ -653,8 +664,14 @@ export function OverviewDashboard({
   const [correctOpen, setCorrectOpen] = useState(false);
   const [eventDetail, setEventDetail] = useState<AgendaItem | null>(null);
   const [fromCache, setFromCache] = useState(false);
+  const [nowTick, setNowTick] = useState(0);
   const dataRef = useRef<OverviewPayload | null>(null);
   dataRef.current = data;
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNowTick((n) => n + 1), 30_000);
+    return () => window.clearInterval(id);
+  }, []);
 
   useEffect(() => {
     const stale = readStaleOverview(period);
@@ -669,16 +686,13 @@ export function OverviewDashboard({
     }
   }, [period]);
 
-  const load = useCallback(async (opts?: { fresh?: boolean }) => {
+  const load = useCallback(async () => {
     const hasShell = Boolean(dataRef.current);
     if (hasShell) setRefreshing(true);
     else setLoading(true);
     setError(null);
     try {
-      const qs = new URLSearchParams({
-        period,
-        ...(opts?.fresh ? { fresh: "1" } : {}),
-      });
+      const qs = new URLSearchParams({ period, fresh: "1" });
       const res = await fetch(`/api/dashboard/overview?${qs}`);
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Laden fehlgeschlagen");
@@ -715,10 +729,10 @@ export function OverviewDashboard({
         if (!res.ok) {
           throw new Error(json.error || "Löschen fehlgeschlagen");
         }
-        void load({ fresh: true });
+        void load();
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
-        void load({ fresh: true });
+        void load();
       }
     },
     [load]
@@ -728,8 +742,34 @@ export function OverviewDashboard({
     void load();
   }, [load]);
 
+  // After first paint: mail AI may finish in background — pull chips again
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      void load();
+    }, 4500);
+    return () => window.clearTimeout(t);
+  }, [load]);
+
+  useEffect(() => {
+    const onVis = () => {
+      if (document.visibilityState === "visible") void load();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    const poll = window.setInterval(() => {
+      if (document.visibilityState === "visible") void load();
+    }, 90_000);
+    return () => {
+      document.removeEventListener("visibilitychange", onVis);
+      window.clearInterval(poll);
+    };
+  }, [load]);
+
   const today = zurichTodayIso();
-  const nowHm = zurichNowHm();
+  // nowTick forces recompute when the clock advances
+  const nowHm = useMemo(() => {
+    void nowTick;
+    return zurichNowHm();
+  }, [nowTick]);
 
   const timelineItems = useMemo(() => {
     if (!data) return [] as AgendaItem[];
@@ -747,30 +787,16 @@ export function OverviewDashboard({
     });
   }, [data, today]);
 
-  const activeId = useMemo(() => {
-    const todayTimed = timelineItems.filter(
-      (i) => i.date === today && i.time
-    );
-    if (todayTimed.length === 0) {
-      return timelineItems[0]?.id ?? null;
-    }
-    let active: string | null = null;
-    for (const it of todayTimed) {
-      if ((it.time || "") <= nowHm) active = it.id;
-    }
-    return active || todayTimed[0]!.id;
-  }, [timelineItems, today, nowHm]);
+  const nextFocusEvent = useMemo(
+    () => pickFocusAgendaItem(timelineItems, today, nowHm),
+    [timelineItems, today, nowHm]
+  );
 
-  const nextFocusEvent = useMemo(() => {
-    if (!timelineItems.length) return null;
-    const active =
-      timelineItems.find((i) => i.id === activeId) || timelineItems[0];
-    return active;
-  }, [timelineItems, activeId]);
+  const activeId = nextFocusEvent?.id ?? null;
 
   const nextStepLine = useMemo(
-    () => buildNextStepLine(timelineItems, today, nowHm, activeId),
-    [timelineItems, today, nowHm, activeId]
+    () => buildNextStepLine(timelineItems, today, nowHm),
+    [timelineItems, today, nowHm]
   );
 
   const conflicts = useMemo(
@@ -1253,7 +1279,7 @@ export function OverviewDashboard({
         open={correctOpen}
         onOpenChange={setCorrectOpen}
         items={data?.financeItems || []}
-        onSaved={() => void load({ fresh: true })}
+        onSaved={() => void load()}
       />
       <AgendaEventDialog
         item={eventDetail}

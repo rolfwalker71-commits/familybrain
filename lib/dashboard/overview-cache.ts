@@ -1,6 +1,6 @@
 import type { OverviewPayload, OverviewPeriod } from "@/lib/dashboard/overview";
 
-const TTL_MS = 50_000;
+const TTL_MS = 15_000;
 
 type CacheEntry = {
   at: number;

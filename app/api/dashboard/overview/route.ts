@@ -7,6 +7,7 @@ import {
 import {
   getCachedOverview,
   setCachedOverview,
+  invalidateOverviewCache,
 } from "@/lib/dashboard/overview-cache";
 import { ensureInitialized } from "@/lib/db/migrations";
 
@@ -26,6 +27,30 @@ function runOverviewBackgroundJobs(
       await finalizeDuePaymentPlans().catch(() => undefined);
     } catch {
       /* ignore */
+    }
+
+    // Mail AI triage: same trigger as /mail list, without blocking overview
+    if (calendarUserId != null) {
+      try {
+        const { getTodayMailExcerpt } = await import("@/lib/mail/gmail");
+        const { syncMailAnalysesForItems } = await import(
+          "@/lib/mail/sync-mail-analysis"
+        );
+        const mailItems = await getTodayMailExcerpt(calendarUserId, 10);
+        const sync = await syncMailAnalysesForItems(
+          calendarUserId,
+          mailItems,
+          { maxAi: 3, request }
+        );
+        if (sync.analyzed > 0 || sync.withSuggestions > 0) {
+          invalidateOverviewCache(calendarUserId);
+        }
+      } catch (error) {
+        console.warn(
+          "[mail] overview background sync:",
+          error instanceof Error ? error.message : error
+        );
+      }
     }
 
     let syncUpdated = 0;
