@@ -14,6 +14,7 @@ type Connection = {
   connectedEmail: string | null;
   hasCalendarScope: boolean;
   hasCalendarEventsWrite: boolean;
+  hasTasksScope: boolean;
 };
 
 export function SettingsGoogleConnectPanel() {
@@ -117,7 +118,9 @@ export function SettingsGoogleConnectPanel() {
                     <Unlink className="size-3.5" />
                     Trennen
                   </Button>
-                  {!data.hasCalendarScope || !data.hasCalendarEventsWrite ? (
+                  {!data.hasCalendarScope ||
+                  !data.hasCalendarEventsWrite ||
+                  !data.hasTasksScope ? (
                     <a
                       href="/api/google/oauth/start"
                       className={cn(
@@ -140,10 +143,14 @@ export function SettingsGoogleConnectPanel() {
                     verbinden, damit Ambri-Resultate (und Torschützen) in deine
                     Google-Termine zurückgeschrieben werden.
                   </p>
+                ) : !data.hasTasksScope ? (
+                  <p className="text-xs text-amber-800">
+                    Tasks-Recht fehlt — bitte neu verbinden (Google Tasks API in
+                    der Cloud Console aktivieren, dann Consent erneut).
+                  </p>
                 ) : (
                   <p className="text-xs text-muted-foreground">
-                    Schreibrecht aktiv: Resultate können in Hockey-Termine
-                    zurückgeschrieben werden.
+                    Schreibrecht Kalender + Tasks aktiv.
                   </p>
                 )}
               </div>

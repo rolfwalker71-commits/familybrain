@@ -6,6 +6,12 @@ import {
   type CurrentWeather,
   fetchCurrentWeather,
 } from "@/lib/trips/weather";
+import {
+  driveLabelDe,
+  fetchDriveFromHome,
+  googleMapsDirFromHomeUrl,
+  googleMapsSearchUrl,
+} from "@/lib/dashboard/drive-time";
 
 export type DayWeather = {
   date: string;
@@ -22,6 +28,12 @@ export type AgendaWeatherChip = {
   temperatureC: number;
   labelDe: string;
   placeLabel: string;
+};
+
+export type AgendaPlaceCoords = {
+  lat: number;
+  lon: number;
+  label: string;
 };
 
 /** Home dashboard weather — Altdorf UR. */
@@ -48,8 +60,11 @@ const KNOWN_PLACES: Record<string, { lat: number; lon: number; label: string }> 
     "centro sportivo": { lat: 46.192, lon: 9.017, label: "Bellinzona" },
     "lonza arena": { lat: 46.295, lon: 7.883, label: "Visp" },
     altdorf: { lat: 46.88042, lon: 8.64345, label: "Altdorf" },
-    "kantonsspital uri": { lat: 46.88042, lon: 8.64345, label: "Altdorf" },
-    "spitalstrasse 1": { lat: 46.88042, lon: 8.64345, label: "Altdorf" },
+    "kantonsspital uri": {
+      lat: 46.8815,
+      lon: 8.6448,
+      label: "Kantonsspital Uri",
+    },
     regensdorf: { lat: 47.4342, lon: 8.4687, label: "Regensdorf" },
   };
 
@@ -60,6 +75,13 @@ function normalizePlaceKey(raw: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
+}
+
+function looksLikeStreetAddress(location: string): boolean {
+  return (
+    /\d/.test(location) &&
+    (/,/.test(location) || /strasse|weg|gasse|platz/i.test(location))
+  );
 }
 
 function shortPlaceLabel(raw: string): string {
@@ -93,13 +115,27 @@ function writeGeoCache(cache: GeoCache): void {
 
 export async function resolvePlaceCoords(
   location: string
-): Promise<{ lat: number; lon: number; label: string; source: "known" | "cache" | "network" } | null> {
+): Promise<{
+  lat: number;
+  lon: number;
+  label: string;
+  source: "known" | "cache" | "network";
+} | null> {
   const key = normalizePlaceKey(location);
   if (!key || key.length < 3) return null;
 
-  for (const [alias, hit] of Object.entries(KNOWN_PLACES)) {
-    if (key === alias || key.includes(alias)) {
-      return { ...hit, source: "known" };
+  // Street addresses: prefer geocoder over coarse venue aliases.
+  if (!looksLikeStreetAddress(location)) {
+    for (const [alias, hit] of Object.entries(KNOWN_PLACES)) {
+      if (key === alias || key.includes(alias)) {
+        return { ...hit, source: "known" };
+      }
+    }
+  } else {
+    for (const [alias, hit] of Object.entries(KNOWN_PLACES)) {
+      if (key === alias) {
+        return { ...hit, source: "known" };
+      }
     }
   }
 
@@ -240,20 +276,33 @@ export async function fetchHomeWeather(): Promise<{
   }
 }
 
+export type AgendaPlaceEnrichment = {
+  weather: AgendaWeatherChip | null;
+  coords: AgendaPlaceCoords | null;
+  driveMinutes: number | null;
+  driveLabel: string | null;
+  mapsUrl: string | null;
+};
+
 /**
- * Attach day-forecast chips for agenda items that have a location.
- * Batches Open-Meteo by unique coordinates.
+ * Attach day-forecast chips, coords, drive time from home, and Maps links
+ * for agenda items that have a location.
  */
 export async function enrichAgendaWithWeather<
   T extends { date: string; location?: string | null },
->(items: T[]): Promise<
-  Array<T & { weather: AgendaWeatherChip | null }>
-> {
+>(items: T[]): Promise<Array<T & AgendaPlaceEnrichment>> {
   const withLoc = items.filter(
     (i) => i.location && String(i.location).trim().length >= 3
   );
   if (withLoc.length === 0) {
-    return items.map((i) => ({ ...i, weather: null }));
+    return items.map((i) => ({
+      ...i,
+      weather: null,
+      coords: null,
+      driveMinutes: null,
+      driveLabel: null,
+      mapsUrl: null,
+    }));
   }
 
   const resolved = new Map<
@@ -291,6 +340,11 @@ export async function enrichAgendaWithWeather<
   forecastDays = Math.min(16, Math.max(1, forecastDays));
 
   const forecastByCoord = new Map<string, DayWeather[]>();
+  const driveByCoord = new Map<
+    string,
+    { minutes: number; distanceKm: number } | null
+  >();
+
   for (const place of resolved.values()) {
     const ck = `${place.lat.toFixed(3)},${place.lon.toFixed(3)}`;
     if (forecastByCoord.has(ck)) continue;
@@ -311,24 +365,61 @@ export async function enrichAgendaWithWeather<
     }
   }
 
+  for (const place of resolved.values()) {
+    const ck = `${place.lat.toFixed(3)},${place.lon.toFixed(3)}`;
+    if (driveByCoord.has(ck)) continue;
+    const drive = await fetchDriveFromHome(place.lat, place.lon).catch(
+      () => null
+    );
+    driveByCoord.set(ck, drive);
+  }
+
   return items.map((item) => {
     const loc = item.location?.trim();
-    if (!loc) return { ...item, weather: null };
+    if (!loc) {
+      return {
+        ...item,
+        weather: null,
+        coords: null,
+        driveMinutes: null,
+        driveLabel: null,
+        mapsUrl: null,
+      };
+    }
     const place = resolved.get(normalizePlaceKey(loc));
-    if (!place) return { ...item, weather: null };
+    if (!place) {
+      return {
+        ...item,
+        weather: null,
+        coords: null,
+        driveMinutes: null,
+        driveLabel: null,
+        mapsUrl: googleMapsSearchUrl(loc),
+      };
+    }
     const ck = `${place.lat.toFixed(3)},${place.lon.toFixed(3)}`;
     const day = (forecastByCoord.get(ck) || []).find(
       (d) => d.date === item.date.slice(0, 10)
     );
-    if (!day) return { ...item, weather: null };
+    const drive = driveByCoord.get(ck) || null;
     return {
       ...item,
-      weather: {
-        icon: weatherConditionIcon(day.weatherCode),
-        temperatureC: Math.round(day.temperatureC),
-        labelDe: day.weatherLabelDe,
-        placeLabel: place.label,
+      weather: day
+        ? {
+            icon: weatherConditionIcon(day.weatherCode),
+            temperatureC: Math.round(day.temperatureC),
+            labelDe: day.weatherLabelDe,
+            placeLabel: place.label,
+          }
+        : null,
+      coords: {
+        lat: place.lat,
+        lon: place.lon,
+        label: place.label,
       },
+      driveMinutes: drive?.minutes ?? null,
+      driveLabel: driveLabelDe(drive),
+      mapsUrl: googleMapsDirFromHomeUrl(place.lat, place.lon),
     };
   });
 }

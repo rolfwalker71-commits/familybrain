@@ -8,6 +8,7 @@ import {
   type IcsCalendarType,
 } from "@/lib/calendar/ics-calendars";
 import { getGenericCalendarEvents } from "@/lib/calendar/ics-generic";
+import { extractMeetUrl } from "@/lib/calendar/meet-url";
 import {
   getEnabledGoogleCalendarSelections,
   googleCalendarSourceId,
@@ -276,7 +277,9 @@ export async function getCalendarAgenda(options: {
             ? "Geburtstag"
             : ICS_TYPE_META[ev.type]?.label || "Google",
           time: ev.time,
+          endTime: ev.endTime,
           location: ev.location,
+          meetUrl: ev.meetUrl,
           accentColor: ev.color,
           calendarType: ev.type,
           calendarId: sourceId,
@@ -368,7 +371,16 @@ export async function getCalendarAgenda(options: {
           href: null,
           badge: ICS_TYPE_META[cal.type].label,
           time: ev.time,
+          endTime: ev.endAt
+            ? new Intl.DateTimeFormat("en-GB", {
+                timeZone: "Europe/Zurich",
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: false,
+              }).format(new Date(ev.endAt))
+            : null,
           location: ev.location,
+          meetUrl: extractMeetUrl(ev.description, ev.location),
           accentColor: cal.color,
           calendarType: cal.type,
           calendarId: cal.id,
@@ -473,7 +485,14 @@ export async function getCalendarAgenda(options: {
 
   const withWeather = options.includeWeather
     ? await enrichAgendaWithWeather(items)
-    : items;
+    : items.map((i) => ({
+        ...i,
+        weather: i.weather ?? null,
+        coords: i.coords ?? null,
+        driveMinutes: i.driveMinutes ?? null,
+        driveLabel: i.driveLabel ?? null,
+        mapsUrl: i.mapsUrl ?? null,
+      }));
 
   return {
     range: options.range,
@@ -484,10 +503,10 @@ export async function getCalendarAgenda(options: {
   };
 }
 
-/** Overview aside: heute + optional morgen (24h), max 5. */
+/** Overview aside: heute + optional morgen (24h), max 12 for Tagesbriefing timeline. */
 export async function getTodayCalendarExcerpt(
   userId: number | null,
-  limit = 5
+  limit = 12
 ): Promise<AgendaItem[]> {
   const feed = await getCalendarAgenda({
     userId,

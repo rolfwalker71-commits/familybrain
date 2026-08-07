@@ -13,6 +13,8 @@ export const GOOGLE_OAUTH_SCOPES = [
   "https://www.googleapis.com/auth/calendar.readonly",
   /** Needed to write Ambri results back into owned Google events */
   "https://www.googleapis.com/auth/calendar.events",
+  /** Google Tasks — lesen + anlegen aus Mail-Vorschlägen */
+  "https://www.googleapis.com/auth/tasks",
 ] as const;
 
 export const GOOGLE_OAUTH_CALLBACK_PATH = "/api/google/oauth/callback";
@@ -138,6 +140,15 @@ export function hasGoogleCalendarEventsWriteScope(
     scope.includes("https://www.googleapis.com/auth/calendar.events") ||
     scope.includes("https://www.googleapis.com/auth/calendar")
   );
+}
+
+/** True if Buddy may read/write Google Tasks (full scope, not readonly). */
+export function hasGoogleTasksScope(userId: number | null): boolean {
+  if (userId == null) return false;
+  const scopes = (readGoogleUserTokens(userId)?.scope || "")
+    .split(/[\s,]+/)
+    .filter(Boolean);
+  return scopes.includes("https://www.googleapis.com/auth/tasks");
 }
 
 export function getConnectedGoogleEmail(

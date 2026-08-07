@@ -6,6 +6,7 @@ import {
   getGoogleOauthRedirectUri,
   hasGoogleCalendarEventsWriteScope,
   hasGoogleCalendarScope,
+  hasGoogleTasksScope,
   isGoogleMailConnected,
   isGoogleOauthConfigured,
   resolveGoogleUserId,
@@ -31,5 +32,6 @@ export async function GET(request: Request) {
     hasCalendarEventsWrite: connected
       ? hasGoogleCalendarEventsWriteScope(userId)
       : false,
+    hasTasksScope: connected ? hasGoogleTasksScope(userId) : false,
   });
 }

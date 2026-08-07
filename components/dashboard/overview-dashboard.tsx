@@ -11,12 +11,17 @@ import {
   ChevronRight,
   Plane,
   ListChecks,
+  Video,
+  MapPin,
+  AlertTriangle,
+  Car,
+  CheckSquare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BackupStatusPanel } from "@/components/settings/backup-status-panel";
 import { KpiCorrectSheet } from "@/components/dashboard/kpi-correct-sheet";
-import { TeamLogo, weekdayLabel } from "@/components/calendar/agenda-row";
+import { TeamLogo, weekdayLabel, resolveAgendaItemIcon } from "@/components/calendar/agenda-row";
 import { formatCHF } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
 import { APP_ICON_STROKE } from "@/lib/branding/app-icons";
@@ -71,6 +76,123 @@ function itemHref(item: AgendaItem): string {
   if (item.kind === "deadline") return "/deadlines";
   if (item.kind === "travel") return "/travel";
   return "/calendar";
+}
+
+function hmToMinutes(hm: string): number | null {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(hm.trim());
+  if (!m) return null;
+  return Number(m[1]) * 60 + Number(m[2]);
+}
+
+function eventWindowMinutes(item: AgendaItem): { start: number; end: number } | null {
+  if (!item.time) return null;
+  const start = hmToMinutes(item.time);
+  if (start == null) return null;
+  const end = item.endTime ? hmToMinutes(item.endTime) : null;
+  return { start, end: end != null && end > start ? end : start + 60 };
+}
+
+function minutesUntilStart(item: AgendaItem, today: string, nowHm: string): number | null {
+  if (!item.time || item.date !== today) return null;
+  const start = hmToMinutes(item.time);
+  const now = hmToMinutes(nowHm);
+  if (start == null || now == null) return null;
+  return start - now;
+}
+
+function formatCountdown(mins: number | null, ongoing: boolean): string | null {
+  if (ongoing) return "Jetzt";
+  if (mins == null) return null;
+  if (mins <= 0) return "Jetzt";
+  if (mins < 60) return `In ${mins} Min`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m === 0 ? `In ${h} Std` : `In ${h} Std ${m} Min`;
+}
+
+function shortPlace(item: AgendaItem): string | null {
+  if (item.coords?.label) return item.coords.label;
+  if (item.weather?.placeLabel) return item.weather.placeLabel;
+  const loc = item.location?.trim();
+  if (!loc) return null;
+  const first = loc.split(",")[0]?.trim() || loc;
+  return first.length > 28 ? `${first.slice(0, 26)}…` : first;
+}
+
+function buildNextStepLine(
+  items: AgendaItem[],
+  today: string,
+  nowHm: string,
+  activeId: string | null
+): string | null {
+  const todayTimed = items.filter((i) => i.date === today && i.time);
+  const now = hmToMinutes(nowHm) ?? 0;
+
+  let focus =
+    todayTimed.find((i) => {
+      const w = eventWindowMinutes(i);
+      return w && w.start > now;
+    }) || null;
+
+  if (!focus) {
+    focus =
+      todayTimed.find((i) => {
+        const w = eventWindowMinutes(i);
+        return w && now >= w.start && now < w.end;
+      }) || null;
+  }
+
+  if (!focus) {
+    focus = items.find((i) => i.id === activeId) || items[0] || null;
+  }
+  if (!focus) return null;
+
+  const w = eventWindowMinutes(focus);
+  const ongoing = Boolean(w && now >= w.start && now < w.end);
+  const countdown = formatCountdown(
+    minutesUntilStart(focus, today, nowHm),
+    ongoing
+  );
+  const place = shortPlace(focus);
+  const drive = focus.driveLabel || null;
+  const parts = [countdown, place, drive].filter(Boolean);
+  if (parts.length === 0) {
+    return [focus.time, focus.title].filter(Boolean).join(" · ") || null;
+  }
+  return parts.join(" · ");
+}
+
+function findConflicts(
+  items: AgendaItem[],
+  today: string
+): Array<{ id: string; label: string }> {
+  const timed = items.filter((i) => i.date === today && i.time);
+  const out: Array<{ id: string; label: string }> = [];
+  const seen = new Set<string>();
+  for (let i = 0; i < timed.length; i += 1) {
+    const a = timed[i]!;
+    const wa = eventWindowMinutes(a);
+    if (!wa) continue;
+    for (let j = i + 1; j < timed.length; j += 1) {
+      const b = timed[j]!;
+      const wb = eventWindowMinutes(b);
+      if (!wb) continue;
+      if (wa.start < wb.end && wb.start < wa.end) {
+        const key = [a.id, b.id].sort().join("|");
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push({
+          id: key,
+          label: `${a.time} ${a.title} ↔ ${b.time} ${b.title}`,
+        });
+      }
+    }
+  }
+  return out;
+}
+
+function placeMapSrc(coords: { lat: number; lon: number }): string {
+  return `/api/dashboard/place-map?lat=${coords.lat}&lon=${coords.lon}&z=14`;
 }
 
 function HomeWeatherWidget({ weather }: { weather: HomeWeatherCard }) {
@@ -251,6 +373,8 @@ function DayTimeline({
         const isTomorrow = item.date > today;
         const hm = item.time || "—";
         const isLast = index === items.length - 1;
+        const TypeIcon = resolveAgendaItemIcon(item);
+        const showMap = active && item.coords;
 
         return (
           <li key={item.id} className="contents">
@@ -268,6 +392,11 @@ function DayTimeline({
               >
                 {hm}
               </span>
+              {item.endTime && item.time ? (
+                <span className="text-[10px] tabular-nums text-muted-foreground/80">
+                  –{item.endTime}
+                </span>
+              ) : null}
             </div>
             <div className="relative flex justify-center pt-2.5 pb-5">
               {!isLast ? (
@@ -293,36 +422,99 @@ function DayTimeline({
                 aria-hidden={!active}
               />
             </div>
-            <Link
-              href={itemHref(item)}
+            <div
               className={cn(
-                "mb-5 min-w-0 rounded-xl border border-border/60 bg-card px-3 py-2.5 transition-colors hover:bg-muted/40 last:mb-1",
+                "mb-5 min-w-0 rounded-xl border border-border/60 bg-card px-3 py-2.5 transition-colors last:mb-1",
                 active && "border-emerald-200/90 bg-emerald-50/50"
               )}
             >
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold tracking-tight">
-                    {item.title}
-                  </p>
-                  {item.subtitle ? (
-                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                      {item.subtitle}
-                    </p>
-                  ) : null}
-                  {item.weather ? (
-                    <p className="mt-1 text-[11px] text-muted-foreground">
-                      {item.weather.icon} {item.weather.temperatureC}° ·{" "}
-                      {item.weather.placeLabel}
-                    </p>
-                  ) : null}
-                </div>
-                <ChevronRight
-                  className="mt-0.5 size-4 shrink-0 text-muted-foreground/70"
+              <div className="flex items-start gap-3">
+                <TypeIcon
+                  className={cn(
+                    "mt-0.5 size-7 shrink-0",
+                    active ? "text-emerald-800" : "text-muted-foreground"
+                  )}
+                  strokeWidth={APP_ICON_STROKE}
+                  absoluteStrokeWidth
                   aria-hidden
                 />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <Link href={itemHref(item)} className="min-w-0 flex-1 hover:opacity-90">
+                      <p className="truncate text-sm font-semibold tracking-tight">
+                        {item.title}
+                      </p>
+                      {item.subtitle ? (
+                        <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                          {item.subtitle}
+                        </p>
+                      ) : null}
+                      {item.weather ? (
+                        <p className="mt-1 text-[11px] text-muted-foreground">
+                          {item.weather.icon} {item.weather.temperatureC}° ·{" "}
+                          {item.weather.placeLabel}
+                        </p>
+                      ) : null}
+                      {active && item.driveLabel ? (
+                        <p className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground">
+                          <Car className="size-3 shrink-0" aria-hidden />
+                          {item.driveLabel}
+                        </p>
+                      ) : null}
+                    </Link>
+                    <ChevronRight
+                      className="mt-0.5 size-4 shrink-0 text-muted-foreground/70"
+                      aria-hidden
+                    />
+                  </div>
+
+                  {active && (item.meetUrl || item.mapsUrl || showMap) ? (
+                    <div className="mt-2.5 space-y-2">
+                      <div className="flex flex-wrap gap-2">
+                        {item.meetUrl ? (
+                          <a
+                            href={item.meetUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex h-7 items-center gap-1.5 rounded-md border border-border/70 bg-background px-2 text-[11px] font-medium text-foreground hover:bg-muted/50"
+                          >
+                            <Video className="size-3.5" aria-hidden />
+                            Meet
+                          </a>
+                        ) : null}
+                        {item.mapsUrl ? (
+                          <a
+                            href={item.mapsUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex h-7 items-center gap-1.5 rounded-md border border-border/70 bg-background px-2 text-[11px] font-medium text-foreground hover:bg-muted/50"
+                          >
+                            <MapPin className="size-3.5" aria-hidden />
+                            Route
+                          </a>
+                        ) : null}
+                      </div>
+                      {showMap && item.coords ? (
+                        <a
+                          href={item.mapsUrl || placeMapSrc(item.coords)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block overflow-hidden rounded-lg border border-border/60"
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={placeMapSrc(item.coords)}
+                            alt={`Karte: ${item.coords.label}`}
+                            className="h-28 w-full object-cover"
+                            loading="lazy"
+                          />
+                        </a>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
               </div>
-            </Link>
+            </div>
           </li>
         );
       })}
@@ -456,6 +648,16 @@ export function OverviewDashboard({
     return active;
   }, [timelineItems, activeId]);
 
+  const nextStepLine = useMemo(
+    () => buildNextStepLine(timelineItems, today, nowHm, activeId),
+    [timelineItems, today, nowHm, activeId]
+  );
+
+  const conflicts = useMemo(
+    () => findConflicts(timelineItems, today),
+    [timelineItems, today]
+  );
+
   const laterCounts = useMemo(() => {
     if (!data) {
       return { travel: 0, deadlines: 0, pipeline: 0, travelSample: "", deadlineSample: "", pipelineSample: "" };
@@ -533,9 +735,16 @@ export function OverviewDashboard({
                     : "Keine Termine"
                 }
                 detail={
-                  nextFocusEvent?.subtitle ||
-                  nextFocusEvent?.location ||
-                  "Kalender öffnen"
+                  nextFocusEvent
+                    ? [
+                        shortPlace(nextFocusEvent),
+                        nextFocusEvent.driveLabel,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ") ||
+                      nextFocusEvent.subtitle ||
+                      "Kalender öffnen"
+                    : "Kalender öffnen"
                 }
               />
               <FocusTile
@@ -590,6 +799,41 @@ export function OverviewDashboard({
                   Alle Termine →
                 </Link>
               </div>
+              {nextStepLine ? (
+                <p className="flex items-start gap-2 text-sm text-foreground/90">
+                  <Clock3
+                    className="mt-0.5 size-4 shrink-0 text-emerald-700"
+                    strokeWidth={APP_ICON_STROKE}
+                    absoluteStrokeWidth
+                    aria-hidden
+                  />
+                  <span>
+                    <span className="font-medium">Nächster Schritt · </span>
+                    {nextStepLine}
+                  </span>
+                </p>
+              ) : null}
+              {conflicts.length > 0 ? (
+                <div
+                  className="flex items-start gap-2 rounded-xl border border-amber-200/80 bg-amber-50/70 px-3 py-2 text-xs text-amber-950"
+                  role="status"
+                >
+                  <AlertTriangle
+                    className="mt-0.5 size-4 shrink-0 text-amber-700"
+                    aria-hidden
+                  />
+                  <div className="min-w-0">
+                    <p className="font-semibold">Termin-Konflikt</p>
+                    <ul className="mt-0.5 space-y-0.5 text-amber-900/90">
+                      {conflicts.slice(0, 2).map((c) => (
+                        <li key={c.id} className="truncate">
+                          {c.label}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              ) : null}
               <Card className="border-border/70">
                 <CardContent className="px-4 py-4 sm:px-5">
                   <DayTimeline
@@ -605,6 +849,78 @@ export function OverviewDashboard({
               {data.homeWeather ? (
                 <HomeWeatherWidget weather={data.homeWeather} />
               ) : null}
+
+              <Card className="border-border/70">
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <CheckSquare
+                      className="size-4 text-muted-foreground"
+                      strokeWidth={APP_ICON_STROKE}
+                      absoluteStrokeWidth
+                      aria-hidden
+                    />
+                    Aufgaben · 7 Tage
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {!data.tasks?.hasScope ? (
+                    <p className="text-xs text-muted-foreground">
+                      Google Tasks noch nicht verbunden — unter{" "}
+                      <Link
+                        href="/account"
+                        className="font-medium underline-offset-2 hover:underline"
+                      >
+                        Konto
+                      </Link>{" "}
+                      neu verbinden (Tasks-API + Consent).
+                    </p>
+                  ) : data.tasks.items.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      Keine offenen Aufgaben in den nächsten 7 Tagen.
+                    </p>
+                  ) : (
+                    <ul className="space-y-2">
+                      {data.tasks.items.slice(0, 10).map((t) => (
+                        <li key={t.id}>
+                          <a
+                            href={t.href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-start gap-2 rounded-lg px-1 py-0.5 hover:bg-muted/40"
+                          >
+                            <span
+                              className={cn(
+                                "mt-1.5 size-1.5 shrink-0 rounded-full",
+                                t.overdue
+                                  ? "bg-rose-600"
+                                  : t.dueDate === today
+                                    ? "bg-emerald-600"
+                                    : "bg-muted-foreground/40"
+                              )}
+                              aria-hidden
+                            />
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-medium leading-snug">
+                                {t.title}
+                              </p>
+                              <p className="text-[11px] text-muted-foreground">
+                                {t.overdue
+                                  ? "Überfällig"
+                                  : t.dueDate
+                                    ? t.dueDate === today
+                                      ? "Heute"
+                                      : weekdayLabel(t.dueDate)
+                                    : "Ohne Datum"}
+                                {t.listTitle ? ` · ${t.listTitle}` : ""}
+                              </p>
+                            </div>
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </CardContent>
+              </Card>
 
               {data.hockey.nextGame ? (
                 <NextHockeyCard game={data.hockey.nextGame} />

@@ -70,6 +70,13 @@ const CALENDAR_TYPE_ICON: Record<IcsCalendarType, typeof FileText> = {
   other: Calendar,
 };
 
+export function resolveAgendaItemIcon(item: AgendaItem) {
+  if (item.calendarType && CALENDAR_TYPE_ICON[item.calendarType]) {
+    return CALENDAR_TYPE_ICON[item.calendarType];
+  }
+  return KIND_ICON[item.kind];
+}
+
 export function TeamLogo({
   label,
   src,
@@ -151,10 +158,7 @@ export function AgendaRow({
   /** upcoming: hockey shows date+time / location / Heim|Auswärts on three lines */
   variant?: "agenda" | "upcoming";
 }) {
-  const Icon =
-    item.calendarType && CALENDAR_TYPE_ICON[item.calendarType]
-      ? CALENDAR_TYPE_ICON[item.calendarType]
-      : KIND_ICON[item.kind];
+  const Icon = resolveAgendaItemIcon(item);
   const isPaymentPipeline = item.badge === "Zahlung";
   const isHockey = item.kind === "hockey";
   const hasLogos = Boolean(item.logos?.left || item.logos?.right);

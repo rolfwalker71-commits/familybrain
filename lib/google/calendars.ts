@@ -14,6 +14,7 @@ import {
   parseHockeyGamesFromGoogleEvents,
   type HockeyGame,
 } from "@/lib/hockey/games";
+import { extractMeetUrl } from "@/lib/calendar/meet-url";
 
 export type GoogleCalendarSelection = {
   id: string;
@@ -51,8 +52,14 @@ export type GoogleCalendarEvent = {
   time: string | null;
   /** RFC3339 start when timed */
   startAt: string | null;
+  /** End time HH:mm when timed */
+  endTime: string | null;
+  /** RFC3339 end when timed */
+  endAt: string | null;
   summary: string;
   location: string | null;
+  /** Google Meet / Zoom / Teams URL when present */
+  meetUrl: string | null;
   isBirthday: boolean;
 };
 
@@ -344,10 +351,34 @@ export async function listGoogleCalendarEventsInRange(
             : ev.start?.dateTime
               ? zurichTimeFromIso(ev.start.dateTime)
               : null;
+          const endTime = allDay
+            ? null
+            : ev.end?.dateTime
+              ? zurichTimeFromIso(ev.end.dateTime)
+              : null;
           const eventType = (ev.eventType || "").toLowerCase();
           const isBirthday =
             isBirthdayCal || eventType === "birthday";
           const summary = (ev.summary || "Termin").trim();
+          const meetUrl =
+            extractMeetUrl(
+              ev.hangoutLink,
+              ev.location,
+              ev.description,
+              // conferenceData may be present even if not typed on list params
+              (
+                ev as {
+                  conferenceData?: {
+                    entryPoints?: Array<{
+                      entryPointType?: string | null;
+                      uri?: string | null;
+                    }>;
+                  };
+                }
+              ).conferenceData?.entryPoints
+                ?.find((ep) => ep.entryPointType === "video" && ep.uri)
+                ?.uri || null
+            ) || null;
           out.push({
             calendarId: sel.id,
             calendarName: name,
@@ -357,8 +388,11 @@ export async function listGoogleCalendarEventsInRange(
             date,
             time,
             startAt: ev.start?.dateTime || null,
+            endTime,
+            endAt: ev.end?.dateTime || null,
             summary,
             location: ev.location?.trim() || null,
+            meetUrl,
             isBirthday,
           });
         }

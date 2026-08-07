@@ -62,6 +62,18 @@ export type AgendaItem = {
   time?: string | null;
   /** Venue / place for weather enrichment */
   location?: string | null;
+  /** End time HH:mm when known */
+  endTime?: string | null;
+  /** Google Meet / Zoom / Teams */
+  meetUrl?: string | null;
+  /** Resolved place coordinates */
+  coords?: { lat: number; lon: number; label: string } | null;
+  /** Driving minutes from home (Altdorf) */
+  driveMinutes?: number | null;
+  /** e.g. "~12 Min Fahrt" / "in der Nähe" */
+  driveLabel?: string | null;
+  /** Google Maps directions / search URL */
+  mapsUrl?: string | null;
   /** Forecast chip when location + date resolve */
   weather?: AgendaWeatherChip | null;
   /** Per-calendar accent (ICS feeds) */
@@ -148,6 +160,18 @@ export type OverviewPayload = {
   };
   /** Current weather at home (Altdorf UR). */
   homeWeather: HomeWeatherCard | null;
+  /** Google Tasks: overdue + next 7 days (+ some undated). */
+  tasks: {
+    hasScope: boolean;
+    items: Array<{
+      id: string;
+      title: string;
+      dueDate: string | null;
+      overdue: boolean;
+      listTitle: string;
+      href: string;
+    }>;
+  };
 };
 
 function isoDate(d: Date): string {
@@ -628,13 +652,43 @@ export async function getDashboardOverview(
       .get(daysFromNow(7)) as { c: number }
   ).c;
 
-  const [agendaWithWeather, todayCalendar, todayMail, hockey, homeWeatherRaw] =
+  const [agendaWithWeather, todayCalendar, todayMail, hockey, homeWeatherRaw, tasksBundle] =
     await Promise.all([
       enrichAgendaWithWeather(agenda),
-      getTodayCalendarExcerpt(calendarUserId, 5),
+      getTodayCalendarExcerpt(calendarUserId, 12),
       getTodayMailExcerpt(calendarUserId, 5),
       getOverviewHockeyBundle(calendarUserId),
       fetchHomeWeather(),
+      (async () => {
+        if (calendarUserId == null) {
+          return { hasScope: false, items: [] as const };
+        }
+        const { hasGoogleTasksScope } = await import("@/lib/google/oauth");
+        if (!hasGoogleTasksScope(calendarUserId)) {
+          return { hasScope: false, items: [] as const };
+        }
+        try {
+          const { listUpcomingGoogleTasks } = await import(
+            "@/lib/google/tasks"
+          );
+          const items = await listUpcomingGoogleTasks(calendarUserId, {
+            horizonDays: 7,
+          });
+          return {
+            hasScope: true,
+            items: items.map((t) => ({
+              id: t.id,
+              title: t.title,
+              dueDate: t.dueDate,
+              overdue: t.overdue,
+              listTitle: t.listTitle,
+              href: t.href,
+            })),
+          };
+        } catch {
+          return { hasScope: true, items: [] as const };
+        }
+      })(),
     ]);
 
   const homeWeather: HomeWeatherCard | null = homeWeatherRaw
@@ -688,5 +742,9 @@ export async function getDashboardOverview(
       upcoming: hockey.upcoming,
     },
     homeWeather,
+    tasks: {
+      hasScope: tasksBundle.hasScope,
+      items: [...tasksBundle.items],
+    },
   };
 }

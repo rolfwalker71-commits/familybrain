@@ -1,8 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Link2, Mail, RefreshCw, Unlink } from "lucide-react";
+import {
+  Link2,
+  Mail,
+  RefreshCw,
+  Unlink,
+  Sparkles,
+  CalendarDays,
+  CheckSquare,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -18,12 +26,16 @@ import { pageVisuals } from "@/components/layout/icon-circle";
 import { cn } from "@/lib/utils";
 import { APP_ICON_STROKE } from "@/lib/branding/app-icons";
 import type { MailListFilter, MailListItem, MailMessageDetail } from "@/lib/mail/gmail";
+import type { MailAnalysis, MailSuggestion } from "@/lib/mail/mail-action-schema";
 
 const FILTERS: { id: MailListFilter; label: string }[] = [
   { id: "today", label: "Heute" },
   { id: "week", label: "Diese Woche" },
   { id: "unread", label: "Ungelesen" },
 ];
+
+type CalOption = { id: string; name: string; primary: boolean };
+type TaskListOption = { id: string; title: string };
 
 function formatMailWhen(item: MailListItem): string {
   if (item.internalDate) {
@@ -40,6 +52,20 @@ function formatMailWhen(item: MailListItem): string {
   return item.date || "";
 }
 
+function suggestionKey(s: MailSuggestion, index: number): string {
+  return `${s.kind}-${index}-${s.title}`;
+}
+
+function suggestionDetail(s: MailSuggestion): string {
+  if (s.kind === "event") {
+    const when = [s.startDate, s.startTime, s.endTime ? `–${s.endTime}` : null]
+      .filter(Boolean)
+      .join(" ");
+    return [when, s.location].filter(Boolean).join(" · ");
+  }
+  return s.dueDate ? `fällig ${s.dueDate}` : "ohne Fälligkeit";
+}
+
 export function MailPageClient() {
   const searchParams = useSearchParams();
   const [filter, setFilter] = useState<MailListFilter>("today");
@@ -54,9 +80,22 @@ export function MailPageClient() {
   const [detail, setDetail] = useState<MailMessageDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
 
+  const [analysis, setAnalysis] = useState<MailAnalysis | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [selected, setSelected] = useState<Record<string, boolean>>({});
+  const [calendarId, setCalendarId] = useState("");
+  const [calendars, setCalendars] = useState<CalOption[]>([]);
+  const [tasklistId, setTasklistId] = useState("");
+  const [tasklists, setTasklists] = useState<TaskListOption[]>([]);
+  const [applying, setApplying] = useState(false);
+  const [applyMsg, setApplyMsg] = useState<string | null>(null);
+
   const openMail = useCallback(async (id: string) => {
     setOpenId(id);
     setDetail(null);
+    setAnalysis(null);
+    setSelected({});
+    setApplyMsg(null);
     setDetailLoading(true);
     try {
       const res = await fetch(`/api/mail/${encodeURIComponent(id)}`);
@@ -120,11 +159,132 @@ export function MailPageClient() {
     await load();
   }
 
+  async function loadTargets() {
+    try {
+      const [calRes, taskRes] = await Promise.all([
+        fetch("/api/google/calendars"),
+        fetch("/api/google/tasks"),
+      ]);
+      const calJson = await calRes.json();
+      const taskJson = await taskRes.json();
+      const cals = (calJson.calendars || []) as Array<{
+        id: string;
+        name: string;
+        primary: boolean;
+        enabled?: boolean;
+        accessRole?: string | null;
+      }>;
+      const writable = cals.filter((c) => {
+        const role = (c.accessRole || "").toLowerCase();
+        return !role || role === "owner" || role === "writer";
+      });
+      const pool = writable.length > 0 ? writable : cals;
+      const options = pool.map((c) => ({
+        id: c.id,
+        name: c.name,
+        primary: c.primary,
+      }));
+      setCalendars(options);
+      const primary = options.find((c) => c.primary) || options[0];
+      if (primary) setCalendarId((prev) => prev || primary.id);
+
+      const lists = (taskJson.lists || []) as TaskListOption[];
+      setTasklists(lists);
+      if (lists[0]) setTasklistId((prev) => prev || lists[0]!.id);
+    } catch {
+      /* optional */
+    }
+  }
+
+  async function runAnalyze() {
+    if (!openId) return;
+    setAnalyzing(true);
+    setApplyMsg(null);
+    setError(null);
+    try {
+      await loadTargets();
+      const res = await fetch(
+        `/api/mail/${encodeURIComponent(openId)}/analyze`,
+        { method: "POST" }
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Analyse fehlgeschlagen");
+      const a = data.analysis as MailAnalysis;
+      setAnalysis(a);
+      const next: Record<string, boolean> = {};
+      a.suggestions.forEach((s, i) => {
+        next[suggestionKey(s, i)] = true;
+      });
+      setSelected(next);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setAnalyzing(false);
+    }
+  }
+
+  const selectedSuggestions = useMemo(() => {
+    if (!analysis) return [] as Array<{ s: MailSuggestion; i: number }>;
+    return analysis.suggestions
+      .map((s, i) => ({ s, i }))
+      .filter(({ s, i }) => selected[suggestionKey(s, i)]);
+  }, [analysis, selected]);
+
+  async function applySelected() {
+    if (!openId || selectedSuggestions.length === 0) return;
+    setApplying(true);
+    setApplyMsg(null);
+    try {
+      const actions = selectedSuggestions.map(({ s }) => ({
+        kind: s.kind,
+        title: s.title,
+        notes: s.notes ?? null,
+        startDate: s.startDate ?? null,
+        startTime: s.startTime ?? null,
+        endDate: s.endDate ?? null,
+        endTime: s.endTime ?? null,
+        allDay: s.allDay ?? !s.startTime,
+        location: s.location ?? null,
+        dueDate: s.dueDate ?? null,
+        calendarId: s.kind === "event" ? calendarId || null : null,
+        tasklistId: s.kind === "task" ? tasklistId || null : null,
+      }));
+      const res = await fetch(
+        `/api/mail/${encodeURIComponent(openId)}/actions`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ actions }),
+        }
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Speichern fehlgeschlagen");
+      const fails = (data.created || []).filter(
+        (c: { ok: boolean }) => !c.ok
+      ) as Array<{ title: string; error?: string }>;
+      if (data.okCount > 0 && fails.length === 0) {
+        setApplyMsg(`${data.okCount} Eintrag(e) angelegt.`);
+      } else if (data.okCount > 0) {
+        setApplyMsg(
+          `${data.okCount} ok, ${fails.length} fehlgeschlagen: ${fails.map((f) => f.error || f.title).join("; ")}`
+        );
+      } else {
+        throw new Error(
+          fails.map((f) => f.error || f.title).join("; ") || "Nichts angelegt"
+        );
+      }
+    } catch (err) {
+      setApplyMsg(err instanceof Error ? err.message : String(err));
+    } finally {
+      setApplying(false);
+    }
+  }
+
   return (
     <div className="min-w-0 space-y-5 pb-8">
       <PageHeader
         title="Mail"
-        description="Gmail-Auszug — heute, Woche oder ungelesen. Nur Lesen."
+        description="Gmail — und Buddy prüft, ob Termin oder Aufgabe drin steckt."
         icon={pageVisuals.mail.icon}
         tone={pageVisuals.mail.tone}
         actions={
@@ -188,7 +348,7 @@ export function MailPageClient() {
         <Card>
           <CardContent className="flex flex-wrap items-center justify-between gap-3 p-6">
             <p className="text-sm text-muted-foreground">
-              Noch kein Google-Konto verbunden. Readonly-Zugriff auf Gmail.
+              Noch kein Google-Konto verbunden.
             </p>
             <a
               href="/api/google/oauth/start"
@@ -283,6 +443,8 @@ export function MailPageClient() {
           if (!open) {
             setOpenId(null);
             setDetail(null);
+            setAnalysis(null);
+            setApplyMsg(null);
           }
         }}
       >
@@ -301,15 +463,157 @@ export function MailPageClient() {
             {detailLoading ? (
               <p className="text-muted-foreground">Lade Inhalt…</p>
             ) : detail ? (
-              <div className="space-y-3">
-                <p className="text-xs text-muted-foreground">
-                  {formatMailWhen(detail)}
-                  {detail.to ? ` · An: ${detail.to}` : ""}
-                </p>
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-xs text-muted-foreground">
+                    {formatMailWhen(detail)}
+                    {detail.to ? ` · An: ${detail.to}` : ""}
+                  </p>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={analyzing}
+                    onClick={() => void runAnalyze()}
+                    className="ml-auto gap-1.5"
+                  >
+                    <Sparkles className="size-3.5" />
+                    {analyzing ? "Prüfe…" : "Buddy prüfen"}
+                  </Button>
+                </div>
+
+                {analysis ? (
+                  <div className="space-y-3 rounded-xl border border-border/70 bg-muted/20 p-3">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        Buddy · {analysis.relevance}
+                      </p>
+                      <p className="text-sm">{analysis.summary}</p>
+                    </div>
+                    {analysis.suggestions.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">
+                        Nichts Speichernswertes erkannt.
+                      </p>
+                    ) : (
+                      <>
+                        <ul className="space-y-2">
+                          {analysis.suggestions.map((s, i) => {
+                            const key = suggestionKey(s, i);
+                            return (
+                              <li
+                                key={key}
+                                className="flex items-start gap-2 rounded-lg border border-border/50 bg-card px-2.5 py-2"
+                              >
+                                <input
+                                  type="checkbox"
+                                  className="mt-1"
+                                  checked={Boolean(selected[key])}
+                                  onChange={(e) =>
+                                    setSelected((prev) => ({
+                                      ...prev,
+                                      [key]: e.target.checked,
+                                    }))
+                                  }
+                                />
+                                <div className="min-w-0 flex-1">
+                                  <p className="flex items-center gap-1.5 text-sm font-medium">
+                                    {s.kind === "event" ? (
+                                      <CalendarDays
+                                        className="size-3.5 shrink-0 text-emerald-700"
+                                        aria-hidden
+                                      />
+                                    ) : (
+                                      <CheckSquare
+                                        className="size-3.5 shrink-0 text-sky-700"
+                                        aria-hidden
+                                      />
+                                    )}
+                                    {s.title}
+                                  </p>
+                                  <p className="text-[11px] text-muted-foreground">
+                                    {suggestionDetail(s)}
+                                    {s.reason ? ` · ${s.reason}` : ""}
+                                  </p>
+                                </div>
+                              </li>
+                            );
+                          })}
+                        </ul>
+
+                        {selectedSuggestions.some(({ s }) => s.kind === "event") ? (
+                          <label className="block space-y-1 text-xs">
+                            <span className="font-medium text-muted-foreground">
+                              Kalender für Termine
+                            </span>
+                            <select
+                              className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm"
+                              value={calendarId}
+                              onChange={(e) => setCalendarId(e.target.value)}
+                            >
+                              {calendars.length === 0 ? (
+                                <option value="">— Kalender laden —</option>
+                              ) : (
+                                calendars.map((c) => (
+                                  <option key={c.id} value={c.id}>
+                                    {c.name}
+                                    {c.primary ? " (primär)" : ""}
+                                  </option>
+                                ))
+                              )}
+                            </select>
+                          </label>
+                        ) : null}
+
+                        {selectedSuggestions.some(({ s }) => s.kind === "task") ? (
+                          <label className="block space-y-1 text-xs">
+                            <span className="font-medium text-muted-foreground">
+                              Taskliste
+                            </span>
+                            <select
+                              className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm"
+                              value={tasklistId}
+                              onChange={(e) => setTasklistId(e.target.value)}
+                            >
+                              {tasklists.length === 0 ? (
+                                <option value="">
+                                  — Standard / Tasks verbinden —
+                                </option>
+                              ) : (
+                                tasklists.map((t) => (
+                                  <option key={t.id} value={t.id}>
+                                    {t.title}
+                                  </option>
+                                ))
+                              )}
+                            </select>
+                          </label>
+                        ) : null}
+
+                        <Button
+                          type="button"
+                          size="sm"
+                          disabled={
+                            applying || selectedSuggestions.length === 0
+                          }
+                          onClick={() => void applySelected()}
+                        >
+                          {applying
+                            ? "Speichere…"
+                            : `${selectedSuggestions.length} übernehmen`}
+                        </Button>
+                        {applyMsg ? (
+                          <p className="text-xs text-muted-foreground" role="status">
+                            {applyMsg}
+                          </p>
+                        ) : null}
+                      </>
+                    )}
+                  </div>
+                ) : null}
+
                 {detail.bodyHtml ? (
                   <div
                     className="prose prose-sm max-w-none break-words dark:prose-invert"
-                    // Gmail HTML — sandbox-ish: we only show for the connected user
                     dangerouslySetInnerHTML={{ __html: detail.bodyHtml }}
                   />
                 ) : (
