@@ -110,7 +110,7 @@ const myBrainNavItems: NavItem[] = [
   },
   {
     href: "/account",
-    label: "Konto",
+    label: "Konto / Kalender",
     icon: pageVisuals.account.icon,
     tone: pageVisuals.account.tone,
   },
@@ -149,7 +149,7 @@ const limitedUserNavItems: NavItem[] = [
   finanzBuddyItem,
   {
     href: "/account",
-    label: "Konto",
+    label: "Konto / Kalender",
     icon: pageVisuals.account.icon,
     tone: pageVisuals.account.tone,
   },

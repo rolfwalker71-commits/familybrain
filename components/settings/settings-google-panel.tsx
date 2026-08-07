@@ -1,13 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { KeyRound, Link2, Unlink } from "lucide-react";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { KeyRound } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { IconCircle } from "@/components/layout/icon-circle";
-import { cn } from "@/lib/utils";
 
 type GoogleSettings = {
   googleOauthClientId: string;
@@ -15,12 +14,9 @@ type GoogleSettings = {
   hasGoogleOauthClientSecret: boolean;
   googleOauthConfigured: boolean;
   googleOauthRedirectUri: string;
-  connected: boolean;
-  connectedEmail: string | null;
-  hasCalendarScope: boolean;
-  ownerUserId: number | null;
 };
 
+/** Admin-only: shared OAuth client credentials. Per-user linking lives under /account. */
 export function SettingsGooglePanel() {
   const [data, setData] = useState<GoogleSettings | null>(null);
   const [clientId, setClientId] = useState("");
@@ -69,7 +65,7 @@ export function SettingsGooglePanel() {
       if (!res.ok) throw new Error(json.error || "Speichern fehlgeschlagen");
       setData(json as GoogleSettings);
       setClientSecret("");
-      setStatus("Google OAuth-Einstellungen gespeichert.");
+      setStatus("Google OAuth Client-Daten gespeichert (app-weit).");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -97,38 +93,24 @@ export function SettingsGooglePanel() {
     }
   }
 
-  async function disconnect() {
-    if (!window.confirm("Google-Konto trennen?")) return;
-    setSaving(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/google/oauth/disconnect", {
-        method: "POST",
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Trennen fehlgeschlagen");
-      setStatus("Google-Konto getrennt.");
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setSaving(false);
-    }
-  }
-
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-3">
           <IconCircle icon={KeyRound} tone="teal" size="sm" />
-          Google OAuth (Mail & Geburtstage)
+          Google OAuth — App-Zugang
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-sm text-muted-foreground">
-          Client-ID und Secret aus der Google Cloud Console (Web-Client).
-          Redirect-URI dort eintragen. Tokens liegen pro App-User. Scopes: Gmail
-          lesen + Kalender (Geburtstage).
+          <span className="font-medium text-foreground">Einmalig app-weit:</span>{" "}
+          Client-ID und Secret aus der Google Cloud Console. Danach verbindet
+          jeder User unter{" "}
+          <a href="/account" className="underline underline-offset-2">
+            Konto
+          </a>{" "}
+          <span className="font-medium text-foreground">sein eigenes</span>{" "}
+          Google-Konto — Tokens sind userspezifisch, nicht geteilt.
         </p>
 
         {loading ? (
@@ -193,72 +175,21 @@ export function SettingsGooglePanel() {
                 <code className="mt-1 block break-all font-mono text-[11px] text-muted-foreground">
                   {data.googleOauthRedirectUri}
                 </code>
+                <p className="mt-2 text-muted-foreground">
+                  Sollte{" "}
+                  <code className="text-[11px]">
+                    https://buddyapp.rolfwalker.ch/api/google/oauth/callback
+                  </code>{" "}
+                  sein. Wenn hier eine andere Domain steht: Einstellungen → Mail
+                  «Öffentliche App-URL» bzw. Env{" "}
+                  <code className="text-[11px]">APP_PUBLIC_URL</code> setzen.
+                </p>
               </div>
             ) : null}
 
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                disabled={saving}
-                onClick={() => void save()}
-              >
-                Speichern
-              </Button>
-              {data?.googleOauthConfigured && data.ownerUserId != null ? (
-                data.connected ? (
-                  <>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={saving}
-                      onClick={() => void disconnect()}
-                    >
-                      <Unlink className="size-3.5" />
-                      {data.connectedEmail
-                        ? `Trennen (${data.connectedEmail})`
-                        : "Trennen"}
-                    </Button>
-                    {!data.hasCalendarScope ? (
-                      <a
-                        href="/api/google/oauth/start"
-                        className={cn(
-                          buttonVariants({ variant: "outline" }),
-                          "gap-1.5"
-                        )}
-                      >
-                        <Link2 className="size-3.5" />
-                        Neu verbinden (Kalender)
-                      </a>
-                    ) : null}
-                  </>
-                ) : (
-                  <a
-                    href="/api/google/oauth/start"
-                    className={cn(
-                      buttonVariants({ variant: "outline" }),
-                      "gap-1.5"
-                    )}
-                  >
-                    <Link2 className="size-3.5" />
-                    Google verbinden
-                  </a>
-                )
-              ) : null}
-            </div>
-
-            {data?.connected && !data.hasCalendarScope ? (
-              <p className="text-xs text-amber-800">
-                Verbindung ohne Kalender-Recht — bitte «Neu verbinden
-                (Kalender)» wählen, damit Geburtstage erscheinen.
-              </p>
-            ) : null}
-
-            {data?.ownerUserId == null ? (
-              <p className="text-xs text-amber-800">
-                Hinweis: Für die Verbindung braucht es einen App-User (z. B.
-                «Rolf»). Env-Admin allein speichert keine User-Tokens.
-              </p>
-            ) : null}
+            <Button type="button" disabled={saving} onClick={() => void save()}>
+              Speichern
+            </Button>
           </>
         )}
       </CardContent>

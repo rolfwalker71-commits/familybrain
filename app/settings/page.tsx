@@ -2568,12 +2568,14 @@ function SettingsPageInner() {
       {activeTab === "calendars" ? (
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            Persönliche Kalender:{" "}
+            <strong className="font-medium text-foreground">App-weit:</strong>{" "}
+            Client-ID/Secret unten.{" "}
+            <strong className="font-medium text-foreground">Pro User:</strong>{" "}
+            Google verbinden und Kalender wählen unter{" "}
             <a href="/account" className="underline underline-offset-2">
               Konto
-            </a>{" "}
-            (Google-Auswahl + ICS). Hier Google OAuth Client-ID/Secret
-            (app-weit).
+            </a>
+            .
           </p>
           <SettingsGooglePanel />
         </div>
