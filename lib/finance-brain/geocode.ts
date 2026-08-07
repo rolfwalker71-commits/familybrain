@@ -1,4 +1,8 @@
 import { getNominatimBaseUrl } from "@/lib/trips/settings";
+import {
+  geocodeWithGoogleMaps,
+  hasGoogleMapsApiKey,
+} from "@/lib/google/maps";
 
 export type GeocodedPlace = {
   lat: number;
@@ -113,7 +117,7 @@ export async function geocodePlaceNominatim(
 }
 
 /**
- * Geocode with Nominatim first (street-capable), then Open-Meteo (place names).
+ * Geocode with Google Maps (if key), then Nominatim, then Open-Meteo.
  * Prefer CH bias for Buddy agenda.
  */
 export async function geocodePlace(
@@ -124,21 +128,27 @@ export async function geocodePlace(
   const q = query.trim();
   if (!q) return null;
 
+  if (hasGoogleMapsApiKey()) {
+    const google = await geocodeWithGoogleMaps(
+      preferCh && !/schweiz|switzerland|\bch\b/i.test(q)
+        ? `${q}, Schweiz`
+        : q
+    );
+    if (google) return google;
+  }
+
   const nominatim = await geocodePlaceNominatim(
     q,
     preferCh ? { countrycodes: "ch" } : undefined
   );
   if (nominatim) return nominatim;
 
-  // Open-Meteo mag eher Ortsnamen als volle Strassenzeilen —
-  // bei Misserfolg trotzdem versuchen (oft Stadt/PLZ-Treffer).
   const om = await geocodePlaceOpenMeteo(
     q,
     preferCh ? { countryCode: "CH" } : undefined
   );
   if (om) return om;
 
-  // Ohne country-Filter noch einmal (Grenznähe / falsches Land-Token)
   if (preferCh) {
     const loose =
       (await geocodePlaceNominatim(q)) || (await geocodePlaceOpenMeteo(q));

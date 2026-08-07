@@ -1,4 +1,8 @@
 import { getSetting, setSetting } from "@/lib/db/migrations";
+import {
+  fetchDriveWithGoogleMaps,
+  hasGoogleMapsApiKey,
+} from "@/lib/google/maps";
 
 /** Same home point as dashboard weather (Altdorf UR). */
 const HOME = { lat: 46.88042, lon: 8.64345 } as const;
@@ -7,7 +11,7 @@ const CACHE_KEY = "agenda_drive_cache_json";
 
 type DriveCache = Record<
   string,
-  { minutes: number; distanceKm: number; at: string }
+  { minutes: number; distanceKm: number; at: string; provider?: string }
 >;
 
 function readCache(): DriveCache {
@@ -32,16 +36,34 @@ export type DriveEstimate = {
   distanceKm: number;
 };
 
-/** Driving time from home (Altdorf) via public OSRM. Cached by destination. */
+function cacheKeyFor(lat: number, lon: number): string {
+  const provider = hasGoogleMapsApiKey() ? "gmaps" : "osrm";
+  return `${provider}:${lat.toFixed(4)},${lon.toFixed(4)}`;
+}
+
+/** Driving time from home (Altdorf). Google Maps if configured, else OSRM. */
 export async function fetchDriveFromHome(
   lat: number,
   lon: number
 ): Promise<DriveEstimate | null> {
-  const key = `${lat.toFixed(4)},${lon.toFixed(4)}`;
+  const key = cacheKeyFor(lat, lon);
   const cache = readCache();
   const hit = cache[key];
   if (hit && Number.isFinite(hit.minutes)) {
     return { minutes: hit.minutes, distanceKm: hit.distanceKm };
+  }
+
+  if (hasGoogleMapsApiKey()) {
+    const google = await fetchDriveWithGoogleMaps(HOME, { lat, lon });
+    if (google) {
+      cache[key] = {
+        ...google,
+        at: new Date().toISOString(),
+        provider: "gmaps",
+      };
+      writeCache(cache);
+      return google;
+    }
   }
 
   const url = new URL(
@@ -75,7 +97,11 @@ export async function fetchDriveFromHome(
         ? Math.round((meters / 1000) * 10) / 10
         : 0,
     };
-    cache[key] = { ...estimate, at: new Date().toISOString() };
+    cache[key] = {
+      ...estimate,
+      at: new Date().toISOString(),
+      provider: "osrm",
+    };
     writeCache(cache);
     return estimate;
   } catch (error) {

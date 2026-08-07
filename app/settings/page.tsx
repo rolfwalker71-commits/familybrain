@@ -144,6 +144,11 @@ function SettingsPageInner() {
   const [nominatimBaseUrl, setNominatimBaseUrl] = useState(
     "https://nominatim.openstreetmap.org"
   );
+  const [googleMapsApiKey, setGoogleMapsApiKey] = useState("");
+  const [googleMapsApiKeyMasked, setGoogleMapsApiKeyMasked] = useState<
+    string | null
+  >(null);
+  const [hasGoogleMapsApiKey, setHasGoogleMapsApiKey] = useState(false);
   const [tripMapStyle, setTripMapStyle] = useState<
     "voyager" | "positron" | "osm"
   >("voyager");
@@ -315,6 +320,8 @@ function SettingsPageInner() {
       setNominatimBaseUrl(
         data.nominatimBaseUrl || "https://nominatim.openstreetmap.org"
       );
+      setGoogleMapsApiKeyMasked(data.googleMapsApiKeyMasked || null);
+      setHasGoogleMapsApiKey(Boolean(data.hasGoogleMapsApiKey));
       setTripMapStyle(
         data.tripMapStyle === "positron" || data.tripMapStyle === "osm"
           ? data.tripMapStyle
@@ -673,6 +680,9 @@ function SettingsPageInner() {
       if (ojpTokenHash.trim()) {
         payload.ojpTokenHash = ojpTokenHash.trim();
       }
+      if (googleMapsApiKey.trim()) {
+        payload.googleMapsApiKey = googleMapsApiKey.trim();
+      }
       const res = await fetch("/api/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -701,6 +711,9 @@ function SettingsPageInner() {
       setNominatimBaseUrl(
         data.nominatimBaseUrl || "https://nominatim.openstreetmap.org"
       );
+      setGoogleMapsApiKeyMasked(data.googleMapsApiKeyMasked || null);
+      setHasGoogleMapsApiKey(Boolean(data.hasGoogleMapsApiKey));
+      setGoogleMapsApiKey("");
       setTripMapStyle(
         data.tripMapStyle === "positron" || data.tripMapStyle === "osm"
           ? data.tripMapStyle
@@ -1758,6 +1771,62 @@ function SettingsPageInner() {
             </p>
           </div>
           <div className="space-y-2">
+            <Label htmlFor="googleMapsKey">Google Maps API-Key</Label>
+            <Input
+              id="googleMapsKey"
+              type="password"
+              autoComplete="off"
+              value={googleMapsApiKey}
+              onChange={(e) => setGoogleMapsApiKey(e.target.value)}
+              placeholder={
+                hasGoogleMapsApiKey
+                  ? `Gespeichert: ${googleMapsApiKeyMasked || "••••"}`
+                  : "AIza…"
+              }
+            />
+            <p className="text-xs text-muted-foreground">
+              Für Geocoding + Fahrzeiten im Kalender (Geocoding API und Routes
+              oder Directions). Leer lassen = Open-Meteo/Nominatim/OSRM.
+              {hasGoogleMapsApiKey ? " Key ist gesetzt." : ""}
+            </p>
+            {hasGoogleMapsApiKey ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={saving !== null}
+                onClick={() => {
+                  void (async () => {
+                    setSaving("travelbrain");
+                    try {
+                      const res = await fetch("/api/settings", {
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ clearGoogleMapsApiKey: true }),
+                      });
+                      const data = await res.json();
+                      if (!res.ok) {
+                        throw new Error(data.error || "Löschen fehlgeschlagen");
+                      }
+                      setHasGoogleMapsApiKey(false);
+                      setGoogleMapsApiKeyMasked(null);
+                      setGoogleMapsApiKey("");
+                      setMessage("Google Maps API-Key entfernt.");
+                    } catch (err) {
+                      setError(
+                        err instanceof Error ? err.message : String(err)
+                      );
+                    } finally {
+                      setSaving(null);
+                    }
+                  })();
+                }}
+              >
+                Maps-Key entfernen
+              </Button>
+            ) : null}
+          </div>
+          <div className="space-y-2">
             <Label htmlFor="nominatimUrl">Nominatim Base URL</Label>
             <Input
               id="nominatimUrl"
@@ -1767,7 +1836,8 @@ function SettingsPageInner() {
               placeholder="https://nominatim.openstreetmap.org"
             />
             <p className="text-xs text-muted-foreground">
-              Leer speichern stellt den öffentlichen OSM-Default wieder her.
+              Fallback ohne Google-Key. Leer speichern stellt den öffentlichen
+              OSM-Default wieder her.
             </p>
           </div>
           <div className="space-y-2">

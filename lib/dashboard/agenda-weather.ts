@@ -1,5 +1,6 @@
 import { getSetting, setSetting } from "@/lib/db/migrations";
 import { geocodePlace } from "@/lib/finance-brain/geocode";
+import { hasGoogleMapsApiKey } from "@/lib/google/maps";
 import {
   weatherCodeLabelDe,
   weatherConditionIcon,
@@ -182,17 +183,22 @@ export async function resolvePlaceCoords(
   }
 
   const cache = readGeoCache();
-  const cached = cache[key];
-  if (cached) {
-    return {
-      lat: cached.lat,
-      lon: cached.lon,
-      label: cached.label,
-      source: "cache",
-    };
+  // Mit Google Maps: frische Geocodierung vor altem Nominatim-Cache
+  const preferFreshGoogle = hasGoogleMapsApiKey();
+
+  if (!preferFreshGoogle) {
+    const cached = cache[key];
+    if (cached) {
+      return {
+        lat: cached.lat,
+        lon: cached.lon,
+        label: cached.label,
+        source: "cache",
+      };
+    }
   }
 
-  // Strasse + Ort: zuerst echte Geocodierung (nicht Stadt-Mittelpunkt)
+  // Strasse + Ort: zuerst echte Geocodierung (Google / Nominatim / Open-Meteo)
   const query = /schweiz|switzerland|\bch\b/i.test(location)
     ? location
     : `${location}, Schweiz`;
@@ -209,6 +215,18 @@ export async function resolvePlaceCoords(
     };
     writeGeoCache(cache);
     return { lat: hit.lat, lon: hit.lon, label, source: "network" };
+  }
+
+  if (preferFreshGoogle) {
+    const cached = cache[key];
+    if (cached) {
+      return {
+        lat: cached.lat,
+        lon: cached.lon,
+        label: cached.label,
+        source: "cache",
+      };
+    }
   }
 
   // Geocode fehlgeschlagen → Stadt/Known-Place als Fallback (Wetter + grobe Fahrtzeit)
@@ -452,7 +470,9 @@ export async function enrichAgendaWithWeather<
     }
     const coords = await resolvePlaceCoords(loc).catch(() => null);
     if (!coords) continue;
-    if (coords.source === "network") needNetworkPause = true;
+    if (coords.source === "network" && !hasGoogleMapsApiKey()) {
+      needNetworkPause = true;
+    }
     resolved.set(key, {
       lat: coords.lat,
       lon: coords.lon,

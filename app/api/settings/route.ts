@@ -38,6 +38,11 @@ import {
   MAP_STYLES,
 } from "@/lib/trips/settings";
 import {
+  getGoogleMapsApiKey,
+  hasGoogleMapsApiKey,
+  saveGoogleMapsApiKey,
+} from "@/lib/google/maps";
+import {
   getSofascoreApiKey,
   getSofascoreRemainingQuota,
   getSofascoreUsageThisMonth,
@@ -182,6 +187,8 @@ export async function GET(request: Request) {
     hasOjpTokenHash: Boolean(ojpTokenHash),
     hasOjpCredentials: hasOjpCredentials(),
     nominatimBaseUrl,
+    googleMapsApiKeyMasked: maskToken(getGoogleMapsApiKey()),
+    hasGoogleMapsApiKey: hasGoogleMapsApiKey(),
     tripMapStyle: getTripMapStyle(),
     eventAiImagePrompt: getEventAiImagePromptTemplate(),
     eventAiImagePromptCustomized: isEventAiImagePromptCustomized(),
@@ -231,6 +238,8 @@ const PutSchema = z.object({
   ojpTokenHash: z.string().optional(),
   clearOjpCredentials: z.boolean().optional(),
   nominatimBaseUrl: z.string().optional(),
+  googleMapsApiKey: z.string().optional(),
+  clearGoogleMapsApiKey: z.boolean().optional(),
   tripMapStyle: z.enum(MAP_STYLES).optional(),
   eventAiImagePrompt: z.string().max(4000).optional(),
   resetEventAiImagePrompt: z.boolean().optional(),
@@ -409,6 +418,13 @@ export async function PUT(request: Request) {
     }
   }
 
+  if (parsed.data.clearGoogleMapsApiKey) {
+    saveGoogleMapsApiKey(null);
+  } else if (parsed.data.googleMapsApiKey !== undefined) {
+    const raw = parsed.data.googleMapsApiKey.trim();
+    if (raw) saveGoogleMapsApiKey(raw);
+  }
+
   if (parsed.data.tripMapStyle !== undefined) {
     saveTripMapStyle(parsed.data.tripMapStyle);
   }
@@ -521,6 +537,8 @@ export async function PUT(request: Request) {
     hasOjpTokenHash: Boolean(ojpTokenHash),
     hasOjpCredentials: hasOjpCredentials(),
     nominatimBaseUrl,
+    googleMapsApiKeyMasked: maskToken(getGoogleMapsApiKey()),
+    hasGoogleMapsApiKey: hasGoogleMapsApiKey(),
     tripMapStyle: getTripMapStyle(),
     eventAiImagePrompt,
     eventAiImagePromptCustomized: isEventAiImagePromptCustomized(),
