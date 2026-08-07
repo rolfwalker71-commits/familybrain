@@ -61,3 +61,28 @@ test("enrich titles and times for UPS + shop", () => {
   assert.match(out.suggestions[1]?.title || "", /UPS/);
   assert.match(out.suggestions[1]?.title || "", /irugs/);
 });
+
+test("enrich event title with sender when no carrier", () => {
+  const out = enrichMailAnalysisTitles(
+    {
+      summary: "Meeting",
+      relevance: "high",
+      suggestions: [
+        {
+          kind: "event",
+          title: "Besprechung - ANG Schweiz",
+          startDate: "2026-08-08",
+          startTime: "16:00",
+        },
+      ],
+    },
+    {
+      from: "office@ang.ch",
+      fromName: "ANG Office",
+      subject: "Besprechung am 08.08.2026",
+      body: "Agenda folgt",
+    }
+  );
+  assert.match(out.suggestions[0]?.title || "", /Besprechung - ANG Schweiz/);
+  assert.match(out.suggestions[0]?.title || "", /ANG Office/);
+});

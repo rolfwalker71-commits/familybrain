@@ -41,10 +41,11 @@ WICHTIG:
   2) kind "task" — z.B. «Paket annehmen (UPS · irugs.ch)»
   3) kind "note" — Tracking-Nummer; title z.B. «UPS Tracking - irugs.ch», reference = Tracking-Code
 - Carrier (UPS, DHL, Die Post, …) und Lieferant/Shop (Domain oder Markenname aus dem Mail) immer in den Titeln, wenn erkennbar.
-- «notes» = Beschreibungstext für Kalender/Task/Notiz. Baue ihn dynamisch aus dem Mail-Kontext (individuell je Mail), Bausteine mit « - »:
-  Absender/Carrier/Lieferant · Worüber · Wen betrifft (Empfänger) · Tracking/Referenz.
+- «title» = kurzer Kalender-/Task-Titel. Enthält wenn sinnvoll Betreff-Kern, Absender und/oder Lieferant/Carrier (Versand: «UPS Paketlieferung - irugs.ch»).
+- «notes» = Beschreibung mit möglichst viel sinnvollem Kontext aus dem Mail (Bausteine mit « - »):
+  Carrier/Lieferant · Worüber · Teilnehmer/Empfänger · Tracking/Referenz/Bestellnr. · Vorbereitung/Agenda.
   Beispiel Versand: «UPS Paketlieferung - irugs.ch - Trackingnummer 1Z…»
-  Beispiel Termin (notes): nur Zusatzkontext, z.B. «mit Rolf Walker» oder Agenda-Stichworte — NICHT Ort, Uhrzeit oder Dauer (die gehören in location / startTime / endTime).
+  Beispiel Termin: Zusatzkontext und Stichworte (Teilnehmer, Mitbringen, Agenda) — NICHT Ort, Uhrzeit oder Dauer (die gehören in location / startTime / endTime). Tracking/Referenzen gehören in notes, nicht weglassen.
   Keine leeren Platzhalter. Nicht den rohen Mail-Betreff nur in Klammern anhängen.
 - Nur vorschlagen, was wirklich speicherwürdig ist. Newsletter/Werbung → suggestions: [].
 - Keine Dubletten. Keine erfundenen Daten — wenn unsicher, weglassen oder allDay/nur Datum.
@@ -79,8 +80,8 @@ JSON-Schema:
   "suggestions": [
     {
       "kind": "event"|"task"|"note",
-      "title": "z.B. UPS Paketlieferung - irugs.ch",
-      "notes": "Zusatzkontext ohne Ort/Zeit; Versand z.B. UPS … - Trackingnummer …",
+      "title": "z.B. UPS Paketlieferung - irugs.ch oder Besprechung - ANG",
+      "notes": "Kontext mit Tracking/Agenda; Versand z.B. UPS … - Trackingnummer … — ohne Ort/Uhrzeit",
       "reference": "Tracking/Code oder null (vor allem bei note)",
       "reason": "warum speichern",
       "confidence": 0.0-1.0,

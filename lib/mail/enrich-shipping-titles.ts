@@ -201,33 +201,65 @@ export function detectDeliveryWindow(hay: string): DeliveryWindow | null {
 function enrichEventTitle(
   title: string,
   carrier: string | null,
-  merchant: string | null
+  merchant: string | null,
+  ctx?: { fromName: string; subject: string }
 ): string {
-  const t = title.trim();
+  let t = title.trim();
   const looksGeneric = GENERIC_EVENT_TITLE.test(t) || /^paket/i.test(t);
 
   if (carrier && merchant) {
     if (looksGeneric || !t.toLowerCase().includes(carrier.toLowerCase())) {
-      return `${carrier} Paketlieferung - ${merchant}`;
+      return `${carrier} Paketlieferung - ${merchant}`.slice(0, 200);
     }
     if (
       !t
         .toLowerCase()
         .includes(merchant.toLowerCase().split(".")[0] || merchant)
     ) {
-      return `${t} - ${merchant}`;
+      return `${t} - ${merchant}`.slice(0, 200);
     }
   }
   if (carrier && looksGeneric) {
-    return `${carrier} Paketlieferung`;
+    return `${carrier} Paketlieferung`.slice(0, 200);
   }
   if (carrier && !t.toLowerCase().includes(carrier.toLowerCase())) {
-    return `${carrier} ${t}`;
+    t = `${carrier} ${t}`;
   }
   if (merchant && looksGeneric) {
-    return `Paketlieferung - ${merchant}`;
+    return `Paketlieferung - ${merchant}`.slice(0, 200);
   }
-  return t;
+  if (merchant && !carrier) {
+    const m0 = merchant.toLowerCase().split(".")[0] || merchant;
+    if (!t.toLowerCase().includes(m0.toLowerCase())) {
+      t = `${t} - ${merchant}`;
+    }
+  }
+
+  // Non-shipping: Absender / Betreff-Kern wenn der Titel noch generisch/kurz ist
+  if (!carrier && ctx) {
+    const subj = (ctx.subject || "").trim();
+    if (
+      looksGeneric &&
+      subj &&
+      subj !== "(kein Betreff)" &&
+      subj.length <= 80
+    ) {
+      t = subj;
+    }
+    const from = (ctx.fromName || "").trim();
+    if (
+      from &&
+      from.length >= 2 &&
+      from.length <= 40 &&
+      !SKIP_MERCHANT_HOST.test(from) &&
+      !t.toLowerCase().includes(from.toLowerCase()) &&
+      t.length + from.length < 90
+    ) {
+      t = `${t} · ${from}`;
+    }
+  }
+
+  return t.slice(0, 200);
 }
 
 function enrichTaskTitle(
@@ -275,7 +307,7 @@ function enrichEventTimes(
   };
 }
 
-/** Post-process AI suggestions: carrier, merchant, delivery window. */
+/** Post-process AI suggestions: carrier, merchant, delivery window, title context. */
 export function enrichMailAnalysisTitles(
   analysis: MailAnalysis,
   ctx: { from: string; fromName: string; subject: string; body: string }
@@ -285,14 +317,12 @@ export function enrichMailAnalysisTitles(
   const merchant = detectMerchant(hay);
   const window = detectDeliveryWindow(hay);
 
-  if (!carrier && !merchant && !window) return analysis;
-
   const suggestions: MailSuggestion[] = analysis.suggestions.map((s) => {
     let next = s;
     if (s.kind === "event") {
       next = {
         ...next,
-        title: enrichEventTitle(s.title, carrier, merchant),
+        title: enrichEventTitle(s.title, carrier, merchant, ctx),
       };
       next = enrichEventTimes(next, window);
     } else if (s.kind === "task") {

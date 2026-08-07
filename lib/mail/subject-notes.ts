@@ -24,12 +24,18 @@ function isBareSubjectParen(
   return n === tag || n === subj;
 }
 
-function aiNotesLookRich(notes: string): boolean {
+/** AI notes worth keeping as description (not just bare subject in parens). */
+function usableAiNotes(
+  notes: string,
+  subject: string | null | undefined
+): boolean {
   const n = notes.trim();
-  if (n.length < 12) return false;
-  if (/^[\(].*[\)]$/.test(n) && !n.includes(" - ")) return false;
-  if (n.includes(" - ") || n.includes("\n")) return true;
-  return n.length >= 28;
+  if (!n || n.length < 3) return false;
+  if (isBareSubjectParen(n, subject)) return false;
+  if (/^[\(].*[\)]$/.test(n) && !n.includes(" - ") && n.length < 40) {
+    return false;
+  }
+  return true;
 }
 
 function pushUnique(parts: string[], value: string | null | undefined) {
@@ -130,7 +136,8 @@ export function scrubEventScheduleFromNotes(
 /**
  * Build a contextual description for calendar/task/note from mail facts.
  * Example shipping: «UPS Paketlieferung - irugs.ch - Trackingnummer 1Z…»
- * Events: no location/time/duration (those are event fields).
+ * Prefer as much useful context as possible (tracking, prep, people).
+ * Events: strip location/time/duration — those belong on event fields.
  */
 export function buildSuggestionDescription(
   suggestion: MailSuggestion,
@@ -146,89 +153,67 @@ export function buildSuggestionDescription(
 
   let out = "";
 
-  if (
-    aiNotes &&
-    aiNotesLookRich(aiNotes) &&
-    !isBareSubjectParen(aiNotes, ctx.subject)
-  ) {
+  if (usableAiNotes(aiNotes, ctx.subject)) {
     out = aiNotes;
-    if (
-      tracking &&
-      !out.toLowerCase().includes(tracking.toLowerCase())
-    ) {
-      out = `${out} - Trackingnummer ${tracking}`;
-    }
   } else {
     const parts: string[] = [];
 
-    if (suggestion.kind === "event" && !carrier && !merchant && !tracking) {
-      // Meeting-style: keep notes lean — only extra context (who), not title/place/time
-      if (recipient) pushUnique(parts, recipient);
-      const fromHint = (ctx.fromName || "").trim();
-      if (
-        fromHint &&
-        fromHint.length >= 2 &&
-        !suggestion.title.toLowerCase().includes(fromHint.toLowerCase())
-      ) {
-        pushUnique(parts, fromHint);
-      }
+    if (suggestion.title.trim()) {
+      pushUnique(parts, suggestion.title.trim());
     } else {
-      if (suggestion.title.trim()) {
-        pushUnique(parts, suggestion.title.trim());
-      } else {
-        pushUnique(parts, carrier);
-        pushUnique(parts, merchant);
-      }
+      pushUnique(parts, carrier);
+      pushUnique(parts, merchant);
+    }
 
-      if (carrier && !parts[0]?.toLowerCase().includes(carrier.toLowerCase())) {
-        parts.unshift(carrier);
-      }
+    if (carrier && !parts[0]?.toLowerCase().includes(carrier.toLowerCase())) {
+      parts.unshift(carrier);
+    }
+    if (
+      merchant &&
+      !parts.some((p) =>
+        p
+          .toLowerCase()
+          .includes(merchant.toLowerCase().split(".")[0] || merchant)
+      )
+    ) {
+      pushUnique(parts, merchant);
+    }
+
+    if (recipient) {
+      pushUnique(parts, recipient);
+    }
+
+    const fromHint = (ctx.fromName || "").trim();
+    if (
+      fromHint &&
+      fromHint.length >= 2 &&
+      !suggestion.title.toLowerCase().includes(fromHint.toLowerCase())
+    ) {
+      pushUnique(parts, fromHint);
+    }
+
+    if (parts.length === 0) {
+      pushUnique(parts, ctx.fromName || ctx.from.split("@")[0] || null);
+      const subj = (ctx.subject || "").trim();
+      if (subj && subj !== "(kein Betreff)") pushUnique(parts, subj);
+    } else if (parts.length === 1 && !tracking && !merchant && !carrier) {
+      const subj = (ctx.subject || "").trim();
       if (
-        merchant &&
-        !parts.some((p) =>
-          p
-            .toLowerCase()
-            .includes(merchant.toLowerCase().split(".")[0] || merchant)
-        )
+        subj &&
+        subj !== "(kein Betreff)" &&
+        !parts[0]!.toLowerCase().includes(subj.toLowerCase().slice(0, 20))
       ) {
-        pushUnique(parts, merchant);
-      }
-
-      if (recipient) {
-        pushUnique(parts, recipient);
-      }
-
-      if (tracking) {
-        const already = parts.some((p) =>
-          p.toLowerCase().includes(tracking.toLowerCase())
-        );
-        if (!already) {
-          parts.push(`Trackingnummer ${tracking}`);
-        }
-      }
-
-      if (parts.length === 0) {
-        pushUnique(parts, ctx.fromName || ctx.from.split("@")[0] || null);
-        const subj = (ctx.subject || "").trim();
-        if (subj && subj !== "(kein Betreff)") pushUnique(parts, subj);
-      } else if (
-        parts.length === 1 &&
-        !tracking &&
-        !merchant &&
-        !carrier
-      ) {
-        const subj = (ctx.subject || "").trim();
-        if (
-          subj &&
-          subj !== "(kein Betreff)" &&
-          !parts[0]!.toLowerCase().includes(subj.toLowerCase().slice(0, 20))
-        ) {
-          pushUnique(parts, subj);
-        }
+        pushUnique(parts, subj);
       }
     }
 
     out = parts.join(" - ");
+  }
+
+  if (tracking && !out.toLowerCase().includes(tracking.toLowerCase())) {
+    out = out
+      ? `${out} - Trackingnummer ${tracking}`
+      : `Trackingnummer ${tracking}`;
   }
 
   const scrubbed = scrubEventScheduleFromNotes(out, suggestion);

@@ -102,6 +102,7 @@ export function MailPageClient() {
   const [analyzing, setAnalyzing] = useState(false);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [notesDraft, setNotesDraft] = useState<Record<string, string>>({});
+  const [titleDraft, setTitleDraft] = useState<Record<string, string>>({});
   const [calendarId, setCalendarId] = useState("");
   const [calendars, setCalendars] = useState<CalOption[]>([]);
   const [tasklistId, setTasklistId] = useState("");
@@ -236,13 +237,16 @@ export function MailPageClient() {
       setAnalysis(a);
       const next: Record<string, boolean> = {};
       const drafts: Record<string, string> = {};
+      const titles: Record<string, string> = {};
       a.suggestions.forEach((s, i) => {
         const key = suggestionKey(s, i);
         next[key] = true;
         drafts[key] = s.notes?.trim() || "";
+        titles[key] = s.title;
       });
       setSelected(next);
       setNotesDraft(drafts);
+      setTitleDraft(titles);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -265,7 +269,7 @@ export function MailPageClient() {
     try {
       const actions = selectedSuggestions.map(({ s, i }) => ({
         kind: s.kind,
-        title: s.title,
+        title: (titleDraft[suggestionKey(s, i)] ?? s.title).trim() || s.title,
         notes: notesDraft[suggestionKey(s, i)] ?? s.notes ?? null,
         startDate: s.startDate ?? null,
         startTime: s.startTime ?? null,
@@ -610,25 +614,40 @@ export function MailPageClient() {
                                   }
                                 />
                                 <div className="min-w-0 flex-1 space-y-1.5">
-                                  <p className="flex items-center gap-1.5 text-sm font-medium">
+                                  <div className="flex items-start gap-1.5">
                                     {s.kind === "event" ? (
                                       <CalendarDays
-                                        className="size-3.5 shrink-0 text-emerald-700"
+                                        className="mt-1.5 size-3.5 shrink-0 text-emerald-700"
                                         aria-hidden
                                       />
                                     ) : s.kind === "note" ? (
                                       <StickyNote
-                                        className="size-3.5 shrink-0 text-amber-700"
+                                        className="mt-1.5 size-3.5 shrink-0 text-amber-700"
                                         aria-hidden
                                       />
                                     ) : (
                                       <CheckSquare
-                                        className="size-3.5 shrink-0 text-sky-700"
+                                        className="mt-1.5 size-3.5 shrink-0 text-sky-700"
                                         aria-hidden
                                       />
                                     )}
-                                    {s.title}
-                                  </p>
+                                    <label className="min-w-0 flex-1 space-y-0.5">
+                                      <span className="sr-only">Titel</span>
+                                      <input
+                                        type="text"
+                                        className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm font-medium"
+                                        value={titleDraft[key] ?? s.title}
+                                        disabled={applying}
+                                        onChange={(e) =>
+                                          setTitleDraft((prev) => ({
+                                            ...prev,
+                                            [key]: e.target.value,
+                                          }))
+                                        }
+                                        placeholder="Titel"
+                                      />
+                                    </label>
+                                  </div>
                                   <p className="text-[11px] text-muted-foreground">
                                     {formatMailSuggestionDetail(s)}
                                     {s.reason ? ` · ${s.reason}` : ""}

@@ -30,6 +30,9 @@ export function MailTriagePanel({
   const [notesDraft, setNotesDraft] = useState<
     Record<string, Record<number, string>>
   >({});
+  const [titleDraft, setTitleDraft] = useState<
+    Record<string, Record<number, string>>
+  >({});
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const loadTargets = useCallback(async () => {
@@ -99,18 +102,23 @@ export function MailTriagePanel({
       setPending(list);
       const next: Record<string, Record<number, boolean>> = {};
       const drafts: Record<string, Record<number, string>> = {};
+      const titles: Record<string, Record<number, string>> = {};
       for (const row of list) {
         const map: Record<number, boolean> = {};
         const noteMap: Record<number, string> = {};
+        const titleMap: Record<number, string> = {};
         (row.analysis?.suggestions || []).forEach((s, i) => {
           map[i] = true;
           noteMap[i] = s.notes?.trim() || "";
+          titleMap[i] = s.title;
         });
         next[row.messageId] = map;
         drafts[row.messageId] = noteMap;
+        titles[row.messageId] = titleMap;
       }
       setSelected(next);
       setNotesDraft(drafts);
+      setTitleDraft(titles);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -186,7 +194,8 @@ export function MailTriagePanel({
     try {
       const actions = picks.map(({ s, i }) => ({
         kind: s.kind,
-        title: s.title,
+        title:
+          (titleDraft[row.messageId]?.[i] ?? s.title).trim() || s.title,
         notes:
           notesDraft[row.messageId]?.[i] ??
           s.notes ??
@@ -353,25 +362,45 @@ export function MailTriagePanel({
                           }
                         />
                         <div className="min-w-0 flex-1 space-y-1.5">
-                          <p className="flex items-center gap-1.5 text-sm font-medium">
+                          <div className="flex items-start gap-1.5">
                             {s.kind === "event" ? (
                               <CalendarDays
-                                className="size-3.5 text-emerald-700"
+                                className="mt-1.5 size-3.5 text-emerald-700"
                                 aria-hidden
                               />
                             ) : s.kind === "note" ? (
                               <StickyNote
-                                className="size-3.5 text-amber-700"
+                                className="mt-1.5 size-3.5 text-amber-700"
                                 aria-hidden
                               />
                             ) : (
                               <CheckSquare
-                                className="size-3.5 text-sky-700"
+                                className="mt-1.5 size-3.5 text-sky-700"
                                 aria-hidden
                               />
                             )}
-                            {s.title}
-                          </p>
+                            <label className="min-w-0 flex-1 space-y-0.5">
+                              <span className="sr-only">Titel</span>
+                              <input
+                                type="text"
+                                className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm font-medium"
+                                value={
+                                  titleDraft[row.messageId]?.[i] ?? s.title
+                                }
+                                disabled={busy}
+                                onChange={(e) =>
+                                  setTitleDraft((prev) => ({
+                                    ...prev,
+                                    [row.messageId]: {
+                                      ...prev[row.messageId],
+                                      [i]: e.target.value,
+                                    },
+                                  }))
+                                }
+                                placeholder="Titel"
+                              />
+                            </label>
+                          </div>
                           <p className="text-[11px] text-muted-foreground">
                             {formatMailSuggestionDetail(s)}
                           </p>
