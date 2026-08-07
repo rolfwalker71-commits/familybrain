@@ -12,7 +12,7 @@ import {
   type MailListFilter,
 } from "@/lib/mail/gmail";
 import { getMailAnalysesForMessages } from "@/lib/mail/mail-analysis-store";
-import { chipLabelDe } from "@/lib/mail/mail-heuristic";
+import { chipForStatus, chipLabelDe } from "@/lib/mail/mail-heuristic";
 import { syncMailAnalysesForItems } from "@/lib/mail/sync-mail-analysis";
 import { countPendingMailTriage } from "@/lib/mail/mail-analysis-store";
 
@@ -81,7 +81,7 @@ export async function GET(request: Request) {
     );
     const enriched = items.map((item) => {
       const a = analyses.get(item.id);
-      const chip = a?.chip ?? null;
+      const chip = chipForStatus(a?.status ?? null, a?.suggestionCount ?? 0);
       return {
         ...item,
         analysisChip: chip,

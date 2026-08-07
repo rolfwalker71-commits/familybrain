@@ -45,28 +45,38 @@ export type MailAnalysisStatus =
 export type MailAnalysisChip =
   | "suggestion"
   | "analyzed"
+  | "none"
+  | "skipped"
+  | "error"
   | "applied"
   | "dismissed"
-  | null;
+  | "pending";
 
 export function chipForStatus(
-  status: MailAnalysisStatus,
-  suggestionCount: number
+  status: MailAnalysisStatus | null | undefined,
+  suggestionCount = 0
 ): MailAnalysisChip {
+  if (!status) return "pending";
   if (status === "pending_triage" && suggestionCount > 0) return "suggestion";
   if (status === "applied") return "applied";
   if (status === "dismissed") return "dismissed";
-  if (status === "analyzed" || status === "pending_triage") return "analyzed";
-  if (status === "skipped" || status === "error") return null;
-  return null;
+  if (status === "skipped") return "skipped";
+  if (status === "error") return "error";
+  // analyzed or pending_triage without suggestions → AI ran, nothing to extract
+  if (status === "analyzed" || status === "pending_triage") return "none";
+  return "pending";
 }
 
-export function chipLabelDe(chip: MailAnalysisChip): string | null {
-  if (chip === "suggestion") return "Vorschlag";
+export function chipLabelDe(chip: MailAnalysisChip | null | undefined): string {
+  if (chip === "suggestion") return "Zur Triage";
+  if (chip === "none") return "Kein Extrakt";
   if (chip === "analyzed") return "Analysiert";
+  if (chip === "skipped") return "Übersprungen";
+  if (chip === "error") return "Fehler";
   if (chip === "applied") return "Übernommen";
   if (chip === "dismissed") return "Verworfen";
-  return null;
+  if (chip === "pending") return "Ausstehend";
+  return "Ausstehend";
 }
 
 export function resolveStatusFromAnalysis(

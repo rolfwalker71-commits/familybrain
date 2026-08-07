@@ -42,8 +42,12 @@ test("newsletter should skip", () => {
   );
 });
 
-test("chip labels", () => {
-  assert.equal(chipLabelDe(chipForStatus("pending_triage", 2)), "Vorschlag");
-  assert.equal(chipLabelDe(chipForStatus("analyzed", 0)), "Analysiert");
-  assert.equal(chipForStatus("skipped", 0), null);
+test("chip labels cover all statuses", () => {
+  assert.equal(chipLabelDe(chipForStatus("pending_triage", 2)), "Zur Triage");
+  assert.equal(chipLabelDe(chipForStatus("analyzed", 0)), "Kein Extrakt");
+  assert.equal(chipLabelDe(chipForStatus("skipped", 0)), "Übersprungen");
+  assert.equal(chipLabelDe(chipForStatus("error", 0)), "Fehler");
+  assert.equal(chipLabelDe(chipForStatus(null)), "Ausstehend");
+  assert.equal(chipLabelDe(chipForStatus("applied", 0)), "Übernommen");
+  assert.equal(chipLabelDe(chipForStatus("dismissed", 0)), "Verworfen");
 });

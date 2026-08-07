@@ -45,6 +45,7 @@ type EnrichedMail = MailListItem & {
   analysisChipLabel?: string | null;
   analysisStatus?: string | null;
   suggestionCount?: number;
+  analysisSummary?: string | null;
 };
 
 type CalOption = { id: string; name: string; primary: boolean };
@@ -78,6 +79,18 @@ function chipClass(chip: MailAnalysisChip): string {
   }
   if (chip === "dismissed") {
     return "bg-muted text-muted-foreground";
+  }
+  if (chip === "skipped") {
+    return "bg-stone-100 text-stone-700 border-stone-200";
+  }
+  if (chip === "error") {
+    return "bg-rose-100 text-rose-900 border-rose-200";
+  }
+  if (chip === "pending") {
+    return "bg-muted/80 text-muted-foreground border-border/70";
+  }
+  if (chip === "none") {
+    return "bg-slate-100 text-slate-700 border-slate-200";
   }
   return "bg-sky-50 text-sky-900 border-sky-200";
 }
@@ -492,13 +505,14 @@ export function MailPageClient() {
                       <span className="text-[11px] tabular-nums text-muted-foreground">
                         {formatMailWhen(item)}
                       </span>
-                      {item.analysisChip && item.analysisChipLabel ? (
+                      {item.analysisChipLabel ? (
                         <Badge
                           variant="outline"
                           className={cn(
                             "text-[10px]",
-                            chipClass(item.analysisChip)
+                            chipClass(item.analysisChip || "pending")
                           )}
+                          title={item.analysisSummary || undefined}
                         >
                           {item.analysisChipLabel}
                         </Badge>
