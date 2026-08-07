@@ -62,6 +62,15 @@ export async function POST(request: Request, context: Ctx) {
     ok: boolean;
     error?: string;
     link?: string | null;
+    notes?: string | null;
+    reference?: string | null;
+    startDate?: string | null;
+    startTime?: string | null;
+    endDate?: string | null;
+    endTime?: string | null;
+    allDay?: boolean | null;
+    location?: string | null;
+    dueDate?: string | null;
   }> = [];
 
   for (const action of body.actions) {
@@ -88,6 +97,8 @@ export async function POST(request: Request, context: Ctx) {
           link: note.triliumNoteId
             ? `trilium:${note.triliumNoteId}`
             : null,
+          notes,
+          reference: action.reference,
         });
       } catch (error) {
         created.push({
@@ -140,6 +151,13 @@ export async function POST(request: Request, context: Ctx) {
           title: ev.summary,
           ok: true,
           link: ev.htmlLink,
+          notes,
+          startDate: action.startDate,
+          startTime: action.startTime,
+          endDate: action.endDate || action.startDate,
+          endTime: action.endTime,
+          allDay: action.allDay,
+          location: action.location,
         });
       } catch (error) {
         created.push({
@@ -177,6 +195,8 @@ export async function POST(request: Request, context: Ctx) {
         title: task.title,
         ok: true,
         link: task.href,
+        notes,
+        dueDate: action.dueDate,
       });
     } catch (error) {
       created.push({
@@ -189,16 +209,28 @@ export async function POST(request: Request, context: Ctx) {
   }
 
   const okCount = created.filter((c) => c.ok).length;
+  let threadNote: { ok: boolean; skipped?: string; error?: string } | null =
+    null;
   if (okCount > 0) {
     updateMailAnalysisStatus(userId, id, "applied");
     const { applyGmailStatusLabel } = await import("@/lib/mail/gmail-labels");
     await applyGmailStatusLabel(userId, id, "applied", request).catch(
       () => undefined
     );
+    const { sendApplyNoteInThread } = await import(
+      "@/lib/mail/gmail-thread-note"
+    );
+    threadNote = await sendApplyNoteInThread(
+      userId,
+      id,
+      created.filter((c) => c.ok),
+      request
+    );
   }
   return NextResponse.json({
     created,
     okCount,
     failCount: created.length - okCount,
+    threadNote,
   });
 }

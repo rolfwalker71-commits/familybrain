@@ -186,30 +186,13 @@ export function weekdayLabel(iso: string): string {
   }
 }
 
-function WeatherChip({ weather }: { weather: AgendaWeatherChip }) {
-  const detail = weather.labelDe?.trim() || null;
+function AgendaWeatherLine({ weather }: { weather: AgendaWeatherChip }) {
   return (
-    <div
-      className="pointer-events-none flex items-center gap-1.5 rounded-full border border-sky-200/90 bg-sky-50 py-0.5 pl-1.5 pr-2.5 shadow-sm"
-      title={detail || `${weather.temperatureC}°`}
-    >
-      <span className="flex items-center gap-1">
-        <span className="text-sm leading-none" aria-hidden>
-          {weather.icon}
-        </span>
-        <span className="text-xs font-bold tabular-nums text-sky-950">
-          {weather.temperatureC}°
-        </span>
-      </span>
-      {detail ? (
-        <>
-          <span className="h-3 w-px shrink-0 bg-sky-200/90" aria-hidden />
-          <span className="max-w-[7rem] truncate text-[11px] font-medium text-sky-900/85">
-            {detail}
-          </span>
-        </>
-      ) : null}
-    </div>
+    <p className="mt-1 truncate text-[11px] text-muted-foreground">
+      <span aria-hidden>{weather.icon}</span>{" "}
+      <span className="tabular-nums">{weather.temperatureC}°</span>
+      {weather.labelDe?.trim() ? ` · ${weather.labelDe.trim()}` : ""}
+    </p>
   );
 }
 
@@ -252,31 +235,24 @@ export function AgendaRow({
   const upcomingLine3 = item.title;
 
   const inner = (
-    <div className={cn("relative", weather && "pt-2.5")}>
-      {weather ? (
-        <div className="absolute left-2 top-0 z-10">
-          <WeatherChip weather={weather} />
-        </div>
-      ) : null}
-      <div
-        className={cn(
-          "overflow-hidden rounded-xl border border-border/60 bg-card shadow-[0_2px_10px_rgba(20,32,28,0.04)]",
-          isPaymentPipeline && "border-sky-300/80"
-        )}
-      >
-        <div className="flex items-stretch">
-          <AgendaTypeRail
-            item={item}
-            className={cn(isPaymentPipeline && "bg-sky-100/80")}
-            iconClassName={isPaymentPipeline ? "text-sky-800" : undefined}
-          />
-          <div
-            className={cn(
-              "flex min-w-0 flex-1 items-center gap-2 px-2.5 py-2.5 sm:gap-3 sm:px-3",
-              isPaymentPipeline && "bg-sky-50/40",
-              weather && "pt-3"
-            )}
-          >
+    <div
+      className={cn(
+        "overflow-hidden rounded-xl border border-border/60 bg-card shadow-[0_2px_10px_rgba(20,32,28,0.04)]",
+        isPaymentPipeline && "border-sky-300/80"
+      )}
+    >
+      <div className="flex items-stretch">
+        <AgendaTypeRail
+          item={item}
+          className={cn(isPaymentPipeline && "bg-sky-100/80")}
+          iconClassName={isPaymentPipeline ? "text-sky-800" : undefined}
+        />
+        <div
+          className={cn(
+            "flex min-w-0 flex-1 items-center gap-2 px-2.5 py-2.5 sm:gap-3 sm:px-3",
+            isPaymentPipeline && "bg-sky-50/40"
+          )}
+        >
           {isHockey && hasLogos ? (
             <div className="flex shrink-0 items-center gap-1" aria-hidden>
               <TeamLogo
@@ -335,6 +311,7 @@ export function AgendaRow({
                 ) : null}
               </>
             )}
+            {weather ? <AgendaWeatherLine weather={weather} /> : null}
             {isPaymentPipeline ? (
               <p className="mt-1 text-[11px] font-medium text-sky-800">
                 Zahlung geplant — noch in der Pipeline
@@ -366,7 +343,6 @@ export function AgendaRow({
             >
               {item.badge}
             </Badge>
-          </div>
           </div>
         </div>
       </div>
