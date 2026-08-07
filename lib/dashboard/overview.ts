@@ -151,6 +151,8 @@ export type OverviewPayload = {
     openDueCount: number;
     /** Open mail AI suggestions awaiting triage */
     mailSuggestionsPending: number;
+    /** Mails AI-processed today (analyzed / triage / applied / dismissed) */
+    mailAnalyzedToday: number;
   };
   agenda: AgendaItem[];
   /** Heute (+ optional nächste 24h), max 5 — Link zu /calendar */
@@ -668,7 +670,7 @@ export async function getDashboardOverview(
       .get(daysFromNow(7)) as { c: number }
   ).c;
 
-  const [agendaWithWeather, todayCalendar, todayMail, hockey, homeWeatherRaw, tasksBundle, mailSuggestionsPending, referenceNotes] =
+  const [agendaWithWeather, todayCalendar, todayMail, hockey, homeWeatherRaw, tasksBundle, mailStats, referenceNotes] =
     await Promise.all([
       enrichAgendaWithWeather(agenda),
       getTodayCalendarExcerpt(calendarUserId, 12),
@@ -706,14 +708,22 @@ export async function getDashboardOverview(
         }
       })(),
       (async () => {
-        if (calendarUserId == null) return 0;
+        if (calendarUserId == null) {
+          return { analyzedToday: 0, pendingTriage: 0 };
+        }
         try {
-          const { countPendingMailTriage } = await import(
+          const { countMailOverviewStats } = await import(
             "@/lib/mail/mail-analysis-store"
           );
-          return countPendingMailTriage(calendarUserId);
+          const day = new Intl.DateTimeFormat("en-CA", {
+            timeZone: "Europe/Zurich",
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+          }).format(new Date());
+          return countMailOverviewStats(calendarUserId, day);
         } catch {
-          return 0;
+          return { analyzedToday: 0, pendingTriage: 0 };
         }
       })(),
       (async () => {
@@ -773,7 +783,8 @@ export async function getDashboardOverview(
       urgentDeadlines,
       openDueAmount,
       openDueCount,
-      mailSuggestionsPending,
+      mailSuggestionsPending: mailStats.pendingTriage,
+      mailAnalyzedToday: mailStats.analyzedToday,
     },
     agenda: agendaWithWeather,
     todayCalendar,

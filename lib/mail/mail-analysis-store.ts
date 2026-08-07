@@ -178,3 +178,23 @@ export function countPendingMailTriage(userId: number): number {
     .get(userId) as { c: number };
   return row?.c || 0;
 }
+
+/** Counts for overview KPI: AI-processed today + open triage suggestions. */
+export function countMailOverviewStats(
+  userId: number,
+  todayIso: string
+): { analyzedToday: number; pendingTriage: number } {
+  const day = todayIso.slice(0, 10);
+  const analyzed = getDb()
+    .prepare(
+      `SELECT COUNT(*) as c FROM mail_analyses
+       WHERE user_id = ?
+         AND substr(analyzed_at, 1, 10) = ?
+         AND status IN ('analyzed', 'pending_triage', 'applied', 'dismissed')`
+    )
+    .get(userId, day) as { c: number };
+  return {
+    analyzedToday: analyzed?.c || 0,
+    pendingTriage: countPendingMailTriage(userId),
+  };
+}

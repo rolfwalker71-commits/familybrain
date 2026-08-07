@@ -2,7 +2,7 @@ import type { MailAnalysis, MailSuggestion } from "@/lib/mail/mail-action-schema
 
 /** Keywords that warrant an AI look (parcel, appointment, bill, travel, …). */
 const INTEREST_RE =
-  /\b(ups|dhl|fedex|swiss\s*post|die\s*post|postch|sendung|paket|parcel|tracking|zustellung|lieferung|abholung|pickup|versand|shipment|termin|appointment|meeting|einladung|invite|calendar|kalender|zoom|teams|meet\.google|rechnung|invoice|zahlung|payment|fällig|frist|reminder|mahnung|flug|flight|booking|buchung|check-?in|hotel|reservation|versicherung|kündigung|vertrag|arzt|spital|hospital|impfung|zahnarzt)\b/i;
+  /\b(ups|dhl|fedex|swiss\s*post|die\s*post|postch|sendung|paket|parcel|tracking|zustellung|lieferung|abholung|pickup|versand|shipment|appointment|meeting|einladung|invite|calendar|kalender|zoom|teams|meet\.google|rechnung|invoice|zahlung|payment|fällig|frist|reminder|mahnung|flug|flight|booking|buchung|check-?in|hotel|reservation|versicherung|kündigung|vertrag|arzt|spital|hospital|impfung|zahnarzt)\b|termin\w*/i;
 
 const SKIP_RE =
   /\b(newsletter|unsubscribe|abmelden|werbung|promotion|sale\s*%|black\s*friday|marketing|digest|weekly\s*roundup)\b/i;
@@ -16,7 +16,10 @@ export function shouldAnalyzeMail(input: {
   subject: string;
   snippet: string;
 }): boolean {
-  const hay = `${input.fromName} ${input.from} ${input.subject} ${input.snippet}`;
+  const subject = (input.subject || "").trim();
+  if (/^(wg|aw|fwd?|fw)\s*:/i.test(subject)) return true;
+
+  const hay = `${input.fromName} ${input.from} ${subject} ${input.snippet}`;
   if (INTEREST_RE.test(hay)) return true;
   if (SKIP_RE.test(hay)) return false;
   // Unknown: still analyze unread-looking short operational mails lightly —

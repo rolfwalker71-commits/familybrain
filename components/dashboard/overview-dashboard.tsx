@@ -18,6 +18,7 @@ import {
   CheckSquare,
   StickyNote,
   X,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -556,7 +557,7 @@ function FocusTile({
   detail,
 }: {
   href: string;
-  tone: "teal" | "rose" | "amber";
+  tone: "teal" | "rose" | "amber" | "sky";
   icon: typeof CalendarDays;
   eyebrow: string;
   title: string;
@@ -566,11 +567,13 @@ function FocusTile({
     teal: "border-l-emerald-600 bg-emerald-50/40",
     rose: "border-l-rose-600 bg-rose-50/40",
     amber: "border-l-amber-500 bg-amber-50/40",
+    sky: "border-l-sky-600 bg-sky-50/40",
   }[tone];
   const iconCls = {
     teal: "text-emerald-800",
     rose: "text-rose-800",
     amber: "text-amber-800",
+    sky: "text-sky-800",
   }[tone];
 
   return (
@@ -637,8 +640,8 @@ function OverviewSkeleton() {
     <div className="space-y-6" aria-busy="true" aria-label="Lade Übersicht">
       <section className="space-y-3">
         <div className="h-4 w-32 animate-pulse rounded bg-muted" />
-        <div className="grid gap-3 md:grid-cols-3">
-          {[0, 1, 2].map((i) => (
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {[0, 1, 2, 3].map((i) => (
             <div
               key={i}
               className="h-[4.5rem] animate-pulse rounded-xl bg-muted/80"
@@ -880,7 +883,7 @@ export function OverviewDashboard({
             <h2 className="text-sm font-semibold tracking-tight text-foreground">
               Heute im Fokus
             </h2>
-            <div className="grid gap-3 md:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <FocusTile
                 href={nextFocusEvent ? itemHref(nextFocusEvent) : "/calendar"}
                 tone="teal"
@@ -927,28 +930,45 @@ export function OverviewDashboard({
               />
               <FocusTile
                 href={
-                  data.chips.mailSuggestionsPending > 0
-                    ? "/mail?tab=triage"
-                    : mailSample
-                      ? `/mail?open=${encodeURIComponent(mailSample.id)}`
-                      : "/mail"
+                  mailSample
+                    ? `/mail?open=${encodeURIComponent(mailSample.id)}`
+                    : "/mail"
                 }
                 tone="amber"
                 icon={Mail}
                 eyebrow="Heute · Mail"
                 title={
+                  mailSample
+                    ? mailSample.subject || "(kein Betreff)"
+                    : "Keine Mails"
+                }
+                detail={
+                  mailSample
+                    ? `${mailSample.fromName}${mailSample.unread ? " · neu" : ""}`
+                    : "Posteingang"
+                }
+              />
+              <FocusTile
+                href={
                   data.chips.mailSuggestionsPending > 0
-                    ? `${data.chips.mailSuggestionsPending} Vorschlag${data.chips.mailSuggestionsPending === 1 ? "" : "e"}`
-                    : mailSample
-                      ? `${unreadMail.length || mailFocus.length} ${unreadMail.length ? "neu" : "heute"}`
-                      : "Keine Mails"
+                    ? "/mail?tab=triage"
+                    : "/mail"
+                }
+                tone="sky"
+                icon={Sparkles}
+                eyebrow="Mail · Analyse"
+                title={
+                  (data.chips.mailAnalyzedToday ?? 0) > 0 ||
+                  data.chips.mailSuggestionsPending > 0
+                    ? `${data.chips.mailAnalyzedToday ?? 0} analysiert`
+                    : "Noch keine Analyse"
                 }
                 detail={
                   data.chips.mailSuggestionsPending > 0
-                    ? "Zur Triage"
-                    : mailSample
-                      ? `${mailSample.fromName} · ${mailSample.subject}`
-                      : "Posteingang"
+                    ? `${data.chips.mailSuggestionsPending} zur Triage bereit`
+                    : (data.chips.mailAnalyzedToday ?? 0) > 0
+                      ? "Nichts in der Triage"
+                      : "Beim Öffnen der Übersicht (~2–5 Sek. je Mail)"
                 }
               />
             </div>

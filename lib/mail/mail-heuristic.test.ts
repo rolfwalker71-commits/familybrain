@@ -18,6 +18,18 @@ test("UPS-like mail should be analyzed", () => {
   );
 });
 
+test("Terminextraktion / WG subject should be analyzed", () => {
+  assert.equal(
+    shouldAnalyzeMail({
+      from: "rolf@example.com",
+      fromName: "Rolf Walker",
+      subject: "WG: Test Terminextraktion V6",
+      snippet: "Bitte prüfen",
+    }),
+    true
+  );
+});
+
 test("newsletter should skip", () => {
   assert.equal(
     shouldAnalyzeMail({

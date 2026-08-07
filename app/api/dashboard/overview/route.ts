@@ -36,13 +36,22 @@ function runOverviewBackgroundJobs(
         const { syncMailAnalysesForItems } = await import(
           "@/lib/mail/sync-mail-analysis"
         );
-        const mailItems = await getTodayMailExcerpt(calendarUserId, 10);
+        const mailItems = await getTodayMailExcerpt(
+          calendarUserId,
+          10,
+          request
+        );
         const sync = await syncMailAnalysesForItems(
           calendarUserId,
           mailItems,
           { maxAi: 3, request }
         );
-        if (sync.analyzed > 0 || sync.withSuggestions > 0) {
+        if (
+          sync.analyzed > 0 ||
+          sync.withSuggestions > 0 ||
+          sync.skippedHeuristic > 0 ||
+          sync.errors > 0
+        ) {
           invalidateOverviewCache(calendarUserId);
         }
       } catch (error) {

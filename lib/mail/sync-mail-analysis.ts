@@ -55,7 +55,22 @@ export async function syncMailAnalysesForItems(
     pendingAi: 0,
   };
 
-  const candidates = items.filter((i) => i.id && !existing.has(i.id));
+  const candidates = items.filter((i) => {
+    if (!i.id) return false;
+    const ex = existing.get(i.id);
+    if (!ex) return true;
+    if (ex.status === "error") return true;
+    // Heuristic may have improved — retry previously skipped rows
+    if (ex.status === "skipped") {
+      return shouldAnalyzeMail({
+        from: i.from,
+        fromName: i.fromName,
+        subject: i.subject,
+        snippet: i.snippet,
+      });
+    }
+    return false;
+  });
   if (candidates.length === 0) return result;
 
   let aiBudget = maxAi;
