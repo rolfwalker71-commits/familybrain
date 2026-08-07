@@ -446,7 +446,7 @@ async function fetchStaticMap(
   const buffer = await fetchStaticMapPng({
     lat,
     lon,
-    zoom: 15,
+    zoom: 13,
     withMarker: true,
   });
   if (!buffer) return null;

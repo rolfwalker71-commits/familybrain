@@ -71,7 +71,7 @@ function typeLabel(item: AgendaItem): string {
 import { placeMapImageSrc } from "@/lib/maps/place-map-src";
 
 function placeMapSrc(coords: { lat: number; lon: number }): string {
-  return placeMapImageSrc(coords.lat, coords.lon, 16);
+  return placeMapImageSrc(coords.lat, coords.lon, 14);
 }
 
 function DetailRow({

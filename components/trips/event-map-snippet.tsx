@@ -308,7 +308,7 @@ export function EventMapSnippet({
         <StaticPlaceMapImage
           lat={point.lat}
           lon={point.lon}
-          zoom={15}
+          zoom={13}
           alt={point.label ? `Karte: ${point.label}` : "Kartenausschnitt"}
           heightClassName={heightClassName}
           className={className}

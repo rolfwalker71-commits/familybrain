@@ -2,9 +2,9 @@
 export function placeMapImageSrc(
   lat: number,
   lon: number,
-  zoom = 15
+  zoom = 13
 ): string {
-  return `/api/dashboard/place-map?lat=${lat}&lon=${lon}&z=${zoom}&v=gmaps3`;
+  return `/api/dashboard/place-map?lat=${lat}&lon=${lon}&z=${zoom}&v=gmaps4`;
 }
 
 export function routeMapImageSrc(input: {
@@ -23,7 +23,7 @@ export function routeMapImageSrc(input: {
     toLat: String(input.toLat),
     toLon: String(input.toLon),
     route: input.route || "straight",
-    v: "gmaps3",
+    v: "gmaps4",
   });
   if (input.pathPoints && input.pathPoints.length >= 2) {
     // URL kurz halten: max. ~40 Punkte subsamplen

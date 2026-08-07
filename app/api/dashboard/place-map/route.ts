@@ -112,7 +112,7 @@ export async function GET(request: Request) {
 
   const lat = parseCoord(searchParams.get("lat"));
   const lon = parseCoord(searchParams.get("lon"));
-  const zoom = Math.min(16, Math.max(10, Number(searchParams.get("z") || 14)));
+  const zoom = Math.min(16, Math.max(8, Number(searchParams.get("z") || 13)));
   if (lat == null || lon == null) {
     return NextResponse.json(
       { error: "lat/lon or fromLat/fromLon/toLat/toLon required" },

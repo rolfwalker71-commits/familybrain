@@ -286,14 +286,14 @@ export function TripMap({
         if (saved) {
           map.setView([saved.lat, saved.lon], saved.zoom);
         } else {
-          map.setView([current[0].lat, current[0].lon], 14);
+          map.setView([current[0].lat, current[0].lon], 12);
         }
       } else {
         const saved = readSavedMapView(pointsKey);
         if (saved) {
           map.setView([saved.lat, saved.lon], saved.zoom);
         } else {
-          map.fitBounds(bounds.pad(0.2));
+          map.fitBounds(bounds.pad(0.4));
         }
       }
 

@@ -254,6 +254,33 @@ export type GoogleStaticMapPath = {
   weight?: number;
 };
 
+/** Erweitert die Bounding-Box, damit Static Maps nicht knüppeldicht zoomen. */
+function paddedVisibleCorners(
+  points: Array<{ lat: number; lon: number }>,
+  padRatio = 0.45,
+  minPadDeg = 0.08
+): Array<{ lat: number; lon: number }> {
+  if (points.length === 0) return [];
+  let minLat = points[0]!.lat;
+  let maxLat = points[0]!.lat;
+  let minLon = points[0]!.lon;
+  let maxLon = points[0]!.lon;
+  for (const p of points) {
+    minLat = Math.min(minLat, p.lat);
+    maxLat = Math.max(maxLat, p.lat);
+    minLon = Math.min(minLon, p.lon);
+    maxLon = Math.max(maxLon, p.lon);
+  }
+  const latPad = Math.max((maxLat - minLat) * padRatio, minPadDeg);
+  const lonPad = Math.max((maxLon - minLon) * padRatio, minPadDeg);
+  return [
+    { lat: minLat - latPad, lon: minLon - lonPad },
+    { lat: minLat - latPad, lon: maxLon + lonPad },
+    { lat: maxLat + latPad, lon: minLon - lonPad },
+    { lat: maxLat + latPad, lon: maxLon + lonPad },
+  ];
+}
+
 async function fetchGoogleStaticMapRequest(input: {
   width?: number;
   height?: number;
@@ -264,6 +291,8 @@ async function fetchGoogleStaticMapRequest(input: {
   zoom?: number;
   markers?: GoogleStaticMapMarker[];
   paths?: GoogleStaticMapPath[];
+  /** Zusätzliche sichtbare Punkte (Padding für Auto-Fit). */
+  visible?: Array<{ lat: number; lon: number }>;
 }): Promise<GoogleStaticMapResult> {
   const key = getGoogleMapsApiKey();
   if (!key) return { ok: false, error: "no_api_key" };
@@ -275,8 +304,14 @@ async function fetchGoogleStaticMapRequest(input: {
   const expectedMinBytes = 8_000;
   const markers = input.markers ?? [];
   const paths = input.paths ?? [];
+  const visible = input.visible ?? [];
 
-  if (!input.center && markers.length === 0 && paths.length === 0) {
+  if (
+    !input.center &&
+    markers.length === 0 &&
+    paths.length === 0 &&
+    visible.length === 0
+  ) {
     return { ok: false, error: "no_geometry" };
   }
 
@@ -318,6 +353,13 @@ async function fetchGoogleStaticMapRequest(input: {
     url.searchParams.append(
       "path",
       `color:${color}|weight:${weight}${geo}|${coords}`
+    );
+  }
+
+  if (visible.length > 0) {
+    url.searchParams.set(
+      "visible",
+      visible.map((p) => `${p.lat},${p.lon}`).join("|")
     );
   }
 
@@ -426,6 +468,17 @@ export async function fetchGoogleStaticRouteMapDetailed(input: {
       ? input.pathPoints
       : [input.from, input.to];
 
+  // Padding: kurze Transfers sonst zu nah; lange Flüge etwas Luft am Rand.
+  const padPts = [...pathPoints, input.from, input.to];
+  const spanLat = Math.max(...padPts.map((p) => p.lat)) - Math.min(...padPts.map((p) => p.lat));
+  const spanLon = Math.max(...padPts.map((p) => p.lon)) - Math.min(...padPts.map((p) => p.lon));
+  const shortHop = Math.max(spanLat, spanLon) < 0.35;
+  const visible = paddedVisibleCorners(
+    padPts,
+    shortHop ? 0.7 : 0.4,
+    shortHop ? 0.12 : 0.05
+  );
+
   return fetchGoogleStaticMapRequest({
     width: input.width,
     height: input.height,
@@ -453,6 +506,7 @@ export async function fetchGoogleStaticRouteMapDetailed(input: {
         weight: 4,
       },
     ],
+    visible,
   });
 }
 
