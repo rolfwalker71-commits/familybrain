@@ -1742,35 +1742,6 @@ function SettingsPageInner() {
             ) : null}
           </div>
           <div className="space-y-2">
-            <Label>Kartenstil</Label>
-            <Select
-              value={tripMapStyle}
-              onValueChange={(v) => {
-                if (v === "voyager" || v === "positron" || v === "osm") {
-                  setTripMapStyle(v);
-                }
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="voyager">
-                  Carto Voyager (farbig)
-                </SelectItem>
-                <SelectItem value="positron">
-                  Carto Positron (hell)
-                </SelectItem>
-                <SelectItem value="osm">
-                  OpenStreetMap (klassisch)
-                </SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              Kostenlose Kacheln auf OSM-Basis. Default: Voyager.
-            </p>
-          </div>
-          <div className="space-y-2">
             <Label htmlFor="googleMapsKey">Google Maps API-Key</Label>
             <Input
               id="googleMapsKey"
@@ -1785,12 +1756,28 @@ function SettingsPageInner() {
               }
             />
             <p className="text-xs text-muted-foreground">
-              Für Geocoding, Fahrzeiten und Kartenausschnitte (Geocoding API,
-              Routes/Directions und{" "}
-              <span className="font-medium">Maps Static API</span>). Leer lassen
-              = Open-Meteo/Nominatim/OSM.
-              {hasGoogleMapsApiKey ? " Key ist gesetzt." : ""}
+              Sobald der Key gespeichert ist (und in Cloud Console{" "}
+              <span className="font-medium">Maps Static API</span>, Geocoding,
+              Routes/Directions aktiv sind), greifen automatisch:
             </p>
+            <ul className="list-inside list-disc text-xs text-muted-foreground">
+              <li>
+                <span className="font-medium">Kartenausschnitte</span> —
+                Dashboard-Ablauf, Kalender-Termin, Hotel-Vorschaubilder (kein
+                Extra-Menüpunkt)
+              </li>
+              <li>Adress-Geocoding und Fahrzeiten</li>
+            </ul>
+            {hasGoogleMapsApiKey ? (
+              <p className="text-xs text-emerald-700">
+                Key gesetzt — Ausschnitte nutzen Google Static Maps (Fallback:
+                OSM).
+              </p>
+            ) : (
+              <p className="text-xs text-amber-800">
+                Noch kein Key — Ausschnitte bleiben OSM-Kacheln.
+              </p>
+            )}
             {hasGoogleMapsApiKey ? (
               <Button
                 type="button"
@@ -1827,6 +1814,38 @@ function SettingsPageInner() {
                 Maps-Key entfernen
               </Button>
             ) : null}
+          </div>
+          <div className="space-y-2">
+            <Label>Kartenstil (TravelBuddy interaktiv)</Label>
+            <Select
+              value={tripMapStyle}
+              onValueChange={(v) => {
+                if (v === "voyager" || v === "positron" || v === "osm") {
+                  setTripMapStyle(v);
+                }
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="voyager">
+                  Carto Voyager (farbig)
+                </SelectItem>
+                <SelectItem value="positron">
+                  Carto Positron (hell)
+                </SelectItem>
+                <SelectItem value="osm">
+                  OpenStreetMap (klassisch)
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Nur für zoom-/klickbare Reisekarten in TravelBuddy (Leaflet).
+              Google erscheint hier absichtlich nicht — Static Maps steuern die
+              kleinen Ausschnitte über den API-Key oben, nicht über diese
+              Liste.
+            </p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="nominatimUrl">Nominatim Base URL</Label>
