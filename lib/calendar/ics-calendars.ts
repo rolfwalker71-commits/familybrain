@@ -2,6 +2,17 @@ import { randomUUID } from "crypto";
 import { getDb } from "@/lib/db/client";
 import { getSetting, setSetting } from "@/lib/db/migrations";
 import type { AuthContext } from "@/lib/auth/current-user";
+import {
+  ICS_CALENDAR_TYPES,
+  ICS_TYPE_META,
+  type IcsCalendarType,
+} from "@/lib/calendar/ics-types";
+
+export {
+  ICS_CALENDAR_TYPES,
+  ICS_TYPE_META,
+  type IcsCalendarType,
+} from "@/lib/calendar/ics-types";
 
 /** Legacy global key — migrated to Rolf once an app user «Rolf» exists. */
 export const ICS_CALENDARS_LEGACY_SETTING = "ics_calendars_json";
@@ -16,21 +27,6 @@ export const AMBRI_ICS_URL =
 
 export const AMBRI_CALENDAR_ID = "builtin-ambri";
 
-export const ICS_CALENDAR_TYPES = [
-  "hockey",
-  "school",
-  "waste",
-  "church",
-  "sports",
-  "family",
-  "birthday",
-  "work",
-  "holiday",
-  "other",
-] as const;
-
-export type IcsCalendarType = (typeof ICS_CALENDAR_TYPES)[number];
-
 export type IcsCalendar = {
   id: string;
   name: string;
@@ -40,62 +36,6 @@ export type IcsCalendar = {
   type: IcsCalendarType;
   /** Built-in Ambri row — URL editable but type locked to hockey. */
   builtin?: boolean;
-};
-
-export const ICS_TYPE_META: Record<
-  IcsCalendarType,
-  { label: string; defaultColor: string; defaultName: string }
-> = {
-  hockey: {
-    label: "Hockey",
-    defaultColor: "#e11d48",
-    defaultName: "Hockey",
-  },
-  school: {
-    label: "Schule",
-    defaultColor: "#2563eb",
-    defaultName: "Schule",
-  },
-  waste: {
-    label: "Abfall",
-    defaultColor: "#78836c",
-    defaultName: "Entsorgung",
-  },
-  church: {
-    label: "Kirche",
-    defaultColor: "#7c3aed",
-    defaultName: "Kirche",
-  },
-  sports: {
-    label: "Sport",
-    defaultColor: "#ea580c",
-    defaultName: "Sport",
-  },
-  family: {
-    label: "Familie",
-    defaultColor: "#db2777",
-    defaultName: "Familie",
-  },
-  birthday: {
-    label: "Geburtstage",
-    defaultColor: "#ec4899",
-    defaultName: "Geburtstage",
-  },
-  work: {
-    label: "Arbeit",
-    defaultColor: "#0f766e",
-    defaultName: "Arbeit",
-  },
-  holiday: {
-    label: "Ferien / Feiertage",
-    defaultColor: "#8b5cf6",
-    defaultName: "Ferien",
-  },
-  other: {
-    label: "Sonstiges",
-    defaultColor: "#64748b",
-    defaultName: "Kalender",
-  },
 };
 
 function ambriSeed(): IcsCalendar {

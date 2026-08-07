@@ -23,7 +23,7 @@ import {
   weekdayLabel,
 } from "@/components/calendar/agenda-row";
 import { APP_ICON_STROKE } from "@/lib/branding/app-icons";
-import { ICS_TYPE_META } from "@/lib/calendar/ics-calendars";
+import { ICS_TYPE_META } from "@/lib/calendar/ics-types";
 import type { AgendaItem } from "@/lib/dashboard/overview";
 import { cn } from "@/lib/utils";
 

@@ -270,7 +270,7 @@ export function CalendarPageClient() {
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 {weekdayLabel(date)}
               </p>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {dayItems.map((item) => (
                   <AgendaRow
                     key={item.id}

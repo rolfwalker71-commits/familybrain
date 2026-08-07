@@ -13,7 +13,7 @@ import {
 } from "@/lib/dashboard/agenda-weather";
 import { weatherConditionIcon } from "@/lib/trips/weather";
 import { daysFromNow, toSwissDate } from "@/lib/utils/dates";
-import type { IcsCalendarType } from "@/lib/calendar/ics-calendars";
+import type { IcsCalendarType } from "@/lib/calendar/ics-types";
 
 export type OverviewPeriod = "week" | "month" | "quarter" | "half" | "year";
 

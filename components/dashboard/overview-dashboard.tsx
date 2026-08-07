@@ -372,7 +372,7 @@ function DayTimeline({
   }
 
   return (
-    <ol className="relative grid grid-cols-[3.5rem_1.25rem_minmax(0,1fr)] gap-x-3">
+    <ol className="relative grid grid-cols-[2.6rem_0.75rem_minmax(0,1fr)] gap-x-1.5 sm:grid-cols-[3.25rem_1.25rem_minmax(0,1fr)] sm:gap-x-3">
       {items.map((item, index) => {
         const active = item.id === activeId;
         const isTomorrow = item.date > today;
@@ -384,20 +384,20 @@ function DayTimeline({
           <li key={item.id} className="contents">
             <div className="flex flex-col items-end justify-start pt-2 text-right">
               {isTomorrow ? (
-                <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <span className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground sm:text-[10px]">
                   Morgen
                 </span>
               ) : null}
               <span
                 className={cn(
-                  "text-xs font-semibold tabular-nums leading-tight",
+                  "text-[11px] font-semibold tabular-nums leading-tight sm:text-xs",
                   active ? "text-emerald-800" : "text-muted-foreground"
                 )}
               >
                 {hm}
               </span>
               {item.endTime && item.time ? (
-                <span className="text-[10px] tabular-nums text-muted-foreground/80">
+                <span className="text-[9px] tabular-nums text-muted-foreground/80 sm:text-[10px]">
                   –{item.endTime}
                 </span>
               ) : null}
@@ -433,7 +433,7 @@ function DayTimeline({
               )}
             >
               <div className="flex items-stretch">
-                <AgendaTypeRail item={item} />
+                <AgendaTypeRail item={item} className="w-9 sm:w-[3.25rem]" />
                 <div
                   className={cn(
                     "min-w-0 flex-1 px-3 py-2.5 transition-colors",
@@ -970,7 +970,7 @@ export function OverviewDashboard({
                 </div>
               ) : null}
               <Card className="border-border/70">
-                <CardContent className="px-4 py-4 sm:px-5">
+                <CardContent className="px-3 py-3 sm:px-5 sm:py-4">
                   <DayTimeline
                     items={timelineItems}
                     activeId={activeId}

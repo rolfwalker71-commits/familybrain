@@ -31,7 +31,7 @@ import type {
   AgendaKind,
   AgendaWeatherChip,
 } from "@/lib/dashboard/overview";
-import type { IcsCalendarType } from "@/lib/calendar/ics-calendars";
+import type { IcsCalendarType } from "@/lib/calendar/ics-types";
 
 /** Solid accent for left rail (calendar color or kind fallback). */
 const KIND_ACCENT_HEX: Record<AgendaKind, string> = {
@@ -87,14 +87,14 @@ export function AgendaTypeRail({
   return (
     <div
       className={cn(
-        "flex w-[3.25rem] shrink-0 flex-col items-center justify-center self-stretch px-1.5",
+        "flex w-9 shrink-0 flex-col items-center justify-center self-stretch px-1 sm:w-[3.25rem] sm:px-1.5",
         className
       )}
       style={{ backgroundColor: hexToRgba(accent, 0.22) }}
       aria-hidden
     >
       <Icon
-        className={cn("size-6", iconClassName)}
+        className={cn("size-5 sm:size-6", iconClassName)}
         style={iconClassName ? undefined : { color: accent }}
         strokeWidth={APP_ICON_STROKE}
         absoluteStrokeWidth
@@ -190,7 +190,7 @@ function WeatherChip({ weather }: { weather: AgendaWeatherChip }) {
   const detail = weather.labelDe?.trim() || null;
   return (
     <div
-      className="pointer-events-none absolute left-2 top-0 z-10 flex -translate-y-1/2 items-center gap-1.5 rounded-full border border-sky-200/90 bg-sky-50 py-0.5 pl-1.5 pr-2.5 shadow-sm ring-2 ring-white"
+      className="pointer-events-none flex items-center gap-1.5 rounded-full border border-sky-200/90 bg-sky-50 py-0.5 pl-1.5 pr-2.5 shadow-sm"
       title={detail || `${weather.temperatureC}°`}
     >
       <span className="flex items-center gap-1">
@@ -252,26 +252,31 @@ export function AgendaRow({
   const upcomingLine3 = item.title;
 
   const inner = (
-    <div
-      className={cn(
-        "relative overflow-hidden rounded-xl border border-border/60 bg-card shadow-[0_2px_10px_rgba(20,32,28,0.04)]",
-        weather && "mt-3",
-        isPaymentPipeline && "border-sky-300/80"
-      )}
-    >
-      {weather ? <WeatherChip weather={weather} /> : null}
-      <div className={cn("flex items-stretch", weather && "pt-3")}>
-        <AgendaTypeRail
-          item={item}
-          className={cn(isPaymentPipeline && "bg-sky-100/80")}
-          iconClassName={isPaymentPipeline ? "text-sky-800" : undefined}
-        />
-        <div
-          className={cn(
-            "flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5",
-            isPaymentPipeline && "bg-sky-50/40"
-          )}
-        >
+    <div className={cn("relative", weather && "pt-2.5")}>
+      {weather ? (
+        <div className="absolute left-2 top-0 z-10">
+          <WeatherChip weather={weather} />
+        </div>
+      ) : null}
+      <div
+        className={cn(
+          "overflow-hidden rounded-xl border border-border/60 bg-card shadow-[0_2px_10px_rgba(20,32,28,0.04)]",
+          isPaymentPipeline && "border-sky-300/80"
+        )}
+      >
+        <div className="flex items-stretch">
+          <AgendaTypeRail
+            item={item}
+            className={cn(isPaymentPipeline && "bg-sky-100/80")}
+            iconClassName={isPaymentPipeline ? "text-sky-800" : undefined}
+          />
+          <div
+            className={cn(
+              "flex min-w-0 flex-1 items-center gap-2 px-2.5 py-2.5 sm:gap-3 sm:px-3",
+              isPaymentPipeline && "bg-sky-50/40",
+              weather && "pt-3"
+            )}
+          >
           {isHockey && hasLogos ? (
             <div className="flex shrink-0 items-center gap-1" aria-hidden>
               <TeamLogo
@@ -361,6 +366,7 @@ export function AgendaRow({
             >
               {item.badge}
             </Badge>
+          </div>
           </div>
         </div>
       </div>
