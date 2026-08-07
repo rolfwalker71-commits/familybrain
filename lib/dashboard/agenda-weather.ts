@@ -172,30 +172,11 @@ export async function resolvePlaceCoords(
 
   const isStreet = looksLikeStreetAddress(location);
 
-  // Street addresses: prefer geocoder over coarse venue aliases for exact hits,
-  // but still allow city/venue tokens as fallback (e.g. «… 6460 Altdorf …»).
+  // Venues / reine Ortsnamen: bekannte Hallen zuerst
   if (!isStreet) {
     for (const [alias, hit] of Object.entries(KNOWN_PLACES)) {
       if (key === alias || key.includes(alias)) {
         return { ...hit, source: "known" };
-      }
-    }
-  } else {
-    for (const [alias, hit] of Object.entries(KNOWN_PLACES)) {
-      if (key === alias) {
-        return { ...hit, source: "known" };
-      }
-    }
-    const cityHit = matchKnownPlaceInKey(key);
-    if (cityHit) {
-      return { ...cityHit, source: "known" };
-    }
-    const cityHint = extractSwissCityHint(location);
-    if (cityHint) {
-      const cityKey = normalizePlaceKey(cityHint);
-      const knownCity = matchKnownPlaceInKey(cityKey) || KNOWN_PLACES[cityKey];
-      if (knownCity) {
-        return { ...knownCity, source: "known" };
       }
     }
   }
@@ -211,10 +192,11 @@ export async function resolvePlaceCoords(
     };
   }
 
+  // Strasse + Ort: zuerst echte Geocodierung (nicht Stadt-Mittelpunkt)
   const query = /schweiz|switzerland|\bch\b/i.test(location)
     ? location
     : `${location}, Schweiz`;
-  const hit = await geocodePlace(query);
+  const hit = await geocodePlace(query, { preferSwitzerland: true });
   if (hit) {
     const label = shortPlaceLabel(
       hit.displayName.split(",")[0]?.trim() || location
@@ -229,7 +211,13 @@ export async function resolvePlaceCoords(
     return { lat: hit.lat, lon: hit.lon, label, source: "network" };
   }
 
-  // Geocode failed → city-level fallback (known or geocode city only)
+  // Geocode fehlgeschlagen → Stadt/Known-Place als Fallback (Wetter + grobe Fahrtzeit)
+  if (isStreet) {
+    const cityHit = matchKnownPlaceInKey(key);
+    if (cityHit) {
+      return { ...cityHit, source: "known" };
+    }
+  }
   const cityHint = extractSwissCityHint(location);
   if (cityHint) {
     const cityKey = normalizePlaceKey(cityHint);
@@ -246,7 +234,9 @@ export async function resolvePlaceCoords(
         source: "cache",
       };
     }
-    const cityHit = await geocodePlace(`${cityHint}, Schweiz`);
+    const cityHit = await geocodePlace(`${cityHint}, Schweiz`, {
+      preferSwitzerland: true,
+    });
     if (cityHit) {
       const label = shortPlaceLabel(cityHint);
       cache[cityKey] = {
@@ -283,6 +273,10 @@ function calendarDaysBetween(fromIso: string, toIso: string): number {
   return Math.round((b.getTime() - a.getTime()) / 86_400_000);
 }
 
+function isSwissApprox(lat: number, lon: number): boolean {
+  return lat >= 45.7 && lat <= 47.9 && lon >= 5.8 && lon <= 10.6;
+}
+
 export async function fetchDailyForecast(
   lat: number,
   lon: number,
@@ -304,6 +298,11 @@ export async function fetchDailyForecast(
   if (pastDays > 0) {
     url.searchParams.set("past_days", String(Math.min(92, pastDays)));
   }
+  // CH: ICON-EU (kostenlos, Mitteleuropa) — oft besser als globales Default-Modell.
+  // Dedizierte MeteoSwiss-ICON-API bei Open-Meteo ist (noch) nicht auf dem Free-Endpoint.
+  if (isSwissApprox(lat, lon)) {
+    url.searchParams.set("models", "icon_eu");
+  }
 
   const res = await fetch(url.toString(), {
     headers: {
@@ -314,15 +313,49 @@ export async function fetchDailyForecast(
     signal: AbortSignal.timeout(12000),
     cache: "no-store",
   });
-  if (!res.ok) throw new Error(`Open-Meteo HTTP ${res.status}`);
-  const data = (await res.json()) as {
-    daily?: {
-      time?: string[];
-      weather_code?: number[];
-      temperature_2m_max?: number[];
-      temperature_2m_min?: number[];
-    };
+  if (!res.ok) {
+    // Fallback ohne Modellzwang (ältere Open-Meteo / ausserhalb Modellgebiet)
+    if (isSwissApprox(lat, lon)) {
+      const fallback = new URL("https://api.open-meteo.com/v1/forecast");
+      fallback.searchParams.set("latitude", String(lat));
+      fallback.searchParams.set("longitude", String(lon));
+      fallback.searchParams.set(
+        "daily",
+        "weather_code,temperature_2m_max,temperature_2m_min"
+      );
+      fallback.searchParams.set("timezone", "Europe/Zurich");
+      fallback.searchParams.set(
+        "forecast_days",
+        String(Math.min(16, Math.max(1, forecastDays)))
+      );
+      if (pastDays > 0) {
+        fallback.searchParams.set("past_days", String(Math.min(92, pastDays)));
+      }
+      const res2 = await fetch(fallback.toString(), {
+        headers: {
+          Accept: "application/json",
+          "User-Agent":
+            "BuddyApp/1.0 (https://github.com/rolfwalker71-commits/familybrain)",
+        },
+        signal: AbortSignal.timeout(12000),
+        cache: "no-store",
+      });
+      if (!res2.ok) throw new Error(`Open-Meteo HTTP ${res2.status}`);
+      return parseDailyForecastJson(await res2.json());
+    }
+    throw new Error(`Open-Meteo HTTP ${res.status}`);
+  }
+  return parseDailyForecastJson(await res.json());
+}
+
+function parseDailyForecastJson(data: {
+  daily?: {
+    time?: string[];
+    weather_code?: number[];
+    temperature_2m_max?: number[];
+    temperature_2m_min?: number[];
   };
+}): DayWeather[] {
   const times = data.daily?.time || [];
   const codes = data.daily?.weather_code || [];
   const maxes = data.daily?.temperature_2m_max || [];
