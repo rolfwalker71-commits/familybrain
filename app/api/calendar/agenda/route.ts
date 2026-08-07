@@ -31,13 +31,15 @@ export async function GET(request: Request) {
           .split(",")
           .map((s) => s.trim())
           .filter(Boolean);
+  // Default: fast list without geocode/weather/drive. Use enrich=1 to include.
+  const includeWeather = searchParams.get("enrich") === "1";
 
   return NextResponse.json(
     await getCalendarAgenda({
       userId,
       range,
       sourceIds,
-      includeWeather: true,
+      includeWeather,
     })
   );
 }

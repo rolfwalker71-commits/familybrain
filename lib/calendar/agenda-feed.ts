@@ -12,7 +12,7 @@ import { extractMeetUrl } from "@/lib/calendar/meet-url";
 import {
   getEnabledGoogleCalendarSelections,
   googleCalendarSourceId,
-  listGoogleCalendarEventsInRange,
+  listGoogleAgendaInRange,
   listGoogleHockeyGamesInRange,
 } from "@/lib/google/calendars";
 import {
@@ -190,29 +190,32 @@ async function loadHockeyGames(
   calendars: IcsCalendar[]
 ): Promise<TaggedHockey[]> {
   const hockeyCalendars = calendars.filter((c) => c.type === "hockey");
-  const hockeyGames: TaggedHockey[] = [];
-  for (const cal of hockeyCalendars) {
-    try {
-      const hockey = await getHockeyGames({
-        icsUrl: cal.url,
-        cacheKey:
-          cal.id === AMBRI_CALENDAR_ID
-            ? "hockey_ambri_ics_cache"
-            : `hockey_ics_cache_${cal.id}`,
-        calendarName: cal.name,
-      });
-      for (const game of hockey.games) {
-        hockeyGames.push({
-          ...game,
-          calendarId: cal.id,
+  const batches = await Promise.all(
+    hockeyCalendars.map(async (cal) => {
+      try {
+        const hockey = await getHockeyGames({
+          icsUrl: cal.url,
+          cacheKey:
+            cal.id === AMBRI_CALENDAR_ID
+              ? "hockey_ambri_ics_cache"
+              : `hockey_ics_cache_${cal.id}`,
           calendarName: cal.name,
-          color: cal.color,
         });
+        return hockey.games.map(
+          (game) =>
+            ({
+              ...game,
+              calendarId: cal.id,
+              calendarName: cal.name,
+              color: cal.color,
+            }) satisfies TaggedHockey
+        );
+      } catch {
+        return [] as TaggedHockey[];
       }
-    } catch {
-      /* skip */
-    }
-  }
+    })
+  );
+  const hockeyGames = batches.flat();
   hockeyGames.sort((a, b) => a.startAt.localeCompare(b.startAt));
   return hockeyGames;
 }
@@ -249,79 +252,91 @@ export async function getCalendarAgenda(options: {
   const items: AgendaItem[] = [];
   const today = zurichIsoDate();
 
-  if (
+  const googleReady =
     options.userId != null &&
     isGoogleMailConnected(options.userId) &&
-    hasGoogleCalendarScope(options.userId)
-  ) {
-    try {
-      const gEvents = await listGoogleCalendarEventsInRange(
-        options.userId,
-        start,
-        end
-      );
-      for (const ev of gEvents) {
-        const sourceId = googleCalendarSourceId(ev.calendarId);
-        if (!sourceAllowed(sourceId, filterIds)) continue;
-        items.push({
-          id: `gcal-${ev.calendarId}-${ev.id}`,
-          kind: "calendar",
-          date: ev.date,
-          title: ev.summary,
-          subtitle: ev.location || ev.calendarName,
-          amount: null,
-          currency: null,
-          documentId: null,
-          href: null,
-          badge: ev.isBirthday
-            ? "Geburtstag"
-            : ICS_TYPE_META[ev.type]?.label || "Google",
-          time: ev.time,
-          endTime: ev.endTime,
-          location: ev.location,
-          meetUrl: ev.meetUrl,
-          accentColor: ev.color,
-          calendarType: ev.type,
-          calendarId: sourceId,
-        });
-      }
-    } catch {
-      /* missing scope or API error — skip */
-    }
+    hasGoogleCalendarScope(options.userId);
+
+  const hockeyIcs = enabledIcs.filter((c) => c.type === "hockey");
+  const genericIcs = enabledIcs.filter((c) => c.type !== "hockey");
+
+  const wantHolidays = sourceAllowed(CALENDAR_SOURCE_HOLIDAYS, filterIds);
+  const holidayYears = wantHolidays
+    ? [
+        ...new Set(
+          [start, end, today]
+            .map((d) => Number(d.slice(0, 4)))
+            .filter((y) => Number.isFinite(y))
+        ),
+      ]
+    : [];
+
+  const [googleBundle, icsHockey, genericBatches, swissHolidays] =
+    await Promise.all([
+      googleReady
+        ? listGoogleAgendaInRange(options.userId!, start, end).catch(() => ({
+            events: [],
+            hockey: [],
+          }))
+        : Promise.resolve({ events: [], hockey: [] }),
+      loadHockeyGames(hockeyIcs),
+      Promise.all(
+        genericIcs.map(async (cal) => {
+          try {
+            const events = await getGenericCalendarEvents(cal);
+            return { cal, events };
+          } catch {
+            return { cal, events: [] as Awaited<
+              ReturnType<typeof getGenericCalendarEvents>
+            > };
+          }
+        })
+      ),
+      wantHolidays
+        ? getSwissHolidays({ years: holidayYears }).catch(() => [])
+        : Promise.resolve([] as Awaited<ReturnType<typeof getSwissHolidays>>),
+    ]);
+
+  for (const ev of googleBundle.events) {
+    const sourceId = googleCalendarSourceId(ev.calendarId);
+    if (!sourceAllowed(sourceId, filterIds)) continue;
+    items.push({
+      id: `gcal-${ev.calendarId}-${ev.id}`,
+      kind: "calendar",
+      date: ev.date,
+      title: ev.summary,
+      subtitle: ev.location || ev.calendarName,
+      amount: null,
+      currency: null,
+      documentId: null,
+      href: null,
+      badge: ev.isBirthday
+        ? "Geburtstag"
+        : ICS_TYPE_META[ev.type]?.label || "Google",
+      time: ev.time,
+      endTime: ev.endTime,
+      location: ev.location,
+      meetUrl: ev.meetUrl,
+      accentColor: ev.color,
+      calendarType: ev.type,
+      calendarId: sourceId,
+    });
   }
 
-  const hockeyGames = await loadHockeyGames(
-    enabledIcs.filter((c) => c.type === "hockey")
-  );
-
-  if (
-    options.userId != null &&
-    isGoogleMailConnected(options.userId) &&
-    hasGoogleCalendarScope(options.userId)
-  ) {
-    try {
-      const gHockey = await listGoogleHockeyGamesInRange(
-        options.userId,
-        start,
-        end
-      );
-      for (const bundle of gHockey) {
-        const sourceId = googleCalendarSourceId(bundle.calendarId);
-        if (!sourceAllowed(sourceId, filterIds)) continue;
-        for (const game of bundle.games) {
-          hockeyGames.push({
-            ...game,
-            calendarId: sourceId,
-            calendarName: bundle.calendarName,
-            color: bundle.color,
-          });
-        }
-      }
-      hockeyGames.sort((a, b) => a.startAt.localeCompare(b.startAt));
-    } catch {
-      /* skip */
+  const hockeyGames = [...icsHockey];
+  for (const bundle of googleBundle.hockey) {
+    const sourceId = googleCalendarSourceId(bundle.calendarId);
+    if (!sourceAllowed(sourceId, filterIds)) continue;
+    for (const game of bundle.games) {
+      hockeyGames.push({
+        ...game,
+        calendarId: sourceId,
+        calendarName: bundle.calendarName,
+        color: bundle.color,
+      });
     }
   }
+  hockeyGames.sort((a, b) => a.startAt.localeCompare(b.startAt));
 
   for (const game of hockeyGames) {
     if (!inRange(game.date, start, end)) continue;
@@ -354,78 +369,61 @@ export async function getCalendarAgenda(options: {
     });
   }
 
-  for (const cal of enabledIcs.filter((c) => c.type !== "hockey")) {
-    try {
-      const events = await getGenericCalendarEvents(cal);
-      for (const ev of events) {
-        if (!inRange(ev.date, start, end)) continue;
-        items.push({
-          id: `ics-${cal.id}-${ev.uid}`,
-          kind: "calendar",
-          date: ev.date,
-          title: ev.summary,
-          subtitle: ev.location || cal.name,
-          amount: null,
-          currency: null,
-          documentId: null,
-          href: null,
-          badge: ICS_TYPE_META[cal.type].label,
-          time: ev.time,
-          endTime: ev.endAt
-            ? new Intl.DateTimeFormat("en-GB", {
-                timeZone: "Europe/Zurich",
-                hour: "2-digit",
-                minute: "2-digit",
-                hour12: false,
-              }).format(new Date(ev.endAt))
-            : null,
-          location: ev.location,
-          meetUrl: extractMeetUrl(ev.description, ev.location),
-          accentColor: cal.color,
-          calendarType: cal.type,
-          calendarId: cal.id,
-        });
-      }
-    } catch {
-      /* skip */
+  for (const { cal, events } of genericBatches) {
+    for (const ev of events) {
+      if (!inRange(ev.date, start, end)) continue;
+      items.push({
+        id: `ics-${cal.id}-${ev.uid}`,
+        kind: "calendar",
+        date: ev.date,
+        title: ev.summary,
+        subtitle: ev.location || cal.name,
+        amount: null,
+        currency: null,
+        documentId: null,
+        href: null,
+        badge: ICS_TYPE_META[cal.type].label,
+        time: ev.time,
+        endTime: ev.endAt
+          ? new Intl.DateTimeFormat("en-GB", {
+              timeZone: "Europe/Zurich",
+              hour: "2-digit",
+              minute: "2-digit",
+              hour12: false,
+            }).format(new Date(ev.endAt))
+          : null,
+        location: ev.location,
+        meetUrl: extractMeetUrl(ev.description, ev.location),
+        accentColor: cal.color,
+        calendarType: cal.type,
+        calendarId: cal.id,
+      });
     }
   }
 
-  if (sourceAllowed(CALENDAR_SOURCE_HOLIDAYS, filterIds)) {
-    const years = [
-      ...new Set(
-        [start, end, today]
-          .map((d) => Number(d.slice(0, 4)))
-          .filter((y) => Number.isFinite(y))
-      ),
-    ];
-    try {
-      const swissHolidays = await getSwissHolidays({ years });
-      for (const h of holidaysInRange(swissHolidays, start, end)) {
-        items.push({
-          id: `hol-${h.date}-${h.canton}-${h.name}`,
-          kind: "holiday",
-          date: h.date,
-          title: h.name,
-          subtitle: holidaySubtitle(h.canton),
-          amount: null,
-          currency: null,
-          documentId: null,
-          href: null,
-          badge: holidayBadge(h.canton),
-          location:
-            h.canton === "UR"
-              ? "Altdorf"
-              : h.canton === "ZH"
-                ? "Regensdorf"
-                : "Schweiz",
-          accentColor: "#8b5cf6",
-          calendarType: "holiday",
-          calendarId: CALENDAR_SOURCE_HOLIDAYS,
-        });
-      }
-    } catch {
-      /* skip */
+  if (wantHolidays) {
+    for (const h of holidaysInRange(swissHolidays, start, end)) {
+      items.push({
+        id: `hol-${h.date}-${h.canton}-${h.name}`,
+        kind: "holiday",
+        date: h.date,
+        title: h.name,
+        subtitle: holidaySubtitle(h.canton),
+        amount: null,
+        currency: null,
+        documentId: null,
+        href: null,
+        badge: holidayBadge(h.canton),
+        location:
+          h.canton === "UR"
+            ? "Altdorf"
+            : h.canton === "ZH"
+              ? "Regensdorf"
+              : "Schweiz",
+        accentColor: "#8b5cf6",
+        calendarType: "holiday",
+        calendarId: CALENDAR_SOURCE_HOLIDAYS,
+      });
     }
   }
 

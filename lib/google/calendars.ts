@@ -279,12 +279,14 @@ function zurichDateFromIso(iso: string): string | null {
 
 /**
  * Events from enabled selected Google calendars in [startIso, endIso].
+ * Pass `listedCalendars` to skip a second calendarList.list round-trip.
  */
 export async function listGoogleCalendarEventsInRange(
   userId: number,
   startIso: string,
   endIso: string,
-  request?: Request | null
+  request?: Request | null,
+  listedCalendars?: GoogleCalendarListItem[] | null
 ): Promise<GoogleCalendarEvent[]> {
   if (!isGoogleMailConnected(userId) || !hasGoogleCalendarScope(userId)) {
     return [];
@@ -295,115 +297,118 @@ export async function listGoogleCalendarEventsInRange(
   const auth = await getAuthedGoogleClient(userId, request);
   const calendar = google.calendar({ version: "v3", auth });
 
-  // Resolve names/colors from calendarList once
-  const listed = await listGoogleCalendarsForUser(userId, request);
-  const metaById = new Map(listed.calendars.map((c) => [c.id, c]));
+  const listed =
+    listedCalendars ??
+    (await listGoogleCalendarsForUser(userId, request)).calendars;
+  const metaById = new Map(listed.map((c) => [c.id, c]));
 
   const timeMin = `${startIso.slice(0, 10)}T00:00:00Z`;
   const endExclusive = new Date(`${endIso.slice(0, 10)}T12:00:00Z`);
   endExclusive.setUTCDate(endExclusive.getUTCDate() + 1);
   const timeMax = `${endExclusive.toISOString().slice(0, 10)}T00:00:00Z`;
 
-  const out: GoogleCalendarEvent[] = [];
-
-  for (const sel of enabled) {
+  const nonHockey = enabled.filter((sel) => {
     const meta = metaById.get(sel.id);
-    const name = meta?.name || sel.name || sel.id;
     const type = sel.type || meta?.type || "other";
-    // Hockey calendars are rendered via Sofascore-enriched hockey cards
-    if (type === "hockey") continue;
-    const color =
-      sel.color ||
-      meta?.color ||
-      ICS_TYPE_META[type].defaultColor;
-    const isBirthdayCal = type === "birthday";
+    return type !== "hockey";
+  });
 
-    try {
-      let pageToken: string | undefined;
-      do {
-        const res = await calendar.events.list({
-          calendarId: sel.id,
-          singleEvents: true,
-          orderBy: "startTime",
-          timeMin,
-          timeMax,
-          timeZone: "Europe/Zurich",
-          maxResults: 250,
-          pageToken,
-        });
-        for (const ev of res.data.items || []) {
-          if (ev.status === "cancelled") continue;
-          const allDay = Boolean(ev.start?.date && !ev.start?.dateTime);
-          const date =
-            ev.start?.date?.slice(0, 10) ||
-            (ev.start?.dateTime
-              ? zurichDateFromIso(ev.start.dateTime)
-              : null);
-          if (
-            !date ||
-            date < startIso.slice(0, 10) ||
-            date > endIso.slice(0, 10)
-          ) {
-            continue;
-          }
-          const time = allDay
-            ? null
-            : ev.start?.dateTime
-              ? zurichTimeFromIso(ev.start.dateTime)
-              : null;
-          const endTime = allDay
-            ? null
-            : ev.end?.dateTime
-              ? zurichTimeFromIso(ev.end.dateTime)
-              : null;
-          const eventType = (ev.eventType || "").toLowerCase();
-          const isBirthday =
-            isBirthdayCal || eventType === "birthday";
-          const summary = (ev.summary || "Termin").trim();
-          const meetUrl =
-            extractMeetUrl(
-              ev.hangoutLink,
-              ev.location,
-              ev.description,
-              // conferenceData may be present even if not typed on list params
-              (
-                ev as {
-                  conferenceData?: {
-                    entryPoints?: Array<{
-                      entryPointType?: string | null;
-                      uri?: string | null;
-                    }>;
-                  };
-                }
-              ).conferenceData?.entryPoints
-                ?.find((ep) => ep.entryPointType === "video" && ep.uri)
-                ?.uri || null
-            ) || null;
-          out.push({
+  const batches = await Promise.all(
+    nonHockey.map(async (sel) => {
+      const meta = metaById.get(sel.id);
+      const name = meta?.name || sel.name || sel.id;
+      const type = sel.type || meta?.type || "other";
+      const color =
+        sel.color || meta?.color || ICS_TYPE_META[type].defaultColor;
+      const isBirthdayCal = type === "birthday";
+      const out: GoogleCalendarEvent[] = [];
+
+      try {
+        let pageToken: string | undefined;
+        do {
+          const res = await calendar.events.list({
             calendarId: sel.id,
-            calendarName: name,
-            color,
-            type: isBirthday ? "birthday" : type,
-            id: ev.id || `${date}-${summary}`,
-            date,
-            time,
-            startAt: ev.start?.dateTime || null,
-            endTime,
-            endAt: ev.end?.dateTime || null,
-            summary,
-            location: ev.location?.trim() || null,
-            meetUrl,
-            isBirthday,
+            singleEvents: true,
+            orderBy: "startTime",
+            timeMin,
+            timeMax,
+            timeZone: "Europe/Zurich",
+            maxResults: 250,
+            pageToken,
           });
-        }
-        pageToken = res.data.nextPageToken || undefined;
-      } while (pageToken);
-    } catch {
-      /* skip calendar on error (missing scope / deleted) */
-    }
-  }
+          for (const ev of res.data.items || []) {
+            if (ev.status === "cancelled") continue;
+            const allDay = Boolean(ev.start?.date && !ev.start?.dateTime);
+            const date =
+              ev.start?.date?.slice(0, 10) ||
+              (ev.start?.dateTime
+                ? zurichDateFromIso(ev.start.dateTime)
+                : null);
+            if (
+              !date ||
+              date < startIso.slice(0, 10) ||
+              date > endIso.slice(0, 10)
+            ) {
+              continue;
+            }
+            const time = allDay
+              ? null
+              : ev.start?.dateTime
+                ? zurichTimeFromIso(ev.start.dateTime)
+                : null;
+            const endTime = allDay
+              ? null
+              : ev.end?.dateTime
+                ? zurichTimeFromIso(ev.end.dateTime)
+                : null;
+            const eventType = (ev.eventType || "").toLowerCase();
+            const isBirthday = isBirthdayCal || eventType === "birthday";
+            const summary = (ev.summary || "Termin").trim();
+            const meetUrl =
+              extractMeetUrl(
+                ev.hangoutLink,
+                ev.location,
+                ev.description,
+                (
+                  ev as {
+                    conferenceData?: {
+                      entryPoints?: Array<{
+                        entryPointType?: string | null;
+                        uri?: string | null;
+                      }>;
+                    };
+                  }
+                ).conferenceData?.entryPoints?.find(
+                  (ep) => ep.entryPointType === "video" && ep.uri
+                )?.uri || null
+              ) || null;
+            out.push({
+              calendarId: sel.id,
+              calendarName: name,
+              color,
+              type: isBirthday ? "birthday" : type,
+              id: ev.id || `${date}-${summary}`,
+              date,
+              time,
+              startAt: ev.start?.dateTime || null,
+              endTime,
+              endAt: ev.end?.dateTime || null,
+              summary,
+              location: ev.location?.trim() || null,
+              meetUrl,
+              isBirthday,
+            });
+          }
+          pageToken = res.data.nextPageToken || undefined;
+        } while (pageToken);
+      } catch {
+        /* skip calendar on error (missing scope / deleted) */
+      }
+      return out;
+    })
+  );
 
-  return out.sort((a, b) => {
+  return batches.flat().sort((a, b) => {
     const c = a.date.localeCompare(b.date);
     if (c !== 0) return c;
     return (a.time || "99:99").localeCompare(b.time || "99:99");
@@ -422,7 +427,8 @@ export async function listGoogleHockeyGamesInRange(
   userId: number,
   startIso: string,
   endIso: string,
-  request?: Request | null
+  request?: Request | null,
+  listedCalendars?: GoogleCalendarListItem[] | null
 ): Promise<GoogleHockeyBundle[]> {
   if (!isGoogleMailConnected(userId) || !hasGoogleCalendarScope(userId)) {
     return [];
@@ -434,89 +440,118 @@ export async function listGoogleHockeyGamesInRange(
 
   const auth = await getAuthedGoogleClient(userId, request);
   const calendar = google.calendar({ version: "v3", auth });
-  const listed = await listGoogleCalendarsForUser(userId, request);
-  const metaById = new Map(listed.calendars.map((c) => [c.id, c]));
+  const listed =
+    listedCalendars ??
+    (await listGoogleCalendarsForUser(userId, request)).calendars;
+  const metaById = new Map(listed.map((c) => [c.id, c]));
 
   const timeMin = `${startIso.slice(0, 10)}T00:00:00Z`;
   const endExclusive = new Date(`${endIso.slice(0, 10)}T12:00:00Z`);
   endExclusive.setUTCDate(endExclusive.getUTCDate() + 1);
   const timeMax = `${endExclusive.toISOString().slice(0, 10)}T00:00:00Z`;
 
-  const bundles: GoogleHockeyBundle[] = [];
+  const bundles = await Promise.all(
+    enabled.map(async (sel) => {
+      const meta = metaById.get(sel.id);
+      const name = sel.name || meta?.name || "Hockey";
+      const color =
+        sel.color || meta?.color || ICS_TYPE_META.hockey.defaultColor;
+      const rawEvents: Array<{
+        id: string;
+        summary: string;
+        date: string;
+        time: string | null;
+        location: string | null;
+        startAt?: string | null;
+      }> = [];
 
-  for (const sel of enabled) {
-    const meta = metaById.get(sel.id);
-    const name = sel.name || meta?.name || "Hockey";
-    const color =
-      sel.color ||
-      meta?.color ||
-      ICS_TYPE_META.hockey.defaultColor;
-    const rawEvents: Array<{
-      id: string;
-      summary: string;
-      date: string;
-      time: string | null;
-      location: string | null;
-      startAt?: string | null;
-    }> = [];
-
-    try {
-      let pageToken: string | undefined;
-      do {
-        const res = await calendar.events.list({
-          calendarId: sel.id,
-          singleEvents: true,
-          orderBy: "startTime",
-          timeMin,
-          timeMax,
-          timeZone: "Europe/Zurich",
-          maxResults: 250,
-          pageToken,
-        });
-        for (const ev of res.data.items || []) {
-          if (ev.status === "cancelled") continue;
-          const allDay = Boolean(ev.start?.date && !ev.start?.dateTime);
-          const date =
-            ev.start?.date?.slice(0, 10) ||
-            (ev.start?.dateTime
-              ? zurichDateFromIso(ev.start.dateTime)
-              : null);
-          if (
-            !date ||
-            date < startIso.slice(0, 10) ||
-            date > endIso.slice(0, 10)
-          ) {
-            continue;
-          }
-          const time = allDay
-            ? null
-            : ev.start?.dateTime
-              ? zurichTimeFromIso(ev.start.dateTime)
-              : null;
-          rawEvents.push({
-            id: ev.id || `${date}-${ev.summary || "game"}`,
-            summary: (ev.summary || "").trim(),
-            date,
-            time,
-            location: ev.location?.trim() || null,
-            startAt: ev.start?.dateTime || null,
+      try {
+        let pageToken: string | undefined;
+        do {
+          const res = await calendar.events.list({
+            calendarId: sel.id,
+            singleEvents: true,
+            orderBy: "startTime",
+            timeMin,
+            timeMax,
+            timeZone: "Europe/Zurich",
+            maxResults: 250,
+            pageToken,
           });
-        }
-        pageToken = res.data.nextPageToken || undefined;
-      } while (pageToken);
-    } catch {
-      continue;
-    }
+          for (const ev of res.data.items || []) {
+            if (ev.status === "cancelled") continue;
+            const allDay = Boolean(ev.start?.date && !ev.start?.dateTime);
+            const date =
+              ev.start?.date?.slice(0, 10) ||
+              (ev.start?.dateTime
+                ? zurichDateFromIso(ev.start.dateTime)
+                : null);
+            if (
+              !date ||
+              date < startIso.slice(0, 10) ||
+              date > endIso.slice(0, 10)
+            ) {
+              continue;
+            }
+            const time = allDay
+              ? null
+              : ev.start?.dateTime
+                ? zurichTimeFromIso(ev.start.dateTime)
+                : null;
+            rawEvents.push({
+              id: ev.id || `${date}-${ev.summary || "game"}`,
+              summary: (ev.summary || "").trim(),
+              date,
+              time,
+              location: ev.location?.trim() || null,
+              startAt: ev.start?.dateTime || null,
+            });
+          }
+          pageToken = res.data.nextPageToken || undefined;
+        } while (pageToken);
+      } catch {
+        return null;
+      }
 
-    const games = parseHockeyGamesFromGoogleEvents(rawEvents);
-    if (games.length === 0) continue;
-    bundles.push({
-      calendarId: sel.id,
-      calendarName: name,
-      color,
-      games,
-    });
+      const games = parseHockeyGamesFromGoogleEvents(rawEvents);
+      if (games.length === 0) return null;
+      return {
+        calendarId: sel.id,
+        calendarName: name,
+        color,
+        games,
+      } satisfies GoogleHockeyBundle;
+    })
+  );
+
+  return bundles.filter((b): b is GoogleHockeyBundle => b != null);
+}
+
+/**
+ * One calendarList.list + parallel events + hockey fetches for agenda.
+ */
+export async function listGoogleAgendaInRange(
+  userId: number,
+  startIso: string,
+  endIso: string,
+  request?: Request | null
+): Promise<{
+  events: GoogleCalendarEvent[];
+  hockey: GoogleHockeyBundle[];
+}> {
+  if (!isGoogleMailConnected(userId) || !hasGoogleCalendarScope(userId)) {
+    return { events: [], hockey: [] };
   }
-
-  return bundles;
+  const listed = (await listGoogleCalendarsForUser(userId, request)).calendars;
+  const [events, hockey] = await Promise.all([
+    listGoogleCalendarEventsInRange(
+      userId,
+      startIso,
+      endIso,
+      request,
+      listed
+    ),
+    listGoogleHockeyGamesInRange(userId, startIso, endIso, request, listed),
+  ]);
+  return { events, hockey };
 }
