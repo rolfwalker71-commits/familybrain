@@ -17,12 +17,17 @@ import {
   Sparkles,
   HardDrive,
   Cake,
+  Video,
+  MapPin,
+  AlertTriangle,
+  Car,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BackupStatusPanel } from "@/components/settings/backup-status-panel";
 import { KpiCorrectSheet } from "@/components/dashboard/kpi-correct-sheet";
-import { TeamLogo, weekdayLabel } from "@/components/calendar/agenda-row";
+import { TeamLogo, weekdayLabel, AgendaTypeRail } from "@/components/calendar/agenda-row";
+import { AgendaEventDialog } from "@/components/calendar/agenda-event-dialog";
 import { formatCHF } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
 import { APP_ICON_STROKE } from "@/lib/branding/app-icons";
@@ -100,6 +105,48 @@ function shortPlace(item: AgendaItem): string | null {
   if (!loc) return null;
   const first = loc.split(",")[0]?.trim() || loc;
   return first.length > 28 ? `${first.slice(0, 26)}…` : first;
+}
+
+function minutesUntilStart(item: AgendaItem, today: string, nowHm: string): number | null {
+  if (!item.time || item.date !== today) return null;
+  const start = hmToMinutes(item.time);
+  const now = hmToMinutes(nowHm);
+  if (start == null || now == null) return null;
+  return start - now;
+}
+
+function formatCountdown(mins: number | null, ongoing: boolean): string | null {
+  if (ongoing) return "Jetzt";
+  if (mins == null) return null;
+  if (mins <= 0) return "Jetzt";
+  if (mins < 60) return `In ${mins} Min`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m === 0 ? `In ${h} Std` : `In ${h} Std ${m} Min`;
+}
+
+function buildNextStepLine(
+  items: AgendaItem[],
+  today: string,
+  nowHm: string
+): string | null {
+  const focus = pickFocusAgendaItem(items, today, nowHm);
+  if (!focus) return null;
+
+  const now = hmToMinutes(nowHm) ?? 0;
+  const w = eventWindowMinutes(focus);
+  const ongoing = Boolean(w && now >= w.start && now < w.end);
+  const countdown = formatCountdown(
+    minutesUntilStart(focus, today, nowHm),
+    ongoing
+  );
+  const place = shortPlace(focus);
+  const drive = focus.driveLabel || null;
+  const parts = [countdown, place, drive].filter(Boolean);
+  if (parts.length === 0) {
+    return [focus.time, focus.title].filter(Boolean).join(" · ") || null;
+  }
+  return parts.join(" · ");
 }
 
 function isBirthdayItem(item: AgendaItem): boolean {
@@ -180,6 +227,41 @@ function birthdayDayLabel(date: string, today: string): string {
   const diff = Math.round((d.getTime() - t.getTime()) / 86_400_000);
   if (diff === 1) return "Morgen";
   return weekdayLabel(date);
+}
+
+function findConflicts(
+  items: AgendaItem[],
+  today: string
+): Array<{ id: string; label: string }> {
+  const timed = items.filter(
+    (i) => i.date === today && i.time && isPlanningRelevant(i)
+  );
+  const out: Array<{ id: string; label: string }> = [];
+  const seen = new Set<string>();
+  for (let i = 0; i < timed.length; i += 1) {
+    const a = timed[i]!;
+    const wa = eventWindowMinutes(a);
+    if (!wa) continue;
+    for (let j = i + 1; j < timed.length; j += 1) {
+      const b = timed[j]!;
+      const wb = eventWindowMinutes(b);
+      if (!wb) continue;
+      if (wa.start < wb.end && wb.start < wa.end) {
+        const key = [a.id, b.id].sort().join("|");
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push({
+          id: key,
+          label: `${a.time} ${a.title} ↔ ${b.time} ${b.title}`,
+        });
+      }
+    }
+  }
+  return out;
+}
+
+function placeMapSrc(coords: { lat: number; lon: number }): string {
+  return `/api/dashboard/place-map?lat=${coords.lat}&lon=${coords.lon}&z=16`;
 }
 
 function HomeWeatherWidget({ weather }: { weather: HomeWeatherCard }) {
@@ -532,6 +614,183 @@ function BirthdaysAsideCard({
   );
 }
 
+function DayTimeline({
+  items,
+  activeId,
+  today,
+  onSelect,
+}: {
+  items: AgendaItem[];
+  activeId: string | null;
+  today: string;
+  onSelect: (item: AgendaItem) => void;
+}) {
+  if (items.length === 0) {
+    return (
+      <p className="px-1 py-6 text-[15px] text-muted-foreground">
+        Keine Termine für heute — der Tag ist frei.
+      </p>
+    );
+  }
+
+  return (
+    <ol className="relative grid grid-cols-[2.6rem_0.75rem_minmax(0,1fr)] gap-x-1.5 sm:grid-cols-[3.25rem_1.25rem_minmax(0,1fr)] sm:gap-x-3">
+      {items.map((item, index) => {
+        const active = item.id === activeId;
+        const isTomorrow = item.date > today;
+        const hm = item.time || "—";
+        const isLast = index === items.length - 1;
+        const showMap = active && item.coords;
+
+        return (
+          <li key={item.id} className="contents">
+            <div className="flex flex-col items-end justify-start pt-2 text-right">
+              {isTomorrow ? (
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:text-[11px]">
+                  Morgen
+                </span>
+              ) : null}
+              <span
+                className={cn(
+                  "text-[12px] font-semibold tabular-nums leading-tight sm:text-[13px]",
+                  active ? "text-emerald-800" : "text-muted-foreground"
+                )}
+              >
+                {hm}
+              </span>
+              {item.endTime && item.time ? (
+                <span className="text-[10px] tabular-nums text-muted-foreground/80 sm:text-[11px]">
+                  –{item.endTime}
+                </span>
+              ) : null}
+            </div>
+            <div className="relative flex justify-center pt-2.5 pb-5">
+              {!isLast ? (
+                <span
+                  className="absolute left-1/2 top-5 bottom-0 w-px -translate-x-1/2 bg-border/70"
+                  aria-hidden
+                />
+              ) : null}
+              {index > 0 ? (
+                <span
+                  className="absolute left-1/2 top-0 h-2.5 w-px -translate-x-1/2 bg-border/70"
+                  aria-hidden
+                />
+              ) : null}
+              <span
+                className={cn(
+                  "relative z-[1] size-3 shrink-0 rounded-full border-2",
+                  active
+                    ? "border-emerald-600 bg-emerald-600 shadow-[0_0_0_4px_rgba(5,150,105,0.2)]"
+                    : "border-muted-foreground/35 bg-background"
+                )}
+                aria-current={active ? "true" : undefined}
+                aria-hidden={!active}
+              />
+            </div>
+            <div
+              className={cn(
+                "mb-5 min-w-0 overflow-hidden rounded-xl border border-border/60 bg-card last:mb-1",
+                active && "border-emerald-200/90"
+              )}
+            >
+              <div className="flex items-stretch">
+                <AgendaTypeRail item={item} className="w-9 sm:w-[3.25rem]" />
+                <div
+                  className={cn(
+                    "min-w-0 flex-1 px-3 py-2.5 transition-colors",
+                    active && "bg-emerald-50/60"
+                  )}
+                >
+                  <button
+                    type="button"
+                    className="flex w-full items-start justify-between gap-2 text-left hover:opacity-90"
+                    onClick={() => onSelect(item)}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[14px] font-black tracking-tight">
+                        {item.title}
+                      </p>
+                      {item.subtitle ? (
+                        <p className="mt-0.5 truncate text-[13px] text-muted-foreground">
+                          {item.subtitle}
+                        </p>
+                      ) : null}
+                      {item.weather ? (
+                        <p className="mt-1 text-[12px] text-muted-foreground">
+                          {item.weather.icon} {item.weather.temperatureC}°
+                          {item.weather.labelDe
+                            ? ` · ${item.weather.labelDe}`
+                            : ""}
+                        </p>
+                      ) : null}
+                      {active && item.driveLabel ? (
+                        <p className="mt-1 flex items-center gap-1 text-[12px] text-muted-foreground">
+                          <Car className="size-3 shrink-0" aria-hidden />
+                          {item.driveLabel}
+                        </p>
+                      ) : null}
+                    </div>
+                    <ChevronRight
+                      className="mt-0.5 size-4 shrink-0 text-muted-foreground/70"
+                      aria-hidden
+                    />
+                  </button>
+
+                  {active && (item.meetUrl || item.mapsUrl || showMap) ? (
+                    <div className="mt-2.5 space-y-2">
+                      <div className="flex flex-wrap gap-2">
+                        {item.meetUrl ? (
+                          <a
+                            href={item.meetUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex h-7 items-center gap-1.5 rounded-md border border-border/70 bg-background px-2 text-[12px] font-medium text-foreground hover:bg-muted/50"
+                          >
+                            <Video className="size-3.5" aria-hidden />
+                            Meet
+                          </a>
+                        ) : null}
+                        {item.mapsUrl ? (
+                          <a
+                            href={item.mapsUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex h-7 items-center gap-1.5 rounded-md border border-border/70 bg-background px-2 text-[12px] font-medium text-foreground hover:bg-muted/50"
+                          >
+                            <MapPin className="size-3.5" aria-hidden />
+                            Route
+                          </a>
+                        ) : null}
+                      </div>
+                      {showMap && item.coords ? (
+                        <a
+                          href={item.mapsUrl || placeMapSrc(item.coords)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block overflow-hidden rounded-lg border border-border/60"
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={placeMapSrc(item.coords)}
+                            alt={`Karte: ${item.coords.label}`}
+                            className="h-28 w-full object-cover"
+                            loading="lazy"
+                          />
+                        </a>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
 function FocusTile({
   href,
   tone,
@@ -656,6 +915,7 @@ export function OverviewDashboard({
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [correctOpen, setCorrectOpen] = useState(false);
+  const [eventDetail, setEventDetail] = useState<AgendaItem | null>(null);
   const [fromCache, setFromCache] = useState(false);
   const [nowTick, setNowTick] = useState(0);
   const dataRef = useRef<OverviewPayload | null>(null);
@@ -768,10 +1028,13 @@ export function OverviewDashboard({
     if (!data) return [] as AgendaItem[];
     const byId = new Map<string, AgendaItem>();
     for (const item of data.todayCalendar || []) {
+      if (isBirthdayItem(item)) continue;
       byId.set(item.id, item);
     }
     for (const item of data.agenda || []) {
-      if (item.date === today) byId.set(item.id, item);
+      if (item.date !== today) continue;
+      if (isBirthdayItem(item)) continue;
+      byId.set(item.id, item);
     }
     return [...byId.values()].sort((a, b) => {
       const dc = a.date.localeCompare(b.date);
@@ -783,6 +1046,18 @@ export function OverviewDashboard({
   const nextFocusEvent = useMemo(
     () => pickFocusAgendaItem(timelineItems, today, nowHm),
     [timelineItems, today, nowHm]
+  );
+
+  const activeId = nextFocusEvent?.id ?? null;
+
+  const nextStepLine = useMemo(
+    () => buildNextStepLine(timelineItems, today, nowHm),
+    [timelineItems, today, nowHm]
+  );
+
+  const conflicts = useMemo(
+    () => findConflicts(timelineItems, today),
+    [timelineItems, today]
   );
 
   const upcomingBirthdays = useMemo(
@@ -950,7 +1225,68 @@ export function OverviewDashboard({
             </div>
           </section>
 
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(17rem,0.85fr)]">
+            <section className="min-w-0 space-y-3">
+              <div className="flex items-baseline justify-between gap-2">
+                <h2 className="text-[14px] font-black tracking-tight">
+                  Heute · Ablauf
+                </h2>
+                <Link
+                  href="/calendar"
+                  className="text-[13px] font-medium text-muted-foreground underline-offset-2 hover:underline"
+                >
+                  Alle Termine →
+                </Link>
+              </div>
+              {nextStepLine ? (
+                <p className="flex items-start gap-2 text-[15px] text-foreground/90">
+                  <Clock3
+                    className="mt-0.5 size-4 shrink-0 text-emerald-700"
+                    strokeWidth={APP_ICON_STROKE}
+                    absoluteStrokeWidth
+                    aria-hidden
+                  />
+                  <span>
+                    <span className="font-medium">Nächster Schritt · </span>
+                    {nextStepLine}
+                  </span>
+                </p>
+              ) : null}
+              {conflicts.length > 0 ? (
+                <div
+                  className="flex items-start gap-2 rounded-xl border border-amber-200/80 bg-amber-50/70 px-3 py-2 text-[13px] text-amber-950"
+                  role="status"
+                >
+                  <AlertTriangle
+                    className="mt-0.5 size-4 shrink-0 text-amber-700"
+                    aria-hidden
+                  />
+                  <div className="min-w-0">
+                    <p className="font-semibold">Termin-Konflikt</p>
+                    <ul className="mt-0.5 space-y-0.5 text-amber-900/90">
+                      {conflicts.slice(0, 2).map((c) => (
+                        <li key={c.id} className="truncate">
+                          {c.label}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              ) : null}
+              <Card className="border-border/70">
+                <CardContent className="px-3 py-3 sm:px-5 sm:py-4">
+                  <DayTimeline
+                    items={timelineItems}
+                    activeId={activeId}
+                    today={today}
+                    onSelect={setEventDetail}
+                  />
+                </CardContent>
+              </Card>
+            </section>
+
+            <aside className="min-w-0 space-y-4">
+
               {data.homeWeather ? (
                 <HomeWeatherWidget weather={data.homeWeather} />
               ) : null}
@@ -1154,7 +1490,7 @@ export function OverviewDashboard({
                   </div>
                 </CardContent>
               </Card>
-
+            </aside>
           </div>
 
           <section className="space-y-3">
@@ -1227,6 +1563,13 @@ export function OverviewDashboard({
         onOpenChange={setCorrectOpen}
         items={data?.financeItems || []}
         onSaved={() => void load()}
+      />
+      <AgendaEventDialog
+        item={eventDetail}
+        open={Boolean(eventDetail)}
+        onOpenChange={(open) => {
+          if (!open) setEventDetail(null);
+        }}
       />
     </div>
   );
