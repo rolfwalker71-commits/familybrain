@@ -97,7 +97,7 @@ export async function POST(request: Request, context: Ctx) {
   }
 
   const created: Array<{
-    kind: "event" | "task" | "note";
+    kind: "event" | "task" | "note" | "trip";
     title: string;
     ok: boolean;
     error?: string;
@@ -112,6 +112,7 @@ export async function POST(request: Request, context: Ctx) {
     location?: string | null;
     dueDate?: string | null;
     patched?: boolean;
+    tripId?: number | null;
   }> = [];
 
   for (const action of body.actions) {
@@ -152,6 +153,103 @@ export async function POST(request: Request, context: Ctx) {
       } catch (error) {
         created.push({
           kind: "note",
+          title: action.title,
+          ok: false,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+      continue;
+    }
+
+    if (action.kind === "trip") {
+      if (!action.startDate?.trim()) {
+        created.push({
+          kind: "trip",
+          title: action.title,
+          ok: false,
+          error: "Reisedatum fehlt",
+        });
+        continue;
+      }
+      try {
+        const { adoptDraftsToTrip } = await import("@/lib/trips/adopt");
+        const { coerceTripEventType } = await import("@/lib/trips/constants");
+        const tripTitle =
+          action.newTripTitle?.trim() ||
+          action.title.trim() ||
+          "Reise aus Mail";
+        const result = await adoptDraftsToTrip({
+          tripId: action.tripId ?? null,
+          newTripTitle: action.tripId ? null : tripTitle,
+          drafts: [
+            {
+              type: coerceTripEventType(action.tripType),
+              title: action.title.trim(),
+              start_date: action.startDate,
+              end_date: action.endDate || action.startDate,
+              start_time: action.startTime || null,
+              end_time: action.endTime || null,
+              location: action.location || null,
+              provider: action.provider || null,
+              booking_reference:
+                action.bookingReference || action.reference || null,
+              notes: notes || null,
+              source_excerpt: `gmail:${id}`,
+            },
+          ],
+        });
+        const ev = result.events[0];
+        insertMailAppliedLink({
+          userId,
+          messageId: id,
+          threadId,
+          kind: "trip",
+          title: action.title,
+          reference: action.bookingReference || action.reference,
+          startDate: action.startDate,
+          startTime: action.startTime,
+          endDate: action.endDate || action.startDate,
+          endTime: action.endTime,
+        });
+        const { upsertBuddySourceLink } = await import(
+          "@/lib/buddy/source-links"
+        );
+        if (ev) {
+          upsertBuddySourceLink({
+            entityType: "trip_leg",
+            entityId: String(ev.id),
+            sourceKind: "gmail_message",
+            sourceId: id,
+            label: "Gmail",
+            role: "related",
+          });
+        }
+        upsertBuddySourceLink({
+          entityType: "mail_message",
+          entityId: id,
+          sourceKind: "url",
+          sourceId: `trip:${result.trip.id}`,
+          url: `/trips/${result.trip.id}`,
+          label: "Reise",
+          role: "related",
+        });
+        created.push({
+          kind: "trip",
+          title: action.title,
+          ok: true,
+          link: `/trips/${result.trip.id}`,
+          notes,
+          reference: action.bookingReference || action.reference,
+          startDate: action.startDate,
+          startTime: action.startTime,
+          endDate: action.endDate || action.startDate,
+          endTime: action.endTime,
+          location: action.location,
+          tripId: result.trip.id,
+        });
+      } catch (error) {
+        created.push({
+          kind: "trip",
           title: action.title,
           ok: false,
           error: error instanceof Error ? error.message : String(error),
@@ -338,6 +436,45 @@ export async function POST(request: Request, context: Ctx) {
       created.filter((c) => c.ok),
       request
     );
+
+    try {
+      const { notifyAppChange } = await import("@/lib/realtime/notify");
+      const patched = created.some((c) => c.ok && c.patched);
+      const tripOk = created.find((c) => c.ok && c.kind === "trip");
+      if (patched) {
+        notifyAppChange({
+          domain: "documents",
+          reason: "mail_calendar_patch",
+          headline: "Termin aus Mail aktualisiert",
+          detail: created
+            .filter((c) => c.ok && c.patched)
+            .map((c) => c.title)
+            .join(", "),
+          title: created.find((c) => c.patched)?.title ?? null,
+          href: "/mail?tab=triage",
+          source: "buddy",
+          aiIconUrl: null,
+          category: "mail",
+          meta: mailFrom || null,
+        });
+      } else if (tripOk) {
+        notifyAppChange({
+          domain: "travel",
+          reason: "trip_event_updated",
+          headline: "Reise aus Mail übernommen",
+          detail: tripOk.title,
+          title: tripOk.title,
+          href: tripOk.link || "/trips",
+          source: "buddy",
+          aiIconUrl: null,
+          category: "mail",
+          meta: mailFrom || null,
+          tripId: tripOk.tripId ?? null,
+        });
+      }
+    } catch {
+      /* optional */
+    }
   }
   return NextResponse.json({
     created,

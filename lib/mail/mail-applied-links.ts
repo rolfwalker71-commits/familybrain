@@ -5,7 +5,7 @@ export type MailAppliedLink = {
   userId: number;
   messageId: string;
   threadId: string | null;
-  kind: "event" | "task" | "note";
+  kind: "event" | "task" | "note" | "trip";
   title: string;
   googleEventId: string | null;
   calendarId: string | null;
@@ -60,7 +60,7 @@ export function insertMailAppliedLink(input: {
   userId: number;
   messageId: string;
   threadId?: string | null;
-  kind: "event" | "task" | "note";
+  kind: "event" | "task" | "note" | "trip";
   title: string;
   googleEventId?: string | null;
   calendarId?: string | null;

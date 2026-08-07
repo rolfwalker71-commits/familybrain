@@ -197,7 +197,26 @@ export async function syncMailAnalysesForItems(
       });
       await tagGmail(userId, item.id, status, options?.request);
       result.analyzed += 1;
-      if (analysis.suggestions.length > 0) result.withSuggestions += 1;
+      if (analysis.suggestions.length > 0) {
+        result.withSuggestions += 1;
+        try {
+          const { notifyAppChange } = await import("@/lib/realtime/notify");
+          notifyAppChange({
+            domain: "documents",
+            reason: "mail_triage",
+            headline: "Mail zur Triage",
+            detail: analysis.summary || detail.subject,
+            title: detail.subject || "Mail",
+            href: `/mail?open=${encodeURIComponent(item.id)}`,
+            source: "buddy",
+            aiIconUrl: null,
+            category: "mail",
+            meta: detail.fromName || detail.from || null,
+          });
+        } catch {
+          /* optional */
+        }
+      }
     } catch (error) {
       upsertMailAnalysis({
         userId,

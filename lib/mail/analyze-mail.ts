@@ -56,6 +56,7 @@ WICHTIG:
 - Wenn im Thread-Kontext bereits ein Google-Event mit ID genannt ist und das Mail eine Änderung (neues Zeitfenster/Ort) ist: dasselbe Event aktualisieren — setze patchEventId und calendarId auf die vorhandenen Werte (kein zweites Event).
 - kind "task": dueDate wenn Frist/Tag bekannt, sonst null.
 - kind "note": «reference» = Tracking/Code, «notes» = kontextuelle Beschreibung wie oben.
+- kind "trip": nur bei klarer Reise (Flug, Hotel, Zug, Mietwagen). tripType eines von Flug|Zugreisen|Hotel|Mietauto|Transfer|Ausflug. startDate Pflicht. bookingReference/provider wenn erkennbar. Kein paralleles Kalender-event für dieselbe Reise — trip reicht.
 - replyDraft: nur wenn eine kurze Antwort an den Absender sinnvoll ist (Termin zusagen, Lieferadresse bestätigen, Rückfrage). Sonst weglassen oder null. body auf Deutsch, höflich und knapp.
 - Antworte NUR als JSON-Objekt.`;
 
@@ -117,10 +118,13 @@ JSON-Schema:
   "replyDraft": { "subject": "Re: …"|null, "body": "kurze Antwort DE", "tone": "kurz"|null }|null,
   "suggestions": [
     {
-      "kind": "event"|"task"|"note",
-      "title": "z.B. UPS Paketlieferung - irugs.ch oder Besprechung - ANG",
-      "notes": "Kontext mit Tracking/Agenda; Versand z.B. UPS … - Trackingnummer … — ohne Ort/Uhrzeit",
-      "reference": "Tracking/Code oder null (vor allem bei note)",
+      "kind": "event"|"task"|"note"|"trip",
+      "title": "z.B. UPS Paketlieferung - irugs.ch oder LX80 ZRH-LHR",
+      "notes": "Kontext …",
+      "reference": "Tracking/Code oder null",
+      "tripType": "Flug|Hotel|Zugreisen|… oder null",
+      "provider": "Airline/Hotel oder null",
+      "bookingReference": "PNR oder null",
       "reason": "warum speichern",
       "confidence": 0.0-1.0,
       "startDate": "YYYY-MM-DD"|null,
@@ -163,6 +167,7 @@ JSON-Schema:
 
   const suggestions = result.data.suggestions.filter((s) => {
     if (s.kind === "event") return Boolean(s.startDate);
+    if (s.kind === "trip") return Boolean(s.startDate && s.title.trim());
     if (s.kind === "note") {
       return Boolean(s.title.trim() && (s.reference?.trim() || s.notes?.trim()));
     }
@@ -171,11 +176,26 @@ JSON-Schema:
 
   const withPatch = attachPatchHints(suggestions, context?.patchableEvent);
 
+  const { matchFamilyMemberFromMail } = await import("@/lib/google/people");
+  const memberMatch = matchFamilyMemberFromMail({
+    fromName: message.fromName,
+    fromEmail: message.from,
+    subject: message.subject,
+    snippet: message.snippet,
+    body,
+  });
+
   const analysis: MailAnalysis = {
     ...result.data,
     suggestions: withPatch,
     replyDraft: result.data.replyDraft?.body?.trim()
       ? result.data.replyDraft
+      : null,
+    suggestedMember: memberMatch
+      ? {
+          memberId: memberMatch.memberId,
+          displayName: memberMatch.displayName,
+        }
       : null,
   };
 
@@ -196,6 +216,7 @@ JSON-Schema:
   return {
     ...enriched,
     replyDraft: analysis.replyDraft,
+    suggestedMember: analysis.suggestedMember,
     suggestions: enriched.suggestions.map((s) =>
       enrichSuggestionNotes(s, ctx)
     ),

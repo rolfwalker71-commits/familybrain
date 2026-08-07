@@ -40,6 +40,16 @@ import {
 
 export const CALENDAR_SOURCE_HOLIDAYS = "swiss-holidays";
 export const CALENDAR_SOURCE_DEADLINES = "deadlines";
+export const CALENDAR_SOURCE_PEOPLE_BIRTHDAYS = "people-birthdays";
+
+function normalizeBirthdayName(raw: string): string {
+  return raw
+    .replace(/^Geburtstag\s*[·•\-–]\s*/i, "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "");
+}
 
 export type CalendarAgendaRange = "today" | "week" | "14d";
 
@@ -174,6 +184,14 @@ export function listCalendarSources(userId: number | null): CalendarSource[] {
       name: "Fristen",
       color: "#0d9488",
       type: "deadline",
+      builtin: true,
+      enabled: true,
+    },
+    {
+      id: CALENDAR_SOURCE_PEOPLE_BIRTHDAYS,
+      name: "Geburtstage (Kontakte)",
+      color: "#db2777",
+      type: "birthday",
       builtin: true,
       enabled: true,
     },
@@ -433,6 +451,57 @@ export async function getCalendarAgenda(options: {
         calendarId: CALENDAR_SOURCE_HOLIDAYS,
         planningRelevant: true,
       });
+    }
+  }
+
+  // People contacts birthdays — fill gaps not already on a Google birthday calendar.
+  if (
+    options.userId != null &&
+    isGoogleMailConnected(options.userId) &&
+    sourceAllowed(CALENDAR_SOURCE_PEOPLE_BIRTHDAYS, filterIds)
+  ) {
+    try {
+      const { hasGoogleContactsScope } = await import("@/lib/google/oauth");
+      if (hasGoogleContactsScope(options.userId)) {
+        const { listPeopleBirthdaysInRange, getCachedPeopleHomeAddress, listPeopleHomeAddresses } =
+          await import("@/lib/google/people");
+        const peopleBdays = await listPeopleBirthdaysInRange(
+          options.userId,
+          start,
+          end
+        );
+        const existingBirthdayKeys = new Set(
+          items
+            .filter((i) => i.badge === "Geburtstag" || i.calendarType === "birthday")
+            .map((i) => `${i.date}|${normalizeBirthdayName(i.title)}`)
+        );
+        for (const b of peopleBdays) {
+          const key = `${b.date}|${normalizeBirthdayName(b.summary)}`;
+          if (existingBirthdayKeys.has(key)) continue;
+          existingBirthdayKeys.add(key);
+          items.push({
+            id: `people-${b.id}`,
+            kind: "calendar",
+            date: b.date,
+            title: b.summary,
+            subtitle: "Kontakte",
+            amount: null,
+            currency: null,
+            documentId: null,
+            href: null,
+            badge: "Geburtstag",
+            accentColor: "#db2777",
+            calendarType: "birthday",
+            calendarId: CALENDAR_SOURCE_PEOPLE_BIRTHDAYS,
+            planningRelevant: true,
+          });
+        }
+        if (!getCachedPeopleHomeAddress()) {
+          void listPeopleHomeAddresses(options.userId).catch(() => undefined);
+        }
+      }
+    } catch {
+      /* contacts optional */
     }
   }
 

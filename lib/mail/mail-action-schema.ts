@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const MailSuggestionSchema = z.object({
-  kind: z.enum(["event", "task", "note"]),
+  kind: z.enum(["event", "task", "note", "trip"]),
   title: z.string().min(1).max(200),
   notes: z.string().max(2000).nullable().optional(),
   reason: z.string().max(400).optional(),
@@ -29,6 +29,10 @@ export const MailSuggestionSchema = z.object({
   dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
   /** note — e.g. tracking number */
   reference: z.string().max(200).nullable().optional(),
+  /** trip — Flug / Hotel / Zugreisen / … */
+  tripType: z.string().max(40).nullable().optional(),
+  provider: z.string().max(120).nullable().optional(),
+  bookingReference: z.string().max(120).nullable().optional(),
 });
 
 export const MailReplyDraftSchema = z.object({
@@ -37,11 +41,17 @@ export const MailReplyDraftSchema = z.object({
   tone: z.string().max(80).nullable().optional(),
 });
 
+export const MailSuggestedMemberSchema = z.object({
+  memberId: z.number().int().positive(),
+  displayName: z.string().min(1).max(120),
+});
+
 export const MailAnalysisSchema = z.object({
   summary: z.string().max(500),
   relevance: z.enum(["none", "low", "medium", "high"]),
   suggestions: z.array(MailSuggestionSchema).max(8),
   replyDraft: MailReplyDraftSchema.nullable().optional(),
+  suggestedMember: MailSuggestedMemberSchema.nullable().optional(),
 });
 
 export type MailSuggestion = z.infer<typeof MailSuggestionSchema>;
@@ -53,7 +63,7 @@ export const MailActionsBodySchema = z.object({
   actions: z
     .array(
       z.object({
-        kind: z.enum(["event", "task", "note"]),
+        kind: z.enum(["event", "task", "note", "trip"]),
         title: z.string().min(1).max(200),
         notes: z.string().max(2000).nullable().optional(),
         startDate: z.string().optional().nullable(),
@@ -67,6 +77,11 @@ export const MailActionsBodySchema = z.object({
         calendarId: z.string().optional().nullable(),
         tasklistId: z.string().optional().nullable(),
         patchEventId: z.string().optional().nullable(),
+        tripType: z.string().optional().nullable(),
+        provider: z.string().optional().nullable(),
+        bookingReference: z.string().optional().nullable(),
+        tripId: z.number().int().positive().optional().nullable(),
+        newTripTitle: z.string().max(200).optional().nullable(),
       })
     )
     .min(1)

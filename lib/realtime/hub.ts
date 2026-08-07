@@ -13,6 +13,8 @@ export type NotifyReason =
   | "buddy_status"
   | "mark_paid"
   | "document_triage"
+  | "mail_triage"
+  | "mail_calendar_patch"
   | "trip_comment"
   | "trip_event_updated"
   | "trip_event_ai_image"

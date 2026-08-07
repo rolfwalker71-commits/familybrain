@@ -311,6 +311,136 @@ function HomeWeatherWidget({ weather }: { weather: HomeWeatherCard }) {
   );
 }
 
+/** Verdichtete Tageskarte: Termine + offene Punkte, eine Karte. */
+function DayBriefCard({
+  data,
+  onSelectEvent,
+}: {
+  data: OverviewPayload;
+  onSelectEvent?: (item: AgendaItem) => void;
+}) {
+  const events = data.todayCalendar.slice(0, 4);
+  const overdueTasks = data.tasks.items.filter((t) => t.overdue).length;
+  const openTasks = data.tasks.items.length;
+  const mailPending = data.chips.mailSuggestionsPending;
+  const docTriage = data.chips.triagePending;
+  const notes = data.referenceNotes.slice(0, 2);
+
+  const chips: string[] = [];
+  if (mailPending > 0) chips.push(`${mailPending} Mail-Triage`);
+  if (docTriage > 0) chips.push(`${docTriage} Belege`);
+  if (overdueTasks > 0) chips.push(`${overdueTasks} überfällig`);
+  else if (openTasks > 0) chips.push(`${openTasks} Aufgaben`);
+
+  return (
+    <Card className="border-border/70">
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-2 text-[16px] font-black">
+          <Sparkles
+            className="size-4 text-muted-foreground"
+            strokeWidth={APP_ICON_STROKE}
+            absoluteStrokeWidth
+            aria-hidden
+          />
+          Tageskarte
+        </CardTitle>
+        {chips.length > 0 ? (
+          <p className="text-[12px] text-muted-foreground">
+            {chips.join(" · ")}
+          </p>
+        ) : (
+          <p className="text-[12px] text-muted-foreground">
+            Heute im Überblick
+          </p>
+        )}
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {events.length === 0 ? (
+          <p className="text-[13px] text-muted-foreground">
+            Keine Termine in den nächsten Stunden.
+          </p>
+        ) : (
+          <ul className="space-y-1.5">
+            {events.map((ev) => (
+              <li key={ev.id}>
+                <button
+                  type="button"
+                  className="flex w-full items-start gap-2 rounded-lg px-1 py-0.5 text-left hover:bg-muted/40"
+                  onClick={() => onSelectEvent?.(ev)}
+                >
+                  <span className="w-10 shrink-0 text-[12px] font-medium tabular-nums text-muted-foreground">
+                    {ev.time || "–"}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[13px] font-semibold">
+                      {ev.title}
+                    </span>
+                    {ev.badge ? (
+                      <span className="text-[11px] text-muted-foreground">
+                        {ev.badge}
+                        {ev.location ? ` · ${ev.location}` : ""}
+                      </span>
+                    ) : null}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {notes.length > 0 ? (
+          <div className="border-t border-border/50 pt-2">
+            <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+              Referenzen
+            </p>
+            <ul className="space-y-1">
+              {notes.map((n) => (
+                <li
+                  key={n.id}
+                  className="truncate text-[12px] text-muted-foreground"
+                >
+                  {n.title}
+                  {n.reference ? ` · ${n.reference}` : ""}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+        <div className="flex flex-wrap gap-x-3 gap-y-1 border-t border-border/50 pt-2 text-[12px]">
+          <Link
+            href="/calendar"
+            className="font-medium text-foreground underline-offset-2 hover:underline"
+          >
+            Kalender
+          </Link>
+          {mailPending > 0 ? (
+            <Link
+              href="/mail?tab=triage"
+              className="font-medium text-foreground underline-offset-2 hover:underline"
+            >
+              Mail-Triage
+            </Link>
+          ) : (
+            <Link
+              href="/mail"
+              className="text-muted-foreground underline-offset-2 hover:underline"
+            >
+              Mail
+            </Link>
+          )}
+          {docTriage > 0 ? (
+            <Link
+              href="/inbox"
+              className="font-medium text-foreground underline-offset-2 hover:underline"
+            >
+              Inbox
+            </Link>
+          ) : null}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function NextHockeyCard({ game }: { game: HockeyGameCard }) {
   return (
     <Card className="border-border/70">
@@ -1038,6 +1168,11 @@ export function OverviewDashboard({
               {data.homeWeather ? (
                 <HomeWeatherWidget weather={data.homeWeather} />
               ) : null}
+
+              <DayBriefCard
+                data={data}
+                onSelectEvent={(item) => setEventDetail(item)}
+              />
 
               <Card className="border-border/70">
                 <CardHeader className="pb-2">

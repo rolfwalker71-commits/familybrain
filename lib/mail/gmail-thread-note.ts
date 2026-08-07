@@ -6,7 +6,7 @@ import {
 } from "@/lib/google/oauth";
 
 export type ThreadNoteAction = {
-  kind: "event" | "task" | "note";
+  kind: "event" | "task" | "note" | "trip";
   title: string;
   notes?: string | null;
   reference?: string | null;
@@ -102,6 +102,9 @@ function kindMeta(kind: ThreadNoteAction["kind"]): {
   if (kind === "task") {
     return { label: "Aufgabe", icon: "✅", color: BRAND.task };
   }
+  if (kind === "trip") {
+    return { label: "Reise", icon: "✈️", color: BRAND.accent };
+  }
   return { label: "Referenz", icon: "📌", color: BRAND.note };
 }
 
@@ -132,6 +135,20 @@ function actionDetailsHtml(a: ThreadNoteAction): string {
     if (due) {
       rows.push(
         `<tr><td style="padding:2px 0;color:${BRAND.muted};width:7rem;">Fällig</td><td style="padding:2px 0;color:${BRAND.ink};">${escapeHtml(due)}</td></tr>`
+      );
+    }
+  }
+  if (a.kind === "trip") {
+    const startD = formatSwissDate(a.startDate);
+    if (startD) {
+      const time = a.startTime || "";
+      rows.push(
+        `<tr><td style="padding:2px 0;color:${BRAND.muted};width:7rem;">Reise</td><td style="padding:2px 0;color:${BRAND.ink};font-variant-numeric:tabular-nums;">${escapeHtml(startD)}${time ? ` · ${escapeHtml(time)}` : ""}</td></tr>`
+      );
+    }
+    if (a.location?.trim()) {
+      rows.push(
+        `<tr><td style="padding:2px 0;color:${BRAND.muted};">Ort</td><td style="padding:2px 0;color:${BRAND.ink};">${escapeHtml(a.location.trim())}</td></tr>`
       );
     }
   }
@@ -243,6 +260,15 @@ export function buildApplyThreadNoteText(input: {
     if (a.kind === "task" && a.dueDate) {
       const d = formatSwissDate(a.dueDate);
       if (d) lines.push(`  Fällig: ${d}`);
+    }
+    if (a.kind === "trip" && a.startDate) {
+      const d = formatSwissDate(a.startDate);
+      if (d) {
+        lines.push(
+          `  Reise: ${d}${a.startTime ? ` · ${a.startTime}` : ""}`
+        );
+      }
+      if (a.location?.trim()) lines.push(`  Ort: ${a.location.trim()}`);
     }
     if (a.reference?.trim()) lines.push(`  Referenz: ${a.reference.trim()}`);
     if (a.notes?.trim()) lines.push(`  Details: ${a.notes.trim()}`);

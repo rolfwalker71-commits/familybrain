@@ -11,6 +11,7 @@ import {
   CalendarDays,
   CheckSquare,
   StickyNote,
+  Plane,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -298,6 +299,10 @@ export function MailPageClient() {
           s.kind === "event" ? s.calendarId || calendarId || null : null,
         tasklistId: s.kind === "task" ? tasklistId || null : null,
         patchEventId: s.patchEventId ?? null,
+        tripType: s.tripType ?? null,
+        provider: s.provider ?? null,
+        bookingReference: s.bookingReference ?? null,
+        newTripTitle: s.kind === "trip" ? s.title : null,
       }));
       const res = await fetch(
         `/api/mail/${encodeURIComponent(openId)}/actions`,
@@ -653,6 +658,11 @@ export function MailPageClient() {
                         Buddy · {analysis.relevance}
                       </p>
                       <p className="text-sm">{analysis.summary}</p>
+                      {analysis.suggestedMember ? (
+                        <p className="text-xs font-medium text-violet-800/90">
+                          Person: {analysis.suggestedMember.displayName}
+                        </p>
+                      ) : null}
                     </div>
                     {analysis.suggestions.length === 0 ? (
                       <p className="text-xs text-muted-foreground">
@@ -689,6 +699,11 @@ export function MailPageClient() {
                                     ) : s.kind === "note" ? (
                                       <StickyNote
                                         className="mt-1.5 size-3.5 shrink-0 text-amber-700"
+                                        aria-hidden
+                                      />
+                                    ) : s.kind === "trip" ? (
+                                      <Plane
+                                        className="mt-1.5 size-3.5 shrink-0 text-violet-700"
                                         aria-hidden
                                       />
                                     ) : (
@@ -733,7 +748,7 @@ export function MailPageClient() {
                                           [key]: e.target.value,
                                         }))
                                       }
-                                      placeholder="Beschreibung für Kalender / Aufgabe / Notiz"
+                                      placeholder="Beschreibung für Kalender / Aufgabe / Reise / Notiz"
                                     />
                                   </label>
                                 </div>

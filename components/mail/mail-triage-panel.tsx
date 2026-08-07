@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CalendarDays, CheckSquare, StickyNote, X } from "lucide-react";
+import { CalendarDays, CheckSquare, Plane, StickyNote, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import type { MailSuggestion } from "@/lib/mail/mail-action-schema";
@@ -230,6 +230,10 @@ export function MailTriagePanel({
             : null,
         tasklistId: s.kind === "task" ? tasklistId || null : null,
         patchEventId: s.patchEventId ?? null,
+        tripType: s.tripType ?? null,
+        provider: s.provider ?? null,
+        bookingReference: s.bookingReference ?? null,
+        newTripTitle: s.kind === "trip" ? s.title : null,
       }));
       const res = await fetch(
         `/api/mail/${encodeURIComponent(row.messageId)}/actions`,
@@ -398,6 +402,11 @@ export function MailTriagePanel({
                         {row.fromName || row.fromEmail}
                         {row.summary ? ` · ${row.summary}` : ""}
                       </p>
+                      {row.analysis?.suggestedMember ? (
+                        <p className="mt-0.5 text-[11px] font-medium text-violet-800/90">
+                          Person: {row.analysis.suggestedMember.displayName}
+                        </p>
+                      ) : null}
                     </div>
                     <Button
                       type="button"
@@ -440,6 +449,11 @@ export function MailTriagePanel({
                             ) : s.kind === "note" ? (
                               <StickyNote
                                 className="mt-1.5 size-3.5 text-amber-700"
+                                aria-hidden
+                              />
+                            ) : s.kind === "trip" ? (
+                              <Plane
+                                className="mt-1.5 size-3.5 text-violet-700"
                                 aria-hidden
                               />
                             ) : (
@@ -496,7 +510,7 @@ export function MailTriagePanel({
                                   },
                                 }))
                               }
-                              placeholder="Beschreibung für Kalender / Aufgabe / Notiz"
+                              placeholder="Beschreibung für Kalender / Aufgabe / Reise / Notiz"
                             />
                           </label>
                         </div>

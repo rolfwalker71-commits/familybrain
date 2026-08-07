@@ -13,7 +13,7 @@ export type ApplyWarning = {
 };
 
 export type ApplyCheckAction = {
-  kind: "event" | "task" | "note";
+  kind: "event" | "task" | "note" | "trip";
   title: string;
   reference?: string | null;
   startDate?: string | null;

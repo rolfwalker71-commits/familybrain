@@ -101,6 +101,25 @@ export async function POST(request: Request, context: Ctx) {
     await applyGmailStatusLabel(userId, id, status, request).catch(
       () => undefined
     );
+    if (analysis.suggestions.length > 0) {
+      try {
+        const { notifyAppChange } = await import("@/lib/realtime/notify");
+        notifyAppChange({
+          domain: "documents",
+          reason: "mail_triage",
+          headline: "Mail zur Triage",
+          detail: analysis.summary || message.subject,
+          title: message.subject || "Mail",
+          href: `/mail?open=${encodeURIComponent(id)}`,
+          source: "buddy",
+          aiIconUrl: null,
+          category: "mail",
+          meta: message.fromName || message.from || null,
+        });
+      } catch {
+        /* optional */
+      }
+    }
     return NextResponse.json({ analysis, messageId: id, stored });
   } catch (error) {
     return NextResponse.json(
