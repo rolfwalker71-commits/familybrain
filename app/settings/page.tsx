@@ -28,6 +28,7 @@ import {
 import { SettingsUsersPanel } from "@/components/settings/settings-users-panel";
 import { SettingsFamilyPanel } from "@/components/settings/settings-family-panel";
 import { SettingsGooglePanel } from "@/components/settings/settings-google-panel";
+import { SettingsMicrosoftPanel } from "@/components/settings/settings-microsoft-panel";
 import { NotificationPrefsPanel } from "@/components/settings/notification-prefs-panel";
 import { SettingsCategorySuggestionsPanel } from "@/components/settings/settings-category-suggestions-panel";
 import { BackupStatusPanel } from "@/components/settings/backup-status-panel";
@@ -2571,13 +2572,14 @@ function SettingsPageInner() {
             <strong className="font-medium text-foreground">App-weit:</strong>{" "}
             Client-ID/Secret unten.{" "}
             <strong className="font-medium text-foreground">Pro User:</strong>{" "}
-            Google verbinden und Kalender wählen unter{" "}
+            Google / Microsoft 365 verbinden unter{" "}
             <a href="/account" className="underline underline-offset-2">
               Konto
             </a>
             .
           </p>
           <SettingsGooglePanel />
+          <SettingsMicrosoftPanel />
         </div>
       ) : null}
 
