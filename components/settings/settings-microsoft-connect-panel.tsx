@@ -198,19 +198,19 @@ export function SettingsMicrosoftConnectPanel() {
                 {!data.hasCalendarScope || !data.hasMailScope ? (
                   <p className="text-xs text-amber-800">
                     Scopes unvollständig — bitte neu verbinden (Mail +
-                    Kalender + Tasks + Teams-Chat).
+                    Kalender + Tasks).
                   </p>
                 ) : (
                   <p className="text-xs text-muted-foreground">
                     Mail und Kalender aktiv
                     {data.hasMailSendScope ? " (inkl. Senden)" : ""}
-                    {data.hasTasksScope ? " · To Do" : ""}
-                    {data.hasTeamsChatScope
-                      ? " · Teams-Selbstchat"
-                      : ""}.
-                    {!data.hasTasksScope || !data.hasTeamsChatScope
-                      ? " Fehlende Rechte: Microsoft 365 neu verbinden."
+                    {data.hasTasksScope ? " · To Do" : ""}.
+                    {!data.hasTasksScope
+                      ? " Für To Do: Tasks.ReadWrite in Entra + neu verbinden."
                       : ""}
+                    {data.hasTeamsChatScope
+                      ? " · Teams-Selbstchat aktiv."
+                      : " Teams-Chat bewusst nicht im Standard-Login (braucht oft Admin-Consent)."}
                   </p>
                 )}
                 {probe?.ok ? (
