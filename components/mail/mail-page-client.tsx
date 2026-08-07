@@ -103,6 +103,7 @@ export function MailPageClient() {
   const [pendingTriage, setPendingTriage] = useState(0);
   const [connected, setConnected] = useState(false);
   const [configured, setConfigured] = useState(false);
+  const [hasGmailModify, setHasGmailModify] = useState(false);
   const [connectedEmail, setConnectedEmail] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -175,6 +176,7 @@ export function MailPageClient() {
       }
       setConfigured(Boolean(data.configured));
       setConnected(Boolean(data.connected));
+      setHasGmailModify(Boolean(data.hasGmailModify));
       setConnectedEmail(data.connectedEmail || null);
       setItems((data.items || []) as EnrichedMail[]);
       setPendingTriage(Number(data.pendingTriage) || 0);
@@ -438,22 +440,36 @@ export function MailPageClient() {
           </CardContent>
         </Card>
       ) : (
-        <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
-          <span>
-            Verbunden als{" "}
-            <span className="font-medium text-foreground">
-              {connectedEmail || "Google"}
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
+            <span>
+              Verbunden als{" "}
+              <span className="font-medium text-foreground">
+                {connectedEmail || "Google"}
+              </span>
             </span>
-          </span>
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            onClick={() => void disconnect()}
-          >
-            <Unlink className="size-3.5" />
-            Trennen
-          </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => void disconnect()}
+            >
+              <Unlink className="size-3.5" />
+              Trennen
+            </Button>
+          </div>
+          {!hasGmailModify ? (
+            <p className="rounded-lg border border-amber-200/80 bg-amber-50/80 px-3 py-2 text-xs text-amber-950">
+              Gmail-Labels brauchen die Berechtigung «ändern». Bitte{" "}
+              <a
+                href="/api/google/oauth/start"
+                className="font-medium underline underline-offset-2"
+              >
+                Google neu verbinden
+              </a>
+              , damit Buddy Status-Labels (Buddy/Zur Triage, …) zurückschreibt.
+            </p>
+          ) : null}
         </div>
       )}
 

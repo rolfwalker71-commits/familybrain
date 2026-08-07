@@ -8,7 +8,8 @@ export const GOOGLE_OAUTH_CLIENT_ID_SETTING = "google_oauth_client_id";
 export const GOOGLE_OAUTH_CLIENT_SECRET_SETTING = "google_oauth_client_secret";
 
 export const GOOGLE_OAUTH_SCOPES = [
-  "https://www.googleapis.com/auth/gmail.readonly",
+  /** Read + labels/modify (replaces gmail.readonly) */
+  "https://www.googleapis.com/auth/gmail.modify",
   "https://www.googleapis.com/auth/userinfo.email",
   "https://www.googleapis.com/auth/calendar.readonly",
   /** Needed to write Ambri results back into owned Google events */
@@ -117,6 +118,18 @@ export function clearGoogleUserTokens(userId: number): void {
 export function isGoogleMailConnected(userId: number | null): boolean {
   if (userId == null) return false;
   return Boolean(readGoogleUserTokens(userId)?.refreshToken);
+}
+
+/** True if Buddy may add/remove Gmail labels (status tags after analysis). */
+export function hasGmailModifyScope(userId: number | null): boolean {
+  if (userId == null) return false;
+  const scopes = (readGoogleUserTokens(userId)?.scope || "")
+    .split(/[\s,]+/)
+    .filter(Boolean);
+  return (
+    scopes.includes("https://www.googleapis.com/auth/gmail.modify") ||
+    scopes.includes("https://www.googleapis.com/auth/gmail")
+  );
 }
 
 /** True if stored token scopes include Calendar read. */

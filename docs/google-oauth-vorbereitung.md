@@ -7,7 +7,7 @@ Status: **Mail + Geburtstage umgesetzt** — Gmail API + Calendar API
 
 | Feature | ICS-URL nötig? | Mit OAuth |
 |---------|----------------|-----------|
-| **Mail (Gmail)** | nein | ja — Gmail API, `gmail.readonly` |
+| **Mail (Gmail)** | nein | ja — Gmail API, `gmail.modify` (Lesen + Labels) |
 | **Geburtstage (Google «Geburtstage»-Kalender)** | nein (gibt keine Geheimadresse) | ja — Calendar API, `eventTypes=birthday` |
 
 Ein **Google-Cloud-Projekt**, **ein OAuth-Client**, **ein verbundenes Konto** reichen für Phase 1.
@@ -46,7 +46,7 @@ Ein **Google-Cloud-Projekt**, **ein OAuth-Client**, **ein verbundenes Konto** re
 
 | Scope | Zweck |
 |-------|--------|
-| `https://www.googleapis.com/auth/gmail.readonly` | Posteingang lesen |
+| `https://www.googleapis.com/auth/gmail.modify` | Posteingang lesen + Labels setzen (Buddy-Status) |
 | `https://www.googleapis.com/auth/userinfo.email` | Welches Konto verbunden ist |
 | `https://www.googleapis.com/auth/calendar.readonly` | Geburtstage + ggf. andere Kalender lesen |
 | optional `https://www.googleapis.com/auth/contacts.readonly` | Geburtstage direkt aus Kontakten |

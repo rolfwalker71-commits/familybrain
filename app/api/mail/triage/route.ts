@@ -55,5 +55,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Analyse nicht gefunden" }, { status: 404 });
   }
   updateMailAnalysisStatus(userId, messageId, "dismissed");
+  const { applyGmailStatusLabel } = await import("@/lib/mail/gmail-labels");
+  await applyGmailStatusLabel(userId, messageId, "dismissed", request).catch(
+    () => undefined
+  );
   return NextResponse.json({ ok: true, status: "dismissed" });
 }

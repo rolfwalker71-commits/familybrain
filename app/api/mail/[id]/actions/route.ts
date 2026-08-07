@@ -191,6 +191,10 @@ export async function POST(request: Request, context: Ctx) {
   const okCount = created.filter((c) => c.ok).length;
   if (okCount > 0) {
     updateMailAnalysisStatus(userId, id, "applied");
+    const { applyGmailStatusLabel } = await import("@/lib/mail/gmail-labels");
+    await applyGmailStatusLabel(userId, id, "applied", request).catch(
+      () => undefined
+    );
   }
   return NextResponse.json({
     created,

@@ -1,9 +1,11 @@
 import { hasOpenAIKey } from "@/lib/ai/client";
 import { getGmailMessage, type MailListItem } from "@/lib/mail/gmail";
+import { applyGmailStatusLabel } from "@/lib/mail/gmail-labels";
 import { analyzeMailForActions } from "@/lib/mail/analyze-mail";
 import {
   shouldAnalyzeMail,
   resolveStatusFromAnalysis,
+  type MailAnalysisStatus,
 } from "@/lib/mail/mail-heuristic";
 import {
   getMailAnalysesForMessages,
@@ -19,6 +21,17 @@ function zurichToday(): string {
   }).format(new Date());
 }
 
+async function tagGmail(
+  userId: number,
+  messageId: string,
+  status: MailAnalysisStatus,
+  request?: Request | null
+): Promise<void> {
+  await applyGmailStatusLabel(userId, messageId, status, request).catch(
+    () => undefined
+  );
+}
+
 export type MailSyncResult = {
   examined: number;
   skippedHeuristic: number;
@@ -30,7 +43,7 @@ export type MailSyncResult = {
 
 /**
  * Analyze new mails from a list batch. Caps AI calls per invocation.
- * Already-stored message ids are left untouched.
+ * Already-stored message ids are left untouched (except skipped→retry / error).
  */
 export async function syncMailAnalysesForItems(
   userId: number,
@@ -60,7 +73,6 @@ export async function syncMailAnalysesForItems(
     const ex = existing.get(i.id);
     if (!ex) return true;
     if (ex.status === "error") return true;
-    // Heuristic may have improved — retry previously skipped rows
     if (ex.status === "skipped") {
       return shouldAnalyzeMail({
         from: i.from,
@@ -98,6 +110,7 @@ export async function syncMailAnalysesForItems(
         summary: "Kein Handlungsbedarf erkannt (Heuristik).",
         suggestionCount: 0,
       });
+      await tagGmail(userId, item.id, "skipped", options?.request);
       result.skippedHeuristic += 1;
       continue;
     }
@@ -130,6 +143,7 @@ export async function syncMailAnalysesForItems(
         analysis,
         suggestionCount: analysis.suggestions.length,
       });
+      await tagGmail(userId, item.id, status, options?.request);
       result.analyzed += 1;
       if (analysis.suggestions.length > 0) result.withSuggestions += 1;
     } catch (error) {
@@ -145,6 +159,7 @@ export async function syncMailAnalysesForItems(
         error: error instanceof Error ? error.message : String(error),
         suggestionCount: 0,
       });
+      await tagGmail(userId, item.id, "error", options?.request);
       result.errors += 1;
     }
   }

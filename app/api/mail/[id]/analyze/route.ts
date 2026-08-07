@@ -6,6 +6,7 @@ import {
   resolveGoogleUserId,
 } from "@/lib/google/oauth";
 import { getGmailMessage } from "@/lib/mail/gmail";
+import { applyGmailStatusLabel } from "@/lib/mail/gmail-labels";
 import { analyzeMailForActions } from "@/lib/mail/analyze-mail";
 import { hasOpenAIKey } from "@/lib/ai/client";
 import { resolveStatusFromAnalysis } from "@/lib/mail/mail-heuristic";
@@ -64,6 +65,9 @@ export async function POST(request: Request, context: Ctx) {
       analysis,
       suggestionCount: analysis.suggestions.length,
     });
+    await applyGmailStatusLabel(userId, id, status, request).catch(
+      () => undefined
+    );
     return NextResponse.json({ analysis, messageId: id, stored });
   } catch (error) {
     return NextResponse.json(

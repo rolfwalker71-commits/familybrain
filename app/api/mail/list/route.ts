@@ -3,6 +3,7 @@ import { isAuthError, requireAuth } from "@/lib/auth/current-user";
 import { ensureInitialized } from "@/lib/db/migrations";
 import {
   getConnectedGoogleEmail,
+  hasGmailModifyScope,
   isGoogleMailConnected,
   isGoogleOauthConfigured,
   resolveGoogleUserId,
@@ -43,6 +44,7 @@ export async function GET(request: Request) {
       connectedEmail: null,
       ownerUserId: userId,
       pendingTriage: 0,
+      hasGmailModify: false,
       sync: null,
     });
   }
@@ -55,6 +57,7 @@ export async function GET(request: Request) {
       connectedEmail: null,
       ownerUserId: userId,
       pendingTriage: 0,
+      hasGmailModify: false,
       sync: null,
     });
   }
@@ -100,6 +103,7 @@ export async function GET(request: Request) {
       filter,
       ownerUserId: userId,
       pendingTriage: countPendingMailTriage(userId),
+      hasGmailModify: hasGmailModifyScope(userId),
       sync: syncResult,
     });
   } catch (error) {
@@ -113,6 +117,7 @@ export async function GET(request: Request) {
         filter,
         ownerUserId: userId,
         pendingTriage: 0,
+        hasGmailModify: userId != null ? hasGmailModifyScope(userId) : false,
         sync: null,
       },
       { status: 502 }

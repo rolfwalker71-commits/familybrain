@@ -24,6 +24,8 @@ export async function POST() {
   }
   clearGoogleUserTokens(userId);
   invalidateMailListCache(userId);
+  const { clearGmailLabelCache } = await import("@/lib/mail/gmail-labels");
+  clearGmailLabelCache(userId);
   return NextResponse.json({
     ok: true,
     connected: false,
