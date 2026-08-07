@@ -27,7 +27,9 @@ Bereits vorhanden bei dir:
 2. **Konto → Mein Microsoft 365** → verbinden als `rolf.walker@an-group.one`
 3. **Verbindung testen** (Graph `/me` + heutige Termine)
 
-## Nächste Ausbaustufen (noch nicht)
+## Nächste Ausbaustufen
 
-- Abend-Review: Termine erledigt / verschieben auf freie Slots
-- Tages-Mails: Inbox + Sent → Summary + Aufgaben-Vorschläge
+Umgesetzt unter **`/microsoft`**:
+
+- **Kalender-Review:** heutige Termine → Erledigt (Kategorie `Buddy/Erledigt`) oder Verschieben auf freie Slots (nächste 7 Tage, 08–18)
+- **Mail-Tag:** Posteingang + Gesendet → AI-Tagesanalyse + Aufgaben (Google Tasks oder Buddy-Notiz)

@@ -50,6 +50,12 @@ const myBrainNavItems: NavItem[] = [
     tone: pageVisuals.mail.tone,
   },
   {
+    href: "/microsoft",
+    label: "Microsoft 365",
+    icon: pageVisuals.microsoft.icon,
+    tone: pageVisuals.microsoft.tone,
+  },
+  {
     href: "/inbox",
     label: "Inbox",
     icon: pageVisuals.inbox.icon,

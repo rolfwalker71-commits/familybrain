@@ -10,6 +10,7 @@ test("inferAdminNavMode maps buddy areas", () => {
   assert.equal(inferAdminNavMode("/dashboard"), "mybrain");
   assert.equal(inferAdminNavMode("/calendar"), "mybrain");
   assert.equal(inferAdminNavMode("/mail"), "mybrain");
+  assert.equal(inferAdminNavMode("/microsoft"), "mybrain");
   assert.equal(inferAdminNavMode("/account"), "mybrain");
   assert.equal(inferAdminNavMode("/documents/9"), "mybrain");
   assert.equal(inferAdminNavMode("/login"), null);

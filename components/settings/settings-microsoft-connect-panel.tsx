@@ -234,6 +234,14 @@ export function SettingsMicrosoftConnectPanel() {
                 Mein Microsoft 365 verbinden
               </a>
             )}
+            {data?.connected ? (
+              <p className="pt-1 text-xs text-muted-foreground">
+                Abend-Review &amp; Mail-Tag:{" "}
+                <a href="/microsoft" className="underline underline-offset-2">
+                  /microsoft
+                </a>
+              </p>
+            ) : null}
           </>
         )}
       </CardContent>
