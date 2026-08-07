@@ -230,3 +230,72 @@ function parseDurationSeconds(raw: string | undefined): number | null {
   const n = Number(m[1]);
   return Number.isFinite(n) ? n : null;
 }
+
+export type GoogleStaticMapType = "roadmap" | "terrain" | "hybrid" | "satellite";
+
+/**
+ * Google Maps Static API — Kartenausschnitt mit Marker.
+ * Braucht «Maps Static API» im Cloud-Projekt (zusätzlich zu Geocoding/Routes).
+ */
+export async function fetchGoogleStaticMapPng(input: {
+  lat: number;
+  lon: number;
+  zoom?: number;
+  width?: number;
+  height?: number;
+  scale?: 1 | 2;
+  maptype?: GoogleStaticMapType;
+  withMarker?: boolean;
+}): Promise<Buffer | null> {
+  const key = getGoogleMapsApiKey();
+  if (!key) return null;
+
+  const zoom = Math.min(20, Math.max(1, input.zoom ?? 15));
+  const width = Math.min(640, Math.max(64, input.width ?? 640));
+  const height = Math.min(640, Math.max(64, input.height ?? 400));
+  const scale = input.scale ?? 2;
+  const maptype = input.maptype ?? "roadmap";
+
+  const url = new URL("https://maps.googleapis.com/maps/api/staticmap");
+  url.searchParams.set("center", `${input.lat},${input.lon}`);
+  url.searchParams.set("zoom", String(zoom));
+  url.searchParams.set("size", `${width}x${height}`);
+  url.searchParams.set("scale", String(scale));
+  url.searchParams.set("maptype", maptype);
+  url.searchParams.set("language", "de");
+  url.searchParams.set("region", "CH");
+  url.searchParams.set("key", key);
+  if (input.withMarker !== false) {
+    url.searchParams.set(
+      "markers",
+      `color:0xC0392B|${input.lat},${input.lon}`
+    );
+  }
+
+  try {
+    const res = await fetch(url.toString(), {
+      signal: AbortSignal.timeout(15000),
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      console.warn("[google-maps] Static Map HTTP", res.status);
+      return null;
+    }
+    const ct = (res.headers.get("content-type") || "").toLowerCase();
+    if (!ct.includes("image")) {
+      const text = await res.text().catch(() => "");
+      console.warn(
+        "[google-maps] Static Map unexpected content:",
+        text.slice(0, 160)
+      );
+      return null;
+    }
+    return Buffer.from(await res.arrayBuffer());
+  } catch (error) {
+    console.warn(
+      "[google-maps] Static Map failed:",
+      error instanceof Error ? error.message : error
+    );
+    return null;
+  }
+}

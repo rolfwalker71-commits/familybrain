@@ -6,7 +6,7 @@ import { fetchStaticMapPng } from "@/lib/trips/static-map";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** Static OSM tile snippet for an agenda place (auth required). */
+/** Static map snippet for an agenda place (Google Static Maps if key set, else OSM). */
 export async function GET(request: Request) {
   ensureInitialized();
   const auth = await requireAdmin();

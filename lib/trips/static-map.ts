@@ -1,4 +1,5 @@
 import sharp from "sharp";
+import { fetchGoogleStaticMapPng, hasGoogleMapsApiKey } from "@/lib/google/maps";
 
 const USER_AGENT =
   "TripBook-TravelBrain/1.0 (https://github.com/rolfwalker71-commits/familybrain)";
@@ -31,25 +32,19 @@ async function fetchOsmTile(
   }
 }
 
-/**
- * Single OSM tile around lat/lon with a simple pin marker.
- * Prefer resolveWeatherMapZoom() for weather comments (sea ≈ 4, urban ≈ 10, land ≈ 11).
- */
-export async function fetchStaticMapPng(input: {
+async function fetchOsmStaticMapPng(input: {
   lat: number;
   lon: number;
-  zoom?: number;
-  withMarker?: boolean;
+  zoom: number;
+  withMarker: boolean;
 }): Promise<Buffer | null> {
-  const zoom = input.zoom ?? 11;
-  const { x, y } = tileXY(input.lat, input.lon, zoom);
-  const tile = await fetchOsmTile(zoom, x, y);
+  const { x, y } = tileXY(input.lat, input.lon, input.zoom);
+  const tile = await fetchOsmTile(input.zoom, x, y);
   if (!tile) return null;
 
-  if (input.withMarker === false) return tile;
+  if (!input.withMarker) return tile;
 
-  // Pixel position of lat/lon within the 256×256 tile.
-  const n = 2 ** zoom;
+  const n = 2 ** input.zoom;
   const xF = ((input.lon + 180) / 360) * n;
   const latRad = (input.lat * Math.PI) / 180;
   const yF =
@@ -72,4 +67,40 @@ export async function fetchStaticMapPng(input: {
   } catch {
     return tile;
   }
+}
+
+/**
+ * Kartenausschnitt um lat/lon mit Pin.
+ * Mit Google Maps API-Key: Static Maps (schärfer, Strassen). Sonst OSM-Kachel.
+ * Prefer resolveWeatherMapZoom() for weather comments (sea ≈ 4, urban ≈ 10, land ≈ 11).
+ */
+export async function fetchStaticMapPng(input: {
+  lat: number;
+  lon: number;
+  zoom?: number;
+  withMarker?: boolean;
+}): Promise<Buffer | null> {
+  const zoom = input.zoom ?? 11;
+  const withMarker = input.withMarker !== false;
+
+  if (hasGoogleMapsApiKey()) {
+    const google = await fetchGoogleStaticMapPng({
+      lat: input.lat,
+      lon: input.lon,
+      zoom,
+      width: 640,
+      height: 400,
+      scale: 2,
+      maptype: "roadmap",
+      withMarker,
+    });
+    if (google) return google;
+  }
+
+  return fetchOsmStaticMapPng({
+    lat: input.lat,
+    lon: input.lon,
+    zoom,
+    withMarker,
+  });
 }

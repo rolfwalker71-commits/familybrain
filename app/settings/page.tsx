@@ -1785,8 +1785,10 @@ function SettingsPageInner() {
               }
             />
             <p className="text-xs text-muted-foreground">
-              Für Geocoding + Fahrzeiten im Kalender (Geocoding API und Routes
-              oder Directions). Leer lassen = Open-Meteo/Nominatim/OSRM.
+              Für Geocoding, Fahrzeiten und Kartenausschnitte (Geocoding API,
+              Routes/Directions und{" "}
+              <span className="font-medium">Maps Static API</span>). Leer lassen
+              = Open-Meteo/Nominatim/OSM.
               {hasGoogleMapsApiKey ? " Key ist gesetzt." : ""}
             </p>
             {hasGoogleMapsApiKey ? (
