@@ -1,9 +1,17 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { findFreeSlots, type MsCalendarEvent } from "./calendar-review.ts";
+import {
+  findFreeSlots,
+  withReschedulePrefix,
+  type MsCalendarEvent,
+} from "./calendar-review.ts";
 
 function ev(
-  partial: Partial<MsCalendarEvent> & { id: string; startHm: string; endHm: string }
+  partial: Partial<MsCalendarEvent> & {
+    id: string;
+    startHm: string;
+    endHm: string;
+  }
 ): MsCalendarEvent {
   return {
     subject: partial.subject || "X",
@@ -54,4 +62,10 @@ test("findFreeSlots skips done events as busy blockers", () => {
   });
   assert.ok(slots.length >= 1);
   assert.equal(slots[0]?.startHm, "08:00");
+});
+
+test("withReschedulePrefix adds arrow once", () => {
+  assert.equal(withReschedulePrefix("MorgenCall"), "➡️ MorgenCall");
+  assert.equal(withReschedulePrefix("➡️ MorgenCall"), "➡️ MorgenCall");
+  assert.equal(withReschedulePrefix("✅ Meeting"), "➡️ ✅ Meeting");
 });
