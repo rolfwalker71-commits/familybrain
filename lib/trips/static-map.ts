@@ -1,5 +1,8 @@
 import sharp from "sharp";
-import { fetchGoogleStaticMapPng, hasGoogleMapsApiKey } from "@/lib/google/maps";
+import {
+  fetchGoogleStaticMapDetailed,
+  hasGoogleMapsApiKey,
+} from "@/lib/google/maps";
 
 const USER_AGENT =
   "TripBook-TravelBrain/1.0 (https://github.com/rolfwalker71-commits/familybrain)";
@@ -69,22 +72,27 @@ async function fetchOsmStaticMapPng(input: {
   }
 }
 
+export type StaticMapFetchResult = {
+  buffer: Buffer | null;
+  source: "google" | "osm" | "none";
+  googleError: string | null;
+};
+
 /**
  * Kartenausschnitt um lat/lon mit Pin.
- * Mit Google Maps API-Key: Static Maps (schärfer, Strassen). Sonst OSM-Kachel.
- * Prefer resolveWeatherMapZoom() for weather comments (sea ≈ 4, urban ≈ 10, land ≈ 11).
+ * Mit Google Maps API-Key: Static Maps zuerst; bei Fehler OSM + googleError.
  */
-export async function fetchStaticMapPng(input: {
+export async function fetchStaticMapPngDetailed(input: {
   lat: number;
   lon: number;
   zoom?: number;
   withMarker?: boolean;
-}): Promise<Buffer | null> {
+}): Promise<StaticMapFetchResult> {
   const zoom = input.zoom ?? 11;
   const withMarker = input.withMarker !== false;
 
   if (hasGoogleMapsApiKey()) {
-    const google = await fetchGoogleStaticMapPng({
+    const google = await fetchGoogleStaticMapDetailed({
       lat: input.lat,
       lon: input.lon,
       zoom,
@@ -94,13 +102,45 @@ export async function fetchStaticMapPng(input: {
       maptype: "roadmap",
       withMarker,
     });
-    if (google) return google;
+    if (google.ok) {
+      return { buffer: google.buffer, source: "google", googleError: null };
+    }
+    console.warn(
+      "[static-map] Google Static Maps fehlgeschlagen, Fallback OSM:",
+      google.error
+    );
+    const osm = await fetchOsmStaticMapPng({
+      lat: input.lat,
+      lon: input.lon,
+      zoom,
+      withMarker,
+    });
+    return {
+      buffer: osm,
+      source: osm ? "osm" : "none",
+      googleError: google.error,
+    };
   }
 
-  return fetchOsmStaticMapPng({
+  const osm = await fetchOsmStaticMapPng({
     lat: input.lat,
     lon: input.lon,
     zoom,
     withMarker,
   });
+  return {
+    buffer: osm,
+    source: osm ? "osm" : "none",
+    googleError: null,
+  };
+}
+
+export async function fetchStaticMapPng(input: {
+  lat: number;
+  lon: number;
+  zoom?: number;
+  withMarker?: boolean;
+}): Promise<Buffer | null> {
+  const r = await fetchStaticMapPngDetailed(input);
+  return r.buffer;
 }

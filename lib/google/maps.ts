@@ -233,6 +233,10 @@ function parseDurationSeconds(raw: string | undefined): number | null {
 
 export type GoogleStaticMapType = "roadmap" | "terrain" | "hybrid" | "satellite";
 
+export type GoogleStaticMapResult =
+  | { ok: true; buffer: Buffer; bytes: number }
+  | { ok: false; error: string; httpStatus?: number };
+
 /**
  * Google Maps Static API — Kartenausschnitt mit Marker.
  * Braucht «Maps Static API» im Cloud-Projekt (zusätzlich zu Geocoding/Routes).
@@ -247,14 +251,29 @@ export async function fetchGoogleStaticMapPng(input: {
   maptype?: GoogleStaticMapType;
   withMarker?: boolean;
 }): Promise<Buffer | null> {
+  const result = await fetchGoogleStaticMapDetailed(input);
+  return result.ok ? result.buffer : null;
+}
+
+export async function fetchGoogleStaticMapDetailed(input: {
+  lat: number;
+  lon: number;
+  zoom?: number;
+  width?: number;
+  height?: number;
+  scale?: 1 | 2;
+  maptype?: GoogleStaticMapType;
+  withMarker?: boolean;
+}): Promise<GoogleStaticMapResult> {
   const key = getGoogleMapsApiKey();
-  if (!key) return null;
+  if (!key) return { ok: false, error: "no_api_key" };
 
   const zoom = Math.min(20, Math.max(1, input.zoom ?? 15));
   const width = Math.min(640, Math.max(64, input.width ?? 640));
   const height = Math.min(640, Math.max(64, input.height ?? 400));
   const scale = input.scale ?? 2;
   const maptype = input.maptype ?? "roadmap";
+  const expectedMinBytes = 8_000; // Fehlerbilder von Google sind oft winzig
 
   const url = new URL("https://maps.googleapis.com/maps/api/staticmap");
   url.searchParams.set("center", `${input.lat},${input.lon}`);
@@ -262,13 +281,15 @@ export async function fetchGoogleStaticMapPng(input: {
   url.searchParams.set("size", `${width}x${height}`);
   url.searchParams.set("scale", String(scale));
   url.searchParams.set("maptype", maptype);
+  url.searchParams.set("format", "png");
   url.searchParams.set("language", "de");
   url.searchParams.set("region", "CH");
   url.searchParams.set("key", key);
   if (input.withMarker !== false) {
+    // Named color ist robuster als 0x… je nach Key/Account
     url.searchParams.set(
       "markers",
-      `color:0xC0392B|${input.lat},${input.lon}`
+      `color:red|${input.lat},${input.lon}`
     );
   }
 
@@ -277,25 +298,94 @@ export async function fetchGoogleStaticMapPng(input: {
       signal: AbortSignal.timeout(15000),
       cache: "no-store",
     });
-    if (!res.ok) {
-      console.warn("[google-maps] Static Map HTTP", res.status);
-      return null;
-    }
     const ct = (res.headers.get("content-type") || "").toLowerCase();
-    if (!ct.includes("image")) {
-      const text = await res.text().catch(() => "");
-      console.warn(
-        "[google-maps] Static Map unexpected content:",
-        text.slice(0, 160)
-      );
-      return null;
+    const buf = Buffer.from(await res.arrayBuffer());
+
+    if (!res.ok) {
+      const hint = buf.toString("utf8").slice(0, 200);
+      console.warn("[google-maps] Static Map HTTP", res.status, hint);
+      return {
+        ok: false,
+        error: `http_${res.status}${hint ? `: ${hint}` : ""}`,
+        httpStatus: res.status,
+      };
     }
-    return Buffer.from(await res.arrayBuffer());
+
+    if (!ct.includes("image") || buf.length < expectedMinBytes) {
+      const asText = buf.toString("utf8").slice(0, 240);
+      console.warn(
+        "[google-maps] Static Map rejected payload",
+        "ct=",
+        ct,
+        "bytes=",
+        buf.length,
+        asText
+      );
+      return {
+        ok: false,
+        error:
+          buf.length < expectedMinBytes
+            ? `tiny_or_error_image (${buf.length}b) — oft: Maps Static API aus, Billing fehlt, oder Key nur für Browser-Referrer statt Server-IP`
+            : `unexpected_content_type:${ct}`,
+        httpStatus: res.status,
+      };
+    }
+
+    return { ok: true, buffer: buf, bytes: buf.length };
   } catch (error) {
-    console.warn(
-      "[google-maps] Static Map failed:",
-      error instanceof Error ? error.message : error
-    );
-    return null;
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn("[google-maps] Static Map failed:", message);
+    return { ok: false, error: message };
   }
+}
+
+/** Kurzer Connectivity-Check für Einstellungen. */
+export async function probeGoogleMaps(): Promise<{
+  hasKey: boolean;
+  geocodeOk: boolean;
+  geocodeError: string | null;
+  staticOk: boolean;
+  staticError: string | null;
+  staticBytes: number | null;
+}> {
+  const hasKey = hasGoogleMapsApiKey();
+  if (!hasKey) {
+    return {
+      hasKey: false,
+      geocodeOk: false,
+      geocodeError: "no_api_key",
+      staticOk: false,
+      staticError: "no_api_key",
+      staticBytes: null,
+    };
+  }
+
+  let geocodeOk = false;
+  let geocodeError: string | null = null;
+  try {
+    const geo = await geocodeWithGoogleMaps("Altdorf UR, Schweiz");
+    geocodeOk = Boolean(geo);
+    if (!geo) geocodeError = "ZERO_RESULTS_or_denied";
+  } catch (e) {
+    geocodeError = e instanceof Error ? e.message : String(e);
+  }
+
+  const staticRes = await fetchGoogleStaticMapDetailed({
+    lat: 46.88042,
+    lon: 8.64345,
+    zoom: 15,
+    width: 400,
+    height: 240,
+    scale: 2,
+    withMarker: true,
+  });
+
+  return {
+    hasKey: true,
+    geocodeOk,
+    geocodeError,
+    staticOk: staticRes.ok,
+    staticError: staticRes.ok ? null : staticRes.error,
+    staticBytes: staticRes.ok ? staticRes.bytes : null,
+  };
 }

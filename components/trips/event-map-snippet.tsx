@@ -3,7 +3,10 @@
 import { cn } from "@/lib/utils";
 import { coerceTripEventType } from "@/lib/trips/constants";
 import { trainEnrichmentRoutePath } from "@/lib/trips/train-enrichment";
+import { placeMapImageSrc } from "@/lib/maps/place-map-src";
 import { TripMap, type TripMapPoint } from "@/components/trips/trip-map";
+
+export { placeMapImageSrc } from "@/lib/maps/place-map-src";
 
 /** Minimal geo/context fields needed to derive a map snippet for an event. */
 export type EventMapGeoFields = {
@@ -177,6 +180,39 @@ export function getEventMapModel(
   return null;
 }
 
+function StaticPlaceMapImage({
+  lat,
+  lon,
+  zoom,
+  alt,
+  heightClassName,
+  className,
+}: {
+  lat: number;
+  lon: number;
+  zoom?: number;
+  alt: string;
+  heightClassName: string;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "overflow-hidden rounded-md border border-border/70 bg-muted/30",
+        className
+      )}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={placeMapImageSrc(lat, lon, zoom)}
+        alt={alt}
+        className={cn("w-full object-cover", heightClassName)}
+        loading="lazy"
+      />
+    </div>
+  );
+}
+
 /** Small map snippet ("Kartenausschnitt") for a trip event, or a static fallback image. */
 export function EventMapSnippet({
   event,
@@ -192,22 +228,40 @@ export function EventMapSnippet({
   const model = getEventMapModel(event);
   if (!model) return null;
 
-  if (model.mapImageUrl) {
-    return (
-      <div
-        className={cn(
-          "overflow-hidden rounded-md border border-border/70 bg-muted/30",
-          className
-        )}
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={model.mapImageUrl}
-          alt="Kartenausschnitt"
-          className={cn("w-full object-cover", heightClassName)}
+  // Orts-/Endpunkt-Ausschnitte: Google Static Maps (wie Dashboard), nicht Leaflet/OSM.
+  // Routen (Flug/Transfer) bleiben interaktiv (Leaflet) wegen Pfadzeichnung.
+  if (model.kind === "place" || model.kind === "endpoint") {
+    const point = model.points[0];
+    if (point) {
+      return (
+        <StaticPlaceMapImage
+          lat={point.lat}
+          lon={point.lon}
+          zoom={15}
+          alt={point.label ? `Karte: ${point.label}` : "Kartenausschnitt"}
+          heightClassName={heightClassName}
+          className={className}
         />
-      </div>
-    );
+      );
+    }
+    if (model.mapImageUrl) {
+      return (
+        <div
+          className={cn(
+            "overflow-hidden rounded-md border border-border/70 bg-muted/30",
+            className
+          )}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={model.mapImageUrl}
+            alt="Kartenausschnitt"
+            className={cn("w-full object-cover", heightClassName)}
+          />
+        </div>
+      );
+    }
+    return null;
   }
 
   if (model.points.length === 0) return null;

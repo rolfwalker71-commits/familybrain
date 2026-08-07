@@ -227,6 +227,10 @@ function SettingsPageInner() {
   const [flightTestDate, setFlightTestDate] = useState("2026-10-23");
   const [flightTestBusy, setFlightTestBusy] = useState(false);
   const [flightTestResult, setFlightTestResult] = useState<string | null>(null);
+  const [googleMapsTestBusy, setGoogleMapsTestBusy] = useState(false);
+  const [googleMapsTestResult, setGoogleMapsTestResult] = useState<
+    string | null
+  >(null);
   const [sofascoreTestBusy, setSofascoreTestBusy] = useState(false);
   const [sofascoreTestResult, setSofascoreTestResult] = useState<string | null>(
     null
@@ -1038,6 +1042,38 @@ function SettingsPageInner() {
     }
   }
 
+  async function testGoogleMapsApi() {
+    setGoogleMapsTestBusy(true);
+    setGoogleMapsTestResult(null);
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/settings/google-maps-probe", {
+        method: "POST",
+      });
+      const data = await res.json();
+      setGoogleMapsTestResult(JSON.stringify(data, null, 2));
+      if (!res.ok || data.ok === false) {
+        setError(
+          data.hint ||
+            data.staticError ||
+            data.geocodeError ||
+            `Google-Maps-Test: HTTP ${res.status}`
+        );
+      } else {
+        setMessage(data.hint || "Google Maps OK.");
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message);
+      setGoogleMapsTestResult(
+        JSON.stringify({ ok: false, error: message }, null, 2)
+      );
+    } finally {
+      setGoogleMapsTestBusy(false);
+    }
+  }
+
   async function testFlightApi() {
     setFlightTestBusy(true);
     setFlightTestResult(null);
@@ -1768,51 +1804,78 @@ function SettingsPageInner() {
               </li>
               <li>Adress-Geocoding und Fahrzeiten</li>
             </ul>
+            <p className="text-xs text-muted-foreground">
+              Wichtig: Der Key wird{" "}
+              <span className="font-medium">serverseitig</span> aufgerufen. Bei
+              Einschränkung «Websites / HTTP-Referrer» schlägt Static Maps fehl
+              und Buddy zeigt still OSM. Dann: keine Application Restriction
+              oder IP des Buddy-Servers.
+            </p>
             {hasGoogleMapsApiKey ? (
               <p className="text-xs text-emerald-700">
-                Key gesetzt — Ausschnitte nutzen Google Static Maps (Fallback:
-                OSM).
+                Key gesetzt — Ausschnitte nutzen Google Static Maps (bei Fehler
+                Fallback OSM).
               </p>
             ) : (
               <p className="text-xs text-amber-800">
                 Noch kein Key — Ausschnitte bleiben OSM-Kacheln.
               </p>
             )}
-            {hasGoogleMapsApiKey ? (
+            <div className="flex flex-wrap gap-2">
               <Button
                 type="button"
-                variant="ghost"
+                variant="outline"
                 size="sm"
-                disabled={saving !== null}
-                onClick={() => {
-                  void (async () => {
-                    setSaving("travelbrain");
-                    try {
-                      const res = await fetch("/api/settings", {
-                        method: "PUT",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ clearGoogleMapsApiKey: true }),
-                      });
-                      const data = await res.json();
-                      if (!res.ok) {
-                        throw new Error(data.error || "Löschen fehlgeschlagen");
-                      }
-                      setHasGoogleMapsApiKey(false);
-                      setGoogleMapsApiKeyMasked(null);
-                      setGoogleMapsApiKey("");
-                      setMessage("Google Maps API-Key entfernt.");
-                    } catch (err) {
-                      setError(
-                        err instanceof Error ? err.message : String(err)
-                      );
-                    } finally {
-                      setSaving(null);
-                    }
-                  })();
-                }}
+                disabled={googleMapsTestBusy || saving !== null}
+                onClick={() => void testGoogleMapsApi()}
               >
-                Maps-Key entfernen
+                {googleMapsTestBusy
+                  ? "Prüft Google Maps…"
+                  : "Google Maps prüfen"}
               </Button>
+              {hasGoogleMapsApiKey ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={saving !== null}
+                  onClick={() => {
+                    void (async () => {
+                      setSaving("travelbrain");
+                      try {
+                        const res = await fetch("/api/settings", {
+                          method: "PUT",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ clearGoogleMapsApiKey: true }),
+                        });
+                        const data = await res.json();
+                        if (!res.ok) {
+                          throw new Error(
+                            data.error || "Löschen fehlgeschlagen"
+                          );
+                        }
+                        setHasGoogleMapsApiKey(false);
+                        setGoogleMapsApiKeyMasked(null);
+                        setGoogleMapsApiKey("");
+                        setMessage("Google Maps API-Key entfernt.");
+                      } catch (err) {
+                        setError(
+                          err instanceof Error ? err.message : String(err)
+                        );
+                      } finally {
+                        setSaving(null);
+                      }
+                    })();
+                  }}
+                >
+                  Maps-Key entfernen
+                </Button>
+              ) : null}
+            </div>
+            {googleMapsTestResult ? (
+              <pre className="max-h-60 overflow-auto rounded-md border border-border/70 bg-background p-3 text-[11px] leading-relaxed whitespace-pre-wrap break-all">
+                {googleMapsTestResult}
+              </pre>
             ) : null}
           </div>
           <div className="space-y-2">
@@ -1841,10 +1904,10 @@ function SettingsPageInner() {
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              Nur für zoom-/klickbare Reisekarten in TravelBuddy (Leaflet).
-              Google erscheint hier absichtlich nicht — Static Maps steuern die
-              kleinen Ausschnitte über den API-Key oben, nicht über diese
-              Liste.
+              Nur für zoom-/klickbare <span className="font-medium">Routen</span>{" "}
+              in TravelBuddy (Flug/Transfer, Leaflet). Einzelne Orte und die
+              Startseiten-Ausschnitte nutzen Google Static Maps über den Key
+              oben — nicht diese Liste.
             </p>
           </div>
           <div className="space-y-2">

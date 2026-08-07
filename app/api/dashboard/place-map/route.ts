@@ -1,15 +1,16 @@
 import { NextResponse } from "next/server";
-import { isAuthError, requireAdmin } from "@/lib/auth/current-user";
+import { isAuthError, requireAuth } from "@/lib/auth/current-user";
 import { ensureInitialized } from "@/lib/db/migrations";
-import { fetchStaticMapPng } from "@/lib/trips/static-map";
+import { fetchStaticMapPngDetailed } from "@/lib/trips/static-map";
+import { hasGoogleMapsApiKey } from "@/lib/google/maps";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** Static map snippet for an agenda place (Google Static Maps if key set, else OSM). */
+/** Static map snippet (Google Static Maps if key works, else OSM). */
 export async function GET(request: Request) {
   ensureInitialized();
-  const auth = await requireAdmin();
+  const auth = await requireAuth();
   if (isAuthError(auth)) return auth;
 
   const { searchParams } = new URL(request.url);
@@ -23,21 +24,38 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "invalid coordinates" }, { status: 400 });
   }
 
-  const png = await fetchStaticMapPng({
+  const result = await fetchStaticMapPngDetailed({
     lat,
     lon,
     zoom,
     withMarker: true,
   });
-  if (!png) {
-    return NextResponse.json({ error: "Karte nicht verfügbar" }, { status: 502 });
+  if (!result.buffer) {
+    return NextResponse.json(
+      {
+        error: "Karte nicht verfügbar",
+        hasGoogleMapsApiKey: hasGoogleMapsApiKey(),
+        googleError: result.googleError,
+        source: result.source,
+      },
+      { status: 502 }
+    );
   }
 
-  return new NextResponse(new Uint8Array(png), {
+  return new NextResponse(new Uint8Array(result.buffer), {
     status: 200,
     headers: {
       "Content-Type": "image/png",
-      "Cache-Control": "private, max-age=86400",
+      // Kurz cachen — sonst bleibt alte OSM-Kachel nach Key-Aktivierung hängen
+      "Cache-Control": "private, max-age=120, must-revalidate",
+      "X-Buddy-Map-Source": result.source,
+      ...(result.googleError
+        ? {
+            "X-Buddy-Google-Map-Error": result.googleError
+              .replace(/[^\x20-\x7E]/g, " ")
+              .slice(0, 180),
+          }
+        : {}),
     },
   });
 }

@@ -68,8 +68,10 @@ function typeLabel(item: AgendaItem): string {
   return item.badge || "Termin";
 }
 
+import { placeMapImageSrc } from "@/lib/maps/place-map-src";
+
 function placeMapSrc(coords: { lat: number; lon: number }): string {
-  return `/api/dashboard/place-map?lat=${coords.lat}&lon=${coords.lon}&z=16`;
+  return placeMapImageSrc(coords.lat, coords.lon, 16);
 }
 
 function DetailRow({
