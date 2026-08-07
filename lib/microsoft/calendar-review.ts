@@ -9,6 +9,16 @@ import {
 
 export const BUDDY_DONE_CATEGORY = "Buddy/Erledigt";
 export const BUDDY_DONE_PREFIX = "✅ ";
+/** Markiert verschobene Termine im Titel (ohne Mail an Organisator). */
+export const BUDDY_RESCHEDULED_PREFIX = "➡️ ";
+export const BUDDY_RESCHEDULED_CATEGORY = "Buddy/Verschoben";
+
+/** Titel um Verschieben-Pfeil ergänzen (idempotent). */
+export function withReschedulePrefix(subject: string): string {
+  const s = (subject || "").trim() || "Termin";
+  if (s.includes(BUDDY_RESCHEDULED_PREFIX.trim())) return s.slice(0, 255);
+  return `${BUDDY_RESCHEDULED_PREFIX}${s}`.slice(0, 255);
+}
 
 export type MsCalendarEvent = {
   id: string;
@@ -261,6 +271,18 @@ export async function rescheduleMicrosoftEvent(
   eventId: string,
   slot: { date: string; startHm: string; endHm: string }
 ): Promise<MsCalendarEvent> {
+  const existing = await graphJson<GraphEvent>(
+    userId,
+    `/me/events/${encodeURIComponent(eventId)}?$select=${EVENT_SELECT}`,
+    { headers: { Prefer: 'outlook.timezone="Europe/Zurich"' } }
+  );
+  const subject = (existing.subject || "").trim() || "Termin";
+  const nextSubject = withReschedulePrefix(subject);
+  const categories = [...(existing.categories || [])];
+  if (!categories.includes(BUDDY_RESCHEDULED_CATEGORY)) {
+    categories.push(BUDDY_RESCHEDULED_CATEGORY);
+  }
+
   const start = {
     dateTime: `${slot.date}T${slot.startHm}:00`,
     timeZone: "Europe/Zurich",
@@ -278,6 +300,8 @@ export async function rescheduleMicrosoftEvent(
         start,
         end,
         isAllDay: false,
+        subject: nextSubject,
+        categories,
       }),
       headers: { Prefer: 'outlook.timezone="Europe/Zurich"' },
     }
