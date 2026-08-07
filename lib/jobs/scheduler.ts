@@ -74,6 +74,29 @@ async function tick(): Promise<void> {
     if (mailSync?.attempted && mailSync.sync) {
       state.lastResult = `${state.lastResult}|mail:ai${mailSync.sync.analyzed}`;
     }
+
+    // Drive mirror: continue migration while pending (throttled by job lease)
+    try {
+      const { getDriveMirrorStatus, isDriveMirrorEnabled } = await import(
+        "@/lib/buddy/drive-mirror"
+      );
+      const st = getDriveMirrorStatus();
+      if (
+        isDriveMirrorEnabled() &&
+        st.hasDriveScope &&
+        st.pending > 0
+      ) {
+        const { runDriveMirrorJob } = await import(
+          "@/lib/jobs/background-runners"
+        );
+        // Only kick if no other job holds the lease — runDriveMirrorJob skips otherwise
+        void runDriveMirrorJob("schedule").catch((error) => {
+          console.warn("[scheduler] drive mirror:", error);
+        });
+      }
+    } catch (error) {
+      console.warn("[scheduler] drive mirror check:", error);
+    }
   } catch (error) {
     state.lastResult =
       error instanceof Error ? error.message : String(error);

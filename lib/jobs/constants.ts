@@ -43,6 +43,8 @@ export const JOB_TYPE_AI_ICONS_MISSING = "ai_icons_missing";
 export const JOB_TYPE_AI_ICONS_REGENERATE = "ai_icons_regenerate";
 /** Re-push completed analyses to Paperless custom fields/tags. */
 export const JOB_TYPE_PAPERLESS_WRITEBACK = "paperless_writeback";
+/** Mirror Paperless PDFs into Google Drive folder BUDDY. */
+export const JOB_TYPE_DRIVE_MIRROR = "drive_mirror";
 
 export const BACKGROUND_JOB_TYPES = [
   JOB_TYPE_SYNC_ANALYZE,
@@ -50,6 +52,7 @@ export const BACKGROUND_JOB_TYPES = [
   JOB_TYPE_AI_ICONS_MISSING,
   JOB_TYPE_AI_ICONS_REGENERATE,
   JOB_TYPE_PAPERLESS_WRITEBACK,
+  JOB_TYPE_DRIVE_MIRROR,
 ] as const;
 
 export type BackgroundJobType = (typeof BACKGROUND_JOB_TYPES)[number];
@@ -73,6 +76,8 @@ export function jobTypeLabel(jobType: string): string {
       return "KI-Icons (alle neu)";
     case JOB_TYPE_PAPERLESS_WRITEBACK:
       return "Paperless-Writeback";
+    case JOB_TYPE_DRIVE_MIRROR:
+      return "Drive-Spiegel (BUDDY)";
     default:
       return jobType;
   }
@@ -82,6 +87,10 @@ export function jobTypeLabel(jobType: string): string {
 export const ANALYZE_PENDING_BATCH_SIZE = 10;
 export const AI_ICONS_MISSING_BATCH_SIZE = 5;
 export const PAPERLESS_WRITEBACK_BATCH_SIZE = 25;
+/** Docs per Drive mirror batch inside one job run. */
+export const DRIVE_MIRROR_BATCH_SIZE = 8;
+/** Max docs mirrored per job run. */
+export const MAX_DRIVE_MIRROR_PER_RUN = 40;
 
 export function clampSchedulerIntervalMinutes(value: unknown): number {
   const n =

@@ -193,6 +193,36 @@ function DocumentDetailInner({ detail }: DetailProps) {
   const [displayCategory, setDisplayCategory] = useState<string | null>(
     typeof summary?.category === "string" ? summary.category : null
   );
+  const [sourceLinks, setSourceLinks] = useState<
+    Array<{
+      sourceKind: string;
+      url: string | null;
+      label: string | null;
+      role: string;
+    }>
+  >([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/buddy/source-links?entityType=document&entityId=${document.id}`
+        );
+        const data = await res.json();
+        if (!cancelled && res.ok && Array.isArray(data.links)) {
+          setSourceLinks(data.links);
+        }
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [document.id]);
+
+  const driveLink = sourceLinks.find((l) => l.sourceKind === "drive_file");
   const [knowledgeAreas, setKnowledgeAreas] = useState<string[]>([]);
 
   const activeTab = parseDocumentDetailTab(searchParams.get("tab"));
@@ -726,6 +756,17 @@ function DocumentDetailInner({ detail }: DetailProps) {
               In Paperless öffnen
             </a>
           ) : null}
+          {driveLink?.url ? (
+            <a
+              href={driveLink.url}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border bg-background px-3 text-sm font-medium hover:bg-muted"
+            >
+              <ExternalLink className="h-4 w-4" />
+              In Drive öffnen
+            </a>
+          ) : null}
           <Button
             variant="outline"
             disabled={iconBusy}
@@ -775,6 +816,17 @@ function DocumentDetailInner({ detail }: DetailProps) {
       </div>
 
       <div className="hidden flex-wrap items-center gap-2 md:flex">
+        {sourceLinks.map((link) => (
+          <Badge
+            key={`${link.sourceKind}-${link.role}`}
+            variant="outline"
+            className="text-[11px]"
+          >
+            {link.label || link.sourceKind}
+            {link.role === "mirror" ? " · Spiegel" : ""}
+            {link.role === "primary" ? " · Primär" : ""}
+          </Badge>
+        ))}
         {tags.map((tag, idx) => (
           <Badge key={`${tag.tag_id}-${idx}`} variant="secondary">
             {tag.tag_name}

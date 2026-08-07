@@ -16,6 +16,10 @@ export const GOOGLE_OAUTH_SCOPES = [
   "https://www.googleapis.com/auth/calendar.events",
   /** Google Tasks — lesen + anlegen aus Mail-Vorschlägen */
   "https://www.googleapis.com/auth/tasks",
+  /** Drive: Ordner BUDDY + PDF-Spiegel (nur App-eigene Dateien) */
+  "https://www.googleapis.com/auth/drive.file",
+  /** Kontakte readonly — Adressen/Geburtstage (Phase C) */
+  "https://www.googleapis.com/auth/contacts.readonly",
 ] as const;
 
 export const GOOGLE_OAUTH_CALLBACK_PATH = "/api/google/oauth/callback";
@@ -162,6 +166,30 @@ export function hasGoogleTasksScope(userId: number | null): boolean {
     .split(/[\s,]+/)
     .filter(Boolean);
   return scopes.includes("https://www.googleapis.com/auth/tasks");
+}
+
+/** True if Buddy may create files/folders via Drive (drive.file). */
+export function hasGoogleDriveScope(userId: number | null): boolean {
+  if (userId == null) return false;
+  const scopes = (readGoogleUserTokens(userId)?.scope || "")
+    .split(/[\s,]+/)
+    .filter(Boolean);
+  return (
+    scopes.includes("https://www.googleapis.com/auth/drive.file") ||
+    scopes.includes("https://www.googleapis.com/auth/drive")
+  );
+}
+
+/** True if Buddy may read Google Contacts / People. */
+export function hasGoogleContactsScope(userId: number | null): boolean {
+  if (userId == null) return false;
+  const scopes = (readGoogleUserTokens(userId)?.scope || "")
+    .split(/[\s,]+/)
+    .filter(Boolean);
+  return (
+    scopes.includes("https://www.googleapis.com/auth/contacts.readonly") ||
+    scopes.includes("https://www.googleapis.com/auth/contacts")
+  );
 }
 
 export function getConnectedGoogleEmail(

@@ -227,6 +227,26 @@ export async function POST(request: Request, context: Ctx) {
           endTime: action.endTime,
           reference: action.reference,
         });
+        const { upsertBuddySourceLink } = await import(
+          "@/lib/buddy/source-links"
+        );
+        upsertBuddySourceLink({
+          entityType: "mail_message",
+          entityId: id,
+          sourceKind: "google_event",
+          sourceId: ev.id,
+          url: ev.htmlLink,
+          label: patchId ? "Kalender (aktualisiert)" : "Kalender",
+          role: "related",
+        });
+        upsertBuddySourceLink({
+          entityType: "mail_message",
+          entityId: id,
+          sourceKind: "gmail_message",
+          sourceId: id,
+          label: "Gmail",
+          role: "related",
+        });
         created.push({
           kind: "event",
           title: ev.summary,

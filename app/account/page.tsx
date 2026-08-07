@@ -1,6 +1,7 @@
 import { SettingsCalendarsPanel } from "@/components/settings/settings-calendars-panel";
 import { SettingsGoogleCalendarsPanel } from "@/components/settings/settings-google-calendars-panel";
 import { SettingsGoogleConnectPanel } from "@/components/settings/settings-google-connect-panel";
+import { DriveMirrorStatusPanel } from "@/components/settings/drive-mirror-status-panel";
 import { PageHeader } from "@/components/layout/page-primitives";
 import { pageVisuals } from "@/components/layout/icon-circle";
 
@@ -16,6 +17,7 @@ export default function AccountPage() {
         tone={pageVisuals.account.tone}
       />
       <SettingsGoogleConnectPanel />
+      <DriveMirrorStatusPanel />
       <SettingsGoogleCalendarsPanel />
       <SettingsCalendarsPanel />
     </div>

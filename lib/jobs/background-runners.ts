@@ -8,6 +8,9 @@ import {
   JOB_TYPE_AI_ICONS_REGENERATE,
   JOB_TYPE_ANALYZE_PENDING,
   JOB_TYPE_PAPERLESS_WRITEBACK,
+  JOB_TYPE_DRIVE_MIRROR,
+  DRIVE_MIRROR_BATCH_SIZE,
+  MAX_DRIVE_MIRROR_PER_RUN,
   PAPERLESS_WRITEBACK_BATCH_SIZE,
 } from "@/lib/jobs/constants";
 import {
@@ -499,6 +502,142 @@ export async function runPaperlessWritebackJob(
     return { ok: true, runId: run.id, status: "success", summary };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    finishJobRun(run.id, "error", summary, message);
+    return {
+      ok: true,
+      runId: run.id,
+      status: "error",
+      summary,
+      error: message,
+    };
+  }
+}
+
+export async function runDriveMirrorJob(
+  trigger: JobTrigger = "manual"
+): Promise<BackgroundRunResult> {
+  recoverExpiredJobLeases();
+
+  const {
+    getDriveMirrorStatus,
+    isDriveMirrorEnabled,
+    mirrorDocumentToDrive,
+    resolveDriveMirrorUserId,
+    DRIVE_MIRROR_LAST_ERROR_KEY,
+    DRIVE_MIRROR_LAST_RUN_KEY,
+  } = await import("@/lib/buddy/drive-mirror");
+  const { setSetting } = await import("@/lib/db/migrations");
+  const { listDocumentIdsMissingDriveMirror } = await import(
+    "@/lib/buddy/source-links"
+  );
+  const { hasGoogleDriveScope } = await import("@/lib/google/oauth");
+
+  if (!isDriveMirrorEnabled()) {
+    return {
+      ok: false,
+      status: "skipped",
+      reason: "Drive-Spiegel ist deaktiviert.",
+    };
+  }
+
+  const userId = resolveDriveMirrorUserId();
+  if (userId == null || !hasGoogleDriveScope(userId)) {
+    return {
+      ok: false,
+      status: "skipped",
+      reason:
+        "Google Drive-Recht fehlt — unter Konto Google neu verbinden (drive.file).",
+    };
+  }
+
+  const run = tryAcquireJobRun(trigger, JOB_TYPE_DRIVE_MIRROR);
+  if (!run) {
+    return {
+      ok: false,
+      status: "skipped",
+      reason: "Ein anderer Hintergrund-Job läuft bereits.",
+    };
+  }
+
+  const summary: JobRunSummary = {
+    processed: 0,
+    succeeded: 0,
+    failed: 0,
+    afterId: 0,
+  };
+
+  try {
+    const before = getDriveMirrorStatus();
+    addJobRunItem({
+      runId: run.id,
+      itemKind: "phase",
+      status: "running",
+      title: "Drive-Spiegel",
+      message: `${before.pending} Dokumente ausstehend · ${before.mirrored}/${before.totalDocuments} bereits gespiegelt`,
+    });
+
+    setSetting(DRIVE_MIRROR_LAST_RUN_KEY, new Date().toISOString());
+    setSetting(DRIVE_MIRROR_LAST_ERROR_KEY, null);
+
+    let processedThisRun = 0;
+    while (
+      (await assertNotCancelled(run.id)) &&
+      processedThisRun < MAX_DRIVE_MIRROR_PER_RUN
+    ) {
+      const batch = listDocumentIdsMissingDriveMirror(DRIVE_MIRROR_BATCH_SIZE);
+      if (batch.length === 0) break;
+
+      for (const id of batch) {
+        if (!(await assertNotCancelled(run.id))) break;
+        if (processedThisRun >= MAX_DRIVE_MIRROR_PER_RUN) break;
+        heartbeatJobRun(run.id);
+        summary.processed = (summary.processed || 0) + 1;
+        processedThisRun += 1;
+        try {
+          const result = await mirrorDocumentToDrive(id, { userId });
+          if (result.ok) {
+            summary.succeeded = (summary.succeeded || 0) + 1;
+          } else {
+            summary.failed = (summary.failed || 0) + 1;
+            addJobRunItem({
+              runId: run.id,
+              itemKind: "document",
+              externalRef: String(id),
+              status: "error",
+              title: `Dokument #${id}`,
+              message: result.skipped || "fehlgeschlagen",
+            });
+          }
+        } catch (error) {
+          summary.failed = (summary.failed || 0) + 1;
+          const msg = error instanceof Error ? error.message : String(error);
+          setSetting(DRIVE_MIRROR_LAST_ERROR_KEY, msg);
+          addJobRunItem({
+            runId: run.id,
+            itemKind: "document",
+            externalRef: String(id),
+            status: "error",
+            title: `Dokument #${id}`,
+            message: msg,
+          });
+        }
+        updateJobRunSummary(run.id, summary);
+      }
+    }
+
+    const after = getDriveMirrorStatus();
+    addJobRunItem({
+      runId: run.id,
+      itemKind: "phase",
+      status: "success",
+      title: "Drive-Spiegel",
+      message: `${summary.succeeded ?? 0} ok, ${summary.failed ?? 0} Fehler · Stand ${after.mirrored}/${after.totalDocuments} (${after.percent}%)`,
+    });
+    finishJobRun(run.id, "success", summary);
+    return { ok: true, runId: run.id, status: "success", summary };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    setSetting(DRIVE_MIRROR_LAST_ERROR_KEY, message);
     finishJobRun(run.id, "error", summary, message);
     return {
       ok: true,

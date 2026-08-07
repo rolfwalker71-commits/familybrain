@@ -5,6 +5,7 @@ import {
   JOB_TYPE_AI_ICONS_MISSING,
   JOB_TYPE_AI_ICONS_REGENERATE,
   JOB_TYPE_ANALYZE_PENDING,
+  JOB_TYPE_DRIVE_MIRROR,
   JOB_TYPE_PAPERLESS_WRITEBACK,
   JOB_TYPE_SYNC_ANALYZE,
   jobTypeLabel,
@@ -13,6 +14,7 @@ import {
   runAiIconsMissingJob,
   runAiIconsRegenerateJob,
   runAnalyzePendingJob,
+  runDriveMirrorJob,
   runPaperlessWritebackJob,
 } from "@/lib/jobs/background-runners";
 import { getActiveJobRun } from "@/lib/jobs/queries";
@@ -30,6 +32,7 @@ const BodySchema = z.object({
       JOB_TYPE_AI_ICONS_MISSING,
       JOB_TYPE_AI_ICONS_REGENERATE,
       JOB_TYPE_PAPERLESS_WRITEBACK,
+      JOB_TYPE_DRIVE_MIRROR,
     ])
     .optional()
     .default(JOB_TYPE_SYNC_ANALYZE),
@@ -77,6 +80,8 @@ export async function POST(request: Request) {
     void runAiIconsRegenerateJob("manual");
   } else if (jobType === JOB_TYPE_PAPERLESS_WRITEBACK) {
     void runPaperlessWritebackJob("manual");
+  } else if (jobType === JOB_TYPE_DRIVE_MIRROR) {
+    void runDriveMirrorJob("manual");
   }
 
   return NextResponse.json(

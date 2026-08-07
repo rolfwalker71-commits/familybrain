@@ -15,6 +15,9 @@ type Connection = {
   hasCalendarScope: boolean;
   hasCalendarEventsWrite: boolean;
   hasTasksScope: boolean;
+  hasDriveScope?: boolean;
+  hasContactsScope?: boolean;
+  hasGmailModify?: boolean;
 };
 
 export function SettingsGoogleConnectPanel() {
@@ -120,7 +123,9 @@ export function SettingsGoogleConnectPanel() {
                   </Button>
                   {!data.hasCalendarScope ||
                   !data.hasCalendarEventsWrite ||
-                  !data.hasTasksScope ? (
+                  !data.hasTasksScope ||
+                  !data.hasDriveScope ||
+                  !data.hasContactsScope ? (
                     <a
                       href="/api/google/oauth/start"
                       className={cn(
@@ -148,9 +153,19 @@ export function SettingsGoogleConnectPanel() {
                     Tasks-Recht fehlt — bitte neu verbinden (Google Tasks API in
                     der Cloud Console aktivieren, dann Consent erneut).
                   </p>
+                ) : !data.hasDriveScope ? (
+                  <p className="text-xs text-amber-800">
+                    Drive-Recht fehlt — bitte neu verbinden (PDF-Spiegel nach
+                    Ordner BUDDY).
+                  </p>
+                ) : !data.hasContactsScope ? (
+                  <p className="text-xs text-amber-800">
+                    Kontakte-Recht fehlt — bitte neu verbinden (Adressen /
+                    Geburtstage).
+                  </p>
                 ) : (
                   <p className="text-xs text-muted-foreground">
-                    Schreibrecht Kalender + Tasks aktiv.
+                    Kalender, Tasks, Drive und Kontakte aktiv.
                   </p>
                 )}
               </div>

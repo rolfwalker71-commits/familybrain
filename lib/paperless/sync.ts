@@ -221,6 +221,34 @@ async function upsertRemoteDocument(
     tags: resolved.tags,
   });
 
+  // Buddy source graph: Paperless primary + optional Drive mirror for new docs
+  try {
+    const { upsertBuddySourceLink } = await import("@/lib/buddy/source-links");
+    upsertBuddySourceLink({
+      entityType: "document",
+      entityId: upserted.id,
+      sourceKind: "paperless",
+      sourceId: String(doc.id),
+      url: client.documentUiUrl(doc.id),
+      label: "Paperless",
+      role: "primary",
+    });
+    if (upserted.isNew) {
+      const { mirrorDocumentToDrive } = await import("@/lib/buddy/drive-mirror");
+      void mirrorDocumentToDrive(upserted.id).catch((error) => {
+        console.warn(
+          "[drive-mirror] new doc:",
+          error instanceof Error ? error.message : error
+        );
+      });
+    }
+  } catch (error) {
+    console.warn(
+      "[buddy-links]",
+      error instanceof Error ? error.message : error
+    );
+  }
+
   if (upserted.isNew || upserted.changed) {
     const logs: Parameters<typeof appendPaperlessFieldSyncLogs>[0] = [];
     const base = {

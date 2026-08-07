@@ -143,6 +143,7 @@ export function bootstrapDatabase(db: Database.Database): void {
   ensureMailAnalysesTable(db);
   ensureMailSenderPrefsTable(db);
   ensureMailAppliedLinksTable(db);
+  ensureBuddySourceLinksTable(db);
   ensureReferenceNotesTable(db);
   ensureActivityLogTable(db);
   ensurePushSubscriptionsTable(db);
@@ -284,6 +285,28 @@ function ensureMailAppliedLinksTable(db: Database.Database): void {
       ON mail_applied_links(user_id, thread_id);
     CREATE INDEX IF NOT EXISTS idx_mail_applied_links_ref
       ON mail_applied_links(user_id, reference);
+  `);
+}
+
+function ensureBuddySourceLinksTable(db: Database.Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS buddy_source_links (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      entity_type TEXT NOT NULL,
+      entity_id TEXT NOT NULL,
+      source_kind TEXT NOT NULL,
+      source_id TEXT NOT NULL,
+      url TEXT,
+      label TEXT,
+      role TEXT NOT NULL DEFAULT 'related',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE(entity_type, entity_id, source_kind, source_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_buddy_source_links_entity
+      ON buddy_source_links(entity_type, entity_id);
+    CREATE INDEX IF NOT EXISTS idx_buddy_source_links_kind
+      ON buddy_source_links(source_kind, role);
   `);
 }
 
