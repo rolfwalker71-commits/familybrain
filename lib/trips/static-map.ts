@@ -155,6 +155,7 @@ export async function fetchStaticRouteMapPngDetailed(input: {
   to: { lat: number; lon: number };
   geodesic?: boolean;
   pathPoints?: Array<{ lat: number; lon: number }>;
+  zoom?: number;
 }): Promise<StaticMapFetchResult> {
   if (!hasGoogleMapsApiKey()) {
     return { buffer: null, source: "none", googleError: "no_api_key" };
@@ -165,6 +166,7 @@ export async function fetchStaticRouteMapPngDetailed(input: {
     to: input.to,
     geodesic: input.geodesic,
     pathPoints: input.pathPoints,
+    zoom: input.zoom,
     width: 640,
     height: 400,
     scale: 2,

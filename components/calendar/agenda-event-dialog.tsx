@@ -69,10 +69,8 @@ function typeLabel(item: AgendaItem): string {
 }
 
 import { placeMapImageSrc } from "@/lib/maps/place-map-src";
-
-function placeMapSrc(coords: { lat: number; lon: number }): string {
-  return placeMapImageSrc(coords.lat, coords.lon, 14);
-}
+import { mapZoomStorageKeyPlace } from "@/lib/maps/map-zoom-storage";
+import { ZoomableStaticMap } from "@/components/maps/zoomable-static-map";
 
 function DetailRow({
   label,
@@ -158,20 +156,25 @@ export function AgendaEventDialog({
               ) : null}
 
               {item.coords ? (
-                <a
-                  href={item.mapsUrl || placeMapSrc(item.coords)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block overflow-hidden rounded-lg border border-border/60"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={placeMapSrc(item.coords)}
-                    alt={`Karte: ${item.coords.label}`}
-                    className="h-36 w-full object-cover"
-                    loading="lazy"
-                  />
-                </a>
+                <ZoomableStaticMap
+                  storageKey={mapZoomStorageKeyPlace(
+                    item.coords.lat,
+                    item.coords.lon
+                  )}
+                  defaultZoom={14}
+                  minZoom={8}
+                  maxZoom={17}
+                  srcForZoom={(z) =>
+                    placeMapImageSrc(item.coords!.lat, item.coords!.lon, z)
+                  }
+                  alt={`Karte: ${item.coords.label}`}
+                  heightClassName="h-36"
+                  className="rounded-lg"
+                  href={
+                    item.mapsUrl ||
+                    `https://www.google.com/maps/search/?api=1&query=${item.coords.lat},${item.coords.lon}`
+                  }
+                />
               ) : null}
 
               {item.time || duration ? (

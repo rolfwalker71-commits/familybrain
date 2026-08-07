@@ -100,19 +100,26 @@ export async function GET(request: Request) {
       if (parsed.length >= 2) pathPoints = parsed;
     }
 
+    const zoomRaw = searchParams.get("z");
+    const zoom =
+      zoomRaw != null && zoomRaw !== ""
+        ? Math.min(18, Math.max(2, Number(zoomRaw)))
+        : undefined;
+
     return mapResponse(
       await fetchStaticRouteMapPngDetailed({
         from: { lat: fromLat, lon: fromLon },
         to: { lat: toLat, lon: toLon },
         geodesic: geodesic && !pathPoints,
         pathPoints,
+        zoom: zoom != null && Number.isFinite(zoom) ? zoom : undefined,
       })
     );
   }
 
   const lat = parseCoord(searchParams.get("lat"));
   const lon = parseCoord(searchParams.get("lon"));
-  const zoom = Math.min(16, Math.max(8, Number(searchParams.get("z") || 13)));
+  const zoom = Math.min(18, Math.max(3, Number(searchParams.get("z") || 13)));
   if (lat == null || lon == null) {
     return NextResponse.json(
       { error: "lat/lon or fromLat/fromLon/toLat/toLon required" },

@@ -4,7 +4,7 @@ export function placeMapImageSrc(
   lon: number,
   zoom = 13
 ): string {
-  return `/api/dashboard/place-map?lat=${lat}&lon=${lon}&z=${zoom}&v=gmaps4`;
+  return `/api/dashboard/place-map?lat=${lat}&lon=${lon}&z=${zoom}&v=gmaps5`;
 }
 
 export function routeMapImageSrc(input: {
@@ -14,6 +14,8 @@ export function routeMapImageSrc(input: {
   toLon: number;
   /** Flüge: Orthodrome; Transfer/Zug: Gerade (oder pathPoints). */
   route?: "geodesic" | "straight";
+  /** Expliziter Zoom (Slider); ohne → Auto-Fit mit Padding. */
+  zoom?: number;
   /** Optional Zwischenpunkte [lat, lon][] — werden kompakt in die URL gepackt. */
   pathPoints?: Array<[number, number]>;
 }): string {
@@ -23,8 +25,11 @@ export function routeMapImageSrc(input: {
     toLat: String(input.toLat),
     toLon: String(input.toLon),
     route: input.route || "straight",
-    v: "gmaps4",
+    v: "gmaps5",
   });
+  if (input.zoom != null && Number.isFinite(input.zoom)) {
+    params.set("z", String(Math.round(input.zoom)));
+  }
   if (input.pathPoints && input.pathPoints.length >= 2) {
     // URL kurz halten: max. ~40 Punkte subsamplen
     const pts = subsamplePath(input.pathPoints, 40);

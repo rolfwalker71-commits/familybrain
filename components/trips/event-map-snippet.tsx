@@ -8,6 +8,12 @@ import {
   placeMapImageSrc,
   routeMapImageSrc,
 } from "@/lib/maps/place-map-src";
+import {
+  mapZoomStorageKeyPlace,
+  mapZoomStorageKeyRoute,
+  suggestRouteZoom,
+} from "@/lib/maps/map-zoom-storage";
+import { ZoomableStaticMap } from "@/components/maps/zoomable-static-map";
 import { TripMap, type TripMapPoint } from "@/components/trips/trip-map";
 
 export { placeMapImageSrc, routeMapImageSrc } from "@/lib/maps/place-map-src";
@@ -187,33 +193,32 @@ export function getEventMapModel(
 function StaticPlaceMapImage({
   lat,
   lon,
-  zoom,
+  defaultZoom = 13,
   alt,
   heightClassName,
   className,
+  href,
 }: {
   lat: number;
   lon: number;
-  zoom?: number;
+  defaultZoom?: number;
   alt: string;
   heightClassName: string;
   className?: string;
+  href?: string | null;
 }) {
   return (
-    <div
-      className={cn(
-        "overflow-hidden rounded-md border border-border/70 bg-muted/30",
-        className
-      )}
-    >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={placeMapImageSrc(lat, lon, zoom)}
-        alt={alt}
-        className={cn("w-full object-cover", heightClassName)}
-        loading="lazy"
-      />
-    </div>
+    <ZoomableStaticMap
+      storageKey={mapZoomStorageKeyPlace(lat, lon)}
+      defaultZoom={defaultZoom}
+      minZoom={8}
+      maxZoom={17}
+      srcForZoom={(z) => placeMapImageSrc(lat, lon, z)}
+      alt={alt}
+      heightClassName={heightClassName}
+      className={className}
+      href={href}
+    />
   );
 }
 
@@ -247,31 +252,30 @@ function StaticRouteMapImage({
     );
   }
 
-  const src = routeMapImageSrc({
-    fromLat: a.lat,
-    fromLon: a.lon,
-    toLat: b.lat,
-    toLon: b.lon,
-    route: model.routeStyle === "greatCircle" ? "geodesic" : "straight",
-    pathPoints: model.routePath,
-  });
+  const defaultZoom = suggestRouteZoom(a.lat, a.lon, b.lat, b.lon);
 
   return (
-    <div
-      className={cn(
-        "overflow-hidden rounded-md border border-border/70 bg-muted/30",
-        className
-      )}
-    >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={src}
-        alt={`Route: ${a.label || "Von"} → ${b.label || "Nach"}`}
-        className={cn("w-full object-cover", heightClassName)}
-        loading="lazy"
-        onError={() => setFallback(true)}
-      />
-    </div>
+    <ZoomableStaticMap
+      storageKey={mapZoomStorageKeyRoute(a.lat, a.lon, b.lat, b.lon)}
+      defaultZoom={defaultZoom}
+      minZoom={2}
+      maxZoom={16}
+      srcForZoom={(z) =>
+        routeMapImageSrc({
+          fromLat: a.lat,
+          fromLon: a.lon,
+          toLat: b.lat,
+          toLon: b.lon,
+          route: model.routeStyle === "greatCircle" ? "geodesic" : "straight",
+          pathPoints: model.routePath,
+          zoom: z,
+        })
+      }
+      alt={`Route: ${a.label || "Von"} → ${b.label || "Nach"}`}
+      heightClassName={heightClassName}
+      className={className}
+      onImageError={() => setFallback(true)}
+    />
   );
 }
 
@@ -308,7 +312,7 @@ export function EventMapSnippet({
         <StaticPlaceMapImage
           lat={point.lat}
           lon={point.lon}
-          zoom={13}
+          defaultZoom={13}
           alt={point.label ? `Karte: ${point.label}` : "Kartenausschnitt"}
           heightClassName={heightClassName}
           className={className}

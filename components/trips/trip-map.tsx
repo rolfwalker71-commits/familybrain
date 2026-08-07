@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
+import { Minus, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   coerceMapStyle,
@@ -169,11 +170,20 @@ export function TripMap({
   compact = false,
 }: Props) {
   const mapId = useId().replace(/:/g, "");
+  const sliderId = useId();
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<{ remove: () => void } | null>(null);
+  const mapRef = useRef<{
+    remove: () => void;
+    setZoom: (z: number) => void;
+    getZoom: () => number;
+    getMinZoom: () => number;
+    getMaxZoom: () => number;
+  } | null>(null);
   const [resolvedStyle, setResolvedStyle] = useState<MapStyleId>(
     mapStyleProp || cachedMapStyle || "voyager"
   );
+  const [zoom, setZoom] = useState(12);
+  const [zoomRange, setZoomRange] = useState({ min: 3, max: 18 });
 
   const valid = points.filter(
     (p) => Number.isFinite(p.lat) && Number.isFinite(p.lon)
@@ -231,7 +241,7 @@ export function TripMap({
       }
 
       const map = L.map(containerRef.current, {
-        zoomControl: true,
+        zoomControl: false,
         attributionControl: false,
         scrollWheelZoom: false,
       });
@@ -297,6 +307,14 @@ export function TripMap({
         }
       }
 
+      const syncZoomUi = () => {
+        if (cancelled) return;
+        setZoom(map.getZoom());
+        setZoomRange({
+          min: map.getMinZoom(),
+          max: Math.min(18, map.getMaxZoom()),
+        });
+      };
       const persistView = () => {
         const c = map.getCenter();
         writeSavedMapView(pointsKey, {
@@ -304,9 +322,11 @@ export function TripMap({
           lon: c.lng,
           zoom: map.getZoom(),
         });
+        syncZoomUi();
       };
       map.on("zoomend", persistView);
       map.on("moveend", persistView);
+      syncZoomUi();
 
       requestAnimationFrame(() => map.invalidateSize());
     })();
@@ -320,6 +340,17 @@ export function TripMap({
     };
   }, [mapStateKey, mapId, resolvedStyle]);
 
+  function applyZoom(next: number) {
+    const map = mapRef.current;
+    if (!map) return;
+    const z = Math.min(
+      zoomRange.max,
+      Math.max(zoomRange.min, Math.round(next))
+    );
+    map.setZoom(z);
+    setZoom(z);
+  }
+
   if (valid.length === 0) return null;
 
   const attribution = getMapTileConfig(resolvedStyle).attribution;
@@ -331,6 +362,41 @@ export function TripMap({
         id={`trip-map-${mapId}`}
         className={cn("w-full bg-muted/30", heightClassName)}
       />
+      <div className="absolute inset-x-0 bottom-0 z-[500] flex items-center gap-1.5 bg-gradient-to-t from-black/55 via-black/35 to-transparent px-2 pb-1.5 pt-6 pointer-events-none">
+        <div className="pointer-events-auto flex w-full items-center gap-1.5">
+          <button
+            type="button"
+            className="inline-flex size-6 shrink-0 items-center justify-center rounded-md bg-white/90 text-foreground shadow-sm hover:bg-white"
+            aria-label="Herauszoomen"
+            onClick={() => applyZoom(zoom - 1)}
+            disabled={zoom <= zoomRange.min}
+          >
+            <Minus className="size-3.5" aria-hidden />
+          </button>
+          <label htmlFor={sliderId} className="sr-only">
+            Kartenzoom
+          </label>
+          <input
+            id={sliderId}
+            type="range"
+            min={zoomRange.min}
+            max={zoomRange.max}
+            step={1}
+            value={zoom}
+            onChange={(e) => applyZoom(Number(e.target.value))}
+            className="h-1.5 w-full cursor-pointer accent-teal-700"
+          />
+          <button
+            type="button"
+            className="inline-flex size-6 shrink-0 items-center justify-center rounded-md bg-white/90 text-foreground shadow-sm hover:bg-white"
+            aria-label="Hereinzoomen"
+            onClick={() => applyZoom(zoom + 1)}
+            disabled={zoom >= zoomRange.max}
+          >
+            <Plus className="size-3.5" aria-hidden />
+          </button>
+        </div>
+      </div>
       {!compact ? (
         <div className="flex items-center justify-between gap-2 px-2 py-1 text-[10px] text-muted-foreground">
           <span>{attribution}</span>

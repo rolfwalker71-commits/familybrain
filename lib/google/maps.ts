@@ -458,6 +458,8 @@ export async function fetchGoogleStaticRouteMapDetailed(input: {
   geodesic?: boolean;
   /** Optional Zwischenpunkte (z. B. OJP-Geometrie), sonst nur from→to. */
   pathPoints?: Array<{ lat: number; lon: number }>;
+  /** Wenn gesetzt: fester Zoom um die Streckenmitte (Slider). */
+  zoom?: number;
   width?: number;
   height?: number;
   scale?: 1 | 2;
@@ -468,10 +470,52 @@ export async function fetchGoogleStaticRouteMapDetailed(input: {
       ? input.pathPoints
       : [input.from, input.to];
 
-  // Padding: kurze Transfers sonst zu nah; lange Flüge etwas Luft am Rand.
+  const markers = [
+    {
+      lat: input.from.lat,
+      lon: input.from.lon,
+      color: "green",
+      label: "A",
+    },
+    {
+      lat: input.to.lat,
+      lon: input.to.lon,
+      color: "red",
+      label: "B",
+    },
+  ];
+  const paths = [
+    {
+      points: pathPoints,
+      geodesic: Boolean(input.geodesic) && pathPoints.length === 2,
+      color: "0x0F766EFF",
+      weight: 4,
+    },
+  ];
+
+  if (input.zoom != null && Number.isFinite(input.zoom)) {
+    const center = {
+      lat: (input.from.lat + input.to.lat) / 2,
+      lon: (input.from.lon + input.to.lon) / 2,
+    };
+    return fetchGoogleStaticMapRequest({
+      width: input.width,
+      height: input.height,
+      scale: input.scale,
+      maptype: input.maptype,
+      center,
+      zoom: Math.min(18, Math.max(2, Math.round(input.zoom))),
+      markers,
+      paths,
+    });
+  }
+
+  // Auto-Fit mit Padding: kurze Transfers sonst zu nah; lange Flüge etwas Luft.
   const padPts = [...pathPoints, input.from, input.to];
-  const spanLat = Math.max(...padPts.map((p) => p.lat)) - Math.min(...padPts.map((p) => p.lat));
-  const spanLon = Math.max(...padPts.map((p) => p.lon)) - Math.min(...padPts.map((p) => p.lon));
+  const spanLat =
+    Math.max(...padPts.map((p) => p.lat)) - Math.min(...padPts.map((p) => p.lat));
+  const spanLon =
+    Math.max(...padPts.map((p) => p.lon)) - Math.min(...padPts.map((p) => p.lon));
   const shortHop = Math.max(spanLat, spanLon) < 0.35;
   const visible = paddedVisibleCorners(
     padPts,
@@ -484,28 +528,8 @@ export async function fetchGoogleStaticRouteMapDetailed(input: {
     height: input.height,
     scale: input.scale,
     maptype: input.maptype,
-    markers: [
-      {
-        lat: input.from.lat,
-        lon: input.from.lon,
-        color: "green",
-        label: "A",
-      },
-      {
-        lat: input.to.lat,
-        lon: input.to.lon,
-        color: "red",
-        label: "B",
-      },
-    ],
-    paths: [
-      {
-        points: pathPoints,
-        geodesic: Boolean(input.geodesic) && pathPoints.length === 2,
-        color: "0x0F766EFF",
-        weight: 4,
-      },
-    ],
+    markers,
+    paths,
     visible,
   });
 }
