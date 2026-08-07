@@ -5,21 +5,27 @@ import { ensureInitialized } from "@/lib/db/migrations";
 import {
   analyzeMicrosoftMailDay,
   emptyMailDayAnalysis,
+  type MsDayMailAnalysis,
 } from "@/lib/microsoft/analyze-mail-day";
 import { listMicrosoftMailForDay } from "@/lib/microsoft/mail-day";
 import {
+  cachedToJob,
   finishMsMailDayJobError,
   finishMsMailDayJobOk,
+  getMsMailDayCached,
   isMsMailDayJobBusy,
+  listMsMailDayCachedDays,
   readMsMailDayJob,
   startMsMailDayJob,
+  upsertMsMailDayCache,
 } from "@/lib/microsoft/mail-day-analysis-job";
 import { zurichYmd } from "@/lib/microsoft/time";
 import {
   isMicrosoftConnected,
   resolveMicrosoftUserId,
 } from "@/lib/microsoft/oauth";
-import { publishRealtime } from "@/lib/realtime/hub";
+import { formatTokenUsageLine } from "@/lib/ai/usage-cost";
+import { notifyAppChange } from "@/lib/realtime/notify";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,41 +39,41 @@ const BodySchema = z.object({
     .nullable(),
 });
 
-function notifyDone(dayIso: string, clusters: number, tasks: number) {
-  publishRealtime({
-    topic: "notify",
-    at: new Date().toISOString(),
-    notification: {
-      domain: "documents",
-      reason: "buddy_status",
-      headline: "Mail-Tagesanalyse fertig",
-      detail: `${clusters} Cluster · ${tasks} Aufgabe(n) · ${dayIso}`,
-      title: null,
-      href: "/microsoft",
-      aiIconUrl: null,
-      category: null,
-      meta: null,
-      source: "buddy",
-    },
+function notifyDone(dayIso: string, analysis: MsDayMailAnalysis) {
+  const usageLine = formatTokenUsageLine(analysis.usage);
+  notifyAppChange({
+    domain: "documents",
+    reason: "buddy_status",
+    headline: "Mail-Tagesanalyse fertig",
+    detail: [
+      `${analysis.clusters.length} Cluster`,
+      `${analysis.tasks.length} Aufgabe(n)`,
+      dayIso,
+      usageLine,
+    ]
+      .filter(Boolean)
+      .join(" · "),
+    title: null,
+    href: "/microsoft",
+    aiIconUrl: null,
+    category: null,
+    meta: null,
+    source: "buddy",
   });
 }
 
 function notifyError(dayIso: string, message: string) {
-  publishRealtime({
-    topic: "notify",
-    at: new Date().toISOString(),
-    notification: {
-      domain: "documents",
-      reason: "buddy_status",
-      headline: "Mail-Tagesanalyse fehlgeschlagen",
-      detail: `${dayIso}: ${message.slice(0, 180)}`,
-      title: null,
-      href: "/microsoft",
-      aiIconUrl: null,
-      category: null,
-      meta: null,
-      source: "buddy",
-    },
+  notifyAppChange({
+    domain: "documents",
+    reason: "buddy_status",
+    headline: "Mail-Tagesanalyse fehlgeschlagen",
+    detail: `${dayIso}: ${message.slice(0, 180)}`,
+    title: null,
+    href: "/microsoft",
+    aiIconUrl: null,
+    category: null,
+    meta: null,
+    source: "buddy",
   });
 }
 
@@ -84,7 +90,7 @@ async function runAnalysisJob(userId: number, day: string) {
         { inbox: mail.inbox, sent: mail.sent, dayIso: mail.dayIso },
         analysis
       );
-      notifyDone(mail.dayIso, 0, 0);
+      notifyDone(mail.dayIso, analysis);
       return;
     }
     const analysis = await analyzeMicrosoftMailDay({
@@ -98,11 +104,7 @@ async function runAnalysisJob(userId: number, day: string) {
       { inbox: mail.inbox, sent: mail.sent, dayIso: mail.dayIso },
       analysis
     );
-    notifyDone(
-      mail.dayIso,
-      analysis.clusters.length,
-      analysis.tasks.length
-    );
+    notifyDone(mail.dayIso, analysis);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     finishMsMailDayJobError(userId, day, message);
@@ -110,7 +112,7 @@ async function runAnalysisJob(userId: number, day: string) {
   }
 }
 
-/** Status / letztes Ergebnis (überlebt Seitenwechsel). */
+/** Status / Cache für Tag (überlebt Seitenwechsel, max. 7 Tage). */
 export async function GET(request: Request) {
   ensureInitialized();
   const auth = await requireAuth();
@@ -124,16 +126,41 @@ export async function GET(request: Request) {
   }
   const url = new URL(request.url);
   const day = url.searchParams.get("date")?.trim() || null;
+  const cachedDays = listMsMailDayCachedDays(userId);
   const job = readMsMailDayJob(userId);
-  if (!job) {
+
+  if (job?.status === "running" && isMsMailDayJobBusy(job)) {
+    const sameDay = !day || job.dayIso === day;
     return NextResponse.json({
       ok: true,
-      status: "idle",
-      job: null,
+      status: "running",
+      job: sameDay ? job : job,
+      cachedDays,
+      fromCache: false,
+      // Wenn anderer Tag gewählt: Cache für diesen Tag mitliefern
+      cachedJob:
+        day && job.dayIso !== day
+          ? (() => {
+              const c = getMsMailDayCached(userId, day);
+              return c ? cachedToJob(userId, c) : null;
+            })()
+          : null,
     });
   }
-  // Veraltetes running als idle behandeln für Client-Polling
-  if (job.status === "running" && !isMsMailDayJobBusy(job)) {
+
+  // Veraltetes running
+  if (job?.status === "running" && !isMsMailDayJobBusy(job)) {
+    const cached = day ? getMsMailDayCached(userId, day) : null;
+    if (cached) {
+      return NextResponse.json({
+        ok: true,
+        status: "done",
+        job: cachedToJob(userId, cached),
+        cachedDays,
+        fromCache: true,
+        stale: true,
+      });
+    }
     return NextResponse.json({
       ok: true,
       status: "idle",
@@ -143,21 +170,87 @@ export async function GET(request: Request) {
         error: job.error || "Analyse abgebrochen oder Timeout.",
         finishedAt: new Date().toISOString(),
       },
+      cachedDays,
       stale: true,
     });
   }
-  if (day && job.dayIso !== day && job.status === "done") {
+
+  // Aktueller Job passt zum Tag
+  if (
+    job?.status === "done" &&
+    job.analysis &&
+    (!day || job.dayIso === day)
+  ) {
+    // Letzten Job in den Tages-Cache übernehmen (Migration / nach Analyse)
+    if (job.finishedAt) {
+      upsertMsMailDayCache(userId, {
+        dayIso: job.dayIso,
+        finishedAt: job.finishedAt,
+        analysis: job.analysis,
+        inboxCount: job.mail?.inbox.length ?? 0,
+        sentCount: job.mail?.sent.length ?? 0,
+      });
+    }
     return NextResponse.json({
       ok: true,
-      status: job.status,
+      status: "done",
       job,
-      dayMismatch: true,
+      cachedDays: listMsMailDayCachedDays(userId),
+      fromCache: false,
     });
   }
+
+  // Cache-Treffer für angefragten Tag
+  if (day) {
+    const cached = getMsMailDayCached(userId, day);
+    if (cached) {
+      return NextResponse.json({
+        ok: true,
+        status: "done",
+        job: cachedToJob(userId, cached),
+        cachedDays,
+        fromCache: true,
+      });
+    }
+    return NextResponse.json({
+      ok: true,
+      status: "idle",
+      job: null,
+      cachedDays,
+      fromCache: false,
+    });
+  }
+
+  // Ohne date: letzten Job oder neuesten Cache
+  if (job?.status === "done" && job.analysis) {
+    return NextResponse.json({
+      ok: true,
+      status: "done",
+      job,
+      cachedDays,
+      fromCache: false,
+    });
+  }
+  const latestDay = cachedDays[0];
+  if (latestDay) {
+    const cached = getMsMailDayCached(userId, latestDay);
+    if (cached) {
+      return NextResponse.json({
+        ok: true,
+        status: "done",
+        job: cachedToJob(userId, cached),
+        cachedDays,
+        fromCache: true,
+      });
+    }
+  }
+
   return NextResponse.json({
     ok: true,
-    status: job.status,
-    job,
+    status: "idle",
+    job: null,
+    cachedDays,
+    fromCache: false,
   });
 }
 
@@ -191,6 +284,7 @@ export async function POST(request: Request) {
         accepted: false,
         status: "running",
         job: existing,
+        cachedDays: listMsMailDayCachedDays(userId),
         message: `Analyse läuft bereits (${existing!.dayIso}).`,
       },
       { status: 202 }
@@ -208,6 +302,7 @@ export async function POST(request: Request) {
       accepted: true,
       status: "running",
       job,
+      cachedDays: listMsMailDayCachedDays(userId),
       message: `Analyse für ${day} gestartet.`,
     },
     { status: 202 }

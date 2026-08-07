@@ -4,6 +4,7 @@ import {
   flattenAnalysis,
   guessCompanyLabel,
   packMailsForPrompt,
+  resolveReplyToEmail,
   senderDisplayName,
   sortClusters,
   withSenderLabel,
@@ -141,6 +142,22 @@ test("sortClusters orders by status then company then theme", () => {
   assert.equal(sorted[0]!.theme, "A");
   assert.equal(sorted[1]!.company, "Zebra");
   assert.equal(sorted[2]!.status, "done");
+});
+
+test("resolveReplyToEmail recovers address from name or angle brackets", () => {
+  assert.equal(
+    resolveReplyToEmail("Raphael Altenberger", "raphael@an-group.one"),
+    "raphael@an-group.one"
+  );
+  assert.equal(
+    resolveReplyToEmail("Raphael <raphael@an-group.one>"),
+    "raphael@an-group.one"
+  );
+  assert.equal(
+    resolveReplyToEmail("raphael@an-group.one"),
+    "raphael@an-group.one"
+  );
+  assert.equal(resolveReplyToEmail("nur Name", "auch kein mail"), null);
 });
 
 test("flattenAnalysis collects tasks events replies", () => {

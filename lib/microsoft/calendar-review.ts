@@ -175,9 +175,73 @@ export type FreeSlot = {
   durationMinutes: number;
 };
 
+/** Arbeitsfenster für Verschiebe-Vorschläge (Europe/Zurich). */
+export const MS_WORK_START_HM = "08:00";
+export const MS_WORK_END_HM = "18:00";
+/** Keine Termine über die Mittagspause. */
+export const MS_LUNCH_START_HM = "12:00";
+export const MS_LUNCH_END_HM = "13:00";
+
+const SLOT_STEP_MINUTES = 30;
+
+function isOccupyingCalendarEvent(e: MsCalendarEvent): boolean {
+  if (e.isAllDay || !e.startHm) return false;
+  if (e.done) return false;
+  const show = (e.showAs || "busy").toLowerCase();
+  // «free» z. B. nach Buddy/Erledigt — Slot wieder nutzbar
+  if (show === "free") return false;
+  return true;
+}
+
+function mergeBusyIntervals(
+  intervals: Array<{ start: number; end: number }>
+): Array<{ start: number; end: number }> {
+  if (intervals.length === 0) return [];
+  const sorted = [...intervals].sort((a, b) => a.start - b.start);
+  const out: Array<{ start: number; end: number }> = [
+    { start: sorted[0]!.start, end: sorted[0]!.end },
+  ];
+  for (let i = 1; i < sorted.length; i++) {
+    const cur = sorted[i]!;
+    const last = out[out.length - 1]!;
+    if (cur.start <= last.end) {
+      last.end = Math.max(last.end, cur.end);
+    } else {
+      out.push({ start: cur.start, end: cur.end });
+    }
+  }
+  return out;
+}
+
+/** Slot muss in 08–18 liegen, Mittag 12–13 meiden, Ende ≤ 18. */
+export function isAllowedWorkSlot(input: {
+  startHm: string;
+  endHm: string;
+  workStartHm?: string;
+  workEndHm?: string;
+  lunchStartHm?: string;
+  lunchEndHm?: string;
+}): boolean {
+  const workStart =
+    hmToMinutes(input.workStartHm || MS_WORK_START_HM) ?? 8 * 60;
+  const workEnd = hmToMinutes(input.workEndHm || MS_WORK_END_HM) ?? 18 * 60;
+  const lunchStart =
+    hmToMinutes(input.lunchStartHm || MS_LUNCH_START_HM) ?? 12 * 60;
+  const lunchEnd =
+    hmToMinutes(input.lunchEndHm || MS_LUNCH_END_HM) ?? 13 * 60;
+  const start = hmToMinutes(input.startHm);
+  const end = hmToMinutes(input.endHm);
+  if (start == null || end == null) return false;
+  if (end <= start) return false;
+  if (start < workStart || end > workEnd) return false;
+  // Überlappt Mittagspause?
+  if (start < lunchEnd && end > lunchStart) return false;
+  return true;
+}
+
 /**
- * Find free slots in [rangeStart, rangeEnd] within work hours,
- * excluding busy timed events. durationMinutes = needed length.
+ * Freie Slots in [rangeStart, rangeEnd] innerhalb Arbeitszeit 08–18,
+ * ohne Mittag 12–13 und ohne bereits belegte Timed-Events.
  */
 export function findFreeSlots(input: {
   events: MsCalendarEvent[];
@@ -186,46 +250,95 @@ export function findFreeSlots(input: {
   durationMinutes: number;
   workStartHm?: string;
   workEndHm?: string;
+  lunchStartHm?: string;
+  lunchEndHm?: string;
   maxSlots?: number;
+  stepMinutes?: number;
 }): FreeSlot[] {
-  const workStart = hmToMinutes(input.workStartHm || "08:00") ?? 8 * 60;
-  const workEnd = hmToMinutes(input.workEndHm || "18:00") ?? 18 * 60;
+  const workStart = Math.max(
+    8 * 60,
+    hmToMinutes(input.workStartHm || MS_WORK_START_HM) ?? 8 * 60
+  );
+  const workEnd = Math.min(
+    18 * 60,
+    hmToMinutes(input.workEndHm || MS_WORK_END_HM) ?? 18 * 60
+  );
+  const lunchStart =
+    hmToMinutes(input.lunchStartHm || MS_LUNCH_START_HM) ?? 12 * 60;
+  const lunchEnd =
+    hmToMinutes(input.lunchEndHm || MS_LUNCH_END_HM) ?? 13 * 60;
   const need = Math.max(15, input.durationMinutes);
+  const step = Math.max(15, input.stepMinutes ?? SLOT_STEP_MINUTES);
   const maxSlots = input.maxSlots ?? 12;
   const slots: FreeSlot[] = [];
 
+  if (workEnd - workStart < need) return slots;
+
   let day = input.rangeStart;
   while (day <= input.rangeEnd && slots.length < maxSlots) {
-    const dayEvents = input.events
-      .filter((e) => e.date === day && !e.isAllDay && e.startHm && !e.done)
+    const dayBusy: Array<{ start: number; end: number }> = input.events
+      .filter((e) => e.date === day && isOccupyingCalendarEvent(e))
       .map((e) => {
         const start = hmToMinutes(e.startHm!) ?? workStart;
         const end = hmToMinutes(e.endHm || "") ?? start + 60;
-        return { start, end: Math.max(end, start + 15) };
+        return {
+          start: Math.max(start, workStart),
+          end: Math.min(Math.max(end, start + 15), workEnd),
+        };
       })
-      .sort((a, b) => a.start - b.start);
+      .filter((b) => b.end > b.start);
 
-    let cursor = workStart;
-    for (const ev of dayEvents) {
-      if (ev.start > cursor && ev.start - cursor >= need) {
-        slots.push({
-          date: day,
-          startHm: minutesToHm(cursor),
-          endHm: minutesToHm(cursor + need),
-          durationMinutes: need,
-        });
-        if (slots.length >= maxSlots) break;
-      }
-      cursor = Math.max(cursor, ev.end);
-    }
-    if (slots.length < maxSlots && workEnd - cursor >= need) {
-      slots.push({
-        date: day,
-        startHm: minutesToHm(cursor),
-        endHm: minutesToHm(cursor + need),
-        durationMinutes: need,
+    // Mittagssperre als belegter Block
+    if (lunchEnd > workStart && lunchStart < workEnd) {
+      dayBusy.push({
+        start: Math.max(lunchStart, workStart),
+        end: Math.min(lunchEnd, workEnd),
       });
     }
+
+    const busy = mergeBusyIntervals(dayBusy);
+    const freeGaps: Array<{ start: number; end: number }> = [];
+    let cursor = workStart;
+    for (const b of busy) {
+      if (b.start > cursor) {
+        freeGaps.push({ start: cursor, end: Math.min(b.start, workEnd) });
+      }
+      cursor = Math.max(cursor, b.end);
+    }
+    if (cursor < workEnd) {
+      freeGaps.push({ start: cursor, end: workEnd });
+    }
+
+    for (const gap of freeGaps) {
+      if (slots.length >= maxSlots) break;
+      if (gap.end - gap.start < need) continue;
+      for (
+        let t = gap.start;
+        t + need <= gap.end && slots.length < maxSlots;
+        t += step
+      ) {
+        const end = t + need;
+        if (
+          !isAllowedWorkSlot({
+            startHm: minutesToHm(t),
+            endHm: minutesToHm(end),
+            workStartHm: minutesToHm(workStart),
+            workEndHm: minutesToHm(workEnd),
+            lunchStartHm: minutesToHm(lunchStart),
+            lunchEndHm: minutesToHm(lunchEnd),
+          })
+        ) {
+          continue;
+        }
+        slots.push({
+          date: day,
+          startHm: minutesToHm(t),
+          endHm: minutesToHm(end),
+          durationMinutes: need,
+        });
+      }
+    }
+
     day = addDaysYmd(day, 1);
   }
   return slots;
@@ -261,8 +374,8 @@ export async function suggestFreeSlotsForEvent(
     rangeStart,
     rangeEnd,
     durationMinutes: duration || 60,
-    workStartHm: options?.workStartHm,
-    workEndHm: options?.workEndHm,
+    workStartHm: options?.workStartHm || MS_WORK_START_HM,
+    workEndHm: options?.workEndHm || MS_WORK_END_HM,
   });
 }
 
@@ -271,6 +384,31 @@ export async function rescheduleMicrosoftEvent(
   eventId: string,
   slot: { date: string; startHm: string; endHm: string }
 ): Promise<MsCalendarEvent> {
+  if (!isAllowedWorkSlot(slot)) {
+    throw new Error(
+      "Slot ungültig: nur 08:00–18:00, nicht über 12:00–13:00, Ende spätestens 18:00."
+    );
+  }
+
+  // Belegte Termine erneut prüfen (ohne das zu verschiebende Event)
+  const dayEvents = await listMicrosoftEventsInRange(
+    userId,
+    slot.date,
+    slot.date
+  );
+  const startM = hmToMinutes(slot.startHm)!;
+  const endM = hmToMinutes(slot.endHm)!;
+  const conflict = dayEvents.some((e) => {
+    if (e.id === eventId || !isOccupyingCalendarEvent(e)) return false;
+    const es = hmToMinutes(e.startHm!);
+    const ee = hmToMinutes(e.endHm || "") ?? (es != null ? es + 60 : null);
+    if (es == null || ee == null) return false;
+    return startM < ee && endM > es;
+  });
+  if (conflict) {
+    throw new Error("Slot ist bereits belegt.");
+  }
+
   const existing = await graphJson<GraphEvent>(
     userId,
     `/me/events/${encodeURIComponent(eventId)}?$select=${EVENT_SELECT}`,

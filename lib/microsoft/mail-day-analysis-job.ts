@@ -21,10 +21,25 @@ export type MsMailDayJob = {
   analysis: MsDayMailAnalysis | null;
 };
 
+/** Persistierte Tagesanalyse (ohne Mail-Bodies — Mails werden frisch geladen). */
+export type MsMailDayCached = {
+  dayIso: string;
+  finishedAt: string;
+  analysis: MsDayMailAnalysis;
+  inboxCount: number;
+  sentCount: number;
+};
+
+export const MS_MAIL_DAY_CACHE_MAX = 7;
+
 const STALE_RUNNING_MS = 12 * 60 * 1000;
 
 function jobKey(userId: number): string {
   return `ms_mail_day_analysis_u${userId}`;
+}
+
+function cacheKey(userId: number): string {
+  return `ms_mail_day_cache_u${userId}`;
 }
 
 export function readMsMailDayJob(userId: number): MsMailDayJob | null {
@@ -46,6 +61,70 @@ export function writeMsMailDayJob(job: MsMailDayJob): void {
 
 export function clearMsMailDayJob(userId: number): void {
   setSetting(jobKey(userId), null);
+}
+
+export function readMsMailDayCache(userId: number): MsMailDayCached[] {
+  const raw = getSetting(cacheKey(userId));
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as MsMailDayCached[];
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (e) =>
+        e &&
+        typeof e.dayIso === "string" &&
+        /^\d{4}-\d{2}-\d{2}$/.test(e.dayIso) &&
+        e.analysis &&
+        typeof e.analysis === "object"
+    );
+  } catch {
+    return [];
+  }
+}
+
+export function getMsMailDayCached(
+  userId: number,
+  dayIso: string
+): MsMailDayCached | null {
+  return readMsMailDayCache(userId).find((e) => e.dayIso === dayIso) || null;
+}
+
+export function listMsMailDayCachedDays(userId: number): string[] {
+  return readMsMailDayCache(userId)
+    .map((e) => e.dayIso)
+    .sort((a, b) => b.localeCompare(a));
+}
+
+/** Speichert/aktualisiert eine Tagesanalyse; hält max. MS_MAIL_DAY_CACHE_MAX (nach finishedAt). */
+export function upsertMsMailDayCache(
+  userId: number,
+  entry: MsMailDayCached,
+  max = MS_MAIL_DAY_CACHE_MAX
+): MsMailDayCached[] {
+  const next = readMsMailDayCache(userId).filter(
+    (e) => e.dayIso !== entry.dayIso
+  );
+  next.push(entry);
+  next.sort((a, b) => b.finishedAt.localeCompare(a.finishedAt));
+  const pruned = next.slice(0, Math.max(1, max));
+  setSetting(cacheKey(userId), JSON.stringify(pruned));
+  return pruned;
+}
+
+export function cachedToJob(
+  userId: number,
+  cached: MsMailDayCached
+): MsMailDayJob {
+  return {
+    userId,
+    dayIso: cached.dayIso,
+    status: "done",
+    startedAt: cached.finishedAt,
+    finishedAt: cached.finishedAt,
+    error: null,
+    mail: null,
+    analysis: cached.analysis,
+  };
 }
 
 /** true wenn ein anderer Lauf noch aktiv und nicht veraltet ist. */
@@ -86,17 +165,25 @@ export function finishMsMailDayJobOk(
   mail: MsMailDayJobMail,
   analysis: MsDayMailAnalysis
 ): MsMailDayJob {
+  const finishedAt = new Date().toISOString();
   const job: MsMailDayJob = {
     userId,
     dayIso,
     status: "done",
-    startedAt: readMsMailDayJob(userId)?.startedAt || new Date().toISOString(),
-    finishedAt: new Date().toISOString(),
+    startedAt: readMsMailDayJob(userId)?.startedAt || finishedAt,
+    finishedAt,
     error: null,
     mail,
     analysis,
   };
   writeMsMailDayJob(job);
+  upsertMsMailDayCache(userId, {
+    dayIso,
+    finishedAt,
+    analysis,
+    inboxCount: mail.inbox.length,
+    sentCount: mail.sent.length,
+  });
   return job;
 }
 

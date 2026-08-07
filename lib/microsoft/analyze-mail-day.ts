@@ -1,4 +1,8 @@
 import { getOpenAIClient, getOpenAIModel, hasOpenAIKey } from "@/lib/ai/client";
+import {
+  buildAiTokenUsage,
+  type AiTokenUsage,
+} from "@/lib/ai/usage-cost";
 import { emailDomain } from "@/lib/mail/mail-sender-prefs";
 import type { MsMailItem } from "@/lib/microsoft/mail-day";
 import { addDaysYmd } from "@/lib/microsoft/time";
@@ -73,6 +77,7 @@ export type MsDayMailAnalysis = z.infer<typeof MsDayMailAnalysisSchema> & {
   tasks: MsDayTaskSuggestion[];
   events: MsDayEventSuggestion[];
   replies: MsDayReplyDraft[];
+  usage?: AiTokenUsage | null;
 };
 
 const GENERIC_MAIL_HOSTS = new Set([
@@ -262,7 +267,7 @@ export function originalSenderForCluster(mails: MsMailItem[]): {
 }
 
 function formatMailBlock(m: MsMailItem, indexLabel: string): string {
-  const body = (m.bodyText || m.preview || "").slice(0, 900);
+  const body = (m.bodyText || m.preview || "").slice(0, 1400);
   const { email, company } = counterpartForMail(m);
   const absender =
     m.folder === "inbox"
@@ -366,6 +371,24 @@ function resolveMail(
   return null;
 }
 
+/** E-Mail aus AI-`to` oder Fallback (Name ohne @ → Gegenstelle). */
+export function resolveReplyToEmail(
+  rawTo: string | null | undefined,
+  ...fallbacks: Array<string | null | undefined>
+): string | null {
+  const candidates = [rawTo, ...fallbacks];
+  for (const raw of candidates) {
+    const t = (raw || "").trim();
+    if (!t) continue;
+    const angle = /<([^<>\s]+@[^<>\s]+)>/.exec(t);
+    if (angle?.[1]) return angle[1].trim();
+    if (t.includes("@") && !/\s/.test(t)) return t;
+    const bare = /\b([^\s<>"]+@[^\s<>"]+)\b/.exec(t);
+    if (bare?.[1]) return bare[1].trim();
+  }
+  return null;
+}
+
 function enrichCluster(
   cluster: z.infer<typeof MsDayClusterSchema>,
   byId: Map<string, MsMailItem>,
@@ -452,7 +475,7 @@ function enrichCluster(
     });
 
   const replies = cluster.replies
-    .filter((r) => r.to.trim() && r.subject.trim() && r.body.trim())
+    .filter((r) => r.subject.trim() && r.body.trim())
     .map((r) => {
       const mail =
         resolveMail(r.sourceMailId, null, byId) ||
@@ -460,7 +483,14 @@ function enrichCluster(
         fromMails[0] ||
         null;
       const c = mail ? counterpartForMail(mail) : null;
-      const to = r.to.trim() || counterpartEmail || c?.email || "";
+      const to =
+        resolveReplyToEmail(
+          r.to,
+          counterpartEmail,
+          c?.email,
+          sender.email,
+          mail?.folder === "inbox" ? mail.fromEmail : mail?.toEmails?.[0]
+        ) || "";
       return {
         ...r,
         to,
@@ -469,12 +499,12 @@ function enrichCluster(
             ? r.sourceMailId
             : mail?.folder === "inbox"
               ? mail.id
-              : null,
+              : fromMails.find((m) => m.folder === "inbox")?.id || null,
         company: r.company?.trim() || company,
         theme,
       };
     })
-    .filter((r) => r.to.includes("@"));
+    .filter((r) => Boolean(resolveReplyToEmail(r.to)));
 
   return {
     company,
@@ -511,7 +541,8 @@ export function sortClusters(clusters: MsDayCluster[]): MsDayCluster[] {
 
 export function flattenAnalysis(
   clusters: MsDayCluster[],
-  daySummary: string
+  daySummary: string,
+  usage?: AiTokenUsage | null
 ): MsDayMailAnalysis {
   return {
     daySummary,
@@ -519,6 +550,7 @@ export function flattenAnalysis(
     tasks: clusters.flatMap((c) => c.tasks),
     events: clusters.flatMap((c) => c.events),
     replies: clusters.flatMap((c) => c.replies),
+    usage: usage || null,
   };
 }
 
@@ -529,6 +561,7 @@ export function emptyMailDayAnalysis(summary: string): MsDayMailAnalysis {
     tasks: [],
     events: [],
     replies: [],
+    usage: null,
   };
 }
 
@@ -550,16 +583,27 @@ Analysiere die Mails des gewählten Tages (Posteingang + Gesendet).
 
 Ablauf:
 1) Gruppiere nach Kunde/Firma und Thema/Thread. Gleiche conv=… = derselbe Thread.
-2) Pro Cluster: kurze Zusammenfassung.
-3) Nächste Schritte — Aufgabe und Antwort dürfen ZUSAMMEN vorkommen:
-   - tasks: wenn DU etwas tun/nachfassen musst. Titel handlungsnah OHNE Absender-Suffix (wird serverseitig ergänzt). dueDate Default ${defaultDue}.
-   - replies: wenn eine Antwort an den Absender sinnvoll ist (Status, Zusage, Rückfrage). Darf parallel zu tasks stehen — z. B. kurze Zwischenantwort + Aufgabe «Problem beheben».
-   - events: nur bei klarem Datum/Zeit.
-WICHTIG replies: Sprache = Sprache der Kunden-Anfrage (EN→EN mit Re:, DE→DE mit AW:).
+2) Pro Cluster: kurze Zusammenfassung + status.
+3) Nächste Schritte — tasks / replies / events sind getrennte Kanäle:
+
+TASKS: interne Handlung für dich (prüfen, buchen, nachfassen, Ticket öffnen). Titel handlungsnah OHNE Absender-Suffix (wird serverseitig ergänzt). dueDate Default ${defaultDue}.
+
+REPLIES (sehr wichtig — oft vergessen):
+- Fertiger Mail-Entwurf an die Gegenstelle (Feld "to" = E-Mail mit @ aus «Gegenstelle <…>», nie nur Name).
+- Pflicht, wenn die letzte relevante Inbox-Mail eine Frage, Bitte, Termin-/Preis-Anfrage, Freigabe, Lieferinfo oder sonstige Rückmeldung erwartet — auch wenn du parallel eine Task anlegst.
+- Typische Paare: Task «Problem beheben» + Reply «kurze Zwischenantwort / ETA»; Task «Angebot prüfen» + Reply «danke, wir melden uns bis …».
+- VERBOTEN: nur Task «Antworten an …» / «Rückmeldung an …» / «Bescheid geben» OHNE replies[] — der Text gehört in replies.body.
+- Sprache = Sprache der Kunden-Anfrage (EN→EN subject «Re: …», DE→DE «AW: …»). body höflich, knapp, absendfertig (Anrede + Schlussformel).
+- Kein Reply bei reiner FYI/Newsletter/Werbung oder wenn du im Thread bereits klar geantwortet hast und nichts Offen ist.
+
+EVENTS: nur bei klarem Datum/Zeit.
+
 Newsletter/Werbung weglassen. Keine erfundenen Fakten. NUR JSON.`;
 
   const user = `Analysetag: ${input.todayIso}
 Default dueDate für Tasks ohne Frist: ${defaultDue}
+
+Vor dem JSON: gehe Cluster für Cluster die Inbox-Mails durch und entscheide bewusst, ob ein Reply fehlt. Lieber ein kurzer Zwischenstands-Reply als gar keiner, wenn der Absender auf Rückmeldung wartet.
 
 ${packed}
 
@@ -577,7 +621,7 @@ JSON-Schema:
       "status": "open"|"waiting"|"done"|"fyi",
       "tasks": [
         {
-          "title": "Handlung ohne Absender-Klammern",
+          "title": "Interne Handlung ohne Absender-Klammern",
           "notes": "…"|null,
           "dueDate": "${defaultDue}"|null,
           "sourceMailId": "id"|null,
@@ -608,10 +652,10 @@ JSON-Schema:
         {
           "to": "name@firma.ch",
           "subject": "Re: … oder AW: …",
-          "body": "Antwort in der Sprache der Anfrage",
-          "sourceMailId": "id"|null,
+          "body": "Fertige Antwort in der Sprache der Anfrage (Anrede + Inhalt + Gruss)",
+          "sourceMailId": "id der Inbox-Mail"|null,
           "company": "…"|null,
-          "reason": "…"
+          "reason": "warum Antwort nötig"
         }
       ]
     }
@@ -619,15 +663,18 @@ JSON-Schema:
 }`;
 
   const client = getOpenAIClient();
+  const model = getOpenAIModel();
   const completion = await client.chat.completions.create({
-    model: getOpenAIModel(),
-    temperature: 0.25,
+    model,
+    temperature: 0.35,
     response_format: { type: "json_object" },
     messages: [
       { role: "system", content: system },
       { role: "user", content: user },
     ],
   });
+
+  const usage = buildAiTokenUsage(model, completion.usage);
 
   const raw = completion.choices[0]?.message?.content ?? "{}";
   let parsed: unknown;
@@ -659,5 +706,5 @@ JSON-Schema:
       )
   );
 
-  return flattenAnalysis(clusters, result.data.daySummary.trim());
+  return flattenAnalysis(clusters, result.data.daySummary.trim(), usage);
 }

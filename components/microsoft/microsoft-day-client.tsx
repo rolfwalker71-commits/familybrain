@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
-  Building2,
   Check,
   CalendarClock,
+  Cloud,
   Mail,
   RefreshCw,
   Sparkles,
@@ -27,6 +27,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { PageHeader } from "@/components/layout/page-primitives";
 import { cn } from "@/lib/utils";
 import { APP_ICON_STROKE } from "@/lib/branding/app-icons";
+import { formatTokenUsageLine } from "@/lib/ai/usage-cost";
+import type { AiTokenUsage } from "@/lib/ai/usage-cost";
 import { toSwissDate } from "@/lib/utils/dates";
 
 function zurichYmdClient(d = new Date()): string {
@@ -35,6 +37,22 @@ function zurichYmdClient(d = new Date()): string {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
+  }).format(d);
+}
+
+/** ISO → `TT.MM.JJJJ, HH:MM` in Europe/Zurich. */
+function toSwissDateTime(iso: string | null | undefined): string {
+  if (!iso) return "–";
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return toSwissDate(iso);
+  return new Intl.DateTimeFormat("de-CH", {
+    timeZone: "Europe/Zurich",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
   }).format(d);
 }
 
@@ -131,6 +149,7 @@ type DayAnalysis = {
   tasks: DayTask[];
   events: DayEventSug[];
   replies: DayReply[];
+  usage?: AiTokenUsage | null;
 };
 
 type PickState = {
@@ -167,6 +186,8 @@ export function MicrosoftDayClient() {
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeNotice, setAnalyzeNotice] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<DayAnalysis | null>(null);
+  const [cachedDays, setCachedDays] = useState<string[]>([]);
+  const [analysisFromCache, setAnalysisFromCache] = useState(false);
   const [picks, setPicks] = useState<PickState>({
     tasks: {},
     events: {},
@@ -322,30 +343,52 @@ export function MicrosoftDayClient() {
     }
   }
 
-  const applyAnalysisPayload = useCallback((a: DayAnalysis, dayLabel: string) => {
-    setAnalysis({
-      daySummary: a.daySummary || "",
-      clusters: a.clusters || [],
-      tasks: a.tasks || [],
-      events: a.events || [],
-      replies: a.replies || [],
-    });
-    const next: PickState = { tasks: {}, events: {}, replies: {} };
-    (a.tasks || []).forEach((_, i) => {
-      next.tasks[i] = true;
-    });
-    (a.events || []).forEach((_, i) => {
-      next.events[i] = true;
-    });
-    (a.replies || []).forEach((_, i) => {
-      next.replies[i] = false;
-    });
-    setPicks(next);
-    setAnalyzeNotice(
-      `Analyse fertig (${toSwissDate(dayLabel)}): ${(a.clusters || []).length} Cluster, ${(a.tasks || []).length} Aufgabe(n).`
-    );
-    setTab("mail");
-  }, []);
+  const applyAnalysisPayload = useCallback(
+    (
+      a: DayAnalysis,
+      dayLabel: string,
+      finishedAt?: string | null,
+      opts?: { fromCache?: boolean }
+    ) => {
+      setAnalysis({
+        daySummary: a.daySummary || "",
+        clusters: a.clusters || [],
+        tasks: a.tasks || [],
+        events: a.events || [],
+        replies: a.replies || [],
+        usage: a.usage || null,
+      });
+      const next: PickState = { tasks: {}, events: {}, replies: {} };
+      (a.tasks || []).forEach((_, i) => {
+        next.tasks[i] = true;
+      });
+      (a.events || []).forEach((_, i) => {
+        next.events[i] = true;
+      });
+      (a.replies || []).forEach((_, i) => {
+        next.replies[i] = true;
+      });
+      setPicks(next);
+      setAnalysisFromCache(Boolean(opts?.fromCache));
+      const when = finishedAt
+        ? toSwissDateTime(finishedAt)
+        : toSwissDate(dayLabel);
+      const usageLine = formatTokenUsageLine(a.usage);
+      const prefix = opts?.fromCache
+        ? `Gespeicherte Analyse (${when})`
+        : `Analyse fertig (${when})`;
+      setAnalyzeNotice(
+        [
+          `${prefix}: ${(a.clusters || []).length} Cluster, ${(a.tasks || []).length} Aufgabe(n), ${(a.replies || []).length} Antwort(en).`,
+          usageLine,
+        ]
+          .filter(Boolean)
+          .join(" ")
+      );
+      setTab("mail");
+    },
+    []
+  );
 
   const stopPoll = useCallback(() => {
     if (pollRef.current != null) {
@@ -355,34 +398,42 @@ export function MicrosoftDayClient() {
   }, []);
 
   const hydrateFromJob = useCallback(
-    (job: {
-      status: string;
-      dayIso: string;
-      error?: string | null;
-      mail?: { inbox?: MsMail[]; sent?: MsMail[]; dayIso?: string } | null;
-      analysis?: DayAnalysis | null;
-    }) => {
+    (
+      job: {
+        status: string;
+        dayIso: string;
+        finishedAt?: string | null;
+        error?: string | null;
+        mail?: { inbox?: MsMail[]; sent?: MsMail[]; dayIso?: string } | null;
+        analysis?: DayAnalysis | null;
+      },
+      opts?: { syncDay?: boolean; fromCache?: boolean }
+    ) => {
+      const syncDay = Boolean(opts?.syncDay);
       if (job.mail) {
         setInbox((job.mail.inbox || []) as MsMail[]);
         setSent((job.mail.sent || []) as MsMail[]);
       }
       if (job.status === "running") {
         setAnalyzing(true);
+        setAnalysisFromCache(false);
         setAnalyzeNotice(
           `Analyse für ${toSwissDate(job.dayIso)} läuft im Hintergrund…`
         );
-        // Analysedatum an laufenden Job anpassen, aber Picker bleibt bedienbar
-        if (job.dayIso) setMailDay(job.dayIso);
+        if (syncDay && job.dayIso) setMailDay(job.dayIso);
         return;
       }
       if (job.status === "done" && job.analysis) {
         setAnalyzing(false);
-        if (job.dayIso) setMailDay(job.dayIso);
-        applyAnalysisPayload(job.analysis, job.dayIso);
+        if (syncDay && job.dayIso) setMailDay(job.dayIso);
+        applyAnalysisPayload(job.analysis, job.dayIso, job.finishedAt, {
+          fromCache: opts?.fromCache,
+        });
         return;
       }
       if (job.status === "error") {
         setAnalyzing(false);
+        setAnalysisFromCache(false);
         setError(job.error || "Analyse fehlgeschlagen");
         setAnalyzeNotice(null);
       }
@@ -397,7 +448,14 @@ export function MicrosoftDayClient() {
       );
       const json = await res.json();
       if (!res.ok) return json.status as string | undefined;
-      if (json.job) hydrateFromJob(json.job);
+      if (Array.isArray(json.cachedDays)) setCachedDays(json.cachedDays);
+      if (json.job) {
+        // Während/nach dem Lauf Tag nur syncen, wenn er zum gestarteten Job gehört
+        hydrateFromJob(json.job, {
+          syncDay: json.job.dayIso === mailDay || json.status === "running",
+          fromCache: false,
+        });
+      }
       if (json.status === "done" || json.status === "error" || json.status === "idle") {
         stopPoll();
         if (json.status !== "running") setAnalyzing(false);
@@ -416,24 +474,87 @@ export function MicrosoftDayClient() {
     }, 2500);
   }, [pollJobOnce, stopPoll]);
 
+  const loadAnalysisForDay = useCallback(
+    async (day: string) => {
+      try {
+        const res = await fetch(
+          `/api/microsoft/mail/analyze?date=${encodeURIComponent(day)}`
+        );
+        const json = await res.json();
+        if (!res.ok) return;
+        if (Array.isArray(json.cachedDays)) setCachedDays(json.cachedDays);
+
+        if (json.status === "running") {
+          if (json.job?.dayIso === day) {
+            hydrateFromJob(json.job, { syncDay: false });
+            startPolling();
+            return;
+          }
+          if (json.cachedJob?.analysis) {
+            hydrateFromJob(json.cachedJob, {
+              syncDay: false,
+              fromCache: true,
+            });
+            return;
+          }
+          setAnalysis(null);
+          setAnalyzeNotice(
+            `Analyse für ${toSwissDate(json.job?.dayIso || "")} läuft noch — dieser Tag hat keine gespeicherte Analyse.`
+          );
+          setAnalysisFromCache(false);
+          setPicks({ tasks: {}, events: {}, replies: {} });
+          return;
+        }
+
+        if (json.status === "done" && json.job?.analysis) {
+          hydrateFromJob(json.job, {
+            syncDay: false,
+            fromCache: Boolean(json.fromCache),
+          });
+          return;
+        }
+
+        setAnalysis(null);
+        setAnalyzeNotice(null);
+        setAnalysisFromCache(false);
+        setPicks({ tasks: {}, events: {}, replies: {} });
+      } catch {
+        /* ignore */
+      }
+    },
+    [hydrateFromJob, startPolling]
+  );
+
   useEffect(() => {
     return () => stopPoll();
   }, [stopPoll]);
 
+  // Einmalig nach Connect: letzten Job wiederherstellen — darf den Picker später
+  // nicht erneut auf job.dayIso zurücksetzen (startPolling ändert sich mit mailDay).
   useEffect(() => {
     if (!connected) return;
+    let cancelled = false;
     void (async () => {
       try {
         const res = await fetch("/api/microsoft/mail/analyze");
         const json = await res.json();
-        if (!res.ok || !json.job) return;
-        hydrateFromJob(json.job);
+        if (cancelled || !res.ok) return;
+        if (Array.isArray(json.cachedDays)) setCachedDays(json.cachedDays);
+        if (!json.job) return;
+        hydrateFromJob(json.job, {
+          syncDay: true,
+          fromCache: Boolean(json.fromCache),
+        });
         if (json.status === "running") startPolling();
       } catch {
         /* ignore */
       }
     })();
-  }, [connected, hydrateFromJob, startPolling]);
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- nur bei Connect
+  }, [connected]);
 
   function startAnalyze() {
     setError(null);
@@ -451,7 +572,8 @@ export function MicrosoftDayClient() {
         });
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || "Analyse starten fehlgeschlagen");
-        if (json.job) hydrateFromJob(json.job);
+        if (Array.isArray(json.cachedDays)) setCachedDays(json.cachedDays);
+        if (json.job) hydrateFromJob(json.job, { fromCache: false });
         startPolling();
       } catch (err) {
         setAnalyzing(false);
@@ -568,7 +690,7 @@ export function MicrosoftDayClient() {
       <PageHeader
         title="Microsoft 365"
         description="Abend-Review für Outlook-Termine und Tages-Mails (Posteingang + Gesendet)."
-        icon={Building2}
+        icon={Cloud}
         tone="blue"
       />
 
@@ -657,7 +779,7 @@ export function MicrosoftDayClient() {
                     <p className="mt-0.5 text-[11px] opacity-80">
                       Läuft serverseitig — du kannst die Seite verlassen. Bei
                       Rückkehr erscheinen die Resultate automatisch; zusätzlich
-                      kommt ein Toast wenn fertig.
+                      Toast und Push-Benachrichtigung wenn fertig.
                     </p>
                   ) : null}
                 </div>
@@ -824,11 +946,14 @@ export function MicrosoftDayClient() {
                       value={mailDay}
                       max={zurichYmdClient()}
                       onValueChange={(v) => {
-                        if (/^\d{4}-\d{2}-\d{2}$/.test(v)) setMailDay(v);
-                      }}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        if (/^\d{4}-\d{2}-\d{2}$/.test(v)) setMailDay(v);
+                        if (!/^\d{4}-\d{2}-\d{2}$/.test(v) || v === mailDay) return;
+                        setMailDay(v);
+                        setAnalysis(null);
+                        setAnalyzeNotice(null);
+                        setAnalysisFromCache(false);
+                        setPicks({ tasks: {}, events: {}, replies: {} });
+                        void loadMail(v);
+                        void loadAnalysisForDay(v);
                       }}
                     />
                     <Button
@@ -840,6 +965,11 @@ export function MicrosoftDayClient() {
                     >
                       Mails laden
                     </Button>
+                    {cachedDays.includes(mailDay) ? (
+                      <span className="text-[11px] text-muted-foreground">
+                        Analyse gespeichert
+                      </span>
+                    ) : null}
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -864,7 +994,11 @@ export function MicrosoftDayClient() {
                     <Sparkles
                       className={cn("size-3.5", analyzing && "animate-pulse")}
                     />
-                    {analyzing ? "Analyse läuft…" : "AI Tagesanalyse"}
+                    {analyzing
+                      ? "Analyse läuft…"
+                      : analysis && cachedDays.includes(mailDay)
+                        ? "Neu analysieren"
+                        : "AI Tagesanalyse"}
                   </Button>
                 </div>
               </div>
@@ -872,10 +1006,22 @@ export function MicrosoftDayClient() {
               {analysis ? (
                 <Card className="border-border/70">
                   <CardHeader>
-                    <CardTitle className="text-sm">AI · Tagesbild</CardTitle>
+                    <CardTitle className="flex flex-wrap items-center gap-2 text-sm">
+                      AI · Tagesbild
+                      {analysisFromCache ? (
+                        <Badge variant="secondary" className="text-[10px] font-normal">
+                          gespeichert
+                        </Badge>
+                      ) : null}
+                    </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <p className="text-sm leading-relaxed">{analysis.daySummary}</p>
+                    {formatTokenUsageLine(analysis.usage) ? (
+                      <p className="text-[11px] text-muted-foreground">
+                        Tokens · {formatTokenUsageLine(analysis.usage)}
+                      </p>
+                    ) : null}
 
                     {analysis.clusters.length === 0 ? (
                       <p className="text-sm text-muted-foreground">

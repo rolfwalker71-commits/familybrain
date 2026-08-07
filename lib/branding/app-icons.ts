@@ -12,6 +12,7 @@ import {
   CalendarDays,
   ChartColumnIncreasing,
   Briefcase,
+  Cloud,
   Shield,
   BookOpen,
   MessageCircle,
@@ -65,7 +66,7 @@ export const appIcons = {
   trips: { icon: Luggage, tone: "green" as const },
   summaries: { icon: Sparkles, tone: "teal" as const },
   buddyArea: { icon: Home, tone: "teal" as const },
-  microsoft: { icon: Briefcase, tone: "blue" as const },
+  microsoft: { icon: Cloud, tone: "blue" as const },
 } as const satisfies Record<string, AppIconSpec>;
 
 export type AppIconKey = keyof typeof appIcons;
