@@ -6,7 +6,7 @@ import {
 } from "@/lib/hockey/teams";
 import { ensureHockeyLogo } from "@/lib/hockey/logo";
 import {
-  getHockeyResultForUid,
+  getHockeyResultForGame,
   type HockeyGameResult,
 } from "@/lib/hockey/sofascore";
 import { AMBRI_ICS_URL } from "@/lib/calendar/ics-calendars";
@@ -154,12 +154,13 @@ export function parseHockeyGamesFromIcs(ics: string): HockeyGame[] {
     const awayTeam = teamSide(matchup.awayLabel);
     const isHome = homeTeam.key === HOME_TEAM_KEY;
     const opponent = isHome ? awayTeam : homeTeam;
+    const date = isoZurichDate(start);
 
     games.push({
       uid,
       startAt: start.toISOString(),
       endAt: end && Number.isFinite(end.getTime()) ? end.toISOString() : null,
-      date: isoZurichDate(start),
+      date,
       time: localTime(start),
       summary: summary.trim(),
       location: prop(block, "LOCATION"),
@@ -167,10 +168,70 @@ export function parseHockeyGamesFromIcs(ics: string): HockeyGame[] {
       awayTeam,
       opponent,
       isHome,
-      result: getHockeyResultForUid(uid),
+      result: getHockeyResultForGame({
+        uid,
+        date,
+        homeKey: homeTeam.key,
+        awayKey: awayTeam.key,
+      }),
     });
   }
 
+  return games.sort((a, b) => a.startAt.localeCompare(b.startAt));
+}
+
+/** Build hockey games from Google Calendar events (Ambri-style «Home - Away»). */
+export function parseHockeyGamesFromGoogleEvents(
+  events: Array<{
+    id: string;
+    summary: string;
+    date: string;
+    time: string | null;
+    location: string | null;
+    startAt?: string | null;
+  }>
+): HockeyGame[] {
+  const games: HockeyGame[] = [];
+  for (const ev of events) {
+    const matchup = parseMatchup(ev.summary);
+    if (!matchup) continue;
+    const homeTeam = teamSide(matchup.homeLabel);
+    const awayTeam = teamSide(matchup.awayLabel);
+    const isHome = homeTeam.key === HOME_TEAM_KEY;
+    const opponent = isHome ? awayTeam : homeTeam;
+    const date = ev.date.slice(0, 10);
+    const uid = ev.id || `${date}-${matchup.homeLabel}-${matchup.awayLabel}`;
+    let startAt = ev.startAt || null;
+    if (!startAt && ev.time) {
+      // Approximate Zurich local as ISO via noon fallback if needed
+      startAt = `${date}T${ev.time}:00`;
+    }
+    if (!startAt) startAt = `${date}T12:00:00`;
+    const startDate = new Date(startAt);
+    const startIso = Number.isFinite(startDate.getTime())
+      ? startDate.toISOString()
+      : new Date(`${date}T12:00:00Z`).toISOString();
+
+    games.push({
+      uid,
+      startAt: startIso,
+      endAt: null,
+      date,
+      time: ev.time,
+      summary: ev.summary.trim(),
+      location: ev.location,
+      homeTeam,
+      awayTeam,
+      opponent,
+      isHome,
+      result: getHockeyResultForGame({
+        uid,
+        date,
+        homeKey: homeTeam.key,
+        awayKey: awayTeam.key,
+      }),
+    });
+  }
   return games.sort((a, b) => a.startAt.localeCompare(b.startAt));
 }
 

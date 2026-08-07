@@ -26,6 +26,8 @@ export type HockeyGameResult = {
 export type HockeyResultsStore = {
   /** calendar game uid → result */
   byUid: Record<string, HockeyGameResult>;
+  /** date|homeKey|awayKey → result (stable across ICS vs Google) */
+  byFingerprint?: Record<string, HockeyGameResult>;
   /** last successful evening sync date (Europe/Zurich YYYY-MM-DD) */
   lastEveningSyncDate?: string | null;
 };
@@ -83,21 +85,52 @@ function recordUsage(count = 1): void {
 
 export function readHockeyResultsStore(): HockeyResultsStore {
   const raw = getSetting(SOFASCORE_RESULTS_SETTING);
-  if (!raw) return { byUid: {} };
+  if (!raw) return { byUid: {}, byFingerprint: {} };
   try {
     const parsed = JSON.parse(raw) as HockeyResultsStore;
-    return { byUid: parsed.byUid || {}, lastEveningSyncDate: parsed.lastEveningSyncDate };
+    return {
+      byUid: parsed.byUid || {},
+      byFingerprint: parsed.byFingerprint || {},
+      lastEveningSyncDate: parsed.lastEveningSyncDate,
+    };
   } catch {
-    return { byUid: {} };
+    return { byUid: {}, byFingerprint: {} };
   }
 }
 
 export function writeHockeyResultsStore(store: HockeyResultsStore): void {
-  setSetting(SOFASCORE_RESULTS_SETTING, JSON.stringify(store));
+  setSetting(
+    SOFASCORE_RESULTS_SETTING,
+    JSON.stringify({
+      byUid: store.byUid || {},
+      byFingerprint: store.byFingerprint || {},
+      lastEveningSyncDate: store.lastEveningSyncDate ?? null,
+    } satisfies HockeyResultsStore)
+  );
+}
+
+export function hockeyGameFingerprint(parts: {
+  date: string;
+  homeKey: string;
+  awayKey: string;
+}): string {
+  return `${parts.date}|${parts.homeKey}|${parts.awayKey}`;
 }
 
 export function getHockeyResultForUid(uid: string): HockeyGameResult | null {
   return readHockeyResultsStore().byUid[uid] || null;
+}
+
+export function getHockeyResultForGame(parts: {
+  uid: string;
+  date: string;
+  homeKey: string;
+  awayKey: string;
+}): HockeyGameResult | null {
+  const store = readHockeyResultsStore();
+  if (store.byUid[parts.uid]) return store.byUid[parts.uid]!;
+  const fp = hockeyGameFingerprint(parts);
+  return store.byFingerprint?.[fp] || null;
 }
 
 async function sleep(ms: number): Promise<void> {

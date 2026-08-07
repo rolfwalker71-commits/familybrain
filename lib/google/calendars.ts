@@ -10,6 +10,10 @@ import {
   hasGoogleCalendarScope,
   isGoogleMailConnected,
 } from "@/lib/google/oauth";
+import {
+  parseHockeyGamesFromGoogleEvents,
+  type HockeyGame,
+} from "@/lib/hockey/games";
 
 export type GoogleCalendarSelection = {
   id: string;
@@ -45,6 +49,8 @@ export type GoogleCalendarEvent = {
   id: string;
   date: string;
   time: string | null;
+  /** RFC3339 start when timed */
+  startAt: string | null;
   summary: string;
   location: string | null;
   isBirthday: boolean;
@@ -73,6 +79,14 @@ function guessType(summary: string | null | undefined): IcsCalendarType {
     s.includes("birthdays")
   ) {
     return "birthday";
+  }
+  if (
+    s.includes("ambri") ||
+    s.includes("hockey") ||
+    s.includes("eishockey") ||
+    s.includes("national league")
+  ) {
+    return "hockey";
   }
   if (s.includes("feiertag") || s.includes("holiday") || s.includes("ferien")) {
     return "holiday";
@@ -287,8 +301,10 @@ export async function listGoogleCalendarEventsInRange(
 
   for (const sel of enabled) {
     const meta = metaById.get(sel.id);
-    const name = meta?.name || sel.id;
+    const name = meta?.name || sel.name || sel.id;
     const type = sel.type || meta?.type || "other";
+    // Hockey calendars are rendered via Sofascore-enriched hockey cards
+    if (type === "hockey") continue;
     const color =
       sel.color ||
       meta?.color ||
@@ -340,6 +356,7 @@ export async function listGoogleCalendarEventsInRange(
             id: ev.id || `${date}-${summary}`,
             date,
             time,
+            startAt: ev.start?.dateTime || null,
             summary,
             location: ev.location?.trim() || null,
             isBirthday,
@@ -357,4 +374,115 @@ export async function listGoogleCalendarEventsInRange(
     if (c !== 0) return c;
     return (a.time || "99:99").localeCompare(b.time || "99:99");
   });
+}
+
+export type GoogleHockeyBundle = {
+  calendarId: string;
+  calendarName: string;
+  color: string;
+  games: HockeyGame[];
+};
+
+/** Enabled Google calendars with type=hockey → Ambri-style matchup games. */
+export async function listGoogleHockeyGamesInRange(
+  userId: number,
+  startIso: string,
+  endIso: string,
+  request?: Request | null
+): Promise<GoogleHockeyBundle[]> {
+  if (!isGoogleMailConnected(userId) || !hasGoogleCalendarScope(userId)) {
+    return [];
+  }
+  const enabled = getEnabledGoogleCalendarSelections(userId).filter(
+    (s) => (s.type || "other") === "hockey"
+  );
+  if (enabled.length === 0) return [];
+
+  const auth = await getAuthedGoogleClient(userId, request);
+  const calendar = google.calendar({ version: "v3", auth });
+  const listed = await listGoogleCalendarsForUser(userId, request);
+  const metaById = new Map(listed.calendars.map((c) => [c.id, c]));
+
+  const timeMin = `${startIso.slice(0, 10)}T00:00:00Z`;
+  const endExclusive = new Date(`${endIso.slice(0, 10)}T12:00:00Z`);
+  endExclusive.setUTCDate(endExclusive.getUTCDate() + 1);
+  const timeMax = `${endExclusive.toISOString().slice(0, 10)}T00:00:00Z`;
+
+  const bundles: GoogleHockeyBundle[] = [];
+
+  for (const sel of enabled) {
+    const meta = metaById.get(sel.id);
+    const name = sel.name || meta?.name || "Hockey";
+    const color =
+      sel.color ||
+      meta?.color ||
+      ICS_TYPE_META.hockey.defaultColor;
+    const rawEvents: Array<{
+      id: string;
+      summary: string;
+      date: string;
+      time: string | null;
+      location: string | null;
+      startAt?: string | null;
+    }> = [];
+
+    try {
+      let pageToken: string | undefined;
+      do {
+        const res = await calendar.events.list({
+          calendarId: sel.id,
+          singleEvents: true,
+          orderBy: "startTime",
+          timeMin,
+          timeMax,
+          timeZone: "Europe/Zurich",
+          maxResults: 250,
+          pageToken,
+        });
+        for (const ev of res.data.items || []) {
+          if (ev.status === "cancelled") continue;
+          const allDay = Boolean(ev.start?.date && !ev.start?.dateTime);
+          const date =
+            ev.start?.date?.slice(0, 10) ||
+            (ev.start?.dateTime
+              ? zurichDateFromIso(ev.start.dateTime)
+              : null);
+          if (
+            !date ||
+            date < startIso.slice(0, 10) ||
+            date > endIso.slice(0, 10)
+          ) {
+            continue;
+          }
+          const time = allDay
+            ? null
+            : ev.start?.dateTime
+              ? zurichTimeFromIso(ev.start.dateTime)
+              : null;
+          rawEvents.push({
+            id: ev.id || `${date}-${ev.summary || "game"}`,
+            summary: (ev.summary || "").trim(),
+            date,
+            time,
+            location: ev.location?.trim() || null,
+            startAt: ev.start?.dateTime || null,
+          });
+        }
+        pageToken = res.data.nextPageToken || undefined;
+      } while (pageToken);
+    } catch {
+      continue;
+    }
+
+    const games = parseHockeyGamesFromGoogleEvents(rawEvents);
+    if (games.length === 0) continue;
+    bundles.push({
+      calendarId: sel.id,
+      calendarName: name,
+      color,
+      games,
+    });
+  }
+
+  return bundles;
 }

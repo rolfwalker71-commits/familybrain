@@ -12,6 +12,7 @@ import {
   getEnabledGoogleCalendarSelections,
   googleCalendarSourceId,
   listGoogleCalendarEventsInRange,
+  listGoogleHockeyGamesInRange,
 } from "@/lib/google/calendars";
 import {
   hasGoogleCalendarScope,
@@ -289,6 +290,36 @@ export async function getCalendarAgenda(options: {
   const hockeyGames = await loadHockeyGames(
     enabledIcs.filter((c) => c.type === "hockey")
   );
+
+  if (
+    options.userId != null &&
+    isGoogleMailConnected(options.userId) &&
+    hasGoogleCalendarScope(options.userId)
+  ) {
+    try {
+      const gHockey = await listGoogleHockeyGamesInRange(
+        options.userId,
+        start,
+        end
+      );
+      for (const bundle of gHockey) {
+        const sourceId = googleCalendarSourceId(bundle.calendarId);
+        if (!sourceAllowed(sourceId, filterIds)) continue;
+        for (const game of bundle.games) {
+          hockeyGames.push({
+            ...game,
+            calendarId: sourceId,
+            calendarName: bundle.calendarName,
+            color: bundle.color,
+          });
+        }
+      }
+      hockeyGames.sort((a, b) => a.startAt.localeCompare(b.startAt));
+    } catch {
+      /* skip */
+    }
+  }
+
   for (const game of hockeyGames) {
     if (!inRange(game.date, start, end)) continue;
     if (!sourceAllowed(game.calendarId, filterIds)) continue;
@@ -494,9 +525,42 @@ export async function getOverviewHockeyBundle(
     (c) => c.type === "hockey"
   );
   const games = await loadHockeyGames(enabled);
-  const next = enabled.length > 0 ? getNextHockeyGame(games) : null;
-  const upcoming =
-    enabled.length > 0 ? getUpcomingHockeyGames(games, new Date(), 5) : [];
+
+  if (
+    userId != null &&
+    isGoogleMailConnected(userId) &&
+    hasGoogleCalendarScope(userId)
+  ) {
+    try {
+      const today = zurichIsoDate();
+      const end = addDaysIso(today, 60);
+      const gHockey = await listGoogleHockeyGamesInRange(userId, today, end);
+      for (const bundle of gHockey) {
+        for (const game of bundle.games) {
+          games.push({
+            ...game,
+            calendarId: googleCalendarSourceId(bundle.calendarId),
+            calendarName: bundle.calendarName,
+            color: bundle.color,
+          });
+        }
+      }
+      games.sort((a, b) => a.startAt.localeCompare(b.startAt));
+    } catch {
+      /* skip */
+    }
+  }
+
+  const hasAny =
+    enabled.length > 0 ||
+    (userId != null &&
+      getEnabledGoogleCalendarSelections(userId).some(
+        (s) => (s.type || "other") === "hockey"
+      ));
+  const next = hasAny ? getNextHockeyGame(games) : null;
+  const upcoming = hasAny
+    ? getUpcomingHockeyGames(games, new Date(), 5)
+    : [];
 
   return {
     calendarName:

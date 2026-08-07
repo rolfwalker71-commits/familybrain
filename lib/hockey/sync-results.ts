@@ -5,6 +5,7 @@ import {
 import { HOME_TEAM_KEY, hockeyTeamByKey } from "@/lib/hockey/teams";
 import {
   formatSofascoreScorers,
+  getHockeyResultForGame,
   getHockeyResultForUid,
   getSofascoreRemainingQuota,
   hasSofascoreApiKey,
@@ -228,6 +229,9 @@ export async function syncHockeyResultsIfDue(
       updatedAt: new Date().toISOString(),
     };
     store.byUid[game.uid] = result;
+    const fp = `${game.date}|${game.homeTeam.key}|${game.awayTeam.key}`;
+    if (!store.byFingerprint) store.byFingerprint = {};
+    store.byFingerprint[fp] = result;
     updated += 1;
   }
 
@@ -246,5 +250,13 @@ export async function syncHockeyResultsIfDue(
 export function attachHockeyResult(
   game: HockeyGame
 ): HockeyGame & { result: HockeyGameResult | null } {
-  return { ...game, result: getHockeyResultForUid(game.uid) };
+  return {
+    ...game,
+    result: getHockeyResultForGame({
+      uid: game.uid,
+      date: game.date,
+      homeKey: game.homeTeam.key,
+      awayKey: game.awayTeam.key,
+    }),
+  };
 }
