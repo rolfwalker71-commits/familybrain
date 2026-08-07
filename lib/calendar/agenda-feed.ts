@@ -31,6 +31,12 @@ import type {
   HockeyGameCard,
 } from "@/lib/dashboard/overview";
 import {
+  CALENDAR_SOURCE_INVOICES,
+  CALENDAR_SOURCE_TRAVEL,
+  listInvoiceAgendaItems,
+  listTravelAgendaItems,
+} from "@/lib/dashboard/buddy-agenda-items";
+import {
   formatHockeyScoreLine,
   getHockeyGames,
   getNextHockeyGame,
@@ -41,6 +47,10 @@ import {
 export const CALENDAR_SOURCE_HOLIDAYS = "swiss-holidays";
 export const CALENDAR_SOURCE_DEADLINES = "deadlines";
 export const CALENDAR_SOURCE_PEOPLE_BIRTHDAYS = "people-birthdays";
+export {
+  CALENDAR_SOURCE_TRAVEL,
+  CALENDAR_SOURCE_INVOICES,
+} from "@/lib/dashboard/buddy-agenda-items";
 
 function looksLikeBirthdayTitle(title: string): boolean {
   const t = title.trim();
@@ -57,7 +67,7 @@ export type CalendarSource = {
   id: string;
   name: string;
   color: string;
-  type: IcsCalendarType | "holiday" | "deadline";
+  type: IcsCalendarType | "holiday" | "deadline" | "travel" | "invoice";
   builtin?: boolean;
   /** From settings — only ICS rows use this for enablement. */
   enabled: boolean;
@@ -192,6 +202,22 @@ export function listCalendarSources(userId: number | null): CalendarSource[] {
       name: "Geburtstage (Kontakte)",
       color: "#db2777",
       type: "birthday",
+      builtin: true,
+      enabled: true,
+    },
+    {
+      id: CALENDAR_SOURCE_TRAVEL,
+      name: "Reisen",
+      color: "#0284c7",
+      type: "other",
+      builtin: true,
+      enabled: true,
+    },
+    {
+      id: CALENDAR_SOURCE_INVOICES,
+      name: "Zahlungen / Rechnungen",
+      color: "#0f766e",
+      type: "other",
       builtin: true,
       enabled: true,
     },
@@ -566,6 +592,17 @@ export async function getCalendarAgenda(options: {
         planningRelevant: true,
       });
     }
+  }
+
+  if (sourceAllowed(CALENDAR_SOURCE_TRAVEL, filterIds)) {
+    items.push(...listTravelAgendaItems(start, end));
+  }
+  if (sourceAllowed(CALENDAR_SOURCE_INVOICES, filterIds)) {
+    items.push(
+      ...listInvoiceAgendaItems(start, end, today, {
+        clampOverdueToToday: true,
+      })
+    );
   }
 
   items.sort((a, b) => {

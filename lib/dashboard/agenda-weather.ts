@@ -84,6 +84,52 @@ function looksLikeStreetAddress(location: string): boolean {
   );
 }
 
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Stadt/Ort aus CH-Adresse, z. B. «6460 Altdorf» oder «…, Altdorf, Schweiz». */
+function extractSwissCityHint(location: string): string | null {
+  const plzCity = location.match(
+    /\b\d{4}\s+([A-Za-zÀ-ÿ][\wÀ-ÿ'’.-]*(?:\s+[A-Za-zÀ-ÿ][\wÀ-ÿ'’.-]*){0,3})/
+  );
+  if (plzCity?.[1]) {
+    const city = plzCity[1].replace(/[,.].*$/, "").trim();
+    if (city.length >= 2 && !/^(ch|schweiz|switzerland|suisse)$/i.test(city)) {
+      return city;
+    }
+  }
+  const parts = location
+    .split(",")
+    .map((p) => p.trim())
+    .filter(Boolean);
+  for (let i = parts.length - 1; i >= 0; i -= 1) {
+    const p = parts[i]!;
+    if (/^(schweiz|switzerland|suisse|ch)$/i.test(p)) continue;
+    if (/^\d{4}/.test(p)) {
+      const after = p.replace(/^\d{4}\s*/, "").trim();
+      if (after.length >= 2) return after;
+      continue;
+    }
+    if (!/\d/.test(p) && p.length >= 2) return p;
+  }
+  return null;
+}
+
+/** Längster Known-Place-Alias, der als Wort in der normalisierten Adresse vorkommt. */
+function matchKnownPlaceInKey(
+  key: string
+): { lat: number; lon: number; label: string } | null {
+  const aliases = Object.entries(KNOWN_PLACES).sort(
+    (a, b) => b[0].length - a[0].length
+  );
+  for (const [alias, hit] of aliases) {
+    const re = new RegExp(`(?:^|\\s)${escapeRegExp(alias)}(?:\\s|$)`);
+    if (re.test(key)) return hit;
+  }
+  return null;
+}
+
 function shortPlaceLabel(raw: string): string {
   const t = raw.trim();
   if (t.length <= 22) return t;
@@ -124,8 +170,11 @@ export async function resolvePlaceCoords(
   const key = normalizePlaceKey(location);
   if (!key || key.length < 3) return null;
 
-  // Street addresses: prefer geocoder over coarse venue aliases.
-  if (!looksLikeStreetAddress(location)) {
+  const isStreet = looksLikeStreetAddress(location);
+
+  // Street addresses: prefer geocoder over coarse venue aliases for exact hits,
+  // but still allow city/venue tokens as fallback (e.g. «… 6460 Altdorf …»).
+  if (!isStreet) {
     for (const [alias, hit] of Object.entries(KNOWN_PLACES)) {
       if (key === alias || key.includes(alias)) {
         return { ...hit, source: "known" };
@@ -135,6 +184,18 @@ export async function resolvePlaceCoords(
     for (const [alias, hit] of Object.entries(KNOWN_PLACES)) {
       if (key === alias) {
         return { ...hit, source: "known" };
+      }
+    }
+    const cityHit = matchKnownPlaceInKey(key);
+    if (cityHit) {
+      return { ...cityHit, source: "known" };
+    }
+    const cityHint = extractSwissCityHint(location);
+    if (cityHint) {
+      const cityKey = normalizePlaceKey(cityHint);
+      const knownCity = matchKnownPlaceInKey(cityKey) || KNOWN_PLACES[cityKey];
+      if (knownCity) {
+        return { ...knownCity, source: "known" };
       }
     }
   }
@@ -154,19 +215,57 @@ export async function resolvePlaceCoords(
     ? location
     : `${location}, Schweiz`;
   const hit = await geocodePlace(query);
-  if (!hit) return null;
+  if (hit) {
+    const label = shortPlaceLabel(
+      hit.displayName.split(",")[0]?.trim() || location
+    );
+    cache[key] = {
+      lat: hit.lat,
+      lon: hit.lon,
+      label,
+      at: new Date().toISOString(),
+    };
+    writeGeoCache(cache);
+    return { lat: hit.lat, lon: hit.lon, label, source: "network" };
+  }
 
-  const label = shortPlaceLabel(
-    hit.displayName.split(",")[0]?.trim() || location
-  );
-  cache[key] = {
-    lat: hit.lat,
-    lon: hit.lon,
-    label,
-    at: new Date().toISOString(),
-  };
-  writeGeoCache(cache);
-  return { lat: hit.lat, lon: hit.lon, label, source: "network" };
+  // Geocode failed → city-level fallback (known or geocode city only)
+  const cityHint = extractSwissCityHint(location);
+  if (cityHint) {
+    const cityKey = normalizePlaceKey(cityHint);
+    const knownCity = matchKnownPlaceInKey(cityKey) || KNOWN_PLACES[cityKey];
+    if (knownCity) {
+      return { ...knownCity, source: "known" };
+    }
+    const cityCached = cache[cityKey];
+    if (cityCached) {
+      return {
+        lat: cityCached.lat,
+        lon: cityCached.lon,
+        label: cityCached.label,
+        source: "cache",
+      };
+    }
+    const cityHit = await geocodePlace(`${cityHint}, Schweiz`);
+    if (cityHit) {
+      const label = shortPlaceLabel(cityHint);
+      cache[cityKey] = {
+        lat: cityHit.lat,
+        lon: cityHit.lon,
+        label,
+        at: new Date().toISOString(),
+      };
+      writeGeoCache(cache);
+      return {
+        lat: cityHit.lat,
+        lon: cityHit.lon,
+        label,
+        source: "network",
+      };
+    }
+  }
+
+  return null;
 }
 
 function zurichIsoDate(d = new Date()): string {
