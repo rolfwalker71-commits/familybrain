@@ -68,6 +68,10 @@ function typeLabel(item: AgendaItem): string {
   return item.badge || "Termin";
 }
 
+function placeMapSrc(coords: { lat: number; lon: number }): string {
+  return `/api/dashboard/place-map?lat=${coords.lat}&lon=${coords.lon}&z=14`;
+}
+
 function DetailRow({
   label,
   children,
@@ -149,6 +153,23 @@ export function AgendaEventDialog({
                     <span>{item.location}</span>
                   </p>
                 </DetailRow>
+              ) : null}
+
+              {item.coords ? (
+                <a
+                  href={item.mapsUrl || placeMapSrc(item.coords)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block overflow-hidden rounded-lg border border-border/60"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={placeMapSrc(item.coords)}
+                    alt={`Karte: ${item.coords.label}`}
+                    className="h-36 w-full object-cover"
+                    loading="lazy"
+                  />
+                </a>
               ) : null}
 
               {item.time || duration ? (
@@ -263,7 +284,7 @@ export function AgendaEventDialog({
                   )}
                 >
                   <MapPin className="size-3.5" aria-hidden />
-                  Karte
+                  Route
                 </a>
               ) : null}
               <Link
