@@ -1,6 +1,7 @@
 import { getOpenAIClient, getOpenAIModel, hasOpenAIKey } from "@/lib/ai/client";
 import { emailDomain } from "@/lib/mail/mail-sender-prefs";
 import type { MsMailItem } from "@/lib/microsoft/mail-day";
+import { addDaysYmd } from "@/lib/microsoft/time";
 import { z } from "zod";
 
 const Ymd = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -15,6 +16,7 @@ export const MsDayTaskSuggestionSchema = z.object({
   folder: z.enum(["inbox", "sent"]).nullable().optional(),
   company: z.string().max(120).nullable().optional(),
   counterpartEmail: z.string().max(200).nullable().optional(),
+  senderInitials: z.string().max(4).nullable().optional(),
   theme: z.string().max(200).nullable().optional(),
   reason: z.string().max(400).optional(),
 });
@@ -68,7 +70,6 @@ export type MsDayEventSuggestion = z.infer<typeof MsDayEventSuggestionSchema>;
 export type MsDayReplyDraft = z.infer<typeof MsDayReplyDraftSchema>;
 export type MsDayCluster = z.infer<typeof MsDayClusterSchema>;
 export type MsDayMailAnalysis = z.infer<typeof MsDayMailAnalysisSchema> & {
-  /** Flach aus Clustern — für UI/Apply. */
   tasks: MsDayTaskSuggestion[];
   events: MsDayEventSuggestion[];
   replies: MsDayReplyDraft[];
@@ -94,7 +95,53 @@ const GENERIC_MAIL_HOSTS = new Set([
   "protonmail.com",
 ]);
 
-/** Ableitung eines Firmen-/Org-Labels aus Domain oder Anzeigenamen. */
+function stripDiacritics(s: string): string {
+  return s.normalize("NFD").replace(/\p{M}/gu, "");
+}
+
+/** Absender-Kürzel z. B. Marita Köpper → MK */
+export function senderInitials(
+  displayName?: string | null,
+  email?: string | null
+): string | null {
+  const name = (displayName || "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const parts = name
+    .split(" ")
+    .map((p) => p.replace(/[^a-zA-ZÀ-ÿ]/g, ""))
+    .filter((p) => p.length > 0 && !p.includes("@"));
+  if (parts.length >= 2) {
+    const a = stripDiacritics(parts[0]![0] || "");
+    const b = stripDiacritics(parts[parts.length - 1]![0] || "");
+    if (a && b) return (a + b).toUpperCase();
+  }
+  if (parts.length === 1 && parts[0]!.length >= 2) {
+    return stripDiacritics(parts[0]!.slice(0, 2)).toUpperCase();
+  }
+  const local = ((email || "").split("@")[0] || "").trim();
+  const segs = local.split(/[._+-]+/).filter(Boolean);
+  if (segs.length >= 2) {
+    const a = stripDiacritics(segs[0]![0] || "");
+    const b = stripDiacritics(segs[1]![0] || "");
+    if (a && b) return (a + b).toUpperCase();
+  }
+  if (local.length >= 2) return stripDiacritics(local.slice(0, 2)).toUpperCase();
+  return null;
+}
+
+/** Titel mit (XX) Absender-Kürzel am Ende. */
+export function withSenderInitials(
+  title: string,
+  initials: string | null | undefined
+): string {
+  const t = title.trim();
+  if (!initials) return t;
+  if (/\([A-ZÄÖÜ]{1,4}\)\s*$/i.test(t)) return t;
+  return `${t} (${initials})`;
+}
+
 export function guessCompanyLabel(input: {
   email?: string | null;
   displayName?: string | null;
@@ -140,11 +187,40 @@ export function counterpartForMail(m: MsMailItem): {
   };
 }
 
+/** Ursprünglicher Absender (Inbox bevorzugen). */
+export function originalSenderForCluster(mails: MsMailItem[]): {
+  name: string | null;
+  email: string | null;
+  initials: string | null;
+} {
+  const inbox = mails.find((m) => m.folder === "inbox");
+  if (inbox) {
+    return {
+      name: inbox.from,
+      email: inbox.fromEmail,
+      initials: senderInitials(inbox.from, inbox.fromEmail),
+    };
+  }
+  const sent = mails[0];
+  if (!sent) return { name: null, email: null, initials: null };
+  const email = sent.toEmails?.[0] || null;
+  const name = sent.toPreview || email;
+  return {
+    name,
+    email,
+    initials: senderInitials(name, email),
+  };
+}
+
 function formatMailBlock(m: MsMailItem, indexLabel: string): string {
   const body = (m.bodyText || m.preview || "").slice(0, 900);
   const { email, company } = counterpartForMail(m);
+  const initials = senderInitials(
+    m.folder === "inbox" ? m.from : m.toPreview,
+    m.folder === "inbox" ? m.fromEmail : m.toEmails?.[0]
+  );
   return `[${indexLabel}|${m.folder}|id=${m.id}|conv=${m.conversationId || "—"}]
-Gegenstelle: ${company || "unbekannt"}${email ? ` <${email}>` : ""}
+Gegenstelle: ${company || "unbekannt"}${email ? ` <${email}>` : ""}${initials ? ` (${initials})` : ""}
 Von: ${m.from}${m.fromEmail ? ` <${m.fromEmail}>` : ""}
 An: ${m.toPreview || "—"}
 Betreff: ${m.subject}
@@ -153,7 +229,6 @@ Text:
 ${body || "(leer)"}`;
 }
 
-/** Inbox + Sent nach conversationId bündeln (Thread), sonst Einzelmails. */
 export function packMailsForPrompt(
   inbox: MsMailItem[],
   sent: MsMailItem[],
@@ -244,7 +319,8 @@ function resolveMail(
 function enrichCluster(
   cluster: z.infer<typeof MsDayClusterSchema>,
   byId: Map<string, MsMailItem>,
-  idSet: Set<string>
+  idSet: Set<string>,
+  dayIso: string
 ): MsDayCluster {
   const mailIds = (cluster.mailIds || []).filter((id) => idSet.has(id));
   const fromMails = mailIds
@@ -263,6 +339,7 @@ function enrichCluster(
       byId
     ) ||
     null;
+  const relatedMails = fromMails.length > 0 ? fromMails : seed ? [seed] : [];
   const counterpart = seed ? counterpartForMail(seed) : null;
   const company =
     cluster.company?.trim() || counterpart?.company || "Unbekannt";
@@ -274,20 +351,32 @@ function enrichCluster(
     seed?.conversationId ||
     fromMails.find((m) => m.conversationId)?.conversationId ||
     null;
+  const sender = originalSenderForCluster(relatedMails);
+  const defaultDue = addDaysYmd(dayIso, 1);
 
   const tasks = cluster.tasks
     .filter((t) => t.title.trim())
     .map((t) => {
       const mail = resolveMail(t.sourceMailId, t.sourceSubject, byId);
       const c = mail ? counterpartForMail(mail) : null;
+      const initials =
+        t.senderInitials?.trim() ||
+        (mail ? originalSenderForCluster([mail]).initials : null) ||
+        sender.initials;
       return {
         ...t,
+        title: withSenderInitials(t.title, initials),
+        dueDate: t.dueDate || defaultDue,
         sourceMailId:
-          t.sourceMailId && idSet.has(t.sourceMailId) ? t.sourceMailId : mail?.id || null,
+          t.sourceMailId && idSet.has(t.sourceMailId)
+            ? t.sourceMailId
+            : mail?.id || null,
         sourceSubject: t.sourceSubject || mail?.subject || null,
         folder: t.folder || mail?.folder || null,
         company: t.company?.trim() || company,
-        counterpartEmail: t.counterpartEmail?.trim() || counterpartEmail || c?.email || null,
+        counterpartEmail:
+          t.counterpartEmail?.trim() || counterpartEmail || c?.email || null,
+        senderInitials: initials,
         theme,
       };
     });
@@ -302,10 +391,13 @@ function enrichCluster(
         ...e,
         allDay: e.allDay ?? !hasTime,
         sourceMailId:
-          e.sourceMailId && idSet.has(e.sourceMailId) ? e.sourceMailId : mail?.id || null,
+          e.sourceMailId && idSet.has(e.sourceMailId)
+            ? e.sourceMailId
+            : mail?.id || null,
         sourceSubject: e.sourceSubject || mail?.subject || null,
         company: e.company?.trim() || company,
-        counterpartEmail: e.counterpartEmail?.trim() || counterpartEmail || c?.email || null,
+        counterpartEmail:
+          e.counterpartEmail?.trim() || counterpartEmail || c?.email || null,
         theme,
       };
     });
@@ -319,11 +411,7 @@ function enrichCluster(
         fromMails[0] ||
         null;
       const c = mail ? counterpartForMail(mail) : null;
-      const to =
-        r.to.trim() ||
-        counterpartEmail ||
-        c?.email ||
-        "";
+      const to = r.to.trim() || counterpartEmail || c?.email || "";
       return {
         ...r,
         to,
@@ -406,22 +494,22 @@ export async function analyzeMicrosoftMailDay(input: {
   }
 
   const packed = packMailsForPrompt(input.inbox, input.sent);
+  const defaultDue = addDaysYmd(input.todayIso, 1);
 
-  const system = `Du bist Buddy, Haushalt-/Büro-Assistent (Schweiz, Deutsch, Europe/Zurich).
-Analysiere die Mails des Tages (Posteingang + Gesendet).
+  const system = `Du bist Buddy, Büro-Assistent (Schweiz, Europe/Zurich).
+Analysiere die Mails des gewählten Tages (Posteingang + Gesendet).
 
 Ablauf:
-1) Gruppiere nach Kunde/Firma (Gegenstelle) und Thema/Thread. Gleiche conv=… = derselbe Thread (Eingang+Gesendet zusammen, nicht doppelt).
-2) Pro Cluster: kurze Zusammenfassung was gelaufen ist und was offen ist.
-3) Leite NUR sinnvolle nächste Schritte ab:
-   - tasks: Handlung für dich (prüfen, einrichten, nachfassen)
-   - events: Kalendertermine NUR wenn Datum/Zeit klar (Meeting, Deadline-Block, Call)
-   - replies: Antwort-Entwurf NUR wenn eine kurze Mail sinnvoll ist (Zusage, Rückfrage, Status). body auf Deutsch, höflich, knapp.
-Newsletter/Werbung weglassen. Keine erfundenen Fakten. Antworte NUR als JSON.
+1) Gruppiere nach Kunde/Firma und Thema/Thread. Gleiche conv=… = derselbe Thread.
+2) Pro Cluster: kurze Zusammenfassung.
+3) Nächste Schritte:
+   - tasks: IMMER wenn Handlung nötig ist (auch wenn du eine Antwort vorschlägst). Titel handlungsnah, am Ende Absender-Kürzel in Klammern z. B. «Zugänge einrichten (NR)». dueDate Default ${defaultDue} (Folgetag) wenn keine Frist genannt.
+   - events: nur bei klarem Datum/Zeit.
+   - replies: nur wenn Antwort sinnvoll. WICHTIG: Sprache der Antwort = Sprache der ursprünglichen Kunden-Anfrage (Englisch→Englisch mit Re:, Deutsch→Deutsch mit AW:). Nie auf Deutsch antworten wenn die Anfrage Englisch war.
+Newsletter/Werbung weglassen. Keine erfundenen Fakten. NUR JSON.`;
 
-Sortiere clusters mental nach: erst offene Kunden, dann Firma A–Z, dann Thema.`;
-
-  const user = `Heute: ${input.todayIso}
+  const user = `Analysetag: ${input.todayIso}
+Default dueDate für Tasks ohne Frist: ${defaultDue}
 
 ${packed}
 
@@ -434,19 +522,20 @@ JSON-Schema:
       "counterpartEmail": "name@firma.ch"|null,
       "theme": "kurzes Thema",
       "conversationId": "conv-id oder null",
-      "summary": "Was ist der Stand in diesem Thread?",
-      "mailIds": ["id", "…"],
+      "summary": "Stand im Thread",
+      "mailIds": ["id"],
       "status": "open"|"waiting"|"done"|"fyi",
       "tasks": [
         {
-          "title": "…",
+          "title": "Handlung (XX)",
           "notes": "…"|null,
-          "dueDate": "YYYY-MM-DD"|null,
+          "dueDate": "${defaultDue}"|null,
           "sourceMailId": "id"|null,
           "sourceSubject": "Betreff"|null,
           "folder": "inbox"|"sent"|null,
           "company": "Firma"|null,
           "counterpartEmail": "…"|null,
+          "senderInitials": "XX"|null,
           "reason": "…"
         }
       ],
@@ -469,9 +558,9 @@ JSON-Schema:
       "replies": [
         {
           "to": "name@firma.ch",
-          "subject": "AW: …",
-          "body": "kurze Antwort",
-          "sourceMailId": "id der Inbox-Mail"|null,
+          "subject": "Re: … oder AW: …",
+          "body": "Antwort in der Sprache der Anfrage",
+          "sourceMailId": "id"|null,
           "company": "…"|null,
           "reason": "…"
         }
@@ -510,8 +599,15 @@ JSON-Schema:
 
   const clusters = sortClusters(
     result.data.clusters
-      .map((c) => enrichCluster(c, byId, idSet))
-      .filter((c) => c.theme || c.summary || c.tasks.length || c.events.length || c.replies.length)
+      .map((c) => enrichCluster(c, byId, idSet, input.todayIso))
+      .filter(
+        (c) =>
+          c.theme ||
+          c.summary ||
+          c.tasks.length ||
+          c.events.length ||
+          c.replies.length
+      )
   );
 
   return flattenAnalysis(clusters, result.data.daySummary.trim());

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Building2,
@@ -13,10 +13,36 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { PageHeader } from "@/components/layout/page-primitives";
 import { cn } from "@/lib/utils";
 import { APP_ICON_STROKE } from "@/lib/branding/app-icons";
 import { toSwissDate } from "@/lib/utils/dates";
+
+function zurichYmdClient(d = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Zurich",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
+}
+
+function addDaysYmdClient(ymd: string, days: number): string {
+  const d = new Date(`${ymd}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
 
 type Tab = "calendar" | "mail";
 
@@ -57,6 +83,7 @@ type DayTask = {
   folder?: "inbox" | "sent" | null;
   company?: string | null;
   counterpartEmail?: string | null;
+  senderInitials?: string | null;
   theme?: string | null;
   reason?: string;
 };
@@ -135,8 +162,10 @@ export function MicrosoftDayClient() {
 
   const [inbox, setInbox] = useState<MsMail[]>([]);
   const [sent, setSent] = useState<MsMail[]>([]);
+  const [mailDay, setMailDay] = useState(() => zurichYmdClient());
   const [mailLoading, setMailLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
+  const [analyzeNotice, setAnalyzeNotice] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<DayAnalysis | null>(null);
   const [picks, setPicks] = useState<PickState>({
     tasks: {},
@@ -144,6 +173,11 @@ export function MicrosoftDayClient() {
     replies: {},
   });
   const [applying, setApplying] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [draftTasks, setDraftTasks] = useState<DayTask[]>([]);
+  const [draftEvents, setDraftEvents] = useState<DayEventSug[]>([]);
+  const [draftReplies, setDraftReplies] = useState<DayReply[]>([]);
+  const analyzeGen = useRef(0);
 
   const loadConnection = useCallback(async () => {
     try {
@@ -173,21 +207,25 @@ export function MicrosoftDayClient() {
     }
   }, []);
 
-  const loadMail = useCallback(async () => {
+  const loadMail = useCallback(async (day?: string) => {
+    const target = day || mailDay;
     setMailLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/microsoft/mail/today");
+      const res = await fetch(
+        `/api/microsoft/mail/today?date=${encodeURIComponent(target)}`
+      );
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Mails laden fehlgeschlagen");
       setInbox((json.inbox || []) as MsMail[]);
       setSent((json.sent || []) as MsMail[]);
+      if (json.dayIso) setMailDay(json.dayIso);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setMailLoading(false);
     }
-  }, []);
+  }, [mailDay]);
 
   useEffect(() => {
     void loadConnection();
@@ -196,9 +234,10 @@ export function MicrosoftDayClient() {
   useEffect(() => {
     if (connected) {
       void loadCalendar();
-      void loadMail();
+      void loadMail(mailDay);
     }
-  }, [connected, loadCalendar, loadMail]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- initial load when connected
+  }, [connected]);
 
   const openEvents = useMemo(
     () => events.filter((e) => !e.done),
@@ -283,69 +322,127 @@ export function MicrosoftDayClient() {
     }
   }
 
-  async function runAnalyze() {
+  function startAnalyze() {
+    const gen = ++analyzeGen.current;
     setAnalyzing(true);
     setError(null);
     setStatus(null);
-    try {
-      const res = await fetch("/api/microsoft/mail/analyze", { method: "POST" });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Analyse fehlgeschlagen");
-      if (json.mail) {
-        setInbox((json.mail.inbox || []) as MsMail[]);
-        setSent((json.mail.sent || []) as MsMail[]);
+    setAnalyzeNotice(
+      `Analyse für ${toSwissDate(mailDay)} läuft im Hintergrund…`
+    );
+    void (async () => {
+      try {
+        const res = await fetch("/api/microsoft/mail/analyze", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ date: mailDay }),
+        });
+        const json = await res.json();
+        if (gen !== analyzeGen.current) return;
+        if (!res.ok) throw new Error(json.error || "Analyse fehlgeschlagen");
+        if (json.mail) {
+          setInbox((json.mail.inbox || []) as MsMail[]);
+          setSent((json.mail.sent || []) as MsMail[]);
+          if (json.mail.dayIso) setMailDay(json.mail.dayIso);
+        }
+        const a = json.analysis as DayAnalysis;
+        setAnalysis({
+          daySummary: a.daySummary || "",
+          clusters: a.clusters || [],
+          tasks: a.tasks || [],
+          events: a.events || [],
+          replies: a.replies || [],
+        });
+        const next: PickState = { tasks: {}, events: {}, replies: {} };
+        (a.tasks || []).forEach((_, i) => {
+          next.tasks[i] = true;
+        });
+        (a.events || []).forEach((_, i) => {
+          next.events[i] = true;
+        });
+        (a.replies || []).forEach((_, i) => {
+          next.replies[i] = false;
+        });
+        setPicks(next);
+        setAnalyzeNotice(
+          `Analyse fertig (${toSwissDate(mailDay)}): ${(a.clusters || []).length} Cluster, ${(a.tasks || []).length} Aufgabe(n).`
+        );
+        setStatus(null);
+        setTab("mail");
+      } catch (err) {
+        if (gen !== analyzeGen.current) return;
+        setError(err instanceof Error ? err.message : String(err));
+        setAnalyzeNotice(null);
+      } finally {
+        if (gen === analyzeGen.current) setAnalyzing(false);
       }
-      const a = json.analysis as DayAnalysis;
-      setAnalysis({
-        daySummary: a.daySummary || "",
-        clusters: a.clusters || [],
-        tasks: a.tasks || [],
-        events: a.events || [],
-        replies: a.replies || [],
-      });
-      const next: PickState = { tasks: {}, events: {}, replies: {} };
-      (a.tasks || []).forEach((_, i) => {
-        next.tasks[i] = true;
-      });
-      (a.events || []).forEach((_, i) => {
-        next.events[i] = true;
-      });
-      (a.replies || []).forEach((_, i) => {
-        next.replies[i] = false;
-      });
-      setPicks(next);
-      setStatus("Tagesanalyse fertig.");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setAnalyzing(false);
-    }
+    })();
   }
 
-  async function applySelected() {
+  function openConfirm() {
     if (!analysis) return;
     const tasks = analysis.tasks.filter((_, i) => picks.tasks[i]);
     const eventsSel = analysis.events.filter((_, i) => picks.events[i]);
     const replies = analysis.replies.filter((_, i) => picks.replies[i]);
     if (tasks.length + eventsSel.length + replies.length === 0) return;
+    const tomorrow = addDaysYmdClient(zurichYmdClient(), 1);
+    setDraftTasks(
+      tasks.map((t) => ({
+        ...t,
+        dueDate: t.dueDate || tomorrow,
+      }))
+    );
+    setDraftEvents(eventsSel.map((e) => ({ ...e })));
+    setDraftReplies(replies.map((r) => ({ ...r })));
+    setConfirmOpen(true);
+  }
+
+  async function applyConfirmed() {
+    if (
+      draftTasks.length + draftEvents.length + draftReplies.length ===
+      0
+    ) {
+      return;
+    }
     setApplying(true);
     setError(null);
     try {
       const res = await fetch("/api/microsoft/mail/apply", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tasks, events: eventsSel, replies }),
+        body: JSON.stringify({
+          tasks: draftTasks,
+          events: draftEvents,
+          replies: draftReplies,
+        }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Übernehmen fehlgeschlagen");
+      if (json.failCount > 0 && json.okCount === 0) {
+        throw new Error(
+          (json.errors || []).join(" · ") || "Übernehmen fehlgeschlagen"
+        );
+      }
       const parts = [
-        json.taskOk
-          ? `${json.taskOk} Aufgabe(n) → ${json.preferGoogleTasks ? "Google Tasks" : "Buddy-Notiz"}`
-          : null,
+        json.taskOk ? `${json.taskOk} Aufgabe(n) → Outlook To Do` : null,
         json.eventOk ? `${json.eventOk} Termin(e) → Outlook` : null,
         json.replyOk ? `${json.replyOk} Entwurf(e) → Outlook` : null,
       ].filter(Boolean);
-      setStatus(parts.join(" · ") || `${json.okCount} übernommen`);
+      setStatus(
+        [
+          parts.join(" · ") || `${json.okCount} übernommen`,
+          json.failCount
+            ? `(${json.failCount} fehlgeschlagen: ${(json.errors || []).join("; ")})`
+            : null,
+        ]
+          .filter(Boolean)
+          .join(" ")
+      );
+      setPicks({ tasks: {}, events: {}, replies: {} });
+      setConfirmOpen(false);
+      setDraftTasks([]);
+      setDraftEvents([]);
+      setDraftReplies([]);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -365,19 +462,22 @@ export function MicrosoftDayClient() {
   function flatTaskIndex(clusterIdx: number, localIdx: number): number {
     if (!analysis) return -1;
     let n = 0;
-    for (let c = 0; c < clusterIdx; c++) n += analysis.clusters[c]?.tasks.length || 0;
+    for (let c = 0; c < clusterIdx; c++)
+      n += analysis.clusters[c]?.tasks.length || 0;
     return n + localIdx;
   }
   function flatEventIndex(clusterIdx: number, localIdx: number): number {
     if (!analysis) return -1;
     let n = 0;
-    for (let c = 0; c < clusterIdx; c++) n += analysis.clusters[c]?.events.length || 0;
+    for (let c = 0; c < clusterIdx; c++)
+      n += analysis.clusters[c]?.events.length || 0;
     return n + localIdx;
   }
   function flatReplyIndex(clusterIdx: number, localIdx: number): number {
     if (!analysis) return -1;
     let n = 0;
-    for (let c = 0; c < clusterIdx; c++) n += analysis.clusters[c]?.replies.length || 0;
+    for (let c = 0; c < clusterIdx; c++)
+      n += analysis.clusters[c]?.replies.length || 0;
     return n + localIdx;
   }
 
@@ -457,6 +557,31 @@ export function MicrosoftDayClient() {
             <p className="text-sm text-destructive" role="alert">
               {error}
             </p>
+          ) : null}
+          {analyzeNotice ? (
+            <div
+              className={cn(
+                "rounded-lg border px-3 py-2 text-sm",
+                analyzing
+                  ? "border-sky-200 bg-sky-50 text-sky-950"
+                  : "border-emerald-200 bg-emerald-50 text-emerald-900"
+              )}
+              role="status"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p>{analyzeNotice}</p>
+                {!analyzing ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setAnalyzeNotice(null)}
+                  >
+                    Schliessen
+                  </Button>
+                ) : null}
+              </div>
+            </div>
           ) : null}
           {status ? (
             <p className="text-sm text-emerald-700" role="status">
@@ -591,17 +716,41 @@ export function MicrosoftDayClient() {
             </section>
           ) : (
             <section className="space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h2 className="text-[15px] font-semibold">
-                  Heute · {inbox.length} Posteingang · {sent.length} Gesendet
-                </h2>
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <div className="space-y-1.5">
+                  <h2 className="text-[15px] font-semibold">
+                    {toSwissDate(mailDay)} · {inbox.length} Posteingang ·{" "}
+                    {sent.length} Gesendet
+                  </h2>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Label htmlFor="ms-mail-day" className="text-xs text-muted-foreground">
+                      Analysedatum
+                    </Label>
+                    <Input
+                      id="ms-mail-day"
+                      type="date"
+                      className="h-8 w-auto"
+                      value={mailDay}
+                      onChange={(e) => setMailDay(e.target.value)}
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={mailLoading}
+                      onClick={() => void loadMail(mailDay)}
+                    >
+                      Mails laden
+                    </Button>
+                  </div>
+                </div>
                 <div className="flex flex-wrap gap-2">
                   <Button
                     type="button"
                     size="sm"
                     variant="outline"
                     disabled={mailLoading}
-                    onClick={() => void loadMail()}
+                    onClick={() => void loadMail(mailDay)}
                   >
                     <RefreshCw
                       className={cn("size-3.5", mailLoading && "animate-spin")}
@@ -611,13 +760,13 @@ export function MicrosoftDayClient() {
                   <Button
                     type="button"
                     size="sm"
-                    disabled={analyzing || (inbox.length === 0 && sent.length === 0)}
-                    onClick={() => void runAnalyze()}
+                    disabled={analyzing}
+                    onClick={() => startAnalyze()}
                   >
                     <Sparkles
                       className={cn("size-3.5", analyzing && "animate-pulse")}
                     />
-                    {analyzing ? "Analysiere…" : "AI Tagesanalyse"}
+                    {analyzing ? "Analyse läuft…" : "AI Tagesanalyse"}
                   </Button>
                 </div>
               </div>
@@ -868,15 +1017,14 @@ export function MicrosoftDayClient() {
                           type="button"
                           size="sm"
                           disabled={applying || selectedCount === 0}
-                          onClick={() => void applySelected()}
+                          onClick={() => openConfirm()}
                         >
-                          {applying
-                            ? "Speichere…"
-                            : `Ausgewählte übernehmen (${selectedCount})`}
+                          {`Ausgewählte prüfen (${selectedCount})`}
                         </Button>
                         <p className="text-[11px] text-muted-foreground">
-                          Aufgaben → Google Tasks (falls verbunden) oder Buddy-Notiz.
-                          Termine & Antwort-Entwürfe → Outlook.
+                          Alles über Outlook: Aufgaben → To Do, Termine →
+                          Kalender, Antworten → Entwürfe. Vor dem Anlegen kannst
+                          du Texte noch anpassen.
                         </p>
                       </div>
                     ) : null}
@@ -890,12 +1038,213 @@ export function MicrosoftDayClient() {
         <p className="text-sm text-muted-foreground">Lade…</p>
       ) : null}
 
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent className="flex max-h-[90dvh] w-[min(96vw,36rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-xl">
+          <DialogHeader className="border-b border-border/60 px-4 py-3">
+            <DialogTitle>Übernehmen bestätigen</DialogTitle>
+            <DialogDescription>
+              Texte und Daten bei Bedarf anpassen, dann in Outlook anlegen.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-3">
+            {draftTasks.map((t, i) => (
+              <div key={`dt-${i}`} className="space-y-2 rounded-lg border border-border/60 p-3">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Aufgabe · Outlook To Do
+                </p>
+                <div className="space-y-1">
+                  <Label>Titel</Label>
+                  <Input
+                    value={t.title}
+                    onChange={(e) =>
+                      setDraftTasks((prev) =>
+                        prev.map((x, j) =>
+                          j === i ? { ...x, title: e.target.value } : x
+                        )
+                      )
+                    }
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Fällig</Label>
+                  <Input
+                    type="date"
+                    value={t.dueDate || ""}
+                    onChange={(e) =>
+                      setDraftTasks((prev) =>
+                        prev.map((x, j) =>
+                          j === i
+                            ? { ...x, dueDate: e.target.value || null }
+                            : x
+                        )
+                      )
+                    }
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Notizen</Label>
+                  <Textarea
+                    rows={3}
+                    value={t.notes || ""}
+                    onChange={(e) =>
+                      setDraftTasks((prev) =>
+                        prev.map((x, j) =>
+                          j === i ? { ...x, notes: e.target.value } : x
+                        )
+                      )
+                    }
+                  />
+                </div>
+              </div>
+            ))}
+            {draftEvents.map((ev, i) => (
+              <div key={`de-${i}`} className="space-y-2 rounded-lg border border-border/60 p-3">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Termin · Outlook Kalender
+                </p>
+                <div className="space-y-1">
+                  <Label>Titel</Label>
+                  <Input
+                    value={ev.title}
+                    onChange={(e) =>
+                      setDraftEvents((prev) =>
+                        prev.map((x, j) =>
+                          j === i ? { ...x, title: e.target.value } : x
+                        )
+                      )
+                    }
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label>Datum</Label>
+                    <Input
+                      type="date"
+                      value={ev.date}
+                      onChange={(e) =>
+                        setDraftEvents((prev) =>
+                          prev.map((x, j) =>
+                            j === i ? { ...x, date: e.target.value } : x
+                          )
+                        )
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Start</Label>
+                    <Input
+                      type="time"
+                      value={ev.startTime || ""}
+                      onChange={(e) =>
+                        setDraftEvents((prev) =>
+                          prev.map((x, j) =>
+                            j === i
+                              ? {
+                                  ...x,
+                                  startTime: e.target.value || null,
+                                  allDay: !e.target.value,
+                                }
+                              : x
+                          )
+                        )
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label>Notizen</Label>
+                  <Textarea
+                    rows={2}
+                    value={ev.notes || ""}
+                    onChange={(e) =>
+                      setDraftEvents((prev) =>
+                        prev.map((x, j) =>
+                          j === i ? { ...x, notes: e.target.value } : x
+                        )
+                      )
+                    }
+                  />
+                </div>
+              </div>
+            ))}
+            {draftReplies.map((r, i) => (
+              <div key={`dr-${i}`} className="space-y-2 rounded-lg border border-border/60 p-3">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Antwort · Outlook Entwurf
+                </p>
+                <div className="space-y-1">
+                  <Label>An</Label>
+                  <Input
+                    value={r.to}
+                    onChange={(e) =>
+                      setDraftReplies((prev) =>
+                        prev.map((x, j) =>
+                          j === i ? { ...x, to: e.target.value } : x
+                        )
+                      )
+                    }
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Betreff</Label>
+                  <Input
+                    value={r.subject}
+                    onChange={(e) =>
+                      setDraftReplies((prev) =>
+                        prev.map((x, j) =>
+                          j === i ? { ...x, subject: e.target.value } : x
+                        )
+                      )
+                    }
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Text</Label>
+                  <Textarea
+                    rows={5}
+                    value={r.body}
+                    onChange={(e) =>
+                      setDraftReplies((prev) =>
+                        prev.map((x, j) =>
+                          j === i ? { ...x, body: e.target.value } : x
+                        )
+                      )
+                    }
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+          <DialogFooter className="border-t border-border/60 px-4 py-3">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setConfirmOpen(false)}
+              disabled={applying}
+            >
+              Abbrechen
+            </Button>
+            <Button
+              type="button"
+              disabled={
+                applying ||
+                draftTasks.length + draftEvents.length + draftReplies.length ===
+                  0
+              }
+              onClick={() => void applyConfirmed()}
+            >
+              {applying ? "Lege an…" : "In Outlook anlegen"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <p className="text-[12px] text-muted-foreground">
         OAuth und Status unter{" "}
         <Link href="/account" className="underline underline-offset-2">
           Konto
         </Link>
-        .
+        . Für Aufgaben ggf. Microsoft 365 neu verbinden (To Do / Tasks.ReadWrite).
       </p>
     </div>
   );

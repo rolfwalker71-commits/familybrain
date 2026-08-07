@@ -196,12 +196,13 @@ export function SettingsMicrosoftConnectPanel() {
                 {!data.hasCalendarScope || !data.hasMailScope ? (
                   <p className="text-xs text-amber-800">
                     Scopes unvollständig — bitte neu verbinden (Mail +
-                    Kalender).
+                    Kalender + Tasks).
                   </p>
                 ) : (
                   <p className="text-xs text-muted-foreground">
                     Mail und Kalender aktiv
-                    {data.hasMailSendScope ? " (inkl. Senden)" : ""}.
+                    {data.hasMailSendScope ? " (inkl. Senden)" : ""}. Für
+                    To‑Do-Aufgaben ggf. neu verbinden (Tasks.ReadWrite).
                   </p>
                 )}
                 {probe?.ok ? (

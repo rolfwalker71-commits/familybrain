@@ -21,6 +21,7 @@ export const MICROSOFT_OAUTH_SCOPES = [
   "Mail.ReadWrite",
   "Mail.Send",
   "Calendars.ReadWrite",
+  "Tasks.ReadWrite",
 ] as const;
 
 export type MicrosoftUserTokens = {
@@ -166,6 +167,16 @@ export function hasMicrosoftCalendarScope(userId: number | null): boolean {
     s.has("Calendars.Read") ||
     s.has("https://graph.microsoft.com/Calendars.ReadWrite") ||
     s.has("https://graph.microsoft.com/Calendars.Read")
+  );
+}
+
+export function hasMicrosoftTasksScope(userId: number | null): boolean {
+  const s = scopeSet(userId);
+  return (
+    s.has("Tasks.ReadWrite") ||
+    s.has("Tasks.Read") ||
+    s.has("https://graph.microsoft.com/Tasks.ReadWrite") ||
+    s.has("https://graph.microsoft.com/Tasks.Read")
   );
 }
 

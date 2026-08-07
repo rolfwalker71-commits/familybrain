@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { isAuthError, requireAuth } from "@/lib/auth/current-user";
 import { ensureInitialized } from "@/lib/db/migrations";
 import {
   analyzeMicrosoftMailDay,
   emptyMailDayAnalysis,
 } from "@/lib/microsoft/analyze-mail-day";
-import { listMicrosoftMailToday } from "@/lib/microsoft/mail-day";
+import { listMicrosoftMailForDay } from "@/lib/microsoft/mail-day";
+import { zurichYmd } from "@/lib/microsoft/time";
 import {
   isMicrosoftConnected,
   resolveMicrosoftUserId,
@@ -14,7 +16,15 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function POST() {
+const BodySchema = z.object({
+  date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional()
+    .nullable(),
+});
+
+export async function POST(request: Request) {
   ensureInitialized();
   const auth = await requireAuth();
   if (isAuthError(auth)) return auth;
@@ -25,19 +35,36 @@ export async function POST() {
       { status: 400 }
     );
   }
+  let day = zurichYmd();
   try {
-    const mail = await listMicrosoftMailToday(userId);
+    const raw = await request.json().catch(() => ({}));
+    const parsed = BodySchema.safeParse(raw);
+    if (parsed.success && parsed.data.date) day = parsed.data.date;
+  } catch {
+    // empty body ok
+  }
+
+  try {
+    const mail = await listMicrosoftMailForDay(userId, day);
     if (mail.inbox.length === 0 && mail.sent.length === 0) {
       return NextResponse.json({
         ok: true,
-        mail,
+        mail: { ...mail, todayIso: mail.dayIso },
         analysis: emptyMailDayAnalysis(
-          "Keine Outlook-Mails für heute gefunden."
+          `Keine Outlook-Mails für ${day} gefunden.`
         ),
       });
     }
-    const analysis = await analyzeMicrosoftMailDay(mail);
-    return NextResponse.json({ ok: true, mail, analysis });
+    const analysis = await analyzeMicrosoftMailDay({
+      todayIso: mail.dayIso,
+      inbox: mail.inbox,
+      sent: mail.sent,
+    });
+    return NextResponse.json({
+      ok: true,
+      mail: { ...mail, todayIso: mail.dayIso },
+      analysis,
+    });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : String(error) },

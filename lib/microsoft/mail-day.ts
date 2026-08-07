@@ -1,5 +1,5 @@
 import { graphJson } from "@/lib/microsoft/graph";
-import { dayWindowLocal, zurichYmd } from "@/lib/microsoft/time";
+import { addDaysYmd, dayWindowLocal, zurichYmd } from "@/lib/microsoft/time";
 
 export type MsMailFolder = "inbox" | "sent";
 
@@ -10,7 +10,6 @@ export type MsMailItem = {
   from: string;
   fromEmail: string | null;
   toPreview: string | null;
-  /** Empfänger-Adressen (für Firmen-Kontext bei Gesendet). */
   toEmails: string[];
   receivedOrSentAt: string | null;
   preview: string;
@@ -93,20 +92,24 @@ function mapMessage(m: GraphMessage, folder: MsMailFolder): MsMailItem | null {
   };
 }
 
-async function listFolderToday(
+function isYmd(value: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+async function listFolderForDay(
   userId: number,
   folder: MsMailFolder,
+  dayIso: string,
   limit: number
 ): Promise<MsMailItem[]> {
-  const today = zurichYmd();
-  const { start } = dayWindowLocal(today);
-  // Graph filter uses UTC ISO; approximate with Zurich midnight as local then Z-ish
+  const ymd = isYmd(dayIso) ? dayIso : zurichYmd();
+  const { start } = dayWindowLocal(ymd);
+  const next = addDaysYmd(ymd, 1);
   const filterField =
     folder === "sent" ? "sentDateTime" : "receivedDateTime";
-  const folderPath =
-    folder === "sent" ? "sentitems" : "inbox";
+  const folderPath = folder === "sent" ? "sentitems" : "inbox";
   const qs = new URLSearchParams({
-    $filter: `${filterField} ge ${start}`,
+    $filter: `${filterField} ge ${start} and ${filterField} lt ${next}T00:00:00`,
     $orderby: `${filterField} desc`,
     $top: String(limit),
     $select:
@@ -126,10 +129,9 @@ async function listFolderToday(
       .map((m) => mapMessage(m, folder))
       .filter((m): m is MsMailItem => Boolean(m));
   } catch {
-    // Fallback without filter (some tenants choke on ge with local format)
     const qs2 = new URLSearchParams({
       $orderby: `${filterField} desc`,
-      $top: String(Math.min(limit * 2, 40)),
+      $top: String(Math.min(limit * 3, 60)),
       $select:
         "id,subject,bodyPreview,body,from,toRecipients,receivedDateTime,sentDateTime,conversationId,webLink,isRead",
     });
@@ -142,20 +144,32 @@ async function listFolderToday(
       .map((m) => mapMessage(m, folder))
       .filter((m): m is MsMailItem => Boolean(m));
     return items
-      .filter((m) => (m.receivedOrSentAt || "").slice(0, 10) === today)
+      .filter((m) => (m.receivedOrSentAt || "").slice(0, 10) === ymd)
       .slice(0, limit);
   }
 }
 
+/** Mails für einen Kalendertag (Europe/Zurich), Default: heute. */
+export async function listMicrosoftMailForDay(
+  userId: number,
+  dayIso?: string | null,
+  options?: { inboxLimit?: number; sentLimit?: number }
+): Promise<{ inbox: MsMailItem[]; sent: MsMailItem[]; dayIso: string }> {
+  const day = dayIso && isYmd(dayIso) ? dayIso : zurichYmd();
+  const inboxLimit = options?.inboxLimit ?? 25;
+  const sentLimit = options?.sentLimit ?? 15;
+  const [inbox, sent] = await Promise.all([
+    listFolderForDay(userId, "inbox", day, inboxLimit),
+    listFolderForDay(userId, "sent", day, sentLimit),
+  ]);
+  return { inbox, sent, dayIso: day };
+}
+
+/** @deprecated use listMicrosoftMailForDay */
 export async function listMicrosoftMailToday(
   userId: number,
   options?: { inboxLimit?: number; sentLimit?: number }
 ): Promise<{ inbox: MsMailItem[]; sent: MsMailItem[]; todayIso: string }> {
-  const inboxLimit = options?.inboxLimit ?? 25;
-  const sentLimit = options?.sentLimit ?? 15;
-  const [inbox, sent] = await Promise.all([
-    listFolderToday(userId, "inbox", inboxLimit),
-    listFolderToday(userId, "sent", sentLimit),
-  ]);
-  return { inbox, sent, todayIso: zurichYmd() };
+  const data = await listMicrosoftMailForDay(userId, null, options);
+  return { inbox: data.inbox, sent: data.sent, todayIso: data.dayIso };
 }

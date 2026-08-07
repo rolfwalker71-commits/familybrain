@@ -3,13 +3,6 @@ import { z } from "zod";
 import { isAuthError, requireAuth } from "@/lib/auth/current-user";
 import { ensureInitialized } from "@/lib/db/migrations";
 import {
-  hasGoogleTasksScope,
-  isGoogleMailConnected,
-  resolveGoogleUserId,
-} from "@/lib/google/oauth";
-import { createGoogleTask } from "@/lib/google/tasks";
-import { createReferenceNote } from "@/lib/mail/reference-notes";
-import {
   MsDayEventSuggestionSchema,
   MsDayReplyDraftSchema,
   MsDayTaskSuggestionSchema,
@@ -17,8 +10,10 @@ import {
 import {
   createOutlookCalendarEvent,
   createOutlookMailDraft,
+  createOutlookTodoTask,
 } from "@/lib/microsoft/mail-day-actions";
 import {
+  hasMicrosoftTasksScope,
   isMicrosoftConnected,
   resolveMicrosoftUserId,
 } from "@/lib/microsoft/oauth";
@@ -30,7 +25,6 @@ const BodySchema = z.object({
   tasks: z.array(MsDayTaskSuggestionSchema).max(12).optional().default([]),
   events: z.array(MsDayEventSuggestionSchema).max(8).optional().default([]),
   replies: z.array(MsDayReplyDraftSchema).max(8).optional().default([]),
-  tasklistId: z.string().optional().nullable(),
 });
 
 export async function POST(request: Request) {
@@ -68,11 +62,15 @@ export async function POST(request: Request) {
     );
   }
 
-  const googleUserId = resolveGoogleUserId(auth);
-  const useGoogle =
-    googleUserId != null &&
-    isGoogleMailConnected(googleUserId) &&
-    hasGoogleTasksScope(googleUserId);
+  if (body.tasks.length > 0 && !hasMicrosoftTasksScope(msUserId)) {
+    return NextResponse.json(
+      {
+        error:
+          "Microsoft To Do-Recht fehlt. Bitte unter Konto Microsoft 365 neu verbinden (Tasks.ReadWrite).",
+      },
+      { status: 403 }
+    );
+  }
 
   const created: Array<{
     title: string;
@@ -95,54 +93,30 @@ export async function POST(request: Request) {
       task.theme ? `Thema: ${task.theme}` : null,
       counterpart ? `Gegenstelle: ${counterpart}` : null,
       task.sourceSubject ? `Quelle Mail: ${task.sourceSubject}` : null,
-      "Übernommen aus Microsoft 365 Tagesanalyse (Buddy)",
+      "Übernommen aus Microsoft 365 Mail-Analyse (Buddy)",
     ]
       .filter(Boolean)
       .join("\n\n");
 
     try {
-      if (useGoogle && googleUserId != null) {
-        const g = await createGoogleTask(
-          googleUserId,
-          {
-            title: task.title,
-            notes,
-            dueDate: task.dueDate,
-            tasklistId: body.tasklistId,
-          },
-          request
-        );
-        created.push({
-          title: g.title,
-          ok: true,
-          kind: "task",
-          target: "google_task",
-          link: g.href,
-        });
-      } else {
-        const note = await createReferenceNote({
-          userId: msUserId,
-          title: task.title,
-          body: notes,
-          reference: task.sourceMailId
-            ? `o365:${task.sourceMailId}`
-            : null,
-          sourceMessageId: task.sourceMailId || undefined,
-        });
-        created.push({
-          title: note.title,
-          ok: true,
-          kind: "task",
-          target: "note",
-          link: note.triliumNoteId ? `trilium:${note.triliumNoteId}` : null,
-        });
-      }
+      const t = await createOutlookTodoTask(msUserId, {
+        title: task.title,
+        notes,
+        dueDate: task.dueDate,
+      });
+      created.push({
+        title: t.title,
+        ok: true,
+        kind: "task",
+        target: "outlook_todo",
+        link: t.webLink,
+      });
     } catch (error) {
       created.push({
         title: task.title,
         ok: false,
         kind: "task",
-        target: useGoogle ? "google_task" : "note",
+        target: "outlook_todo",
         error: error instanceof Error ? error.message : String(error),
       });
     }
@@ -155,7 +129,7 @@ export async function POST(request: Request) {
       [event.company, event.counterpartEmail].filter(Boolean).join(" · ") ||
         null,
       event.sourceSubject ? `Quelle Mail: ${event.sourceSubject}` : null,
-      "Übernommen aus Microsoft 365 Tagesanalyse (Buddy)",
+      "Übernommen aus Microsoft 365 Mail-Analyse (Buddy)",
     ]
       .filter(Boolean)
       .join("\n\n");
@@ -213,11 +187,13 @@ export async function POST(request: Request) {
     }
   }
 
+  const failed = created.filter((c) => !c.ok);
   return NextResponse.json({
     ok: created.some((c) => c.ok),
-    preferGoogleTasks: useGoogle,
     created,
     okCount: created.filter((c) => c.ok).length,
+    failCount: failed.length,
+    errors: failed.map((f) => f.error).filter(Boolean),
     taskOk: created.filter((c) => c.kind === "task" && c.ok).length,
     eventOk: created.filter((c) => c.kind === "event" && c.ok).length,
     replyOk: created.filter((c) => c.kind === "reply" && c.ok).length,

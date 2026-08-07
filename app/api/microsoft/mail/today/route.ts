@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { isAuthError, requireAuth } from "@/lib/auth/current-user";
 import { ensureInitialized } from "@/lib/db/migrations";
-import { listMicrosoftMailToday } from "@/lib/microsoft/mail-day";
+import { listMicrosoftMailForDay } from "@/lib/microsoft/mail-day";
+import { zurichYmd } from "@/lib/microsoft/time";
 import {
   isMicrosoftConnected,
   resolveMicrosoftUserId,
@@ -10,7 +11,7 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(request: Request) {
   ensureInitialized();
   const auth = await requireAuth();
   if (isAuthError(auth)) return auth;
@@ -21,9 +22,17 @@ export async function GET() {
       { status: 400 }
     );
   }
+  const url = new URL(request.url);
+  const day =
+    url.searchParams.get("date")?.trim() ||
+    url.searchParams.get("day")?.trim() ||
+    zurichYmd();
   try {
-    const data = await listMicrosoftMailToday(userId);
-    return NextResponse.json(data);
+    const data = await listMicrosoftMailForDay(userId, day);
+    return NextResponse.json({
+      ...data,
+      todayIso: data.dayIso,
+    });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : String(error) },

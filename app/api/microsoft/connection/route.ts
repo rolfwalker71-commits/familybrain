@@ -9,6 +9,7 @@ import {
   hasMicrosoftCalendarScope,
   hasMicrosoftMailScope,
   hasMicrosoftMailSendScope,
+  hasMicrosoftTasksScope,
   isMicrosoftConnected,
   isMicrosoftOauthConfigured,
   resolveMicrosoftUserId,
@@ -35,5 +36,6 @@ export async function GET(request: Request) {
     hasMailScope: connected ? hasMicrosoftMailScope(userId) : false,
     hasMailSendScope: connected ? hasMicrosoftMailSendScope(userId) : false,
     hasCalendarScope: connected ? hasMicrosoftCalendarScope(userId) : false,
+    hasTasksScope: connected ? hasMicrosoftTasksScope(userId) : false,
   });
 }

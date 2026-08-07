@@ -4,7 +4,9 @@ import {
   flattenAnalysis,
   guessCompanyLabel,
   packMailsForPrompt,
+  senderInitials,
   sortClusters,
+  withSenderInitials,
   type MsDayCluster,
 } from "@/lib/microsoft/analyze-mail-day";
 import type { MsMailItem } from "@/lib/microsoft/mail-day";
@@ -36,6 +38,23 @@ test("guessCompanyLabel uses company domain, not gmail", () => {
   assert.equal(
     guessCompanyLabel({ email: "rolf@gmail.com", displayName: "Rolf" }),
     "Rolf"
+  );
+});
+
+test("senderInitials from name and email", () => {
+  assert.equal(
+    senderInitials("Marita Köpper", "marita.koepper@s-peers.com"),
+    "MK"
+  );
+  assert.equal(senderInitials("Nicole Rengstorf", null), "NR");
+  assert.equal(senderInitials(null, "n.rengstorf@scalepharm.com"), "NR");
+  assert.equal(
+    withSenderInitials("Zugänge einrichten", "NR"),
+    "Zugänge einrichten (NR)"
+  );
+  assert.equal(
+    withSenderInitials("Zugänge einrichten (NR)", "XX"),
+    "Zugänge einrichten (NR)"
   );
 });
 
@@ -135,7 +154,7 @@ test("flattenAnalysis collects tasks events replies", () => {
         status: "open",
         tasks: [
           {
-            title: "Fix Sync",
+            title: "Fix Sync (ES)",
             company: "ELO",
             counterpartEmail: "ops@elo.example",
             theme: "Sync",
