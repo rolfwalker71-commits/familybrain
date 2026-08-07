@@ -627,6 +627,34 @@ export async function getTodayCalendarExcerpt(
   return ranked.slice(0, limit);
 }
 
+/** Overview aside: Geburtstage von heute bis +horizonDays (inkl.). */
+export async function getUpcomingBirthdaysExcerpt(
+  userId: number | null,
+  horizonDays = 7
+): Promise<AgendaItem[]> {
+  const today = zurichIsoDate();
+  const end = addDaysIso(today, horizonDays);
+  const feed = await getCalendarAgenda({
+    userId,
+    range: "14d",
+    includeWeather: false,
+  });
+  return feed.items
+    .filter((item) => {
+      if (item.date < today || item.date > end) return false;
+      return (
+        item.badge === "Geburtstag" ||
+        item.calendarType === "birthday" ||
+        /^Geburtstag\b/i.test(item.title) ||
+        /\bhat\s+Geburtstag\b/i.test(item.title)
+      );
+    })
+    .sort(
+      (a, b) =>
+        a.date.localeCompare(b.date) || a.title.localeCompare(b.title, "de")
+    );
+}
+
 /** Hockey widget data for overview (enabled hockey calendars only). */
 export async function getOverviewHockeyBundle(
   userId: number | null

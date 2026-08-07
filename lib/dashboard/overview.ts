@@ -4,6 +4,7 @@ import { paymentMethodLabel } from "@/lib/finance/payment-methods";
 import {
   getOverviewHockeyBundle,
   getTodayCalendarExcerpt,
+  getUpcomingBirthdaysExcerpt,
 } from "@/lib/calendar/agenda-feed";
 import { getTodayMailExcerpt } from "@/lib/mail/gmail";
 import type { MailListItem } from "@/lib/mail/gmail";
@@ -191,6 +192,8 @@ export type OverviewPayload = {
     reference: string | null;
     createdAt: string;
   }>;
+  /** Upcoming birthdays (today … +7 days), for aside — not in Fokus/Ablauf. */
+  upcomingBirthdays: AgendaItem[];
   /** Google Drive mirror progress (Paperless → BUDDY/…). */
   driveMirror: {
     enabled: boolean;
@@ -684,10 +687,11 @@ export async function getDashboardOverview(
       .get(daysFromNow(7)) as { c: number }
   ).c;
 
-  const [agendaWithWeather, todayCalendar, todayMail, hockey, homeWeatherRaw, tasksBundle, mailStats, referenceNotes] =
+  const [agendaWithWeather, todayCalendar, upcomingBirthdays, todayMail, hockey, homeWeatherRaw, tasksBundle, mailStats, referenceNotes] =
     await Promise.all([
       enrichAgendaWithWeather(agenda),
       getTodayCalendarExcerpt(calendarUserId, 12),
+      getUpcomingBirthdaysExcerpt(calendarUserId, 7).catch(() => [] as AgendaItem[]),
       getTodayMailExcerpt(calendarUserId, 8),
       getOverviewHockeyBundle(calendarUserId),
       fetchHomeWeather(),
@@ -816,6 +820,7 @@ export async function getDashboardOverview(
       items: [...tasksBundle.items],
     },
     referenceNotes: [...referenceNotes],
+    upcomingBirthdays: [...upcomingBirthdays],
     driveMirror: (() => {
       try {
         const st = getDriveMirrorStatus();
