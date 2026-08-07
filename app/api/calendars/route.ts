@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { isAuthError, requireAdmin } from "@/lib/auth/current-user";
+import { isAuthError, requireAuth } from "@/lib/auth/current-user";
 import { ensureInitialized } from "@/lib/db/migrations";
 import {
   deleteIcsCalendar,
   ICS_CALENDAR_TYPES,
   ICS_TYPE_META,
-  listIcsCalendars,
+  listIcsCalendarsForOwner,
+  resolveCalendarUserId,
   setIcsCalendarEnabled,
   upsertIcsCalendar,
 } from "@/lib/calendar/ics-calendars";
@@ -28,10 +29,12 @@ const UpsertSchema = z.object({
 
 export async function GET() {
   ensureInitialized();
-  const auth = await requireAdmin();
+  const auth = await requireAuth();
   if (isAuthError(auth)) return auth;
+  const userId = resolveCalendarUserId(auth);
   return NextResponse.json({
-    calendars: listIcsCalendars(),
+    calendars: listIcsCalendarsForOwner(userId),
+    ownerUserId: userId,
     types: ICS_CALENDAR_TYPES.map((id) => ({
       id,
       label: ICS_TYPE_META[id].label,
@@ -42,8 +45,9 @@ export async function GET() {
 
 export async function PUT(request: Request) {
   ensureInitialized();
-  const auth = await requireAdmin();
+  const auth = await requireAuth();
   if (isAuthError(auth)) return auth;
+  const userId = resolveCalendarUserId(auth);
   try {
     const body = await request.json();
     const parsed = UpsertSchema.safeParse(body);
@@ -53,8 +57,8 @@ export async function PUT(request: Request) {
         { status: 400 }
       );
     }
-    const calendars = upsertIcsCalendar(parsed.data);
-    return NextResponse.json({ ok: true, calendars });
+    const calendars = upsertIcsCalendar(userId, parsed.data);
+    return NextResponse.json({ ok: true, calendars, ownerUserId: userId });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : String(error) },
@@ -65,8 +69,9 @@ export async function PUT(request: Request) {
 
 export async function PATCH(request: Request) {
   ensureInitialized();
-  const auth = await requireAdmin();
+  const auth = await requireAuth();
   if (isAuthError(auth)) return auth;
+  const userId = resolveCalendarUserId(auth);
   try {
     const body = (await request.json()) as {
       id?: string;
@@ -78,8 +83,8 @@ export async function PATCH(request: Request) {
         { status: 400 }
       );
     }
-    const calendars = setIcsCalendarEnabled(body.id, body.enabled);
-    return NextResponse.json({ ok: true, calendars });
+    const calendars = setIcsCalendarEnabled(userId, body.id, body.enabled);
+    return NextResponse.json({ ok: true, calendars, ownerUserId: userId });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : String(error) },
@@ -90,13 +95,14 @@ export async function PATCH(request: Request) {
 
 export async function DELETE(request: Request) {
   ensureInitialized();
-  const auth = await requireAdmin();
+  const auth = await requireAuth();
   if (isAuthError(auth)) return auth;
+  const userId = resolveCalendarUserId(auth);
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id");
   if (!id) {
     return NextResponse.json({ error: "id fehlt." }, { status: 400 });
   }
-  const calendars = deleteIcsCalendar(id);
-  return NextResponse.json({ ok: true, calendars });
+  const calendars = deleteIcsCalendar(userId, id);
+  return NextResponse.json({ ok: true, calendars, ownerUserId: userId });
 }

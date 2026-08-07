@@ -28,6 +28,7 @@ import {
 import { SettingsUsersPanel } from "@/components/settings/settings-users-panel";
 import { SettingsFamilyPanel } from "@/components/settings/settings-family-panel";
 import { SettingsCalendarsPanel } from "@/components/settings/settings-calendars-panel";
+import { SettingsGooglePanel } from "@/components/settings/settings-google-panel";
 import { NotificationPrefsPanel } from "@/components/settings/notification-prefs-panel";
 import { SettingsCategorySuggestionsPanel } from "@/components/settings/settings-category-suggestions-panel";
 import { BackupStatusPanel } from "@/components/settings/backup-status-panel";
@@ -2564,7 +2565,12 @@ function SettingsPageInner() {
 
       {activeTab === "users" ? <SettingsUsersPanel /> : null}
       {activeTab === "family" ? <SettingsFamilyPanel /> : null}
-      {activeTab === "calendars" ? <SettingsCalendarsPanel /> : null}
+      {activeTab === "calendars" ? (
+        <div className="space-y-4">
+          <SettingsCalendarsPanel />
+          <SettingsGooglePanel />
+        </div>
+      ) : null}
 
       {activeTab === "notify" ? (
         <>

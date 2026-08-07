@@ -62,7 +62,7 @@ export function getAppPublicOrigin(request?: Request | null): string {
   if (fromSettings) return fromSettings;
   const fromRequest = requestOriginFromHeaders(request);
   if (fromRequest) return fromRequest;
-  return "http://localhost:3000";
+  return "http://localhost:3100";
 }
 
 export function absoluteAppUrl(

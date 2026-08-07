@@ -3,11 +3,13 @@ import {
   AMBRI_CALENDAR_ID,
   getEnabledIcsCalendars,
   ICS_TYPE_META,
-  listIcsCalendars,
+  listIcsCalendarsForOwner,
   type IcsCalendar,
   type IcsCalendarType,
 } from "@/lib/calendar/ics-calendars";
 import { getGenericCalendarEvents } from "@/lib/calendar/ics-generic";
+import { listGoogleBirthdaysInRange } from "@/lib/google/birthdays";
+import { isGoogleMailConnected } from "@/lib/google/oauth";
 import {
   getSwissHolidays,
   holidayBadge,
@@ -29,6 +31,9 @@ import {
 
 export const CALENDAR_SOURCE_HOLIDAYS = "swiss-holidays";
 export const CALENDAR_SOURCE_DEADLINES = "deadlines";
+export const CALENDAR_SOURCE_GOOGLE_BIRTHDAYS = "google-birthdays";
+
+const GOOGLE_BIRTHDAY_COLOR = "#ec4899";
 
 export type CalendarAgendaRange = "today" | "week" | "14d";
 
@@ -125,8 +130,8 @@ function toHockeyCard(game: HockeyGame): HockeyGameCard {
   };
 }
 
-export function listCalendarSources(): CalendarSource[] {
-  const ics = listIcsCalendars().map((c) => ({
+export function listCalendarSources(userId: number | null): CalendarSource[] {
+  const ics = listIcsCalendarsForOwner(userId).map((c) => ({
     id: c.id,
     name: c.name,
     color: c.color,
@@ -134,8 +139,21 @@ export function listCalendarSources(): CalendarSource[] {
     builtin: c.builtin,
     enabled: c.enabled,
   }));
+  const googleBirthdays: CalendarSource[] = isGoogleMailConnected(userId)
+    ? [
+        {
+          id: CALENDAR_SOURCE_GOOGLE_BIRTHDAYS,
+          name: "Geburtstage (Google)",
+          color: GOOGLE_BIRTHDAY_COLOR,
+          type: "birthday",
+          builtin: true,
+          enabled: true,
+        },
+      ]
+    : [];
   return [
     ...ics,
+    ...googleBirthdays,
     {
       id: CALENDAR_SOURCE_HOLIDAYS,
       name: "Feiertage UR/ZH",
@@ -202,9 +220,11 @@ function sourceAllowed(
 }
 
 /**
- * Calendar / Termine feed: ICS (incl. hockey), Swiss holidays, open deadlines.
+ * Calendar / Termine feed: ICS (incl. hockey), Google birthdays, Swiss holidays, deadlines.
  */
 export async function getCalendarAgenda(options: {
+  /** App user whose ICS feeds to load; null = legacy global until migrated. */
+  userId: number | null;
   range: CalendarAgendaRange;
   /** If set, only these source ids. Empty/omit = all enabled ICS + holidays + deadlines. */
   sourceIds?: string[] | null;
@@ -214,13 +234,46 @@ export async function getCalendarAgenda(options: {
   const filterIds =
     options.sourceIds == null ? null : new Set(options.sourceIds);
 
-  const sources = listCalendarSources();
-  const enabledIcs = getEnabledIcsCalendars().filter((c) =>
+  const sources = listCalendarSources(options.userId);
+  const enabledIcs = getEnabledIcsCalendars(options.userId).filter((c) =>
     sourceAllowed(c.id, filterIds)
   );
 
   const items: AgendaItem[] = [];
   const today = zurichIsoDate();
+
+  if (
+    options.userId != null &&
+    sourceAllowed(CALENDAR_SOURCE_GOOGLE_BIRTHDAYS, filterIds) &&
+    isGoogleMailConnected(options.userId)
+  ) {
+    try {
+      const birthdays = await listGoogleBirthdaysInRange(
+        options.userId,
+        start,
+        end
+      );
+      for (const b of birthdays) {
+        items.push({
+          id: `gbd-${b.id}`,
+          kind: "calendar",
+          date: b.date,
+          title: b.summary,
+          subtitle: "Google · Geburtstag",
+          amount: null,
+          currency: null,
+          documentId: null,
+          href: null,
+          badge: "Geburtstag",
+          accentColor: GOOGLE_BIRTHDAY_COLOR,
+          calendarType: "birthday",
+          calendarId: CALENDAR_SOURCE_GOOGLE_BIRTHDAYS,
+        });
+      }
+    } catch {
+      /* missing calendar scope or API error — skip */
+    }
+  }
 
   const hockeyGames = await loadHockeyGames(
     enabledIcs.filter((c) => c.type === "hockey")
@@ -391,9 +444,11 @@ export async function getCalendarAgenda(options: {
 
 /** Overview aside: heute + optional morgen (24h), max 5. */
 export async function getTodayCalendarExcerpt(
+  userId: number | null,
   limit = 5
 ): Promise<AgendaItem[]> {
   const feed = await getCalendarAgenda({
+    userId,
     range: "today",
     includeWeather: true,
   });
@@ -417,12 +472,16 @@ export async function getTodayCalendarExcerpt(
 }
 
 /** Hockey widget data for overview (enabled hockey calendars only). */
-export async function getOverviewHockeyBundle(): Promise<{
+export async function getOverviewHockeyBundle(
+  userId: number | null
+): Promise<{
   calendarName: string;
   nextGame: HockeyGameCard | null;
   upcoming: HockeyGameCard[];
 }> {
-  const enabled = getEnabledIcsCalendars().filter((c) => c.type === "hockey");
+  const enabled = getEnabledIcsCalendars(userId).filter(
+    (c) => c.type === "hockey"
+  );
   const games = await loadHockeyGames(enabled);
   const next = enabled.length > 0 ? getNextHockeyGame(games) : null;
   const upcoming =

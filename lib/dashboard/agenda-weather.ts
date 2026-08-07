@@ -48,6 +48,8 @@ const KNOWN_PLACES: Record<string, { lat: number; lon: number; label: string }> 
     "centro sportivo": { lat: 46.192, lon: 9.017, label: "Bellinzona" },
     "lonza arena": { lat: 46.295, lon: 7.883, label: "Visp" },
     altdorf: { lat: 46.88042, lon: 8.64345, label: "Altdorf" },
+    "kantonsspital uri": { lat: 46.88042, lon: 8.64345, label: "Altdorf" },
+    "spitalstrasse 1": { lat: 46.88042, lon: 8.64345, label: "Altdorf" },
     regensdorf: { lat: 47.4342, lon: 8.4687, label: "Regensdorf" },
   };
 
@@ -131,10 +133,26 @@ export async function resolvePlaceCoords(
   return { lat: hit.lat, lon: hit.lon, label, source: "network" };
 }
 
+function zurichIsoDate(d = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Zurich",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
+}
+
+function calendarDaysBetween(fromIso: string, toIso: string): number {
+  const a = new Date(`${fromIso.slice(0, 10)}T12:00:00Z`);
+  const b = new Date(`${toIso.slice(0, 10)}T12:00:00Z`);
+  return Math.round((b.getTime() - a.getTime()) / 86_400_000);
+}
+
 export async function fetchDailyForecast(
   lat: number,
   lon: number,
-  forecastDays = 16
+  forecastDays = 16,
+  pastDays = 0
 ): Promise<DayWeather[]> {
   const url = new URL("https://api.open-meteo.com/v1/forecast");
   url.searchParams.set("latitude", String(lat));
@@ -144,7 +162,13 @@ export async function fetchDailyForecast(
     "weather_code,temperature_2m_max,temperature_2m_min"
   );
   url.searchParams.set("timezone", "Europe/Zurich");
-  url.searchParams.set("forecast_days", String(Math.min(16, forecastDays)));
+  url.searchParams.set(
+    "forecast_days",
+    String(Math.min(16, Math.max(1, forecastDays)))
+  );
+  if (pastDays > 0) {
+    url.searchParams.set("past_days", String(Math.min(92, pastDays)));
+  }
 
   const res = await fetch(url.toString(), {
     headers: {
@@ -255,12 +279,28 @@ export async function enrichAgendaWithWeather<
     });
   }
 
+  const today = zurichIsoDate();
+  let pastDays = 0;
+  let forecastDays = 7;
+  for (const item of withLoc) {
+    const delta = calendarDaysBetween(today, item.date.slice(0, 10));
+    if (delta < 0) pastDays = Math.max(pastDays, -delta);
+    else forecastDays = Math.max(forecastDays, delta + 1);
+  }
+  pastDays = Math.min(92, pastDays);
+  forecastDays = Math.min(16, Math.max(1, forecastDays));
+
   const forecastByCoord = new Map<string, DayWeather[]>();
   for (const place of resolved.values()) {
     const ck = `${place.lat.toFixed(3)},${place.lon.toFixed(3)}`;
     if (forecastByCoord.has(ck)) continue;
     try {
-      const days = await fetchDailyForecast(place.lat, place.lon, 16);
+      const days = await fetchDailyForecast(
+        place.lat,
+        place.lon,
+        forecastDays,
+        pastDays
+      );
       forecastByCoord.set(ck, days);
     } catch (error) {
       console.warn(

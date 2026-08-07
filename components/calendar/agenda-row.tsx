@@ -20,6 +20,7 @@ import {
   BriefcaseBusiness,
   Palmtree,
   Calendar,
+  Cake,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { formatCHF } from "@/lib/utils/format";
@@ -63,6 +64,7 @@ const CALENDAR_TYPE_ICON: Record<IcsCalendarType, typeof FileText> = {
   church: Church,
   sports: Dumbbell,
   family: Heart,
+  birthday: Cake,
   work: BriefcaseBusiness,
   holiday: Palmtree,
   other: Calendar,

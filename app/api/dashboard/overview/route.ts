@@ -39,5 +39,9 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const period = parseOverviewPeriod(searchParams.get("period"));
   const anchor = searchParams.get("anchor");
-  return NextResponse.json(await getDashboardOverview(period, anchor));
+  const { resolveCalendarUserId } = await import("@/lib/calendar/ics-calendars");
+  const calendarUserId = resolveCalendarUserId(auth);
+  return NextResponse.json(
+    await getDashboardOverview(period, anchor, calendarUserId)
+  );
 }

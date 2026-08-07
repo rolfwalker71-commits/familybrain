@@ -6,6 +6,7 @@ export const ADMIN_NAV_EXITED_HOME_KEY = "buddyapp-admin-nav-exited-home";
 const MYBRAIN_PREFIXES = [
   "/dashboard",
   "/calendar",
+  "/mail",
   "/inbox",
   "/documents",
   "/warranties",

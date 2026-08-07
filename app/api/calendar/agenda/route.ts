@@ -4,6 +4,7 @@ import {
   getCalendarAgenda,
   type CalendarAgendaRange,
 } from "@/lib/calendar/agenda-feed";
+import { resolveCalendarUserId } from "@/lib/calendar/ics-calendars";
 import { ensureInitialized } from "@/lib/db/migrations";
 
 export const runtime = "nodejs";
@@ -18,11 +19,11 @@ export async function GET(request: Request) {
   ensureInitialized();
   const auth = await requireAdmin();
   if (isAuthError(auth)) return auth;
+  const userId = resolveCalendarUserId(auth);
 
   const { searchParams } = new URL(request.url);
   const range = parseRange(searchParams.get("range"));
   const sourcesRaw = searchParams.get("sources");
-  // null = alle; "" / list = Filter (leer = nichts)
   const sourceIds =
     sourcesRaw === null
       ? null
@@ -33,6 +34,7 @@ export async function GET(request: Request) {
 
   return NextResponse.json(
     await getCalendarAgenda({
+      userId,
       range,
       sourceIds,
       includeWeather: true,

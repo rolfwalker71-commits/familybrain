@@ -5,6 +5,8 @@ import {
   getOverviewHockeyBundle,
   getTodayCalendarExcerpt,
 } from "@/lib/calendar/agenda-feed";
+import { getTodayMailExcerpt } from "@/lib/mail/gmail";
+import type { MailListItem } from "@/lib/mail/gmail";
 import {
   enrichAgendaWithWeather,
   fetchHomeWeather,
@@ -132,6 +134,8 @@ export type OverviewPayload = {
   agenda: AgendaItem[];
   /** Heute (+ optional nächste 24h), max 5 — Link zu /calendar */
   todayCalendar: AgendaItem[];
+  /** Heute-Mails (Gmail), max 5 — Link zu /mail */
+  todayMail: MailListItem[];
   kpi: {
     total: number;
     byCategory: KpiCategorySlice[];
@@ -235,7 +239,8 @@ function inRange(date: string | null | undefined, start: string, end: string) {
 
 export async function getDashboardOverview(
   period: OverviewPeriod,
-  anchorIso?: string | null
+  anchorIso?: string | null,
+  calendarUserId: number | null = null
 ): Promise<OverviewPayload> {
   const anchor = anchorIso ? new Date(anchorIso) : new Date();
   const { start, end, label } = resolvePeriodRange(period, anchor);
@@ -623,11 +628,12 @@ export async function getDashboardOverview(
       .get(daysFromNow(7)) as { c: number }
   ).c;
 
-  const [agendaWithWeather, todayCalendar, hockey, homeWeatherRaw] =
+  const [agendaWithWeather, todayCalendar, todayMail, hockey, homeWeatherRaw] =
     await Promise.all([
       enrichAgendaWithWeather(agenda),
-      getTodayCalendarExcerpt(5),
-      getOverviewHockeyBundle(),
+      getTodayCalendarExcerpt(calendarUserId, 5),
+      getTodayMailExcerpt(calendarUserId, 5),
+      getOverviewHockeyBundle(calendarUserId),
       fetchHomeWeather(),
     ]);
 
@@ -673,6 +679,7 @@ export async function getDashboardOverview(
     },
     agenda: agendaWithWeather,
     todayCalendar,
+    todayMail,
     kpi: { total: kpiTotal, byCategory },
     financeItems,
     hockey: {

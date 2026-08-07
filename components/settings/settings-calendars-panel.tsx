@@ -23,6 +23,7 @@ type CalType =
   | "church"
   | "sports"
   | "family"
+  | "birthday"
   | "work"
   | "holiday"
   | "other";
@@ -46,6 +47,7 @@ const PRESET_COLORS = [
   "#7c3aed",
   "#ea580c",
   "#db2777",
+  "#ec4899",
   "#0f766e",
   "#8b5cf6",
   "#64748b",
@@ -225,8 +227,9 @@ export function SettingsCalendarsPanel() {
       </CardHeader>
       <CardContent className="space-y-6">
         <p className="text-sm text-muted-foreground">
-          Öffentliche ICS-URLs (z.&nbsp;B. Google «Geheimadresse im iCal-Format»).
-          Typ steuert das Agenda-Icon, Farbe den linken Rand. Ambri bleibt als
+          Deine persönlichen ICS-Kalender (nicht zentral für alle). Öffentliche
+          ICS-URLs (z.&nbsp;B. Google «Geheimadresse im iCal-Format»). Typ
+          steuert das Agenda-Icon, Farbe den linken Rand. Ambri bleibt als
           Hockey-Feed mit Logos/Sofascore und kann nur ein-/ausgeblendet werden.
         </p>
 

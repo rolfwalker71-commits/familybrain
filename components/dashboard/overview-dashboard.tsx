@@ -51,10 +51,10 @@ function HomeWeatherWidget({ weather }: { weather: HomeWeatherCard }) {
       : "0 mm";
 
   return (
-    <Card className="border-border/70 overflow-hidden">
+    <Card className="gap-0 overflow-hidden border-border/70 py-0">
       <CardContent className="p-0">
         <div className="flex items-stretch gap-0">
-          <div className="flex w-[5.5rem] shrink-0 flex-col items-center justify-center bg-sky-50/90 px-2 py-4">
+          <div className="flex w-[5.5rem] shrink-0 flex-col items-center justify-center self-stretch bg-sky-50/90 px-2 py-4">
             <span className="text-5xl leading-none" aria-hidden>
               {weather.icon}
             </span>
@@ -457,6 +457,53 @@ export function OverviewDashboard({
                   className="inline-flex text-xs font-medium text-muted-foreground underline-offset-2 hover:underline"
                 >
                   Alle Termine →
+                </Link>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Heute · Mail</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {(data.todayMail || []).length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    Keine Mails für heute (oder Google nicht verbunden).
+                  </p>
+                ) : (
+                  <ul className="space-y-2">
+                    {(data.todayMail || []).map((m) => (
+                      <li key={m.id}>
+                        <Link
+                          href={`/mail?open=${encodeURIComponent(m.id)}`}
+                          className="flex items-start gap-2 rounded-lg border border-border/50 px-2.5 py-2 hover:bg-muted/40"
+                        >
+                          {m.unread ? (
+                            <span
+                              className="mt-1.5 size-2 shrink-0 rounded-full bg-[var(--brand-docs)]"
+                              aria-hidden
+                            />
+                          ) : (
+                            <span className="mt-1.5 size-2 shrink-0" aria-hidden />
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium">
+                              {m.fromName}
+                            </p>
+                            <p className="truncate text-xs text-muted-foreground">
+                              {m.subject}
+                            </p>
+                          </div>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <Link
+                  href="/mail"
+                  className="inline-flex text-xs font-medium text-muted-foreground underline-offset-2 hover:underline"
+                >
+                  Posteingang →
                 </Link>
               </CardContent>
             </Card>
