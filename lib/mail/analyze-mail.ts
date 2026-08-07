@@ -42,14 +42,14 @@ WICHTIG:
   3) kind "note" — Tracking-Nummer; title z.B. «UPS Tracking - irugs.ch», reference = Tracking-Code
 - Carrier (UPS, DHL, Die Post, …) und Lieferant/Shop (Domain oder Markenname aus dem Mail) immer in den Titeln, wenn erkennbar.
 - «notes» = Beschreibungstext für Kalender/Task/Notiz. Baue ihn dynamisch aus dem Mail-Kontext (individuell je Mail), Bausteine mit « - »:
-  Absender/Carrier/Lieferant · Worüber · Wen betrifft (Empfänger) · Tracking/Referenz · ggf. Ort/Zeitfenster.
+  Absender/Carrier/Lieferant · Worüber · Wen betrifft (Empfänger) · Tracking/Referenz.
   Beispiel Versand: «UPS Paketlieferung - irugs.ch - Trackingnummer 1Z…»
-  Beispiel Termin: «Zahnarzt - Kontrolle - Praxis Müller»
+  Beispiel Termin (notes): nur Zusatzkontext, z.B. «mit Rolf Walker» oder Agenda-Stichworte — NICHT Ort, Uhrzeit oder Dauer (die gehören in location / startTime / endTime).
   Keine leeren Platzhalter. Nicht den rohen Mail-Betreff nur in Klammern anhängen.
 - Nur vorschlagen, was wirklich speicherwürdig ist. Newsletter/Werbung → suggestions: [].
 - Keine Dubletten. Keine erfundenen Daten — wenn unsicher, weglassen oder allDay/nur Datum.
 - Zeiten als HH:mm (24h). Datumsangaben relativ («morgen», «Montag») in absolute YYYY-MM-DD anhand «Heute» auflösen.
-- kind "event": startDate Pflicht wenn möglich. Wenn ein Zustell-/Termin-Zeitfenster im Mail steht (z.B. «zwischen 9 und 13 Uhr», «9:00 AM – 1:00 PM»), IMMER startTime und endTime als HH:mm setzen — nicht nur das Datum.
+- kind "event": startDate Pflicht wenn möglich. Wenn ein Zustell-/Termin-Zeitfenster im Mail steht (z.B. «zwischen 9 und 13 Uhr», «9:00 AM – 1:00 PM»), IMMER startTime und endTime als HH:mm setzen — nicht nur das Datum. location setzen wenn Adresse/Ort genannt. In notes KEINE Adresse, KEINE Uhrzeiten, KEINE Dauer wiederholen.
 - kind "task": dueDate wenn Frist/Tag bekannt, sonst null.
 - kind "note": «reference» = Tracking/Code, «notes» = kontextuelle Beschreibung wie oben.
 - Antworte NUR als JSON-Objekt.`;
@@ -80,7 +80,7 @@ JSON-Schema:
     {
       "kind": "event"|"task"|"note",
       "title": "z.B. UPS Paketlieferung - irugs.ch",
-      "notes": "z.B. UPS Paketlieferung - irugs.ch - Trackingnummer 1Z…",
+      "notes": "Zusatzkontext ohne Ort/Zeit; Versand z.B. UPS … - Trackingnummer …",
       "reference": "Tracking/Code oder null (vor allem bei note)",
       "reason": "warum speichern",
       "confidence": 0.0-1.0,
