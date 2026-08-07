@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   CalendarDays,
@@ -576,6 +576,64 @@ function FocusTile({
   );
 }
 
+const OVERVIEW_LS_KEY = "buddy-overview-cache-v1";
+const OVERVIEW_LS_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+function readStaleOverview(period: OverviewPeriod): OverviewPayload | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(OVERVIEW_LS_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as {
+      period: OverviewPeriod;
+      payload: OverviewPayload;
+      at: number;
+    };
+    if (parsed.period !== period) return null;
+    if (Date.now() - parsed.at > OVERVIEW_LS_MAX_AGE_MS) return null;
+    return parsed.payload;
+  } catch {
+    return null;
+  }
+}
+
+function writeStaleOverview(period: OverviewPeriod, payload: OverviewPayload) {
+  try {
+    localStorage.setItem(
+      OVERVIEW_LS_KEY,
+      JSON.stringify({ period, payload, at: Date.now() })
+    );
+  } catch {
+    /* quota / private mode */
+  }
+}
+
+function OverviewSkeleton() {
+  return (
+    <div className="space-y-6" aria-busy="true" aria-label="Lade Übersicht">
+      <section className="space-y-3">
+        <div className="h-4 w-32 animate-pulse rounded bg-muted" />
+        <div className="grid gap-3 md:grid-cols-3">
+          {[0, 1, 2].map((i) => (
+            <div
+              key={i}
+              className="h-[4.5rem] animate-pulse rounded-xl bg-muted/80"
+            />
+          ))}
+        </div>
+      </section>
+      <section className="space-y-3">
+        <div className="h-4 w-40 animate-pulse rounded bg-muted" />
+        <div className="h-48 animate-pulse rounded-xl bg-muted/80" />
+      </section>
+      <section className="grid gap-3 md:grid-cols-2">
+        <div className="h-36 animate-pulse rounded-xl bg-muted/80" />
+        <div className="h-36 animate-pulse rounded-xl bg-muted/80" />
+      </section>
+    </div>
+  );
+}
+
 export function OverviewDashboard({
   greetingName,
 }: {
@@ -584,24 +642,49 @@ export function OverviewDashboard({
   const [period, setPeriod] = useState<OverviewPeriod>("month");
   const [data, setData] = useState<OverviewPayload | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [correctOpen, setCorrectOpen] = useState(false);
+  const [fromCache, setFromCache] = useState(false);
+  const dataRef = useRef<OverviewPayload | null>(null);
+  dataRef.current = data;
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  useEffect(() => {
+    const stale = readStaleOverview(period);
+    if (stale) {
+      setData(stale);
+      setFromCache(true);
+      setLoading(false);
+    } else {
+      setData(null);
+      setFromCache(false);
+      setLoading(true);
+    }
+  }, [period]);
+
+  const load = useCallback(async (opts?: { fresh?: boolean }) => {
+    const hasShell = Boolean(dataRef.current);
+    if (hasShell) setRefreshing(true);
+    else setLoading(true);
     setError(null);
     try {
-      const res = await fetch(
-        `/api/dashboard/overview?period=${encodeURIComponent(period)}`
-      );
+      const qs = new URLSearchParams({
+        period,
+        ...(opts?.fresh ? { fresh: "1" } : {}),
+      });
+      const res = await fetch(`/api/dashboard/overview?${qs}`);
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Laden fehlgeschlagen");
-      setData(json as OverviewPayload);
+      const payload = json as OverviewPayload;
+      setData(payload);
+      setFromCache(false);
+      writeStaleOverview(period, payload);
     } catch (err) {
-      setData(null);
+      if (!dataRef.current) setData(null);
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, [period]);
 
@@ -700,10 +783,17 @@ export function OverviewDashboard({
   return (
     <div className="min-w-0 space-y-6 pb-10">
       <header className="space-y-1">
-        <h1 className="text-3xl font-semibold tracking-tight">
-          {greeting}
-          {greetingName ? `, ${greetingName}` : ""}
-        </h1>
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h1 className="text-3xl font-semibold tracking-tight">
+            {greeting}
+            {greetingName ? `, ${greetingName}` : ""}
+          </h1>
+          {refreshing || fromCache ? (
+            <p className="text-[11px] text-muted-foreground">
+              {refreshing ? "Aktualisiere…" : "Zwischengespeicherte Ansicht"}
+            </p>
+          ) : null}
+        </div>
         <p className="text-sm capitalize text-muted-foreground">
           {formatLongDeDate()}
         </p>
@@ -711,9 +801,11 @@ export function OverviewDashboard({
 
       {error ? (
         <p className="text-sm text-destructive">{error}</p>
-      ) : loading && !data ? (
-        <p className="text-sm text-muted-foreground">Lade Übersicht…</p>
-      ) : data ? (
+      ) : null}
+
+      {loading && !data ? <OverviewSkeleton /> : null}
+
+      {data ? (
         <>
           <section className="space-y-3">
             <h2 className="text-sm font-semibold tracking-tight text-foreground">
@@ -1109,7 +1201,7 @@ export function OverviewDashboard({
         open={correctOpen}
         onOpenChange={setCorrectOpen}
         items={data?.financeItems || []}
-        onSaved={() => void load()}
+        onSaved={() => void load({ fresh: true })}
       />
     </div>
   );

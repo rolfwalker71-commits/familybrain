@@ -665,22 +665,7 @@ export async function getDashboardOverview(
     await Promise.all([
       enrichAgendaWithWeather(agenda),
       getTodayCalendarExcerpt(calendarUserId, 12),
-      (async () => {
-        const mails = await getTodayMailExcerpt(calendarUserId, 8);
-        if (calendarUserId != null && mails.length > 0) {
-          try {
-            const { syncMailAnalysesForItems } = await import(
-              "@/lib/mail/sync-mail-analysis"
-            );
-            await syncMailAnalysesForItems(calendarUserId, mails, {
-              maxAi: 2,
-            });
-          } catch {
-            /* non-blocking */
-          }
-        }
-        return mails;
-      })(),
+      getTodayMailExcerpt(calendarUserId, 8),
       getOverviewHockeyBundle(calendarUserId),
       fetchHomeWeather(),
       (async () => {

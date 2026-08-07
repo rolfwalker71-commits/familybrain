@@ -4,61 +4,112 @@ import {
   getDashboardOverview,
   parseOverviewPeriod,
 } from "@/lib/dashboard/overview";
+import {
+  getCachedOverview,
+  setCachedOverview,
+} from "@/lib/dashboard/overview-cache";
 import { ensureInitialized } from "@/lib/db/migrations";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+/** Side jobs must not block first paint — run after kicking off response path. */
+function runOverviewBackgroundJobs(
+  calendarUserId: number | null,
+  request: Request
+): void {
+  void (async () => {
+    try {
+      const { finalizeDuePaymentPlans } = await import(
+        "@/lib/finance/payment-pipeline"
+      );
+      await finalizeDuePaymentPlans().catch(() => undefined);
+    } catch {
+      /* ignore */
+    }
+
+    let syncUpdated = 0;
+    try {
+      const { ensureSofascoreLogosMigrated } = await import(
+        "@/lib/hockey/logo"
+      );
+      await ensureSofascoreLogosMigrated().catch((error) => {
+        console.warn(
+          "[hockey] Sofascore logo migration:",
+          error instanceof Error ? error.message : error
+        );
+      });
+      const { syncHockeyResultsIfDue } = await import(
+        "@/lib/hockey/sync-results"
+      );
+      const syncSummary = await syncHockeyResultsIfDue().catch((error) => {
+        console.warn(
+          "[hockey] Sofascore result sync:",
+          error instanceof Error ? error.message : error
+        );
+        return null;
+      });
+      syncUpdated = syncSummary?.updated ?? 0;
+    } catch (error) {
+      console.warn(
+        "[hockey] background sync:",
+        error instanceof Error ? error.message : error
+      );
+    }
+
+    if (calendarUserId == null) return;
+    try {
+      const { writeHockeyResultsToGoogleCalendars } = await import(
+        "@/lib/google/hockey-writeback"
+      );
+      await writeHockeyResultsToGoogleCalendars(calendarUserId, {
+        force: syncUpdated > 0,
+        request,
+      }).catch((error) => {
+        console.warn(
+          "[hockey] Google result writeback:",
+          error instanceof Error ? error.message : error
+        );
+      });
+    } catch (error) {
+      console.warn(
+        "[hockey] writeback import:",
+        error instanceof Error ? error.message : error
+      );
+    }
+  })();
+}
 
 export async function GET(request: Request) {
   ensureInitialized();
   const auth = await requireAdmin();
   if (isAuthError(auth)) return auth;
 
-  const { finalizeDuePaymentPlans } = await import(
-    "@/lib/finance/payment-pipeline"
+  const { resolveCalendarUserId } = await import(
+    "@/lib/calendar/ics-calendars"
   );
-  await finalizeDuePaymentPlans().catch(() => undefined);
-
-  const { ensureSofascoreLogosMigrated } = await import("@/lib/hockey/logo");
-  const { syncHockeyResultsIfDue } = await import(
-    "@/lib/hockey/sync-results"
-  );
-  await ensureSofascoreLogosMigrated().catch((error) => {
-    console.warn(
-      "[hockey] Sofascore logo migration:",
-      error instanceof Error ? error.message : error
-    );
-  });
-  const syncSummary = await syncHockeyResultsIfDue().catch((error) => {
-    console.warn(
-      "[hockey] Sofascore result sync:",
-      error instanceof Error ? error.message : error
-    );
-    return null;
-  });
-
-  const { resolveCalendarUserId } = await import("@/lib/calendar/ics-calendars");
   const calendarUserId = resolveCalendarUserId(auth);
 
-  if (calendarUserId != null) {
-    const { writeHockeyResultsToGoogleCalendars } = await import(
-      "@/lib/google/hockey-writeback"
-    );
-    await writeHockeyResultsToGoogleCalendars(calendarUserId, {
-      force: Boolean(syncSummary && syncSummary.updated > 0),
-      request,
-    }).catch((error) => {
-      console.warn(
-        "[hockey] Google result writeback:",
-        error instanceof Error ? error.message : error
-      );
-    });
-  }
+  // Do not await — overview paint must not wait for Sofascore / Google writeback
+  runOverviewBackgroundJobs(calendarUserId, request);
 
   const { searchParams } = new URL(request.url);
   const period = parseOverviewPeriod(searchParams.get("period"));
   const anchor = searchParams.get("anchor");
-  return NextResponse.json(
-    await getDashboardOverview(period, anchor, calendarUserId)
-  );
+  const fresh = searchParams.get("fresh") === "1";
+
+  if (!fresh) {
+    const cached = getCachedOverview(calendarUserId, period, anchor);
+    if (cached) {
+      return NextResponse.json(cached, {
+        headers: { "X-Overview-Cache": "hit" },
+      });
+    }
+  }
+
+  const payload = await getDashboardOverview(period, anchor, calendarUserId);
+  setCachedOverview(calendarUserId, period, anchor, payload);
+  return NextResponse.json(payload, {
+    headers: { "X-Overview-Cache": fresh ? "bypass" : "miss" },
+  });
 }
