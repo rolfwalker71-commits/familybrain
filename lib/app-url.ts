@@ -80,11 +80,49 @@ export function getAppPublicOrigin(request?: Request | null): string {
   return "http://localhost:3100";
 }
 
+/**
+ * OAuth redirect URIs: prefer the browser-facing HTTPS host when it differs
+ * from a stale app_public_url (e.g. old tripbook domain vs buddyapp).
+ * Falls back to getAppPublicOrigin for local / non-HTTPS requests.
+ */
+export function getOauthRedirectOrigin(request?: Request | null): string {
+  const fromRequest = requestOriginFromHeaders(request);
+  const fromSettings = getAppPublicUrlSetting();
+  if (
+    fromRequest &&
+    /^https:\/\//i.test(fromRequest) &&
+    !/localhost|127\.0\.0\.1/i.test(fromRequest)
+  ) {
+    try {
+      const reqHost = new URL(fromRequest).host.toLowerCase();
+      const setHost = fromSettings
+        ? new URL(fromSettings).host.toLowerCase()
+        : null;
+      if (!setHost || setHost !== reqHost) {
+        return fromRequest.replace(/\/+$/, "");
+      }
+    } catch {
+      /* use absoluteAppUrl path below */
+    }
+  }
+  return getAppPublicOrigin(request).replace(/\/+$/, "");
+}
+
 export function absoluteAppUrl(
   path: string,
   request?: Request | null
 ): string {
   const origin = getAppPublicOrigin(request).replace(/\/+$/, "");
+  const normalized = path.startsWith("/") ? path : `/${path}`;
+  return `${origin}${normalized}`;
+}
+
+/** Like absoluteAppUrl but host-aware for OAuth callbacks. */
+export function absoluteOauthRedirectUrl(
+  path: string,
+  request?: Request | null
+): string {
+  const origin = getOauthRedirectOrigin(request);
   const normalized = path.startsWith("/") ? path : `/${path}`;
   return `${origin}${normalized}`;
 }

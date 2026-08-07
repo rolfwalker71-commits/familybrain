@@ -1,5 +1,5 @@
 import { getSetting, setSetting } from "@/lib/db/migrations";
-import { absoluteAppUrl } from "@/lib/app-url";
+import { absoluteOauthRedirectUrl } from "@/lib/app-url";
 import type { AuthContext } from "@/lib/auth/current-user";
 import { resolveCalendarUserId } from "@/lib/calendar/ics-calendars";
 
@@ -85,7 +85,7 @@ export function isMicrosoftOauthConfigured(): boolean {
 export function getMicrosoftOauthRedirectUri(
   request?: Request | null
 ): string {
-  return absoluteAppUrl(MICROSOFT_OAUTH_CALLBACK_PATH, request);
+  return absoluteOauthRedirectUrl(MICROSOFT_OAUTH_CALLBACK_PATH, request);
 }
 
 function authorizeEndpoint(): string {
@@ -216,8 +216,9 @@ export function beginMicrosoftOauth(
   url.searchParams.set("response_mode", "query");
   url.searchParams.set("scope", MICROSOFT_OAUTH_SCOPES.join(" "));
   url.searchParams.set("state", state);
-  // Force account picker + consent so refresh_token is issued
-  url.searchParams.set("prompt", "select_account consent");
+  // Force account picker alone — Entra rejects combined values like
+  // "select_account consent" (AADSTS90023).
+  url.searchParams.set("prompt", "select_account");
   return url.toString();
 }
 

@@ -198,6 +198,19 @@ export function SettingsMicrosoftPanel() {
               <p className="mt-1 break-all font-mono text-[13px]">
                 {data?.microsoftOauthRedirectUri || "—"}
               </p>
+              <p className="mt-2 text-[12px] text-muted-foreground">
+                Soll{" "}
+                <code className="text-[11px]">
+                  https://buddyapp.rolfwalker.ch/api/microsoft/oauth/callback
+                </code>{" "}
+                sein. Wenn hier eine andere Domain steht: unter Einstellungen →
+                Mail/SMTP die «Öffentliche App-URL» auf{" "}
+                <code className="text-[11px]">
+                  https://buddyapp.rolfwalker.ch
+                </code>{" "}
+                setzen (oder Env{" "}
+                <code className="text-[11px]">APP_PUBLIC_URL</code>).
+              </p>
             </div>
 
             <Button

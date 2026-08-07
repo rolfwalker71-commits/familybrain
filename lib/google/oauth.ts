@@ -1,6 +1,6 @@
 import { google } from "googleapis";
 import { getSetting, setSetting } from "@/lib/db/migrations";
-import { absoluteAppUrl } from "@/lib/app-url";
+import { absoluteOauthRedirectUrl } from "@/lib/app-url";
 import type { AuthContext } from "@/lib/auth/current-user";
 import { resolveCalendarUserId } from "@/lib/calendar/ics-calendars";
 
@@ -66,7 +66,7 @@ export function isGoogleOauthConfigured(): boolean {
 }
 
 export function getGoogleOauthRedirectUri(request?: Request | null): string {
-  return absoluteAppUrl(GOOGLE_OAUTH_CALLBACK_PATH, request);
+  return absoluteOauthRedirectUrl(GOOGLE_OAUTH_CALLBACK_PATH, request);
 }
 
 export function createOAuth2Client(request?: Request | null) {
