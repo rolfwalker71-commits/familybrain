@@ -32,6 +32,7 @@ import { formatCHF } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
 import { APP_ICON_STROKE } from "@/lib/branding/app-icons";
 import { windDirectionDe } from "@/lib/trips/weather";
+import { filterAblaufTimelineItems } from "@/lib/dashboard/ablauf-timeline";
 import type {
   AgendaItem,
   HockeyGameCard,
@@ -1020,12 +1021,13 @@ export function OverviewDashboard({
       if (isBirthdayItem(item)) continue;
       byId.set(item.id, item);
     }
-    return [...byId.values()].sort((a, b) => {
+    const merged = [...byId.values()].sort((a, b) => {
       const dc = a.date.localeCompare(b.date);
       if (dc !== 0) return dc;
       return (a.time || "99:99").localeCompare(b.time || "99:99");
     });
-  }, [data, today]);
+    return filterAblaufTimelineItems(merged, today, nowHm, 30);
+  }, [data, today, nowHm]);
 
   const nextFocusEvent = useMemo(
     () => pickNextUpcomingAgendaItem(timelineItems, today, nowHm),
