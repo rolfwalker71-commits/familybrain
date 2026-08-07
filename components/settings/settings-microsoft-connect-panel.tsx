@@ -120,7 +120,8 @@ export function SettingsMicrosoftConnectPanel() {
           <span className="font-medium text-foreground">
             rolf.walker@an-group.one
           </span>
-          ). Getrennt von Google — Tokens nur für dich.
+          ). Getrennt von Google — Tokens nur für dich. Welche Kalender Buddy
+          zeigt, wählst du unten unter «Microsoft 365-Kalender».
         </p>
 
         {loading ? (

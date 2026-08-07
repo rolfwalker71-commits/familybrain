@@ -16,9 +16,18 @@ import {
   listGoogleHockeyGamesInRange,
 } from "@/lib/google/calendars";
 import {
+  getEnabledMicrosoftCalendarSelections,
+  listMicrosoftAgendaInRange,
+  microsoftCalendarSourceId,
+} from "@/lib/microsoft/calendars";
+import {
   hasGoogleCalendarScope,
   isGoogleMailConnected,
 } from "@/lib/google/oauth";
+import {
+  hasMicrosoftCalendarScope,
+  isMicrosoftConnected,
+} from "@/lib/microsoft/oauth";
 import {
   getSwissHolidays,
   holidayBadge,
@@ -178,9 +187,23 @@ export function listCalendarSources(userId: number | null): CalendarSource[] {
           enabled: true,
         }))
       : [];
+  const microsoftSelected =
+    userId != null &&
+    isMicrosoftConnected(userId) &&
+    hasMicrosoftCalendarScope(userId)
+      ? getEnabledMicrosoftCalendarSelections(userId).map((s) => ({
+          id: microsoftCalendarSourceId(s.id),
+          name: s.name || s.id.slice(0, 24),
+          color: s.color || ICS_TYPE_META[s.type || "other"].defaultColor,
+          type: (s.type || "other") as CalendarSource["type"],
+          builtin: true,
+          enabled: true,
+        }))
+      : [];
   return [
     ...ics,
     ...googleSelected,
+    ...microsoftSelected,
     {
       id: CALENDAR_SOURCE_HOLIDAYS,
       name: "Feiertage UR/ZH",
@@ -303,6 +326,11 @@ export async function getCalendarAgenda(options: {
     isGoogleMailConnected(options.userId) &&
     hasGoogleCalendarScope(options.userId);
 
+  const microsoftReady =
+    options.userId != null &&
+    isMicrosoftConnected(options.userId) &&
+    hasMicrosoftCalendarScope(options.userId);
+
   const hockeyIcs = enabledIcs.filter((c) => c.type === "hockey");
   const genericIcs = enabledIcs.filter((c) => c.type !== "hockey");
 
@@ -322,14 +350,25 @@ export async function getCalendarAgenda(options: {
     isGoogleMailConnected(options.userId) &&
     sourceAllowed(CALENDAR_SOURCE_PEOPLE_BIRTHDAYS, filterIds);
 
-  const [googleBundle, icsHockey, genericBatches, swissHolidays, peopleBirthdays] =
-    await Promise.all([
+  const [
+    googleBundle,
+    microsoftBundle,
+    icsHockey,
+    genericBatches,
+    swissHolidays,
+    peopleBirthdays,
+  ] = await Promise.all([
       googleReady
         ? listGoogleAgendaInRange(options.userId!, start, end).catch(() => ({
             events: [],
             hockey: [],
           }))
         : Promise.resolve({ events: [], hockey: [] }),
+      microsoftReady
+        ? listMicrosoftAgendaInRange(options.userId!, start, end).catch(
+            () => ({ events: [] })
+          )
+        : Promise.resolve({ events: [] }),
       loadHockeyGames(hockeyIcs),
       Promise.all(
         genericIcs.map(async (cal) => {
@@ -399,6 +438,42 @@ export async function getCalendarAgenda(options: {
       badge: ev.isBirthday
         ? "Geburtstag"
         : ICS_TYPE_META[ev.type]?.label || "Google",
+      time: ev.time,
+      endTime: ev.endTime,
+      location: ev.location,
+      meetUrl: ev.meetUrl,
+      description: ev.description,
+      accentColor: ev.color,
+      calendarType: ev.type,
+      calendarId: sourceId,
+      planningRelevant: ev.planningRelevant !== false,
+    });
+  }
+
+  for (const ev of microsoftBundle.events) {
+    const sourceId = microsoftCalendarSourceId(ev.calendarId);
+    if (!sourceAllowed(sourceId, filterIds)) continue;
+    if (
+      preferPeopleBirthdays &&
+      (ev.isBirthday ||
+        ev.type === "birthday" ||
+        looksLikeBirthdayTitle(ev.summary))
+    ) {
+      continue;
+    }
+    items.push({
+      id: `mscal-${ev.calendarId}-${ev.id}`,
+      kind: "calendar",
+      date: ev.date,
+      title: ev.summary,
+      subtitle: ev.location || ev.calendarName,
+      amount: null,
+      currency: null,
+      documentId: null,
+      href: ev.webLink,
+      badge: ev.isBirthday
+        ? "Geburtstag"
+        : ICS_TYPE_META[ev.type]?.label || "Outlook",
       time: ev.time,
       endTime: ev.endTime,
       location: ev.location,

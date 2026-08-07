@@ -1,6 +1,7 @@
 import { SettingsCalendarsPanel } from "@/components/settings/settings-calendars-panel";
 import { SettingsGoogleCalendarsPanel } from "@/components/settings/settings-google-calendars-panel";
 import { SettingsGoogleConnectPanel } from "@/components/settings/settings-google-connect-panel";
+import { SettingsMicrosoftCalendarsPanel } from "@/components/settings/settings-microsoft-calendars-panel";
 import { SettingsMicrosoftConnectPanel } from "@/components/settings/settings-microsoft-connect-panel";
 import { DriveMirrorStatusPanel } from "@/components/settings/drive-mirror-status-panel";
 import { PageHeader } from "@/components/layout/page-primitives";
@@ -24,6 +25,7 @@ export default function AccountPage() {
       </Suspense>
       <DriveMirrorStatusPanel />
       <SettingsGoogleCalendarsPanel />
+      <SettingsMicrosoftCalendarsPanel />
       <SettingsCalendarsPanel />
     </div>
   );
