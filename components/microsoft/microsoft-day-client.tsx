@@ -869,54 +869,6 @@ export function MicrosoftDayClient() {
                 </div>
               </div>
 
-              <div className="grid gap-3 md:grid-cols-2">
-                <Card className="border-border/70">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm">Posteingang</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    {inbox.length === 0 ? (
-                      <p className="text-xs text-muted-foreground">Keine.</p>
-                    ) : (
-                      inbox.slice(0, 12).map((m) => (
-                        <div key={m.id} className="border-b border-border/40 pb-2 last:border-0">
-                          <p className="text-sm font-medium leading-snug">
-                            {m.subject}
-                          </p>
-                          <p className="text-[11px] text-muted-foreground">
-                            {m.from}
-                          </p>
-                          <p className="line-clamp-2 text-xs text-muted-foreground">
-                            {m.preview}
-                          </p>
-                        </div>
-                      ))
-                    )}
-                  </CardContent>
-                </Card>
-                <Card className="border-border/70">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm">Gesendet</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    {sent.length === 0 ? (
-                      <p className="text-xs text-muted-foreground">Keine.</p>
-                    ) : (
-                      sent.slice(0, 10).map((m) => (
-                        <div key={m.id} className="border-b border-border/40 pb-2 last:border-0">
-                          <p className="text-sm font-medium leading-snug">
-                            {m.subject}
-                          </p>
-                          <p className="line-clamp-2 text-xs text-muted-foreground">
-                            {m.preview}
-                          </p>
-                        </div>
-                      ))
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-
               {analysis ? (
                 <Card className="border-border/70">
                   <CardHeader>
@@ -1129,6 +1081,55 @@ export function MicrosoftDayClient() {
                   </CardContent>
                 </Card>
               ) : null}
+
+              <div className="grid gap-3 md:grid-cols-2">
+                <Card className="border-border/70">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">Posteingang</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {inbox.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">Keine.</p>
+                    ) : (
+                      inbox.slice(0, 12).map((m) => (
+                        <div key={m.id} className="border-b border-border/40 pb-2 last:border-0">
+                          <p className="text-sm font-medium leading-snug">
+                            {m.subject}
+                          </p>
+                          <p className="text-[11px] text-muted-foreground">
+                            {m.from}
+                          </p>
+                          <p className="line-clamp-2 text-xs text-muted-foreground">
+                            {m.preview}
+                          </p>
+                        </div>
+                      ))
+                    )}
+                  </CardContent>
+                </Card>
+                <Card className="border-border/70">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">Gesendet</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {sent.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">Keine.</p>
+                    ) : (
+                      sent.slice(0, 10).map((m) => (
+                        <div key={m.id} className="border-b border-border/40 pb-2 last:border-0">
+                          <p className="text-sm font-medium leading-snug">
+                            {m.subject}
+                          </p>
+                          <p className="line-clamp-2 text-xs text-muted-foreground">
+                            {m.preview}
+                          </p>
+                        </div>
+                      ))
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+
             </section>
           )}
         </>
