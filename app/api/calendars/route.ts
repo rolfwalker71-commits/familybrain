@@ -4,6 +4,7 @@ import { isAuthError, requireAuth } from "@/lib/auth/current-user";
 import { ensureInitialized } from "@/lib/db/migrations";
 import {
   deleteIcsCalendar,
+  ensureAmbriForUser,
   ICS_CALENDAR_TYPES,
   ICS_TYPE_META,
   listIcsCalendarsForOwner,
@@ -50,6 +51,16 @@ export async function PUT(request: Request) {
   const userId = resolveCalendarUserId(auth);
   try {
     const body = await request.json();
+    if (body?.action === "addAmbri") {
+      if (userId == null) {
+        return NextResponse.json(
+          { error: "Kein App-User für Kalender." },
+          { status: 400 }
+        );
+      }
+      const calendars = ensureAmbriForUser(userId);
+      return NextResponse.json({ ok: true, calendars, ownerUserId: userId });
+    }
     const parsed = UpsertSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(

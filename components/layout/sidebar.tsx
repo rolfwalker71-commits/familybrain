@@ -109,6 +109,12 @@ const myBrainNavItems: NavItem[] = [
     tone: pageVisuals.chat.tone,
   },
   {
+    href: "/account",
+    label: "Konto",
+    icon: pageVisuals.account.icon,
+    tone: pageVisuals.account.tone,
+  },
+  {
     href: "/settings",
     label: "Einstellungen",
     icon: pageVisuals.settings.icon,
@@ -138,7 +144,16 @@ const finanzBuddyItem: NavItem = {
   tone: pageVisuals.financeBrain.tone,
 };
 
-const limitedUserNavItems: NavItem[] = [travelBuddyItem, finanzBuddyItem];
+const limitedUserNavItems: NavItem[] = [
+  travelBuddyItem,
+  finanzBuddyItem,
+  {
+    href: "/account",
+    label: "Konto",
+    icon: pageVisuals.account.icon,
+    tone: pageVisuals.account.tone,
+  },
+];
 
 type AreaEntry = {
   mode: Exclude<AdminNavMode, "home">;

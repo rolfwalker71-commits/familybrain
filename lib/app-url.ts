@@ -2,11 +2,26 @@ import { getSetting } from "@/lib/db/migrations";
 
 const APP_PUBLIC_URL_KEY = "app_public_url";
 
+/** Settings DB first, then env (Docker/production), then callers use request host. */
 export function getAppPublicUrlSetting(): string | null {
   const raw = getSetting(APP_PUBLIC_URL_KEY)?.trim() || null;
-  if (!raw) return null;
+  if (raw) {
+    try {
+      const url = new URL(raw);
+      if (url.protocol === "http:" || url.protocol === "https:") {
+        return `${url.protocol}//${url.host}`;
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  const fromEnv =
+    process.env.APP_PUBLIC_URL?.trim() ||
+    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+    null;
+  if (!fromEnv) return null;
   try {
-    const url = new URL(raw);
+    const url = new URL(fromEnv);
     if (url.protocol !== "http:" && url.protocol !== "https:") return null;
     return `${url.protocol}//${url.host}`;
   } catch {

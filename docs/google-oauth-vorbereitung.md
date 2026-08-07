@@ -62,7 +62,7 @@ Phase 1 Mail: nur die ersten zwei. Geburtstage: mindestens `calendar.readonly` d
 3. **Autorisierte Weiterleitungs-URIs** (Platzhalter — exakte Pfade bei Umsetzung):
 
 ```
-https://<buddy-domain>/api/google/oauth/callback
+https://buddyapp.rolfwalker.ch/api/google/oauth/callback
 ```
 
 Lokal optional (Docker-Host-Port **3100**); Google akzeptiert localhost nicht immer — dann nur über HTTPS-Produktion verbinden:
@@ -71,7 +71,7 @@ Lokal optional (Docker-Host-Port **3100**); Google akzeptiert localhost nicht im
 http://localhost:3100/api/google/oauth/callback
 ```
 
-*(Ein gemeinsamer Callback für Mail + Kalender/Geburtstage ist sinnvoller als getrennte Clients.)*
+Buddy baut die Redirect-URI aus `APP_PUBLIC_URL` / Einstellung «Öffentliche App-URL» + Pfad `/api/google/oauth/callback`.
 
 4. **Client-ID** und **Client-Secret** sicher notieren → später in Buddy-Settings / `.env`, **nicht ins Git**
 

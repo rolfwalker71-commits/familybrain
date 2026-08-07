@@ -36,8 +36,9 @@ services:
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       SMTP_FROM: ${SMTP_FROM:-}
-      # Sofascore RapidAPI (Hockey logos + results) — or set in UI
-      SOFASCORE_RAPIDAPI_KEY: ${SOFASCORE_RAPIDAPI_KEY:-}
+      # Public HTTPS origin (OAuth redirect, push links, …)
+      # Example: https://buddyapp.rolfwalker.ch
+      APP_PUBLIC_URL: ${APP_PUBLIC_URL:-}
       # Web Push (VAPID) — set in host .env, see docs/web-push.md
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}

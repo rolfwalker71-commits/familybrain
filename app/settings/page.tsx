@@ -2009,10 +2009,11 @@ function SettingsPageInner() {
               id="appPublicUrl"
               value={appPublicUrl}
               onChange={(e) => setAppPublicUrl(e.target.value)}
-              placeholder="https://familybrain.example.com"
+              placeholder="https://buddyapp.rolfwalker.ch"
             />
             <p className="text-xs text-muted-foreground">
-              Basis für Links in Mails (Inbox, Einladungen) — nicht localhost.
+              Basis für OAuth-Redirect, Push- und Mail-Links — nicht localhost.
+              Alternativ Env <code className="text-[11px]">APP_PUBLIC_URL</code>.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -2567,6 +2568,13 @@ function SettingsPageInner() {
       {activeTab === "family" ? <SettingsFamilyPanel /> : null}
       {activeTab === "calendars" ? (
         <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Persönliche ICS-Feeds verwalten die User unter{" "}
+            <a href="/account" className="underline underline-offset-2">
+              Konto → Meine Kalender
+            </a>
+            . Hier zusätzlich Google OAuth (App-weit Client-ID/Secret).
+          </p>
           <SettingsCalendarsPanel />
           <SettingsGooglePanel />
         </div>

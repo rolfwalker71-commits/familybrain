@@ -29,7 +29,7 @@ Buddy zeigt Gmail zentral — lesen/überblicken, kein voller Client.
 **Ausreichend (empfohlen):** nur die öffentliche Buddy-URL — OAuth dort verbinden:
 
 ```
-https://<buddy-domain>/api/google/oauth/callback
+https://buddyapp.rolfwalker.ch/api/google/oauth/callback
 ```
 
 Lokal (Docker) wäre der Host-Port **3100**, nicht 3000:
@@ -38,7 +38,7 @@ Lokal (Docker) wäre der Host-Port **3100**, nicht 3000:
 http://localhost:3100/api/google/oauth/callback
 ```
 
-Google lässt `http://localhost` manchmal nicht zu bzw. ist unnötig, wenn du die Verbindung über die HTTPS-Produktions-URL herstellst. Die Redirect-URI in den Buddy-Einstellungen folgt `app_public_url` bzw. dem aktuellen Host.
+Google lässt `http://localhost` manchmal nicht zu bzw. ist unnötig, wenn du die Verbindung über die HTTPS-Produktions-URL herstellst. Die Redirect-URI in Buddy folgt `app_public_url` (UI) bzw. Env `APP_PUBLIC_URL` bzw. dem Request-Host.
 
 ## Setup kurz
 
@@ -50,4 +50,4 @@ Google lässt `http://localhost` manchmal nicht zu bzw. ist unnötig, wenn du di
 
 ## Noch nicht
 
-- Als gelesen markieren, Senden, Labels/Filter, Geburtstage via Calendar API
+- Als gelesen markieren, Senden, Labels/Filter

@@ -132,6 +132,29 @@ export function SettingsCalendarsPanel() {
     }
   }
 
+  async function addAmbri() {
+    setBusy(true);
+    setError(null);
+    setStatus(null);
+    try {
+      const res = await fetch("/api/calendars", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "addAmbri" }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Ambri hinzufügen fehlgeschlagen");
+      }
+      setCalendars(data.calendars || []);
+      setStatus("Ambri-Kalender hinzugefügt.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function saveEdit() {
     if (!editId) return;
     setBusy(true);
@@ -184,10 +207,9 @@ export function SettingsCalendarsPanel() {
 
   async function removeCalendar(id: string) {
     const row = calendars.find((c) => c.id === id);
-    const msg = row?.builtin
-      ? "Ambri-Kalender ausblenden?"
-      : `Kalender «${row?.name || id}» wirklich löschen?`;
-    if (!window.confirm(msg)) return;
+    if (!window.confirm(`Kalender «${row?.name || id}» wirklich löschen?`)) {
+      return;
+    }
     setBusy(true);
     setError(null);
     setStatus(null);
@@ -198,7 +220,7 @@ export function SettingsCalendarsPanel() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Löschen fehlgeschlagen");
       setCalendars(data.calendars || []);
-      setStatus(row?.builtin ? "Ambri ausgeblendet." : "Kalender gelöscht.");
+      setStatus("Kalender gelöscht.");
       if (editId === id) setEditId(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -222,15 +244,15 @@ export function SettingsCalendarsPanel() {
       <CardHeader>
         <CardTitle className="flex items-center gap-3">
           <IconCircle icon={CalendarDays} tone="teal" size="sm" />
-          Kalender (ICS)
+          Meine Kalender (ICS)
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
         <p className="text-sm text-muted-foreground">
-          Deine persönlichen ICS-Kalender (nicht zentral für alle). Öffentliche
-          ICS-URLs (z.&nbsp;B. Google «Geheimadresse im iCal-Format»). Typ
-          steuert das Agenda-Icon, Farbe den linken Rand. Ambri bleibt als
-          Hockey-Feed mit Logos/Sofascore und kann nur ein-/ausgeblendet werden.
+          Hier trägst <span className="font-medium text-foreground">du</span>{" "}
+          deine eigenen ICS-Feeds ein (Name, URL, Typ, Farbe) — kein gemeinsames
+          Vordefinieren für alle. Die Filter-Chips im Kalender blenden nur aus,
+          was du hier angelegt hast. Ambri/Hockey ist optional (Vorlage unten).
         </p>
 
         {error ? (
@@ -395,7 +417,7 @@ export function SettingsCalendarsPanel() {
                         onClick={() => void removeCalendar(c.id)}
                       >
                         <Trash2 className="size-3.5" />
-                        {c.builtin ? "Ausblenden" : "Löschen"}
+                        Löschen
                       </Button>
                     </div>
                   </div>
@@ -410,6 +432,22 @@ export function SettingsCalendarsPanel() {
             <Plus className="size-4" />
             Kalender hinzufügen
           </p>
+          {!calendars.some((c) => c.id === "builtin-ambri") ? (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-muted/40 px-3 py-2 text-sm">
+              <span className="text-muted-foreground">
+                Optional: öffentlicher Ambri-Spielplan (ICS) für Logos/Resultate
+              </span>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={busy}
+                onClick={() => void addAmbri()}
+              >
+                Ambri hinzufügen
+              </Button>
+            </div>
+          ) : null}
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="cal-new-name">Name</Label>

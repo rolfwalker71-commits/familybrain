@@ -123,7 +123,7 @@ export function CalendarPageClient() {
         <p className="text-xs text-muted-foreground">
           {toSwissDate(rangeStart)} – {toSwissDate(rangeEnd)}
           <Link
-            href="/settings?tab=calendars"
+            href="/account"
             className="ml-3 font-medium text-[var(--brand-docs)] underline-offset-2 hover:underline"
           >
             Kalender verwalten →

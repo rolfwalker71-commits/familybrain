@@ -209,6 +209,7 @@ export const pageVisuals = {
   travel: appIcons.travel,
   trips: appIcons.trips,
   settings: appIcons.settings,
+  account: appIcons.account,
   summaries: appIcons.summaries,
   guides: appIcons.guides,
 } as const;

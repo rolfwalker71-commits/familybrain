@@ -295,13 +295,6 @@ export function deleteIcsCalendar(
   userId: number | null,
   id: string
 ): IcsCalendar[] {
-  if (id === AMBRI_CALENDAR_ID) {
-    const ambri =
-      listIcsCalendarsForOwner(userId).find(
-        (c) => c.id === AMBRI_CALENDAR_ID
-      ) || ambriSeed();
-    return upsertIcsCalendar(userId, { ...ambri, enabled: false });
-  }
   return saveIcsCalendars(
     userId,
     listIcsCalendarsForOwner(userId).filter((c) => c.id !== id)
