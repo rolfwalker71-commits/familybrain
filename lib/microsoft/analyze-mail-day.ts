@@ -5,6 +5,11 @@ import {
 } from "@/lib/ai/usage-cost";
 import { emailDomain } from "@/lib/mail/mail-sender-prefs";
 import type { MsMailItem } from "@/lib/microsoft/mail-day";
+import {
+  detectReplyLanguage,
+  normalizeReplySubject,
+  type ReplyLang,
+} from "@/lib/microsoft/reply-language-shared";
 import { addDaysYmd } from "@/lib/microsoft/time";
 import { z } from "zod";
 
@@ -45,6 +50,8 @@ export const MsDayReplyDraftSchema = z.object({
   to: z.string().min(3).max(200),
   subject: z.string().min(1).max(300),
   body: z.string().min(1).max(4000),
+  /** Sprache des Antworttexts — muss zur Kunden-Anfrage passen. */
+  language: z.enum(["de", "en"]).optional(),
   sourceMailId: z.string().max(200).nullable().optional(),
   company: z.string().max(120).nullable().optional(),
   theme: z.string().max(200).nullable().optional(),
@@ -273,6 +280,7 @@ function formatMailBlock(m: MsMailItem, indexLabel: string): string {
     m.folder === "inbox"
       ? senderDisplayName(m.from, m.fromEmail)
       : senderDisplayName(m.toPreview, m.toEmails?.[0]);
+  const langHint = detectReplyLanguage(`${m.subject}\n${body}`);
   return `[${indexLabel}|${m.folder}|id=${m.id}|conv=${m.conversationId || "—"}]
 Gegenstelle: ${company || "unbekannt"}${email ? ` <${email}>` : ""}
 Absender-Name für Aufgaben: ${absender || "—"}
@@ -280,6 +288,7 @@ Von: ${m.from}${m.fromEmail ? ` <${m.fromEmail}>` : ""}
 An: ${m.toPreview || "—"}
 Betreff: ${m.subject}
 Zeit: ${m.receivedOrSentAt || "—"}
+Textsprache (Heuristik): ${langHint === "en" ? "EN" : "DE"}
 Text:
 ${body || "(leer)"}`;
 }
@@ -491,9 +500,15 @@ function enrichCluster(
           sender.email,
           mail?.folder === "inbox" ? mail.fromEmail : mail?.toEmails?.[0]
         ) || "";
+      // Aktuelle Textsprache (für UI-Toggle); Prompt soll schon korrekt liefern.
+      const bodyLang = detectReplyLanguage(`${r.subject}\n${r.body}`);
+      const lang: ReplyLang =
+        r.language === "en" || r.language === "de" ? r.language : bodyLang;
       return {
         ...r,
         to,
+        language: lang,
+        subject: normalizeReplySubject(r.subject, lang),
         sourceMailId:
           r.sourceMailId && idSet.has(r.sourceMailId)
             ? r.sourceMailId
@@ -593,7 +608,11 @@ REPLIES (sehr wichtig — oft vergessen):
 - Pflicht, wenn die letzte relevante Inbox-Mail eine Frage, Bitte, Termin-/Preis-Anfrage, Freigabe, Lieferinfo oder sonstige Rückmeldung erwartet — auch wenn du parallel eine Task anlegst.
 - Typische Paare: Task «Problem beheben» + Reply «kurze Zwischenantwort / ETA»; Task «Angebot prüfen» + Reply «danke, wir melden uns bis …».
 - VERBOTEN: nur Task «Antworten an …» / «Rückmeldung an …» / «Bescheid geben» OHNE replies[] — der Text gehört in replies.body.
-- Sprache = Sprache der Kunden-Anfrage (EN→EN subject «Re: …», DE→DE «AW: …»). body höflich, knapp, absendfertig (Anrede + Schlussformel).
+- SPRACHE (hart): Schreibe subject+body AUSSCHLIESSLICH in der Sprache der Kunden-Anfrage (Inbox-Text / «Textsprache»). Buddy-UI ist Deutsch — das ist IRRELEVANT für den Reply.
+  · Kundenmail EN (z. B. «Dear…», «please», englischer Fliesstext) → language="en", subject «Re: …», body komplett Englisch (Dear… / Best regards).
+  · Kundenmail DE → language="de", subject «AW: …», body komplett Deutsch.
+  · Nie deutschen Reply auf englische Anfrage und umgekehrt. Feld "language" immer setzen.
+- body höflich, knapp, absendfertig (Anrede + Schlussformel).
 - Kein Reply bei reiner FYI/Newsletter/Werbung oder wenn du im Thread bereits klar geantwortet hast und nichts Offen ist.
 
 EVENTS: nur bei klarem Datum/Zeit.
@@ -651,8 +670,9 @@ JSON-Schema:
       "replies": [
         {
           "to": "name@firma.ch",
-          "subject": "Re: … oder AW: …",
-          "body": "Fertige Antwort in der Sprache der Anfrage (Anrede + Inhalt + Gruss)",
+          "subject": "Re: … (EN) oder AW: … (DE)",
+          "body": "Fertige Antwort NUR in language (Anrede + Inhalt + Gruss)",
+          "language": "en"|"de",
           "sourceMailId": "id der Inbox-Mail"|null,
           "company": "…"|null,
           "reason": "warum Antwort nötig"

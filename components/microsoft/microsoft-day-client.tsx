@@ -34,6 +34,10 @@ import { formatTokenUsageLine } from "@/lib/ai/usage-cost";
 import type { AiTokenUsage } from "@/lib/ai/usage-cost";
 import { toSwissDate } from "@/lib/utils/dates";
 import { MicrosoftMailInboxPanel } from "@/components/microsoft/microsoft-mail-inbox-panel";
+import {
+  detectReplyLanguage,
+  type ReplyLang,
+} from "@/lib/microsoft/reply-language-shared";
 
 function zurichYmdClient(d = new Date()): string {
   return new Intl.DateTimeFormat("en-CA", {
@@ -138,11 +142,56 @@ type DayReply = {
   to: string;
   subject: string;
   body: string;
+  language?: ReplyLang | null;
   sourceMailId?: string | null;
   company?: string | null;
   theme?: string | null;
   reason?: string;
 };
+
+function currentReplyLang(r: DayReply): ReplyLang {
+  if (r.language === "en" || r.language === "de") return r.language;
+  return detectReplyLanguage(`${r.subject}\n${r.body}`);
+}
+
+function ReplyLangToggle({
+  lang,
+  busy,
+  onChange,
+}: {
+  lang: ReplyLang;
+  busy: boolean;
+  onChange: (lang: ReplyLang) => void;
+}) {
+  return (
+    <div
+      className="inline-flex items-center gap-0.5 rounded-md border border-border/60 p-0.5"
+      onClick={(e) => e.preventDefault()}
+      onKeyDown={(e) => e.stopPropagation()}
+    >
+      {(["de", "en"] as const).map((code) => (
+        <button
+          key={code}
+          type="button"
+          disabled={busy}
+          className={cn(
+            "rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase",
+            lang === code
+              ? "bg-muted text-foreground"
+              : "text-muted-foreground hover:text-foreground"
+          )}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onChange(code);
+          }}
+        >
+          {code}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 type DayCluster = {
   company: string;
@@ -217,6 +266,9 @@ export function MicrosoftDayClient() {
   const [draftTasks, setDraftTasks] = useState<DayTask[]>([]);
   const [draftEvents, setDraftEvents] = useState<DayEventSug[]>([]);
   const [draftReplies, setDraftReplies] = useState<DayReply[]>([]);
+  const [translatingReply, setTranslatingReply] = useState<string | null>(
+    null
+  );
   const pollRef = useRef<number | null>(null);
 
   const loadConnection = useCallback(async () => {
@@ -702,6 +754,89 @@ export function MicrosoftDayClient() {
     for (let c = 0; c < clusterIdx; c++)
       n += analysis.clusters[c]?.replies.length || 0;
     return n + localIdx;
+  }
+
+  async function translateReplyFields(
+    reply: DayReply,
+    targetLang: ReplyLang
+  ): Promise<DayReply> {
+    if (currentReplyLang(reply) === targetLang) return reply;
+    const res = await fetch("/api/microsoft/mail/translate-reply", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        subject: reply.subject,
+        body: reply.body,
+        targetLang,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.error || `Übersetzung fehlgeschlagen (${res.status})`);
+    }
+    return {
+      ...reply,
+      subject: String(data.subject || reply.subject),
+      body: String(data.body || reply.body),
+      language: data.language === "en" ? "en" : "de",
+    };
+  }
+
+  async function changeAnalysisReplyLanguage(
+    flatIndex: number,
+    targetLang: ReplyLang
+  ) {
+    if (!analysis) return;
+    const reply = analysis.replies[flatIndex];
+    if (!reply) return;
+    if (currentReplyLang(reply) === targetLang) return;
+    const key = `a-${flatIndex}`;
+    setTranslatingReply(key);
+    setError(null);
+    try {
+      const next = await translateReplyFields(reply, targetLang);
+      setAnalysis((prev) => {
+        if (!prev) return prev;
+        let n = 0;
+        const clusters = prev.clusters.map((c) => ({
+          ...c,
+          replies: c.replies.map((r) => {
+            const idx = n++;
+            return idx === flatIndex ? { ...r, ...next } : r;
+          }),
+        }));
+        const replies = prev.replies.map((r, i) =>
+          i === flatIndex ? { ...r, ...next } : r
+        );
+        return { ...prev, clusters, replies };
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setTranslatingReply(null);
+    }
+  }
+
+  async function changeDraftReplyLanguage(
+    draftIndex: number,
+    targetLang: ReplyLang
+  ) {
+    const reply = draftReplies[draftIndex];
+    if (!reply) return;
+    if (currentReplyLang(reply) === targetLang) return;
+    const key = `d-${draftIndex}`;
+    setTranslatingReply(key);
+    setError(null);
+    try {
+      const next = await translateReplyFields(reply, targetLang);
+      setDraftReplies((prev) =>
+        prev.map((r, i) => (i === draftIndex ? { ...r, ...next } : r))
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setTranslatingReply(null);
+    }
   }
 
   return (
@@ -1228,6 +1363,8 @@ export function MicrosoftDayClient() {
                                 </p>
                                 {cluster.replies.map((r, li) => {
                                   const i = flatReplyIndex(ci, li);
+                                  const lang = currentReplyLang(r);
+                                  const busy = translatingReply === `a-${i}`;
                                   return (
                                     <label
                                       key={`r-${ci}-${li}`}
@@ -1247,13 +1384,26 @@ export function MicrosoftDayClient() {
                                           }))
                                         }
                                       />
-                                      <span className="min-w-0">
-                                        <span className="block text-sm font-medium">
-                                          {r.subject}
+                                      <span className="min-w-0 flex-1">
+                                        <span className="flex flex-wrap items-start justify-between gap-2">
+                                          <span className="block text-sm font-medium">
+                                            {r.subject}
+                                          </span>
+                                          <ReplyLangToggle
+                                            lang={lang}
+                                            busy={busy}
+                                            onChange={(next) =>
+                                              void changeAnalysisReplyLanguage(
+                                                i,
+                                                next
+                                              )
+                                            }
+                                          />
                                         </span>
                                         <span className="block text-[11px] text-muted-foreground">
                                           An {r.to}
                                           {r.reason ? ` · ${r.reason}` : ""}
+                                          {busy ? " · übersetzt…" : ""}
                                         </span>
                                         <span className="mt-1 block whitespace-pre-wrap text-xs text-foreground/80">
                                           {r.body}
@@ -1478,11 +1628,22 @@ export function MicrosoftDayClient() {
                 </div>
               </div>
             ))}
-            {draftReplies.map((r, i) => (
+            {draftReplies.map((r, i) => {
+              const lang = currentReplyLang(r);
+              const busy = translatingReply === `d-${i}`;
+              return (
               <div key={`dr-${i}`} className="space-y-2 rounded-lg border border-border/60 p-3">
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Antwort · Outlook Entwurf
-                </p>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Antwort · Outlook Entwurf
+                    {busy ? " · übersetzt…" : ""}
+                  </p>
+                  <ReplyLangToggle
+                    lang={lang}
+                    busy={busy || applying}
+                    onChange={(next) => void changeDraftReplyLanguage(i, next)}
+                  />
+                </div>
                 <div className="space-y-1">
                   <Label>An</Label>
                   <Input
@@ -1524,7 +1685,8 @@ export function MicrosoftDayClient() {
                   />
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
           <DialogFooter className="border-t border-border/60 px-4 py-3">
             <Button
