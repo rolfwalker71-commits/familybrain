@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CalendarRange, Link2 } from "lucide-react";
+import { CalendarRange, ChevronDown, Link2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -89,6 +89,7 @@ export function SettingsGoogleCalendarsPanel() {
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [draft, setDraft] = useState<Record<string, DraftRow>>({});
+  const [open, setOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -217,15 +218,48 @@ export function SettingsGoogleCalendarsPanel() {
     });
   }, [calendars, draft]);
 
+  const activeCount = useMemo(
+    () => calendars.filter((c) => draft[c.id]?.on).length,
+    [calendars, draft]
+  );
+
+  const collapsedHint = loading
+    ? "Lädt…"
+    : !connected
+      ? "Nicht verbunden"
+      : !hasCalendarScope
+        ? "Recht fehlt"
+        : `${activeCount} aktiv`;
+
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-3">
-          <IconCircle icon={CalendarRange} tone="teal" size="sm" />
-          Google-Kalender
-        </CardTitle>
+      <CardHeader className="pb-4">
+        <button
+          type="button"
+          className="flex w-full items-center gap-3 rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          aria-expanded={open}
+          onClick={() => setOpen((v) => !v)}
+        >
+          <CardTitle className="flex min-w-0 flex-1 items-center gap-3">
+            <IconCircle icon={CalendarRange} tone="teal" size="sm" />
+            <span className="min-w-0 flex-1 truncate">Google-Kalender</span>
+            {!open ? (
+              <span className="shrink-0 text-sm font-normal text-muted-foreground">
+                {collapsedHint}
+              </span>
+            ) : null}
+          </CardTitle>
+          <ChevronDown
+            className={cn(
+              "size-4 shrink-0 text-muted-foreground transition-transform",
+              open && "rotate-180"
+            )}
+            aria-hidden
+          />
+        </button>
       </CardHeader>
-      <CardContent className="space-y-4">
+      {open ? (
+      <CardContent className="space-y-4 pt-0">
         <p className="text-sm text-muted-foreground">
           Kalender aus deinem Google-Konto anhaken und Typ/Farbe setzen.
           «Relevant für Terminplanung» steuert, ob Termine den Fokus «nächster
@@ -441,6 +475,7 @@ export function SettingsGoogleCalendarsPanel() {
           </>
         )}
       </CardContent>
+      ) : null}
     </Card>
   );
 }

@@ -331,47 +331,77 @@ export async function fetchDailyForecast(
     signal: AbortSignal.timeout(12000),
     cache: "no-store",
   });
+
+  const swiss = isSwissApprox(lat, lon);
   if (!res.ok) {
+    if (!swiss) throw new Error(`Open-Meteo HTTP ${res.status}`);
     // Fallback ohne Modellzwang (ältere Open-Meteo / ausserhalb Modellgebiet)
-    if (isSwissApprox(lat, lon)) {
-      const fallback = new URL("https://api.open-meteo.com/v1/forecast");
-      fallback.searchParams.set("latitude", String(lat));
-      fallback.searchParams.set("longitude", String(lon));
-      fallback.searchParams.set(
-        "daily",
-        "weather_code,temperature_2m_max,temperature_2m_min"
-      );
-      fallback.searchParams.set("timezone", "Europe/Zurich");
-      fallback.searchParams.set(
-        "forecast_days",
-        String(Math.min(16, Math.max(1, forecastDays)))
-      );
-      if (pastDays > 0) {
-        fallback.searchParams.set("past_days", String(Math.min(92, pastDays)));
-      }
-      const res2 = await fetch(fallback.toString(), {
-        headers: {
-          Accept: "application/json",
-          "User-Agent":
-            "BuddyApp/1.0 (https://github.com/rolfwalker71-commits/familybrain)",
-        },
-        signal: AbortSignal.timeout(12000),
-        cache: "no-store",
-      });
-      if (!res2.ok) throw new Error(`Open-Meteo HTTP ${res2.status}`);
-      return parseDailyForecastJson(await res2.json());
-    }
-    throw new Error(`Open-Meteo HTTP ${res.status}`);
+    return fetchDailyForecastDefaultModel(lat, lon, forecastDays, pastDays);
   }
-  return parseDailyForecastJson(await res.json());
+
+  let days = parseDailyForecastJson(await res.json());
+  // icon_eu deckt oft nur ~5 Tage ab (danach null). Fehlende Tage mit
+  // Default-Modell ergänzen — nie null als 0°/Klar anzeigen.
+  if (swiss && days.length < Math.min(16, Math.max(1, forecastDays))) {
+    try {
+      const fill = await fetchDailyForecastDefaultModel(
+        lat,
+        lon,
+        forecastDays,
+        pastDays
+      );
+      const byDate = new Map(days.map((d) => [d.date, d]));
+      for (const d of fill) {
+        if (!byDate.has(d.date)) byDate.set(d.date, d);
+      }
+      days = [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
+    } catch {
+      // Nur die gültigen icon_eu-Tage behalten
+    }
+  }
+  return days;
+}
+
+async function fetchDailyForecastDefaultModel(
+  lat: number,
+  lon: number,
+  forecastDays: number,
+  pastDays: number
+): Promise<DayWeather[]> {
+  const fallback = new URL("https://api.open-meteo.com/v1/forecast");
+  fallback.searchParams.set("latitude", String(lat));
+  fallback.searchParams.set("longitude", String(lon));
+  fallback.searchParams.set(
+    "daily",
+    "weather_code,temperature_2m_max,temperature_2m_min"
+  );
+  fallback.searchParams.set("timezone", "Europe/Zurich");
+  fallback.searchParams.set(
+    "forecast_days",
+    String(Math.min(16, Math.max(1, forecastDays)))
+  );
+  if (pastDays > 0) {
+    fallback.searchParams.set("past_days", String(Math.min(92, pastDays)));
+  }
+  const res2 = await fetch(fallback.toString(), {
+    headers: {
+      Accept: "application/json",
+      "User-Agent":
+        "BuddyApp/1.0 (https://github.com/rolfwalker71-commits/familybrain)",
+    },
+    signal: AbortSignal.timeout(12000),
+    cache: "no-store",
+  });
+  if (!res2.ok) throw new Error(`Open-Meteo HTTP ${res2.status}`);
+  return parseDailyForecastJson(await res2.json());
 }
 
 function parseDailyForecastJson(data: {
   daily?: {
     time?: string[];
-    weather_code?: number[];
-    temperature_2m_max?: number[];
-    temperature_2m_min?: number[];
+    weather_code?: (number | null)[];
+    temperature_2m_max?: (number | null)[];
+    temperature_2m_min?: (number | null)[];
   };
 }): DayWeather[] {
   const times = data.daily?.time || [];
@@ -381,15 +411,32 @@ function parseDailyForecastJson(data: {
   const out: DayWeather[] = [];
   for (let i = 0; i < times.length; i += 1) {
     const date = times[i];
-    const code = Math.round(Number(codes[i]));
-    const tmax = Number(maxes[i]);
-    const tmin = Number(mins[i]);
-    if (!date || !Number.isFinite(tmax) || !Number.isFinite(code)) continue;
+    // Open-Meteo liefert oft null für fehlende Tage; Number(null) === 0
+    // würde fälschlich als 0° / Klar (Code 0) erscheinen.
+    const rawMax = maxes[i];
+    const rawMin = mins[i];
+    const rawCode = codes[i];
+    if (
+      !date ||
+      rawMax == null ||
+      rawCode == null ||
+      typeof rawMax !== "number" ||
+      typeof rawCode !== "number"
+    ) {
+      continue;
+    }
+    const tmax = rawMax;
+    const tmin =
+      rawMin != null && typeof rawMin === "number" && Number.isFinite(rawMin)
+        ? rawMin
+        : tmax;
+    const code = Math.round(rawCode);
+    if (!Number.isFinite(tmax) || !Number.isFinite(code)) continue;
     out.push({
       date: date.slice(0, 10),
       temperatureMaxC: tmax,
-      temperatureMinC: Number.isFinite(tmin) ? tmin : tmax,
-      temperatureC: Number.isFinite(tmin) ? (tmax + tmin) / 2 : tmax,
+      temperatureMinC: tmin,
+      temperatureC: (tmax + tmin) / 2,
       weatherCode: code,
       weatherLabelDe: weatherCodeLabelDe(code),
     });

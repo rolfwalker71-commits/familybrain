@@ -318,7 +318,10 @@ function HomeWeatherWidget({ weather }: { weather: HomeWeatherCard }) {
 
       {week.length > 0 ? (
         <ul
-          className="mt-2.5 grid grid-cols-7 gap-0.5 border-t border-sky-200/60 pt-2"
+          className="mt-2.5 grid gap-0.5 border-t border-sky-200/60 pt-2"
+          style={{
+            gridTemplateColumns: `repeat(${Math.min(7, Math.max(1, week.length))}, minmax(0, 1fr))`,
+          }}
           aria-label="Wetter Woche"
         >
           {week.map((day, i) => (

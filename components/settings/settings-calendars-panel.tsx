@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CalendarDays, Pencil, Plus, Trash2 } from "lucide-react";
+import { CalendarDays, ChevronDown, Pencil, Plus, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { IconCircle } from "@/components/layout/icon-circle";
+import { cn } from "@/lib/utils";
 
 type CalType =
   | "hockey"
@@ -75,6 +76,7 @@ export function SettingsCalendarsPanel() {
   const [editColor, setEditColor] = useState("#64748b");
   const [editPlanningRelevant, setEditPlanningRelevant] = useState(true);
   const [newPlanningRelevant, setNewPlanningRelevant] = useState(true);
+  const [open, setOpen] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -273,13 +275,33 @@ export function SettingsCalendarsPanel() {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-3">
-          <IconCircle icon={CalendarDays} tone="teal" size="sm" />
-          Meine Kalender (ICS)
-        </CardTitle>
+      <CardHeader className="pb-4">
+        <button
+          type="button"
+          className="flex w-full items-center gap-3 rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          aria-expanded={open}
+          onClick={() => setOpen((v) => !v)}
+        >
+          <CardTitle className="flex min-w-0 flex-1 items-center gap-3">
+            <IconCircle icon={CalendarDays} tone="teal" size="sm" />
+            <span className="min-w-0 flex-1 truncate">Meine Kalender (ICS)</span>
+            {!open ? (
+              <span className="shrink-0 text-sm font-normal text-muted-foreground">
+                {loading ? "Lädt…" : `${calendars.length} eingetragen`}
+              </span>
+            ) : null}
+          </CardTitle>
+          <ChevronDown
+            className={cn(
+              "size-4 shrink-0 text-muted-foreground transition-transform",
+              open && "rotate-180"
+            )}
+            aria-hidden
+          />
+        </button>
       </CardHeader>
-      <CardContent className="space-y-6">
+      {open ? (
+      <CardContent className="space-y-6 pt-0">
         <p className="text-sm text-muted-foreground">
           Zusätzliche öffentliche ICS-URLs (z.&nbsp;B. Schulen, Gemeinden) —
           unabhängig von Google. Google-Kalender oben anhaken, statt sie hier
@@ -602,6 +624,7 @@ export function SettingsCalendarsPanel() {
           </Button>
         </div>
       </CardContent>
+      ) : null}
     </Card>
   );
 }
