@@ -22,7 +22,7 @@ test("birthday prompt has no itinerary panels", () => {
   );
 });
 
-test("drive prompt asks for Tiguan, distance and map", () => {
+test("drive prompt asks for Tiguan, Uri plate and one illustrated map", () => {
   const subject = {
     title: "Mittagessen bei Eltern",
     location: "Efibach 38 Silenen",
@@ -34,9 +34,11 @@ test("drive prompt asks for Tiguan, distance and map", () => {
   assert.equal(hasDriveAgendaContext(subject), true);
   const prompt = buildAgendaAiIconPrompt(subject);
   assert.match(prompt, /Volkswagen Tiguan/i);
+  assert.match(prompt, /UR · 15716/);
+  assert.match(prompt, /Uri canton/i);
+  assert.match(prompt, /exactly one illustrated destination map/i);
   assert.match(prompt, /12\.4 km/);
   assert.match(prompt, /15 Min/);
-  assert.match(prompt, /map/i);
   assert.match(prompt, /Familie/);
 });
 

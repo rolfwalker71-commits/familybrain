@@ -4,14 +4,13 @@ import { createHash } from "crypto";
 import { getOpenAIClient, hasOpenAIKey } from "@/lib/ai/client";
 import { isPhysicalAgendaLocation } from "@/lib/dashboard/agenda-location";
 import { getTripsDataRoot } from "@/lib/trips/paths";
-import { fetchStaticMapPng } from "@/lib/trips/static-map";
 import {
   ICS_TYPE_META,
   type IcsCalendarType,
 } from "@/lib/calendar/ics-types";
 
 /** Bump when illustration style changes so cached JPGs are regenerated. */
-const AGENDA_AI_ICON_STYLE = "travel-poster-v3";
+const AGENDA_AI_ICON_STYLE = "travel-poster-v4";
 
 const TRAVEL_STYLE =
   "Style: clean modern editorial illustration, soft flat colors with gentle shading, friendly travel poster vibe. Any text in the image must be spelled correctly and clearly readable. No logos, watermarks, prices, or UI chrome. Suitable as a small card thumbnail.";
@@ -298,10 +297,11 @@ function buildDrivePrompt(input: AgendaIconSubject): string {
       ? `Show clearly readable travel stats on the poster: ${stats}.`
       : "Show approximate distance and drive time as readable poster stats if fitting.",
     "Feature a white Volkswagen Tiguan (SUV) as the main vehicle — accurate white VW Tiguan look, no other brand.",
-    "Include an illustrated destination map inset or map-card of the goal area (Swiss local map vibe), not a photoreal satellite screenshot.",
+    "Rear Swiss license plate clearly readable: white plate with black border, Swiss coat of arms (red shield, white cross) on the left, Uri canton arms (yellow shield with black bull head, red tongue and nose ring) on the right, bold black text «UR · 15716» (canton code UR, middle dot, number 15716) — authentic Swiss Uri plate layout, correct spelling.",
+    "Include exactly one illustrated destination map inset / map-card of the goal area (Swiss local map vibe, editorial illustration — not a photoreal OSM/satellite tile). Do not stack a second map.",
     "Friendly road-trip / arrival atmosphere; keep editorial travel-poster layout.",
     workManClause(input),
-    "No logos other than subtle vehicle identity, no watermarks, no UI chrome, no prices.",
+    "No dealer frames, no watermarks, no UI chrome, no prices; no logos except the Swiss/Uri plate emblems and subtle VW identity.",
     TRAVEL_STYLE,
   ]
     .filter(Boolean)
@@ -345,63 +345,6 @@ export function buildAgendaAiIconPrompt(input: AgendaIconSubject): string {
   return buildStandardPrompt(input);
 }
 
-async function maybeCompositeStaticMap(
-  aiPngOrJpeg: Buffer,
-  input: AgendaIconSubject
-): Promise<Buffer> {
-  const lat = input.coords?.lat;
-  const lon = input.coords?.lon;
-  if (
-    !hasDriveAgendaContext(input) ||
-    lat == null ||
-    lon == null ||
-    !Number.isFinite(lat) ||
-    !Number.isFinite(lon)
-  ) {
-    return aiPngOrJpeg;
-  }
-
-  try {
-    const map = await fetchStaticMapPng({
-      lat,
-      lon,
-      zoom: 13,
-      withMarker: true,
-    });
-    if (!map) return aiPngOrJpeg;
-
-    const sharp = (await import("sharp")).default;
-    const base = sharp(aiPngOrJpeg).resize(1024, 1024, { fit: "cover" });
-    const inset = await sharp(map)
-      .resize(220, 220, { fit: "cover" })
-      .png()
-      .toBuffer();
-
-    const framed = await sharp({
-      create: {
-        width: 236,
-        height: 236,
-        channels: 4,
-        background: { r: 255, g: 255, b: 255, alpha: 1 },
-      },
-    })
-      .composite([{ input: inset, top: 8, left: 8 }])
-      .png()
-      .toBuffer();
-
-    return await base
-      .composite([{ input: framed, top: 1024 - 236 - 28, left: 28 }])
-      .jpeg({ quality: 88 })
-      .toBuffer();
-  } catch (err) {
-    console.warn(
-      "[agenda-ai-icon] map composite:",
-      err instanceof Error ? err.message : err
-    );
-    return aiPngOrJpeg;
-  }
-}
-
 export async function ensureAgendaAiIcon(
   input: AgendaIconSubject,
   options?: { force?: boolean }
@@ -431,11 +374,8 @@ export async function ensureAgendaAiIcon(
   const b64 = result.data?.[0]?.b64_json;
   if (!b64) throw new Error("Bildgenerierung lieferte kein Bild");
 
-  const raw = Buffer.from(b64, "base64");
-  const withMap = await maybeCompositeStaticMap(raw, input);
-
   const sharp = (await import("sharp")).default;
-  const jpg = await sharp(withMap)
+  const jpg = await sharp(Buffer.from(b64, "base64"))
     .resize(256, 256, {
       fit: "cover",
       background: { r: 255, g: 255, b: 255, alpha: 1 },
