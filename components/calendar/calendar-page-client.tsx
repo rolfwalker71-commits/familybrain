@@ -171,7 +171,7 @@ export function CalendarPageClient() {
   return (
     <div className="min-w-0 space-y-5 pb-8">
       <PageHeader
-        title="Kalender / Termine"
+        title="Kalender"
         description="Deine ICS-Kalender, Feiertage und Fristen — gefiltert nach Quelle."
         icon={pageVisuals.calendar.icon}
         tone={pageVisuals.calendar.tone}

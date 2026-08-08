@@ -7,7 +7,9 @@ export default function GooglePage() {
   return (
     <Suspense
       fallback={
-        <p className="p-6 text-sm text-muted-foreground">Lade Google…</p>
+        <p className="p-6 text-sm text-muted-foreground">
+          Lade Google Workspace…
+        </p>
       }
     >
       <MailPageClient />

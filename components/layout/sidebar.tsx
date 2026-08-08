@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { Fragment } from "react";
 import { LogOut, ArrowLeft, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAnalysis } from "@/components/analysis/analysis-provider";
@@ -20,6 +21,8 @@ type NavItem = {
   label: string;
   icon: LucideIcon;
   tone: IconTone;
+  /** Sidebar section caption; shown before the first item of each group. */
+  section?: string;
   countKey?:
     | "pendingCount"
     | "urgentDeadlinesCount"
@@ -29,25 +32,27 @@ type NavItem = {
   pendingStyle?: boolean;
 };
 
-/** Order + icons match mockup (bold outline). */
+/** Order + icons match mockup (bold outline); sections for scanability. */
 const myBrainNavItems: NavItem[] = [
   {
     href: "/dashboard",
     label: "Übersicht",
     icon: pageVisuals.overview.icon,
     tone: pageVisuals.overview.tone,
+    section: "Tag",
   },
   {
     href: "/calendar",
-    label: "Kalender / Termine",
+    label: "Kalender",
     icon: pageVisuals.calendar.icon,
     tone: pageVisuals.calendar.tone,
   },
   {
     href: "/google",
-    label: "Google",
+    label: "Google Workspace",
     icon: pageVisuals.google.icon,
     tone: pageVisuals.google.tone,
+    section: "Cloud",
   },
   {
     href: "/microsoft",
@@ -62,6 +67,7 @@ const myBrainNavItems: NavItem[] = [
     tone: pageVisuals.inbox.tone,
     countKey: "triagePendingCount",
     pendingStyle: true,
+    section: "Handeln",
   },
   {
     href: "/documents",
@@ -84,12 +90,6 @@ const myBrainNavItems: NavItem[] = [
     countKey: "openDueFinanceCount",
   },
   {
-    href: "/travel",
-    label: BRAND.travelMemory,
-    icon: pageVisuals.travel.icon,
-    tone: pageVisuals.travel.tone,
-  },
-  {
     href: "/warranties",
     label: "Garantien",
     icon: pageVisuals.warranties.icon,
@@ -97,10 +97,17 @@ const myBrainNavItems: NavItem[] = [
     countKey: "warrantiesExpiringSoon",
   },
   {
+    href: "/travel",
+    label: BRAND.travelMemory,
+    icon: pageVisuals.travel.icon,
+    tone: pageVisuals.travel.tone,
+  },
+  {
     href: "/knowledge",
     label: "Wissen",
     icon: pageVisuals.knowledge.icon,
     tone: pageVisuals.knowledge.tone,
+    section: "Wissen",
   },
   {
     href: "/guides",
@@ -116,9 +123,10 @@ const myBrainNavItems: NavItem[] = [
   },
   {
     href: "/account",
-    label: "Konto / Kalender",
+    label: "Konto",
     icon: pageVisuals.account.icon,
     tone: pageVisuals.account.tone,
+    section: "System",
   },
   {
     href: "/settings",
@@ -155,7 +163,7 @@ const limitedUserNavItems: NavItem[] = [
   finanzBuddyItem,
   {
     href: "/account",
-    label: "Konto / Kalender",
+    label: "Konto",
     icon: pageVisuals.account.icon,
     tone: pageVisuals.account.tone,
   },
@@ -455,16 +463,32 @@ export function Sidebar({
             ))}
           </div>
         ) : (
-          listItems.map((item) => (
-            <NavLinkRow
-              key={item.href}
-              item={item}
-              pathname={pathname}
-              showBadges={!isLimitedUser}
-              isRunning={isRunning}
-              onNavigate={onNavigate}
-            />
-          ))
+          listItems.map((item, index) => {
+            const prev = listItems[index - 1];
+            const showSection =
+              Boolean(item.section) && item.section !== prev?.section;
+            return (
+              <Fragment key={item.href}>
+                {showSection ? (
+                  <p
+                    className={cn(
+                      "px-2 text-[11px] font-semibold uppercase tracking-wide text-sidebar-foreground/55",
+                      index === 0 ? "pt-1" : "pt-3"
+                    )}
+                  >
+                    {item.section}
+                  </p>
+                ) : null}
+                <NavLinkRow
+                  item={item}
+                  pathname={pathname}
+                  showBadges={!isLimitedUser}
+                  isRunning={isRunning}
+                  onNavigate={onNavigate}
+                />
+              </Fragment>
+            );
+          })
         )}
       </nav>
 

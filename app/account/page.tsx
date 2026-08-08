@@ -7,28 +7,72 @@ import { DriveMirrorStatusPanel } from "@/components/settings/drive-mirror-statu
 import { O365PdfBackfillPanel } from "@/components/settings/o365-pdf-backfill-panel";
 import { PageHeader } from "@/components/layout/page-primitives";
 import { pageVisuals } from "@/components/layout/icon-circle";
-import { Suspense } from "react";
+import { Suspense, type ReactNode } from "react";
 
 export const dynamic = "force-dynamic";
 
+function AccountSection({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="space-y-3">
+      <div className="space-y-1">
+        <h2 className="text-sm font-semibold tracking-tight text-foreground">
+          {title}
+        </h2>
+        {description ? (
+          <p className="text-xs text-muted-foreground">{description}</p>
+        ) : null}
+      </div>
+      <div className="space-y-4">{children}</div>
+    </section>
+  );
+}
+
 export default function AccountPage() {
   return (
-    <div className="space-y-6 pb-28 md:space-y-8 md:pb-0">
+    <div className="space-y-8 pb-28 md:pb-0">
       <PageHeader
         title="Konto"
-        description="Google und Microsoft 365 — getrennt von anderen Buddy-Usern."
+        description="Verbindungen und Kalenderquellen — getrennt von anderen Buddy-Usern."
         icon={pageVisuals.account.icon}
         tone={pageVisuals.account.tone}
       />
-      <SettingsGoogleConnectPanel />
-      <Suspense fallback={<p className="text-sm text-muted-foreground">Lade…</p>}>
-        <SettingsMicrosoftConnectPanel />
-      </Suspense>
-      <DriveMirrorStatusPanel />
-      <O365PdfBackfillPanel />
-      <SettingsGoogleCalendarsPanel />
-      <SettingsMicrosoftCalendarsPanel />
-      <SettingsCalendarsPanel />
+
+      <AccountSection
+        title="Verbindungen"
+        description="Google Workspace und Microsoft 365 für diesen User."
+      >
+        <SettingsGoogleConnectPanel />
+        <Suspense
+          fallback={<p className="text-sm text-muted-foreground">Lade…</p>}
+        >
+          <SettingsMicrosoftConnectPanel />
+        </Suspense>
+      </AccountSection>
+
+      <AccountSection
+        title="Kalenderquellen"
+        description="Welche Google-/Microsoft-/ICS-Kalender in Buddy erscheinen."
+      >
+        <SettingsGoogleCalendarsPanel />
+        <SettingsMicrosoftCalendarsPanel />
+        <SettingsCalendarsPanel />
+      </AccountSection>
+
+      <AccountSection
+        title="Spiegel & Import"
+        description="Drive-Spiegel und historische O365-PDFs nach Paperless."
+      >
+        <DriveMirrorStatusPanel />
+        <O365PdfBackfillPanel />
+      </AccountSection>
     </div>
   );
 }

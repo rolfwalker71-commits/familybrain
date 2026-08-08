@@ -972,7 +972,7 @@ function MailAnalyseFocusTile({
           className="block px-3.5 py-1.5 transition-colors hover:bg-muted/30"
         >
           <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Google Mail
+            Google Workspace
           </p>
           <p className="truncate text-[14px] font-black tracking-tight">
             {mailAnalyseLine(google)}
@@ -1057,7 +1057,7 @@ function InboxFocusTile({
           className="block px-3.5 py-1.5 transition-colors hover:bg-muted/30"
         >
           <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Google Mail
+            Google Workspace
           </p>
           <p className="truncate text-[14px] font-black tracking-tight">
             {g ? g.subject || "(kein Betreff)" : "Keine Mails"}
@@ -1546,7 +1546,7 @@ export function OverviewDashboard({
                     key: "g-triage",
                     href: "/google?tab=triage",
                     label: sample
-                      ? `Google: ${sample}`
+                      ? `Workspace: ${sample}`
                       : `${gPending} Gmail zur Triage`,
                     meta: `${gPending} offen · Gmail`,
                   });

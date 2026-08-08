@@ -1243,7 +1243,7 @@ function SettingsPageInner() {
     { id: "notify", label: "Backup & Hinweise", icon: Bell },
     { id: "users", label: "User", icon: Users },
     { id: "family", label: "Familie", icon: Heart },
-    { id: "calendars", label: "Kalender", icon: CalendarDays },
+    { id: "calendars", label: "Cloud-OAuth", icon: CalendarDays },
     { id: "more", label: "Mehr", icon: MoreHorizontal },
   ];
 

@@ -9,7 +9,7 @@ export default function InboxPage() {
     <div className="min-w-0 space-y-6 pb-6 md:space-y-8">
       <PageHeader
         title="Inbox"
-        description="Triage, Fristen, Rechnungen und Garantien — zum Abarbeiten"
+        description="Belege, Fristen, Rechnungen und Garantien — zum Abarbeiten (nicht Mail; Mail-Triage unter Google Workspace / Microsoft 365)."
         icon={pageVisuals.inbox.icon}
         tone={pageVisuals.inbox.tone}
       />

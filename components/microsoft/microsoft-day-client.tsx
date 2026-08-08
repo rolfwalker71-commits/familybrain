@@ -73,7 +73,7 @@ function parseTab(raw: string | null): Tab {
     return raw;
   }
   if (raw === "mail") return "day";
-  return "calendar";
+  return "inbox";
 }
 
 type MsEvent = {
@@ -747,21 +747,6 @@ export function MicrosoftDayClient() {
                 type="button"
                 className={cn(
                   "rounded-md px-3 py-1.5 text-sm font-medium",
-                  tab === "calendar"
-                    ? "bg-muted text-foreground"
-                    : "text-muted-foreground"
-                )}
-                onClick={() => setTab("calendar")}
-              >
-                <span className="inline-flex items-center gap-1.5">
-                  <CalendarClock className="size-3.5" strokeWidth={APP_ICON_STROKE} />
-                  Kalender
-                </span>
-              </button>
-              <button
-                type="button"
-                className={cn(
-                  "rounded-md px-3 py-1.5 text-sm font-medium",
                   tab === "inbox"
                     ? "bg-muted text-foreground"
                     : "text-muted-foreground"
@@ -791,6 +776,21 @@ export function MicrosoftDayClient() {
                       {inboxPending}
                     </Badge>
                   ) : null}
+                </span>
+              </button>
+              <button
+                type="button"
+                className={cn(
+                  "rounded-md px-3 py-1.5 text-sm font-medium",
+                  tab === "calendar"
+                    ? "bg-muted text-foreground"
+                    : "text-muted-foreground"
+                )}
+                onClick={() => setTab("calendar")}
+              >
+                <span className="inline-flex items-center gap-1.5">
+                  <CalendarClock className="size-3.5" strokeWidth={APP_ICON_STROKE} />
+                  Kalender
                 </span>
               </button>
               <button

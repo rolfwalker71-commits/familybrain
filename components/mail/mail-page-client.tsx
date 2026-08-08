@@ -417,8 +417,8 @@ export function MailPageClient() {
   return (
     <div className="min-w-0 space-y-5 pb-8">
       <PageHeader
-        title="Google"
-        description="Gmail wird automatisch geprüft — Vorschläge in der Triage."
+        title="Google Workspace"
+        description="Gmail · Triage — Vorschläge prüfen und übernehmen."
         icon={pageVisuals.google.icon}
         tone={pageVisuals.google.tone}
         actions={
