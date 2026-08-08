@@ -1,11 +1,13 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
   CalendarDays,
   Car,
+  Check,
   Clock3,
+  ListTodo,
   MapPin,
   Video,
 } from "lucide-react";
@@ -17,7 +19,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   AgendaTypeRail,
   weekdayLabel,
@@ -26,6 +28,9 @@ import { APP_ICON_STROKE } from "@/lib/branding/app-icons";
 import { ICS_TYPE_META } from "@/lib/calendar/ics-types";
 import type { AgendaItem } from "@/lib/dashboard/overview";
 import { cn } from "@/lib/utils";
+import { TripMap } from "@/components/trips/trip-map";
+import { AgendaAiIconThumb } from "@/components/calendar/agenda-ai-icon-thumb";
+import { isPhysicalAgendaLocation } from "@/lib/dashboard/agenda-location";
 
 function stripIcsDescription(raw: string | null | undefined): string | null {
   if (!raw?.trim()) return null;
@@ -68,9 +73,25 @@ function typeLabel(item: AgendaItem): string {
   return item.badge || "Termin";
 }
 
-import { TripMap } from "@/components/trips/trip-map";
-import { AgendaAiIconThumb } from "@/components/calendar/agenda-ai-icon-thumb";
-import { isPhysicalAgendaLocation } from "@/lib/dashboard/agenda-location";
+function isCloudCalendarItem(item: AgendaItem): boolean {
+  const id = item.id || "";
+  return (
+    (id.startsWith("gcal-") || id.startsWith("mscal-")) &&
+    Boolean(item.calendarId)
+  );
+}
+
+function isAgendaEventDone(item: AgendaItem): boolean {
+  const t = (item.title || "").trim();
+  return t.startsWith("✅");
+}
+
+type FreeSlot = {
+  date: string;
+  startHm: string;
+  endHm: string;
+  durationMinutes: number;
+};
 
 function DetailRow({
   label,
@@ -94,12 +115,20 @@ export function AgendaEventDialog({
   open,
   onOpenChange,
   calendarHref = "/calendar",
+  onChanged,
 }: {
   item: AgendaItem | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   calendarHref?: string;
+  onChanged?: () => void;
 }) {
+  const [busy, setBusy] = useState(false);
+  const [actionMsg, setActionMsg] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [slots, setSlots] = useState<FreeSlot[]>([]);
+  const [localDone, setLocalDone] = useState(false);
+
   const description = item ? stripIcsDescription(item.description) : null;
   const duration = item ? durationLabel(item) : null;
   const when = item
@@ -112,9 +141,124 @@ export function AgendaEventDialog({
           : "Ganztägig",
       ].join(" · ")
     : "";
+  const cloud = item ? isCloudCalendarItem(item) : false;
+  const done = localDone || (item ? isAgendaEventDone(item) : false);
+
+  async function runAction(
+    body: Record<string, unknown>
+  ): Promise<Record<string, unknown>> {
+    if (!item?.calendarId) throw new Error("Kein Kalender verknüpft.");
+    const res = await fetch("/api/calendar/actions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...body,
+        agendaItemId: item.id,
+        calendarSourceId: item.calendarId,
+      }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(
+        (json as { error?: string }).error || "Aktion fehlgeschlagen"
+      );
+    }
+    return json as Record<string, unknown>;
+  }
+
+  async function markDone() {
+    setBusy(true);
+    setActionError(null);
+    setActionMsg(null);
+    try {
+      await runAction({ action: "done" });
+      setLocalDone(true);
+      setSlots([]);
+      setActionMsg("Als erledigt markiert.");
+      onChanged?.();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function loadSlots() {
+    setBusy(true);
+    setActionError(null);
+    setActionMsg(null);
+    try {
+      const json = await runAction({ action: "suggest_slots" });
+      const next = (json.slots || []) as FreeSlot[];
+      setSlots(next);
+      setActionMsg(
+        next.length
+          ? `${next.length} freie Slots (nächste 7 Tage, 08–18).`
+          : "Keine freien Slots gefunden."
+      );
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function reschedule(slot: FreeSlot) {
+    setBusy(true);
+    setActionError(null);
+    setActionMsg(null);
+    try {
+      await runAction({
+        action: "reschedule",
+        date: slot.date,
+        startHm: slot.startHm,
+        endHm: slot.endHm,
+      });
+      setSlots([]);
+      setActionMsg(
+        `Verschoben auf ${slot.date} ${slot.startHm}–${slot.endHm}.`
+      );
+      onChanged?.();
+      onOpenChange(false);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function followUpTask() {
+    setBusy(true);
+    setActionError(null);
+    setActionMsg(null);
+    try {
+      const json = await runAction({ action: "follow_up_task" });
+      const task = json.task as { title?: string } | undefined;
+      setActionMsg(
+        task?.title
+          ? `Aufgabe angelegt: ${task.title}`
+          : "Folge-Aufgabe angelegt."
+      );
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) {
+          setSlots([]);
+          setActionMsg(null);
+          setActionError(null);
+          setLocalDone(false);
+        }
+        onOpenChange(next);
+      }}
+    >
       <DialogContent className="flex max-h-[85dvh] w-[min(96vw,28rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-md">
         {item ? (
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -134,6 +278,11 @@ export function AgendaEventDialog({
                   {item.calendarType && item.badge !== typeLabel(item) ? (
                     <Badge variant="outline" className="text-[11px]">
                       {item.badge}
+                    </Badge>
+                  ) : null}
+                  {done ? (
+                    <Badge variant="secondary" className="text-[11px]">
+                      Erledigt
                     </Badge>
                   ) : null}
                 </div>
@@ -277,13 +426,83 @@ export function AgendaEventDialog({
                 </DetailRow>
               ) : null}
 
+              {cloud ? (
+                <DetailRow label="Buddy-Aktionen">
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap gap-2">
+                      {!done ? (
+                        <>
+                          <Button
+                            type="button"
+                            size="sm"
+                            disabled={busy}
+                            onClick={() => void markDone()}
+                          >
+                            <Check className="size-3.5" />
+                            Erledigt
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={busy || !item.time}
+                            onClick={() => void loadSlots()}
+                          >
+                            Freien Slot suchen
+                          </Button>
+                        </>
+                      ) : null}
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={busy}
+                        onClick={() => void followUpTask()}
+                      >
+                        <ListTodo className="size-3.5" />
+                        Folge-Task
+                      </Button>
+                    </div>
+                    {slots.length > 0 ? (
+                      <div className="space-y-1.5 rounded-lg border border-border/60 bg-muted/20 p-2">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                          Verschieben nach
+                        </p>
+                        <ul className="flex flex-wrap gap-1.5">
+                          {slots.map((s) => (
+                            <li key={`${s.date}-${s.startHm}`}>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="secondary"
+                                disabled={busy}
+                                onClick={() => void reschedule(s)}
+                              >
+                                {s.date.slice(5)} {s.startHm}
+                              </Button>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                    {actionMsg ? (
+                      <p className="text-xs text-emerald-700">{actionMsg}</p>
+                    ) : null}
+                    {actionError ? (
+                      <p className="text-xs text-destructive">{actionError}</p>
+                    ) : null}
+                  </div>
+                </DetailRow>
+              ) : null}
+
               {!description &&
               !item.location &&
               !item.weather &&
               !item.driveLabel &&
               !item.score &&
               !item.aiIconKey &&
-              !item.aiIconUrl ? (
+              !item.aiIconUrl &&
+              !cloud ? (
                 <p className="text-[13px] text-muted-foreground">
                   Keine weiteren Details in der Quelle.
                 </p>

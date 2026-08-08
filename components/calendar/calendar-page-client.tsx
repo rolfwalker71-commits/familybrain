@@ -293,6 +293,7 @@ export function CalendarPageClient() {
         onOpenChange={(open) => {
           if (!open) setEventDetail(null);
         }}
+        onChanged={() => void loadAgenda(selected)}
       />
     </div>
   );

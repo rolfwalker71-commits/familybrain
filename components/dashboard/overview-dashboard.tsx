@@ -1966,6 +1966,7 @@ export function OverviewDashboard({
         onOpenChange={(open) => {
           if (!open) setEventDetail(null);
         }}
+        onChanged={() => void load()}
       />
     </div>
   );

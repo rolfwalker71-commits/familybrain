@@ -8,6 +8,10 @@ export type DayBriefingFacts = {
   mode: BriefingMode;
   todayIso: string;
   calendarTodayCount: number;
+  /** Google/O365 Termine mit ✅ Buddy-Erledigt */
+  calendarReviewedDone: number;
+  /** Planungsrelevante Termine ohne Erledigt-Markierung */
+  calendarOpen: number;
   nextEventTitle: string | null;
   nextEventTime: string | null;
   conflictCount: number;
@@ -123,11 +127,17 @@ export function buildDayBriefingFacts(input: {
 
   const next = upcoming[0] || null;
   const bday = input.upcomingBirthdays.find((b) => b.date === todayIso);
+  const reviewedDone = planning.filter((i) =>
+    (i.title || "").trim().startsWith("✅")
+  ).length;
+  const calendarOpen = Math.max(0, planning.length - reviewedDone);
 
   return {
     mode,
     todayIso,
     calendarTodayCount: planning.length,
+    calendarReviewedDone: reviewedDone,
+    calendarOpen,
     nextEventTitle: next?.title ?? null,
     nextEventTime: next?.time ?? null,
     conflictCount: conflicts.length,
@@ -163,7 +173,9 @@ export function formatContextPulse(facts: DayBriefingFacts): {
   const bits: string[] = [];
   if (facts.calendarTodayCount > 0) {
     bits.push(
-      `${facts.calendarTodayCount} ${plural(facts.calendarTodayCount, "Termin", "Termine")}`
+      facts.calendarReviewedDone > 0
+        ? `${facts.calendarReviewedDone}/${facts.calendarTodayCount} Termine erledigt`
+        : `${facts.calendarTodayCount} ${plural(facts.calendarTodayCount, "Termin", "Termine")}`
     );
   } else {
     bits.push("keine Termine");
@@ -227,6 +239,11 @@ function buildOpenBullets(facts: DayBriefingFacts): string[] {
       `${facts.conflictCount} ${plural(facts.conflictCount, "Terminkonflikt", "Terminkonflikte")}`
     );
   }
+  if (facts.calendarOpen > 0 && facts.mode === "evening") {
+    open.push(
+      `${facts.calendarOpen} ${plural(facts.calendarOpen, "Termin noch offen", "Termine noch offen")}`
+    );
+  }
   if (facts.mailTriagePending > 0) {
     open.push(
       `${facts.mailTriagePending} ${plural(facts.mailTriagePending, "Mail zur Triage", "Mails zur Triage")}`
@@ -275,9 +292,15 @@ export function buildEveningDigest(facts: DayBriefingFacts): {
     );
   }
   if (facts.calendarTodayCount > 0) {
-    done.push(
-      `${facts.calendarTodayCount} ${plural(facts.calendarTodayCount, "Termin am Kalender", "Termine am Kalender")}`
-    );
+    if (facts.calendarReviewedDone > 0) {
+      done.push(
+        `${facts.calendarReviewedDone} von ${facts.calendarTodayCount} ${plural(facts.calendarTodayCount, "Termin erledigt", "Terminen erledigt")}`
+      );
+    } else {
+      done.push(
+        `${facts.calendarTodayCount} ${plural(facts.calendarTodayCount, "Termin am Kalender", "Termine am Kalender")}`
+      );
+    }
   }
   if (done.length === 0) {
     done.push("Keine Buddy-Übernahmen heute");
