@@ -401,11 +401,13 @@ export async function fetchHomeWeather(): Promise<{
   placeLabel: string;
   current: CurrentWeather;
   today: DayWeather | null;
+  /** Nächste 7 Tage ab heute (inkl. heute). */
+  week: DayWeather[];
 } | null> {
   try {
     const [current, days] = await Promise.all([
       fetchCurrentWeather(HOME_WEATHER.lat, HOME_WEATHER.lon),
-      fetchDailyForecast(HOME_WEATHER.lat, HOME_WEATHER.lon, 2).catch(
+      fetchDailyForecast(HOME_WEATHER.lat, HOME_WEATHER.lon, 7).catch(
         () => [] as DayWeather[]
       ),
     ]);
@@ -415,8 +417,10 @@ export async function fetchHomeWeather(): Promise<{
       month: "2-digit",
       day: "2-digit",
     }).format(new Date());
-    const today = days.find((d) => d.date === todayIso) || days[0] || null;
-    return { placeLabel: HOME_WEATHER.label, current, today };
+    const fromToday = days.filter((d) => d.date >= todayIso);
+    const week = (fromToday.length > 0 ? fromToday : days).slice(0, 7);
+    const today = week.find((d) => d.date === todayIso) || week[0] || null;
+    return { placeLabel: HOME_WEATHER.label, current, today, week };
   } catch (error) {
     console.warn(
       "[weather] home fetch failed:",

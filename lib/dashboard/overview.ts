@@ -94,6 +94,14 @@ export type AgendaItem = {
   planningRelevant?: boolean;
 };
 
+export type HomeWeatherDay = {
+  date: string;
+  icon: string;
+  weatherLabelDe: string;
+  temperatureMaxC: number;
+  temperatureMinC: number;
+};
+
 export type HomeWeatherCard = {
   placeLabel: string;
   temperatureC: number;
@@ -107,6 +115,8 @@ export type HomeWeatherCard = {
   humidityPct: number | null;
   precipitationMm: number | null;
   observedAt: string | null;
+  /** 7-Tage-Übersicht (inkl. heute). Fehlt ggf. in älteren Caches. */
+  week?: HomeWeatherDay[];
 };
 
 export type HockeyGameCard = {
@@ -791,6 +801,13 @@ export async function getDashboardOverview(
             : null,
         precipitationMm: homeWeatherRaw.current.precipitationMm,
         observedAt: homeWeatherRaw.current.observedAt,
+        week: (homeWeatherRaw.week || []).map((d) => ({
+          date: d.date,
+          icon: weatherConditionIcon(d.weatherCode),
+          weatherLabelDe: d.weatherLabelDe,
+          temperatureMaxC: Math.round(d.temperatureMaxC),
+          temperatureMinC: Math.round(d.temperatureMinC),
+        })),
       }
     : null;
 

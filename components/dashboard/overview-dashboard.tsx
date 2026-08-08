@@ -247,97 +247,106 @@ function findConflicts(
 
 import { TripMap } from "@/components/trips/trip-map";
 
+function weekdayShortDe(isoDate: string): string {
+  const [y, m, d] = isoDate.split("-").map(Number);
+  if (!y || !m || !d) return "";
+  return new Intl.DateTimeFormat("de-CH", {
+    weekday: "short",
+    timeZone: "Europe/Zurich",
+  }).format(new Date(y, m - 1, d));
+}
+
+/** Kompakte Header-Wetterkarte mit 7-Tage-Zeile. */
 function HomeWeatherWidget({ weather }: { weather: HomeWeatherCard }) {
   const windDir =
     weather.windDirectionDeg != null &&
     Number.isFinite(weather.windDirectionDeg)
       ? windDirectionDe(weather.windDirectionDeg)
       : null;
-  const precip =
-    weather.precipitationMm != null && weather.precipitationMm > 0
-      ? `${weather.precipitationMm.toFixed(1).replace(".", ",")} mm`
-      : "0 mm";
+  const meta = [
+    windDir && weather.windSpeedKmh != null
+      ? `${weather.windSpeedKmh} km/h ${windDir}`
+      : weather.windSpeedKmh != null
+        ? `${weather.windSpeedKmh} km/h`
+        : null,
+    weather.humidityPct != null ? `${weather.humidityPct} %` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  const week = weather.week ?? [];
 
   return (
-    <Card className="gap-0 overflow-hidden border-border/70 py-0">
-      <CardContent className="p-0">
-        <div className="flex items-stretch gap-0">
-          <div className="flex w-[5.5rem] shrink-0 flex-col items-center justify-center self-stretch bg-sky-50/90 px-2 py-4">
-            <span className="text-5xl leading-none" aria-hidden>
-              {weather.icon}
-            </span>
-            <p className="mt-2 text-center text-[12px] font-semibold uppercase tracking-wide text-sky-900/70">
-              Jetzt
+    <div className="w-full min-w-0 rounded-xl border border-border/70 bg-sky-50/50 px-3 py-2.5 sm:max-w-md sm:px-3.5 sm:py-3">
+      <div className="flex items-start gap-3">
+        <div className="flex shrink-0 flex-col items-center pt-0.5">
+          <span className="text-[2.25rem] leading-none" aria-hidden>
+            {weather.icon}
+          </span>
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="truncate text-[14px] font-semibold tracking-tight">
+                {weather.placeLabel}
+              </p>
+              <p className="truncate text-[12px] capitalize text-muted-foreground">
+                {weather.weatherLabelDe}
+              </p>
+            </div>
+            <p className="shrink-0 text-[28px] font-bold tabular-nums leading-none tracking-tight">
+              {weather.temperatureC}°
             </p>
           </div>
-          <div className="min-w-0 flex-1 space-y-3 px-4 py-3.5">
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <p className="text-[15px] font-semibold tracking-tight text-foreground">
-                  {weather.placeLabel}
-                </p>
-                <p className="text-[13px] capitalize text-muted-foreground">
-                  {weather.weatherLabelDe}
-                </p>
-              </div>
-              <p className="shrink-0 text-[31px] font-bold tabular-nums tracking-tight">
-                {weather.temperatureC}°
-              </p>
-            </div>
-            {(weather.temperatureMinC != null ||
-              weather.temperatureMaxC != null) && (
-              <p className="text-[13px] tabular-nums text-muted-foreground">
-                Heute{" "}
-                <span className="font-medium text-foreground">
-                  {weather.temperatureMinC ?? "—"}°
-                </span>
-                {" – "}
-                <span className="font-medium text-foreground">
-                  {weather.temperatureMaxC ?? "—"}°
-                </span>
-              </p>
-            )}
-            <div className="grid grid-cols-3 gap-2 border-t border-border/50 pt-2.5">
-              <div className="min-w-0">
-                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                  Wind
-                </p>
-                <p className="truncate text-[15px] font-semibold tabular-nums">
-                  {weather.windSpeedKmh != null
-                    ? `${weather.windSpeedKmh}`
-                    : "—"}
-                  <span className="ml-0.5 text-[12px] font-medium text-muted-foreground">
-                    km/h
-                  </span>
-                </p>
-                {windDir ? (
-                  <p className="text-[11px] text-muted-foreground">{windDir}</p>
-                ) : null}
-              </div>
-              <div className="min-w-0">
-                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                  Feuchte
-                </p>
-                <p className="truncate text-[15px] font-semibold tabular-nums">
-                  {weather.humidityPct != null ? weather.humidityPct : "—"}
-                  <span className="ml-0.5 text-[12px] font-medium text-muted-foreground">
-                    %
-                  </span>
-                </p>
-              </div>
-              <div className="min-w-0">
-                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                  Regen
-                </p>
-                <p className="truncate text-[15px] font-semibold tabular-nums">
-                  {precip}
-                </p>
-              </div>
-            </div>
-          </div>
+          {(weather.temperatureMinC != null ||
+            weather.temperatureMaxC != null) && (
+            <p className="mt-1 text-[12px] tabular-nums text-muted-foreground">
+              Heute{" "}
+              <span className="font-medium text-foreground">
+                {weather.temperatureMinC ?? "—"}°
+              </span>
+              {" – "}
+              <span className="font-medium text-foreground">
+                {weather.temperatureMaxC ?? "—"}°
+              </span>
+              {meta ? (
+                <span className="text-muted-foreground/80"> · {meta}</span>
+              ) : null}
+            </p>
+          )}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+
+      {week.length > 0 ? (
+        <ul
+          className="mt-2.5 grid grid-cols-7 gap-0.5 border-t border-sky-200/60 pt-2"
+          aria-label="Wetter Woche"
+        >
+          {week.map((day, i) => (
+            <li
+              key={day.date}
+              className={cn(
+                "flex min-w-0 flex-col items-center rounded-md px-0.5 py-1 text-center",
+                i === 0 && "bg-white/70"
+              )}
+              title={`${weekdayShortDe(day.date)}: ${day.weatherLabelDe}, ${day.temperatureMinC}–${day.temperatureMaxC}°`}
+            >
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                {i === 0 ? "Heute" : weekdayShortDe(day.date)}
+              </span>
+              <span className="mt-0.5 text-[1.05rem] leading-none" aria-hidden>
+                {day.icon}
+              </span>
+              <span className="mt-1 text-[10px] font-semibold tabular-nums leading-tight text-foreground">
+                {day.temperatureMaxC}°
+              </span>
+              <span className="text-[10px] tabular-nums leading-tight text-muted-foreground">
+                {day.temperatureMinC}°
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
   );
 }
 
@@ -1086,60 +1095,68 @@ export function OverviewDashboard({
 
   return (
     <div className="min-w-0 space-y-6 pb-10">
-      <header className="space-y-1">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h1 className="text-[30px] font-black tracking-tight">
-            {greeting}
-            {greetingName ? `, ${greetingName}` : ""}
-          </h1>
-          {refreshing || fromCache ? (
-            <p className="text-[12px] text-muted-foreground">
-              {refreshing ? "Aktualisiere…" : "Zwischengespeicherte Ansicht"}
-            </p>
+      <header className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(16rem,22rem)] lg:items-start lg:gap-6">
+        <div className="min-w-0 space-y-1">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h1 className="text-[30px] font-black tracking-tight">
+              {greeting}
+              {greetingName ? `, ${greetingName}` : ""}
+            </h1>
+            {refreshing || fromCache ? (
+              <p className="text-[12px] text-muted-foreground">
+                {refreshing ? "Aktualisiere…" : "Zwischengespeicherte Ansicht"}
+              </p>
+            ) : null}
+          </div>
+          <p className="text-[15px] capitalize text-muted-foreground">
+            {formatLongDeDate()}
+          </p>
+          {data?.briefing ? (
+            <div className="space-y-1.5 pt-1">
+              <p className="text-[15px] font-medium leading-snug text-foreground/90">
+                {data.briefing.headline}
+              </p>
+              {data.briefing.prose ? (
+                <p className="max-w-2xl text-[14px] leading-relaxed text-muted-foreground">
+                  {data.briefing.prose}
+                </p>
+              ) : data.briefing.detail ? (
+                <p className="max-w-2xl text-[14px] leading-relaxed text-muted-foreground">
+                  {data.briefing.detail}
+                </p>
+              ) : null}
+              {data.briefing.mode === "evening" &&
+              (data.briefing.done.length > 0 ||
+                data.briefing.open.length > 0) ? (
+                <div className="grid max-w-2xl gap-3 pt-1 sm:grid-cols-2">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Erledigt
+                    </p>
+                    <ul className="mt-1 space-y-0.5 text-[13px] text-foreground/85">
+                      {data.briefing.done.map((line) => (
+                        <li key={`done-${line}`}>{line}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Offen
+                    </p>
+                    <ul className="mt-1 space-y-0.5 text-[13px] text-foreground/85">
+                      {data.briefing.open.map((line) => (
+                        <li key={`open-${line}`}>{line}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              ) : null}
+            </div>
           ) : null}
         </div>
-        <p className="text-[15px] capitalize text-muted-foreground">
-          {formatLongDeDate()}
-        </p>
-        {data?.briefing ? (
-          <div className="space-y-1.5 pt-1">
-            <p className="text-[15px] font-medium leading-snug text-foreground/90">
-              {data.briefing.headline}
-            </p>
-            {data.briefing.prose ? (
-              <p className="max-w-2xl text-[14px] leading-relaxed text-muted-foreground">
-                {data.briefing.prose}
-              </p>
-            ) : data.briefing.detail ? (
-              <p className="max-w-2xl text-[14px] leading-relaxed text-muted-foreground">
-                {data.briefing.detail}
-              </p>
-            ) : null}
-            {data.briefing.mode === "evening" &&
-            (data.briefing.done.length > 0 || data.briefing.open.length > 0) ? (
-              <div className="grid max-w-2xl gap-3 pt-1 sm:grid-cols-2">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                    Erledigt
-                  </p>
-                  <ul className="mt-1 space-y-0.5 text-[13px] text-foreground/85">
-                    {data.briefing.done.map((line) => (
-                      <li key={`done-${line}`}>{line}</li>
-                    ))}
-                  </ul>
-                </div>
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                    Offen
-                  </p>
-                  <ul className="mt-1 space-y-0.5 text-[13px] text-foreground/85">
-                    {data.briefing.open.map((line) => (
-                      <li key={`open-${line}`}>{line}</li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            ) : null}
+        {data?.homeWeather ? (
+          <div className="min-w-0 lg:justify-self-end">
+            <HomeWeatherWidget weather={data.homeWeather} />
           </div>
         ) : null}
       </header>
@@ -1294,11 +1311,6 @@ export function OverviewDashboard({
             </section>
 
             <aside className="min-w-0 space-y-4">
-
-              {data.homeWeather ? (
-                <HomeWeatherWidget weather={data.homeWeather} />
-              ) : null}
-
               <BirthdaysAsideCard items={upcomingBirthdays} today={today} />
 
               <Card className="border-border/70">
