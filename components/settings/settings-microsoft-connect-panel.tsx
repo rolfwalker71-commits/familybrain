@@ -18,7 +18,6 @@ type Connection = {
   hasMailSendScope: boolean;
   hasCalendarScope: boolean;
   hasTasksScope?: boolean;
-  hasTeamsChatScope?: boolean;
 };
 
 type Probe = {
@@ -208,9 +207,6 @@ export function SettingsMicrosoftConnectPanel() {
                     {!data.hasTasksScope
                       ? " Für To Do: Tasks.ReadWrite in Entra + neu verbinden."
                       : ""}
-                    {data.hasTeamsChatScope
-                      ? " · Teams-Selbstchat aktiv."
-                      : " Teams-Chat bewusst nicht im Standard-Login (braucht oft Admin-Consent)."}
                   </p>
                 )}
                 {probe?.ok ? (

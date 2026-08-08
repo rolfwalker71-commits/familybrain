@@ -10,7 +10,6 @@ import {
   hasMicrosoftMailScope,
   hasMicrosoftMailSendScope,
   hasMicrosoftTasksScope,
-  hasMicrosoftTeamsChatScope,
   isMicrosoftConnected,
   isMicrosoftOauthConfigured,
   resolveMicrosoftUserId,
@@ -38,6 +37,5 @@ export async function GET(request: Request) {
     hasMailSendScope: connected ? hasMicrosoftMailSendScope(userId) : false,
     hasCalendarScope: connected ? hasMicrosoftCalendarScope(userId) : false,
     hasTasksScope: connected ? hasMicrosoftTasksScope(userId) : false,
-    hasTeamsChatScope: connected ? hasMicrosoftTeamsChatScope(userId) : false,
   });
 }

@@ -30,6 +30,7 @@ import { SettingsFamilyPanel } from "@/components/settings/settings-family-panel
 import { SettingsGooglePanel } from "@/components/settings/settings-google-panel";
 import { SettingsMicrosoftPanel } from "@/components/settings/settings-microsoft-panel";
 import { NotificationPrefsPanel } from "@/components/settings/notification-prefs-panel";
+import { SettingsTelegramPanel } from "@/components/settings/settings-telegram-panel";
 import { SettingsCategorySuggestionsPanel } from "@/components/settings/settings-category-suggestions-panel";
 import { BackupStatusPanel } from "@/components/settings/backup-status-panel";
 
@@ -2732,6 +2733,7 @@ function SettingsPageInner() {
       {activeTab === "notify" ? (
         <>
           <BackupStatusPanel />
+          <SettingsTelegramPanel />
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-3">

@@ -43,6 +43,14 @@ import {
   saveGoogleMapsApiKey,
 } from "@/lib/google/maps";
 import {
+  getTelegramBotToken,
+  getTelegramBotTokenMasked,
+  getTelegramChatId,
+  hasTelegramConfigured,
+  saveTelegramBotToken,
+  saveTelegramChatId,
+} from "@/lib/telegram/notify";
+import {
   getSofascoreApiKey,
   getSofascoreRemainingQuota,
   getSofascoreUsageThisMonth,
@@ -189,6 +197,11 @@ export async function GET(request: Request) {
     nominatimBaseUrl,
     googleMapsApiKeyMasked: maskToken(getGoogleMapsApiKey()),
     hasGoogleMapsApiKey: hasGoogleMapsApiKey(),
+    telegramBotTokenMasked: getTelegramBotTokenMasked(),
+    hasTelegramBotToken: Boolean(getTelegramBotToken()),
+    telegramChatId: getTelegramChatId() || "",
+    hasTelegramChatId: Boolean(getTelegramChatId()),
+    hasTelegramConfigured: hasTelegramConfigured(),
     tripMapStyle: getTripMapStyle(),
     eventAiImagePrompt: getEventAiImagePromptTemplate(),
     eventAiImagePromptCustomized: isEventAiImagePromptCustomized(),
@@ -240,6 +253,10 @@ const PutSchema = z.object({
   nominatimBaseUrl: z.string().optional(),
   googleMapsApiKey: z.string().optional(),
   clearGoogleMapsApiKey: z.boolean().optional(),
+  telegramBotToken: z.string().optional(),
+  clearTelegramBotToken: z.boolean().optional(),
+  telegramChatId: z.string().max(64).optional(),
+  clearTelegramChatId: z.boolean().optional(),
   tripMapStyle: z.enum(MAP_STYLES).optional(),
   eventAiImagePrompt: z.string().max(4000).optional(),
   resetEventAiImagePrompt: z.boolean().optional(),
@@ -425,6 +442,19 @@ export async function PUT(request: Request) {
     if (raw) saveGoogleMapsApiKey(raw);
   }
 
+  if (parsed.data.clearTelegramBotToken) {
+    saveTelegramBotToken(null);
+  } else if (parsed.data.telegramBotToken !== undefined) {
+    const raw = parsed.data.telegramBotToken.trim();
+    if (raw) saveTelegramBotToken(raw);
+  }
+
+  if (parsed.data.clearTelegramChatId) {
+    saveTelegramChatId(null);
+  } else if (parsed.data.telegramChatId !== undefined) {
+    saveTelegramChatId(parsed.data.telegramChatId.trim() || null);
+  }
+
   if (parsed.data.tripMapStyle !== undefined) {
     saveTripMapStyle(parsed.data.tripMapStyle);
   }
@@ -539,6 +569,11 @@ export async function PUT(request: Request) {
     nominatimBaseUrl,
     googleMapsApiKeyMasked: maskToken(getGoogleMapsApiKey()),
     hasGoogleMapsApiKey: hasGoogleMapsApiKey(),
+    telegramBotTokenMasked: getTelegramBotTokenMasked(),
+    hasTelegramBotToken: Boolean(getTelegramBotToken()),
+    telegramChatId: getTelegramChatId() || "",
+    hasTelegramChatId: Boolean(getTelegramChatId()),
+    hasTelegramConfigured: hasTelegramConfigured(),
     tripMapStyle: getTripMapStyle(),
     eventAiImagePrompt,
     eventAiImagePromptCustomized: isEventAiImagePromptCustomized(),

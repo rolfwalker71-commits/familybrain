@@ -6,7 +6,7 @@ import {
   parseMicrosoftOauthState,
 } from "./oauth.ts";
 
-test("Microsoft scopes include mail + calendar + tasks, not teams by default", () => {
+test("Microsoft scopes include mail + calendar + tasks by default", () => {
   assert.ok(MICROSOFT_OAUTH_SCOPES.includes("Mail.ReadWrite"));
   assert.ok(MICROSOFT_OAUTH_SCOPES.includes("Calendars.ReadWrite"));
   assert.ok(MICROSOFT_OAUTH_SCOPES.includes("Tasks.ReadWrite"));

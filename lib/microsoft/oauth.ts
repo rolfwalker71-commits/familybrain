@@ -11,10 +11,7 @@ export const MICROSOFT_OAUTH_TENANT_SETTING = "microsoft_oauth_tenant";
 
 export const MICROSOFT_OAUTH_CALLBACK_PATH = "/api/microsoft/oauth/callback";
 
-/** Delegated Graph scopes — match Entra app registration.
- *  Chat/Teams absichtlich nicht hier: die brauchen oft Admin-Consent und
- *  blockieren sonst den normalen Reconnect. Teams-Selbstchat bleibt im Code,
- *  greift erst wenn der Token ChatMessage.Send / Chat.ReadWrite hat. */
+/** Delegated Graph scopes — match Entra app registration. */
 export const MICROSOFT_OAUTH_SCOPES = [
   "openid",
   "profile",
@@ -25,12 +22,6 @@ export const MICROSOFT_OAUTH_SCOPES = [
   "Mail.Send",
   "Calendars.ReadWrite",
   "Tasks.ReadWrite",
-] as const;
-
-/** Optional — nur wenn in Entra freigegeben + Admin-Consent erteilt. */
-export const MICROSOFT_TEAMS_CHAT_SCOPES = [
-  "Chat.ReadWrite",
-  "ChatMessage.Send",
 ] as const;
 
 export type MicrosoftUserTokens = {
@@ -186,16 +177,6 @@ export function hasMicrosoftTasksScope(userId: number | null): boolean {
     s.has("Tasks.Read") ||
     s.has("https://graph.microsoft.com/Tasks.ReadWrite") ||
     s.has("https://graph.microsoft.com/Tasks.Read")
-  );
-}
-
-export function hasMicrosoftTeamsChatScope(userId: number | null): boolean {
-  const s = scopeSet(userId);
-  return (
-    s.has("ChatMessage.Send") ||
-    s.has("Chat.ReadWrite") ||
-    s.has("https://graph.microsoft.com/ChatMessage.Send") ||
-    s.has("https://graph.microsoft.com/Chat.ReadWrite")
   );
 }
 
