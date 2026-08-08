@@ -152,11 +152,14 @@ export function SettingsTelegramPanel() {
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-sm text-muted-foreground">
-          Zusätzlicher Nachrichtenkanal (Outbound). Bot bei{" "}
+          Zusätzlicher Kanal parallel zu Web Push: jede Live-Benachrichtigung
+          (Dokumente, Reisen, Finanzen, Briefing, …) mit gleichem Text und —
+          wenn vorhanden — dem KI-/Event-Bild. Bot bei{" "}
           <span className="font-medium">@BotFather</span> anlegen, einmal
           anschreiben, Chat-ID z. B. über{" "}
           <span className="font-medium">@userinfobot</span> oder{" "}
-          <code className="text-[11px]">getUpdates</code> ermitteln.
+          <code className="text-[11px]">getUpdates</code> ermitteln. Master-Schalter
+          unter Live-Benachrichtigungen gilt auch hier.
         </p>
 
         {message ? (

@@ -9,7 +9,6 @@ import {
 import { getDashboardOverview } from "@/lib/dashboard/overview";
 import { countMailAppliedToday } from "@/lib/mail/mail-applied-links";
 import { notifyAppChange } from "@/lib/realtime/notify";
-import { notifyTelegramMessage } from "@/lib/telegram/notify";
 
 const MORNING_SENT_KEY = "day_briefing_last_sent_date";
 const EVENING_SENT_KEY = "evening_digest_last_sent_date";
@@ -82,11 +81,6 @@ export async function maybeDispatchBriefingPushes(
         category: "briefing",
         meta: resolveBriefingMode(hour),
       });
-      notifyTelegramMessage({
-        headline: pulse.headline,
-        detail: payload.prose || pulse.detail,
-        href: "/",
-      });
       setSetting(MORNING_SENT_KEY, todayIso);
       out.morning = true;
     }
@@ -116,11 +110,6 @@ export async function maybeDispatchBriefingPushes(
         aiIconUrl: null,
         category: "briefing",
         meta: "evening",
-      });
-      notifyTelegramMessage({
-        headline: "Abend-Digest",
-        detail: eveningDetail,
-        href: "/",
       });
       setSetting(EVENING_SENT_KEY, todayIso);
       out.evening = true;

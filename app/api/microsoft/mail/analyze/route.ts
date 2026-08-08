@@ -26,7 +26,6 @@ import {
 } from "@/lib/microsoft/oauth";
 import { formatTokenUsageLine } from "@/lib/ai/usage-cost";
 import { notifyAppChange } from "@/lib/realtime/notify";
-import { notifyTelegramMessage } from "@/lib/telegram/notify";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -68,12 +67,6 @@ function notifyDone(
     meta: null,
     source: "buddy",
   });
-
-  notifyTelegramMessage({
-    headline: "Mail-Tagesanalyse fertig",
-    detail,
-    href: "/microsoft",
-  });
 }
 
 function notifyError(userId: number, dayIso: string, message: string) {
@@ -89,11 +82,6 @@ function notifyError(userId: number, dayIso: string, message: string) {
     category: null,
     meta: null,
     source: "buddy",
-  });
-  notifyTelegramMessage({
-    headline: "Mail-Tagesanalyse fehlgeschlagen",
-    detail,
-    href: "/microsoft",
   });
 }
 

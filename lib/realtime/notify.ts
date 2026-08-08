@@ -66,6 +66,12 @@ export function notifyAppChange(
     .catch(() => {
       /* optional */
     });
+
+  void import("@/lib/telegram/notify")
+    .then((m) => m.notifyTelegramFromAppNotify(notification))
+    .catch(() => {
+      /* optional */
+    });
 }
 
 export function getDocumentRealtimeSnapshot(localId: number): {
