@@ -25,6 +25,7 @@ export function AgendaAiIconThumb({
   aiIconKey,
   aiIconUrl,
   className,
+  imgClassName,
 }: {
   itemId: string;
   title: string;
@@ -42,6 +43,8 @@ export function AgendaAiIconThumb({
   aiIconKey?: string | null;
   aiIconUrl?: string | null;
   className?: string;
+  /** Override default size-12 / sm:size-14 thumbnail */
+  imgClassName?: string;
 }) {
   const [url, setUrl] = useState<string | null>(aiIconUrl ?? null);
   const [zoomOpen, setZoomOpen] = useState(false);
@@ -134,7 +137,8 @@ export function AgendaAiIconThumb({
     return (
       <span
         className={cn(
-          "size-12 shrink-0 animate-pulse rounded-lg bg-muted/70 sm:size-14",
+          "shrink-0 animate-pulse rounded-lg bg-muted/70",
+          imgClassName || "size-12 sm:size-14",
           className
         )}
         aria-hidden
@@ -163,7 +167,7 @@ export function AgendaAiIconThumb({
         <img
           src={url}
           alt=""
-          className="size-12 object-cover sm:size-14"
+          className={cn("object-cover", imgClassName || "size-12 sm:size-14")}
         />
       </button>
       {zoomOpen ? (

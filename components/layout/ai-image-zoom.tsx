@@ -40,7 +40,7 @@ export function AiImageZoom({
   return createPortal(
     <button
       type="button"
-      className="fixed inset-0 z-[2000] flex cursor-zoom-out items-center justify-center bg-black/75 p-4"
+      className="fixed inset-0 z-[2000] flex cursor-zoom-out items-center justify-center bg-black/80 p-1.5 sm:p-2"
       onClick={onClose}
       aria-label="Schliessen"
       title="Klicken zum Schliessen"
@@ -49,7 +49,7 @@ export function AiImageZoom({
       <img
         src={src}
         alt={alt}
-        className="max-h-[90vh] max-w-[95vw] rounded-lg object-contain shadow-2xl"
+        className="h-[min(98dvh,98vw)] w-[min(98dvh,98vw)] max-h-[98dvh] max-w-[98vw] rounded-lg object-contain shadow-2xl"
       />
     </button>,
     document.body

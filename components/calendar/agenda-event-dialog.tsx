@@ -69,6 +69,7 @@ function typeLabel(item: AgendaItem): string {
 }
 
 import { TripMap } from "@/components/trips/trip-map";
+import { AgendaAiIconThumb } from "@/components/calendar/agenda-ai-icon-thumb";
 import { isPhysicalAgendaLocation } from "@/lib/dashboard/agenda-location";
 
 function DetailRow({
@@ -140,6 +141,34 @@ export function AgendaEventDialog({
             </div>
 
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-3">
+              {item.aiIconKey || item.aiIconUrl ? (
+                <DetailRow label="Motiv">
+                  <AgendaAiIconThumb
+                    itemId={item.id}
+                    title={item.title}
+                    location={item.location}
+                    description={item.description}
+                    calendarType={item.calendarType}
+                    calendarName={item.calendarName}
+                    kind={item.kind}
+                    meetUrl={item.meetUrl}
+                    time={item.time}
+                    endTime={item.endTime}
+                    driveMinutes={item.driveMinutes}
+                    distanceKm={item.distanceKm}
+                    coords={
+                      item.coords
+                        ? { lat: item.coords.lat, lon: item.coords.lon }
+                        : null
+                    }
+                    aiIconKey={item.aiIconKey}
+                    aiIconUrl={item.aiIconUrl}
+                    className="w-full max-w-[14rem]"
+                    imgClassName="aspect-square w-full"
+                  />
+                </DetailRow>
+              ) : null}
+
               {item.location ? (
                 <DetailRow label="Ort">
                   <p className="flex items-start gap-1.5">
@@ -248,7 +277,9 @@ export function AgendaEventDialog({
               !item.location &&
               !item.weather &&
               !item.driveLabel &&
-              !item.score ? (
+              !item.score &&
+              !item.aiIconKey &&
+              !item.aiIconUrl ? (
                 <p className="text-[13px] text-muted-foreground">
                   Keine weiteren Details in der Quelle.
                 </p>
