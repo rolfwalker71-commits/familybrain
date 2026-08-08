@@ -18,7 +18,7 @@ export async function GET(request: Request) {
   const code = searchParams.get("code");
   const stateRaw = searchParams.get("state");
 
-  const mailUrl = absoluteAppUrl("/mail", request);
+  const mailUrl = absoluteAppUrl("/google", request);
 
   if (error) {
     return NextResponse.redirect(

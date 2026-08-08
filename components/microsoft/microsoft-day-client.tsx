@@ -2,10 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   Check,
   CalendarClock,
   Cloud,
+  Inbox,
+  ListChecks,
   Mail,
   RefreshCw,
   Sparkles,
@@ -30,6 +33,7 @@ import { APP_ICON_STROKE } from "@/lib/branding/app-icons";
 import { formatTokenUsageLine } from "@/lib/ai/usage-cost";
 import type { AiTokenUsage } from "@/lib/ai/usage-cost";
 import { toSwissDate } from "@/lib/utils/dates";
+import { MicrosoftMailInboxPanel } from "@/components/microsoft/microsoft-mail-inbox-panel";
 
 function zurichYmdClient(d = new Date()): string {
   return new Intl.DateTimeFormat("en-CA", {
@@ -62,7 +66,15 @@ function addDaysYmdClient(ymd: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-type Tab = "calendar" | "mail";
+type Tab = "calendar" | "inbox" | "triage" | "day";
+
+function parseTab(raw: string | null): Tab {
+  if (raw === "inbox" || raw === "triage" || raw === "day" || raw === "calendar") {
+    return raw;
+  }
+  if (raw === "mail") return "day";
+  return "calendar";
+}
 
 type MsEvent = {
   id: string;
@@ -166,7 +178,14 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 export function MicrosoftDayClient() {
-  const [tab, setTab] = useState<Tab>("calendar");
+  const searchParams = useSearchParams();
+  const [tab, setTab] = useState<Tab>(() =>
+    parseTab(searchParams.get("tab"))
+  );
+  const [openMailId, setOpenMailId] = useState<string | null>(
+    () => searchParams.get("open")
+  );
+  const [inboxPending, setInboxPending] = useState(0);
   const [connected, setConnected] = useState<boolean | null>(null);
   const [connectedEmail, setConnectedEmail] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -385,7 +404,7 @@ export function MicrosoftDayClient() {
           .filter(Boolean)
           .join(" ")
       );
-      setTab("mail");
+      setTab("day");
     },
     []
   );
@@ -689,7 +708,7 @@ export function MicrosoftDayClient() {
     <div className="min-w-0 space-y-5 pb-10">
       <PageHeader
         title="Microsoft 365"
-        description="Abend-Review für Outlook-Termine und Tages-Mails (Posteingang + Gesendet)."
+        description="Outlook-Mails analysieren, Triage und Kalender-Review — Tagesanalyse und Slot-Suche zusätzlich."
         icon={Cloud}
         tone="blue"
       />
@@ -723,7 +742,7 @@ export function MicrosoftDayClient() {
                 {connectedEmail || "Microsoft 365"}
               </span>
             </p>
-            <div className="flex gap-1 rounded-lg border border-border/70 p-0.5">
+            <div className="flex flex-wrap gap-1 rounded-lg border border-border/70 p-0.5">
               <button
                 type="button"
                 className={cn(
@@ -736,22 +755,57 @@ export function MicrosoftDayClient() {
               >
                 <span className="inline-flex items-center gap-1.5">
                   <CalendarClock className="size-3.5" strokeWidth={APP_ICON_STROKE} />
-                  Kalender-Review
+                  Kalender
                 </span>
               </button>
               <button
                 type="button"
                 className={cn(
                   "rounded-md px-3 py-1.5 text-sm font-medium",
-                  tab === "mail"
+                  tab === "inbox"
                     ? "bg-muted text-foreground"
                     : "text-muted-foreground"
                 )}
-                onClick={() => setTab("mail")}
+                onClick={() => setTab("inbox")}
+              >
+                <span className="inline-flex items-center gap-1.5">
+                  <Inbox className="size-3.5" strokeWidth={APP_ICON_STROKE} />
+                  Posteingang
+                </span>
+              </button>
+              <button
+                type="button"
+                className={cn(
+                  "rounded-md px-3 py-1.5 text-sm font-medium",
+                  tab === "triage"
+                    ? "bg-muted text-foreground"
+                    : "text-muted-foreground"
+                )}
+                onClick={() => setTab("triage")}
+              >
+                <span className="inline-flex items-center gap-1.5">
+                  <ListChecks className="size-3.5" strokeWidth={APP_ICON_STROKE} />
+                  Triage
+                  {inboxPending > 0 ? (
+                    <Badge variant="secondary" className="text-[10px]">
+                      {inboxPending}
+                    </Badge>
+                  ) : null}
+                </span>
+              </button>
+              <button
+                type="button"
+                className={cn(
+                  "rounded-md px-3 py-1.5 text-sm font-medium",
+                  tab === "day"
+                    ? "bg-muted text-foreground"
+                    : "text-muted-foreground"
+                )}
+                onClick={() => setTab("day")}
               >
                 <span className="inline-flex items-center gap-1.5">
                   <Mail className="size-3.5" strokeWidth={APP_ICON_STROKE} />
-                  Mail-Tag
+                  Tagesanalyse
                 </span>
               </button>
             </div>
@@ -927,6 +981,18 @@ export function MicrosoftDayClient() {
                 </ul>
               )}
             </section>
+          ) : tab === "inbox" ? (
+            <MicrosoftMailInboxPanel
+              mode="inbox"
+              openMessageId={openMailId}
+              onPendingChange={setInboxPending}
+            />
+          ) : tab === "triage" ? (
+            <MicrosoftMailInboxPanel
+              mode="triage"
+              openMessageId={openMailId}
+              onPendingChange={setInboxPending}
+            />
           ) : (
             <section className="space-y-4">
               <div className="flex flex-wrap items-end justify-between gap-3">

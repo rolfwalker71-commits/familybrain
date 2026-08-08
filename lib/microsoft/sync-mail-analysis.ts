@@ -1,23 +1,25 @@
 import { hasOpenAIKey } from "@/lib/ai/client";
-import { getGmailMessage, type MailListItem } from "@/lib/mail/gmail";
-import { applyGmailStatusLabel } from "@/lib/mail/gmail-labels";
+import type { MailListItem } from "@/lib/mail/gmail";
 import { analyzeMailForActions } from "@/lib/mail/analyze-mail";
 import {
   shouldAnalyzeMail,
   resolveStatusFromAnalysis,
-  type MailAnalysisStatus,
 } from "@/lib/mail/mail-heuristic";
 import {
   getMailAnalysesForMessages,
   listMailAnalysesByThread,
   upsertMailAnalysis,
+  type MailProvider,
 } from "@/lib/mail/mail-analysis-store";
 import {
   emailDomain,
   getMailSenderPref,
   senderPrefPromptLine,
 } from "@/lib/mail/mail-sender-prefs";
-import { findPatchableEventInThread } from "@/lib/mail/mail-applied-links";
+import { getMicrosoftMessage } from "@/lib/microsoft/mail-inbox";
+import type { MailSyncResult } from "@/lib/mail/sync-mail-analysis";
+
+const PROVIDER: MailProvider = "microsoft";
 
 function zurichToday(): string {
   return new Intl.DateTimeFormat("en-CA", {
@@ -28,60 +30,40 @@ function zurichToday(): string {
   }).format(new Date());
 }
 
-async function tagGmail(
-  userId: number,
-  messageId: string,
-  status: MailAnalysisStatus,
-  request?: Request | null
-): Promise<void> {
-  await applyGmailStatusLabel(userId, messageId, status, request).catch(
-    () => undefined
-  );
-}
-
 function buildThreadContext(
   userId: number,
   threadId: string | null | undefined,
   currentMessageId: string
 ): string | null {
   if (!threadId?.trim()) return null;
-  const siblings = listMailAnalysesByThread(userId, threadId, 6).filter(
-    (r) => r.messageId !== currentMessageId
-  );
+  const siblings = listMailAnalysesByThread(
+    userId,
+    threadId,
+    6,
+    PROVIDER
+  ).filter((r) => r.messageId !== currentMessageId);
   if (siblings.length === 0) return null;
   const lines = siblings.map((r) => {
-    const st = r.status;
     const sum = r.summary || r.snippet || "—";
-    return `- [${st}] ${r.subject || "(kein Betreff)"}: ${sum.slice(0, 160)}`;
+    return `- [${r.status}] ${r.subject || "(kein Betreff)"}: ${sum.slice(0, 160)}`;
   });
   return `Frühere Mails in diesem Thread:\n${lines.join("\n")}`;
 }
 
-export type MailSyncResult = {
-  examined: number;
-  skippedHeuristic: number;
-  analyzed: number;
-  withSuggestions: number;
-  errors: number;
-  pendingAi: number;
-};
-
 /**
- * Analyze new mails from a list batch. Caps AI calls per invocation.
- * Already-stored message ids are left untouched (except skipped→retry / error).
+ * Analyze new Outlook inbox mails. Caps AI calls per invocation.
+ * No Gmail label writeback (MVP).
  */
-export async function syncMailAnalysesForItems(
+export async function syncMicrosoftMailAnalysesForItems(
   userId: number,
   items: MailListItem[],
-  options?: {
-    maxAi?: number;
-    request?: Request | null;
-  }
+  options?: { maxAi?: number }
 ): Promise<MailSyncResult> {
   const maxAi = Math.max(0, options?.maxAi ?? 3);
   const existing = getMailAnalysesForMessages(
     userId,
-    items.map((i) => i.id)
+    items.map((i) => i.id),
+    PROVIDER
   );
 
   const result: MailSyncResult = {
@@ -148,7 +130,7 @@ export async function syncMailAnalysesForItems(
       upsertMailAnalysis({
         userId,
         messageId: item.id,
-        provider: "google",
+        provider: PROVIDER,
         threadId: item.threadId,
         subject: item.subject,
         fromName: item.fromName,
@@ -158,7 +140,6 @@ export async function syncMailAnalysesForItems(
         summary: "Kein Handlungsbedarf erkannt (Heuristik).",
         suggestionCount: 0,
       });
-      await tagGmail(userId, item.id, "skipped", options?.request);
       result.skippedHeuristic += 1;
       continue;
     }
@@ -170,22 +151,17 @@ export async function syncMailAnalysesForItems(
 
     aiBudget -= 1;
     try {
-      const detail = await getGmailMessage(
-        userId,
-        item.id,
-        options?.request
-      );
+      const detail = await getMicrosoftMessage(userId, item.id);
       const threadId = item.threadId || detail.threadId;
       const analysis = await analyzeMailForActions(detail, zurichToday(), {
         threadContext: buildThreadContext(userId, threadId, item.id),
         senderPrefLine: senderPrefPromptLine(pref),
-        patchableEvent: findPatchableEventInThread(userId, threadId),
       });
       const status = resolveStatusFromAnalysis(analysis);
       upsertMailAnalysis({
         userId,
         messageId: item.id,
-        provider: "google",
+        provider: PROVIDER,
         threadId,
         subject: detail.subject,
         fromName: detail.fromName,
@@ -197,43 +173,22 @@ export async function syncMailAnalysesForItems(
         analysis,
         suggestionCount: analysis.suggestions.length,
       });
-      await tagGmail(userId, item.id, status, options?.request);
       result.analyzed += 1;
-      if (analysis.suggestions.length > 0) {
-        result.withSuggestions += 1;
-        try {
-          const { notifyAppChange } = await import("@/lib/realtime/notify");
-          notifyAppChange({
-            domain: "documents",
-            reason: "mail_triage",
-            headline: "Mail zur Triage",
-            detail: analysis.summary || detail.subject,
-            title: detail.subject || "Mail",
-            href: `/google?open=${encodeURIComponent(item.id)}`,
-            source: "buddy",
-            aiIconUrl: null,
-            category: "mail",
-            meta: detail.fromName || detail.from || null,
-          });
-        } catch {
-          /* optional */
-        }
-      }
-    } catch (error) {
+      if (analysis.suggestions.length > 0) result.withSuggestions += 1;
+    } catch (err) {
       upsertMailAnalysis({
         userId,
         messageId: item.id,
-        provider: "google",
+        provider: PROVIDER,
         threadId: item.threadId,
         subject: item.subject,
         fromName: item.fromName,
         fromEmail: item.from,
         snippet: item.snippet,
         status: "error",
-        error: error instanceof Error ? error.message : String(error),
+        error: err instanceof Error ? err.message : String(err),
         suggestionCount: 0,
       });
-      await tagGmail(userId, item.id, "error", options?.request);
       result.errors += 1;
     }
   }

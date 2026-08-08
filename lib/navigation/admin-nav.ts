@@ -7,6 +7,7 @@ const MYBRAIN_PREFIXES = [
   "/dashboard",
   "/calendar",
   "/mail",
+  "/google",
   "/microsoft",
   "/account",
   "/inbox",

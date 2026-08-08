@@ -1,16 +1,23 @@
-import { Suspense } from "react";
-import { MailPageClient } from "@/components/mail/mail-page-client";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
-export default function MailPage() {
-  return (
-    <Suspense
-      fallback={
-        <p className="p-6 text-sm text-muted-foreground">Lade Mail…</p>
-      }
-    >
-      <MailPageClient />
-    </Suspense>
-  );
+/** Legacy bookmark: /mail → /google */
+export default async function MailRedirectPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = await searchParams;
+  const qs = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value == null) continue;
+    if (Array.isArray(value)) {
+      for (const v of value) qs.append(key, v);
+    } else {
+      qs.set(key, value);
+    }
+  }
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  redirect(`/google${suffix}`);
 }

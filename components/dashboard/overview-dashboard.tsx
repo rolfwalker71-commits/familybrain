@@ -473,7 +473,7 @@ function SystemStatusCard({
           </Link>
           {mailPending > 0 ? (
             <Link
-              href="/mail?tab=triage"
+              href="/google?tab=triage"
               className="font-medium text-foreground underline-offset-2 hover:underline"
             >
               Mail-Triage
@@ -1224,8 +1224,8 @@ export function OverviewDashboard({
               <FocusTile
                 href={
                   mailSample
-                    ? `/mail?open=${encodeURIComponent(mailSample.id)}`
-                    : "/mail"
+                    ? `/google?open=${encodeURIComponent(mailSample.id)}`
+                    : "/google"
                 }
                 tone="amber"
                 icon={Mail}
@@ -1243,25 +1243,43 @@ export function OverviewDashboard({
               />
               <FocusTile
                 href={
-                  data.chips.mailSuggestionsPending > 0
-                    ? "/mail?tab=triage"
-                    : "/mail"
+                  (data.chips.mailByProvider?.microsoft.pendingTriage ?? 0) >
+                  (data.chips.mailByProvider?.google.pendingTriage ?? 0)
+                    ? "/microsoft?tab=triage"
+                    : data.chips.mailSuggestionsPending > 0
+                      ? "/google?tab=triage"
+                      : "/google"
                 }
                 tone="sky"
                 icon={Sparkles}
                 eyebrow="Mail · Analyse"
                 title={
-                  (data.chips.mailAnalyzedToday ?? 0) > 0 ||
                   data.chips.mailSuggestionsPending > 0
-                    ? `${data.chips.mailAnalyzedToday ?? 0} analysiert`
-                    : "Noch keine Analyse"
+                    ? `${data.chips.mailSuggestionsPending} zur Triage`
+                    : (data.chips.mailAnalyzedToday ?? 0) > 0
+                      ? `${data.chips.mailAnalyzedToday} analysiert`
+                      : "Noch keine Analyse"
                 }
                 detail={
-                  data.chips.mailSuggestionsPending > 0
-                    ? `${data.chips.mailSuggestionsPending} zur Triage bereit`
-                    : (data.chips.mailAnalyzedToday ?? 0) > 0
-                      ? "Nichts in der Triage"
-                      : "Beim Öffnen der Übersicht (~2–5 Sek. je Mail)"
+                  (() => {
+                    const g =
+                      data.chips.mailByProvider?.google ?? {
+                        analyzedToday: 0,
+                        pendingTriage: 0,
+                      };
+                    const m =
+                      data.chips.mailByProvider?.microsoft ?? {
+                        analyzedToday: 0,
+                        pendingTriage: 0,
+                      };
+                    if (
+                      data.chips.mailSuggestionsPending > 0 ||
+                      data.chips.mailAnalyzedToday > 0
+                    ) {
+                      return `Google ${g.pendingTriage} · O365 ${m.pendingTriage} offen`;
+                    }
+                    return "Beim Öffnen der Übersicht (~2–5 Sek. je Mail)";
+                  })()
                 }
               />
             </div>

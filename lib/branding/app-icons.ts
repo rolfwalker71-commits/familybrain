@@ -49,6 +49,7 @@ export const appIcons = {
   overview: { icon: Home, tone: "teal" as const },
   inbox: { icon: Inbox, tone: "teal" as const },
   mail: { icon: Mail, tone: "teal" as const },
+  google: { icon: Mail, tone: "teal" as const },
   documents: { icon: FileText, tone: "teal" as const },
   calendar: { icon: CalendarDays, tone: "teal" as const },
   deadlines: { icon: Calendar, tone: "teal" as const },

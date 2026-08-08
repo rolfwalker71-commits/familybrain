@@ -162,15 +162,19 @@ export type OverviewPayload = {
     urgentDeadlines: number;
     openDueAmount: number;
     openDueCount: number;
-    /** Open mail AI suggestions awaiting triage */
+    /** Open mail AI suggestions awaiting triage (Google + O365) */
     mailSuggestionsPending: number;
     /** Mails AI-processed today (analyzed / triage / applied / dismissed) */
     mailAnalyzedToday: number;
+    mailByProvider: {
+      google: { analyzedToday: number; pendingTriage: number };
+      microsoft: { analyzedToday: number; pendingTriage: number };
+    };
   };
   agenda: AgendaItem[];
   /** Heute (+ optional nächste 24h), max 5 — Link zu /calendar */
   todayCalendar: AgendaItem[];
-  /** Heute-Mails (Gmail), max 5 — Link zu /mail */
+  /** Heute-Mails (Gmail), max 5 — Link zu /google */
   todayMail: MailListItem[];
   kpi: {
     total: number;
@@ -740,10 +744,13 @@ export async function getDashboardOverview(
       })(),
       (async () => {
         if (calendarUserId == null) {
-          return { analyzedToday: 0, pendingTriage: 0 };
+          return {
+            google: { analyzedToday: 0, pendingTriage: 0 },
+            microsoft: { analyzedToday: 0, pendingTriage: 0 },
+          };
         }
         try {
-          const { countMailOverviewStats } = await import(
+          const { countMailOverviewStatsByProvider } = await import(
             "@/lib/mail/mail-analysis-store"
           );
           const day = new Intl.DateTimeFormat("en-CA", {
@@ -752,9 +759,12 @@ export async function getDashboardOverview(
             month: "2-digit",
             day: "2-digit",
           }).format(new Date());
-          return countMailOverviewStats(calendarUserId, day);
+          return countMailOverviewStatsByProvider(calendarUserId, day);
         } catch {
-          return { analyzedToday: 0, pendingTriage: 0 };
+          return {
+            google: { analyzedToday: 0, pendingTriage: 0 },
+            microsoft: { analyzedToday: 0, pendingTriage: 0 },
+          };
         }
       })(),
       (async () => {
@@ -821,8 +831,14 @@ export async function getDashboardOverview(
       urgentDeadlines,
       openDueAmount,
       openDueCount,
-      mailSuggestionsPending: mailStats.pendingTriage,
-      mailAnalyzedToday: mailStats.analyzedToday,
+      mailSuggestionsPending:
+        mailStats.google.pendingTriage + mailStats.microsoft.pendingTriage,
+      mailAnalyzedToday:
+        mailStats.google.analyzedToday + mailStats.microsoft.analyzedToday,
+      mailByProvider: {
+        google: mailStats.google,
+        microsoft: mailStats.microsoft,
+      },
     },
     agenda: agendaWithWeather,
     todayCalendar,

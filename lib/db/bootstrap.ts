@@ -245,6 +245,19 @@ function ensureMailAnalysesTable(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_mail_analyses_thread
       ON mail_analyses(user_id, thread_id);
   `);
+  const cols = db
+    .prepare(`PRAGMA table_info(mail_analyses)`)
+    .all() as Array<{ name: string }>;
+  const names = new Set(cols.map((c) => c.name));
+  if (!names.has("provider")) {
+    db.exec(
+      `ALTER TABLE mail_analyses ADD COLUMN provider TEXT NOT NULL DEFAULT 'google'`
+    );
+  }
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_mail_analyses_provider_status
+      ON mail_analyses(user_id, provider, status, analyzed_at DESC);
+  `);
 }
 
 function ensureMailSenderPrefsTable(db: Database.Database): void {

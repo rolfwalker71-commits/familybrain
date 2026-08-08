@@ -2,9 +2,10 @@ import { NextResponse } from "next/server";
 import { isAuthError, requireAuth } from "@/lib/auth/current-user";
 import { ensureInitialized } from "@/lib/db/migrations";
 import {
-  isGoogleMailConnected,
-  resolveGoogleUserId,
-} from "@/lib/google/oauth";
+  hasMicrosoftMailScope,
+  isMicrosoftConnected,
+  resolveMicrosoftUserId,
+} from "@/lib/microsoft/oauth";
 import {
   countPendingMailTriage,
   getMailAnalysis,
@@ -19,26 +20,26 @@ export async function GET() {
   ensureInitialized();
   const auth = await requireAuth();
   if (isAuthError(auth)) return auth;
-  const userId = resolveGoogleUserId(auth);
-  if (userId == null || !isGoogleMailConnected(userId)) {
-    return NextResponse.json({
-      pending: [],
-      pendingCount: 0,
-    });
+  const userId = resolveMicrosoftUserId(auth);
+  if (
+    userId == null ||
+    !isMicrosoftConnected(userId) ||
+    !hasMicrosoftMailScope(userId)
+  ) {
+    return NextResponse.json({ pending: [], pendingCount: 0 });
   }
-  const pending = listPendingMailTriage(userId, 40, "google");
+  const pending = listPendingMailTriage(userId, 40, "microsoft");
   return NextResponse.json({
     pending,
-    pendingCount: countPendingMailTriage(userId, "google"),
+    pendingCount: countPendingMailTriage(userId, "microsoft"),
   });
 }
 
-/** Dismiss a mail analysis (no calendar/task created). */
 export async function POST(request: Request) {
   ensureInitialized();
   const auth = await requireAuth();
   if (isAuthError(auth)) return auth;
-  const userId = resolveGoogleUserId(auth);
+  const userId = resolveMicrosoftUserId(auth);
   if (userId == null) {
     return NextResponse.json({ error: "Kein User" }, { status: 400 });
   }
@@ -50,18 +51,17 @@ export async function POST(request: Request) {
   if (!messageId) {
     return NextResponse.json({ error: "messageId fehlt" }, { status: 400 });
   }
-  const existing = getMailAnalysis(userId, messageId, "google");
+  const existing = getMailAnalysis(userId, messageId, "microsoft");
   if (!existing) {
-    return NextResponse.json({ error: "Analyse nicht gefunden" }, { status: 404 });
+    return NextResponse.json(
+      { error: "Analyse nicht gefunden" },
+      { status: 404 }
+    );
   }
-  updateMailAnalysisStatus(userId, messageId, "dismissed", "google");
+  updateMailAnalysisStatus(userId, messageId, "dismissed", "microsoft");
   const { recordMailSenderDismissed } = await import(
     "@/lib/mail/mail-sender-prefs"
   );
   recordMailSenderDismissed(userId, existing.fromEmail);
-  const { applyGmailStatusLabel } = await import("@/lib/mail/gmail-labels");
-  await applyGmailStatusLabel(userId, messageId, "dismissed", request).catch(
-    () => undefined
-  );
   return NextResponse.json({ ok: true, status: "dismissed" });
 }

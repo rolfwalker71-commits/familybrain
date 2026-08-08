@@ -601,7 +601,7 @@ export async function POST(request: Request, context: Ctx) {
             .map((c) => c.title)
             .join(", "),
           title: created.find((c) => c.patched)?.title ?? null,
-          href: "/mail?tab=triage",
+          href: "/google?tab=triage",
           source: "buddy",
           aiIconUrl: null,
           category: "mail",

@@ -2,11 +2,11 @@ import { NextResponse } from "next/server";
 import { isAuthError, requireAuth } from "@/lib/auth/current-user";
 import { ensureInitialized } from "@/lib/db/migrations";
 import {
-  isGoogleMailConnected,
-  resolveGoogleUserId,
-} from "@/lib/google/oauth";
-import { getGmailMessage } from "@/lib/mail/gmail";
-import { applyGmailStatusLabel } from "@/lib/mail/gmail-labels";
+  hasMicrosoftMailScope,
+  isMicrosoftConnected,
+  resolveMicrosoftUserId,
+} from "@/lib/microsoft/oauth";
+import { getMicrosoftMessage } from "@/lib/microsoft/mail-inbox";
 import { analyzeMailForActions } from "@/lib/mail/analyze-mail";
 import { hasOpenAIKey } from "@/lib/ai/client";
 import { resolveStatusFromAnalysis } from "@/lib/mail/mail-heuristic";
@@ -19,7 +19,6 @@ import {
   getMailSenderPref,
   senderPrefPromptLine,
 } from "@/lib/mail/mail-sender-prefs";
-import { findPatchableEventInThread } from "@/lib/mail/mail-applied-links";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,14 +38,18 @@ export async function POST(request: Request, context: Ctx) {
   ensureInitialized();
   const auth = await requireAuth();
   if (isAuthError(auth)) return auth;
-  const userId = resolveGoogleUserId(auth);
+  const userId = resolveMicrosoftUserId(auth);
   const { id } = await context.params;
   if (!id) {
     return NextResponse.json({ error: "id fehlt" }, { status: 400 });
   }
-  if (userId == null || !isGoogleMailConnected(userId)) {
+  if (
+    userId == null ||
+    !isMicrosoftConnected(userId) ||
+    !hasMicrosoftMailScope(userId)
+  ) {
     return NextResponse.json(
-      { error: "Google-Konto nicht verbunden." },
+      { error: "Microsoft 365 nicht verbunden." },
       { status: 400 }
     );
   }
@@ -57,13 +60,14 @@ export async function POST(request: Request, context: Ctx) {
     );
   }
   try {
-    const message = await getGmailMessage(userId, id, request);
+    const message = await getMicrosoftMessage(userId, id);
     const domain = emailDomain(message.from);
     const pref = domain ? getMailSenderPref(userId, domain) : null;
     const siblings = listMailAnalysesByThread(
       userId,
       message.threadId || "",
-      6
+      6,
+      "microsoft"
     ).filter((r) => r.messageId !== id);
     const threadContext =
       siblings.length > 0
@@ -77,17 +81,12 @@ export async function POST(request: Request, context: Ctx) {
     const analysis = await analyzeMailForActions(message, zurichToday(), {
       threadContext,
       senderPrefLine: senderPrefPromptLine(pref),
-      patchableEvent: findPatchableEventInThread(
-        userId,
-        message.threadId,
-        message.subject
-      ),
     });
     const status = resolveStatusFromAnalysis(analysis);
     const stored = upsertMailAnalysis({
       userId,
       messageId: id,
-      provider: "google",
+      provider: "microsoft",
       threadId: message.threadId,
       subject: message.subject,
       fromName: message.fromName,
@@ -99,19 +98,16 @@ export async function POST(request: Request, context: Ctx) {
       analysis,
       suggestionCount: analysis.suggestions.length,
     });
-    await applyGmailStatusLabel(userId, id, status, request).catch(
-      () => undefined
-    );
     if (analysis.suggestions.length > 0) {
       try {
         const { notifyAppChange } = await import("@/lib/realtime/notify");
         notifyAppChange({
           domain: "documents",
           reason: "mail_triage",
-          headline: "Mail zur Triage",
+          headline: "O365-Mail zur Triage",
           detail: analysis.summary || message.subject,
           title: message.subject || "Mail",
-          href: `/google?open=${encodeURIComponent(id)}`,
+          href: `/microsoft?tab=triage&open=${encodeURIComponent(id)}`,
           source: "buddy",
           aiIconUrl: null,
           category: "mail",

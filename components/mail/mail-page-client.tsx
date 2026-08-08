@@ -417,10 +417,10 @@ export function MailPageClient() {
   return (
     <div className="min-w-0 space-y-5 pb-8">
       <PageHeader
-        title="Mail"
-        description="Neue Mails werden automatisch geprüft — Vorschläge in der Triage."
-        icon={pageVisuals.mail.icon}
-        tone={pageVisuals.mail.tone}
+        title="Google"
+        description="Gmail wird automatisch geprüft — Vorschläge in der Triage."
+        icon={pageVisuals.google.icon}
+        tone={pageVisuals.google.tone}
         actions={
           <div className="flex flex-wrap gap-1.5">
             <Button
@@ -445,7 +445,7 @@ export function MailPageClient() {
               )}
               onClick={() => setTab("triage")}
             >
-              Vorschläge
+              Triage
               {pendingTriage > 0 ? (
                 <Badge variant="secondary" className="ml-1 text-[10px]">
                   {pendingTriage}

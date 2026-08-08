@@ -2,20 +2,20 @@ import { NextResponse } from "next/server";
 import { isAuthError, requireAuth } from "@/lib/auth/current-user";
 import { ensureInitialized } from "@/lib/db/migrations";
 import {
-  getConnectedGoogleEmail,
-  hasGmailModifyScope,
-  isGoogleMailConnected,
-  isGoogleOauthConfigured,
-  resolveGoogleUserId,
-} from "@/lib/google/oauth";
+  getConnectedMicrosoftEmail,
+  hasMicrosoftMailScope,
+  isMicrosoftConnected,
+  isMicrosoftOauthConfigured,
+  resolveMicrosoftUserId,
+} from "@/lib/microsoft/oauth";
+import { listMicrosoftInboxMessages } from "@/lib/microsoft/mail-inbox";
+import { syncMicrosoftMailAnalysesForItems } from "@/lib/microsoft/sync-mail-analysis";
 import {
-  listGmailMessages,
-  type MailListFilter,
-} from "@/lib/mail/gmail";
-import { getMailAnalysesForMessages } from "@/lib/mail/mail-analysis-store";
+  countPendingMailTriage,
+  getMailAnalysesForMessages,
+} from "@/lib/mail/mail-analysis-store";
 import { chipForStatus, chipLabelDe } from "@/lib/mail/mail-heuristic";
-import { syncMailAnalysesForItems } from "@/lib/mail/sync-mail-analysis";
-import { countPendingMailTriage } from "@/lib/mail/mail-analysis-store";
+import type { MailListFilter } from "@/lib/mail/gmail";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,58 +29,56 @@ export async function GET(request: Request) {
   ensureInitialized();
   const auth = await requireAuth();
   if (isAuthError(auth)) return auth;
-  const userId = resolveGoogleUserId(auth);
+  const userId = resolveMicrosoftUserId(auth);
   const { searchParams } = new URL(request.url);
   const filter = parseFilter(searchParams.get("filter"));
-  const limit = Number(searchParams.get("limit") || "20");
+  const limit = Number(searchParams.get("limit") || "30");
   const sync = searchParams.get("sync") !== "0";
 
-  if (!isGoogleOauthConfigured()) {
+  if (!isMicrosoftOauthConfigured()) {
     return NextResponse.json({
       configured: false,
       connected: false,
       items: [],
       filter,
       connectedEmail: null,
-      ownerUserId: userId,
       pendingTriage: 0,
-      hasGmailModify: false,
       sync: null,
     });
   }
-  if (userId == null || !isGoogleMailConnected(userId)) {
+  if (
+    userId == null ||
+    !isMicrosoftConnected(userId) ||
+    !hasMicrosoftMailScope(userId)
+  ) {
     return NextResponse.json({
       configured: true,
       connected: false,
       items: [],
       filter,
-      connectedEmail: null,
-      ownerUserId: userId,
+      connectedEmail: getConnectedMicrosoftEmail(userId),
       pendingTriage: 0,
-      hasGmailModify: false,
       sync: null,
     });
   }
 
   try {
-    const items = await listGmailMessages(userId, {
+    const items = await listMicrosoftInboxMessages(userId, {
       filter,
-      limit: Number.isFinite(limit) ? limit : 20,
-      request,
-      forceRefresh: searchParams.get("refresh") === "1",
+      limit: Number.isFinite(limit) ? limit : 30,
     });
 
     let syncResult = null;
     if (sync) {
-      syncResult = await syncMailAnalysesForItems(userId, items, {
+      syncResult = await syncMicrosoftMailAnalysesForItems(userId, items, {
         maxAi: 3,
-        request,
       });
     }
 
     const analyses = getMailAnalysesForMessages(
       userId,
-      items.map((i) => i.id)
+      items.map((i) => i.id),
+      "microsoft"
     );
     const enriched = items.map((item) => {
       const a = analyses.get(item.id);
@@ -98,28 +96,15 @@ export async function GET(request: Request) {
     return NextResponse.json({
       configured: true,
       connected: true,
-      connectedEmail: getConnectedGoogleEmail(userId),
       items: enriched,
       filter,
-      ownerUserId: userId,
-      pendingTriage: countPendingMailTriage(userId, "google"),
-      hasGmailModify: hasGmailModifyScope(userId),
+      connectedEmail: getConnectedMicrosoftEmail(userId),
+      pendingTriage: countPendingMailTriage(userId, "microsoft"),
       sync: syncResult,
     });
   } catch (error) {
     return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : String(error),
-        configured: true,
-        connected: true,
-        connectedEmail: getConnectedGoogleEmail(userId),
-        items: [],
-        filter,
-        ownerUserId: userId,
-        pendingTriage: 0,
-        hasGmailModify: userId != null ? hasGmailModifyScope(userId) : false,
-        sync: null,
-      },
+      { error: error instanceof Error ? error.message : String(error) },
       { status: 502 }
     );
   }
