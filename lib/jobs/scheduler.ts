@@ -91,6 +91,23 @@ async function tick(): Promise<void> {
     }
 
     try {
+      const { syncAgendaNotesWritebackIfDue } = await import(
+        "@/lib/dashboard/agenda-notes-writeback"
+      );
+      const notesSync = await syncAgendaNotesWritebackIfDue().catch((error) => {
+        console.warn("[scheduler] agenda notes writeback:", error);
+        return null;
+      });
+      if (notesSync?.attempted) {
+        const n =
+          (notesSync.updatedGoogle ?? 0) + (notesSync.updatedMicrosoft ?? 0);
+        state.lastResult = `${state.lastResult}|agenda-notes:u${n}`;
+      }
+    } catch (error) {
+      console.warn("[scheduler] agenda notes writeback:", error);
+    }
+
+    try {
       const { findRolfAppUserId } = await import(
         "@/lib/calendar/ics-calendars"
       );

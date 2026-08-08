@@ -50,6 +50,11 @@ export async function POST(request: Request) {
       description: item.description,
       calendarType: item.calendarType,
       kind: item.kind,
+      driveMinutes: item.driveMinutes ?? null,
+      distanceKm: item.distanceKm ?? null,
+      coords: item.coords
+        ? { lat: item.coords.lat, lon: item.coords.lon }
+        : null,
     };
 
     const existing = lookupAgendaAiIconUrl(subject);

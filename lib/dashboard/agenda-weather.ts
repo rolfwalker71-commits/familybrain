@@ -482,6 +482,8 @@ export type AgendaPlaceEnrichment = {
   weather: AgendaWeatherChip | null;
   coords: AgendaPlaceCoords | null;
   driveMinutes: number | null;
+  /** Road distance from home when drive estimate exists */
+  distanceKm: number | null;
   driveLabel: string | null;
   mapsUrl: string | null;
 };
@@ -502,6 +504,7 @@ export async function enrichAgendaWithWeather<
       weather: null,
       coords: null,
       driveMinutes: null,
+      distanceKm: null,
       driveLabel: null,
       mapsUrl: null,
     }));
@@ -586,6 +589,7 @@ export async function enrichAgendaWithWeather<
         weather: null,
         coords: null,
         driveMinutes: null,
+        distanceKm: null,
         driveLabel: null,
         mapsUrl: null,
       };
@@ -597,6 +601,7 @@ export async function enrichAgendaWithWeather<
         weather: null,
         coords: null,
         driveMinutes: null,
+        distanceKm: null,
         driveLabel: null,
         mapsUrl: googleMapsSearchUrl(loc),
       };
@@ -622,6 +627,7 @@ export async function enrichAgendaWithWeather<
         label: place.label,
       },
       driveMinutes: drive?.minutes ?? null,
+      distanceKm: drive?.distanceKm ?? null,
       driveLabel: driveLabelDe(drive),
       mapsUrl: googleMapsDirFromHomeUrl(place.lat, place.lon),
     };

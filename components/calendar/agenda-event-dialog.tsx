@@ -229,7 +229,7 @@ export function AgendaEventDialog({
               ) : null}
 
               {description ? (
-                <DetailRow label="Beschreibung">
+                <DetailRow label="Notizen">
                   <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-foreground/90">
                     {description}
                   </p>

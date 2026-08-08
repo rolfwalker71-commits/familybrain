@@ -334,6 +334,13 @@ export function AgendaRow({
               description={item.description}
               calendarType={item.calendarType}
               kind={item.kind}
+              driveMinutes={item.driveMinutes}
+              distanceKm={item.distanceKm}
+              coords={
+                item.coords
+                  ? { lat: item.coords.lat, lon: item.coords.lon }
+                  : null
+              }
               aiIconKey={item.aiIconKey}
               aiIconUrl={item.aiIconUrl}
             />

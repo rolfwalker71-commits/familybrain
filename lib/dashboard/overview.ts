@@ -95,6 +95,8 @@ export type AgendaItem = {
   coords?: { lat: number; lon: number; label: string } | null;
   /** Driving minutes from home (Altdorf) */
   driveMinutes?: number | null;
+  /** Road distance km from home when known */
+  distanceKm?: number | null;
   /** e.g. "~12 Min Fahrt" / "in der Nähe" */
   driveLabel?: string | null;
   /** Google Maps directions / search URL */

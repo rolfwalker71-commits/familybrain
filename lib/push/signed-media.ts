@@ -36,6 +36,7 @@ export function isPushMediaPathAllowed(pathname: string): boolean {
   if (!pathname.startsWith("/") || pathname.includes("..")) return false;
   return (
     pathname.startsWith("/api/documents/media/ai-icon/") ||
+    pathname.startsWith("/api/calendar/media/ai-icon/") ||
     pathname.startsWith("/api/trips/media/ai/") ||
     pathname.startsWith("/api/trips/media/cover/") ||
     pathname.startsWith("/api/trips/media/aircraft/") ||

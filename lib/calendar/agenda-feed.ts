@@ -697,6 +697,7 @@ export async function getCalendarAgenda(options: {
         weather: i.weather ?? null,
         coords: i.coords ?? null,
         driveMinutes: i.driveMinutes ?? null,
+        distanceKm: i.distanceKm ?? null,
         driveLabel: i.driveLabel ?? null,
         mapsUrl: i.mapsUrl ?? null,
       }));

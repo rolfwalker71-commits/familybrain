@@ -15,6 +15,9 @@ export function AgendaAiIconThumb({
   description,
   calendarType,
   kind,
+  driveMinutes,
+  distanceKm,
+  coords,
   aiIconKey,
   aiIconUrl,
   className,
@@ -25,6 +28,9 @@ export function AgendaAiIconThumb({
   description?: string | null;
   calendarType?: string | null;
   kind?: string | null;
+  driveMinutes?: number | null;
+  distanceKm?: number | null;
+  coords?: { lat: number; lon: number } | null;
   aiIconKey?: string | null;
   aiIconUrl?: string | null;
   className?: string;
@@ -56,6 +62,9 @@ export function AgendaAiIconThumb({
                 description,
                 calendarType,
                 kind,
+                driveMinutes,
+                distanceKm,
+                coords,
               },
             ],
           }),
@@ -83,6 +92,9 @@ export function AgendaAiIconThumb({
     description,
     calendarType,
     kind,
+    driveMinutes,
+    distanceKm,
+    coords,
   ]);
 
   function clearHoverTimer() {

@@ -97,7 +97,7 @@ export async function syncAgendaAiIconsIfDue(options?: {
     const feed = await getCalendarAgenda({
       userId,
       range: "week",
-      includeWeather: false,
+      includeWeather: true,
     });
 
     const subjects = new Map<string, AgendaIconSubject>();
@@ -112,6 +112,11 @@ export async function syncAgendaAiIconsIfDue(options?: {
         description: item.description,
         calendarType: item.calendarType,
         kind: item.kind,
+        driveMinutes: item.driveMinutes ?? null,
+        distanceKm: item.distanceKm ?? null,
+        coords: item.coords
+          ? { lat: item.coords.lat, lon: item.coords.lon }
+          : null,
       };
       const key = buildAgendaAiIconKey(subject);
       if (!key) continue;

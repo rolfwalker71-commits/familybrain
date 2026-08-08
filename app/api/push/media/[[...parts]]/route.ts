@@ -12,6 +12,7 @@ import {
   verifyPushMediaQuery,
   verifyPushMediaToken,
 } from "@/lib/push/signed-media";
+import { resolveAgendaAiIcon } from "@/lib/dashboard/agenda-ai-icon";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,6 +27,10 @@ function resolveFilesystemPath(mediaPath: string): string | null {
 
   if (mediaPath.startsWith("/api/documents/media/ai-icon/")) {
     return resolveDocumentAiIconPath(base);
+  }
+  if (mediaPath.startsWith("/api/calendar/media/ai-icon/")) {
+    const key = base.replace(/\.jpe?g$/i, "").toLowerCase();
+    return resolveAgendaAiIcon(key);
   }
   if (mediaPath.startsWith("/api/trips/media/ai/")) {
     return resolveMediaPath("ai", base);

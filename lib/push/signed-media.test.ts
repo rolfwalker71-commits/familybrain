@@ -12,6 +12,10 @@ test("isPushMediaPathAllowed only whitelists media paths", () => {
     isPushMediaPathAllowed("/api/documents/media/ai-icon/doc-1.jpg"),
     true
   );
+  assert.equal(
+    isPushMediaPathAllowed("/api/calendar/media/ai-icon/abc123.jpg"),
+    true
+  );
   assert.equal(isPushMediaPathAllowed("/api/trips/media/ai/ev.jpg"), true);
   assert.equal(
     isPushMediaPathAllowed("/api/finance-ledgers/media/ai/x.jpg"),

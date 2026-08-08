@@ -61,6 +61,7 @@ export async function POST(request: Request) {
       weather: row.weather,
       coords: row.coords,
       driveMinutes: row.driveMinutes,
+      distanceKm: row.distanceKm,
       driveLabel: row.driveLabel,
       mapsUrl: row.mapsUrl,
     };
