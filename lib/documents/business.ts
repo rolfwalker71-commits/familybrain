@@ -83,15 +83,16 @@ export function markDocumentAsBusiness(documentId: number): void {
     ).run(documentId, BUSINESS_KNOWLEDGE_AREA, ts, ts);
   }
 
-  // Keep out of household Action-Inbox
+  // Keep out of household Action-Inbox (O365 / business is never household triage)
   db.prepare(
     `UPDATE paperless_documents
      SET triage_status = CASE
-           WHEN triage_status IN ('pay','ignored','done','ebill','twint','card') THEN triage_status
+           WHEN triage_status IN ('ignored','done') THEN triage_status
            ELSE 'skipped'
          END,
-         triage_reasons = COALESCE(triage_reasons, '["business"]'),
+         triage_reasons = ?,
+         triage_at = ?,
          updated_at = ?
      WHERE id = ?`
-  ).run(ts, documentId);
+  ).run(JSON.stringify(["business"]), ts, ts, documentId);
 }

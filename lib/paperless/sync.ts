@@ -399,11 +399,25 @@ export async function uploadAndIngestPaperlessDocument(input: {
   buffer: Buffer;
   filename: string;
   title?: string | null;
+  /** Applied on Paperless consume (before Buddy analysis). */
+  tagIds?: number[];
+  /** Force category Geschäftlich + skip household triage. */
+  markAsBusiness?: boolean;
 }): Promise<{ localId: number; paperlessId: number }> {
   const client = createClient();
-  const taskId = await client.postDocument(input);
+  const taskId = await client.postDocument({
+    buffer: input.buffer,
+    filename: input.filename,
+    title: input.title,
+    tagIds: input.tagIds,
+  });
   const paperlessId = await client.waitForPostedDocument(taskId);
-  return ingestPaperlessDocumentById(paperlessId);
+  const ingested = await ingestPaperlessDocumentById(paperlessId);
+  if (input.markAsBusiness) {
+    const { markDocumentAsBusiness } = await import("@/lib/documents/business");
+    markDocumentAsBusiness(ingested.localId);
+  }
+  return ingested;
 }
 
 async function syncDocumentPages(

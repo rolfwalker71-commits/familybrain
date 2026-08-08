@@ -556,11 +556,14 @@ export class PaperlessClient {
 
   /**
    * Upload a file for consumption. Returns the celery task UUID.
+   * Optional `tagIds` are applied at consume time (Paperless form: repeat `tags`).
    */
   async postDocument(input: {
     buffer: Buffer;
     filename: string;
     title?: string | null;
+    /** Paperless tag PKs — appended as repeated form fields. */
+    tagIds?: number[];
   }): Promise<string> {
     const form = new FormData();
     const bytes = new Uint8Array(input.buffer);
@@ -571,6 +574,11 @@ export class PaperlessClient {
     );
     if (input.title?.trim()) {
       form.append("title", input.title.trim());
+    }
+    for (const id of input.tagIds || []) {
+      if (Number.isFinite(id) && id > 0) {
+        form.append("tags", String(id));
+      }
     }
     const response = await this.postForm("/api/documents/post_document/", form);
     const raw = await response.text();

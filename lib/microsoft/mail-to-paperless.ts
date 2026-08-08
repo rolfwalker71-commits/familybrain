@@ -12,8 +12,9 @@ import {
   type MicrosoftMailAttachmentMeta,
 } from "@/lib/microsoft/mail-attachments";
 import { getMicrosoftMessage } from "@/lib/microsoft/mail-inbox";
+import { markDocumentAsBusiness } from "@/lib/documents/business";
 
-/** Default Paperless tags for O365 business PDFs. */
+/** Default Paperless tags for O365 business PDFs — always business. */
 export const O365_PAPERLESS_TAGS = ["O365", "ANG", "geschäftlich"] as const;
 
 export type O365PdfIngestResult = {
@@ -34,14 +35,15 @@ function createPaperlessClient(): PaperlessClient {
   return new PaperlessClient(baseUrl, apiToken);
 }
 
-async function applyO365Tags(paperlessId: number): Promise<void> {
+/** Resolve O365/ANG/geschäftlich tag PKs (create if missing). */
+async function resolveO365TagIds(): Promise<number[]> {
   const client = createPaperlessClient();
   const tagCache = new Map<string, number>();
-  const addTagIds: number[] = [];
+  const ids: number[] = [];
   for (const name of O365_PAPERLESS_TAGS) {
-    addTagIds.push(await client.ensureTag(name, tagCache));
+    ids.push(await client.ensureTag(name, tagCache));
   }
-  await client.setDocumentMetadata(paperlessId, { addTagIds });
+  return ids;
 }
 
 function linkDocumentToMessage(input: {
@@ -84,6 +86,18 @@ function linkDocumentToMessage(input: {
   }
 }
 
+/** Every O365→Paperless doc is business: category + triage skip + mail link. */
+function sealAsO365Business(input: {
+  localId: number;
+  messageId: string;
+  attachmentId: string;
+  filename: string;
+  subject?: string | null;
+}): void {
+  markDocumentAsBusiness(input.localId);
+  linkDocumentToMessage(input);
+}
+
 export async function ingestMicrosoftPdfAttachment(input: {
   userId: number;
   messageId: string;
@@ -98,6 +112,16 @@ export async function ingestMicrosoftPdfAttachment(input: {
   );
   if (existing && !input.force) {
     const localId = Number(existing.entityId);
+    if (Number.isFinite(localId) && localId > 0) {
+      // Heal older imports that might still be pending in household triage
+      sealAsO365Business({
+        localId,
+        messageId,
+        attachmentId: attachment.id,
+        filename: attachment.name,
+        subject: input.title,
+      });
+    }
     return {
       attachmentId: attachment.id,
       filename: attachment.name,
@@ -121,38 +145,17 @@ export async function ingestMicrosoftPdfAttachment(input: {
       ? attachment.name
       : `${attachment.name}.pdf`;
 
+    // Tags at consume time → already business in Paperless before Buddy analysis
+    const tagIds = await resolveO365TagIds();
     const ingested = await uploadAndIngestPaperlessDocument({
       buffer,
       filename,
       title,
+      tagIds,
+      markAsBusiness: true,
     });
 
-    try {
-      await applyO365Tags(ingested.paperlessId);
-    } catch {
-      /* tags best-effort; document is already in */
-    }
-
-    // Re-sync so Buddy picks up tags
-    try {
-      const { ingestPaperlessDocumentById } = await import(
-        "@/lib/paperless/sync"
-      );
-      await ingestPaperlessDocumentById(ingested.paperlessId);
-    } catch {
-      /* ignore */
-    }
-
-    try {
-      const { markDocumentAsBusiness } = await import(
-        "@/lib/documents/business"
-      );
-      markDocumentAsBusiness(ingested.localId);
-    } catch {
-      /* category best-effort */
-    }
-
-    linkDocumentToMessage({
+    sealAsO365Business({
       localId: ingested.localId,
       messageId,
       attachmentId: attachment.id,
