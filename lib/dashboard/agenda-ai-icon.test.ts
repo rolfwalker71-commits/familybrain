@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  buildAgendaAiIconKey,
   buildAgendaAiIconPrompt,
   hasDriveAgendaContext,
   isBirthdayAgendaSubject,
@@ -55,11 +56,12 @@ test("birthday wins over drive context", () => {
   );
 });
 
-test("online Teams meeting prompt only emphasizes time", () => {
+test("online Teams meeting uses title, notes and topic visuals", () => {
   const subject = {
-    title: "Sync Call",
+    title: "AI Wochencall",
     location: "Microsoft Teams Besprechung",
     meetUrl: "https://teams.microsoft.com/l/meetup-join/x",
+    description: "Themen: Modelle, Prompting, Buddy",
     calendarType: "work",
     calendarName: "Kalender",
     time: "09:00",
@@ -68,10 +70,27 @@ test("online Teams meeting prompt only emphasizes time", () => {
   assert.equal(isOnlineAgendaMeeting(subject), true);
   assert.equal(hasDriveAgendaContext(subject), false);
   const prompt = buildAgendaAiIconPrompt(subject);
-  assert.match(prompt, /09:00–09:30/);
-  assert.match(prompt, /ONLY text/i);
+  assert.match(prompt, /AI Wochencall/);
+  assert.match(prompt, /Themen: Modelle/);
+  assert.match(prompt, /AI theme/i);
+  assert.match(prompt, /laptop/i);
+  assert.doesNotMatch(prompt, /ONLY text/i);
   assert.doesNotMatch(prompt, /Tiguan/i);
   assert.match(prompt, /adult man/i);
+});
+
+test("online recurring meetings share cache key across times", () => {
+  const base = {
+    title: "AI Wochencall",
+    location: "Microsoft Teams Besprechung",
+    meetUrl: "https://teams.microsoft.com/l/meetup-join/x",
+    calendarType: "work",
+    calendarName: "Kalender",
+  };
+  const a = buildAgendaAiIconKey({ ...base, time: "09:00", endTime: "09:30" });
+  const b = buildAgendaAiIconKey({ ...base, time: "10:00", endTime: "10:30" });
+  assert.ok(a);
+  assert.equal(a, b);
 });
 
 test("Valentyna work calendar skips man depiction", () => {

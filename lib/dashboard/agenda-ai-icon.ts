@@ -10,7 +10,7 @@ import {
 } from "@/lib/calendar/ics-types";
 
 /** Bump when illustration style changes so cached JPGs are regenerated. */
-const AGENDA_AI_ICON_STYLE = "travel-poster-v4";
+const AGENDA_AI_ICON_STYLE = "travel-poster-v5";
 
 const TRAVEL_STYLE =
   "Style: clean modern editorial illustration, soft flat colors with gentle shading, friendly travel poster vibe. Any text in the image must be spelled correctly and clearly readable. No logos, watermarks, prices, or UI chrome. Suitable as a small card thumbnail.";
@@ -116,8 +116,8 @@ function workPersonVariant(input: AgendaIconSubject): string {
 }
 
 /**
- * Stable cache key for recurring events (e.g. «F2 Früh» shifts).
- * Online meetings include start/end so different slots get distinct images.
+ * Stable cache key for recurring events (e.g. «F2 Früh» / «AI Wochencall»).
+ * Online meetings intentionally omit date/time so weekly repeats reuse one image.
  */
 export function buildAgendaAiIconKey(input: AgendaIconSubject): string {
   const title = normalizeTitle(input.title || "");
@@ -135,11 +135,8 @@ export function buildAgendaAiIconKey(input: AgendaIconSubject): string {
       : hasDriveAgendaContext(input)
         ? "drive"
         : "std";
-  const timePart = online
-    ? `${String(input.time || "").slice(0, 5)}-${String(input.endTime || "").slice(0, 5)}`
-    : "";
   const person = workPersonVariant(input);
-  const raw = `${AGENDA_AI_ICON_STYLE}|${variant}|${type}|${person}|${title}|${loc}|${timePart}`;
+  const raw = `${AGENDA_AI_ICON_STYLE}|${variant}|${type}|${person}|${title}|${loc}`;
   return createHash("sha256").update(raw).digest("hex").slice(0, 20);
 }
 
@@ -246,22 +243,71 @@ function buildBirthdayPrompt(input: AgendaIconSubject): string {
   ].join(" ");
 }
 
+function plainAgendaNotes(raw: string | null | undefined): string {
+  if (!raw?.trim()) return "";
+  return raw
+    .replace(/\\n/gi, "\n")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/— Buddy —[\s\S]*?— \/Buddy —/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Short theme cues from title/notes for online-meeting visuals. */
+function onlineTopicVisualHint(title: string, notes: string): string {
+  const blob = `${title} ${notes}`.toLowerCase();
+  const hints: string[] = [];
+  if (/\bai\b|künstliche intelligenz|machine learning|\bllm\b|chatgpt|copilot/.test(blob)) {
+    hints.push(
+      "subtle AI theme (soft neural/network glow, abstract nodes — not sci-fi overload)"
+    );
+  }
+  if (/woche|weekly|standup|daily|jour fixe|sync|call|meeting|besprechung/.test(blob)) {
+    hints.push("recurring team-meeting / weekly check-in mood");
+  }
+  if (/sprint|scrum|agile|retro/.test(blob)) {
+    hints.push("agile / sprint planning vibe");
+  }
+  if (/sicherheit|security|compliance|datenschutz/.test(blob)) {
+    hints.push("subtle security / lock motif in the background");
+  }
+  if (/finanzen|budget|controlling|zahl/.test(blob)) {
+    hints.push("light finance / charts atmosphere");
+  }
+  if (hints.length === 0) {
+    hints.push("friendly professional remote-work atmosphere");
+  }
+  return hints.join("; ");
+}
+
 /**
- * Online / Teams: only start–end time as information on the image.
+ * Online / Teams: person at PC + readable meeting title/notes; recurring reuse via cache key.
  */
 function buildOnlineMeetingPrompt(input: AgendaIconSubject): string {
   const typeLabel = calendarTypeLabelDe(input.calendarType);
+  const headline = clip(input.title, 80) || "Online-Meeting";
+  const notes = clip(plainAgendaNotes(input.description), 120);
   const range = formatTimeRange(input);
-  const timeLine = range
-    ? `The ONLY text on the image must be the meeting time «${range}» (24h, clear and correctly spelled).`
-    : "Do not invent a time; keep the image almost text-free aside from optional subtle clock motifs.";
+  const theme = onlineTopicVisualHint(headline, notes);
 
   return [
     "Square online-meeting illustration (not photorealistic) for a video call / Teams / remote appointment.",
     `Calendar category: «${typeLabel}».`,
-    "Atmosphere: laptop or soft video-call mood, calm home-office or meeting vibe — no street address, no map, no car, no venue.",
-    timeLine,
-    "Do NOT show location names, titles, agendas, participant lists, or travel details.",
+    "Show someone sitting at a laptop / desk in a calm video meeting — home-office or quiet meeting vibe.",
+    "No street address, no map, no car, no venue exterior.",
+    `Primary readable text on the poster (correct spelling, clear): «${headline}».`,
+    notes
+      ? `Secondary text from the meeting notes (short, correct spelling): «${notes}».`
+      : "If no notes, keep only the headline text.",
+    range
+      ? `Optional small secondary time label «${range}» (24h) — do not dominate the composition.`
+      : "",
+    `Topic visualization: ${theme}.`,
+    "Do NOT invent participant lists, fake URLs, or Microsoft/Google logos.",
     workManClause(input),
     TRAVEL_STYLE,
   ]
