@@ -235,8 +235,10 @@ export function O365PdfBackfillPanel() {
           <span className="font-medium text-foreground">
             O365 · ANG · geschäftlich
           </span>
-          ). Crawl listet nur Mails mit Anhang; hochgeladen werden nur PDFs.
-          Manuelle Imports zählen unter{" "}
+          ). Catch-up läuft in Blöcken (bis ~400 Mails / 40 neue PDFs) und
+          verkettet sich automatisch alle paar Sekunden — nicht nur alle
+          Scheduler-Minuten. Hochgeladen werden nur PDFs. Manuelle Imports
+          zählen unter{" "}
           <span className="font-medium text-foreground">Docs in Buddy</span>,
           nicht unter den Crawl-Batch-Zählern.
         </p>
@@ -299,7 +301,7 @@ export function O365PdfBackfillPanel() {
                 </p>
                 {live.messageTotal > 0 ? (
                   <ProgressBar
-                    label="Mails in diesem Batch"
+                    label="Mails in diesem Lauf"
                     value={live.messageIndex}
                     max={live.messageTotal}
                   />
@@ -307,7 +309,7 @@ export function O365PdfBackfillPanel() {
                   <div className="h-2 animate-pulse rounded-full bg-muted" />
                 )}
                 <ProgressBar
-                  label="PDFs neu (Batch-Limit)"
+                  label="PDFs neu (Lauf-Limit)"
                   value={live.pdfsUploadedThisBatch}
                   max={live.pdfsMaxThisBatch}
                 />

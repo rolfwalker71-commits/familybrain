@@ -20,12 +20,18 @@ export const O365_PDF_BACKFILL_STATS_KEY = "o365_pdf_backfill_stats";
 export const O365_PDF_BACKFILL_PROGRESS_KEY = "o365_pdf_backfill_progress";
 
 /**
- * Messages listed per run (Graph already filters hasAttachments).
+ * Catch-up crawl: several Graph pages per job, then auto-chain (see job runner).
  * Non-PDF attachment mails are skipped after a cheap metadata call — no download.
  */
-export const O365_PDF_BACKFILL_MAX_MESSAGES_PER_RUN = 40;
-/** Max PDFs uploaded per run. */
-export const O365_PDF_BACKFILL_MAX_PDFS_PER_RUN = 12;
+/** Messages per Graph page ($top, Graph-seitig max. sinnvoll ~50). */
+export const O365_PDF_BACKFILL_PAGE_SIZE = 50;
+/** Max Graph-Seiten pro Job-Lauf. */
+export const O365_PDF_BACKFILL_MAX_PAGES_PER_RUN = 8;
+/** Hartes Mail-Limit über alle Seiten eines Laufs. */
+export const O365_PDF_BACKFILL_MAX_MESSAGES_PER_RUN =
+  O365_PDF_BACKFILL_PAGE_SIZE * O365_PDF_BACKFILL_MAX_PAGES_PER_RUN;
+/** Max neue PDFs pro Job-Lauf (Upload nach Paperless). */
+export const O365_PDF_BACKFILL_MAX_PDFS_PER_RUN = 40;
 
 type GraphMessageLite = {
   id?: string;
@@ -260,7 +266,7 @@ export async function listMicrosoftInboxWithAttachmentsPage(
   messages: Array<{ id: string; subject: string; receivedDateTime: string | null }>;
   nextLink: string | null;
 }> {
-  const pageSize = Math.min(50, Math.max(1, options.pageSize ?? 25));
+  const pageSize = Math.min(100, Math.max(1, options.pageSize ?? 50));
   let data: {
     value?: GraphMessageLite[];
     "@odata.nextLink"?: string;
@@ -308,14 +314,14 @@ export type O365PdfBackfillRunResult = {
   nextLink: string | null;
 };
 
-/** One batch of the historical crawl (idempotent via source-links). */
+/** One catch-up run: several Graph pages (idempotent via source-links). */
 export async function runO365PdfBackfillBatch(
   userId: number
 ): Promise<O365PdfBackfillRunResult> {
   setO365PdfBackfillAttemptNow();
   const status = getO365PdfBackfillStatus();
   const sinceYmd = status.sinceYmd || defaultSinceYmd(1);
-  const cursor = getSetting(O365_PDF_BACKFILL_CURSOR_KEY);
+  let cursor = getSetting(O365_PDF_BACKFILL_CURSOR_KEY);
 
   writeLiveProgress({
     active: true,
@@ -331,137 +337,176 @@ export async function runO365PdfBackfillBatch(
       : `Lade Inbox ab ${sinceYmd}…`,
   });
 
-  const page = await listMicrosoftInboxWithAttachmentsPage(userId, {
-    sinceYmd,
-    nextLink: cursor,
-    pageSize: O365_PDF_BACKFILL_MAX_MESSAGES_PER_RUN,
-  });
-
   let pdfsUploaded = 0;
   let pdfsSkipped = 0;
   let pdfsFailed = 0;
   let messagesSeen = 0;
   let messagesWithPdf = 0;
-  const pageTotal = page.messages.length;
+  let pagesDone = 0;
+  let lastNextLink: string | null = cursor;
+  let done = false;
+  let stoppedMidPage = false;
 
-  writeLiveProgress({
-    active: true,
-    step: "scan_mail",
-    messageIndex: 0,
-    messageTotal: pageTotal,
-    pdfsUploadedThisBatch: 0,
-    detail:
-      pageTotal === 0
-        ? "Keine Mails mit Anhang auf dieser Seite"
-        : `${pageTotal} Mails mit Anhang auf dieser Seite`,
-  });
-
-  for (const msg of page.messages) {
-    if (pdfsUploaded >= O365_PDF_BACKFILL_MAX_PDFS_PER_RUN) break;
-    messagesSeen += 1;
+  while (
+    pagesDone < O365_PDF_BACKFILL_MAX_PAGES_PER_RUN &&
+    messagesSeen < O365_PDF_BACKFILL_MAX_MESSAGES_PER_RUN &&
+    pdfsUploaded < O365_PDF_BACKFILL_MAX_PDFS_PER_RUN
+  ) {
     writeLiveProgress({
       active: true,
-      step: "scan_mail",
-      subject: msg.subject,
-      receivedDateTime: msg.receivedDateTime,
+      step: "fetch_page",
       messageIndex: messagesSeen,
-      messageTotal: pageTotal,
+      messageTotal: Math.max(messagesSeen, O365_PDF_BACKFILL_PAGE_SIZE),
       pdfsUploadedThisBatch: pdfsUploaded,
-      detail: "Prüfe Anhänge…",
+      detail:
+        pagesDone === 0
+          ? cursor
+            ? "Lade nächste Graph-Seite…"
+            : `Lade Inbox ab ${sinceYmd}…`
+          : `Seite ${pagesDone + 1}/${O365_PDF_BACKFILL_MAX_PAGES_PER_RUN}…`,
     });
 
-    let pdfs;
-    try {
-      pdfs = await listMicrosoftPdfAttachments(userId, msg.id);
-    } catch {
+    const page = await listMicrosoftInboxWithAttachmentsPage(userId, {
+      sinceYmd,
+      nextLink: cursor,
+      pageSize: O365_PDF_BACKFILL_PAGE_SIZE,
+    });
+    pagesDone += 1;
+    lastNextLink = page.nextLink;
+    const pageTotal = page.messages.length;
+    let pageComplete = true;
+
+    if (pageTotal === 0) {
+      done = !page.nextLink;
+      cursor = page.nextLink;
+      setSetting(O365_PDF_BACKFILL_CURSOR_KEY, cursor);
+      break;
+    }
+
+    for (const msg of page.messages) {
+      if (
+        pdfsUploaded >= O365_PDF_BACKFILL_MAX_PDFS_PER_RUN ||
+        messagesSeen >= O365_PDF_BACKFILL_MAX_MESSAGES_PER_RUN
+      ) {
+        pageComplete = false;
+        stoppedMidPage = true;
+        break;
+      }
+      messagesSeen += 1;
       writeLiveProgress({
         active: true,
         step: "scan_mail",
         subject: msg.subject,
         receivedDateTime: msg.receivedDateTime,
         messageIndex: messagesSeen,
-        messageTotal: pageTotal,
+        messageTotal: O365_PDF_BACKFILL_MAX_MESSAGES_PER_RUN,
         pdfsUploadedThisBatch: pdfsUploaded,
-        detail: "Anhänge konnten nicht gelesen werden — übersprungen",
+        detail: `Seite ${pagesDone} · Prüfe Anhänge…`,
       });
-      continue;
-    }
-    if (pdfs.length === 0) {
+
+      let pdfs;
+      try {
+        pdfs = await listMicrosoftPdfAttachments(userId, msg.id);
+      } catch {
+        writeLiveProgress({
+          active: true,
+          step: "scan_mail",
+          subject: msg.subject,
+          receivedDateTime: msg.receivedDateTime,
+          messageIndex: messagesSeen,
+          messageTotal: O365_PDF_BACKFILL_MAX_MESSAGES_PER_RUN,
+          pdfsUploadedThisBatch: pdfsUploaded,
+          detail: "Anhänge konnten nicht gelesen werden — übersprungen",
+        });
+        continue;
+      }
+      if (pdfs.length === 0) {
+        writeLiveProgress({
+          active: true,
+          step: "scan_mail",
+          subject: msg.subject,
+          receivedDateTime: msg.receivedDateTime,
+          messageIndex: messagesSeen,
+          messageTotal: O365_PDF_BACKFILL_MAX_MESSAGES_PER_RUN,
+          pdfsUploadedThisBatch: pdfsUploaded,
+          detail: "Kein PDF — übersprungen",
+        });
+        continue;
+      }
+      messagesWithPdf += 1;
+
+      const pending = pdfs.filter(
+        (p) => !findDocumentForMicrosoftAttachment(msg.id, p.id)
+      );
+      if (pending.length === 0) {
+        pdfsSkipped += pdfs.length;
+        writeLiveProgress({
+          active: true,
+          step: "scan_mail",
+          subject: msg.subject,
+          receivedDateTime: msg.receivedDateTime,
+          messageIndex: messagesSeen,
+          messageTotal: O365_PDF_BACKFILL_MAX_MESSAGES_PER_RUN,
+          pdfsUploadedThisBatch: pdfsUploaded,
+          detail: `${pdfs.length} PDF(s) bereits in Buddy`,
+        });
+        continue;
+      }
+
       writeLiveProgress({
         active: true,
-        step: "scan_mail",
+        step: "upload_pdf",
         subject: msg.subject,
         receivedDateTime: msg.receivedDateTime,
         messageIndex: messagesSeen,
-        messageTotal: pageTotal,
+        messageTotal: O365_PDF_BACKFILL_MAX_MESSAGES_PER_RUN,
         pdfsUploadedThisBatch: pdfsUploaded,
-        detail: "Kein PDF — übersprungen",
+        detail: `Lade ${pending.length} PDF(s) nach Paperless…`,
       });
-      continue;
-    }
-    messagesWithPdf += 1;
 
-    const pending = pdfs.filter(
-      (p) => !findDocumentForMicrosoftAttachment(msg.id, p.id)
-    );
-    if (pending.length === 0) {
-      pdfsSkipped += pdfs.length;
+      const { results } = await ingestMicrosoftMessagePdfs({
+        userId,
+        messageId: msg.id,
+      });
+      for (const r of results) {
+        if (r.ok && r.skipped === "already") pdfsSkipped += 1;
+        else if (r.ok) pdfsUploaded += 1;
+        else pdfsFailed += 1;
+      }
       writeLiveProgress({
         active: true,
-        step: "scan_mail",
+        step: "upload_pdf",
         subject: msg.subject,
         receivedDateTime: msg.receivedDateTime,
         messageIndex: messagesSeen,
-        messageTotal: pageTotal,
+        messageTotal: O365_PDF_BACKFILL_MAX_MESSAGES_PER_RUN,
         pdfsUploadedThisBatch: pdfsUploaded,
-        detail: `${pdfs.length} PDF(s) bereits in Buddy`,
+        detail: `PDFs · neu ${pdfsUploaded}/${O365_PDF_BACKFILL_MAX_PDFS_PER_RUN} · Seite ${pagesDone}`,
       });
-      continue;
     }
 
-    writeLiveProgress({
-      active: true,
-      step: "upload_pdf",
-      subject: msg.subject,
-      receivedDateTime: msg.receivedDateTime,
-      messageIndex: messagesSeen,
-      messageTotal: pageTotal,
-      pdfsUploadedThisBatch: pdfsUploaded,
-      detail: `Lade ${pending.length} PDF(s) nach Paperless…`,
-    });
-
-    const { results } = await ingestMicrosoftMessagePdfs({
-      userId,
-      messageId: msg.id,
-    });
-    for (const r of results) {
-      if (r.ok && r.skipped === "already") pdfsSkipped += 1;
-      else if (r.ok) pdfsUploaded += 1;
-      else pdfsFailed += 1;
+    if (pageComplete) {
+      cursor = page.nextLink;
+      setSetting(O365_PDF_BACKFILL_CURSOR_KEY, cursor);
+      if (!page.nextLink) {
+        done = true;
+        break;
+      }
+    } else {
+      // Cursor bleibt — Seite beim nächsten Lauf erneut (bereits importierte PDFs = skip).
+      break;
     }
-    writeLiveProgress({
-      active: true,
-      step: "upload_pdf",
-      subject: msg.subject,
-      receivedDateTime: msg.receivedDateTime,
-      messageIndex: messagesSeen,
-      messageTotal: pageTotal,
-      pdfsUploadedThisBatch: pdfsUploaded,
-      detail: `PDFs verarbeitet · neu bisher ${pdfsUploaded}/${O365_PDF_BACKFILL_MAX_PDFS_PER_RUN}`,
-    });
-    if (pdfsUploaded >= O365_PDF_BACKFILL_MAX_PDFS_PER_RUN) break;
   }
 
   writeLiveProgress({
     active: true,
     step: "finishing",
     messageIndex: messagesSeen,
-    messageTotal: pageTotal,
+    messageTotal: messagesSeen,
     pdfsUploadedThisBatch: pdfsUploaded,
     detail: "Batch speichern…",
   });
 
-  setSetting(O365_PDF_BACKFILL_CURSOR_KEY, page.nextLink);
   const prev = parseStats(getSetting(O365_PDF_BACKFILL_STATS_KEY));
   const nextStats = {
     messagesSeen: prev.messagesSeen + messagesSeen,
@@ -474,14 +519,15 @@ export async function runO365PdfBackfillBatch(
   setSetting(O365_PDF_BACKFILL_LAST_RUN_KEY, new Date().toISOString());
   setSetting(O365_PDF_BACKFILL_LAST_ERROR_KEY, null);
 
-  const done = !page.nextLink;
   if (done) {
     setSetting(O365_PDF_BACKFILL_ENABLED_KEY, "0");
   }
 
   const note = done
-    ? `Crawl fertig · Batch: ${pdfsUploaded} neu, ${messagesSeen} Mails geprüft`
-    : `Batch ok · ${pdfsUploaded} neu / ${pdfsSkipped} übersprungen / ${messagesSeen} Mails · Fortsetzung folgt`;
+    ? `Crawl fertig · ${pdfsUploaded} neu, ${messagesSeen} Mails · ${pagesDone} Seite(n)`
+    : `Catch-up · ${pdfsUploaded} neu / ${pdfsSkipped} übersprungen / ${messagesSeen} Mails · ${pagesDone} Seite(n)${
+        stoppedMidPage ? " · Seite fortsetzen" : ""
+      } · Fortsetzung folgt gleich`;
   setO365PdfBackfillNote(note);
   clearLiveProgress();
 
@@ -492,6 +538,6 @@ export async function runO365PdfBackfillBatch(
     pdfsSkipped,
     pdfsFailed,
     done,
-    nextLink: page.nextLink,
+    nextLink: done ? null : lastNextLink,
   };
 }

@@ -732,6 +732,19 @@ export async function runO365PdfBackfillJob(
       message: `${batch.pdfsUploaded} neu, ${batch.pdfsSkipped} übersprungen, ${batch.pdfsFailed} Fehler · ${batch.messagesSeen} Mails m. Anhang (${batch.messagesWithPdf} mit PDF) · ${batch.done ? "fertig" : "Fortsetzung folgt"}`,
     });
     finishJobRun(run.id, "success", summary);
+
+    // Catch-up: nicht auf den 2h-Scheduler warten — nächster Block nach kurzer Pause.
+    if (!batch.done) {
+      const again = getO365PdfBackfillStatus();
+      if (again.enabled) {
+        setTimeout(() => {
+          void runO365PdfBackfillJob("schedule").catch((error) => {
+            console.warn("[o365-backfill] chain:", error);
+          });
+        }, 2_500);
+      }
+    }
+
     return { ok: true, runId: run.id, status: "success", summary };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
