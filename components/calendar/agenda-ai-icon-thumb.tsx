@@ -14,7 +14,11 @@ export function AgendaAiIconThumb({
   location,
   description,
   calendarType,
+  calendarName,
   kind,
+  meetUrl,
+  time,
+  endTime,
   driveMinutes,
   distanceKm,
   coords,
@@ -27,7 +31,11 @@ export function AgendaAiIconThumb({
   location?: string | null;
   description?: string | null;
   calendarType?: string | null;
+  calendarName?: string | null;
   kind?: string | null;
+  meetUrl?: string | null;
+  time?: string | null;
+  endTime?: string | null;
   driveMinutes?: number | null;
   distanceKm?: number | null;
   coords?: { lat: number; lon: number } | null;
@@ -61,7 +69,11 @@ export function AgendaAiIconThumb({
                 location,
                 description,
                 calendarType,
+                calendarName,
                 kind,
+                meetUrl,
+                time,
+                endTime,
                 driveMinutes,
                 distanceKm,
                 coords,
@@ -91,7 +103,11 @@ export function AgendaAiIconThumb({
     location,
     description,
     calendarType,
+    calendarName,
     kind,
+    meetUrl,
+    time,
+    endTime,
     driveMinutes,
     distanceKm,
     coords,

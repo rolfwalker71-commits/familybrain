@@ -333,7 +333,11 @@ export function AgendaRow({
               location={item.location}
               description={item.description}
               calendarType={item.calendarType}
+              calendarName={item.calendarName}
               kind={item.kind}
+              meetUrl={item.meetUrl}
+              time={item.time}
+              endTime={item.endTime}
               driveMinutes={item.driveMinutes}
               distanceKm={item.distanceKm}
               coords={

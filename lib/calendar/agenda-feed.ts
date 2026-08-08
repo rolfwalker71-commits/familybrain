@@ -446,6 +446,7 @@ export async function getCalendarAgenda(options: {
       accentColor: ev.color,
       calendarType: ev.type,
       calendarId: sourceId,
+      calendarName: ev.calendarName || null,
       planningRelevant: ev.planningRelevant !== false,
     });
   }
@@ -482,6 +483,7 @@ export async function getCalendarAgenda(options: {
       accentColor: ev.color,
       calendarType: ev.type,
       calendarId: sourceId,
+      calendarName: ev.calendarName || null,
       planningRelevant: ev.planningRelevant !== false,
     });
   }
@@ -570,6 +572,7 @@ export async function getCalendarAgenda(options: {
         accentColor: cal.color,
         calendarType: cal.type,
         calendarId: cal.id,
+        calendarName: cal.name || null,
         planningRelevant: cal.planningRelevant !== false,
       });
     }

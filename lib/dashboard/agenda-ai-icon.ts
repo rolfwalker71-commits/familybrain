@@ -5,12 +5,20 @@ import { getOpenAIClient, hasOpenAIKey } from "@/lib/ai/client";
 import { isPhysicalAgendaLocation } from "@/lib/dashboard/agenda-location";
 import { getTripsDataRoot } from "@/lib/trips/paths";
 import { fetchStaticMapPng } from "@/lib/trips/static-map";
+import {
+  ICS_TYPE_META,
+  type IcsCalendarType,
+} from "@/lib/calendar/ics-types";
 
 /** Bump when illustration style changes so cached JPGs are regenerated. */
-const AGENDA_AI_ICON_STYLE = "travel-poster-v2";
+const AGENDA_AI_ICON_STYLE = "travel-poster-v3";
 
 const TRAVEL_STYLE =
   "Style: clean modern editorial illustration, soft flat colors with gentle shading, friendly travel poster vibe. Any text in the image must be spelled correctly and clearly readable. No logos, watermarks, prices, or UI chrome. Suitable as a small card thumbnail.";
+
+/** Partner work calendar — do not force a male figure in the illustration. */
+const VALENTYNA_WORK_CAL_RE =
+  /arbeitsplan\s*valentyna|valentyna.*arbeitsplan/i;
 
 export function getAgendaAiIconDir(): string {
   return path.join(getTripsDataRoot(), "agenda-ai-icons");
@@ -44,11 +52,23 @@ export type AgendaIconSubject = {
   description?: string | null;
   calendarType?: string | null;
   kind?: string | null;
-  /** Driving time from home when known */
+  /** Source calendar display name (e.g. «Arbeitsplan Valentyna») */
+  calendarName?: string | null;
+  meetUrl?: string | null;
+  time?: string | null;
+  endTime?: string | null;
   driveMinutes?: number | null;
   distanceKm?: number | null;
   coords?: { lat: number; lon: number } | null;
 };
+
+export function calendarTypeLabelDe(
+  calendarType: string | null | undefined
+): string {
+  const key = String(calendarType || "").toLowerCase() as IcsCalendarType;
+  if (key && key in ICS_TYPE_META) return ICS_TYPE_META[key].label;
+  return "Termin";
+}
 
 export function isBirthdayAgendaSubject(input: AgendaIconSubject): boolean {
   const type = String(input.calendarType || input.kind || "").toLowerCase();
@@ -56,8 +76,33 @@ export function isBirthdayAgendaSubject(input: AgendaIconSubject): boolean {
   return /geburtstag|birthday/i.test(input.title || "");
 }
 
+/** Teams / Meet / Zoom or non-physical location without a usable address. */
+export function isOnlineAgendaMeeting(input: AgendaIconSubject): boolean {
+  if (isBirthdayAgendaSubject(input)) return false;
+  if (isPhysicalAgendaLocation(input.location)) return false;
+  if (input.meetUrl?.trim()) return true;
+  const loc = (input.location || "").trim();
+  if (!loc) return false;
+  return !isPhysicalAgendaLocation(loc);
+}
+
+export function isValentynaWorkCalendar(
+  calendarName: string | null | undefined
+): boolean {
+  return VALENTYNA_WORK_CAL_RE.test(calendarName || "");
+}
+
+/** Work calendars (except Valentyna’s plan): show an adult man in the scene. */
+export function shouldDepictManForWork(input: AgendaIconSubject): boolean {
+  const type = String(input.calendarType || "").toLowerCase();
+  if (type !== "work") return false;
+  if (isValentynaWorkCalendar(input.calendarName)) return false;
+  return true;
+}
+
 export function hasDriveAgendaContext(input: AgendaIconSubject): boolean {
   if (isBirthdayAgendaSubject(input)) return false;
+  if (isOnlineAgendaMeeting(input)) return false;
   const mins = input.driveMinutes;
   const km = input.distanceKm;
   const hasDrive =
@@ -66,10 +111,14 @@ export function hasDriveAgendaContext(input: AgendaIconSubject): boolean {
   return hasDrive && isPhysicalAgendaLocation(input.location);
 }
 
+function workPersonVariant(input: AgendaIconSubject): string {
+  if (!shouldDepictManForWork(input)) return "";
+  return "man";
+}
+
 /**
  * Stable cache key for recurring events (e.g. «F2 Früh» shifts).
- * Title + calendar type + place; date/time not included.
- * Drive variant keyed separately so Tiguan posters do not collide with plain icons.
+ * Online meetings include start/end so different slots get distinct images.
  */
 export function buildAgendaAiIconKey(input: AgendaIconSubject): string {
   const title = normalizeTitle(input.title || "");
@@ -79,12 +128,19 @@ export function buildAgendaAiIconKey(input: AgendaIconSubject): string {
     .replace(/[^a-z0-9_-]+/g, "")
     .slice(0, 24);
   const loc = normalizeLocationHint(input.location);
+  const online = isOnlineAgendaMeeting(input);
   const variant = isBirthdayAgendaSubject(input)
     ? "bday"
-    : hasDriveAgendaContext(input)
-      ? "drive"
-      : "std";
-  const raw = `${AGENDA_AI_ICON_STYLE}|${variant}|${type}|${title}|${loc}`;
+    : online
+      ? "online"
+      : hasDriveAgendaContext(input)
+        ? "drive"
+        : "std";
+  const timePart = online
+    ? `${String(input.time || "").slice(0, 5)}-${String(input.endTime || "").slice(0, 5)}`
+    : "";
+  const person = workPersonVariant(input);
+  const raw = `${AGENDA_AI_ICON_STYLE}|${variant}|${type}|${person}|${title}|${loc}|${timePart}`;
   return createHash("sha256").update(raw).digest("hex").slice(0, 20);
 }
 
@@ -128,39 +184,58 @@ function personHintFromBirthdayTitle(title: string): string {
   return clip(t, 80);
 }
 
-/** Scene hint for standard (non-birthday, non-drive) appointments. */
+function formatTimeRange(input: AgendaIconSubject): string | null {
+  const start = String(input.time || "").trim().slice(0, 5);
+  const end = String(input.endTime || "").trim().slice(0, 5);
+  if (start && end) return `${start}–${end}`;
+  if (start) return start;
+  return null;
+}
+
+function workManClause(input: AgendaIconSubject): string {
+  if (!shouldDepictManForWork(input)) return "";
+  return "Include one friendly adult man as a natural part of the scene (not a portrait headshot).";
+}
+
+/** Scene hint keyed by calendar type (Arbeit, Sport, Ferien, …). */
 function sceneForAgenda(input: AgendaIconSubject): string {
   const type = String(input.calendarType || input.kind || "").toLowerCase();
   const title = (input.title || "").toLowerCase();
+  const label = calendarTypeLabelDe(input.calendarType);
+
   if (type === "hockey" || /\bhockey|spiel|match\b/i.test(title)) {
-    return "ice hockey arena atmosphere, game day mood";
+    return `${label}: ice hockey arena atmosphere, game day mood`;
   }
   if (type === "work" || /\bf\d|schicht|dienst|früh|spät|nacht\b/i.test(title)) {
-    return "professional work day / hospital or office shift atmosphere";
+    return `${label}: professional work day / hospital or office shift atmosphere`;
   }
   if (type === "school" || /\bschule|unterricht\b/i.test(title)) {
-    return "school day atmosphere";
+    return `${label}: school day atmosphere`;
   }
   if (type === "family" || /\bfamilie|essen|mittag|eltern\b/i.test(title)) {
-    return "cozy family gathering atmosphere";
+    return `${label}: cozy family gathering atmosphere`;
   }
   if (type === "sports") {
-    return "active sports / outdoor activity atmosphere";
+    return `${label}: active sports / outdoor activity atmosphere`;
+  }
+  if (type === "holiday") {
+    return `${label}: relaxed holiday / vacation atmosphere`;
   }
   if (type === "church") {
-    return "calm church or community gathering atmosphere";
+    return `${label}: calm church or community gathering atmosphere`;
+  }
+  if (type === "waste") {
+    return `${label}: household / recycling day atmosphere`;
   }
   if (isPhysicalAgendaLocation(input.location)) {
-    return "everyday appointment at a real place, local Swiss mood";
+    return `${label}: everyday appointment at a real place, local Swiss mood`;
   }
-  return "everyday calendar moment atmosphere";
+  return `${label}: everyday calendar moment atmosphere`;
 }
 
-/**
- * Birthday: pure celebration illustration — no itinerary panels, times, or routes.
- */
 function buildBirthdayPrompt(input: AgendaIconSubject): string {
-  const who = personHintFromBirthdayTitle(input.title || "") || "einem Geburtstagskind";
+  const who =
+    personHintFromBirthdayTitle(input.title || "") || "einem Geburtstagskind";
   return [
     "Square birthday celebration illustration (not photorealistic).",
     `Warm, joyful birthday mood for «${who}».`,
@@ -173,10 +248,31 @@ function buildBirthdayPrompt(input: AgendaIconSubject): string {
 }
 
 /**
- * Drive appointments: travel-poster with white VW Tiguan, distance/time, destination map mood.
+ * Online / Teams: only start–end time as information on the image.
  */
+function buildOnlineMeetingPrompt(input: AgendaIconSubject): string {
+  const typeLabel = calendarTypeLabelDe(input.calendarType);
+  const range = formatTimeRange(input);
+  const timeLine = range
+    ? `The ONLY text on the image must be the meeting time «${range}» (24h, clear and correctly spelled).`
+    : "Do not invent a time; keep the image almost text-free aside from optional subtle clock motifs.";
+
+  return [
+    "Square online-meeting illustration (not photorealistic) for a video call / Teams / remote appointment.",
+    `Calendar category: «${typeLabel}».`,
+    "Atmosphere: laptop or soft video-call mood, calm home-office or meeting vibe — no street address, no map, no car, no venue.",
+    timeLine,
+    "Do NOT show location names, titles, agendas, participant lists, or travel details.",
+    workManClause(input),
+    TRAVEL_STYLE,
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
 function buildDrivePrompt(input: AgendaIconSubject): string {
   const title = clip(input.title, 100) || "Termin";
+  const typeLabel = calendarTypeLabelDe(input.calendarType);
   const loc = clip(input.location, 100);
   const mins =
     input.driveMinutes != null && Number.isFinite(input.driveMinutes)
@@ -195,6 +291,7 @@ function buildDrivePrompt(input: AgendaIconSubject): string {
 
   return [
     "Square travel illustration (not photorealistic) for a car trip to an appointment.",
+    `Calendar category: «${typeLabel}».`,
     `Title mood: ${title}.`,
     loc ? `Destination: ${loc}.` : "",
     stats
@@ -203,6 +300,7 @@ function buildDrivePrompt(input: AgendaIconSubject): string {
     "Feature a white Volkswagen Tiguan (SUV) as the main vehicle — accurate white VW Tiguan look, no other brand.",
     "Include an illustrated destination map inset or map-card of the goal area (Swiss local map vibe), not a photoreal satellite screenshot.",
     "Friendly road-trip / arrival atmosphere; keep editorial travel-poster layout.",
+    workManClause(input),
     "No logos other than subtle vehicle identity, no watermarks, no UI chrome, no prices.",
     TRAVEL_STYLE,
   ]
@@ -212,8 +310,8 @@ function buildDrivePrompt(input: AgendaIconSubject): string {
 
 function buildStandardPrompt(input: AgendaIconSubject): string {
   const title = clip(input.title, 100) || "Termin";
-  const type =
-    clip(input.calendarType || input.kind || "Termin", 40) || "Termin";
+  const typeLabel = calendarTypeLabelDe(input.calendarType);
+  const typeKey = clip(input.calendarType || input.kind || "Termin", 40);
   const loc = isPhysicalAgendaLocation(input.location)
     ? clip(input.location, 100)
     : "";
@@ -226,18 +324,23 @@ function buildStandardPrompt(input: AgendaIconSubject): string {
     .join("; ");
 
   return [
-    `Square calendar illustration (not photorealistic) for a «${type}» appointment.`,
+    `Square calendar illustration (not photorealistic) for a «${typeLabel}» (${typeKey}) appointment.`,
     `Title: ${title}.`,
     `Activity details: ${details || "—"}.`,
     `Scene idea: ${sceneForAgenda(input)}.`,
+    "Lean on the calendar category mood (Arbeit, Sport, Ferien, Familie, …).",
     "Do not add fake flight/train itinerary panels unless the appointment is clearly travel.",
+    workManClause(input),
     TRAVEL_STYLE,
-  ].join(" ");
+  ]
+    .filter(Boolean)
+    .join(" ");
 }
 
 /** Exported for tests. */
 export function buildAgendaAiIconPrompt(input: AgendaIconSubject): string {
   if (isBirthdayAgendaSubject(input)) return buildBirthdayPrompt(input);
+  if (isOnlineAgendaMeeting(input)) return buildOnlineMeetingPrompt(input);
   if (hasDriveAgendaContext(input)) return buildDrivePrompt(input);
   return buildStandardPrompt(input);
 }
@@ -274,7 +377,6 @@ async function maybeCompositeStaticMap(
       .png()
       .toBuffer();
 
-    // Soft frame so the OSM inset sits like a map card on the poster
     const framed = await sharp({
       create: {
         width: 236,
@@ -361,4 +463,10 @@ export function shouldHaveAgendaAiIcon(input: {
     return false;
   }
   return Boolean(normalizeTitle(input.title || ""));
+}
+
+/** Google / Microsoft agenda rows only (not ICS / holidays / Buddy-local). */
+export function isCloudCalendarAgendaId(id: string | null | undefined): boolean {
+  const s = id || "";
+  return s.startsWith("gcal-") || s.startsWith("mscal-");
 }

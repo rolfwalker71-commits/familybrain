@@ -50,6 +50,10 @@ export async function POST(request: Request) {
       description: item.description,
       calendarType: item.calendarType,
       kind: item.kind,
+      calendarName: item.calendarName,
+      meetUrl: item.meetUrl,
+      time: item.time,
+      endTime: item.endTime,
       driveMinutes: item.driveMinutes ?? null,
       distanceKm: item.distanceKm ?? null,
       coords: item.coords

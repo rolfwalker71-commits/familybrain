@@ -29,6 +29,7 @@ import { SettingsUsersPanel } from "@/components/settings/settings-users-panel";
 import { SettingsFamilyPanel } from "@/components/settings/settings-family-panel";
 import { SettingsGooglePanel } from "@/components/settings/settings-google-panel";
 import { SettingsMicrosoftPanel } from "@/components/settings/settings-microsoft-panel";
+import { SettingsAgendaAiIconsPanel } from "@/components/settings/settings-agenda-ai-icons-panel";
 import { NotificationPrefsPanel } from "@/components/settings/notification-prefs-panel";
 import { SettingsTelegramPanel } from "@/components/settings/settings-telegram-panel";
 import { SettingsCategorySuggestionsPanel } from "@/components/settings/settings-category-suggestions-panel";
@@ -2727,6 +2728,7 @@ function SettingsPageInner() {
           </p>
           <SettingsGooglePanel />
           <SettingsMicrosoftPanel />
+          <SettingsAgendaAiIconsPanel />
         </div>
       ) : null}
 
