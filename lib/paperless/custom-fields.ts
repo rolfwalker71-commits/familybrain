@@ -34,6 +34,7 @@ export const BUDDY_CUSTOM_FIELD_NAMES = {
   buddyCategory: "Buddy Kategorie",
   buddyReviewed: "Buddy geprüft",
   taxRelevant: "Steuer relevant",
+  forGuide: "Für Guide",
   buddyStatus: "Buddy Status",
 } as const;
 
@@ -54,6 +55,7 @@ export const BUDDY_WRITEBACK_FIELD_CHECKLIST: ReadonlyArray<{
   { name: BUDDY_CUSTOM_FIELD_NAMES.buddyCategory, dataTypeHint: "Text" },
   { name: BUDDY_CUSTOM_FIELD_NAMES.buddyReviewed, dataTypeHint: "Wahrheitswert" },
   { name: BUDDY_CUSTOM_FIELD_NAMES.taxRelevant, dataTypeHint: "Wahrheitswert" },
+  { name: BUDDY_CUSTOM_FIELD_NAMES.forGuide, dataTypeHint: "Wahrheitswert" },
   { name: BUDDY_CUSTOM_FIELD_NAMES.buddyStatus, dataTypeHint: "Text" },
 ];
 

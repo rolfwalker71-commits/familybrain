@@ -72,6 +72,7 @@ type DocRow = {
   analysis_status?: string | null;
   sync_status: string | null;
   ai_icon_url?: string | null;
+  is_business?: boolean;
   recipients?: {
     status: "matched" | "unknown" | null;
     label: string | null;
@@ -1683,11 +1684,18 @@ export function DocumentsClient() {
                       <div className="truncate font-semibold text-foreground">
                         {doc.title || `Dokument #${doc.id}`}
                       </div>
-                      {doc.category ? (
-                        <span className="mt-1 inline-flex rounded-full bg-[var(--brand-docs-soft)] px-2 py-0.5 text-[11px] font-medium text-[var(--brand-docs)]">
-                          {doc.category}
-                        </span>
-                      ) : null}
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {doc.is_business || doc.category === "Geschäftlich" ? (
+                          <span className="inline-flex rounded-full bg-slate-800 px-2 py-0.5 text-[11px] font-medium text-white">
+                            Geschäftlich · O365
+                          </span>
+                        ) : null}
+                        {doc.category && doc.category !== "Geschäftlich" ? (
+                          <span className="inline-flex rounded-full bg-[var(--brand-docs-soft)] px-2 py-0.5 text-[11px] font-medium text-[var(--brand-docs)]">
+                            {doc.category}
+                          </span>
+                        ) : null}
+                      </div>
                       {doc.recipients?.label ? (
                         <div className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
                           {doc.recipients.members.slice(0, 3).map((m) => (
@@ -1762,7 +1770,13 @@ export function DocumentsClient() {
                           {doc.document_type_name ? (
                             <span>{doc.document_type_name}</span>
                           ) : null}
-                          {doc.category ? <span>{doc.category}</span> : null}
+                          {doc.is_business || doc.category === "Geschäftlich" ? (
+                            <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[11px] font-medium text-white">
+                              Geschäftlich · O365
+                            </span>
+                          ) : doc.category ? (
+                            <span>{doc.category}</span>
+                          ) : null}
                           {statusBadge(doc.analysis_status)}
                         </MetaLine>
                       }

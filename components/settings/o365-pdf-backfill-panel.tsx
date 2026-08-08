@@ -16,6 +16,7 @@ type BackfillStatus = {
   documentsFromO365: number;
   stats: {
     messagesSeen: number;
+    messagesWithPdf?: number;
     pdfsUploaded: number;
     pdfsSkipped: number;
     pdfsFailed: number;
@@ -134,9 +135,13 @@ export function O365PdfBackfillPanel() {
       <CardContent className="space-y-3 text-sm">
         <p className="text-muted-foreground">
           PDF-Anhänge aus Outlook nach Paperless (Tags{" "}
-          <span className="font-medium text-foreground">O365 · ANG · geschäftlich</span>
-          ). Pro Mail auch manuell unter Microsoft → Öffnen. Historischer Crawl:
-          Graph erlaubt Jahre zurück — Standard ca. 1 Jahr, Datum unten änderbar.
+          <span className="font-medium text-foreground">
+            O365 · ANG · geschäftlich
+          </span>
+          ). Crawl listet nur Mails mit Anhang (`hasAttachments`); hochgeladen
+          werden ausschliesslich PDFs — andere Anhänge werden nur kurz geprüft
+          und übersprungen. Graph erlaubt Jahre zurück; sehr frühe Daten (z. B.
+          2000) sind möglich, dauern aber länger.
         </p>
 
         {loading && !status ? (
@@ -180,10 +185,11 @@ export function O365PdfBackfillPanel() {
             </div>
 
             <p className="text-xs text-muted-foreground">
-              Docs aus O365: {status.documentsFromO365} · Mails gesehen:{" "}
-              {status.stats.messagesSeen} · neu: {status.stats.pdfsUploaded} ·
-              übersprungen: {status.stats.pdfsSkipped} · Fehler:{" "}
-              {status.stats.pdfsFailed}
+              Docs aus O365: {status.documentsFromO365} · Mails mit Anhang:{" "}
+              {status.stats.messagesSeen} · davon mit PDF:{" "}
+              {status.stats.messagesWithPdf ?? 0} · neu:{" "}
+              {status.stats.pdfsUploaded} · übersprungen:{" "}
+              {status.stats.pdfsSkipped} · Fehler: {status.stats.pdfsFailed}
               {status.enabled || status.hasCursor
                 ? " · Crawl aktiv"
                 : status.complete

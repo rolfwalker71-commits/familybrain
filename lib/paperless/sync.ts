@@ -221,6 +221,20 @@ async function upsertRemoteDocument(
     tags: resolved.tags,
   });
 
+  try {
+    const forGuide = extractNamedBooleanField(
+      doc,
+      caches.customFieldNames,
+      BUDDY_CUSTOM_FIELD_NAMES.forGuide
+    );
+    if (forGuide != null) {
+      const { setDocumentForGuide } = await import("@/lib/documents/for-guide");
+      setDocumentForGuide(upserted.id, forGuide);
+    }
+  } catch {
+    /* optional UDF */
+  }
+
   // Buddy source graph: Paperless primary + optional Drive mirror for new docs
   try {
     const { upsertBuddySourceLink } = await import("@/lib/buddy/source-links");

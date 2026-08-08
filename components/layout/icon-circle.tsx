@@ -181,6 +181,7 @@ export const knowledgeAreaVisuals: Record<
   Reisen: { icon: Plane, tone: "teal" },
   Fahrzeuge: { icon: Car, tone: "teal" },
   Arbeit: { icon: Briefcase, tone: "teal" },
+  Geschäftlich: { icon: Briefcase, tone: "slate" },
   Computer: { icon: Monitor, tone: "teal" },
   "Geräte & Garantien": { icon: Cpu, tone: "teal" },
   Verträge: { icon: FileSignature, tone: "teal" },

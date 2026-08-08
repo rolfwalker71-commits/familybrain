@@ -13,6 +13,10 @@ import {
 import { isTriageAfterAnalysisEnabled } from "@/lib/documents/triage-settings";
 import { applyTaxRelevantLocal } from "@/lib/documents/tax-relevance";
 import { appendActivityLog } from "@/lib/activity-log";
+import {
+  isBusinessDocument,
+  SQL_DOC_NOT_BUSINESS,
+} from "@/lib/documents/business";
 
 export type { TriageAction, TriageReason, TriageStatus };
 export { TRIAGE_REASON_LABELS, TRIAGE_STATUS_LABELS };
@@ -167,6 +171,17 @@ export function applyTriageAfterAnalysis(
 
   if (!row) return { queued: false, newlyQueued: false, reasons: [] };
 
+  if (isBusinessDocument(documentId)) {
+    if (row.triage_status !== "skipped") {
+      db.prepare(
+        `UPDATE paperless_documents
+         SET triage_status = 'skipped', triage_reasons = ?, triage_at = ?, updated_at = ?
+         WHERE id = ?`
+      ).run(JSON.stringify(["business"]), nowIso(), nowIso(), documentId);
+    }
+    return { queued: false, newlyQueued: false, reasons: [] };
+  }
+
   const status = row.triage_status;
   if (status && SETTLED_TRIAGE_STATUSES.has(status)) {
     return { queued: false, newlyQueued: false, reasons: [] };
@@ -233,9 +248,10 @@ export function countPendingTriageDocuments(): number {
   const db = getDb();
   const row = db
     .prepare(
-      `SELECT COUNT(*) AS n FROM paperless_documents
-       WHERE triage_status = 'pending'
-         AND COALESCE(sync_status, 'synced') != 'missing'`
+      `SELECT COUNT(*) AS n FROM paperless_documents d
+       WHERE d.triage_status = 'pending'
+         AND COALESCE(d.sync_status, 'synced') != 'missing'
+         AND ${SQL_DOC_NOT_BUSINESS}`
     )
     .get() as { n: number };
   return Number(row?.n) || 0;
@@ -314,6 +330,7 @@ export function listPendingTriageDocuments(limit = 12): TriageInboxItem[] {
        LEFT JOIN document_summaries s ON s.document_id = d.id
        WHERE d.triage_status = 'pending'
          AND COALESCE(d.sync_status, 'synced') != 'missing'
+         AND ${SQL_DOC_NOT_BUSINESS}
          AND (
            d.triage_snoozed_until IS NULL
            OR TRIM(d.triage_snoozed_until) = ''

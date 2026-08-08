@@ -501,6 +501,7 @@ export async function writebackStatusFlagsToPaperless(input: {
   localDocumentId: number;
   buddyReviewed?: boolean;
   taxRelevant?: boolean;
+  forGuide?: boolean;
   /** When toggling Steuer relevant from Buddy-Status / Triage. Default true. */
   applyLocalTaxCategory?: boolean;
   taxYear?: number | null;
@@ -520,6 +521,11 @@ export async function writebackStatusFlagsToPaperless(input: {
       taxRelevant: input.taxRelevant,
       taxYear: input.taxYear,
     });
+  }
+
+  if (input.forGuide !== undefined) {
+    const { setDocumentForGuide } = await import("@/lib/documents/for-guide");
+    setDocumentForGuide(input.localDocumentId, input.forGuide);
   }
 
   if (!isPaperlessWritebackEnabled()) return { ok: true };
@@ -582,6 +588,9 @@ export async function writebackStatusFlagsToPaperless(input: {
     }
     if (input.taxRelevant !== undefined) {
       put(BUDDY_CUSTOM_FIELD_NAMES.taxRelevant, input.taxRelevant);
+    }
+    if (input.forGuide !== undefined) {
+      put(BUDDY_CUSTOM_FIELD_NAMES.forGuide, input.forGuide);
     }
     if (input.buddyStatus !== undefined && input.buddyStatus != null) {
       put(BUDDY_CUSTOM_FIELD_NAMES.buddyStatus, input.buddyStatus);
@@ -658,7 +667,8 @@ export async function writebackStatusFlagsToPaperless(input: {
     try {
       if (
         input.buddyReviewed !== undefined ||
-        input.taxRelevant !== undefined
+        input.taxRelevant !== undefined ||
+        input.forGuide !== undefined
       ) {
         const bits: string[] = [];
         if (input.buddyReviewed !== undefined) {
@@ -668,6 +678,9 @@ export async function writebackStatusFlagsToPaperless(input: {
           bits.push(
             input.taxRelevant ? "Steuer relevant: ja" : "Steuer relevant: nein"
           );
+        }
+        if (input.forGuide !== undefined) {
+          bits.push(input.forGuide ? "Für Guide: ja" : "Für Guide: nein");
         }
         const { notifyBuddyStatusChanged } = await import(
           "@/lib/realtime/notify"

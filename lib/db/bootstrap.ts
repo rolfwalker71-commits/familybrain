@@ -408,6 +408,11 @@ function ensurePaymentCustomFieldColumns(db: Database.Database): void {
   if (!names.has("payment_method")) {
     db.exec(`ALTER TABLE paperless_documents ADD COLUMN payment_method TEXT`);
   }
+  if (!names.has("for_guide")) {
+    db.exec(
+      `ALTER TABLE paperless_documents ADD COLUMN for_guide INTEGER NOT NULL DEFAULT 0`
+    );
+  }
   db.exec(
     `CREATE INDEX IF NOT EXISTS idx_docs_payment_flags
      ON paperless_documents(zu_bezahlen, bezahlt)`
@@ -415,6 +420,10 @@ function ensurePaymentCustomFieldColumns(db: Database.Database): void {
   db.exec(
     `CREATE INDEX IF NOT EXISTS idx_docs_payment_planned
      ON paperless_documents(payment_planned_date)`
+  );
+  db.exec(
+    `CREATE INDEX IF NOT EXISTS idx_docs_for_guide
+     ON paperless_documents(for_guide)`
   );
 }
 
@@ -715,6 +724,19 @@ function ensureKnowledgeGuidesTables(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_knowledge_guides_status ON knowledge_guides(embedding_status);
     CREATE INDEX IF NOT EXISTS idx_knowledge_guide_chunks_guide ON knowledge_guide_chunks(guide_id);
   `);
+  const cols = db
+    .prepare(`PRAGMA table_info(knowledge_guides)`)
+    .all() as Array<{ name: string }>;
+  const names = new Set(cols.map((c) => c.name));
+  if (!names.has("source_document_id")) {
+    db.exec(
+      `ALTER TABLE knowledge_guides ADD COLUMN source_document_id INTEGER`
+    );
+  }
+  db.exec(
+    `CREATE INDEX IF NOT EXISTS idx_knowledge_guides_source_doc
+     ON knowledge_guides(source_document_id)`
+  );
 }
 
 function ensureTriliumNotesTable(db: Database.Database): void {

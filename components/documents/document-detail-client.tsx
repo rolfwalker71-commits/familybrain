@@ -177,6 +177,8 @@ function DocumentDetailInner({ detail }: DetailProps) {
   const [error, setError] = useState<string | null>(null);
   const [buddyReviewed, setBuddyReviewed] = useState(false);
   const [taxRelevant, setTaxRelevant] = useState(false);
+  const [forGuide, setForGuide] = useState(false);
+  const [guideBusy, setGuideBusy] = useState(false);
   const [invoicePaid, setInvoicePaid] = useState(false);
   const [invoiceOpen, setInvoiceOpen] = useState(false);
   const [statusBusy, setStatusBusy] = useState(false);
@@ -434,6 +436,7 @@ function DocumentDetailInner({ detail }: DetailProps) {
         if (!res.ok || cancelled) return;
         setBuddyReviewed(data.buddyReviewed === true);
         setTaxRelevant(data.taxRelevant === true);
+        setForGuide(data.forGuide === true);
         if (typeof data.bezahlt === "boolean") {
           setInvoicePaid(data.bezahlt);
         }
@@ -508,6 +511,7 @@ function DocumentDetailInner({ detail }: DetailProps) {
   async function patchStatus(next: {
     buddyReviewed?: boolean;
     taxRelevant?: boolean;
+    forGuide?: boolean;
     bezahlt?: boolean;
     zuBezahlen?: boolean;
   }) {
@@ -533,6 +537,9 @@ function DocumentDetailInner({ detail }: DetailProps) {
         setTaxRelevant(next.taxRelevant);
         startTransition(() => router.refresh());
       }
+      if (next.forGuide !== undefined) {
+        setForGuide(next.forGuide);
+      }
       if (next.bezahlt !== undefined) {
         setInvoicePaid(next.bezahlt);
       }
@@ -543,6 +550,31 @@ function DocumentDetailInner({ detail }: DetailProps) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setStatusBusy(false);
+    }
+  }
+
+  async function importAsGuide() {
+    setGuideBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/guides/from-document", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          documentLocalId: document.id,
+          replaceExisting: true,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || "Guide-Import fehlgeschlagen");
+      }
+      setForGuide(false);
+      startTransition(() => router.refresh());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setGuideBusy(false);
     }
   }
 
@@ -1129,6 +1161,36 @@ function DocumentDetailInner({ detail }: DetailProps) {
                       </span>
                     </span>
                   </label>
+                  <label className="flex cursor-pointer items-start gap-3 text-sm">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5 size-4 accent-[var(--brand-docs)]"
+                      checked={forGuide}
+                      disabled={!statusLoaded || statusBusy || guideBusy}
+                      onChange={(e) =>
+                        void patchStatus({ forGuide: e.target.checked })
+                      }
+                    />
+                    <span>
+                      <span className="font-medium">Für Guide</span>
+                      <span className="mt-0.5 block text-xs text-muted-foreground">
+                        Markiert für Guides (Paperless «Für Guide»). Batch unter
+                        Guides.
+                      </span>
+                    </span>
+                  </label>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="w-full gap-1.5"
+                    disabled={guideBusy || statusBusy}
+                    onClick={() => void importAsGuide()}
+                  >
+                    {guideBusy
+                      ? "Guide wird erstellt…"
+                      : "Jetzt in Guide übernehmen"}
+                  </Button>
                 </CardContent>
               </Card>
 

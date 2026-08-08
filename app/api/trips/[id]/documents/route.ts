@@ -37,7 +37,7 @@ export async function GET(request: Request, context: Ctx) {
     const limit = Number(searchParams.get("limit") || 80);
 
     if (auth.isAdmin) {
-      const data = listDocuments({ search, limit });
+      const data = listDocuments({ search, limit, excludeBusiness: true });
       return NextResponse.json({
         documents: data.documents.map((d) => ({
           id: d.id,

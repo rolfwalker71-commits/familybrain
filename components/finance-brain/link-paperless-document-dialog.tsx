@@ -74,7 +74,10 @@ export function LinkPaperlessDocumentDialog({
       setLoading(true);
       void (async () => {
         try {
-          const params = new URLSearchParams({ limit: "80" });
+          const params = new URLSearchParams({
+            limit: "80",
+            excludeBusiness: "1",
+          });
           if (search.trim()) params.set("search", search.trim());
           const res = await fetch(`/api/documents?${params}`);
           const data = await res.json();

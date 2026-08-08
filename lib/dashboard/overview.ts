@@ -1,6 +1,7 @@
 import { getDb } from "@/lib/db/client";
 import { countPendingTriageDocuments } from "@/lib/documents/triage";
 import { paymentMethodLabel } from "@/lib/finance/payment-methods";
+import { SQL_DOC_NOT_BUSINESS } from "@/lib/documents/business";
 import {
   getOverviewHockeyBundle,
   getTodayCalendarExcerpt,
@@ -378,7 +379,8 @@ export async function getDashboardOverview(
        )
        WHERE COALESCE(d.sync_status, 'synced') != 'missing'
          AND d.zu_bezahlen = 1
-         AND COALESCE(d.bezahlt, 0) = 0`
+         AND COALESCE(d.bezahlt, 0) = 0
+         AND ${SQL_DOC_NOT_BUSINESS}`
     )
     .all() as Array<{
     document_id: number;
@@ -639,6 +641,7 @@ export async function getDashboardOverview(
        FROM paperless_documents d
        WHERE d.triage_status = 'pending'
          AND COALESCE(d.sync_status, 'synced') != 'missing'
+         AND ${SQL_DOC_NOT_BUSINESS}
        ORDER BY d.triage_at DESC
        LIMIT 40`
     )

@@ -143,6 +143,15 @@ export async function ingestMicrosoftPdfAttachment(input: {
       /* ignore */
     }
 
+    try {
+      const { markDocumentAsBusiness } = await import(
+        "@/lib/documents/business"
+      );
+      markDocumentAsBusiness(ingested.localId);
+    } catch {
+      /* category best-effort */
+    }
+
     linkDocumentToMessage({
       localId: ingested.localId,
       messageId,

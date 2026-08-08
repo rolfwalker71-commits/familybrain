@@ -43,6 +43,8 @@ export async function GET(request: Request) {
     documentType: searchParams.get("documentType") || undefined,
     analysisStatus: searchParams.get("analysisStatus") || undefined,
     recipient: searchParams.get("recipient") || undefined,
+    excludeBusiness: searchParams.get("excludeBusiness") === "1",
+    businessOnly: searchParams.get("businessOnly") === "1",
     limit: Number(searchParams.get("limit") || 100),
     offset: Number(searchParams.get("offset") || 0),
     sortDir: parseSortDir(searchParams.get("sortDir"), "desc"),

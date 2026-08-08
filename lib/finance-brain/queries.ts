@@ -21,6 +21,7 @@ import {
   grantLedgerAccess,
 } from "@/lib/users/queries";
 import { appendActivityLog, logFieldChange } from "@/lib/activity-log";
+import { sqlDocNotBusiness } from "@/lib/documents/business";
 
 export type FinanceLedgerRow = {
   id: number;
@@ -1993,6 +1994,7 @@ export function listPaperlessFinancialItemsForImport(
   limit = 100
 ): PaperlessImportRow[] {
   const db = getDb();
+  const notBusiness = sqlDocNotBusiness("pd");
   const rows = db
     .prepare(
       `SELECT
@@ -2007,6 +2009,7 @@ export function listPaperlessFinancialItemsForImport(
        JOIN paperless_documents pd ON pd.id = fi.document_id
        WHERE fi.amount IS NOT NULL
          AND COALESCE(fi.counts_in_stats, 1) = 1
+         AND ${notBusiness}
        ORDER BY COALESCE(fi.invoice_date, fi.created_at) DESC, fi.id DESC
        LIMIT ?`
     )

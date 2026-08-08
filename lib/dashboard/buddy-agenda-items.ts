@@ -5,6 +5,7 @@ import { getDb } from "@/lib/db/client";
 import { paymentMethodLabel } from "@/lib/finance/payment-methods";
 import { toSwissDate } from "@/lib/utils/dates";
 import type { AgendaItem } from "@/lib/dashboard/overview";
+import { SQL_DOC_NOT_BUSINESS } from "@/lib/documents/business";
 
 export const CALENDAR_SOURCE_TRAVEL = "travel";
 export const CALENDAR_SOURCE_INVOICES = "invoices";
@@ -38,7 +39,8 @@ export function listInvoiceAgendaItems(
        )
        WHERE COALESCE(d.sync_status, 'synced') != 'missing'
          AND d.zu_bezahlen = 1
-         AND COALESCE(d.bezahlt, 0) = 0`
+         AND COALESCE(d.bezahlt, 0) = 0
+         AND ${SQL_DOC_NOT_BUSINESS}`
     )
     .all() as Array<{
     document_id: number;

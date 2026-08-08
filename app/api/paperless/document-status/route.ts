@@ -19,6 +19,7 @@ const PatchSchema = z.object({
   documentLocalId: z.number().int().positive(),
   buddyReviewed: z.boolean().optional(),
   taxRelevant: z.boolean().optional(),
+  forGuide: z.boolean().optional(),
   buddyStatus: z.string().max(40).nullable().optional(),
   /** Paperless UDF «Bezahlt» / «Rechnung Bezahlt» */
   bezahlt: z.boolean().optional(),
@@ -31,6 +32,7 @@ async function resolveStatusFromRaw(
 ): Promise<{
   buddyReviewed: boolean | null;
   taxRelevant: boolean | null;
+  forGuide: boolean | null;
   buddyStatus: string | null;
   bezahlt: boolean | null;
   zuBezahlen: boolean | null;
@@ -57,6 +59,11 @@ async function resolveStatusFromRaw(
       raw,
       fieldIdToName,
       BUDDY_CUSTOM_FIELD_NAMES.taxRelevant
+    ),
+    forGuide: extractNamedBooleanField(
+      raw,
+      fieldIdToName,
+      BUDDY_CUSTOM_FIELD_NAMES.forGuide
     ),
     buddyStatus: extractNamedStringField(
       raw,
@@ -101,7 +108,11 @@ export async function GET(request: Request) {
       : category === "Steuern"
         ? true
         : status.taxRelevant;
-  return NextResponse.json({ ...status, taxRelevant });
+  const { getDocumentForGuide } = await import("@/lib/documents/for-guide");
+  const forGuideLocal = getDocumentForGuide(id);
+  const forGuide =
+    status.forGuide != null ? status.forGuide : forGuideLocal;
+  return NextResponse.json({ ...status, taxRelevant, forGuide });
 }
 
 export async function PATCH(request: Request) {
@@ -117,6 +128,7 @@ export async function PATCH(request: Request) {
     localDocumentId: parsed.data.documentLocalId,
     buddyReviewed: parsed.data.buddyReviewed,
     taxRelevant: parsed.data.taxRelevant,
+    forGuide: parsed.data.forGuide,
     buddyStatus: parsed.data.buddyStatus,
     bezahlt: parsed.data.bezahlt,
     zuBezahlen: parsed.data.zuBezahlen,

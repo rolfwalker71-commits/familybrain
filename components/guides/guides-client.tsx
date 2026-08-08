@@ -51,18 +51,28 @@ function statusBadge(status: string | null) {
   }
 }
 
+type PendingGuideDoc = {
+  id: number;
+  paperless_id: number;
+  title: string | null;
+  correspondent_name: string | null;
+  created_date: string | null;
+  hasGuide: boolean;
+};
+
 export function GuidesClient() {
   const [guides, setGuides] = useState<GuideRow[]>([]);
   const [indexedGuides, setIndexedGuides] = useState(0);
   const [qdrantOk, setQdrantOk] = useState(false);
   const [qdrantPoints, setQdrantPoints] = useState(0);
   const [hasOpenAIKey, setHasOpenAIKey] = useState(false);
+  const [pendingDocs, setPendingDocs] = useState<PendingGuideDoc[]>([]);
   const [title, setTitle] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [replaceExisting, setReplaceExisting] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState<"upload" | number | null>(null);
+  const [busy, setBusy] = useState<"upload" | "pending" | number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [sortDir, setSortDir] = useListSortDir("guides", "desc");
 
@@ -76,10 +86,52 @@ export function GuidesClient() {
     setHasOpenAIKey(Boolean(data.hasOpenAIKey));
   }
 
+  async function loadPending() {
+    try {
+      const res = await fetch("/api/guides/from-document");
+      const data = await res.json();
+      if (res.ok) {
+        setPendingDocs((data.pending || []) as PendingGuideDoc[]);
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
   useEffect(() => {
     void loadGuides();
+    void loadPending();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sortDir]);
+
+  async function importPendingGuides() {
+    setBusy("pending");
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/guides/from-document", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ importPending: true, limit: 20 }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Import fehlgeschlagen");
+      const batch = data.batch as {
+        succeeded: number;
+        failed: number;
+        processed: number;
+      };
+      setMessage(
+        `${batch.succeeded} Guide(s) aus markierten Docs · ${batch.failed} Fehler · ${batch.processed} verarbeitet`
+      );
+      await loadGuides();
+      await loadPending();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(null);
+    }
+  }
 
   async function uploadGuide() {
     if (!file) {
@@ -292,6 +344,58 @@ export function GuidesClient() {
           />
         }
       />
+
+      {pendingDocs.length > 0 ? (
+        <Card className="border-border/60">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex flex-wrap items-center justify-between gap-2 text-base">
+              <span className="flex items-center gap-3">
+                <IconCircle icon={BookOpen} tone="teal" size="sm" />
+                Markiert «Für Guide» ({pendingDocs.length})
+              </span>
+              <Button
+                type="button"
+                size="sm"
+                disabled={busy !== null || !hasOpenAIKey}
+                onClick={() => void importPendingGuides()}
+              >
+                {busy === "pending" ? (
+                  <>
+                    <Loader2 className="size-3.5 animate-spin" />
+                    Import…
+                  </>
+                ) : (
+                  "Markierte importieren"
+                )}
+              </Button>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            <p className="text-xs text-muted-foreground">
+              Dokumente mit Flag «Für Guide» — Text-PDFs werden übernommen und
+              indexiert.
+            </p>
+            <ul className="divide-y divide-border/50 rounded-lg border border-border/60">
+              {pendingDocs.map((d) => (
+                <li
+                  key={d.id}
+                  className="flex items-center justify-between gap-2 px-3 py-2"
+                >
+                  <a
+                    href={`/documents/${d.id}`}
+                    className="min-w-0 truncate font-medium underline-offset-2 hover:underline"
+                  >
+                    {d.title || `Dokument #${d.id}`}
+                  </a>
+                  {d.hasGuide ? (
+                    <Badge variant="secondary">Guide vorhanden</Badge>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Card className="border-border/60 shadow-[0_4px_16px_rgba(20,32,28,0.05)]">
         <CardHeader>

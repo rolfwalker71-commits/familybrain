@@ -11,7 +11,15 @@ export const KNOWLEDGE_AREAS = [
   { name: "Finanzen", description: "Rechnungen, Kontobewegungen, Ausgaben" },
   { name: "Reisen", description: "Flüge, Hotels, Tickets, Reiseunterlagen" },
   { name: "Fahrzeuge", description: "Auto, Motorrad, Versicherungen, Service" },
-  { name: "Arbeit", description: "Arbeitsvertrag, Lohn, Bewerbungen" },
+  {
+    name: "Arbeit",
+    description: "Arbeitsvertrag, Lohn, Bewerbungen (privat)",
+  },
+  {
+    name: "Geschäftlich",
+    description:
+      "O365 / ANG Firmenbelege — getrennt von Haushalts-Finanzen und Ferien",
+  },
   {
     name: "Computer",
     description: "Hardware, Software, Lizenzen, IT-Abos",

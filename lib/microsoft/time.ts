@@ -40,6 +40,18 @@ export function dayWindowLocal(ymd: string): {
   };
 }
 
+/**
+ * UTC midnight for Graph **mail** `$filter` on receivedDateTime / sentDateTime.
+ * Graph rejects bare local times without offset (DateTimeOffset).
+ */
+export function graphMailDateTimeUtc(ymd: string): string {
+  const d = ymd.trim().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) {
+    throw new Error(`Ungültiges Datum für Graph-Filter: ${ymd}`);
+  }
+  return `${d}T00:00:00.000Z`;
+}
+
 export function hmToMinutes(hm: string): number | null {
   const m = /^(\d{1,2}):(\d{2})$/.exec(hm.trim());
   if (!m) return null;

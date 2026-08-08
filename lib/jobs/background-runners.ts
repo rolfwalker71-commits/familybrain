@@ -718,7 +718,7 @@ export async function runO365PdfBackfillJob(
       itemKind: "phase",
       status: "success",
       title: "O365 → Paperless",
-      message: `${batch.pdfsUploaded} neu, ${batch.pdfsSkipped} übersprungen, ${batch.pdfsFailed} Fehler · ${batch.messagesSeen} Mails · ${batch.done ? "fertig" : "Fortsetzung folgt"}`,
+      message: `${batch.pdfsUploaded} neu, ${batch.pdfsSkipped} übersprungen, ${batch.pdfsFailed} Fehler · ${batch.messagesSeen} Mails m. Anhang (${batch.messagesWithPdf} mit PDF) · ${batch.done ? "fertig" : "Fortsetzung folgt"}`,
     });
     finishJobRun(run.id, "success", summary);
     return { ok: true, runId: run.id, status: "success", summary };

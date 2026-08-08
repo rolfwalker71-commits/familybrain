@@ -41,6 +41,10 @@ import {
   SQL_DOC_IN_PAYMENT_PIPELINE,
   SQL_DOC_NOT_IN_PAYMENT_PIPELINE,
 } from "@/lib/finance/payment-pipeline";
+import {
+  SQL_DOC_IS_BUSINESS,
+  SQL_DOC_NOT_BUSINESS,
+} from "@/lib/documents/business";
 
 function aiIconPublicUrl(aiIconPath: string | null | undefined): string | null {
   if (!aiIconPath) return null;
@@ -100,6 +104,10 @@ export type DocumentFilters = {
   analysisStatus?: string;
   /** Family member id, or "unknown" */
   recipient?: string;
+  /** Exclude O365 / Geschäftlich docs (pickers, household flows). */
+  excludeBusiness?: boolean;
+  /** Only business docs (optional filter). */
+  businessOnly?: boolean;
   limit?: number;
   offset?: number;
   /** Document date sort: newest first by default */
@@ -231,10 +239,15 @@ export function listDocuments(filters: DocumentFilters = {}) {
         OR LOWER(COALESCE(d.document_type_name, '')) LIKE LOWER(?)
         OR LOWER(COALESCE(d.original_file_name, '')) LIKE LOWER(?)
         OR LOWER(COALESCE(s.category, '')) LIKE LOWER(?)
-        OR LOWER(COALESCE(s.short_summary, '')) LIKE LOWER(?))`
+        OR LOWER(COALESCE(s.short_summary, '')) LIKE LOWER(?)
+        OR EXISTS (
+          SELECT 1 FROM document_tags t
+          WHERE t.document_id = d.id
+            AND LOWER(COALESCE(t.tag_name,'')) LIKE LOWER(?)
+        ))`
     );
     const q = `%${filters.search}%`;
-    params.push(q, q, q, q, q, q, q);
+    params.push(q, q, q, q, q, q, q, q);
   }
   if (filters.category) {
     if (filters.category === "Arbeit") {
@@ -269,6 +282,11 @@ export function listDocuments(filters: DocumentFilters = {}) {
       params.push(...rec.params);
     }
   }
+  if (filters.excludeBusiness) {
+    where.push(SQL_DOC_NOT_BUSINESS);
+  } else if (filters.businessOnly) {
+    where.push(SQL_DOC_IS_BUSINESS);
+  }
 
   const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
   const limit = filters.limit ?? 100;
@@ -281,14 +299,17 @@ export function listDocuments(filters: DocumentFilters = {}) {
 
   const rows = db
     .prepare(
-      `SELECT d.*, s.category, s.analysis_status, s.short_summary
+      `SELECT d.*, s.category, s.analysis_status, s.short_summary,
+              CASE WHEN ${SQL_DOC_IS_BUSINESS} THEN 1 ELSE 0 END AS is_business
        FROM paperless_documents d
        LEFT JOIN document_summaries s ON s.document_id = d.id
        ${whereSql}
        ORDER BY ${orderExpr} ${sortSql}, d.id ${sortSql}
        LIMIT ? OFFSET ?`
     )
-    .all(...params, limit, offset) as PaperlessDocumentRow[];
+    .all(...params, limit, offset) as Array<
+    PaperlessDocumentRow & { is_business?: number }
+  >;
 
   const countRow = db
     .prepare(
@@ -299,7 +320,13 @@ export function listDocuments(filters: DocumentFilters = {}) {
     )
     .get(...params) as { count: number };
 
-  return { documents: rows, total: countRow.count };
+  return {
+    documents: rows.map((row) => ({
+      ...row,
+      is_business: Boolean(row.is_business),
+    })),
+    total: countRow.count,
+  };
 }
 
 export function getDocumentById(id: number) {
@@ -791,7 +818,8 @@ export function getDashboardStats() {
        WHERE COALESCE(d.sync_status, 'synced') != 'missing'
          AND d.zu_bezahlen = 1
          AND COALESCE(d.bezahlt, 0) = 0
-         AND ${SQL_DOC_NOT_IN_PAYMENT_PIPELINE}`
+         AND ${SQL_DOC_NOT_IN_PAYMENT_PIPELINE}
+         AND ${SQL_DOC_NOT_BUSINESS}`
     )
     .get(today) as {
     open_unpaid_count: number;
@@ -1204,6 +1232,7 @@ export function getDashboardInbox(limits = { each: 5 }) {
          AND COALESCE(d.bezahlt, 0) = 0
          AND COALESCE(d.sync_status, 'synced') != 'missing'
          AND ${SQL_DOC_NOT_IN_PAYMENT_PIPELINE}
+         AND ${SQL_DOC_NOT_BUSINESS}
        ORDER BY f.due_date ASC
        LIMIT ?`
     )
@@ -1349,6 +1378,7 @@ export function listOpenUnpaidInvoices(limit = 12): OpenUnpaidInvoice[] {
        WHERE COALESCE(d.sync_status, 'synced') != 'missing'
          AND d.zu_bezahlen = 1
          AND COALESCE(d.bezahlt, 0) = 0
+         AND ${SQL_DOC_NOT_BUSINESS}
        ORDER BY
          CASE
            WHEN d.payment_planned_date IS NOT NULL AND TRIM(d.payment_planned_date) != ''
@@ -1838,7 +1868,8 @@ export function getFinanceOverview() {
        )
        WHERE COALESCE(d.sync_status, 'synced') != 'missing'
          AND d.zu_bezahlen = 1
-         AND COALESCE(d.bezahlt, 0) = 0`;
+         AND COALESCE(d.bezahlt, 0) = 0
+         AND ${SQL_DOC_NOT_BUSINESS}`;
 
   const dueInvoices = db
     .prepare(
@@ -2455,6 +2486,7 @@ export type KnowledgeGuideRow = {
   embedding_status: string | null;
   embedding_error: string | null;
   last_indexed_at: string | null;
+  source_document_id?: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -2518,6 +2550,18 @@ export function countIndexedKnowledgeGuides(): number {
   return row.count;
 }
 
+export function findKnowledgeGuideBySourceDocumentId(
+  documentId: number
+): KnowledgeGuideRow | null {
+  const db = getDb();
+  const row = db
+    .prepare(
+      `SELECT * FROM knowledge_guides WHERE source_document_id = ? LIMIT 1`
+    )
+    .get(documentId) as KnowledgeGuideRow | undefined;
+  return row ?? null;
+}
+
 export function createKnowledgeGuide(input: {
   title: string;
   filename: string;
@@ -2525,6 +2569,7 @@ export function createKnowledgeGuide(input: {
   fileHash: string;
   pageCount: number | null;
   extractedText: string;
+  sourceDocumentId?: number | null;
 }): number {
   const db = getDb();
   const ts = nowIso();
@@ -2532,8 +2577,8 @@ export function createKnowledgeGuide(input: {
     .prepare(
       `INSERT INTO knowledge_guides (
          title, filename, file_path, file_hash, page_count, extracted_text,
-         embedding_status, created_at, updated_at
-       ) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)`
+         embedding_status, source_document_id, created_at, updated_at
+       ) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)`
     )
     .run(
       input.title,
@@ -2542,10 +2587,24 @@ export function createKnowledgeGuide(input: {
       input.fileHash,
       input.pageCount,
       input.extractedText,
+      input.sourceDocumentId ?? null,
       ts,
       ts
     );
   return Number(result.lastInsertRowid);
+}
+
+export function updateKnowledgeGuideSourceDocument(
+  guideId: number,
+  sourceDocumentId: number | null
+): void {
+  getDb()
+    .prepare(
+      `UPDATE knowledge_guides
+       SET source_document_id = ?, updated_at = ?
+       WHERE id = ?`
+    )
+    .run(sourceDocumentId, nowIso(), guideId);
 }
 
 export function updateKnowledgeGuideFilePath(

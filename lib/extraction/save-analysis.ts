@@ -36,6 +36,10 @@ import {
   serializeAlsoCategories,
 } from "@/lib/extraction/tax";
 import { enrichAnalysisIdentity } from "@/lib/extraction/enrich-identity";
+import {
+  BUSINESS_KNOWLEDGE_AREA,
+  isBusinessDocument,
+} from "@/lib/documents/business";
 
 function warrantyStatus(warrantyUntil: string | null): string {
   if (!warrantyUntil) return "unknown";
@@ -213,6 +217,11 @@ export function saveAnalysis(
     (looksLikeSwissTaxDocument(taxText) || looksLikeLohnausweis(taxText))
   ) {
     category = "Steuern";
+  }
+
+  // O365 / business docs stay in «Geschäftlich» — never household remaps
+  if (isBusinessDocument(documentId)) {
+    category = BUSINESS_KNOWLEDGE_AREA;
   }
 
   const taxYear = resolveTaxYear({

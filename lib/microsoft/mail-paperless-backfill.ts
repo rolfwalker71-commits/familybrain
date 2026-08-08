@@ -1,5 +1,5 @@
 import { graphJson } from "@/lib/microsoft/graph";
-import { addDaysYmd, dayWindowLocal, zurichYmd } from "@/lib/microsoft/time";
+import { addDaysYmd, graphMailDateTimeUtc, zurichYmd } from "@/lib/microsoft/time";
 import { getSetting, setSetting } from "@/lib/db/migrations";
 import {
   findDocumentForMicrosoftAttachment,
@@ -16,8 +16,11 @@ export const O365_PDF_BACKFILL_LAST_RUN_KEY = "o365_pdf_backfill_last_run_at";
 export const O365_PDF_BACKFILL_LAST_ERROR_KEY = "o365_pdf_backfill_last_error";
 export const O365_PDF_BACKFILL_STATS_KEY = "o365_pdf_backfill_stats";
 
-/** Max messages inspected per job run (attachments checked). */
-export const O365_PDF_BACKFILL_MAX_MESSAGES_PER_RUN = 25;
+/**
+ * Messages listed per run (Graph already filters hasAttachments).
+ * Non-PDF attachment mails are skipped after a cheap metadata call — no download.
+ */
+export const O365_PDF_BACKFILL_MAX_MESSAGES_PER_RUN = 40;
 /** Max PDFs uploaded per run. */
 export const O365_PDF_BACKFILL_MAX_PDFS_PER_RUN = 12;
 
@@ -36,6 +39,7 @@ export type O365PdfBackfillStatus = {
   lastError: string | null;
   stats: {
     messagesSeen: number;
+    messagesWithPdf: number;
     pdfsUploaded: number;
     pdfsSkipped: number;
     pdfsFailed: number;
@@ -54,6 +58,7 @@ function parseStats(raw: string | null): O365PdfBackfillStatus["stats"] {
     const j = JSON.parse(raw) as Partial<O365PdfBackfillStatus["stats"]>;
     return {
       messagesSeen: Number(j.messagesSeen) || 0,
+      messagesWithPdf: Number(j.messagesWithPdf) || 0,
       pdfsUploaded: Number(j.pdfsUploaded) || 0,
       pdfsSkipped: Number(j.pdfsSkipped) || 0,
       pdfsFailed: Number(j.pdfsFailed) || 0,
@@ -61,6 +66,7 @@ function parseStats(raw: string | null): O365PdfBackfillStatus["stats"] {
   } catch {
     return {
       messagesSeen: 0,
+      messagesWithPdf: 0,
       pdfsUploaded: 0,
       pdfsSkipped: 0,
       pdfsFailed: 0,
@@ -114,8 +120,9 @@ export function configureO365PdfBackfill(input: {
 }
 
 /**
- * List inbox messages with attachments since `sinceYmd`, with Graph pagination.
- * Graph supports multi-year history; practical limit is rate/quota + PDF volume.
+ * List inbox messages that Graph marks as having attachments since `sinceYmd`.
+ * Graph cannot filter by «PDF only» on the message list — we then inspect
+ * attachment metadata and skip non-PDFs without downloading.
  */
 export async function listMicrosoftInboxWithAttachmentsPage(
   userId: number,
@@ -137,7 +144,8 @@ export async function listMicrosoftInboxWithAttachmentsPage(
   if (options.nextLink) {
     data = await graphJson(userId, options.nextLink);
   } else {
-    const { start } = dayWindowLocal(options.sinceYmd);
+    const start = graphMailDateTimeUtc(options.sinceYmd);
+    // DateTimeOffset must include Z / offset — bare local times → Graph 400
     const filter = `receivedDateTime ge ${start} and hasAttachments eq true`;
     const qs = new URLSearchParams({
       $filter: filter,
@@ -167,6 +175,7 @@ export async function listMicrosoftInboxWithAttachmentsPage(
 
 export type O365PdfBackfillRunResult = {
   messagesSeen: number;
+  messagesWithPdf: number;
   pdfsUploaded: number;
   pdfsSkipped: number;
   pdfsFailed: number;
@@ -192,6 +201,7 @@ export async function runO365PdfBackfillBatch(
   let pdfsSkipped = 0;
   let pdfsFailed = 0;
   let messagesSeen = 0;
+  let messagesWithPdf = 0;
 
   for (const msg of page.messages) {
     if (pdfsUploaded >= O365_PDF_BACKFILL_MAX_PDFS_PER_RUN) break;
@@ -203,6 +213,7 @@ export async function runO365PdfBackfillBatch(
       continue;
     }
     if (pdfs.length === 0) continue;
+    messagesWithPdf += 1;
 
     const pending = pdfs.filter(
       (p) => !findDocumentForMicrosoftAttachment(msg.id, p.id)
@@ -228,6 +239,7 @@ export async function runO365PdfBackfillBatch(
   const prev = parseStats(getSetting(O365_PDF_BACKFILL_STATS_KEY));
   const nextStats = {
     messagesSeen: prev.messagesSeen + messagesSeen,
+    messagesWithPdf: prev.messagesWithPdf + messagesWithPdf,
     pdfsUploaded: prev.pdfsUploaded + pdfsUploaded,
     pdfsSkipped: prev.pdfsSkipped + pdfsSkipped,
     pdfsFailed: prev.pdfsFailed + pdfsFailed,
@@ -243,6 +255,7 @@ export async function runO365PdfBackfillBatch(
 
   return {
     messagesSeen,
+    messagesWithPdf,
     pdfsUploaded,
     pdfsSkipped,
     pdfsFailed,
