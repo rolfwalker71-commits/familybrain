@@ -195,8 +195,16 @@ export type OverviewPayload = {
     /** Mails AI-processed today (analyzed / triage / applied / dismissed) */
     mailAnalyzedToday: number;
     mailByProvider: {
-      google: { analyzedToday: number; pendingTriage: number };
-      microsoft: { analyzedToday: number; pendingTriage: number };
+      google: {
+        analyzedToday: number;
+        pendingTriage: number;
+        lastAnalyzedAt: string | null;
+      };
+      microsoft: {
+        analyzedToday: number;
+        pendingTriage: number;
+        lastAnalyzedAt: string | null;
+      };
     };
   };
   agenda: AgendaItem[];
@@ -773,8 +781,8 @@ export async function getDashboardOverview(
       (async () => {
         if (calendarUserId == null) {
           return {
-            google: { analyzedToday: 0, pendingTriage: 0 },
-            microsoft: { analyzedToday: 0, pendingTriage: 0 },
+            google: { analyzedToday: 0, pendingTriage: 0, lastAnalyzedAt: null },
+            microsoft: { analyzedToday: 0, pendingTriage: 0, lastAnalyzedAt: null },
           };
         }
         try {
@@ -790,8 +798,8 @@ export async function getDashboardOverview(
           return countMailOverviewStatsByProvider(calendarUserId, day);
         } catch {
           return {
-            google: { analyzedToday: 0, pendingTriage: 0 },
-            microsoft: { analyzedToday: 0, pendingTriage: 0 },
+            google: { analyzedToday: 0, pendingTriage: 0, lastAnalyzedAt: null },
+            microsoft: { analyzedToday: 0, pendingTriage: 0, lastAnalyzedAt: null },
           };
         }
       })(),

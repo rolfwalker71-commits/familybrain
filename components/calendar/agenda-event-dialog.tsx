@@ -141,7 +141,11 @@ export function AgendaEventDialog({
             </div>
 
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-3">
-              {item.aiIconKey || item.aiIconUrl ? (
+              {item.kind === "calendar" ||
+              item.kind === "hockey" ||
+              item.kind === "holiday" ||
+              item.aiIconKey ||
+              item.aiIconUrl ? (
                 <DetailRow label="Motiv">
                   <AgendaAiIconThumb
                     itemId={item.id}

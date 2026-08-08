@@ -249,6 +249,8 @@ export function countPendingMailTriage(
 export type MailOverviewStats = {
   analyzedToday: number;
   pendingTriage: number;
+  /** Latest analyzed_at ISO for this provider (any day), if any */
+  lastAnalyzedAt: string | null;
 };
 
 /** Counts for overview KPI: AI-processed today + open triage suggestions. */
@@ -268,9 +270,19 @@ export function countMailOverviewStats(
            AND status IN ('analyzed', 'pending_triage', 'applied', 'dismissed')`
       )
       .get(userId, provider, day) as { c: number };
+    const last = getDb()
+      .prepare(
+        `SELECT MAX(analyzed_at) as at FROM mail_analyses
+         WHERE user_id = ?
+           AND COALESCE(provider, 'google') = ?
+           AND analyzed_at IS NOT NULL
+           AND TRIM(analyzed_at) != ''`
+      )
+      .get(userId, provider) as { at: string | null };
     return {
       analyzedToday: analyzed?.c || 0,
       pendingTriage: countPendingMailTriage(userId, provider),
+      lastAnalyzedAt: last?.at?.trim() || null,
     };
   }
   const analyzed = getDb()
@@ -281,9 +293,18 @@ export function countMailOverviewStats(
          AND status IN ('analyzed', 'pending_triage', 'applied', 'dismissed')`
     )
     .get(userId, day) as { c: number };
+  const last = getDb()
+    .prepare(
+      `SELECT MAX(analyzed_at) as at FROM mail_analyses
+       WHERE user_id = ?
+         AND analyzed_at IS NOT NULL
+         AND TRIM(analyzed_at) != ''`
+    )
+    .get(userId) as { at: string | null };
   return {
     analyzedToday: analyzed?.c || 0,
     pendingTriage: countPendingMailTriage(userId),
+    lastAnalyzedAt: last?.at?.trim() || null,
   };
 }
 

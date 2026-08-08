@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { AiImageZoom } from "@/components/layout/ai-image-zoom";
 import { cn } from "@/lib/utils";
 
 /**
- * Agenda AI thumbnail: hover (desktop) / tippen opens fullscreen zoom.
- * Lazily requests generation when only a cache key is known.
+ * Agenda AI thumbnail. Opens zoom only on explicit click (no hover).
+ * Lazily ensures/generates when a cache key is known or title is present.
  */
 export function AgendaAiIconThumb({
   itemId,
@@ -47,18 +47,21 @@ export function AgendaAiIconThumb({
   imgClassName?: string;
 }) {
   const [url, setUrl] = useState<string | null>(aiIconUrl ?? null);
+  const [loading, setLoading] = useState(
+    () => !aiIconUrl && Boolean(aiIconKey || title?.trim())
+  );
   const [zoomOpen, setZoomOpen] = useState(false);
-  const hoverTimer = useRef<number | null>(null);
-  const asked = useRef(false);
 
   useEffect(() => {
     setUrl(aiIconUrl ?? null);
   }, [aiIconUrl]);
 
   useEffect(() => {
-    if (url || !aiIconKey || asked.current) return;
-    asked.current = true;
+    if (url) return;
+    if (!aiIconKey && !title?.trim()) return;
+
     let cancelled = false;
+    setLoading(true);
     void (async () => {
       try {
         const res = await fetch("/api/calendar/ai-icons", {
@@ -86,15 +89,22 @@ export function AgendaAiIconThumb({
         });
         const data = await res.json();
         if (!res.ok || cancelled) return;
-        const next =
-          data.byId?.[itemId]?.url ||
-          (aiIconKey ? data.byKey?.[aiIconKey] : null) ||
-          null;
+        const fromId = data.byId?.[itemId]?.url as string | undefined;
+        const fromPropKey = aiIconKey
+          ? (data.byKey?.[aiIconKey] as string | undefined)
+          : undefined;
+        const fromAnyKey = Object.values(
+          (data.byKey || {}) as Record<string, string>
+        )[0];
+        const next = fromId || fromPropKey || fromAnyKey || null;
         if (next) setUrl(next);
       } catch {
         /* optional */
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     })();
+
     return () => {
       cancelled = true;
     };
@@ -113,25 +123,11 @@ export function AgendaAiIconThumb({
     endTime,
     driveMinutes,
     distanceKm,
-    coords,
+    coords?.lat,
+    coords?.lon,
   ]);
 
-  function clearHoverTimer() {
-    if (hoverTimer.current != null) {
-      window.clearTimeout(hoverTimer.current);
-      hoverTimer.current = null;
-    }
-  }
-
-  function scheduleZoomOpen() {
-    clearHoverTimer();
-    hoverTimer.current = window.setTimeout(() => {
-      setZoomOpen(true);
-      hoverTimer.current = null;
-    }, 180);
-  }
-
-  if (!url && !aiIconKey) return null;
+  if (!url && !aiIconKey && !loading) return null;
 
   if (!url) {
     return (
@@ -157,11 +153,8 @@ export function AgendaAiIconThumb({
         )}
         onClick={(e) => {
           e.stopPropagation();
-          clearHoverTimer();
           setZoomOpen(true);
         }}
-        onMouseEnter={scheduleZoomOpen}
-        onMouseLeave={clearHoverTimer}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img

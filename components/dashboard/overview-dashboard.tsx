@@ -855,12 +855,124 @@ function FocusTile({
         <p className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">
           {eyebrow}
         </p>
-        <p className="truncate text-[16px] font-black tracking-tight">
+        <p className="truncate text-[15px] font-black tracking-tight">
           {title}
         </p>
         <p className="truncate text-[13px] text-muted-foreground">{detail}</p>
       </div>
     </Link>
+  );
+}
+
+function formatMailAnalyseTime(iso: string | null | undefined): string | null {
+  if (!iso?.trim()) return null;
+  try {
+    const d = new Date(iso);
+    if (!Number.isFinite(d.getTime())) return null;
+    return new Intl.DateTimeFormat("de-CH", {
+      timeZone: "Europe/Zurich",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(d);
+  } catch {
+    return null;
+  }
+}
+
+function mailAnalyseLine(stats: {
+  analyzedToday: number;
+  pendingTriage: number;
+}): string {
+  if (stats.pendingTriage > 0) {
+    return `${stats.pendingTriage} zur Triage`;
+  }
+  if (stats.analyzedToday > 0) {
+    return `${stats.analyzedToday} analysiert`;
+  }
+  return "Noch keine Analyse";
+}
+
+function MailAnalyseFocusTile({
+  google,
+  microsoft,
+}: {
+  google: {
+    analyzedToday: number;
+    pendingTriage: number;
+    lastAnalyzedAt?: string | null;
+  };
+  microsoft: {
+    analyzedToday: number;
+    pendingTriage: number;
+    lastAnalyzedAt?: string | null;
+  };
+}) {
+  const msTime = formatMailAnalyseTime(microsoft.lastAnalyzedAt);
+  const gTime = formatMailAnalyseTime(google.lastAnalyzedAt);
+
+  return (
+    <div
+      className={cn(
+        "flex min-w-0 items-stretch gap-3 rounded-2xl border border-border/60 border-l-4 border-l-sky-600 bg-sky-50/40 shadow-sm"
+      )}
+    >
+      <div className="flex shrink-0 items-center pl-4">
+        <Sparkles
+          className="size-5 text-sky-800"
+          strokeWidth={APP_ICON_STROKE}
+          absoluteStrokeWidth
+          aria-hidden
+        />
+      </div>
+      <div className="min-w-0 flex-1">
+        <Link
+          href={
+            microsoft.pendingTriage > 0
+              ? "/microsoft?tab=triage"
+              : "/microsoft?tab=inbox"
+          }
+          className="block px-4 py-2.5 transition-colors hover:bg-muted/30"
+        >
+          <p className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">
+            O365 Mail
+          </p>
+          <p className="truncate text-[15px] font-black tracking-tight">
+            {mailAnalyseLine(microsoft)}
+          </p>
+          <p className="truncate text-[13px] text-muted-foreground">
+            {microsoft.pendingTriage > 0
+              ? `${microsoft.pendingTriage} offen`
+              : microsoft.analyzedToday > 0
+                ? `${microsoft.analyzedToday} heute`
+                : "Outlook"}
+            {msTime ? ` · ${msTime}` : ""}
+          </p>
+        </Link>
+        <div className="mx-4 border-t border-border/70" aria-hidden />
+        <Link
+          href={
+            google.pendingTriage > 0 ? "/google?tab=triage" : "/google"
+          }
+          className="block px-4 py-2.5 transition-colors hover:bg-muted/30"
+        >
+          <p className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Google Mail
+          </p>
+          <p className="truncate text-[15px] font-black tracking-tight">
+            {mailAnalyseLine(google)}
+          </p>
+          <p className="truncate text-[13px] text-muted-foreground">
+            {google.pendingTriage > 0
+              ? `${google.pendingTriage} offen`
+              : google.analyzedToday > 0
+                ? `${google.analyzedToday} heute`
+                : "Gmail"}
+            {gTime ? ` · ${gTime}` : ""}
+          </p>
+        </Link>
+      </div>
+    </div>
   );
 }
 
@@ -1290,45 +1402,20 @@ export function OverviewDashboard({
                     : "Posteingang"
                 }
               />
-              <FocusTile
-                href={
-                  (data.chips.mailByProvider?.microsoft.pendingTriage ?? 0) >
-                  (data.chips.mailByProvider?.google.pendingTriage ?? 0)
-                    ? "/microsoft?tab=triage"
-                    : data.chips.mailSuggestionsPending > 0
-                      ? "/google?tab=triage"
-                      : "/google"
+              <MailAnalyseFocusTile
+                google={
+                  data.chips.mailByProvider?.google ?? {
+                    analyzedToday: 0,
+                    pendingTriage: 0,
+                    lastAnalyzedAt: null,
+                  }
                 }
-                tone="sky"
-                icon={Sparkles}
-                eyebrow="Mail · Analyse"
-                title={
-                  data.chips.mailSuggestionsPending > 0
-                    ? `${data.chips.mailSuggestionsPending} zur Triage`
-                    : (data.chips.mailAnalyzedToday ?? 0) > 0
-                      ? `${data.chips.mailAnalyzedToday} analysiert`
-                      : "Noch keine Analyse"
-                }
-                detail={
-                  (() => {
-                    const g =
-                      data.chips.mailByProvider?.google ?? {
-                        analyzedToday: 0,
-                        pendingTriage: 0,
-                      };
-                    const m =
-                      data.chips.mailByProvider?.microsoft ?? {
-                        analyzedToday: 0,
-                        pendingTriage: 0,
-                      };
-                    if (
-                      data.chips.mailSuggestionsPending > 0 ||
-                      data.chips.mailAnalyzedToday > 0
-                    ) {
-                      return `Google ${g.pendingTriage} · O365 ${m.pendingTriage} offen`;
-                    }
-                    return "Beim Öffnen der Übersicht (~2–5 Sek. je Mail)";
-                  })()
+                microsoft={
+                  data.chips.mailByProvider?.microsoft ?? {
+                    analyzedToday: 0,
+                    pendingTriage: 0,
+                    lastAnalyzedAt: null,
+                  }
                 }
               />
             </div>
