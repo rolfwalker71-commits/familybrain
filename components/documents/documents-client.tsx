@@ -859,17 +859,24 @@ export function DocumentsClient() {
     router.replace("/documents", { scroll: false });
   }
 
-  const categoryItems = useMemo(
-    () =>
-      toItemsRecord([
-        { value: "all", label: "Alle Kategorien" },
-        ...filters.categories.map((c) => ({ value: c, label: c })),
-        ...(category !== "all" && !filters.categories.includes(category)
-          ? [{ value: category, label: category }]
-          : []),
-      ]),
-    [filters.categories, category]
-  );
+  const categoryItems = useMemo(() => {
+    // Prefer full knowledge-area list (incl. «Geschäftlich») over only
+    // categories that already appear on ≥1 document.
+    const names = [
+      ...knowledgeAreas,
+      ...filters.categories.filter((c) => !knowledgeAreas.includes(c)),
+    ];
+    if (
+      category !== "all" &&
+      !names.includes(category)
+    ) {
+      names.push(category);
+    }
+    return toItemsRecord([
+      { value: "all", label: "Alle Kategorien" },
+      ...names.map((c) => ({ value: c, label: c })),
+    ]);
+  }, [filters.categories, knowledgeAreas, category]);
 
   const correspondentItems = useMemo(
     () =>

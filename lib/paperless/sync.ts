@@ -235,6 +235,26 @@ async function upsertRemoteDocument(
     /* optional UDF */
   }
 
+  // O365 / ANG tags → Geschäftlich + out of household Action-Inbox
+  try {
+    const { BUSINESS_TAG_NAMES, markDocumentAsBusiness } = await import(
+      "@/lib/documents/business"
+    );
+    const tagSet = new Set(
+      (resolved.tags || [])
+        .map((t) => (t.name || "").trim().toLowerCase())
+        .filter(Boolean)
+    );
+    const isBiz = BUSINESS_TAG_NAMES.some((n) =>
+      tagSet.has(n.toLowerCase())
+    );
+    if (isBiz) {
+      markDocumentAsBusiness(upserted.id);
+    }
+  } catch {
+    /* best-effort */
+  }
+
   // Buddy source graph: Paperless primary + optional Drive mirror for new docs
   try {
     const { upsertBuddySourceLink } = await import("@/lib/buddy/source-links");
