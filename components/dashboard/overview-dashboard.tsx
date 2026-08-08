@@ -245,9 +245,7 @@ function findConflicts(
   return out;
 }
 
-import { placeMapImageSrc } from "@/lib/maps/place-map-src";
-import { mapZoomStorageKeyPlace } from "@/lib/maps/map-zoom-storage";
-import { ZoomableStaticMap } from "@/components/maps/zoomable-static-map";
+import { TripMap } from "@/components/trips/trip-map";
 
 function HomeWeatherWidget({ weather }: { weather: HomeWeatherCard }) {
   const windDir =
@@ -749,28 +747,17 @@ function DayTimeline({
                         ) : null}
                       </div>
                       {showMap && item.coords ? (
-                        <ZoomableStaticMap
-                          storageKey={mapZoomStorageKeyPlace(
-                            item.coords.lat,
-                            item.coords.lon
-                          )}
-                          defaultZoom={14}
-                          minZoom={8}
-                          maxZoom={17}
-                          srcForZoom={(z) =>
-                            placeMapImageSrc(
-                              item.coords!.lat,
-                              item.coords!.lon,
-                              z
-                            )
-                          }
-                          alt={`Karte: ${item.coords.label}`}
+                        <TripMap
+                          points={[
+                            {
+                              lat: item.coords.lat,
+                              lon: item.coords.lon,
+                              label: item.coords.label,
+                            },
+                          ]}
                           heightClassName="h-28"
                           className="rounded-lg"
-                          href={
-                            item.mapsUrl ||
-                            `https://www.google.com/maps/search/?api=1&query=${item.coords.lat},${item.coords.lon}`
-                          }
+                          compact
                         />
                       ) : null}
                     </div>

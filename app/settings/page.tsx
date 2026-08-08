@@ -1056,8 +1056,8 @@ function SettingsPageInner() {
       if (!res.ok || data.ok === false) {
         setError(
           data.hint ||
-            data.staticError ||
             data.geocodeError ||
+            data.driveError ||
             `Google-Maps-Test: HTTP ${res.status}`
         );
       } else {
@@ -1792,33 +1792,27 @@ function SettingsPageInner() {
               }
             />
             <p className="text-xs text-muted-foreground">
-              Sobald der Key gespeichert ist (und in Cloud Console{" "}
-              <span className="font-medium">Maps Static API</span>, Geocoding,
-              Routes/Directions aktiv sind), greifen automatisch:
+              Für Geocoding und Fahrzeiten (Cloud Console:{" "}
+              <span className="font-medium">Geocoding API</span> und{" "}
+              <span className="font-medium">Routes</span> bzw. Directions).
+              Kartenausschnitte bleiben Leaflet/Carto/OSM — kein Static Maps.
             </p>
             <ul className="list-inside list-disc text-xs text-muted-foreground">
-              <li>
-                <span className="font-medium">Kartenausschnitte</span> —
-                Dashboard-Ablauf, Kalender-Termin, Hotel-Vorschaubilder (kein
-                Extra-Menüpunkt)
-              </li>
-              <li>Adress-Geocoding und Fahrzeiten</li>
+              <li>Adress-Geocoding (u. a. Wetter-Orte)</li>
+              <li>Fahrzeiten im Ablauf</li>
             </ul>
             <p className="text-xs text-muted-foreground">
-              Wichtig: Der Key wird{" "}
-              <span className="font-medium">serverseitig</span> aufgerufen. Bei
-              Einschränkung «Websites / HTTP-Referrer» schlägt Static Maps fehl
-              und Buddy zeigt still OSM. Dann: keine Application Restriction
-              oder IP des Buddy-Servers.
+              Der Key wird <span className="font-medium">serverseitig</span>{" "}
+              genutzt — bei Application Restriction IP des Servers oder keine
+              Restriction (nicht nur HTTP-Referrer).
             </p>
             {hasGoogleMapsApiKey ? (
               <p className="text-xs text-emerald-700">
-                Key gesetzt — Ausschnitte nutzen Google Static Maps (bei Fehler
-                Fallback OSM).
+                Key gesetzt — Geocode/Fahrzeiten über Google.
               </p>
             ) : (
               <p className="text-xs text-amber-800">
-                Noch kein Key — Ausschnitte bleiben OSM-Kacheln.
+                Noch kein Key — Fallback Nominatim/OSRM.
               </p>
             )}
             <div className="flex flex-wrap gap-2">
@@ -1904,10 +1898,8 @@ function SettingsPageInner() {
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              Nur für die grosse zoom-/klickbare{" "}
-              <span className="font-medium">Reise-Übersichtskarte</span>{" "}
-              (Leaflet). Alle Event-Ausschnitte inkl. Flug/Transfer Von→Nach
-              nutzen Google Static Maps über den Key oben.
+              Gilt für alle TravelBuddy- und Dashboard-Kartenausschnitte
+              (Leaflet).
             </p>
           </div>
           <div className="space-y-2">

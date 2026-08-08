@@ -1,9 +1,4 @@
 import sharp from "sharp";
-import {
-  fetchGoogleStaticMapDetailed,
-  fetchGoogleStaticRouteMapDetailed,
-  hasGoogleMapsApiKey,
-} from "@/lib/google/maps";
 
 const USER_AGENT =
   "TripBook-TravelBrain/1.0 (https://github.com/rolfwalker71-commits/familybrain)";
@@ -36,19 +31,25 @@ async function fetchOsmTile(
   }
 }
 
-async function fetchOsmStaticMapPng(input: {
+/**
+ * OSM-Kachelausschnitt mit optionalem Marker.
+ * Google Static Maps wird bewusst nicht verwendet (nur Geocode/Routen).
+ */
+export async function fetchStaticMapPng(input: {
   lat: number;
   lon: number;
-  zoom: number;
-  withMarker: boolean;
+  zoom?: number;
+  withMarker?: boolean;
 }): Promise<Buffer | null> {
-  const { x, y } = tileXY(input.lat, input.lon, input.zoom);
-  const tile = await fetchOsmTile(input.zoom, x, y);
+  const zoom = input.zoom ?? 11;
+  const withMarker = input.withMarker !== false;
+  const { x, y } = tileXY(input.lat, input.lon, zoom);
+  const tile = await fetchOsmTile(zoom, x, y);
   if (!tile) return null;
 
-  if (!input.withMarker) return tile;
+  if (!withMarker) return tile;
 
-  const n = 2 ** input.zoom;
+  const n = 2 ** zoom;
   const xF = ((input.lon + 180) / 360) * n;
   const latRad = (input.lat * Math.PI) / 180;
   const yF =
@@ -71,115 +72,4 @@ async function fetchOsmStaticMapPng(input: {
   } catch {
     return tile;
   }
-}
-
-export type StaticMapFetchResult = {
-  buffer: Buffer | null;
-  source: "google" | "osm" | "none";
-  googleError: string | null;
-};
-
-/**
- * Kartenausschnitt um lat/lon mit Pin.
- * Mit Google Maps API-Key: Static Maps zuerst; bei Fehler OSM + googleError.
- */
-export async function fetchStaticMapPngDetailed(input: {
-  lat: number;
-  lon: number;
-  zoom?: number;
-  withMarker?: boolean;
-}): Promise<StaticMapFetchResult> {
-  const zoom = input.zoom ?? 11;
-  const withMarker = input.withMarker !== false;
-
-  if (hasGoogleMapsApiKey()) {
-    const google = await fetchGoogleStaticMapDetailed({
-      lat: input.lat,
-      lon: input.lon,
-      zoom,
-      width: 640,
-      height: 400,
-      scale: 2,
-      maptype: "roadmap",
-      withMarker,
-    });
-    if (google.ok) {
-      return { buffer: google.buffer, source: "google", googleError: null };
-    }
-    console.warn(
-      "[static-map] Google Static Maps fehlgeschlagen, Fallback OSM:",
-      google.error
-    );
-    const osm = await fetchOsmStaticMapPng({
-      lat: input.lat,
-      lon: input.lon,
-      zoom,
-      withMarker,
-    });
-    return {
-      buffer: osm,
-      source: osm ? "osm" : "none",
-      googleError: google.error,
-    };
-  }
-
-  const osm = await fetchOsmStaticMapPng({
-    lat: input.lat,
-    lon: input.lon,
-    zoom,
-    withMarker,
-  });
-  return {
-    buffer: osm,
-    source: osm ? "osm" : "none",
-    googleError: null,
-  };
-}
-
-export async function fetchStaticMapPng(input: {
-  lat: number;
-  lon: number;
-  zoom?: number;
-  withMarker?: boolean;
-}): Promise<Buffer | null> {
-  const r = await fetchStaticMapPngDetailed(input);
-  return r.buffer;
-}
-
-/**
- * Von/Nach-Route als Static Map (Google). Ohne Key / bei Fehler: kein OSM-Stitch,
- * caller kann auf Leaflet zurückfallen.
- */
-export async function fetchStaticRouteMapPngDetailed(input: {
-  from: { lat: number; lon: number };
-  to: { lat: number; lon: number };
-  geodesic?: boolean;
-  pathPoints?: Array<{ lat: number; lon: number }>;
-  zoom?: number;
-}): Promise<StaticMapFetchResult> {
-  if (!hasGoogleMapsApiKey()) {
-    return { buffer: null, source: "none", googleError: "no_api_key" };
-  }
-
-  const google = await fetchGoogleStaticRouteMapDetailed({
-    from: input.from,
-    to: input.to,
-    geodesic: input.geodesic,
-    pathPoints: input.pathPoints,
-    zoom: input.zoom,
-    width: 640,
-    height: 400,
-    scale: 2,
-    maptype: "roadmap",
-  });
-
-  if (google.ok) {
-    return { buffer: google.buffer, source: "google", googleError: null };
-  }
-
-  console.warn(
-    "[static-map] Google Static Route fehlgeschlagen:",
-    google.error
-  );
-  return { buffer: null, source: "none", googleError: google.error };
 }

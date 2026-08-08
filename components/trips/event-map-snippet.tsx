@@ -1,22 +1,9 @@
 "use client";
 
-import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { coerceTripEventType } from "@/lib/trips/constants";
 import { trainEnrichmentRoutePath } from "@/lib/trips/train-enrichment";
-import {
-  placeMapImageSrc,
-  routeMapImageSrc,
-} from "@/lib/maps/place-map-src";
-import {
-  mapZoomStorageKeyPlace,
-  mapZoomStorageKeyRoute,
-  suggestRouteZoom,
-} from "@/lib/maps/map-zoom-storage";
-import { ZoomableStaticMap } from "@/components/maps/zoomable-static-map";
 import { TripMap, type TripMapPoint } from "@/components/trips/trip-map";
-
-export { placeMapImageSrc, routeMapImageSrc } from "@/lib/maps/place-map-src";
 
 /** Minimal geo/context fields needed to derive a map snippet for an event. */
 export type EventMapGeoFields = {
@@ -85,9 +72,8 @@ export type EventMapModel = {
 };
 
 /**
- * Derive a single map snippet model for an event, mirroring the priority used
- * in the (former) expanded card detail view: flight great-circle > straight
- * transfer route > single place (lat/lon or static image) > single endpoint.
+ * Derive a single map snippet model for an event: flight great-circle > straight
+ * transfer/train route > single place > static image > single endpoint.
  */
 export function getEventMapModel(
   event: EventMapGeoFields
@@ -190,96 +176,7 @@ export function getEventMapModel(
   return null;
 }
 
-function StaticPlaceMapImage({
-  lat,
-  lon,
-  defaultZoom = 13,
-  alt,
-  heightClassName,
-  className,
-  href,
-}: {
-  lat: number;
-  lon: number;
-  defaultZoom?: number;
-  alt: string;
-  heightClassName: string;
-  className?: string;
-  href?: string | null;
-}) {
-  return (
-    <ZoomableStaticMap
-      storageKey={mapZoomStorageKeyPlace(lat, lon)}
-      defaultZoom={defaultZoom}
-      minZoom={8}
-      maxZoom={17}
-      srcForZoom={(z) => placeMapImageSrc(lat, lon, z)}
-      alt={alt}
-      heightClassName={heightClassName}
-      className={className}
-      href={href}
-    />
-  );
-}
-
-function StaticRouteMapImage({
-  model,
-  heightClassName,
-  className,
-  compact,
-}: {
-  model: EventMapModel;
-  heightClassName: string;
-  className?: string;
-  compact: boolean;
-}) {
-  const [fallback, setFallback] = useState(false);
-  const a = model.points[0];
-  const b = model.points[1];
-  if (!a || !b) return null;
-
-  if (fallback) {
-    return (
-      <TripMap
-        points={model.points}
-        drawRoute={model.drawRoute}
-        routeStyle={model.routeStyle}
-        routePath={model.routePath}
-        heightClassName={heightClassName}
-        className={className}
-        compact={compact}
-      />
-    );
-  }
-
-  const defaultZoom = suggestRouteZoom(a.lat, a.lon, b.lat, b.lon);
-
-  return (
-    <ZoomableStaticMap
-      storageKey={mapZoomStorageKeyRoute(a.lat, a.lon, b.lat, b.lon)}
-      defaultZoom={defaultZoom}
-      minZoom={2}
-      maxZoom={16}
-      srcForZoom={(z) =>
-        routeMapImageSrc({
-          fromLat: a.lat,
-          fromLon: a.lon,
-          toLat: b.lat,
-          toLon: b.lon,
-          route: model.routeStyle === "greatCircle" ? "geodesic" : "straight",
-          pathPoints: model.routePath,
-          zoom: z,
-        })
-      }
-      alt={`Route: ${a.label || "Von"} → ${b.label || "Nach"}`}
-      heightClassName={heightClassName}
-      className={className}
-      onImageError={() => setFallback(true)}
-    />
-  );
-}
-
-/** Small map snippet ("Kartenausschnitt") for a trip event, or a static fallback image. */
+/** Leaflet/Carto/OSM-Kartenausschnitt (kein Google Static Maps). */
 export function EventMapSnippet({
   event,
   heightClassName = "h-28",
@@ -294,49 +191,22 @@ export function EventMapSnippet({
   const model = getEventMapModel(event);
   if (!model) return null;
 
-  if (model.kind === "route" && model.points.length >= 2) {
+  if (model.mapImageUrl && model.points.length === 0) {
     return (
-      <StaticRouteMapImage
-        model={model}
-        heightClassName={heightClassName}
-        className={className}
-        compact={compact}
-      />
-    );
-  }
-
-  if (model.kind === "place" || model.kind === "endpoint") {
-    const point = model.points[0];
-    if (point) {
-      return (
-        <StaticPlaceMapImage
-          lat={point.lat}
-          lon={point.lon}
-          defaultZoom={13}
-          alt={point.label ? `Karte: ${point.label}` : "Kartenausschnitt"}
-          heightClassName={heightClassName}
-          className={className}
+      <div
+        className={cn(
+          "overflow-hidden rounded-md border border-border/70 bg-muted/30",
+          className
+        )}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={model.mapImageUrl}
+          alt="Kartenausschnitt"
+          className={cn("w-full object-cover", heightClassName)}
         />
-      );
-    }
-    if (model.mapImageUrl) {
-      return (
-        <div
-          className={cn(
-            "overflow-hidden rounded-md border border-border/70 bg-muted/30",
-            className
-          )}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={model.mapImageUrl}
-            alt="Kartenausschnitt"
-            className={cn("w-full object-cover", heightClassName)}
-          />
-        </div>
-      );
-    }
-    return null;
+      </div>
+    );
   }
 
   if (model.points.length === 0) return null;

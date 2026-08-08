@@ -6,7 +6,7 @@ import { probeGoogleMaps } from "@/lib/google/maps";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** Admin: Google Maps Key / Static API / Geocoding kurz prüfen. */
+/** Admin: Google Geocoding / Routes prüfen (keine Static Maps). */
 export async function POST() {
   ensureInitialized();
   const auth = await requireAdmin();
@@ -14,14 +14,14 @@ export async function POST() {
 
   const result = await probeGoogleMaps();
   return NextResponse.json({
-    ok: result.hasKey && result.geocodeOk && result.staticOk,
+    ok: result.hasKey && result.geocodeOk,
     ...result,
     hint: !result.hasKey
       ? "Kein API-Key unter TravelBuddy gespeichert."
-      : !result.staticOk
-        ? "Static Maps fehlgeschlagen. Typisch: Maps Static API nicht aktiv, Billing aus, oder Key nur auf HTTP-Referrer beschränkt (Server braucht IP-Beschränkung oder keine Restriction)."
-        : !result.geocodeOk
-          ? "Geocoding fehlgeschlagen — Geocoding API / Key prüfen."
-          : "Google Maps OK (Geocode + Static Map).",
+      : !result.geocodeOk
+        ? "Geocoding fehlgeschlagen — Geocoding API / Key / Billing prüfen."
+        : !result.driveOk
+          ? "Geocode ok, Fahrzeit fehlgeschlagen — Routes oder Directions API aktivieren."
+          : "Google Maps OK (Geocode + Fahrzeit). Kartenausschnitte nutzen Leaflet/OSM.",
   });
 }
