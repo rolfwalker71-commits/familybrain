@@ -144,6 +144,24 @@ async function tick(): Promise<void> {
     } catch (error) {
       console.warn("[scheduler] drive mirror check:", error);
     }
+
+    // O365 PDF → Paperless backfill (while enabled / cursor remains)
+    try {
+      const { getO365PdfBackfillStatus } = await import(
+        "@/lib/microsoft/mail-paperless-backfill"
+      );
+      const st = getO365PdfBackfillStatus();
+      if (st.enabled || st.hasCursor) {
+        const { runO365PdfBackfillJob } = await import(
+          "@/lib/jobs/background-runners"
+        );
+        void runO365PdfBackfillJob("schedule").catch((error) => {
+          console.warn("[scheduler] o365 pdf backfill:", error);
+        });
+      }
+    } catch (error) {
+      console.warn("[scheduler] o365 pdf backfill check:", error);
+    }
   } catch (error) {
     state.lastResult =
       error instanceof Error ? error.message : String(error);

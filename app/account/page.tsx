@@ -4,6 +4,7 @@ import { SettingsGoogleConnectPanel } from "@/components/settings/settings-googl
 import { SettingsMicrosoftCalendarsPanel } from "@/components/settings/settings-microsoft-calendars-panel";
 import { SettingsMicrosoftConnectPanel } from "@/components/settings/settings-microsoft-connect-panel";
 import { DriveMirrorStatusPanel } from "@/components/settings/drive-mirror-status-panel";
+import { O365PdfBackfillPanel } from "@/components/settings/o365-pdf-backfill-panel";
 import { PageHeader } from "@/components/layout/page-primitives";
 import { pageVisuals } from "@/components/layout/icon-circle";
 import { Suspense } from "react";
@@ -24,6 +25,7 @@ export default function AccountPage() {
         <SettingsMicrosoftConnectPanel />
       </Suspense>
       <DriveMirrorStatusPanel />
+      <O365PdfBackfillPanel />
       <SettingsGoogleCalendarsPanel />
       <SettingsMicrosoftCalendarsPanel />
       <SettingsCalendarsPanel />

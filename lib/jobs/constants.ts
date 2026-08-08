@@ -45,6 +45,8 @@ export const JOB_TYPE_AI_ICONS_REGENERATE = "ai_icons_regenerate";
 export const JOB_TYPE_PAPERLESS_WRITEBACK = "paperless_writeback";
 /** Mirror Paperless PDFs into Google Drive folder BUDDY. */
 export const JOB_TYPE_DRIVE_MIRROR = "drive_mirror";
+/** Crawl O365 inbox PDFs → Paperless (historical backfill). */
+export const JOB_TYPE_O365_PDF_BACKFILL = "o365_pdf_backfill";
 
 export const BACKGROUND_JOB_TYPES = [
   JOB_TYPE_SYNC_ANALYZE,
@@ -53,6 +55,7 @@ export const BACKGROUND_JOB_TYPES = [
   JOB_TYPE_AI_ICONS_REGENERATE,
   JOB_TYPE_PAPERLESS_WRITEBACK,
   JOB_TYPE_DRIVE_MIRROR,
+  JOB_TYPE_O365_PDF_BACKFILL,
 ] as const;
 
 export type BackgroundJobType = (typeof BACKGROUND_JOB_TYPES)[number];
@@ -78,6 +81,8 @@ export function jobTypeLabel(jobType: string): string {
       return "Paperless-Writeback";
     case JOB_TYPE_DRIVE_MIRROR:
       return "Drive-Spiegel (BUDDY)";
+    case JOB_TYPE_O365_PDF_BACKFILL:
+      return "O365-PDFs → Paperless";
     default:
       return jobType;
   }

@@ -9,6 +9,7 @@ import {
   JOB_TYPE_ANALYZE_PENDING,
   JOB_TYPE_PAPERLESS_WRITEBACK,
   JOB_TYPE_DRIVE_MIRROR,
+  JOB_TYPE_O365_PDF_BACKFILL,
   DRIVE_MIRROR_BATCH_SIZE,
   MAX_DRIVE_MIRROR_PER_RUN,
   PAPERLESS_WRITEBACK_BATCH_SIZE,
@@ -638,6 +639,92 @@ export async function runDriveMirrorJob(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     setSetting(DRIVE_MIRROR_LAST_ERROR_KEY, message);
+    finishJobRun(run.id, "error", summary, message);
+    return {
+      ok: true,
+      runId: run.id,
+      status: "error",
+      summary,
+      error: message,
+    };
+  }
+}
+
+export async function runO365PdfBackfillJob(
+  trigger: JobTrigger = "manual"
+): Promise<BackgroundRunResult> {
+  recoverExpiredJobLeases();
+
+  const {
+    getO365PdfBackfillStatus,
+    runO365PdfBackfillBatch,
+    configureO365PdfBackfill,
+    O365_PDF_BACKFILL_LAST_ERROR_KEY,
+  } = await import("@/lib/microsoft/mail-paperless-backfill");
+  const { setSetting } = await import("@/lib/db/migrations");
+  const {
+    hasMicrosoftMailScope,
+    isMicrosoftConnected,
+  } = await import("@/lib/microsoft/oauth");
+  const { findRolfAppUserId } = await import("@/lib/calendar/ics-calendars");
+
+  const status = getO365PdfBackfillStatus();
+  if (!status.enabled && trigger === "schedule") {
+    return {
+      ok: false,
+      status: "skipped",
+      reason: "O365-PDF-Backfill ist nicht aktiv.",
+    };
+  }
+
+  const userId = findRolfAppUserId();
+  if (userId == null || !isMicrosoftConnected(userId) || !hasMicrosoftMailScope(userId)) {
+    return {
+      ok: false,
+      status: "skipped",
+      reason: "Microsoft Mail nicht verbunden oder Scope fehlt.",
+    };
+  }
+
+  const run = tryAcquireJobRun(trigger, JOB_TYPE_O365_PDF_BACKFILL);
+  if (!run) {
+    return {
+      ok: false,
+      status: "skipped",
+      reason: "Ein anderer Hintergrund-Job läuft bereits.",
+    };
+  }
+
+  const summary: JobRunSummary = {
+    processed: 0,
+    succeeded: 0,
+    failed: 0,
+    remaining: status.hasCursor || status.enabled ? 1 : 0,
+  };
+
+  try {
+    if (trigger === "manual" && !status.enabled) {
+      configureO365PdfBackfill({ enabled: true });
+    }
+
+    const batch = await runO365PdfBackfillBatch(userId);
+    summary.processed = batch.messagesSeen;
+    summary.succeeded = batch.pdfsUploaded;
+    summary.failed = batch.pdfsFailed;
+    summary.remaining = batch.done ? 0 : 1;
+
+    addJobRunItem({
+      runId: run.id,
+      itemKind: "phase",
+      status: "success",
+      title: "O365 → Paperless",
+      message: `${batch.pdfsUploaded} neu, ${batch.pdfsSkipped} übersprungen, ${batch.pdfsFailed} Fehler · ${batch.messagesSeen} Mails · ${batch.done ? "fertig" : "Fortsetzung folgt"}`,
+    });
+    finishJobRun(run.id, "success", summary);
+    return { ok: true, runId: run.id, status: "success", summary };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    setSetting(O365_PDF_BACKFILL_LAST_ERROR_KEY, message);
     finishJobRun(run.id, "error", summary, message);
     return {
       ok: true,

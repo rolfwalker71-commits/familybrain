@@ -129,10 +129,100 @@ export async function POST(request: Request, context: Ctx) {
       continue;
     }
 
-    if (action.kind === "task" || action.kind === "finance") {
+    if (action.kind === "finance") {
+      try {
+        const { upsertBuddySourceLink } = await import(
+          "@/lib/buddy/source-links"
+        );
+        let documentId = action.documentId ?? null;
+        if (documentId == null && (action.vendor || action.amount != null)) {
+          const { matchOpenInvoiceFromMail } = await import(
+            "@/lib/mail/match-finance"
+          );
+          const match = matchOpenInvoiceFromMail({
+            vendor: action.vendor,
+            amount: action.amount,
+            currency: action.currency,
+          });
+          if (match) documentId = match.documentId;
+        }
+
+        // If still no doc: ingest PDF attachments from this mail
+        if (documentId == null) {
+          try {
+            const { ingestMicrosoftMessagePdfs } = await import(
+              "@/lib/microsoft/mail-to-paperless"
+            );
+            const { results } = await ingestMicrosoftMessagePdfs({
+              userId,
+              messageId: id,
+            });
+            const first = results.find((r) => r.ok && r.localId != null);
+            if (first?.localId != null) documentId = first.localId;
+          } catch {
+            /* optional */
+          }
+        }
+
+        let link: string | null = null;
+        if (documentId != null) {
+          upsertBuddySourceLink({
+            entityType: "document",
+            entityId: String(documentId),
+            sourceKind: "microsoft_message",
+            sourceId: id,
+            label: "O365",
+            role: "related",
+          });
+          upsertBuddySourceLink({
+            entityType: "mail_message",
+            entityId: id,
+            sourceKind: "url",
+            sourceId: `document:${documentId}`,
+            url: `/documents/${documentId}`,
+            label: "Beleg",
+            role: "related",
+          });
+          link = `/documents/${documentId}`;
+        }
+
+        if (hasMicrosoftTasksScope(userId)) {
+          const task = await createOutlookTodoTask(userId, {
+            title: actionTitle.startsWith("Rechnung")
+              ? actionTitle
+              : `Zahlung: ${actionTitle}`,
+            notes: [
+              notes,
+              documentId ? `Buddy-Dokument: /documents/${documentId}` : null,
+            ]
+              .filter(Boolean)
+              .join("\n\n"),
+            dueDate: action.dueDate || action.startDate || null,
+          });
+          link = link || task.webLink;
+        }
+
+        created.push({
+          kind: "finance",
+          title: actionTitle,
+          ok: true,
+          link,
+        });
+      } catch (err) {
+        created.push({
+          kind: "finance",
+          title: actionTitle,
+          ok: false,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+      continue;
+    }
+
+    if (action.kind === "task") {
       if (!hasMicrosoftTasksScope(userId)) {
         created.push({
-          kind: action.kind,
+          kind: "task",
           title: actionTitle,
           ok: false,
           error: "Tasks-Recht fehlt",
@@ -146,14 +236,14 @@ export async function POST(request: Request, context: Ctx) {
           dueDate: action.dueDate || action.startDate || null,
         });
         created.push({
-          kind: action.kind,
+          kind: "task",
           title: actionTitle,
           ok: true,
           link: task.webLink,
         });
       } catch (err) {
         created.push({
-          kind: action.kind,
+          kind: "task",
           title: actionTitle,
           ok: false,
           error: err instanceof Error ? err.message : String(err),
@@ -175,6 +265,83 @@ export async function POST(request: Request, context: Ctx) {
       } catch (err) {
         created.push({
           kind: "note",
+          title: actionTitle,
+          ok: false,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+      continue;
+    }
+
+    if (action.kind === "trip") {
+      if (!action.startDate?.trim()) {
+        created.push({
+          kind: "trip",
+          title: actionTitle,
+          ok: false,
+          error: "Reisedatum fehlt",
+        });
+        continue;
+      }
+      try {
+        const { adoptDraftsToTrip } = await import("@/lib/trips/adopt");
+        const { coerceTripEventType } = await import("@/lib/trips/constants");
+        const { upsertBuddySourceLink } = await import(
+          "@/lib/buddy/source-links"
+        );
+        const tripTitle =
+          action.newTripTitle?.trim() ||
+          action.title.trim() ||
+          "Reise aus Mail";
+        const result = await adoptDraftsToTrip({
+          tripId: action.tripId ?? null,
+          newTripTitle: action.tripId ? null : tripTitle,
+          drafts: [
+            {
+              type: coerceTripEventType(action.tripType),
+              title: actionTitle,
+              start_date: action.startDate,
+              end_date: action.endDate || action.startDate,
+              start_time: action.startTime || null,
+              end_time: action.endTime || null,
+              location: action.location || null,
+              provider: action.provider || null,
+              booking_reference:
+                action.bookingReference || action.reference || null,
+              notes: notes || null,
+              source_excerpt: `microsoft:${id}`,
+            },
+          ],
+        });
+        const ev = result.events[0];
+        if (ev) {
+          upsertBuddySourceLink({
+            entityType: "trip_leg",
+            entityId: String(ev.id),
+            sourceKind: "microsoft_message",
+            sourceId: id,
+            label: "O365",
+            role: "related",
+          });
+        }
+        upsertBuddySourceLink({
+          entityType: "mail_message",
+          entityId: id,
+          sourceKind: "url",
+          sourceId: `trip:${result.trip.id}`,
+          url: `/trips/${result.trip.id}`,
+          label: "Reise",
+          role: "related",
+        });
+        created.push({
+          kind: "trip",
+          title: actionTitle,
+          ok: true,
+          link: `/trips/${result.trip.id}`,
+        });
+      } catch (err) {
+        created.push({
+          kind: "trip",
           title: actionTitle,
           ok: false,
           error: err instanceof Error ? err.message : String(err),

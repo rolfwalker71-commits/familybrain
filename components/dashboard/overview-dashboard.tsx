@@ -1497,6 +1497,92 @@ export function OverviewDashboard({
 
       {data ? (
         <>
+          <section className="space-y-2">
+            <h2 className="text-[14px] font-black tracking-tight text-foreground">
+              Heute handeln
+            </h2>
+            <ul className="divide-y divide-border/60 overflow-hidden rounded-xl border border-border/70 bg-card text-sm">
+              {(() => {
+                const rows: Array<{
+                  key: string;
+                  href: string;
+                  label: string;
+                  meta: string;
+                }> = [];
+                for (const ev of nextFocusEvents.slice(0, 2)) {
+                  rows.push({
+                    key: `ev-${ev.id}`,
+                    href: "/calendar",
+                    label: ev.title,
+                    meta: `${ev.time || "ganztags"}${ev.location ? ` · ${ev.location}` : ""} · Termin`,
+                  });
+                }
+                if (data.chips.openDueCount > 0) {
+                  rows.push({
+                    key: "finance-open",
+                    href: "/finance",
+                    label: `${data.chips.openDueCount} offene Zahlung${data.chips.openDueCount === 1 ? "" : "en"}`,
+                    meta: `${formatCHF(data.chips.openDueAmount)} · Finanzen`,
+                  });
+                }
+                const msPending =
+                  data.chips.mailByProvider?.microsoft?.pendingTriage || 0;
+                const gPending =
+                  data.chips.mailByProvider?.google?.pendingTriage || 0;
+                if (msPending > 0) {
+                  const sample = mailFocusMicrosoft[0]?.subject;
+                  rows.push({
+                    key: "ms-triage",
+                    href: "/microsoft?tab=triage",
+                    label: sample
+                      ? `O365: ${sample}`
+                      : `${msPending} O365-Mail zur Triage`,
+                    meta: `${msPending} offen · Outlook`,
+                  });
+                }
+                if (gPending > 0) {
+                  const sample = mailFocusGoogle[0]?.subject;
+                  rows.push({
+                    key: "g-triage",
+                    href: "/google?tab=triage",
+                    label: sample
+                      ? `Google: ${sample}`
+                      : `${gPending} Gmail zur Triage`,
+                    meta: `${gPending} offen · Gmail`,
+                  });
+                }
+                if (rows.length === 0) {
+                  rows.push({
+                    key: "empty",
+                    href: "/calendar",
+                    label: "Nichts Dringendes",
+                    meta: "Agenda & Postfächer sind ruhig",
+                  });
+                }
+                return rows.slice(0, 6).map((row) => (
+                  <li key={row.key}>
+                    <Link
+                      href={row.href}
+                      className="flex items-start justify-between gap-3 px-3 py-2.5 transition-colors hover:bg-muted/40"
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate font-medium">
+                          {row.label}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {row.meta}
+                        </span>
+                      </span>
+                      <span className="shrink-0 text-xs text-muted-foreground">
+                        →
+                      </span>
+                    </Link>
+                  </li>
+                ));
+              })()}
+            </ul>
+          </section>
+
           <section className="space-y-3">
             <h2 className="text-[14px] font-black tracking-tight text-foreground">
               Heute im Fokus

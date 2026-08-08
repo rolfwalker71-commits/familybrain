@@ -13,6 +13,7 @@ export type BuddySourceKind =
   | "paperless"
   | "gmail_message"
   | "gmail_thread"
+  | "microsoft_message"
   | "drive_file"
   | "google_event"
   | "google_task"
@@ -150,6 +151,43 @@ export function findDriveMirrorForDocument(
     )
     .get(String(documentId)) as Row | undefined;
   return row ? mapRow(row) : null;
+}
+
+/** Stable source_id for one Outlook attachment (message + attachment). */
+export function microsoftAttachmentSourceId(
+  messageId: string,
+  attachmentId: string
+): string {
+  return `${messageId}#${attachmentId}`;
+}
+
+/** Already ingested this Outlook PDF into a Buddy document? */
+export function findDocumentForMicrosoftAttachment(
+  messageId: string,
+  attachmentId: string
+): BuddySourceLink | null {
+  const row = getDb()
+    .prepare(
+      `SELECT * FROM buddy_source_links
+       WHERE entity_type = 'document'
+         AND source_kind = 'microsoft_message'
+         AND source_id = ?
+       LIMIT 1`
+    )
+    .get(microsoftAttachmentSourceId(messageId, attachmentId)) as
+    | Row
+    | undefined;
+  return row ? mapRow(row) : null;
+}
+
+export function countDocumentsFromMicrosoftMail(): number {
+  const row = getDb()
+    .prepare(
+      `SELECT COUNT(DISTINCT entity_id) as c FROM buddy_source_links
+       WHERE entity_type = 'document' AND source_kind = 'microsoft_message'`
+    )
+    .get() as { c: number };
+  return row?.c || 0;
 }
 
 export function countDocumentsWithDriveMirror(): number {

@@ -48,7 +48,7 @@ flowchart LR
 ### `buddy_source_links`
 
 - `entity_type` + `entity_id`
-- `source_kind`: `paperless` | `gmail_message` | `gmail_thread` | `drive_file` | `google_event` | `google_task` | `trilium` | `url`
+- `source_kind`: `paperless` | `gmail_message` | `gmail_thread` | `microsoft_message` | `drive_file` | `google_event` | `google_task` | `trilium` | `url`
 - `source_id`, optional `url` / `label`
 - `role`: `primary` | `mirror` | `related`
 

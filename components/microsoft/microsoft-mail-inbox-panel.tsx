@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   CalendarDays,
   CheckSquare,
+  FileText,
+  HardDrive,
   Mail,
   RefreshCw,
   Sparkles,
@@ -118,6 +120,16 @@ export function MicrosoftMailInboxPanel({
   const [applying, setApplying] = useState(false);
   const [applyMsg, setApplyMsg] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [pdfAttachments, setPdfAttachments] = useState<
+    Array<{
+      id: string;
+      name: string;
+      size: number;
+      alreadyIngested: boolean;
+      documentId: number | null;
+    }>
+  >([]);
+  const [paperlessBusy, setPaperlessBusy] = useState(false);
 
   const loadInbox = useCallback(async () => {
     setLoading(true);
@@ -168,6 +180,7 @@ export function MicrosoftMailInboxPanel({
     setAnalysis(null);
     setSelected({});
     setApplyMsg(null);
+    setPdfAttachments([]);
     setDetailLoading(true);
     try {
       const res = await fetch(`/api/microsoft/mail/${encodeURIComponent(id)}`);
@@ -181,6 +194,17 @@ export function MicrosoftMailInboxPanel({
           init[String(i)] = true;
         });
         setSelected(init);
+      }
+      try {
+        const attRes = await fetch(
+          `/api/microsoft/mail/${encodeURIComponent(id)}/attachments`
+        );
+        const attData = await attRes.json();
+        if (attRes.ok && Array.isArray(attData.attachments)) {
+          setPdfAttachments(attData.attachments);
+        }
+      } catch {
+        /* optional */
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -221,6 +245,51 @@ export function MicrosoftMailInboxPanel({
     }
   }
 
+  async function sendPdfsToPaperless() {
+    if (!openId || pdfAttachments.length === 0) return;
+    setPaperlessBusy(true);
+    setApplyMsg(null);
+    try {
+      const res = await fetch(
+        `/api/microsoft/mail/${encodeURIComponent(openId)}/to-paperless`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        }
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Paperless-Upload fehlgeschlagen");
+      const results = (data.results || []) as Array<{
+        ok: boolean;
+        skipped?: string;
+        localId?: number;
+        filename?: string;
+        error?: string;
+      }>;
+      const neu = results.filter((r) => r.ok && !r.skipped).length;
+      const skip = results.filter((r) => r.skipped === "already").length;
+      const fail = results.filter((r) => !r.ok).length;
+      setApplyMsg(
+        `${neu} PDF nach Paperless` +
+          (skip ? `, ${skip} schon vorhanden` : "") +
+          (fail ? `, ${fail} Fehler` : "") +
+          "."
+      );
+      const attRes = await fetch(
+        `/api/microsoft/mail/${encodeURIComponent(openId)}/attachments`
+      );
+      const attData = await attRes.json();
+      if (attRes.ok && Array.isArray(attData.attachments)) {
+        setPdfAttachments(attData.attachments);
+      }
+    } catch (err) {
+      setApplyMsg(err instanceof Error ? err.message : String(err));
+    } finally {
+      setPaperlessBusy(false);
+    }
+  }
+
   const selectedSuggestions = useMemo(() => {
     if (!analysis) return [] as Array<{ s: MailSuggestion; i: number }>;
     return analysis.suggestions
@@ -245,11 +314,19 @@ export function MicrosoftMailInboxPanel({
               notes: s.notes,
               startDate: s.startDate,
               startTime: s.startTime,
+              endDate: s.endDate,
               endTime: s.endTime,
               allDay: s.allDay,
               location: s.location,
               dueDate: s.dueDate,
               reference: s.reference,
+              vendor: s.vendor,
+              amount: s.amount,
+              currency: s.currency,
+              documentId: s.documentId,
+              tripType: s.tripType,
+              provider: s.provider,
+              bookingReference: s.bookingReference,
             })),
             confirmDuplicates: true,
           }),
@@ -482,98 +559,145 @@ export function MicrosoftMailInboxPanel({
           if (!o) setOpenId(null);
         }}
       >
-        <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto sm:max-w-xl">
-          <DialogHeader>
-            <DialogTitle>
+        <DialogContent className="flex max-h-[90dvh] w-[min(96vw,40rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
+          <DialogHeader className="shrink-0 space-y-1 border-b border-border/60 px-4 py-3 pr-12 text-left">
+            <DialogTitle className="text-base leading-snug">
               {detail?.subject || (detailLoading ? "Lade…" : "Mail")}
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-xs">
               {detail
                 ? `${detail.fromName} · ${formatMailWhen(detail)}`
                 : "Outlook-Nachricht"}
             </DialogDescription>
           </DialogHeader>
-          {detailLoading ? (
-            <p className="text-sm text-muted-foreground">Lade Inhalt…</p>
-          ) : detail ? (
-            <div className="space-y-4">
-              <pre className="max-h-48 whitespace-pre-wrap rounded-lg bg-muted/50 p-3 text-xs">
-                {detail.bodyText || detail.snippet || "(kein Text)"}
-              </pre>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  disabled={analyzing}
-                  onClick={() => void runAnalyze()}
-                >
-                  <Sparkles className="size-3.5" />
-                  {analyzing ? "Analysiert…" : "Analysieren"}
-                </Button>
-              </div>
-              {analysis ? (
-                <div className="space-y-3">
-                  <p className="text-sm text-muted-foreground">
-                    {analysis.summary}
-                  </p>
-                  <ul className="space-y-2">
-                    {analysis.suggestions.map((s, i) => {
-                      const Icon = kindIcon(s.kind);
-                      const key = String(i);
-                      return (
-                        <li
-                          key={suggestionKey(s, i)}
-                          className="flex items-start gap-2 rounded-lg border border-border/60 px-2.5 py-2"
-                        >
-                          <input
-                            type="checkbox"
-                            className="mt-1"
-                            checked={Boolean(selected[key])}
-                            onChange={(e) =>
-                              setSelected((prev) => ({
-                                ...prev,
-                                [key]: e.target.checked,
-                              }))
-                            }
-                          />
-                          <Icon className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-                          <div className="min-w-0 text-sm">
-                            <p className="font-medium">{s.title}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {formatMailSuggestionDetail(s)}
-                            </p>
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                  {analysis.suggestions.length > 0 ? (
+          <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-4 py-3">
+            {detailLoading ? (
+              <p className="text-sm text-muted-foreground">Lade Inhalt…</p>
+            ) : detail ? (
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={analyzing}
+                    onClick={() => void runAnalyze()}
+                    className="gap-1.5"
+                  >
+                    <Sparkles className="size-3.5" />
+                    {analyzing ? "Analysiert…" : "Analysieren"}
+                  </Button>
+                  {pdfAttachments.length > 0 ? (
                     <Button
                       type="button"
                       size="sm"
-                      disabled={applying || selectedSuggestions.length === 0}
-                      onClick={() =>
-                        openId &&
-                        void applySelected(
-                          openId,
-                          selectedSuggestions.map(({ s }) => s)
-                        )
-                      }
+                      variant="outline"
+                      disabled={paperlessBusy}
+                      onClick={() => void sendPdfsToPaperless()}
+                      className="gap-1.5"
                     >
-                      Ausgewählte übernehmen
+                      <HardDrive className="size-3.5" />
+                      {paperlessBusy
+                        ? "Lädt nach Paperless…"
+                        : `PDF → Paperless (${pdfAttachments.length})`}
                     </Button>
-                  ) : (
-                    <p className="text-xs text-muted-foreground">
-                      Keine Vorschläge.
-                    </p>
-                  )}
+                  ) : null}
                 </div>
-              ) : null}
-              {applyMsg ? (
-                <p className="text-sm text-muted-foreground">{applyMsg}</p>
-              ) : null}
-            </div>
-          ) : null}
+                {pdfAttachments.length > 0 ? (
+                  <ul className="space-y-1.5 rounded-lg border border-border/60 bg-muted/20 px-2.5 py-2 text-xs">
+                    {pdfAttachments.map((a) => (
+                      <li
+                        key={a.id}
+                        className="flex items-start gap-2 text-muted-foreground"
+                      >
+                        <FileText className="mt-0.5 size-3.5 shrink-0" />
+                        <span className="min-w-0 flex-1 break-words">
+                          {a.name}
+                          {a.alreadyIngested && a.documentId ? (
+                            <>
+                              {" · "}
+                              <a
+                                href={`/documents/${a.documentId}`}
+                                className="text-foreground underline-offset-2 hover:underline"
+                              >
+                                in Buddy
+                              </a>
+                            </>
+                          ) : null}
+                        </span>
+                      </li>
+                    ))}
+                    <li className="pt-0.5 text-[11px] text-muted-foreground">
+                      Tags: O365 · ANG · geschäftlich
+                    </li>
+                  </ul>
+                ) : null}
+                <pre className="max-h-52 overflow-y-auto overflow-x-hidden whitespace-pre-wrap break-words rounded-lg bg-muted/50 p-3 font-sans text-xs leading-relaxed">
+                  {detail.bodyText || detail.snippet || "(kein Text)"}
+                </pre>
+                {analysis ? (
+                  <div className="space-y-3 rounded-xl border border-border/70 bg-muted/20 p-3">
+                    <p className="text-sm text-muted-foreground">
+                      {analysis.summary}
+                    </p>
+                    <ul className="space-y-2">
+                      {analysis.suggestions.map((s, i) => {
+                        const Icon = kindIcon(s.kind);
+                        const key = String(i);
+                        return (
+                          <li
+                            key={suggestionKey(s, i)}
+                            className="flex items-start gap-2 rounded-lg border border-border/60 bg-card px-2.5 py-2"
+                          >
+                            <input
+                              type="checkbox"
+                              className="mt-1 shrink-0"
+                              checked={Boolean(selected[key])}
+                              onChange={(e) =>
+                                setSelected((prev) => ({
+                                  ...prev,
+                                  [key]: e.target.checked,
+                                }))
+                              }
+                            />
+                            <Icon className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+                            <div className="min-w-0 flex-1 text-sm">
+                              <p className="break-words font-medium">{s.title}</p>
+                              <p className="break-words text-xs text-muted-foreground">
+                                {formatMailSuggestionDetail(s)}
+                              </p>
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                    {analysis.suggestions.length > 0 ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        disabled={applying || selectedSuggestions.length === 0}
+                        onClick={() =>
+                          openId &&
+                          void applySelected(
+                            openId,
+                            selectedSuggestions.map(({ s }) => s)
+                          )
+                        }
+                      >
+                        Ausgewählte übernehmen
+                      </Button>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        Keine Vorschläge.
+                      </p>
+                    )}
+                  </div>
+                ) : null}
+                {applyMsg ? (
+                  <p className="text-sm text-muted-foreground">{applyMsg}</p>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
         </DialogContent>
       </Dialog>
     </div>
