@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useId, useState } from "react";
-import { Minus, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   readStoredMapZoom,
   writeStoredMapZoom,
 } from "@/lib/maps/map-zoom-storage";
+import { MapZoomControl } from "@/components/maps/map-zoom-control";
 
 type Props = {
   /** Stabiler Schlüssel für localStorage (pro Ort/Route). */
@@ -89,42 +89,14 @@ export function ZoomableStaticMap({
         image
       )}
 
-      <div
-        className="absolute inset-x-0 bottom-0 flex items-center gap-1.5 bg-gradient-to-t from-black/55 via-black/35 to-transparent px-2 pb-1.5 pt-6"
-        onClick={(e) => e.preventDefault()}
-        onPointerDown={(e) => e.stopPropagation()}
-      >
-        <button
-          type="button"
-          className="inline-flex size-6 shrink-0 items-center justify-center rounded-md bg-white/90 text-foreground shadow-sm hover:bg-white"
-          aria-label="Herauszoomen"
-          onClick={() => applyZoom(zoom - 1)}
-          disabled={zoom <= minZoom}
-        >
-          <Minus className="size-3.5" aria-hidden />
-        </button>
-        <label htmlFor={sliderId} className="sr-only">
-          Kartenzoom
-        </label>
-        <input
+      <div className="pointer-events-none absolute inset-y-0 left-0 z-10 flex items-center pl-1.5">
+        <MapZoomControl
           id={sliderId}
-          type="range"
-          min={minZoom}
-          max={maxZoom}
-          step={1}
-          value={zoom}
-          onChange={(e) => applyZoom(Number(e.target.value))}
-          className="h-1.5 w-full cursor-pointer accent-teal-700"
+          zoom={zoom}
+          minZoom={minZoom}
+          maxZoom={maxZoom}
+          onZoomChange={applyZoom}
         />
-        <button
-          type="button"
-          className="inline-flex size-6 shrink-0 items-center justify-center rounded-md bg-white/90 text-foreground shadow-sm hover:bg-white"
-          aria-label="Hereinzoomen"
-          onClick={() => applyZoom(zoom + 1)}
-          disabled={zoom >= maxZoom}
-        >
-          <Plus className="size-3.5" aria-hidden />
-        </button>
       </div>
     </div>
   );

@@ -215,3 +215,40 @@ input[type="time"]:not([data-empty="true"])::-webkit-datetime-edit-text {
     var(--background) 100%
   );
 }
+
+/* Compact vertical map zoom slider (rotated range input) */
+.map-zoom-range {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  accent-color: #0f766e;
+}
+.map-zoom-range::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 999px;
+  background: #cbd5e1;
+}
+.map-zoom-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 10px;
+  height: 10px;
+  margin-top: -3.5px;
+  border-radius: 999px;
+  background: #0f766e;
+  border: 1px solid #fff;
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.15);
+}
+.map-zoom-range::-moz-range-track {
+  height: 3px;
+  border-radius: 999px;
+  background: #cbd5e1;
+}
+.map-zoom-range::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border: 1px solid #fff;
+  border-radius: 999px;
+  background: #0f766e;
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.15);
+}

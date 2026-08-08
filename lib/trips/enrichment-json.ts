@@ -2,9 +2,21 @@
  * Keep trip_events.enrichment_json small.
  * Older flight enrichments stored the full AeroDataBox payload under `flight`,
  * which can be hundreds of KB and break API responses / proxies (HTML error pages).
+ * Train OJP enrichments can be large due to routePath — subsample instead of truncating JSON.
  */
 
 const PRUNE_MIN_CHARS = 6_000;
+const MAX_TRAIN_PATH_POINTS = 160;
+
+function subsamplePathPoints(path: unknown, maxPoints: number): unknown {
+  if (!Array.isArray(path) || path.length <= maxPoints) return path;
+  const out: unknown[] = [];
+  const last = path.length - 1;
+  for (let i = 0; i < maxPoints; i++) {
+    out.push(path[Math.round((i / (maxPoints - 1)) * last)]);
+  }
+  return out;
+}
 
 export function slimEnrichmentJson(raw: string | null | undefined): string | null {
   if (raw == null) return null;
@@ -12,7 +24,9 @@ export function slimEnrichmentJson(raw: string | null | undefined): string | nul
   if (!text) return null;
 
   const needsParse =
-    text.length >= PRUNE_MIN_CHARS || text.includes('"flight":');
+    text.length >= PRUNE_MIN_CHARS ||
+    text.includes('"flight":') ||
+    text.includes('"routePath":');
   if (!needsParse) return text;
 
   try {
@@ -22,7 +36,19 @@ export function slimEnrichmentJson(raw: string | null | undefined): string | nul
         ? `${text.slice(0, PRUNE_MIN_CHARS - 1)}…`
         : text;
     }
-    const obj = parsed as Record<string, unknown>;
+    const obj = { ...(parsed as Record<string, unknown>) };
+
+    // OJP / Zug: Pfad verdichten, JSON intakt lassen (kein String-Abschneiden).
+    if (obj.source === "ojp" || Array.isArray(obj.routePath)) {
+      if (Array.isArray(obj.routePath)) {
+        obj.routePath = subsamplePathPoints(
+          obj.routePath,
+          MAX_TRAIN_PATH_POINTS
+        );
+      }
+      return JSON.stringify(obj);
+    }
+
     if (!("flight" in obj)) {
       return text.length > 12_000 ? `${text.slice(0, 11_999)}…` : text;
     }

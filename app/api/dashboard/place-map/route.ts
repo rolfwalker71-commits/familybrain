@@ -6,6 +6,7 @@ import {
   fetchStaticRouteMapPngDetailed,
 } from "@/lib/trips/static-map";
 import { hasGoogleMapsApiKey } from "@/lib/google/maps";
+import { decodeGooglePolyline } from "@/lib/google/polyline";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -84,12 +85,22 @@ export async function GET(request: Request) {
     const route = (searchParams.get("route") || "straight").toLowerCase();
     const geodesic = route === "geodesic" || route === "greatcircle";
 
-    // Optional: kompakte Pfadpunkte "lat,lon|lat,lon|…" (z. B. Zug-Geometrie)
+    // Zug-Geometrie: bevorzugt encoded polyline (kurz), sonst lat,lon|…
+    const pathEnc = searchParams.get("pathEnc");
     const pathRaw = searchParams.get("path");
     let pathPoints: Array<{ lat: number; lon: number }> | undefined;
-    if (pathRaw) {
+    if (pathEnc) {
+      try {
+        const decoded = decodeGooglePolyline(pathEnc).filter((p) =>
+          isValidLatLon(p.lat, p.lon)
+        );
+        if (decoded.length >= 2) pathPoints = decoded;
+      } catch {
+        /* ignore */
+      }
+    } else if (pathRaw) {
       const parsed: Array<{ lat: number; lon: number }> = [];
-      for (const part of pathRaw.split("|").slice(0, 60)) {
+      for (const part of pathRaw.split("|").slice(0, 120)) {
         const [a, b] = part.split(",");
         const lat = Number(a);
         const lon = Number(b);

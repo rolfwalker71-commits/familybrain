@@ -1,4 +1,8 @@
 import { getSetting, setSetting } from "@/lib/db/migrations";
+import {
+  encodeGooglePolyline,
+  subsamplePolyline,
+} from "@/lib/google/polyline";
 
 export const GOOGLE_MAPS_API_KEY_SETTING = "google_maps_api_key";
 
@@ -242,8 +246,9 @@ export type GoogleStaticMapMarker = {
   lon: number;
   /** Named color, e.g. red / green / blue */
   color?: string;
-  /** Single A–Z / 0–9 label on the pin */
+  /** Single A–Z / 0–9 label on the pin (nur mid/normal) */
   label?: string;
+  size?: "tiny" | "mid" | "normal";
 };
 
 export type GoogleStaticMapPath = {
@@ -332,27 +337,30 @@ async function fetchGoogleStaticMapRequest(input: {
 
   for (const m of markers) {
     const color = m.color || "red";
+    const size = m.size ? `size:${m.size}|` : "";
     const label =
-      m.label && /^[A-Za-z0-9]$/.test(m.label)
-        ? `|label:${m.label.toUpperCase()}`
+      m.label &&
+      m.size !== "tiny" &&
+      /^[A-Za-z0-9]$/.test(m.label)
+        ? `label:${m.label.toUpperCase()}|`
         : "";
     url.searchParams.append(
       "markers",
-      `color:${color}${label}|${m.lat},${m.lon}`
+      `${size}color:${color}|${label}${m.lat},${m.lon}`
     );
   }
 
   for (const p of paths) {
     if (p.points.length < 2) continue;
     const color = p.color || "0x0F766EFF";
-    const weight = Math.min(10, Math.max(1, p.weight ?? 4));
+    const weight = Math.min(10, Math.max(1, p.weight ?? 3));
     const geo = p.geodesic ? "|geodesic:true" : "";
-    // Zu viele Punkte → URL-Limit; für Flüge reichen 2 + geodesic.
-    const pts = p.points.slice(0, 80);
-    const coords = pts.map((pt) => `${pt.lat},${pt.lon}`).join("|");
+    // Encoded polyline hält die Google-URL kurz (viele Zug-Punkte).
+    const pts = subsamplePolyline(p.points, 120);
+    const enc = encodeGooglePolyline(pts);
     url.searchParams.append(
       "path",
-      `color:${color}|weight:${weight}${geo}|${coords}`
+      `color:${color}|weight:${weight}${geo}|enc:${enc}`
     );
   }
 
@@ -470,18 +478,19 @@ export async function fetchGoogleStaticRouteMapDetailed(input: {
       ? input.pathPoints
       : [input.from, input.to];
 
+  // Kleine Dots statt riesiger A/B-Pins — Route trägt die Info.
   const markers = [
     {
       lat: input.from.lat,
       lon: input.from.lon,
-      color: "green",
-      label: "A",
+      color: "0x0F766E",
+      size: "tiny" as const,
     },
     {
       lat: input.to.lat,
       lon: input.to.lon,
-      color: "red",
-      label: "B",
+      color: "0xC0392B",
+      size: "tiny" as const,
     },
   ];
   const paths = [
@@ -489,7 +498,7 @@ export async function fetchGoogleStaticRouteMapDetailed(input: {
       points: pathPoints,
       geodesic: Boolean(input.geodesic) && pathPoints.length === 2,
       color: "0x0F766EFF",
-      weight: 4,
+      weight: 3,
     },
   ];
 
