@@ -76,6 +76,21 @@ async function tick(): Promise<void> {
     }
 
     try {
+      const { syncAgendaAiIconsIfDue } = await import(
+        "@/lib/dashboard/sync-agenda-ai-icons-if-due"
+      );
+      const iconSync = await syncAgendaAiIconsIfDue().catch((error) => {
+        console.warn("[scheduler] agenda ai icons:", error);
+        return null;
+      });
+      if (iconSync?.attempted) {
+        state.lastResult = `${state.lastResult}|agenda-icons:g${iconSync.generated ?? 0}`;
+      }
+    } catch (error) {
+      console.warn("[scheduler] agenda ai icons:", error);
+    }
+
+    try {
       const { findRolfAppUserId } = await import(
         "@/lib/calendar/ics-calendars"
       );

@@ -13,6 +13,7 @@ import {
   googleMapsDirFromHomeUrl,
   googleMapsSearchUrl,
 } from "@/lib/dashboard/drive-time";
+import { isPhysicalAgendaLocation } from "@/lib/dashboard/agenda-location";
 
 export type DayWeather = {
   date: string;
@@ -492,8 +493,8 @@ export type AgendaPlaceEnrichment = {
 export async function enrichAgendaWithWeather<
   T extends { date: string; location?: string | null },
 >(items: T[]): Promise<Array<T & AgendaPlaceEnrichment>> {
-  const withLoc = items.filter(
-    (i) => i.location && String(i.location).trim().length >= 3
+  const withLoc = items.filter((i) =>
+    isPhysicalAgendaLocation(i.location)
   );
   if (withLoc.length === 0) {
     return items.map((i) => ({
@@ -579,7 +580,7 @@ export async function enrichAgendaWithWeather<
 
   return items.map((item) => {
     const loc = item.location?.trim();
-    if (!loc) {
+    if (!loc || !isPhysicalAgendaLocation(loc)) {
       return {
         ...item,
         weather: null,

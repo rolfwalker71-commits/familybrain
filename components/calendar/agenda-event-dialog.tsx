@@ -69,6 +69,7 @@ function typeLabel(item: AgendaItem): string {
 }
 
 import { TripMap } from "@/components/trips/trip-map";
+import { isPhysicalAgendaLocation } from "@/lib/dashboard/agenda-location";
 
 function DetailRow({
   label,
@@ -153,7 +154,7 @@ export function AgendaEventDialog({
                 </DetailRow>
               ) : null}
 
-              {item.coords ? (
+              {item.coords && isPhysicalAgendaLocation(item.location) ? (
                 <TripMap
                   points={[
                     {

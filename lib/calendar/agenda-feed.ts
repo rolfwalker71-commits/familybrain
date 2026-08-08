@@ -701,11 +701,26 @@ export async function getCalendarAgenda(options: {
         mapsUrl: i.mapsUrl ?? null,
       }));
 
+  const { buildAgendaAiIconKey, lookupAgendaAiIconUrl, shouldHaveAgendaAiIcon } =
+    await import("@/lib/dashboard/agenda-ai-icon");
+  const withIcons = withWeather.map((item) => {
+    if (!shouldHaveAgendaAiIcon(item)) {
+      return { ...item, aiIconKey: null, aiIconUrl: null };
+    }
+    const key = buildAgendaAiIconKey(item);
+    const hit = lookupAgendaAiIconUrl(item);
+    return {
+      ...item,
+      aiIconKey: key || null,
+      aiIconUrl: hit?.url ?? null,
+    };
+  });
+
   return {
     range: options.range,
     rangeStart: start,
     rangeEnd: end,
-    items: withWeather,
+    items: withIcons,
     sources,
   };
 }

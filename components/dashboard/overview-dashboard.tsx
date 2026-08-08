@@ -27,6 +27,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BackupStatusPanel } from "@/components/settings/backup-status-panel";
 import { KpiCorrectSheet } from "@/components/dashboard/kpi-correct-sheet";
 import { TeamLogo, weekdayLabel, AgendaTypeRail } from "@/components/calendar/agenda-row";
+import { AgendaAiIconThumb } from "@/components/calendar/agenda-ai-icon-thumb";
 import { AgendaEventDialog } from "@/components/calendar/agenda-event-dialog";
 import { formatCHF } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
@@ -635,7 +636,8 @@ function DayTimeline({
         const isTomorrow = item.date > today;
         const hm = item.time || "—";
         const isLast = index === items.length - 1;
-        const showMap = active && item.coords;
+        // Karte wenn geocodiert (virtuelle Orte werden serverseitig nicht angereichert)
+        const showMap = Boolean(item.coords);
 
         return (
           <li key={item.id} className="contents">
@@ -719,20 +721,32 @@ function DayTimeline({
                             : ""}
                         </p>
                       ) : null}
-                      {active && item.driveLabel ? (
+                      {item.driveLabel ? (
                         <p className="mt-1 flex items-center gap-1 text-[12px] text-muted-foreground">
                           <Car className="size-3 shrink-0" aria-hidden />
                           {item.driveLabel}
                         </p>
                       ) : null}
                     </div>
-                    <ChevronRight
-                      className="mt-0.5 size-4 shrink-0 text-muted-foreground/70"
-                      aria-hidden
-                    />
+                    <div className="flex shrink-0 items-start gap-1.5">
+                      <AgendaAiIconThumb
+                        itemId={item.id}
+                        title={item.title}
+                        location={item.location}
+                        description={item.description}
+                        calendarType={item.calendarType}
+                        kind={item.kind}
+                        aiIconKey={item.aiIconKey}
+                        aiIconUrl={item.aiIconUrl}
+                      />
+                      <ChevronRight
+                        className="mt-0.5 size-4 shrink-0 text-muted-foreground/70"
+                        aria-hidden
+                      />
+                    </div>
                   </button>
 
-                  {active && (item.meetUrl || item.mapsUrl || showMap) ? (
+                  {item.meetUrl || item.mapsUrl || showMap ? (
                     <div className="mt-2.5 space-y-2">
                       <div className="flex flex-wrap gap-2">
                         {item.meetUrl ? (
@@ -1053,6 +1067,30 @@ export function OverviewDashboard({
     [timelineItems, today, nowHm]
   );
 
+  const CONFLICT_MUTE_KEY = "buddy-conflicts-muted-ymd";
+  const [conflictsMutedYmd, setConflictsMutedYmd] = useState<string | null>(
+    null
+  );
+  useEffect(() => {
+    try {
+      setConflictsMutedYmd(localStorage.getItem(CONFLICT_MUTE_KEY));
+    } catch {
+      setConflictsMutedYmd(null);
+    }
+  }, [today]);
+
+  const visibleConflicts =
+    conflictsMutedYmd === today ? [] : conflicts;
+
+  function muteConflictsForToday() {
+    try {
+      localStorage.setItem(CONFLICT_MUTE_KEY, today);
+    } catch {
+      /* ignore */
+    }
+    setConflictsMutedYmd(today);
+  }
+
   const upcomingBirthdays = useMemo(
     () => (data ? collectUpcomingBirthdays(data, today) : []),
     [data, today]
@@ -1298,7 +1336,7 @@ export function OverviewDashboard({
                   Alle Termine →
                 </Link>
               </div>
-              {conflicts.length > 0 ? (
+              {visibleConflicts.length > 0 ? (
                 <div
                   className="flex items-start gap-2 rounded-xl border border-amber-200/80 bg-amber-50/70 px-3 py-2 text-[13px] text-amber-950"
                   role="status"
@@ -1307,16 +1345,29 @@ export function OverviewDashboard({
                     className="mt-0.5 size-4 shrink-0 text-amber-700"
                     aria-hidden
                   />
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="font-semibold">Termin-Konflikt</p>
                     <ul className="mt-0.5 space-y-0.5 text-amber-900/90">
-                      {conflicts.slice(0, 2).map((c) => (
+                      {visibleConflicts.slice(0, 2).map((c) => (
                         <li key={c.id} className="truncate">
                           {c.label}
                         </li>
                       ))}
                     </ul>
                   </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 shrink-0 px-2 text-[12px] text-amber-900/80 hover:bg-amber-100/80 hover:text-amber-950"
+                    onClick={muteConflictsForToday}
+                    title="Für heute ausblenden"
+                  >
+                    <X className="size-3.5" aria-hidden />
+                    <span className="sr-only sm:not-sr-only sm:ml-1">
+                      Heute ok
+                    </span>
+                  </Button>
                 </div>
               ) : null}
               <Card className="border-border/70">

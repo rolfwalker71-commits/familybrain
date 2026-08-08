@@ -21,6 +21,7 @@ import {
   Palmtree,
   Calendar,
   Cake,
+  Car,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { formatCHF } from "@/lib/utils/format";
@@ -32,6 +33,7 @@ import type {
   AgendaWeatherChip,
 } from "@/lib/dashboard/overview";
 import type { IcsCalendarType } from "@/lib/calendar/ics-types";
+import { AgendaAiIconThumb } from "@/components/calendar/agenda-ai-icon-thumb";
 
 /** Solid accent for left rail (calendar color or kind fallback). */
 const KIND_ACCENT_HEX: Record<AgendaKind, string> = {
@@ -312,6 +314,12 @@ export function AgendaRow({
               </>
             )}
             {weather ? <AgendaWeatherLine weather={weather} /> : null}
+            {item.driveLabel ? (
+              <p className="mt-1 flex items-center gap-1 text-[12px] text-muted-foreground">
+                <Car className="size-3 shrink-0" aria-hidden />
+                {item.driveLabel}
+              </p>
+            ) : null}
             {isPaymentPipeline ? (
               <p className="mt-1 text-[12px] font-medium text-sky-800">
                 Zahlung geplant — noch in der Pipeline
@@ -319,6 +327,16 @@ export function AgendaRow({
             ) : null}
           </div>
           <div className="flex shrink-0 flex-col items-end gap-1">
+            <AgendaAiIconThumb
+              itemId={item.id}
+              title={item.title}
+              location={item.location}
+              description={item.description}
+              calendarType={item.calendarType}
+              kind={item.kind}
+              aiIconKey={item.aiIconKey}
+              aiIconUrl={item.aiIconUrl}
+            />
             {item.amount != null ? (
               <span className="text-[15px] font-semibold tabular-nums">
                 {formatCHF(item.amount, item.currency || "CHF")}

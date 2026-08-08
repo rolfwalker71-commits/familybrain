@@ -12,11 +12,31 @@ import {
   enrichAgendaWithWeather,
   fetchHomeWeather,
 } from "@/lib/dashboard/agenda-weather";
+import {
+  buildAgendaAiIconKey,
+  lookupAgendaAiIconUrl,
+  shouldHaveAgendaAiIcon,
+} from "@/lib/dashboard/agenda-ai-icon";
 import { weatherConditionIcon } from "@/lib/trips/weather";
 import { daysFromNow, toSwissDate } from "@/lib/utils/dates";
 import type { IcsCalendarType } from "@/lib/calendar/ics-types";
 import { getDriveMirrorStatus } from "@/lib/buddy/drive-mirror";
 import type { DayBriefingPayload } from "@/lib/dashboard/day-briefing";
+
+function attachAgendaAiIconMeta<T extends AgendaItem>(items: T[]): T[] {
+  return items.map((item) => {
+    if (!shouldHaveAgendaAiIcon(item)) {
+      return { ...item, aiIconKey: null, aiIconUrl: null };
+    }
+    const key = buildAgendaAiIconKey(item);
+    const hit = lookupAgendaAiIconUrl(item);
+    return {
+      ...item,
+      aiIconKey: key || null,
+      aiIconUrl: hit?.url ?? null,
+    };
+  });
+}
 
 export type OverviewPeriod = "week" | "month" | "quarter" | "half" | "year";
 
@@ -92,6 +112,10 @@ export type AgendaItem = {
    * für «nächster Termin» / Fokus / Konflikte.
    */
   planningRelevant?: boolean;
+  /** Cache key for recurring-event AI illustration */
+  aiIconKey?: string | null;
+  /** Public URL when icon file already exists */
+  aiIconUrl?: string | null;
 };
 
 export type HomeWeatherDay = {
@@ -840,8 +864,8 @@ export async function getDashboardOverview(
         microsoft: mailStats.microsoft,
       },
     },
-    agenda: agendaWithWeather,
-    todayCalendar,
+    agenda: attachAgendaAiIconMeta(agendaWithWeather),
+    todayCalendar: attachAgendaAiIconMeta(todayCalendar),
     todayMail,
     kpi: { total: kpiTotal, byCategory },
     financeItems,
@@ -856,7 +880,7 @@ export async function getDashboardOverview(
       items: [...tasksBundle.items],
     },
     referenceNotes: [...referenceNotes],
-    upcomingBirthdays: [...upcomingBirthdays],
+    upcomingBirthdays: attachAgendaAiIconMeta([...upcomingBirthdays]),
     driveMirror: (() => {
       try {
         const st = getDriveMirrorStatus();
