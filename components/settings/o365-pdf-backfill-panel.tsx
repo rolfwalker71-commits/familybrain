@@ -6,14 +6,31 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { IconCircle } from "@/components/layout/icon-circle";
 
+type LiveProgress = {
+  active: boolean;
+  step: string;
+  subject: string | null;
+  receivedDateTime: string | null;
+  messageIndex: number;
+  messageTotal: number;
+  pdfsUploadedThisBatch: number;
+  pdfsMaxThisBatch: number;
+  detail: string | null;
+  updatedAt: string;
+};
+
 type BackfillStatus = {
   enabled: boolean;
   sinceYmd: string;
   hasCursor: boolean;
   lastRunAt: string | null;
+  lastAttemptAt: string | null;
   lastError: string | null;
+  lastNote: string | null;
   complete: boolean;
+  phase: "idle" | "queued" | "running_or_waiting" | "error" | "complete";
   documentsFromO365: number;
+  live: LiveProgress | null;
   stats: {
     messagesSeen: number;
     messagesWithPdf?: number;
@@ -21,7 +38,83 @@ type BackfillStatus = {
     pdfsSkipped: number;
     pdfsFailed: number;
   };
+  job?: {
+    o365Running: boolean;
+    otherRunning: boolean;
+    activeLabel: string | null;
+  };
+  scheduler?: {
+    enabled: boolean;
+    intervalMinutes: number;
+    nextTickAt: string | null;
+  };
 };
+
+function phaseLabel(status: BackfillStatus): string {
+  if (status.live?.active) return "Batch arbeitet…";
+  if (status.job?.o365Running) return "Batch läuft gerade…";
+  if (status.job?.otherRunning) {
+    return `Wartet — anderer Job aktiv (${status.job.activeLabel || "?"})`;
+  }
+  if (status.lastError) return "Fehler (siehe unten)";
+  if (status.complete) return "Crawl fertig";
+  if (status.enabled || status.hasCursor) {
+    if (!status.lastRunAt && !status.lastAttemptAt) {
+      return "Warteschlange an — noch kein Batch gestartet/beendet";
+    }
+    if (!status.lastRunAt && status.lastAttemptAt) {
+      return "Versuch lief — Batch noch ohne Erfolg (Fehler oder Abbruch)";
+    }
+    return "Crawl aktiv — nächster Batch per Scheduler / «Weiter»";
+  }
+  return "Pausiert / idle";
+}
+
+function fmtTs(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  try {
+    return new Date(iso).toLocaleString("de-CH");
+  } catch {
+    return iso;
+  }
+}
+
+function fmtMailDate(iso: string | null | undefined): string {
+  if (!iso) return "ohne Datum";
+  try {
+    return new Date(iso).toLocaleString("de-CH", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
+  } catch {
+    return iso;
+  }
+}
+
+function ProgressBar(props: {
+  value: number;
+  max: number;
+  label: string;
+}) {
+  const max = Math.max(1, props.max);
+  const pct = Math.min(100, Math.round((props.value / max) * 100));
+  return (
+    <div className="space-y-1">
+      <div className="flex justify-between gap-2 text-[11px] text-muted-foreground">
+        <span>{props.label}</span>
+        <span>
+          {props.value}/{props.max} ({pct}%)
+        </span>
+      </div>
+      <div className="h-2 overflow-hidden rounded-full bg-muted">
+        <div
+          className="h-full rounded-full bg-[var(--brand-docs,#0d9488)] transition-[width] duration-300"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  );
+}
 
 export function O365PdfBackfillPanel() {
   const [status, setStatus] = useState<BackfillStatus | null>(null);
@@ -32,14 +125,13 @@ export function O365PdfBackfillPanel() {
   const [sinceYmd, setSinceYmd] = useState("");
 
   const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
     try {
       const res = await fetch("/api/buddy/o365-pdf-backfill");
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Status laden fehlgeschlagen");
       setStatus(json as BackfillStatus);
       setSinceYmd((json as BackfillStatus).sinceYmd);
+      setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -49,9 +141,13 @@ export function O365PdfBackfillPanel() {
 
   useEffect(() => {
     void load();
-    const t = window.setInterval(() => void load(), 15_000);
-    return () => window.clearInterval(t);
   }, [load]);
+
+  useEffect(() => {
+    const live = Boolean(status?.live?.active || status?.job?.o365Running);
+    const t = window.setInterval(() => void load(), live ? 1_500 : 5_000);
+    return () => window.clearInterval(t);
+  }, [load, status?.live?.active, status?.job?.o365Running]);
 
   async function saveSince() {
     setBusy(true);
@@ -65,7 +161,9 @@ export function O365PdfBackfillPanel() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Speichern fehlgeschlagen");
       setStatus(json as BackfillStatus);
-      setMsg("Zeitraum gesetzt — Crawl startet von diesem Datum.");
+      setMsg(
+        "Zeitraum gesetzt — Crawl-Zähler genullt. «Docs in Buddy» bleibt. Danach Batch starten."
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -84,7 +182,6 @@ export function O365PdfBackfillPanel() {
         body: JSON.stringify({
           enabled: true,
           sinceYmd: sinceYmd || undefined,
-          resetStats: !status?.hasCursor,
         }),
       });
       const res = await fetch("/api/jobs/run", {
@@ -94,9 +191,7 @@ export function O365PdfBackfillPanel() {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Job starten fehlgeschlagen");
-      setMsg(
-        "Backfill gestartet — läuft in Batches weiter (Scheduler), bis der Zeitraum durch ist."
-      );
+      setMsg("Batch gestartet — Live-Fortschritt aktualisiert sich unten.");
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -116,13 +211,15 @@ export function O365PdfBackfillPanel() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Stoppen fehlgeschlagen");
       setStatus(json as BackfillStatus);
-      setMsg("Backfill pausiert.");
+      setMsg("Backfill pausiert (Cursor bleibt erhalten).");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setBusy(false);
     }
   }
+
+  const live = status?.live?.active ? status.live : null;
 
   return (
     <Card>
@@ -138,10 +235,10 @@ export function O365PdfBackfillPanel() {
           <span className="font-medium text-foreground">
             O365 · ANG · geschäftlich
           </span>
-          ). Crawl listet nur Mails mit Anhang (`hasAttachments`); hochgeladen
-          werden ausschliesslich PDFs — andere Anhänge werden nur kurz geprüft
-          und übersprungen. Graph erlaubt Jahre zurück; sehr frühe Daten (z. B.
-          2000) sind möglich, dauern aber länger.
+          ). Crawl listet nur Mails mit Anhang; hochgeladen werden nur PDFs.
+          Manuelle Imports zählen unter{" "}
+          <span className="font-medium text-foreground">Docs in Buddy</span>,
+          nicht unter den Crawl-Batch-Zählern.
         </p>
 
         {loading && !status ? (
@@ -184,35 +281,85 @@ export function O365PdfBackfillPanel() {
               </Button>
             </div>
 
-            <p className="text-xs text-muted-foreground">
-              Docs aus O365: {status.documentsFromO365} · Mails mit Anhang:{" "}
-              {status.stats.messagesSeen} · davon mit PDF:{" "}
-              {status.stats.messagesWithPdf ?? 0} · neu:{" "}
-              {status.stats.pdfsUploaded} · übersprungen:{" "}
-              {status.stats.pdfsSkipped} · Fehler: {status.stats.pdfsFailed}
-              {status.enabled || status.hasCursor
-                ? " · Crawl aktiv"
-                : status.complete
-                  ? " · letzter Lauf fertig"
-                  : ""}
-              {status.lastRunAt
-                ? ` · zuletzt ${new Date(status.lastRunAt).toLocaleString("de-CH")}`
-                : ""}
-            </p>
-            {status.lastError ? (
-              <p className="text-xs text-destructive">{status.lastError}</p>
+            {live ? (
+              <div className="space-y-2.5 rounded-lg border border-teal-600/30 bg-teal-500/5 px-3 py-3 text-xs">
+                <p className="font-medium text-foreground">
+                  Gerade aktiv
+                  <span className="ml-2 font-normal text-muted-foreground">
+                    (aktualisiert ~1,5 s)
+                  </span>
+                </p>
+                <p className="text-sm text-foreground">
+                  <span className="text-muted-foreground">Mail: </span>
+                  {live.subject || "—"}
+                </p>
+                <p className="text-muted-foreground">
+                  Empfangen: {fmtMailDate(live.receivedDateTime)}
+                  {live.detail ? ` · ${live.detail}` : ""}
+                </p>
+                {live.messageTotal > 0 ? (
+                  <ProgressBar
+                    label="Mails in diesem Batch"
+                    value={live.messageIndex}
+                    max={live.messageTotal}
+                  />
+                ) : (
+                  <div className="h-2 animate-pulse rounded-full bg-muted" />
+                )}
+                <ProgressBar
+                  label="PDFs neu (Batch-Limit)"
+                  value={live.pdfsUploadedThisBatch}
+                  max={live.pdfsMaxThisBatch}
+                />
+              </div>
             ) : null}
+
+            <div className="space-y-1.5 rounded-lg border border-border/60 bg-muted/20 px-3 py-2.5 text-xs">
+              <p className="font-medium text-foreground">
+                Status: {phaseLabel(status)}
+              </p>
+              <p className="text-muted-foreground">
+                <span className="font-medium text-foreground">
+                  Docs in Buddy (O365): {status.documentsFromO365}
+                </span>
+                {" · "}
+                Crawl — Mails: {status.stats.messagesSeen} · mit PDF:{" "}
+                {status.stats.messagesWithPdf ?? 0} · neu:{" "}
+                {status.stats.pdfsUploaded} · übersprungen:{" "}
+                {status.stats.pdfsSkipped} · Fehler: {status.stats.pdfsFailed}
+              </p>
+              <p className="text-muted-foreground">
+                Letzter erfolgreicher Batch: {fmtTs(status.lastRunAt)}
+                {" · "}
+                Letzter Versuch: {fmtTs(status.lastAttemptAt)}
+                {status.scheduler
+                  ? ` · Scheduler ${status.scheduler.enabled ? "an" : "aus"} (${status.scheduler.intervalMinutes} Min)`
+                  : ""}
+              </p>
+              {status.lastNote ? (
+                <p className="text-foreground/90">{status.lastNote}</p>
+              ) : null}
+              {status.lastError ? (
+                <p className="text-destructive">{status.lastError}</p>
+              ) : null}
+            </div>
 
             <div className="flex flex-wrap gap-2">
               <Button
                 type="button"
                 size="sm"
-                disabled={busy}
+                disabled={
+                  busy ||
+                  Boolean(status.job?.o365Running) ||
+                  Boolean(live)
+                }
                 onClick={() => void startBackfill()}
               >
-                {status.enabled || status.hasCursor
-                  ? "Weiter / Batch starten"
-                  : "Backfill starten"}
+                {live || status.job?.o365Running
+                  ? "Batch läuft…"
+                  : status.enabled || status.hasCursor
+                    ? "Weiter / Batch starten"
+                    : "Backfill starten"}
               </Button>
               {status.enabled || status.hasCursor ? (
                 <Button

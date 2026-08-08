@@ -659,7 +659,10 @@ export async function runO365PdfBackfillJob(
     getO365PdfBackfillStatus,
     runO365PdfBackfillBatch,
     configureO365PdfBackfill,
+    setO365PdfBackfillNote,
+    setO365PdfBackfillAttemptNow,
     O365_PDF_BACKFILL_LAST_ERROR_KEY,
+    O365_PDF_BACKFILL_PROGRESS_KEY,
   } = await import("@/lib/microsoft/mail-paperless-backfill");
   const { setSetting } = await import("@/lib/db/migrations");
   const {
@@ -670,6 +673,7 @@ export async function runO365PdfBackfillJob(
 
   const status = getO365PdfBackfillStatus();
   if (!status.enabled && trigger === "schedule") {
+    setO365PdfBackfillNote("Übersprungen: Crawl ist nicht aktiv (pausiert/fertig).");
     return {
       ok: false,
       status: "skipped",
@@ -679,19 +683,26 @@ export async function runO365PdfBackfillJob(
 
   const userId = findRolfAppUserId();
   if (userId == null || !isMicrosoftConnected(userId) || !hasMicrosoftMailScope(userId)) {
+    const reason = "Microsoft Mail nicht verbunden oder Scope fehlt.";
+    setSetting(O365_PDF_BACKFILL_LAST_ERROR_KEY, reason);
+    setO365PdfBackfillNote(`Job gestoppt: ${reason}`);
+    setO365PdfBackfillAttemptNow();
     return {
       ok: false,
       status: "skipped",
-      reason: "Microsoft Mail nicht verbunden oder Scope fehlt.",
+      reason,
     };
   }
 
   const run = tryAcquireJobRun(trigger, JOB_TYPE_O365_PDF_BACKFILL);
   if (!run) {
+    const reason = "Ein anderer Hintergrund-Job läuft bereits.";
+    setO365PdfBackfillNote(`Wartet: ${reason}`);
+    setO365PdfBackfillAttemptNow();
     return {
       ok: false,
       status: "skipped",
-      reason: "Ein anderer Hintergrund-Job läuft bereits.",
+      reason,
     };
   }
 
@@ -725,6 +736,8 @@ export async function runO365PdfBackfillJob(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     setSetting(O365_PDF_BACKFILL_LAST_ERROR_KEY, message);
+    setO365PdfBackfillNote(`Fehler: ${message}`);
+    setSetting(O365_PDF_BACKFILL_PROGRESS_KEY, null);
     finishJobRun(run.id, "error", summary, message);
     return {
       ok: true,

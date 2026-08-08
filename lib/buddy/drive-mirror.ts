@@ -6,18 +6,23 @@ import {
   isGoogleMailConnected,
 } from "@/lib/google/oauth";
 import {
+  countDocumentsMissingDriveMirror,
+  countDocumentsWithDriveMirror,
+  countOrphanDriveMirrorLinks,
+  countPaperlessDocuments,
+  deleteBuddySourceLinkById,
+  deleteDriveMirrorLinksForDocument,
+  findDriveMirrorForDocument,
+  listOrphanDriveMirrorLinks,
+  upsertBuddySourceLink,
+} from "@/lib/buddy/source-links";
+import {
   ensureBuddyDrivePath,
   uploadBuddyDrivePdf,
+  trashBuddyDriveFile,
   BUDDY_ROOT_FOLDER_NAME,
 } from "@/lib/google/drive";
 import { PaperlessClient } from "@/lib/paperless/client";
-import {
-  countDocumentsMissingDriveMirror,
-  countDocumentsWithDriveMirror,
-  countPaperlessDocuments,
-  findDriveMirrorForDocument,
-  upsertBuddySourceLink,
-} from "@/lib/buddy/source-links";
 
 export const DRIVE_MIRROR_ENABLED_KEY = "buddy_drive_mirror_enabled";
 export const DRIVE_MIRROR_LAST_ERROR_KEY = "buddy_drive_mirror_last_error";
@@ -56,6 +61,8 @@ export type DriveMirrorStatus = {
   totalDocuments: number;
   mirrored: number;
   pending: number;
+  /** Links to Drive files whose Buddy document was already deleted */
+  orphanMirrors: number;
   percent: number;
   complete: boolean;
   lastRunAt: string | null;
@@ -69,6 +76,7 @@ export function getDriveMirrorStatus(): DriveMirrorStatus {
   const total = countPaperlessDocuments();
   const mirrored = countDocumentsWithDriveMirror();
   const pending = countDocumentsMissingDriveMirror();
+  const orphanMirrors = countOrphanDriveMirrorLinks();
   const percent =
     total === 0 ? 100 : Math.min(100, Math.round((mirrored / total) * 100));
   return {
@@ -80,6 +88,7 @@ export function getDriveMirrorStatus(): DriveMirrorStatus {
     totalDocuments: total,
     mirrored,
     pending,
+    orphanMirrors,
     percent,
     complete: total > 0 ? pending === 0 : true,
     lastRunAt: getSetting(DRIVE_MIRROR_LAST_RUN_KEY),
@@ -168,4 +177,98 @@ export async function mirrorDocumentToDrive(
   });
 
   return { ok: true, fileId: uploaded.fileId, url: uploaded.webViewLink };
+}
+
+/**
+ * Trash Drive mirror for a Buddy document (call before local row delete).
+ * Best-effort: missing Drive file / no scope still clears the local link.
+ */
+export async function removeDocumentDriveMirror(
+  documentId: number,
+  options?: { userId?: number; request?: Request | null }
+): Promise<{ trashed: boolean; linkRemoved: boolean; error?: string }> {
+  const existing = findDriveMirrorForDocument(documentId);
+  if (!existing) {
+    return { trashed: false, linkRemoved: false };
+  }
+
+  let trashed = false;
+  let error: string | undefined;
+  const userId = options?.userId ?? resolveDriveMirrorUserId();
+  if (userId != null && hasGoogleDriveScope(userId)) {
+    try {
+      await trashBuddyDriveFile({
+        userId,
+        fileId: existing.sourceId,
+        request: options?.request,
+      });
+      trashed = true;
+    } catch (err) {
+      error = err instanceof Error ? err.message : String(err);
+    }
+  } else {
+    error = "Drive nicht verbunden — Link wird lokal entfernt, Datei bleibt ggf. in Drive.";
+  }
+
+  deleteDriveMirrorLinksForDocument(documentId);
+  return { trashed, linkRemoved: true, error };
+}
+
+/**
+ * Trash Drive files for orphaned mirror links (document already deleted in Buddy)
+ * and remove the stale links. Batched for UI/manual cleanup.
+ */
+export async function cleanupOrphanDriveMirrors(options?: {
+  limit?: number;
+  userId?: number;
+  request?: Request | null;
+}): Promise<{
+  processed: number;
+  trashed: number;
+  linksRemoved: number;
+  failed: number;
+  errors: string[];
+}> {
+  const limit = Math.min(200, Math.max(1, options?.limit ?? 50));
+  const orphans = listOrphanDriveMirrorLinks(limit);
+  const userId = options?.userId ?? resolveDriveMirrorUserId();
+  let trashed = 0;
+  let linksRemoved = 0;
+  let failed = 0;
+  const errors: string[] = [];
+
+  for (const link of orphans) {
+    let fileOk = true;
+    if (userId != null && hasGoogleDriveScope(userId)) {
+      try {
+        await trashBuddyDriveFile({
+          userId,
+          fileId: link.sourceId,
+          request: options?.request,
+        });
+        trashed += 1;
+      } catch (err) {
+        fileOk = false;
+        failed += 1;
+        const msg = err instanceof Error ? err.message : String(err);
+        if (errors.length < 8) {
+          errors.push(`Drive ${link.sourceId}: ${msg}`);
+        }
+      }
+    }
+    // Always drop stale link so counters heal (even if trash failed / no scope)
+    deleteBuddySourceLinkById(link.id);
+    linksRemoved += 1;
+    if (!fileOk && userId == null) {
+      /* counted above only on trash fail */
+    }
+  }
+
+  return {
+    processed: orphans.length,
+    trashed,
+    linksRemoved,
+    failed,
+    errors,
+  };
 }

@@ -190,14 +190,97 @@ export function countDocumentsFromMicrosoftMail(): number {
   return row?.c || 0;
 }
 
-export function countDocumentsWithDriveMirror(): number {
+/**
+ * Docs that came from O365 (mail link and/or Paperless-Tag «O365»).
+ * Manual imports + backfill both count here — unlike crawl batch stats.
+ */
+export function countDocumentsFromO365(): number {
   const row = getDb()
     .prepare(
-      `SELECT COUNT(DISTINCT entity_id) as c FROM buddy_source_links
-       WHERE entity_type = 'document' AND source_kind = 'drive_file' AND role = 'mirror'`
+      `SELECT COUNT(DISTINCT d.id) as c
+       FROM paperless_documents d
+       WHERE COALESCE(d.sync_status, 'synced') != 'missing'
+         AND (
+           EXISTS (
+             SELECT 1 FROM buddy_source_links l
+             WHERE l.entity_type = 'document'
+               AND l.entity_id = CAST(d.id AS TEXT)
+               AND l.source_kind = 'microsoft_message'
+           )
+           OR EXISTS (
+             SELECT 1 FROM document_tags t
+             WHERE t.document_id = d.id
+               AND LOWER(COALESCE(t.tag_name, '')) = 'o365'
+           )
+         )`
     )
     .get() as { c: number };
   return row?.c || 0;
+}
+
+export function countDocumentsWithDriveMirror(): number {
+  const row = getDb()
+    .prepare(
+      `SELECT COUNT(DISTINCT l.entity_id) as c
+       FROM buddy_source_links l
+       INNER JOIN paperless_documents d ON CAST(d.id AS TEXT) = l.entity_id
+       WHERE l.entity_type = 'document'
+         AND l.source_kind = 'drive_file'
+         AND l.role = 'mirror'
+         AND COALESCE(d.sync_status, 'synced') != 'missing'`
+    )
+    .get() as { c: number };
+  return row?.c || 0;
+}
+
+/** Drive mirror links whose Buddy document row is already gone. */
+export function listOrphanDriveMirrorLinks(limit = 200): BuddySourceLink[] {
+  const rows = getDb()
+    .prepare(
+      `SELECT l.* FROM buddy_source_links l
+       WHERE l.entity_type = 'document'
+         AND l.source_kind = 'drive_file'
+         AND l.role = 'mirror'
+         AND NOT EXISTS (
+           SELECT 1 FROM paperless_documents d
+           WHERE CAST(d.id AS TEXT) = l.entity_id
+         )
+       ORDER BY l.id ASC
+       LIMIT ?`
+    )
+    .all(limit) as Row[];
+  return rows.map(mapRow);
+}
+
+export function countOrphanDriveMirrorLinks(): number {
+  const row = getDb()
+    .prepare(
+      `SELECT COUNT(*) as c FROM buddy_source_links l
+       WHERE l.entity_type = 'document'
+         AND l.source_kind = 'drive_file'
+         AND l.role = 'mirror'
+         AND NOT EXISTS (
+           SELECT 1 FROM paperless_documents d
+           WHERE CAST(d.id AS TEXT) = l.entity_id
+         )`
+    )
+    .get() as { c: number };
+  return row?.c || 0;
+}
+
+export function deleteBuddySourceLinkById(id: number): void {
+  getDb().prepare(`DELETE FROM buddy_source_links WHERE id = ?`).run(id);
+}
+
+export function deleteDriveMirrorLinksForDocument(documentId: number): number {
+  const result = getDb()
+    .prepare(
+      `DELETE FROM buddy_source_links
+       WHERE entity_type = 'document' AND entity_id = ?
+         AND source_kind = 'drive_file' AND role = 'mirror'`
+    )
+    .run(String(documentId));
+  return Number(result.changes) || 0;
 }
 
 export function listDocumentIdsMissingDriveMirror(limit = 50): number[] {

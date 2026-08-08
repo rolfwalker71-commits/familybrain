@@ -14,6 +14,7 @@ type DriveStatus = {
   totalDocuments: number;
   mirrored: number;
   pending: number;
+  orphanMirrors: number;
   percent: number;
   complete: boolean;
   lastRunAt: string | null;
@@ -90,6 +91,48 @@ export function DriveMirrorStatusPanel() {
     }
   }
 
+  async function cleanupOrphans() {
+    if (
+      !window.confirm(
+        "Verwaiste Drive-Spiegel in den Papierkorb legen und lokale Links entfernen?\n\nBetrifft Dateien, deren Buddy-/Paperless-Dokument schon gelöscht ist (bis 50 pro Klick)."
+      )
+    ) {
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    setMsg(null);
+    try {
+      const res = await fetch("/api/buddy/drive-mirror", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cleanupOrphans: true, cleanupLimit: 50 }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Bereinigung fehlgeschlagen");
+      setStatus(json as DriveStatus);
+      const c = (json as { cleanup?: {
+        processed: number;
+        trashed: number;
+        linksRemoved: number;
+        failed: number;
+      } }).cleanup;
+      if (c) {
+        setMsg(
+          `Bereinigt: ${c.linksRemoved} Links · ${c.trashed} in Drive-Papierkorb` +
+            (c.failed ? ` · ${c.failed} Drive-Fehler` : "") +
+            ((json as DriveStatus).orphanMirrors > 0
+              ? " — erneut klicken für weitere"
+              : "")
+        );
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -104,7 +147,8 @@ export function DriveMirrorStatusPanel() {
           <span className="font-medium text-foreground">
             BUDDY/Jahr/Rubrik/…
           </span>
-          ). Der Stand bleibt sichtbar — auch wenn alles synchron ist.
+          ). Beim Löschen in Buddy wird der Drive-Spiegel mit in den Papierkorb
+          gelegt.
         </p>
 
         {loading && !status ? (
@@ -147,10 +191,19 @@ export function DriveMirrorStatusPanel() {
               </div>
               <p className="text-xs text-muted-foreground">
                 Ausstehend: {status.pending}
+                {status.orphanMirrors > 0
+                  ? ` · verwaist: ${status.orphanMirrors}`
+                  : ""}
                 {status.lastRunAt
                   ? ` · letzter Lauf ${new Date(status.lastRunAt).toLocaleString("de-CH")}`
                   : " · noch kein Lauf"}
               </p>
+              {status.orphanMirrors > 0 ? (
+                <p className="text-xs text-amber-800">
+                  {status.orphanMirrors} Drive-Spiegel ohne Buddy-Dokument
+                  (ältere Löschungen). Unten bereinigen.
+                </p>
+              ) : null}
               {status.lastError ? (
                 <p className="text-xs text-amber-800">
                   Letzter Fehler: {status.lastError}
@@ -196,6 +249,19 @@ export function DriveMirrorStatusPanel() {
                   ? "Erneut prüfen / Rest syncen"
                   : "Migration starten"}
               </Button>
+              {status.orphanMirrors > 0 ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={
+                    busy || !status.connected || !status.hasDriveScope
+                  }
+                  onClick={() => void cleanupOrphans()}
+                >
+                  Verwaiste bereinigen ({status.orphanMirrors})
+                </Button>
+              ) : null}
               <Button
                 type="button"
                 size="sm"

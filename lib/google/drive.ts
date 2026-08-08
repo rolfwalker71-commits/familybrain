@@ -169,4 +169,34 @@ export async function uploadBuddyDrivePdf(input: {
   };
 }
 
+/** Move a Drive file to trash (app-created mirrors under drive.file scope). */
+export async function trashBuddyDriveFile(input: {
+  userId: number;
+  fileId: string;
+  request?: Request | null;
+}): Promise<{ ok: boolean; alreadyGone?: boolean }> {
+  const fileId = input.fileId.trim();
+  if (!fileId) return { ok: false };
+  const drive = await getDrive(input.userId, input.request);
+  try {
+    await drive.files.update({
+      fileId,
+      requestBody: { trashed: true },
+      fields: "id,trashed",
+    });
+    return { ok: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    const lower = message.toLowerCase();
+    if (
+      lower.includes("404") ||
+      lower.includes("not found") ||
+      lower.includes("file not found")
+    ) {
+      return { ok: true, alreadyGone: true };
+    }
+    throw err;
+  }
+}
+
 export { BUDDY_ROOT_FOLDER_NAME, DRIVE_ROOT_FOLDER_ID_KEY, sanitizePathSegment };

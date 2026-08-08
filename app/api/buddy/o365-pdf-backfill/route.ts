@@ -2,11 +2,14 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { isAuthError, requireAdmin } from "@/lib/auth/current-user";
 import { ensureInitialized } from "@/lib/db/migrations";
+import { countDocumentsFromO365 } from "@/lib/buddy/source-links";
 import {
   configureO365PdfBackfill,
   getO365PdfBackfillStatus,
 } from "@/lib/microsoft/mail-paperless-backfill";
-import { countDocumentsFromMicrosoftMail } from "@/lib/buddy/source-links";
+import { getActiveJobRun, getSchedulerSettings } from "@/lib/jobs/queries";
+import { JOB_TYPE_O365_PDF_BACKFILL, jobTypeLabel } from "@/lib/jobs/constants";
+import { getSchedulerRuntimeStatus } from "@/lib/jobs/scheduler";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,14 +23,36 @@ const PatchSchema = z.object({
   resetStats: z.boolean().optional(),
 });
 
+function enrichStatus() {
+  const status = getO365PdfBackfillStatus();
+  const active = getActiveJobRun();
+  const o365JobRunning =
+    active?.job_type === JOB_TYPE_O365_PDF_BACKFILL &&
+    active.status === "running";
+  const otherJobRunning = Boolean(active) && !o365JobRunning;
+  const scheduler = getSchedulerRuntimeStatus();
+  const settings = getSchedulerSettings();
+  return {
+    ...status,
+    documentsFromO365: countDocumentsFromO365(),
+    job: {
+      o365Running: o365JobRunning,
+      otherRunning: otherJobRunning,
+      activeLabel: active ? jobTypeLabel(active.job_type) : null,
+    },
+    scheduler: {
+      enabled: settings.enabled,
+      intervalMinutes: settings.intervalMinutes,
+      nextTickAt: scheduler.nextTickAt,
+    },
+  };
+}
+
 export async function GET() {
   ensureInitialized();
   const auth = await requireAdmin();
   if (isAuthError(auth)) return auth;
-  return NextResponse.json({
-    ...getO365PdfBackfillStatus(),
-    documentsFromO365: countDocumentsFromMicrosoftMail(),
-  });
+  return NextResponse.json(enrichStatus());
 }
 
 export async function PATCH(request: Request) {
@@ -38,9 +63,6 @@ export async function PATCH(request: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: "Ungültige Eingabe" }, { status: 400 });
   }
-  const status = configureO365PdfBackfill(parsed.data);
-  return NextResponse.json({
-    ...status,
-    documentsFromO365: countDocumentsFromMicrosoftMail(),
-  });
+  configureO365PdfBackfill(parsed.data);
+  return NextResponse.json(enrichStatus());
 }

@@ -34,6 +34,19 @@ export async function purgeDocumentLocally(localDocumentId: number): Promise<{
     /* ignore vector cleanup failures */
   }
 
+  // Trash Google Drive mirror before local row/link vanishes
+  try {
+    const { removeDocumentDriveMirror } = await import(
+      "@/lib/buddy/drive-mirror"
+    );
+    await removeDocumentDriveMirror(localDocumentId);
+  } catch (err) {
+    console.warn(
+      "[drive-mirror] delete:",
+      err instanceof Error ? err.message : err
+    );
+  }
+
   // Detach optional refs without cascade FK
   db.prepare(
     `UPDATE trip_events SET document_id = NULL, updated_at = datetime('now')
@@ -41,6 +54,12 @@ export async function purgeDocumentLocally(localDocumentId: number): Promise<{
   ).run(localDocumentId);
 
   db.prepare(`DELETE FROM paperless_documents WHERE id = ?`).run(localDocumentId);
+
+  // Any remaining source links for this document
+  db.prepare(
+    `DELETE FROM buddy_source_links
+     WHERE entity_type = 'document' AND entity_id = ?`
+  ).run(String(localDocumentId));
 
   return { ok: true, paperlessId: row.paperless_id };
 }
