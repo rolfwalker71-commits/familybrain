@@ -231,9 +231,9 @@ function DocumentDetailInner({ detail }: DetailProps) {
   const tabItems: DocumentTabItem[] = [
     { id: "overview", label: "Übersicht", icon: LayoutDashboard },
     { id: "extracts", label: "Extrakte", icon: Layers },
+    { id: "more", label: "Mehr", icon: MoreHorizontal },
     { id: "files", label: "OCR", icon: FileText },
     { id: "activity", label: "Log", icon: History },
-    { id: "more", label: "Mehr", icon: MoreHorizontal },
   ];
 
   function setTab(tab: DocumentDetailTab) {
@@ -913,9 +913,10 @@ function DocumentDetailInner({ detail }: DetailProps) {
                   <Button
                     size="sm"
                     className="bg-[var(--brand-docs)] text-white hover:bg-[var(--brand-docs)]/90"
-                    onClick={() => setTab("more")}
+                    disabled={analyzing}
+                    onClick={() => void analyze()}
                   >
-                    Analyse starten (Mehr)
+                    {analyzing ? "Analysiert…" : "Analyse starten"}
                   </Button>
                 ) : null}
                 <Button
@@ -926,10 +927,10 @@ function DocumentDetailInner({ detail }: DetailProps) {
                   Extrakte ansehen
                 </Button>
                 <Link
-                  href="/dashboard"
+                  href="/inbox"
                   className="inline-flex h-8 items-center rounded-md border border-border px-3 text-sm font-medium hover:bg-accent"
                 >
-                  Zur Action-Inbox
+                  Zur Inbox
                 </Link>
               </div>
             </CardContent>

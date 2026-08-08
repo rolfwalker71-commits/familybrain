@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { KeyRound, Server, BookOpen, MessageSquareText, Luggage, HandCoins, Mail, MoreHorizontal, Users, Bell, Heart, CalendarDays } from "lucide-react";
+import { KeyRound, Server, BookOpen, MessageSquareText, Luggage, HandCoins, Mail, MoreHorizontal, Users, Bell, Heart, CalendarDays, Sparkles } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -1236,20 +1236,21 @@ function SettingsPageInner() {
 
   const activeTab = parseSettingsTab(searchParams.get("tab"));
   const tabItems: SettingsTabItem[] = [
-    { id: "chat", label: "Chat", icon: MessageSquareText },
     { id: "paperless", label: "Paperless", icon: Server },
-    { id: "travel", label: "Travel", icon: Luggage },
+    { id: "openai", label: "OpenAI", icon: Sparkles },
+    { id: "calendars", label: "Cloud-OAuth", icon: CalendarDays },
     { id: "mail", label: "Mail", icon: Mail },
+    { id: "travel", label: "Travel", icon: Luggage },
     { id: "notify", label: "Backup & Hinweise", icon: Bell },
+    { id: "chat", label: "Chat", icon: MessageSquareText },
     { id: "users", label: "User", icon: Users },
     { id: "family", label: "Familie", icon: Heart },
-    { id: "calendars", label: "Cloud-OAuth", icon: CalendarDays },
     { id: "more", label: "Mehr", icon: MoreHorizontal },
   ];
 
   function setTab(tab: SettingsTab) {
     const params = new URLSearchParams(searchParams.toString());
-    if (tab === "chat") params.delete("tab");
+    if (tab === "paperless") params.delete("tab");
     else params.set("tab", tab);
     const q = params.toString();
     router.replace(q ? `?${q}` : "?", { scroll: false });
@@ -1262,7 +1263,7 @@ function SettingsPageInner() {
     <div className="space-y-6 pb-28 md:space-y-8 md:pb-0">
       <PageHeader
         title="Einstellungen"
-        description="Verbindungen, KI und Chat-Verhalten für Buddy."
+        description="Paperless, OpenAI, Cloud-OAuth und weitere App-Einstellungen."
         icon={pageVisuals.settings.icon}
         tone={pageVisuals.settings.tone}
       />
@@ -2813,7 +2814,10 @@ function SettingsPageInner() {
           </Button>
         </CardContent>
       </Card>
+        </div>
+      ) : null}
 
+      {activeTab === "openai" ? (
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="flex items-center gap-3">
@@ -2888,7 +2892,6 @@ function SettingsPageInner() {
           </Button>
         </CardContent>
       </Card>
-        </div>
       ) : null}
 
       {message ? (

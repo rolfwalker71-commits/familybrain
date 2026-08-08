@@ -452,23 +452,6 @@ export function MailPageClient() {
                 </Badge>
               ) : null}
             </Button>
-            {tab === "inbox"
-              ? FILTERS.map((f) => (
-                  <Button
-                    key={f.id}
-                    type="button"
-                    size="sm"
-                    variant={filter === f.id ? "default" : "outline"}
-                    className={cn(
-                      filter === f.id &&
-                        "bg-[var(--brand-docs)] text-white hover:bg-[var(--brand-docs)]/90"
-                    )}
-                    onClick={() => setFilter(f.id)}
-                  >
-                    {f.label}
-                  </Button>
-                ))
-              : null}
             <Button
               type="button"
               size="sm"
@@ -482,6 +465,29 @@ export function MailPageClient() {
           </div>
         }
       />
+
+      {connected && tab === "inbox" ? (
+        <div className="flex flex-wrap gap-1.5">
+          <span className="self-center text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Filter
+          </span>
+          {FILTERS.map((f) => (
+            <Button
+              key={f.id}
+              type="button"
+              size="sm"
+              variant={filter === f.id ? "default" : "outline"}
+              className={cn(
+                filter === f.id &&
+                  "bg-[var(--brand-docs)] text-white hover:bg-[var(--brand-docs)]/90"
+              )}
+              onClick={() => setFilter(f.id)}
+            >
+              {f.label}
+            </Button>
+          ))}
+        </div>
+      ) : null}
 
       {banner ? (
         <p className="text-sm text-emerald-800" role="status">
@@ -498,14 +504,22 @@ export function MailPageClient() {
         <Card>
           <CardContent className="space-y-3 p-6 text-sm">
             <p>
-              Google OAuth ist noch nicht konfiguriert. Unter{" "}
+              Google OAuth (App) ist noch nicht konfiguriert. Client-ID und
+              Secret unter{" "}
               <a
                 href="/settings?tab=calendars"
                 className="font-medium text-[var(--brand-docs)] underline-offset-2 hover:underline"
               >
-                Einstellungen → Kalender
-              </a>{" "}
-              Client-ID und Secret hinterlegen.
+                Einstellungen → Cloud-OAuth
+              </a>
+              ; verbinden danach unter{" "}
+              <a
+                href="/account"
+                className="font-medium text-[var(--brand-docs)] underline-offset-2 hover:underline"
+              >
+                Konto
+              </a>
+              .
             </p>
           </CardContent>
         </Card>

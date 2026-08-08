@@ -241,19 +241,19 @@ function NavLinkRow({
       href={item.href}
       onClick={onNavigate}
       className={cn(
-        "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
+        "flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm font-medium transition-colors",
         active
           ? "bg-white/15 text-white"
           : "text-sidebar-foreground/90 hover:bg-sidebar-accent hover:text-white"
       )}
     >
       <Icon
-        className="size-5 shrink-0"
+        className="size-4 shrink-0"
         strokeWidth={APP_ICON_STROKE}
         absoluteStrokeWidth
         aria-hidden
       />
-      <span className="flex-1 text-[15px] font-semibold tracking-tight">
+      <span className="flex-1 text-[14px] font-semibold tracking-tight">
         {item.label}
       </span>
       {showCount ? (
@@ -432,10 +432,10 @@ export function Sidebar({
         </div>
       ) : null}
 
-      <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto px-3 pb-4">
+      <nav className="min-h-0 flex-1 space-y-0.5 overflow-y-auto px-3 pb-3">
         {isAdminNav && mode === "home" ? (
-          <div className="space-y-2 pt-1">
-            <p className="px-2 text-[11px] font-semibold uppercase tracking-wide text-sidebar-foreground/55">
+          <div className="space-y-1.5 pt-0.5">
+            <p className="px-2 pb-0.5 text-[10px] font-semibold uppercase tracking-wide text-sidebar-foreground/55">
               Bereiche
             </p>
             {areaEntries.map((entry) => (
@@ -472,8 +472,8 @@ export function Sidebar({
                 {showSection ? (
                   <p
                     className={cn(
-                      "px-2 text-[11px] font-semibold uppercase tracking-wide text-sidebar-foreground/55",
-                      index === 0 ? "pt-1" : "pt-3"
+                      "px-2.5 pb-0 text-[10px] font-semibold uppercase tracking-wide text-sidebar-foreground/55",
+                      index === 0 ? "pt-0.5" : "pt-1.5"
                     )}
                   >
                     {item.section}

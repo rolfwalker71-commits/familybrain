@@ -315,18 +315,9 @@ export function ActionInbox() {
     <Card className="border-border/70 shadow-[0_2px_4px_rgba(20,32,28,0.06),0_10px_28px_rgba(20,32,28,0.08)]">
       <CardContent className="space-y-4 p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Was muss ich tun?
-            </p>
-            <h2 className="mt-0.5 text-base font-bold tracking-tight sm:text-lg">
-              Action-Inbox
-            </h2>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              Einheitliche Aufgaben aus Prüfung, Fristen, Rechnungen, Garantien
-              und Analysen.
-            </p>
-          </div>
+          <p className="text-xs text-muted-foreground">
+            Prüfung, Fristen, Rechnungen, Garantien und Analysen.
+          </p>
           <div className="flex flex-wrap gap-1.5">
             {(
               [

@@ -17,6 +17,7 @@ import {
   Copy,
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -537,7 +538,7 @@ function SyncClientInner() {
     <div className="space-y-6 pb-28 md:space-y-8 md:pb-0">
       <PageHeader
         title="Sync"
-        description="Paperless und Trilium aktuell halten — danach Action-Inbox (Dashboard) und Analyse."
+        description="Paperless und Trilium aktuell halten — danach Inbox und Analyse."
         icon={pageVisuals.sync.icon}
         tone={pageVisuals.sync.tone}
       />
@@ -623,14 +624,34 @@ function SyncClientInner() {
 
       <VectorIndexStatusPanel />
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-3">
-            <IconCircle icon={Link2} tone="teal" size="sm" />
-            Paperless-Verbindung
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <details className="rounded-xl border border-border/70 bg-card open:shadow-sm">
+        <summary className="cursor-pointer list-none px-4 py-3 marker:content-none [&::-webkit-details-marker]:hidden">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="flex items-center gap-3 text-sm font-semibold">
+              <IconCircle icon={Link2} tone="teal" size="sm" />
+              Paperless-Verbindung
+              {hasToken ? (
+                <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">
+                  Token ok
+                </Badge>
+              ) : (
+                <Badge variant="secondary">Nicht gesetzt</Badge>
+              )}
+            </span>
+            <Link
+              href="/settings?tab=paperless"
+              className="text-xs font-medium text-muted-foreground underline-offset-2 hover:underline"
+              onClick={(e) => e.stopPropagation()}
+            >
+              Einstellungen → Paperless
+            </Link>
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Erweitern zum Bearbeiten der URLs/Tokens (gleiche Werte wie unter
+            Einstellungen).
+          </p>
+        </summary>
+        <div className="space-y-4 border-t border-border/60 px-4 py-4">
           <div className="space-y-2">
             <Label htmlFor="baseUrl">API-URL (Server / intern)</Label>
             <Input
@@ -689,8 +710,8 @@ function SyncClientInner() {
               {busy === "test" ? "Testet…" : "Verbindung testen"}
             </Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </details>
 
       <Card>
         <CardHeader>

@@ -3,14 +3,15 @@
 import { AppTabNav, type AppTabItem } from "@/components/layout/app-tab-nav";
 
 export type SettingsTab =
-  | "chat"
   | "paperless"
-  | "travel"
+  | "openai"
+  | "calendars"
   | "mail"
+  | "travel"
+  | "notify"
+  | "chat"
   | "users"
   | "family"
-  | "calendars"
-  | "notify"
   | "more";
 
 export type SettingsTabItem = AppTabItem<SettingsTab>;
@@ -19,19 +20,20 @@ export function parseSettingsTab(
   raw: string | null | undefined
 ): SettingsTab {
   if (
-    raw === "chat" ||
     raw === "paperless" ||
-    raw === "travel" ||
+    raw === "openai" ||
+    raw === "calendars" ||
     raw === "mail" ||
+    raw === "travel" ||
+    raw === "notify" ||
+    raw === "chat" ||
     raw === "users" ||
     raw === "family" ||
-    raw === "calendars" ||
-    raw === "notify" ||
     raw === "more"
   ) {
     return raw;
   }
-  return "chat";
+  return "paperless";
 }
 
 export function SettingsTabNav({
