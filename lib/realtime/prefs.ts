@@ -46,7 +46,7 @@ export const NOTIFY_REASON_LABELS: Record<NotifyReason, string> = {
   mail_triage: "Mail zur Triage",
   mail_calendar_patch: "Termin aus Mail aktualisiert",
   day_briefing: "Tageslage (Morgen)",
-  evening_digest: "Abend-Digest",
+  evening_digest: "Tagesabschluss / Abend-Digest",
   trip_comment: "Neuer Reise-Kommentar",
   trip_event_updated: "Reise-Ereignis geändert",
   trip_event_ai_image: "Reise-Ereignis KI-Bild",

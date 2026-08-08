@@ -122,6 +122,10 @@ function isPlanningRelevant(item: AgendaItem): boolean {
   return item.planningRelevant !== false;
 }
 
+function isBuddyRitualItem(item: AgendaItem): boolean {
+  return (item.id || "").startsWith("buddy-day-close");
+}
+
 /**
  * KPI «Nächster Termin»: heutige Termine, die noch nicht begonnen haben
  * (optional ergänzt um morgige), max. `limit`.
@@ -232,7 +236,8 @@ function findConflicts(
       i.date === today &&
       i.time &&
       isPlanningRelevant(i) &&
-      !isBirthdayItem(i)
+      !isBirthdayItem(i) &&
+      !isBuddyRitualItem(i)
   );
   const now = hmToMinutes(nowHm) ?? 0;
   const out: Array<{ id: string; label: string }> = [];

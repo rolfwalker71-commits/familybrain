@@ -6,6 +6,10 @@ import {
   resolveBriefingMode,
   zurichNowParts,
 } from "@/lib/dashboard/day-briefing";
+import {
+  isZurichWeekday,
+  resolveDayCloseRitualStatus,
+} from "@/lib/dashboard/day-close-ritual";
 import { getDashboardOverview } from "@/lib/dashboard/overview";
 import { countMailAppliedToday } from "@/lib/mail/mail-applied-links";
 import { notifyAppChange } from "@/lib/realtime/notify";
@@ -13,14 +17,24 @@ import { notifyAppChange } from "@/lib/realtime/notify";
 const MORNING_SENT_KEY = "day_briefing_last_sent_date";
 const EVENING_SENT_KEY = "evening_digest_last_sent_date";
 
-/** Morning window 07:00–09:30 Zurich; evening 19:45–21:30. */
+/** Morning window 07:00–09:30 Zurich. */
 function inMorningWindow(hour: number, minute: number): boolean {
   const mins = hour * 60 + minute;
   return mins >= 7 * 60 && mins < 9 * 60 + 30;
 }
 
-function inEveningWindow(hour: number, minute: number): boolean {
+/**
+ * Evening: weekdays 18:30–19:30 (Tagesabschluss), weekends 19:45–21:30.
+ */
+function inEveningWindow(
+  hour: number,
+  minute: number,
+  weekday: boolean
+): boolean {
   const mins = hour * 60 + minute;
+  if (weekday) {
+    return mins >= 18 * 60 + 30 && mins < 19 * 60 + 30;
+  }
   return mins >= 19 * 60 + 45 && mins < 21 * 60 + 30;
 }
 
@@ -85,8 +99,9 @@ export async function maybeDispatchBriefingPushes(
       out.morning = true;
     }
 
+    const weekday = isZurichWeekday(todayIso);
     if (
-      inEveningWindow(hour, minute) &&
+      inEveningWindow(hour, minute, weekday) &&
       getSetting(EVENING_SENT_KEY) !== todayIso
     ) {
       const built = await briefingForUser(userId);
@@ -95,17 +110,37 @@ export async function maybeDispatchBriefingPushes(
         withAi: true,
         aiTimeoutMs: 4000,
       });
+      const ritual = await resolveDayCloseRitualStatus(
+        userId,
+        todayIso,
+        built.overview.todayCalendar || []
+      );
+      const ritualBits = [
+        ritual.calendarOpen > 0
+          ? `${ritual.calendarOpen} Termin(e) prüfen`
+          : "Termine geprüft",
+        ritual.googleDayDone === false ? "Gmail-Tagesanalyse offen" : null,
+        ritual.microsoftDayDone === false
+          ? "Outlook-Tagesanalyse offen"
+          : null,
+        ritual.googleDayDone === true ? "Gmail-Analyse ✓" : null,
+        ritual.microsoftDayDone === true ? "Outlook-Analyse ✓" : null,
+      ].filter(Boolean);
       const openLine = payload.open.slice(0, 2).join(" · ");
       const doneLine = payload.done.slice(0, 2).join(" · ");
-      const eveningDetail =
-        payload.prose || [doneLine, openLine].filter(Boolean).join(" — ");
+      const eveningDetail = [
+        weekday ? `Tagesabschluss 18:30: ${ritualBits.join(" · ")}` : null,
+        payload.prose || [doneLine, openLine].filter(Boolean).join(" — "),
+      ]
+        .filter(Boolean)
+        .join("\n");
       notifyAppChange({
         domain: "documents",
         reason: "evening_digest",
-        headline: "Abend-Digest",
+        headline: weekday ? "Tagesabschluss" : "Abend-Digest",
         detail: eveningDetail,
-        title: "Abend-Digest",
-        href: "/",
+        title: weekday ? "Tagesabschluss" : "Abend-Digest",
+        href: weekday ? "/google?tab=calendar" : "/",
         source: "buddy",
         aiIconUrl: null,
         category: "briefing",

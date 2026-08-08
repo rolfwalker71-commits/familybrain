@@ -738,6 +738,30 @@ function ensureKnowledgeGuidesTables(db: Database.Database): void {
     `CREATE INDEX IF NOT EXISTS idx_knowledge_guides_source_doc
      ON knowledge_guides(source_document_id)`
   );
+  // Nachziehen: bereits in Guides übernommene PDFs → Haken «Für Guide»
+  try {
+    const result = db
+      .prepare(
+        `UPDATE paperless_documents
+         SET for_guide = 1, updated_at = datetime('now')
+         WHERE COALESCE(for_guide, 0) = 0
+           AND id IN (
+             SELECT source_document_id FROM knowledge_guides
+             WHERE source_document_id IS NOT NULL
+           )`
+      )
+      .run();
+    if (result.changes > 0) {
+      console.info(
+        `[bootstrap] for_guide backfill: ${result.changes} Dokument(e)`
+      );
+    }
+  } catch (err) {
+    console.warn(
+      "[bootstrap] for_guide backfill:",
+      err instanceof Error ? err.message : err
+    );
+  }
 }
 
 function ensureTriliumNotesTable(db: Database.Database): void {

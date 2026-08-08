@@ -892,7 +892,24 @@ export async function getDashboardOverview(
       },
     },
     agenda: attachAgendaAiIconMeta(agendaWithWeather),
-    todayCalendar: attachAgendaAiIconMeta(todayCalendar),
+    todayCalendar: attachAgendaAiIconMeta(
+      await (async () => {
+        const {
+          resolveDayCloseRitualStatus,
+          withDayCloseRitual,
+        } = await import("@/lib/dashboard/day-close-ritual");
+        const { zurichNowParts } = await import(
+          "@/lib/dashboard/day-briefing"
+        );
+        const day = zurichNowParts().todayIso;
+        const status = await resolveDayCloseRitualStatus(
+          calendarUserId,
+          day,
+          todayCalendar
+        );
+        return withDayCloseRitual(todayCalendar, day, status);
+      })()
+    ),
     todayMail,
     todayMailMicrosoft,
     kpi: { total: kpiTotal, byCategory },

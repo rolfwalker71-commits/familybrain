@@ -569,7 +569,7 @@ function DocumentDetailInner({ detail }: DetailProps) {
       if (!res.ok) {
         throw new Error(data.error || "Guide-Import fehlgeschlagen");
       }
-      setForGuide(false);
+      setForGuide(true);
       startTransition(() => router.refresh());
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -1175,8 +1175,9 @@ function DocumentDetailInner({ detail }: DetailProps) {
                     <span>
                       <span className="font-medium">Für Guide</span>
                       <span className="mt-0.5 block text-xs text-muted-foreground">
-                        Markiert für Guides (Paperless «Für Guide»). Batch unter
-                        Guides.
+                        {forGuide
+                          ? "Markiert (Paperless «Für Guide»). Nach Übernahme bleibt der Haken gesetzt."
+                          : "Markiert für Guides (Paperless «Für Guide»). Batch unter Guides."}
                       </span>
                     </span>
                   </label>
@@ -1190,7 +1191,9 @@ function DocumentDetailInner({ detail }: DetailProps) {
                   >
                     {guideBusy
                       ? "Guide wird erstellt…"
-                      : "Jetzt in Guide übernehmen"}
+                      : forGuide
+                        ? "Guide erneut übernehmen"
+                        : "Jetzt in Guide übernehmen"}
                   </Button>
                 </CardContent>
               </Card>

@@ -38,8 +38,11 @@ export async function importDocumentAsGuide(input: {
   documentLocalId: number;
   title?: string | null;
   replaceExisting?: boolean;
-  /** Clear «Für Guide» after successful import (default true). */
-  clearForGuideFlag?: boolean;
+  /**
+   * After import: keep «Für Guide» checked (default).
+   * Pass `false` only for rare cases that should leave the flag unchanged.
+   */
+  markForGuide?: boolean;
   index?: boolean;
 }): Promise<ImportDocumentAsGuideResult> {
   const pack = getDocumentById(input.documentLocalId);
@@ -158,8 +161,22 @@ export async function importDocumentAsGuide(input: {
     });
   }
 
-  if (input.clearForGuideFlag !== false) {
-    setDocumentForGuide(doc.id, false);
+  if (input.markForGuide !== false) {
+    setDocumentForGuide(doc.id, true);
+    try {
+      const { writebackStatusFlagsToPaperless } = await import(
+        "@/lib/paperless/writeback"
+      );
+      await writebackStatusFlagsToPaperless({
+        localDocumentId: doc.id,
+        forGuide: true,
+      });
+    } catch (err) {
+      console.warn(
+        "[guides] for_guide writeback:",
+        err instanceof Error ? err.message : err
+      );
+    }
   }
 
   return {
@@ -187,6 +204,7 @@ export function listPendingGuideDocuments(limit = 40): Array<{
        FROM paperless_documents d
        LEFT JOIN knowledge_guides g ON g.source_document_id = d.id
        WHERE COALESCE(d.for_guide, 0) = 1
+         AND g.id IS NULL
          AND COALESCE(d.sync_status, 'synced') != 'missing'
        ORDER BY d.updated_at DESC
        LIMIT ?`

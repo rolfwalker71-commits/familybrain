@@ -99,7 +99,10 @@ export function buildDayBriefingFacts(input: {
   const mode = input.mode ?? resolveBriefingMode(hour);
 
   const planning = input.todayCalendar.filter(
-    (i) => i.date === todayIso && i.planningRelevant !== false
+    (i) =>
+      i.date === todayIso &&
+      i.planningRelevant !== false &&
+      !String(i.id || "").startsWith("buddy-day-close")
   );
   const conflicts = findTimedOverlaps(
     planning.map((i) => ({

@@ -73,6 +73,11 @@ type DocRow = {
   sync_status: string | null;
   ai_icon_url?: string | null;
   is_business?: boolean;
+  /** Bereits als Knowledge-Guide übernommen */
+  has_guide?: boolean;
+  guide_id?: number | null;
+  /** Paperless «Für Guide» / lokal markiert */
+  for_guide?: boolean;
   recipients?: {
     status: "matched" | "unknown" | null;
     label: string | null;
@@ -83,6 +88,24 @@ type DocRow = {
     }>;
   };
 };
+
+function GuideBadges({ doc }: { doc: DocRow }) {
+  if (doc.has_guide) {
+    return (
+      <span className="inline-flex rounded-full bg-emerald-700 px-2 py-0.5 text-[11px] font-medium text-white">
+        In Guide
+      </span>
+    );
+  }
+  if (doc.for_guide) {
+    return (
+      <span className="inline-flex rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-900">
+        Für Guide
+      </span>
+    );
+  }
+  return null;
+}
 
 type Filters = {
   correspondents: string[];
@@ -1651,7 +1674,11 @@ export function DocumentsClient() {
               return (
                 <div
                   key={doc.id}
-                  className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-card p-3.5 shadow-[0_4px_16px_rgba(20,32,28,0.05)]"
+                  className={
+                    doc.has_guide
+                      ? "flex items-center gap-2.5 rounded-xl border border-emerald-200/80 bg-emerald-50/60 p-3.5 shadow-[0_4px_16px_rgba(20,32,28,0.05)]"
+                      : "flex items-center gap-2.5 rounded-xl border border-border/60 bg-card p-3.5 shadow-[0_4px_16px_rgba(20,32,28,0.05)]"
+                  }
                 >
                   <input
                     type="checkbox"
@@ -1702,6 +1729,7 @@ export function DocumentsClient() {
                             {doc.category}
                           </span>
                         ) : null}
+                        <GuideBadges doc={doc} />
                       </div>
                       {doc.recipients?.label ? (
                         <div className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -1735,7 +1763,14 @@ export function DocumentsClient() {
             <CardContent className="p-0">
               <DataList>
                 {docs.map((doc) => (
-                  <DataListRow key={doc.id}>
+                  <DataListRow
+                    key={doc.id}
+                    className={
+                      doc.has_guide
+                        ? "bg-emerald-50/50 dark:bg-emerald-950/20"
+                        : undefined
+                    }
+                  >
                     <DataListMain
                       title={
                         <div className="flex items-start gap-3">
@@ -1784,6 +1819,7 @@ export function DocumentsClient() {
                           ) : doc.category ? (
                             <span>{doc.category}</span>
                           ) : null}
+                          <GuideBadges doc={doc} />
                           {statusBadge(doc.analysis_status)}
                         </MetaLine>
                       }

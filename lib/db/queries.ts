@@ -300,7 +300,14 @@ export function listDocuments(filters: DocumentFilters = {}) {
   const rows = db
     .prepare(
       `SELECT d.*, s.category, s.analysis_status, s.short_summary,
-              CASE WHEN ${SQL_DOC_IS_BUSINESS} THEN 1 ELSE 0 END AS is_business
+              CASE WHEN ${SQL_DOC_IS_BUSINESS} THEN 1 ELSE 0 END AS is_business,
+              CASE WHEN EXISTS (
+                SELECT 1 FROM knowledge_guides g
+                WHERE g.source_document_id = d.id
+              ) THEN 1 ELSE 0 END AS has_guide,
+              (SELECT g2.id FROM knowledge_guides g2
+               WHERE g2.source_document_id = d.id
+               ORDER BY g2.id DESC LIMIT 1) AS guide_id
        FROM paperless_documents d
        LEFT JOIN document_summaries s ON s.document_id = d.id
        ${whereSql}
@@ -308,7 +315,12 @@ export function listDocuments(filters: DocumentFilters = {}) {
        LIMIT ? OFFSET ?`
     )
     .all(...params, limit, offset) as Array<
-    PaperlessDocumentRow & { is_business?: number }
+    PaperlessDocumentRow & {
+      is_business?: number;
+      has_guide?: number;
+      guide_id?: number | null;
+      for_guide?: number | null;
+    }
   >;
 
   const countRow = db
@@ -324,6 +336,9 @@ export function listDocuments(filters: DocumentFilters = {}) {
     documents: rows.map((row) => ({
       ...row,
       is_business: Boolean(row.is_business),
+      has_guide: Boolean(row.has_guide),
+      guide_id: row.guide_id ?? null,
+      for_guide: Number(row.for_guide) === 1,
     })),
     total: countRow.count,
   };

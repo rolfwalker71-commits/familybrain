@@ -75,6 +75,7 @@ function typeLabel(item: AgendaItem): string {
 
 function isCloudCalendarItem(item: AgendaItem): boolean {
   const id = item.id || "";
+  if (id.startsWith("buddy-day-close")) return false;
   return (
     (id.startsWith("gcal-") || id.startsWith("mscal-")) &&
     Boolean(item.calendarId)
@@ -423,6 +424,46 @@ export function AgendaEventDialog({
               item.subtitle !== item.title ? (
                 <DetailRow label="Details">
                   <p>{item.subtitle}</p>
+                </DetailRow>
+              ) : null}
+
+              {item.id.startsWith("buddy-day-close") ? (
+                <DetailRow label="Tagesabschluss">
+                  <div className="flex flex-wrap gap-2">
+                    <Link
+                      href="/google?tab=calendar"
+                      className={cn(buttonVariants({ size: "sm" }), "gap-1.5")}
+                    >
+                      Google · Kalender
+                    </Link>
+                    <Link
+                      href="/google?tab=day"
+                      className={cn(
+                        buttonVariants({ size: "sm", variant: "outline" }),
+                        "gap-1.5"
+                      )}
+                    >
+                      Gmail-Tagesanalyse
+                    </Link>
+                    <Link
+                      href="/microsoft?tab=calendar"
+                      className={cn(
+                        buttonVariants({ size: "sm", variant: "outline" }),
+                        "gap-1.5"
+                      )}
+                    >
+                      Microsoft · Kalender
+                    </Link>
+                    <Link
+                      href="/microsoft?tab=day"
+                      className={cn(
+                        buttonVariants({ size: "sm", variant: "outline" }),
+                        "gap-1.5"
+                      )}
+                    >
+                      Outlook-Tagesanalyse
+                    </Link>
+                  </div>
                 </DetailRow>
               ) : null}
 
