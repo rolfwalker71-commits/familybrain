@@ -28,6 +28,7 @@ export type GoogleReviewEvent = {
   date: string;
   startHm: string | null;
   endHm: string | null;
+  location: string | null;
   isAllDay: boolean;
   done: boolean;
   htmlLink: string | null;
@@ -42,6 +43,35 @@ function withDonePrefix(subject: string): string {
   const s = (subject || "").trim() || "Termin";
   if (isDoneTitle(s)) return s.slice(0, 255);
   return `${BUDDY_DONE_PREFIX}${s}`.slice(0, 255);
+}
+
+/** Heutige Termine (alle aktivierten Google-Kalender) für den Hub-Kalender-Tab. */
+export async function listGoogleEventsToday(
+  userId: number,
+  request?: Request | null
+): Promise<GoogleReviewEvent[]> {
+  const today = zurichYmd();
+  const events = await listGoogleCalendarEventsInRange(
+    userId,
+    today,
+    today,
+    request
+  );
+  return events.map((e) => {
+    const summary = (e.summary || "").trim() || "(ohne Titel)";
+    return {
+      id: e.id,
+      calendarId: e.calendarId,
+      subject: summary,
+      date: e.date,
+      startHm: e.time,
+      endHm: e.endTime,
+      location: e.location,
+      isAllDay: !e.time,
+      done: isDoneTitle(summary),
+      htmlLink: null,
+    };
+  });
 }
 
 export async function getGoogleCalendarEvent(
@@ -86,6 +116,7 @@ export async function getGoogleCalendarEvent(
     date: startDate,
     startHm,
     endHm,
+    location: null,
     isAllDay: Boolean(ev.start?.date && !ev.start?.dateTime),
     done,
     htmlLink: ev.htmlLink || null,

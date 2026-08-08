@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { MailPageClient } from "@/components/mail/mail-page-client";
+import { GoogleWorkspaceClient } from "@/components/google/google-workspace-client";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +12,7 @@ export default function GooglePage() {
         </p>
       }
     >
-      <MailPageClient />
+      <GoogleWorkspaceClient />
     </Suspense>
   );
 }

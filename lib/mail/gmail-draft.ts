@@ -45,12 +45,54 @@ function buildPlainReplyMime(input: {
 }
 
 /**
+ * Freier Gmail-Entwurf (ohne Thread) — Fallback für Tagesanalyse.
+ */
+export async function createGmailDraft(
+  userId: number,
+  input: { to: string; subject: string; body: string },
+  request?: Request | null
+): Promise<{ ok: boolean; draftId?: string; error?: string; skipped?: string }> {
+  const to = input.to.trim();
+  const body = input.body.trim();
+  const subject = input.subject.trim() || "(kein Betreff)";
+  if (!to.includes("@")) return { ok: false, error: "Ungültige Empfänger-Adresse." };
+  if (!body) return { ok: false, skipped: "leerer Text" };
+  if (!hasGmailModifyScope(userId)) {
+    return { ok: false, skipped: "gmail.modify fehlt" };
+  }
+  const me = getConnectedGoogleEmail(userId);
+  if (!me) return { ok: false, skipped: "keine Google-E-Mail" };
+  try {
+    const auth = await getAuthedGoogleClient(userId, request);
+    const gmail = google.gmail({ version: "v1", auth });
+    const raw = toBase64Url(
+      buildPlainReplyMime({
+        from: me,
+        to,
+        subject,
+        inReplyTo: null,
+        references: null,
+        text: body,
+      })
+    );
+    const created = await gmail.users.drafts.create({
+      userId: "me",
+      requestBody: { message: { raw } },
+    });
+    return { ok: true, draftId: created.data.id || undefined };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    return { ok: false, error: msg };
+  }
+}
+
+/**
  * Create a Gmail draft reply in the same thread (user can edit/send in Gmail).
  */
 export async function createGmailReplyDraft(
   userId: number,
   messageId: string,
-  draft: { subject?: string | null; body: string },
+  draft: { subject?: string | null; body: string; to?: string | null },
   request?: Request | null
 ): Promise<{ ok: boolean; draftId?: string; skipped?: string; error?: string }> {
   const body = draft.body.trim();
@@ -76,7 +118,10 @@ export async function createGmailReplyDraft(
     const messageIdHdr = headerValue(headers, "Message-ID");
     const prevRefs = headerValue(headers, "References");
     const replyTo =
-      headerValue(headers, "Reply-To") || headerValue(headers, "From") || me;
+      draft.to?.trim() ||
+      headerValue(headers, "Reply-To") ||
+      headerValue(headers, "From") ||
+      me;
     const subject =
       draft.subject?.trim() ||
       (/^(re|aw|wg|fwd?)\s*:/i.test(subjectRaw)
