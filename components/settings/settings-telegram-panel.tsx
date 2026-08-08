@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { IconCircle } from "@/components/layout/icon-circle";
 
+type InboundMode = "off" | "poll" | "webhook";
+
 export function SettingsTelegramPanel() {
   const [botToken, setBotToken] = useState("");
   const [chatId, setChatId] = useState("");
@@ -16,12 +18,34 @@ export function SettingsTelegramPanel() {
   const [hasToken, setHasToken] = useState(false);
   const [hasChatId, setHasChatId] = useState(false);
   const [configured, setConfigured] = useState(false);
+  const [inboundMode, setInboundMode] = useState<InboundMode>("off");
+  const [webhookUrl, setWebhookUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [probing, setProbing] = useState(false);
+  const [inboundBusy, setInboundBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [probeResult, setProbeResult] = useState<string | null>(null);
+
+  const loadInbound = useCallback(async () => {
+    try {
+      const res = await fetch("/api/settings/telegram-inbound");
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setInboundMode(
+          data.mode === "webhook" || data.mode === "poll" || data.mode === "off"
+            ? data.mode
+            : "off"
+        );
+        setWebhookUrl(
+          typeof data.webhookUrl === "string" ? data.webhookUrl : null
+        );
+      }
+    } catch {
+      /* optional */
+    }
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -40,12 +64,13 @@ export function SettingsTelegramPanel() {
         typeof data.telegramChatId === "string" ? data.telegramChatId : ""
       );
       setBotToken("");
+      await loadInbound();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [loadInbound]);
 
   useEffect(() => {
     void load();
@@ -78,6 +103,15 @@ export function SettingsTelegramPanel() {
         typeof data.telegramChatId === "string" ? data.telegramChatId : chatId
       );
       setBotToken("");
+      // Auto-enable poll so buttons work without extra setup.
+      if (data.hasTelegramConfigured) {
+        await fetch("/api/settings/telegram-inbound", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "enable_poll" }),
+        }).catch(() => null);
+        await loadInbound();
+      }
       setMessage("Telegram-Einstellungen gespeichert.");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -91,6 +125,11 @@ export function SettingsTelegramPanel() {
     setMessage(null);
     setError(null);
     try {
+      await fetch("/api/settings/telegram-inbound", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "disable" }),
+      }).catch(() => null);
       const res = await fetch("/api/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -109,6 +148,7 @@ export function SettingsTelegramPanel() {
       setConfigured(false);
       setBotToken("");
       setChatId("");
+      setInboundMode("off");
       setMessage("Telegram-Zugang entfernt.");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -142,6 +182,42 @@ export function SettingsTelegramPanel() {
     }
   }
 
+  async function setInbound(action: "enable_poll" | "enable_webhook" | "disable") {
+    setInboundBusy(true);
+    setMessage(null);
+    setError(null);
+    try {
+      const res = await fetch("/api/settings/telegram-inbound", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.ok === false) {
+        throw new Error(
+          data.error || data.hint || `Inbound: HTTP ${res.status}`
+        );
+      }
+      setInboundMode(
+        data.mode === "webhook" || data.mode === "poll" || data.mode === "off"
+          ? data.mode
+          : inboundMode
+      );
+      if (typeof data.webhookUrl === "string") setWebhookUrl(data.webhookUrl);
+      setMessage(
+        action === "enable_webhook"
+          ? "Webhook aktiv — Telegram ruft Buddy direkt an."
+          : action === "enable_poll"
+            ? "Polling aktiv — Buddy holt Updates alle paar Sekunden."
+            : "Telegram-Aktionen aus."
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setInboundBusy(false);
+    }
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -152,14 +228,15 @@ export function SettingsTelegramPanel() {
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-sm text-muted-foreground">
-          Zusätzlicher Kanal parallel zu Web Push: jede Live-Benachrichtigung
-          (Dokumente, Reisen, Finanzen, Briefing, …) mit gleichem Text und —
-          wenn vorhanden — dem KI-/Event-Bild. Bot bei{" "}
+          Zusätzlicher Kanal parallel zu Web Push: Live-Benachrichtigungen mit
+          Text und Bild. Bei Belegen Buttons{" "}
+          <span className="font-medium">Zahlen / Irrelevant / Später</span>,
+          beim Abend-Digest bis zu drei{" "}
+          <span className="font-medium">Erledigt</span>-Termine. Antworten auf
+          die Nachricht mit denselben Stichworten geht auch. Bot bei{" "}
           <span className="font-medium">@BotFather</span> anlegen, einmal
-          anschreiben, Chat-ID z. B. über{" "}
-          <span className="font-medium">@userinfobot</span> oder{" "}
-          <code className="text-[11px]">getUpdates</code> ermitteln. Master-Schalter
-          unter Live-Benachrichtigungen gilt auch hier.
+          anschreiben, Chat-ID ermitteln. Master-Schalter unter
+          Live-Benachrichtigungen gilt auch hier.
         </p>
 
         {message ? (
@@ -204,7 +281,13 @@ export function SettingsTelegramPanel() {
             </div>
             {configured ? (
               <p className="text-xs text-emerald-700">
-                Konfiguriert — Buddy kann Nachrichten senden.
+                Konfiguriert — Senden ok
+                {inboundMode === "poll"
+                  ? " · Aktionen via Polling"
+                  : inboundMode === "webhook"
+                    ? " · Aktionen via Webhook"
+                    : " · Aktionen aus"}
+                .
               </p>
             ) : (
               <p className="text-xs text-amber-800">
@@ -214,7 +297,7 @@ export function SettingsTelegramPanel() {
             <div className="flex flex-wrap gap-2">
               <Button
                 type="button"
-                disabled={saving || probing}
+                disabled={saving || probing || inboundBusy}
                 onClick={() => void save()}
               >
                 {saving ? "Speichert…" : "Telegram speichern"}
@@ -222,7 +305,7 @@ export function SettingsTelegramPanel() {
               <Button
                 type="button"
                 variant="outline"
-                disabled={saving || probing || !configured}
+                disabled={saving || probing || inboundBusy || !configured}
                 onClick={() => void probe()}
               >
                 {probing ? "Sendet…" : "Testnachricht senden"}
@@ -231,13 +314,54 @@ export function SettingsTelegramPanel() {
                 <Button
                   type="button"
                   variant="ghost"
-                  disabled={saving || probing}
+                  disabled={saving || probing || inboundBusy}
                   onClick={() => void clearAll()}
                 >
                   Entfernen
                 </Button>
               ) : null}
             </div>
+
+            {configured ? (
+              <div className="space-y-2 rounded-md border border-border/70 p-3">
+                <p className="text-sm font-medium">Aktionen empfangen</p>
+                <p className="text-xs text-muted-foreground">
+                  Polling funktioniert ohne öffentlichen HTTPS-Webhook.
+                  Webhook ist sparsam, braucht aber erreichbare App-URL
+                  {webhookUrl ? ` (${webhookUrl})` : ""}.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={inboundMode === "poll" ? "default" : "outline"}
+                    disabled={inboundBusy}
+                    onClick={() => void setInbound("enable_poll")}
+                  >
+                    Polling
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={inboundMode === "webhook" ? "default" : "outline"}
+                    disabled={inboundBusy}
+                    onClick={() => void setInbound("enable_webhook")}
+                  >
+                    Webhook
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={inboundMode === "off" ? "default" : "ghost"}
+                    disabled={inboundBusy}
+                    onClick={() => void setInbound("disable")}
+                  >
+                    Aus
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+
             {probeResult ? (
               <pre className="max-h-48 overflow-auto rounded-md border border-border/70 bg-background p-3 text-[11px] leading-relaxed whitespace-pre-wrap break-all">
                 {probeResult}

@@ -139,6 +139,7 @@ export function bootstrapDatabase(db: Database.Database): void {
   ensureTripTravelersTable(db);
   ensureFinanceBrainTables(db);
   ensureUserAccessTables(db);
+  ensureTelegramActionTokens(db);
   ensureInboxTaskTables(db);
   ensureMailAnalysesTable(db);
   ensureMailSenderPrefsTable(db);
@@ -1138,5 +1139,24 @@ function ensureUserAccessTables(db: Database.Database): void {
       FOREIGN KEY(ledger_id) REFERENCES finance_ledgers(id) ON DELETE CASCADE
     );
     CREATE INDEX IF NOT EXISTS idx_user_ledger_access_ledger ON user_ledger_access(ledger_id);
+  `);
+}
+
+/** Short-lived tokens for Telegram inline buttons / reply actions. */
+function ensureTelegramActionTokens(db: Database.Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS telegram_action_tokens (
+      token TEXT PRIMARY KEY,
+      kind TEXT NOT NULL,
+      payload TEXT NOT NULL,
+      message_id INTEGER,
+      created_at TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      consumed_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_telegram_action_tokens_message
+      ON telegram_action_tokens(message_id);
+    CREATE INDEX IF NOT EXISTS idx_telegram_action_tokens_expires
+      ON telegram_action_tokens(expires_at);
   `);
 }

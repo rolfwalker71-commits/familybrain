@@ -6,5 +6,11 @@ export async function register() {
     } catch (error) {
       console.error("[familybrain] Scheduler failed to start:", error);
     }
+    try {
+      const { startTelegramPollLoop } = await import("./lib/telegram/poll");
+      startTelegramPollLoop();
+    } catch (error) {
+      console.error("[familybrain] Telegram poll failed to start:", error);
+    }
   }
 }
