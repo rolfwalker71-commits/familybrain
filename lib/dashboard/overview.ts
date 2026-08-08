@@ -212,6 +212,8 @@ export type OverviewPayload = {
   todayCalendar: AgendaItem[];
   /** Heute-Mails (Gmail), max 5 — Link zu /google */
   todayMail: MailListItem[];
+  /** Heute-Mails (Outlook), max 5 — Link zu /microsoft */
+  todayMailMicrosoft: MailListItem[];
   kpi: {
     total: number;
     byCategory: KpiCategorySlice[];
@@ -740,12 +742,22 @@ export async function getDashboardOverview(
       .get(daysFromNow(7)) as { c: number }
   ).c;
 
-  const [agendaWithWeather, todayCalendar, upcomingBirthdays, todayMail, hockey, homeWeatherRaw, tasksBundle, mailStats, referenceNotes] =
+  const [agendaWithWeather, todayCalendar, upcomingBirthdays, todayMail, todayMailMicrosoft, hockey, homeWeatherRaw, tasksBundle, mailStats, referenceNotes] =
     await Promise.all([
       enrichAgendaWithWeather(agenda),
       getTodayCalendarExcerpt(calendarUserId, 12),
       getUpcomingBirthdaysExcerpt(calendarUserId, 7).catch(() => [] as AgendaItem[]),
       getTodayMailExcerpt(calendarUserId, 8),
+      (async () => {
+        try {
+          const { getTodayMicrosoftMailExcerpt } = await import(
+            "@/lib/microsoft/mail-inbox"
+          );
+          return await getTodayMicrosoftMailExcerpt(calendarUserId, 8);
+        } catch {
+          return [] as MailListItem[];
+        }
+      })(),
       getOverviewHockeyBundle(calendarUserId),
       fetchHomeWeather(),
       (async () => {
@@ -879,6 +891,7 @@ export async function getDashboardOverview(
     agenda: attachAgendaAiIconMeta(agendaWithWeather),
     todayCalendar: attachAgendaAiIconMeta(todayCalendar),
     todayMail,
+    todayMailMicrosoft,
     kpi: { total: kpiTotal, byCategory },
     financeItems,
     hockey: {

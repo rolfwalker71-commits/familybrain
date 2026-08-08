@@ -123,28 +123,43 @@ function isPlanningRelevant(item: AgendaItem): boolean {
 }
 
 /**
- * KPI «Nächster Termin»: nur heutige Termine, die noch nicht begonnen haben.
- * Laufende Termine gehören in die Timeline, nicht in die Kachel.
+ * KPI «Nächster Termin»: heutige Termine, die noch nicht begonnen haben
+ * (optional ergänzt um morgige), max. `limit`.
  */
+function pickNextUpcomingAgendaItems(
+  items: AgendaItem[],
+  today: string,
+  nowHm: string,
+  limit = 2
+): AgendaItem[] {
+  const pool = items
+    .filter((i) => isPlanningRelevant(i) && !isBirthdayItem(i))
+    .sort((a, b) => {
+      const dc = a.date.localeCompare(b.date);
+      if (dc !== 0) return dc;
+      return (a.time || "99:99").localeCompare(b.time || "99:99");
+    });
+  if (!pool.length) return [];
+  const now = hmToMinutes(nowHm) ?? 0;
+  const out: AgendaItem[] = [];
+  for (const i of pool) {
+    if (out.length >= limit) break;
+    if (i.date === today && i.time) {
+      const w = eventWindowMinutes(i);
+      if (w != null && w.start > now) out.push(i);
+      continue;
+    }
+    if (i.date > today) out.push(i);
+  }
+  return out;
+}
+
 function pickNextUpcomingAgendaItem(
   items: AgendaItem[],
   today: string,
   nowHm: string
 ): AgendaItem | null {
-  const pool = items.filter(
-    (i) => isPlanningRelevant(i) && !isBirthdayItem(i)
-  );
-  if (!pool.length) return null;
-  const now = hmToMinutes(nowHm) ?? 0;
-
-  return (
-    pool
-      .filter((i) => i.date === today && i.time)
-      .find((i) => {
-        const w = eventWindowMinutes(i);
-        return w != null && w.start > now;
-      }) || null
-  );
+  return pickNextUpcomingAgendaItems(items, today, nowHm, 1)[0] ?? null;
 }
 
 /** Timeline-Highlight: laufender Termin, sonst nächster heute, sonst morgen. */
@@ -841,7 +856,7 @@ function FocusTile({
     <Link
       href={href}
       className={cn(
-        "flex min-w-0 items-start gap-3 rounded-2xl border border-border/60 border-l-4 bg-card px-4 py-3.5 shadow-sm transition-colors hover:bg-muted/30",
+        "flex min-w-0 items-start gap-3 rounded-2xl border border-border/60 border-l-4 bg-card px-3.5 py-2.5 shadow-sm transition-colors hover:bg-muted/30",
         toneCls
       )}
     >
@@ -932,15 +947,15 @@ function MailAnalyseFocusTile({
               ? "/microsoft?tab=triage"
               : "/microsoft?tab=inbox"
           }
-          className="block px-4 py-2.5 transition-colors hover:bg-muted/30"
+          className="block px-3.5 py-1.5 transition-colors hover:bg-muted/30"
         >
-          <p className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             O365 Mail
           </p>
-          <p className="truncate text-[15px] font-black tracking-tight">
+          <p className="truncate text-[14px] font-black tracking-tight">
             {mailAnalyseLine(microsoft)}
           </p>
-          <p className="truncate text-[13px] text-muted-foreground">
+          <p className="truncate text-[12px] text-muted-foreground">
             {microsoft.pendingTriage > 0
               ? `${microsoft.pendingTriage} offen`
               : microsoft.analyzedToday > 0
@@ -949,20 +964,20 @@ function MailAnalyseFocusTile({
             {msTime ? ` · ${msTime}` : ""}
           </p>
         </Link>
-        <div className="mx-4 border-t border-border/70" aria-hidden />
+        <div className="mx-3.5 border-t border-border/70" aria-hidden />
         <Link
           href={
             google.pendingTriage > 0 ? "/google?tab=triage" : "/google"
           }
-          className="block px-4 py-2.5 transition-colors hover:bg-muted/30"
+          className="block px-3.5 py-1.5 transition-colors hover:bg-muted/30"
         >
-          <p className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             Google Mail
           </p>
-          <p className="truncate text-[15px] font-black tracking-tight">
+          <p className="truncate text-[14px] font-black tracking-tight">
             {mailAnalyseLine(google)}
           </p>
-          <p className="truncate text-[13px] text-muted-foreground">
+          <p className="truncate text-[12px] text-muted-foreground">
             {google.pendingTriage > 0
               ? `${google.pendingTriage} offen`
               : google.analyzedToday > 0
@@ -976,7 +991,156 @@ function MailAnalyseFocusTile({
   );
 }
 
-const OVERVIEW_LS_KEY = "buddy-overview-cache-v1";
+function mailInboxSample(items: MailListItem[]): MailListItem | null {
+  const unread = items.find((m) => m.unread);
+  return unread || items[0] || null;
+}
+
+function mailReceivedLabel(item: MailListItem | null): string | null {
+  if (!item) return null;
+  const raw = item.date || item.internalDate;
+  if (!raw) return null;
+  const iso =
+    /^\d+$/.test(raw) ? new Date(Number(raw)).toISOString() : raw;
+  return formatMailAnalyseTime(iso);
+}
+
+function InboxFocusTile({
+  google,
+  microsoft,
+}: {
+  google: MailListItem[];
+  microsoft: MailListItem[];
+}) {
+  const ms = mailInboxSample(microsoft);
+  const g = mailInboxSample(google);
+  const msTime = mailReceivedLabel(ms);
+  const gTime = mailReceivedLabel(g);
+
+  return (
+    <div className="flex min-w-0 items-stretch gap-2.5 rounded-2xl border border-border/60 border-l-4 border-l-amber-500 bg-amber-50/40 shadow-sm">
+      <div className="flex shrink-0 items-center pl-3.5">
+        <Mail
+          className="size-5 text-amber-800"
+          strokeWidth={APP_ICON_STROKE}
+          absoluteStrokeWidth
+          aria-hidden
+        />
+      </div>
+      <div className="min-w-0 flex-1">
+        <Link
+          href={
+            ms
+              ? `/microsoft?tab=inbox&open=${encodeURIComponent(ms.id)}`
+              : "/microsoft?tab=inbox"
+          }
+          className="block px-3.5 py-1.5 transition-colors hover:bg-muted/30"
+        >
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            O365 Mail
+          </p>
+          <p className="truncate text-[14px] font-black tracking-tight">
+            {ms ? ms.subject || "(kein Betreff)" : "Keine Mails"}
+          </p>
+          <p className="truncate text-[12px] text-muted-foreground">
+            {ms
+              ? `${ms.fromName}${ms.unread ? " · neu" : ""}`
+              : "Outlook"}
+            {msTime ? ` · ${msTime}` : ""}
+          </p>
+        </Link>
+        <div className="mx-3.5 border-t border-border/70" aria-hidden />
+        <Link
+          href={
+            g ? `/google?open=${encodeURIComponent(g.id)}` : "/google"
+          }
+          className="block px-3.5 py-1.5 transition-colors hover:bg-muted/30"
+        >
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Google Mail
+          </p>
+          <p className="truncate text-[14px] font-black tracking-tight">
+            {g ? g.subject || "(kein Betreff)" : "Keine Mails"}
+          </p>
+          <p className="truncate text-[12px] text-muted-foreground">
+            {g ? `${g.fromName}${g.unread ? " · neu" : ""}` : "Gmail"}
+            {gTime ? ` · ${gTime}` : ""}
+          </p>
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function TermineFocusTile({
+  items,
+  today,
+}: {
+  items: AgendaItem[];
+  today: string;
+}) {
+  const [first, second] = items;
+
+  function row(item: AgendaItem | undefined, label: string) {
+    const titleLine = !item
+      ? "Keine Termine"
+      : item.date === today
+        ? [item.time, item.title].filter(Boolean).join(" · ")
+        : item.date > today
+          ? [
+              `Morgen${item.time ? ` · ${item.time}` : ""}`,
+              item.title,
+            ]
+              .filter(Boolean)
+              .join(" · ")
+          : item.title;
+    return (
+      <Link
+        href={item ? itemHref(item) : "/calendar"}
+        className="block px-3.5 py-1.5 transition-colors hover:bg-muted/30"
+      >
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          {label}
+        </p>
+        <p className="truncate text-[14px] font-black tracking-tight">
+          {titleLine}
+        </p>
+        <p className="truncate text-[12px] text-muted-foreground">
+          {item
+            ? [
+                shortPlace(item),
+                item.driveLabel,
+              ]
+                .filter(Boolean)
+                .join(" · ") ||
+              item.subtitle ||
+              "Kalender"
+            : "Kalender öffnen"}
+        </p>
+      </Link>
+    );
+  }
+
+  return (
+    <div className="flex min-w-0 items-stretch gap-2.5 rounded-2xl border border-border/60 border-l-4 border-l-emerald-600 bg-emerald-50/40 shadow-sm">
+      <div className="flex shrink-0 items-center pl-3.5">
+        <CalendarDays
+          className="size-5 text-emerald-800"
+          strokeWidth={APP_ICON_STROKE}
+          absoluteStrokeWidth
+          aria-hidden
+        />
+      </div>
+      <div className="min-w-0 flex-1">
+        {row(first, "Nächster Termin")}
+        <div className="mx-3.5 border-t border-border/70" aria-hidden />
+        {row(second, "Danach")}
+      </div>
+    </div>
+  );
+}
+
+const OVERVIEW_LS_KEY = "buddy-overview-cache-v2";
 const OVERVIEW_LS_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 function readStaleOverview(period: OverviewPeriod): OverviewPayload | null {
@@ -1174,8 +1338,8 @@ export function OverviewDashboard({
     return filterAblaufTimelineItems(merged, today, nowHm, 30);
   }, [data, today, nowHm]);
 
-  const nextFocusEvent = useMemo(
-    () => pickNextUpcomingAgendaItem(timelineItems, today, nowHm),
+  const nextFocusEvents = useMemo(
+    () => pickNextUpcomingAgendaItems(timelineItems, today, nowHm, 2),
     [timelineItems, today, nowHm]
   );
 
@@ -1253,9 +1417,9 @@ export function OverviewDashboard({
     1
   );
 
-  const mailFocus = (data?.todayMail || []) as MailListItem[];
-  const unreadMail = mailFocus.filter((m) => m.unread);
-  const mailSample = unreadMail[0] || mailFocus[0];
+  const mailFocusGoogle = (data?.todayMail || []) as MailListItem[];
+  const mailFocusMicrosoft = (data?.todayMailMicrosoft ||
+    []) as MailListItem[];
 
   return (
     <div className="min-w-0 space-y-6 pb-10">
@@ -1338,34 +1502,7 @@ export function OverviewDashboard({
               Heute im Fokus
             </h2>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <FocusTile
-                href={nextFocusEvent ? itemHref(nextFocusEvent) : "/calendar"}
-                tone="teal"
-                icon={CalendarDays}
-                eyebrow="Nächster Termin"
-                title={
-                  nextFocusEvent
-                    ? [
-                        nextFocusEvent.time,
-                        nextFocusEvent.title,
-                      ]
-                        .filter(Boolean)
-                        .join(" · ")
-                    : "Keine Termine"
-                }
-                detail={
-                  nextFocusEvent
-                    ? [
-                        shortPlace(nextFocusEvent),
-                        nextFocusEvent.driveLabel,
-                      ]
-                        .filter(Boolean)
-                        .join(" · ") ||
-                      nextFocusEvent.subtitle ||
-                      "Kalender öffnen"
-                    : "Kalender öffnen"
-                }
-              />
+              <TermineFocusTile items={nextFocusEvents} today={today} />
               <FocusTile
                 href="/finance"
                 tone="rose"
@@ -1382,25 +1519,9 @@ export function OverviewDashboard({
                     : "Finanzen im Blick"
                 }
               />
-              <FocusTile
-                href={
-                  mailSample
-                    ? `/google?open=${encodeURIComponent(mailSample.id)}`
-                    : "/google"
-                }
-                tone="amber"
-                icon={Mail}
-                eyebrow="Heute · Mail"
-                title={
-                  mailSample
-                    ? mailSample.subject || "(kein Betreff)"
-                    : "Keine Mails"
-                }
-                detail={
-                  mailSample
-                    ? `${mailSample.fromName}${mailSample.unread ? " · neu" : ""}`
-                    : "Posteingang"
-                }
+              <InboxFocusTile
+                google={mailFocusGoogle}
+                microsoft={mailFocusMicrosoft}
               />
               <MailAnalyseFocusTile
                 google={

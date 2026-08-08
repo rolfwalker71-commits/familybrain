@@ -138,6 +138,33 @@ export async function listMicrosoftInboxMessages(
   }
 }
 
+/** Overview KPI: latest inbox mails today (or newest if today empty). */
+export async function getTodayMicrosoftMailExcerpt(
+  userId: number | null,
+  limit = 5
+): Promise<MailListItem[]> {
+  if (userId == null) return [];
+  try {
+    const { isMicrosoftConnected, hasMicrosoftMailScope } = await import(
+      "@/lib/microsoft/oauth"
+    );
+    if (!isMicrosoftConnected(userId) || !hasMicrosoftMailScope(userId)) {
+      return [];
+    }
+    const today = await listMicrosoftInboxMessages(userId, {
+      filter: "today",
+      limit,
+    });
+    if (today.length > 0) return today;
+    return await listMicrosoftInboxMessages(userId, {
+      filter: "week",
+      limit,
+    });
+  } catch {
+    return [];
+  }
+}
+
 export async function getMicrosoftMessage(
   userId: number,
   messageId: string
