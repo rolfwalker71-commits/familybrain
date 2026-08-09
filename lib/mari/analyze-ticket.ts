@@ -1,5 +1,9 @@
 import { z } from "zod";
 import { getOpenAIClient, getOpenAIModel, hasOpenAIKey } from "@/lib/ai/client";
+import {
+  buildAiTokenUsage,
+  type AiTokenUsage,
+} from "@/lib/ai/usage-cost";
 import type { MariTicketDetail } from "@/lib/mari/tickets";
 
 function clip(s: string, max: number): string {
@@ -235,6 +239,7 @@ Keine erfundenen Fakten. score als Zahl. Arrays nie weglassen (leer ok). Antwort
 export type AnalyzeMariTicketResult = MariTicketAnalysis & {
   imagesAnalyzed: number;
   imageNames: string[];
+  usage: AiTokenUsage;
 };
 
 export async function analyzeMariTicket(
@@ -338,5 +343,6 @@ ${timelineText.slice(0, 14000) || "(keine Positionen)"}`;
     ...result.data,
     imagesAnalyzed: images.length,
     imageNames,
+    usage: buildAiTokenUsage(model, completion.usage),
   };
 }

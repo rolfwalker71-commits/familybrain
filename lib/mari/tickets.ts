@@ -412,7 +412,11 @@ ORDER BY "ChangeDate", "ChangeLogID"`
       text: plain.slice(0, 4000),
       actor,
       meta:
-        line.VisibleInternOnly === 1 ? "Nur intern sichtbar" : null,
+        // HANA: VisibleInternOnly = -1 (true) / 0 (false)
+        line.VisibleInternOnly != null &&
+        Number(line.VisibleInternOnly) !== 0
+          ? "Nur intern sichtbar"
+          : null,
     });
   }
 

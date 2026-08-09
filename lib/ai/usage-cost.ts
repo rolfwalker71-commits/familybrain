@@ -22,16 +22,13 @@ export function estimateOpenAiCostUsd(
   promptTokens: number,
   completionTokens: number
 ): number | null {
-  const key = model.trim().toLowerCase();
-  const rates =
-    MODEL_USD_PER_MTOK[key] ||
-    MODEL_USD_PER_MTOK[key.replace(/-\d{8}$/, "")] ||
-    null;
-  if (!rates) return null;
-  return (
-    (promptTokens / 1_000_000) * rates.input +
-    (completionTokens / 1_000_000) * rates.output
+  const parts = estimateOpenAiCostPartsUsd(
+    model,
+    promptTokens,
+    completionTokens
   );
+  if (!parts) return null;
+  return parts.inputUsd + parts.outputUsd;
 }
 
 export function buildAiTokenUsage(
@@ -67,6 +64,29 @@ export function formatUsdCost(usd: number | null | undefined): string | null {
   return `$${usd.toFixed(3)}`;
 }
 
+function modelRates(model: string): { input: number; output: number } | null {
+  const key = model.trim().toLowerCase();
+  return (
+    MODEL_USD_PER_MTOK[key] ||
+    MODEL_USD_PER_MTOK[key.replace(/-\d{8}$/, "")] ||
+    null
+  );
+}
+
+/** Input-/Output-Kosten getrennt (Listenpreise, ungefähr). */
+export function estimateOpenAiCostPartsUsd(
+  model: string,
+  promptTokens: number,
+  completionTokens: number
+): { inputUsd: number; outputUsd: number } | null {
+  const rates = modelRates(model);
+  if (!rates) return null;
+  return {
+    inputUsd: (promptTokens / 1_000_000) * rates.input,
+    outputUsd: (completionTokens / 1_000_000) * rates.output,
+  };
+}
+
 export function formatTokenUsageLine(u: AiTokenUsage | null | undefined): string | null {
   if (!u || u.totalTokens <= 0) return null;
   const cost = formatUsdCost(u.estimatedCostUsd);
@@ -78,4 +98,35 @@ export function formatTokenUsageLine(u: AiTokenUsage | null | undefined): string
   ]
     .filter(Boolean)
     .join(" · ");
+}
+
+/**
+ * Mehrzeilige Übersicht Input/Output inkl. ungefährer USD-Beträge.
+ * Nur für UI — nicht in Ticket-Kommentare schreiben.
+ */
+export function formatTokenUsageBreakdownLines(
+  u: AiTokenUsage | null | undefined
+): string[] {
+  if (!u || u.totalTokens <= 0) return [];
+  const parts = estimateOpenAiCostPartsUsd(
+    u.model,
+    u.promptTokens,
+    u.completionTokens
+  );
+  const inCost = parts ? formatUsdCost(parts.inputUsd) : null;
+  const outCost = parts ? formatUsdCost(parts.outputUsd) : null;
+  const total = formatUsdCost(u.estimatedCostUsd);
+  return [
+    `Input: ${u.promptTokens.toLocaleString("de-CH")} Token${
+      inCost ? ` ≈ ${inCost}` : ""
+    }`,
+    `Output: ${u.completionTokens.toLocaleString("de-CH")} Token${
+      outCost ? ` ≈ ${outCost}` : ""
+    }`,
+    total
+      ? `Gesamt ≈ ${total}${u.model ? ` · ${u.model}` : ""} (Listenpreis, ungefähr)`
+      : u.model
+        ? `Modell: ${u.model}`
+        : "",
+  ].filter(Boolean);
 }

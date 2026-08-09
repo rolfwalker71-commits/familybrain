@@ -1,21 +1,23 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { ensureInitialized } from "@/lib/db/migrations";
 import { isAuthError, requireAuth } from "@/lib/auth/current-user";
-import { hasOpenAIKey } from "@/lib/ai/client";
 import { MariApiError } from "@/lib/mari/client";
 import { hasMariConfig } from "@/lib/mari/config";
-import { listMariImageAttachmentsForAi } from "@/lib/mari/attachments";
-import { analyzeMariTicket } from "@/lib/mari/analyze-ticket";
+import { MariTicketAnalysisSchema } from "@/lib/mari/analyze-ticket";
+import { postAnalysisAsInternalNote } from "@/lib/mari/internal-note";
 import { getTicketDetail } from "@/lib/mari/tickets";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-/** Vision + Attachments können länger dauern */
-export const maxDuration = 120;
 
 type Ctx = { params: Promise<{ id: string }> };
 
-export async function POST(_request: Request, context: Ctx) {
+const BodySchema = z.object({
+  analysis: MariTicketAnalysisSchema,
+});
+
+export async function POST(request: Request, context: Ctx) {
   ensureInitialized();
   const auth = await requireAuth();
   if (isAuthError(auth)) return auth;
@@ -25,12 +27,6 @@ export async function POST(_request: Request, context: Ctx) {
       { status: 503 }
     );
   }
-  if (!hasOpenAIKey()) {
-    return NextResponse.json(
-      { error: "OpenAI API-Key fehlt (Einstellungen → OpenAI)." },
-      { status: 400 }
-    );
-  }
 
   const { id: raw } = await context.params;
   const id = Number(raw);
@@ -38,28 +34,25 @@ export async function POST(_request: Request, context: Ctx) {
     return NextResponse.json({ error: "Ungültige Ticket-ID" }, { status: 400 });
   }
 
+  const json = await request.json().catch(() => null);
+  const parsed = BodySchema.safeParse(json);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Ungültige Analyse-Daten", details: parsed.error.flatten() },
+      { status: 400 }
+    );
+  }
+
   try {
+    // Ticket muss existieren; verhindert Blind-Writes
+    await getTicketDetail(id);
+    const posted = await postAnalysisAsInternalNote(id, parsed.data.analysis);
     const ticket = await getTicketDetail(id);
-    let images: Awaited<ReturnType<typeof listMariImageAttachmentsForAi>> = [];
-    try {
-      images = await listMariImageAttachmentsForAi(id, { maxImages: 4 });
-    } catch {
-      images = [];
-    }
-    const analysis = await analyzeMariTicket(ticket, {
-      images: images.map((img) => ({
-        dataUrl: img.dataUrl,
-        orgFilename: img.orgFilename,
-        mimeType: img.mimeType,
-      })),
-    });
-    const { imagesAnalyzed, imageNames, usage, ...payload } = analysis;
     return NextResponse.json({
-      analysis: payload,
-      issueId: id,
-      imagesAnalyzed,
-      imageNames,
-      usage,
+      ok: true,
+      attachmentId: posted.attachmentId,
+      internal: posted.internal,
+      ticket,
     });
   } catch (err) {
     const message =

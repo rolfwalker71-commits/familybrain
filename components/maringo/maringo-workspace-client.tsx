@@ -6,6 +6,7 @@ import {
   Calendar,
   Flag,
   Inbox,
+  Lock,
   MessageSquare,
   MoreHorizontal,
   RefreshCw,
@@ -39,6 +40,8 @@ import {
 import { cn } from "@/lib/utils";
 import { toSwissDate } from "@/lib/utils/dates";
 import type { MariTicketAnalysis } from "@/lib/mari/analyze-ticket";
+import type { AiTokenUsage } from "@/lib/ai/usage-cost";
+import { formatTokenUsageBreakdownLines } from "@/lib/ai/usage-cost";
 import type {
   MariEmployeeOption,
   MariTicketDetail,
@@ -166,6 +169,7 @@ function TimelineRow({ item }: { item: MariTimelineItem }) {
         <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
           {formatTimelineAt(item.at)} · {item.label}
           {item.actor ? ` · ${item.actor}` : ""}
+          {item.meta ? ` · ${item.meta}` : ""}
         </p>
         {item.subject ? (
           <p className="text-[12px] font-medium text-foreground/80">{item.subject}</p>
@@ -193,11 +197,14 @@ export function MaringoWorkspaceClient() {
   const [analysis, setAnalysis] = useState<MariTicketAnalysis | null>(null);
   const [imagesAnalyzed, setImagesAnalyzed] = useState(0);
   const [imageNames, setImageNames] = useState<string[]>([]);
+  const [analysisUsage, setAnalysisUsage] = useState<AiTokenUsage | null>(null);
   const [listLoading, setListLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
+  const [postingInternalNote, setPostingInternalNote] = useState(false);
   const [patching, setPatching] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notePostedHint, setNotePostedHint] = useState<string | null>(null);
   const [configured, setConfigured] = useState(true);
   const [dueDraft, setDueDraft] = useState("");
   const [employees, setEmployees] = useState<MariEmployeeOption[]>([]);
@@ -207,6 +214,10 @@ export function MaringoWorkspaceClient() {
   const [handlerMode, setHandlerMode] = useState<"list" | "manual">("list");
 
   const statusParam = useMemo(() => statuses.join(","), [statuses]);
+  const analysisUsageLines = useMemo(
+    () => formatTokenUsageBreakdownLines(analysisUsage),
+    [analysisUsage]
+  );
 
   const effectiveHandledBy = useMemo(() => {
     if (handlerMode === "manual") {
@@ -287,6 +298,8 @@ export function MaringoWorkspaceClient() {
     setAnalysis(null);
     setImagesAnalyzed(0);
     setImageNames([]);
+    setAnalysisUsage(null);
+    setNotePostedHint(null);
     setError(null);
     try {
       const res = await fetch(`/api/maringo/tickets/${id}`);
@@ -354,6 +367,8 @@ export function MaringoWorkspaceClient() {
     if (!selectedId) return;
     setAnalyzing(true);
     setError(null);
+    setNotePostedHint(null);
+    setAnalysisUsage(null);
     try {
       const res = await fetch(`/api/maringo/tickets/${selectedId}/analyze`, {
         method: "POST",
@@ -367,10 +382,52 @@ export function MaringoWorkspaceClient() {
           ? data.imageNames.map((n: unknown) => String(n))
           : []
       );
+      setAnalysisUsage(
+        data.usage && typeof data.usage === "object"
+          ? (data.usage as AiTokenUsage)
+          : null
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setAnalyzing(false);
+    }
+  }
+
+  async function postAnalysisAsInternalNote() {
+    if (!selectedId || !analysis) return;
+    const ok = window.confirm(
+      "AI-Vorschläge als internen Kommentar auf dem Ticket speichern?\n\nNur für internes Support-Personal sichtbar — nicht für den Kunden."
+    );
+    if (!ok) return;
+    setPostingInternalNote(true);
+    setError(null);
+    setNotePostedHint(null);
+    try {
+      const res = await fetch(
+        `/api/maringo/tickets/${selectedId}/internal-note`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ analysis }),
+        }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || "Interner Kommentar fehlgeschlagen");
+      }
+      if (data.ticket) {
+        setDetail(data.ticket as MariTicketDetail);
+      } else {
+        await loadDetail(selectedId);
+      }
+      setNotePostedHint(
+        "Als interner Kommentar geschrieben (nur intern sichtbar)."
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setPostingInternalNote(false);
     }
   }
 
@@ -933,6 +990,18 @@ export function MaringoWorkspaceClient() {
                           Keine Bild-Anhänge für die Analyse geladen (nur Text).
                         </p>
                       )}
+                      {analysisUsageLines.length > 0 ? (
+                        <div className="rounded-lg border border-orange-200/50 bg-white/50 px-2.5 py-2 text-[11px] leading-relaxed text-orange-950/80">
+                          <p className="font-semibold text-orange-900/90">
+                            Token / Kosten (nur in Buddy)
+                          </p>
+                          <ul className="mt-1 space-y-0.5">
+                            {analysisUsageLines.map((line) => (
+                              <li key={line}>{line}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
                       <p className="leading-relaxed">{analysis.summary}</p>
                       <div className="rounded-xl border border-orange-200/60 bg-white/70 px-3 py-2">
                         <p className="font-semibold">
@@ -1017,6 +1086,30 @@ export function MaringoWorkspaceClient() {
                           </pre>
                         </div>
                       ) : null}
+                      <div className="flex flex-col gap-2 border-t border-orange-200/50 pt-3">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="border-orange-300/80 bg-white/80 text-orange-950 hover:bg-orange-100/80"
+                          disabled={postingInternalNote}
+                          onClick={() => void postAnalysisAsInternalNote()}
+                        >
+                          <Lock className="size-3.5" />
+                          {postingInternalNote
+                            ? "Schreibe intern…"
+                            : "Als internen Kommentar schreiben"}
+                        </Button>
+                        <p className="text-[11px] text-orange-900/75">
+                          Wird mit Flag «Internal» nach Maringo geschrieben —
+                          nur für Support sichtbar, nicht für den Kunden.
+                        </p>
+                        {notePostedHint ? (
+                          <p className="text-[11px] font-medium text-emerald-800">
+                            {notePostedHint}
+                          </p>
+                        ) : null}
+                      </div>
                     </CardContent>
                   </Card>
                 ) : null}

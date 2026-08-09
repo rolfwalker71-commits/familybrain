@@ -106,7 +106,7 @@ Attachments (nur mit bekannter Issue-ID):
 - `GET /api/SupportIssueAttachmentList/{id}`
 - `GET /api/SupportIssueAttachmentListData/{id}` (inkl. Base64)
 - `GET|DELETE /api/SupportIssueAttachment/{attachmentId}`
-- `POST /api/SupportIssueAttachment`
+- `POST /api/SupportIssueAttachment` — Anhänge **und Notizen**; `Internal: true` = nur intern (`VisibleInternOnly = -1` in HANA). Notizen ohne Datei: `AttachmentTyp: 1`, HTML in `Comment`.
 
 Parallel existieren `/wopi/...`-Spiegelpfade derselben Operationen.
 
@@ -275,10 +275,12 @@ curl -sS -X POST -H "Authorization: Bearer $TOKEN" \
 
 1. Credentials: Einstellungen → Maringo (oder Env).
 2. Client: `lib/mari/*` — Token-Cache, SQL-Liste, GET/PATCH Issue, Timeline, Anhänge (Vision), AI-Analyse.
-3. UI: `/maringo` — Liste mit Status-Multiselect + Bearbeiter-Wahl, Detail + Verlauf, Status/Fälligkeit ändern, AI (Text + Screenshots).
+3. UI: `/maringo` — Liste mit Status-Multiselect + Bearbeiter-Wahl, Detail + Verlauf, Status/Fälligkeit ändern, AI (Text + Screenshots), optional **AI als internen Kommentar** zurückschreiben.
 4. Keine Secrets committen; SystemTools-SQL nur lesend.
 
 **AI-Screenshots:** `GET /api/SupportIssueAttachment/{id}` liefert Base64; bis zu 4 Bilder (png/jpeg/webp, kleine GIF-Signaturen werden übersprungen) gehen mit Vision in die Analyse.
+
+**AI → interner Kommentar:** Buddy `POST /api/maringo/tickets/{id}/internal-note` → MARI `POST /api/SupportIssueAttachment` mit `Internal: true`, `AttachmentTyp: 1`. Nie kunden-sichtbare Reply-Pfade.
 
 Menü: `/maringo` («Maringo Support»).
 ---
