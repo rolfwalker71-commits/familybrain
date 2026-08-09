@@ -162,6 +162,23 @@ async function tick(): Promise<void> {
     } catch (error) {
       console.warn("[scheduler] o365 pdf backfill check:", error);
     }
+
+    // O365 PDF live import (opt-in; skipped while catch-up enabled)
+    try {
+      const { isO365PdfLiveDue } = await import(
+        "@/lib/microsoft/mail-paperless-live"
+      );
+      if (isO365PdfLiveDue()) {
+        const { runO365PdfLiveJob } = await import(
+          "@/lib/jobs/background-runners"
+        );
+        void runO365PdfLiveJob("schedule").catch((error) => {
+          console.warn("[scheduler] o365 pdf live:", error);
+        });
+      }
+    } catch (error) {
+      console.warn("[scheduler] o365 pdf live check:", error);
+    }
   } catch (error) {
     state.lastResult =
       error instanceof Error ? error.message : String(error);

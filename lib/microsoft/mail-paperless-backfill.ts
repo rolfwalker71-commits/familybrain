@@ -12,6 +12,7 @@ import {
   ingestMicrosoftMessagePdfs,
   resolveO365TagIdsCached,
 } from "@/lib/microsoft/mail-to-paperless";
+import { cancelActiveJobRun } from "@/lib/jobs/queries";
 
 export const O365_PDF_BACKFILL_ENABLED_KEY = "o365_pdf_backfill_enabled";
 export const O365_PDF_BACKFILL_SINCE_KEY = "o365_pdf_backfill_since_ymd";
@@ -59,8 +60,8 @@ export type O365PdfBackfillLogEntry = {
  */
 /** Messages per Graph page ($top, Graph-seitig max. sinnvoll ~50). */
 export const O365_PDF_BACKFILL_PAGE_SIZE = 50;
-/** Max Graph-Seiten pro Job-Lauf. */
-export const O365_PDF_BACKFILL_MAX_PAGES_PER_RUN = 12;
+/** Max Graph-Seiten pro Job-Lauf (50×16 = 800 Mails). */
+export const O365_PDF_BACKFILL_MAX_PAGES_PER_RUN = 16;
 /** Hartes Mail-Limit über alle Seiten eines Laufs. */
 export const O365_PDF_BACKFILL_MAX_MESSAGES_PER_RUN =
   O365_PDF_BACKFILL_PAGE_SIZE * O365_PDF_BACKFILL_MAX_PAGES_PER_RUN;
@@ -69,13 +70,15 @@ export const O365_PDF_BACKFILL_MAX_PDFS_PER_RUN = 80;
 /** Parallel Graph attachment-list calls while scanning a page. */
 export const O365_PDF_BACKFILL_SCAN_CONCURRENCY = 12;
 /** Parallel PDF uploads within one mail. */
-export const O365_PDF_BACKFILL_UPLOAD_CONCURRENCY = 3;
+export const O365_PDF_BACKFILL_UPLOAD_CONCURRENCY = 2;
 /** Delay between successful catch-up blocks. */
 export const O365_PDF_BACKFILL_CHAIN_DELAY_MS = 400;
 /** Retry when global job lease is busy. */
 export const O365_PDF_BACKFILL_CHAIN_RETRY_MS = 4_000;
 /** Paperless consume poll interval during catch-up. */
 export const O365_PDF_BACKFILL_PAPERLESS_POLL_MS = 400;
+/** Cap wait per PDF so Stop/Fehler nicht minutenlang blockieren. */
+export const O365_PDF_BACKFILL_PAPERLESS_TIMEOUT_MS = 45_000;
 
 async function mapPool<T, R>(
   items: T[],
@@ -230,6 +233,12 @@ export function stopO365PdfBackfill(reason = "Manuell gestoppt"): O365PdfBackfil
   clearO365PdfBackfillChainTimer();
   setSetting(O365_PDF_BACKFILL_ENABLED_KEY, "0");
   setO365PdfBackfillNote(reason);
+  // Mark live UI idle immediately (uploads may still wind down cooperatively)
+  writeLiveProgress({
+    active: false,
+    step: "idle",
+    detail: reason,
+  });
   appendO365PdfBackfillLog({
     receivedAt: getSetting(O365_PDF_BACKFILL_REACHED_YMD_KEY)
       ? `${getSetting(O365_PDF_BACKFILL_REACHED_YMD_KEY)}T12:00:00Z`
@@ -238,6 +247,11 @@ export function stopO365PdfBackfill(reason = "Manuell gestoppt"): O365PdfBackfil
     outcome: "stopped",
     detail: reason,
   });
+  try {
+    cancelActiveJobRun("O365 Catch-up gestoppt");
+  } catch {
+    /* ignore if no active lease */
+  }
   return getO365PdfBackfillStatus();
 }
 
@@ -353,6 +367,19 @@ export function getO365PdfBackfillStatus(): O365PdfBackfillStatus {
   const lastError = getSetting(O365_PDF_BACKFILL_LAST_ERROR_KEY);
   const stats = parseStats(getSetting(O365_PDF_BACKFILL_STATS_KEY));
   const lastRunAt = getSetting(O365_PDF_BACKFILL_LAST_RUN_KEY);
+  const live = parseLiveProgress(getSetting(O365_PDF_BACKFILL_PROGRESS_KEY));
+  const reachedStored = getSetting(O365_PDF_BACKFILL_REACHED_YMD_KEY);
+  const reachedLive = ymdFromReceivedAt(live?.receivedDateTime);
+  const reachedYmd =
+    reachedStored && reachedLive
+      ? reachedStored > reachedLive
+        ? reachedStored
+        : reachedLive
+      : reachedStored || reachedLive;
+  // Heal: if live is ahead of stored watermark, persist it
+  if (reachedLive && (!reachedStored || reachedLive > reachedStored)) {
+    setSetting(O365_PDF_BACKFILL_REACHED_YMD_KEY, reachedLive);
+  }
   const complete =
     !enabled &&
     !cursor &&
@@ -361,7 +388,7 @@ export function getO365PdfBackfillStatus(): O365PdfBackfillStatus {
     enabled,
     sinceYmd: since,
     hasCursor: Boolean(cursor),
-    reachedYmd: getSetting(O365_PDF_BACKFILL_REACHED_YMD_KEY),
+    reachedYmd,
     lastRunAt,
     lastAttemptAt: getSetting(O365_PDF_BACKFILL_LAST_ATTEMPT_KEY),
     lastError,
@@ -375,7 +402,7 @@ export function getO365PdfBackfillStatus(): O365PdfBackfillStatus {
       lastError,
       complete,
     }),
-    live: parseLiveProgress(getSetting(O365_PDF_BACKFILL_PROGRESS_KEY)),
+    live,
   };
 }
 
@@ -668,6 +695,8 @@ export async function runO365PdfBackfillBatch(
         subject: msg.subject,
         tagIds,
         waitIntervalMs: O365_PDF_BACKFILL_PAPERLESS_POLL_MS,
+        waitTimeoutMs: O365_PDF_BACKFILL_PAPERLESS_TIMEOUT_MS,
+        shouldAbort: () => !isO365PdfBackfillEnabled(),
         concurrency: O365_PDF_BACKFILL_UPLOAD_CONCURRENCY,
       });
       let mailNew = 0;

@@ -7,6 +7,7 @@ import {
   JOB_TYPE_ANALYZE_PENDING,
   JOB_TYPE_DRIVE_MIRROR,
   JOB_TYPE_O365_PDF_BACKFILL,
+  JOB_TYPE_O365_PDF_LIVE,
   JOB_TYPE_PAPERLESS_WRITEBACK,
   JOB_TYPE_SYNC_ANALYZE,
   jobTypeLabel,
@@ -17,6 +18,7 @@ import {
   runAnalyzePendingJob,
   runDriveMirrorJob,
   runO365PdfBackfillJob,
+  runO365PdfLiveJob,
   runPaperlessWritebackJob,
 } from "@/lib/jobs/background-runners";
 import { getActiveJobRun } from "@/lib/jobs/queries";
@@ -36,6 +38,7 @@ const BodySchema = z.object({
       JOB_TYPE_PAPERLESS_WRITEBACK,
       JOB_TYPE_DRIVE_MIRROR,
       JOB_TYPE_O365_PDF_BACKFILL,
+      JOB_TYPE_O365_PDF_LIVE,
     ])
     .optional()
     .default(JOB_TYPE_SYNC_ANALYZE),
@@ -87,6 +90,8 @@ export async function POST(request: Request) {
     void runDriveMirrorJob("manual");
   } else if (jobType === JOB_TYPE_O365_PDF_BACKFILL) {
     void runO365PdfBackfillJob("manual");
+  } else if (jobType === JOB_TYPE_O365_PDF_LIVE) {
+    void runO365PdfLiveJob("manual");
   }
 
   return NextResponse.json(

@@ -47,6 +47,8 @@ export const JOB_TYPE_PAPERLESS_WRITEBACK = "paperless_writeback";
 export const JOB_TYPE_DRIVE_MIRROR = "drive_mirror";
 /** Crawl O365 inbox PDFs → Paperless (historical backfill). */
 export const JOB_TYPE_O365_PDF_BACKFILL = "o365_pdf_backfill";
+/** Incremental O365 PDF import for new mail (opt-in). */
+export const JOB_TYPE_O365_PDF_LIVE = "o365_pdf_live";
 
 export const BACKGROUND_JOB_TYPES = [
   JOB_TYPE_SYNC_ANALYZE,
@@ -56,6 +58,7 @@ export const BACKGROUND_JOB_TYPES = [
   JOB_TYPE_PAPERLESS_WRITEBACK,
   JOB_TYPE_DRIVE_MIRROR,
   JOB_TYPE_O365_PDF_BACKFILL,
+  JOB_TYPE_O365_PDF_LIVE,
 ] as const;
 
 export type BackgroundJobType = (typeof BACKGROUND_JOB_TYPES)[number];
@@ -83,6 +86,8 @@ export function jobTypeLabel(jobType: string): string {
       return "Drive-Spiegel (BUDDY)";
     case JOB_TYPE_O365_PDF_BACKFILL:
       return "O365-PDFs → Paperless";
+    case JOB_TYPE_O365_PDF_LIVE:
+      return "O365-PDFs Live-Import";
     default:
       return jobType;
   }

@@ -32,6 +32,17 @@ type LogEntry = {
   detail?: string | null;
 };
 
+type LiveSyncStatus = {
+  enabled: boolean;
+  intervalMinutes: number;
+  watermark: string | null;
+  lastRunAt: string | null;
+  lastAttemptAt: string | null;
+  lastError: string | null;
+  lastNote: string | null;
+  blockedByBackfill: boolean;
+};
+
 type BackfillStatus = {
   enabled: boolean;
   sinceYmd: string;
@@ -45,6 +56,11 @@ type BackfillStatus = {
   phase: "idle" | "queued" | "running_or_waiting" | "error" | "complete";
   documentsFromO365: number;
   live: LiveProgress | null;
+  liveSync?: LiveSyncStatus;
+  limits?: {
+    messagesPerRun: number;
+    pdfsPerRun: number;
+  };
   log: LogEntry[];
   stats: {
     messagesSeen: number;
@@ -179,21 +195,24 @@ export function O365PdfBackfillPanel() {
   const [error, setError] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [sinceYmd, setSinceYmd] = useState("");
+  /** Prevent poll from overwriting the date input while editing. */
+  const [sinceDirty, setSinceDirty] = useState(false);
 
   const load = useCallback(async () => {
     try {
       const res = await fetch("/api/buddy/o365-pdf-backfill");
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Status laden fehlgeschlagen");
-      setStatus(json as BackfillStatus);
-      setSinceYmd((json as BackfillStatus).sinceYmd);
+      const next = json as BackfillStatus;
+      setStatus(next);
+      setSinceYmd((prev) => (sinceDirty ? prev : next.sinceYmd));
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [sinceDirty]);
 
   useEffect(() => {
     void load();
@@ -209,6 +228,12 @@ export function O365PdfBackfillPanel() {
     setBusy(true);
     setError(null);
     try {
+      // Stop any running catch-up before resetting the window
+      await fetch("/api/buddy/o365-pdf-backfill", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stop: true }),
+      }).catch(() => undefined);
       const res = await fetch("/api/buddy/o365-pdf-backfill", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -217,8 +242,10 @@ export function O365PdfBackfillPanel() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Speichern fehlgeschlagen");
       setStatus(json as BackfillStatus);
+      setSinceYmd((json as BackfillStatus).sinceYmd);
+      setSinceDirty(false);
       setMsg(
-        "Zeitraum gesetzt — Cursor, Zähler und Log genullt. Danach «Backfill starten»."
+        "Zeitraum gesetzt — laufender Batch gestoppt, Cursor/Zähler/Log genullt. Danach «Backfill starten»."
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -270,7 +297,7 @@ export function O365PdfBackfillPanel() {
       if (!res.ok) throw new Error(json.error || "Stoppen fehlgeschlagen");
       setStatus(json as BackfillStatus);
       setMsg(
-        "Stop angefordert — laufende Mail endet noch, dann keine Auto-Fortsetzung. Cursor bleibt."
+        "Stop — Kette und Job-Lease beendet. Offene Paperless-Uploads brechen kooperativ ab (max. ~45 s). Cursor bleibt."
       );
       await load();
     } catch (err) {
@@ -280,8 +307,77 @@ export function O365PdfBackfillPanel() {
     }
   }
 
+  async function setLiveEnabled(enabled: boolean) {
+    setBusy(true);
+    setError(null);
+    setMsg(null);
+    try {
+      const res = await fetch("/api/buddy/o365-pdf-backfill", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ liveEnabled: enabled }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Speichern fehlgeschlagen");
+      setStatus(json as BackfillStatus);
+      setMsg(
+        enabled
+          ? "Laufender Import aktiviert (Standard war aus). Catch-up hat Vorrang."
+          : "Laufender Import deaktiviert."
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveLiveInterval(minutes: number) {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/buddy/o365-pdf-backfill", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ liveIntervalMinutes: minutes }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Intervall speichern fehlgeschlagen");
+      setStatus(json as BackfillStatus);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function runLiveOnce() {
+    setBusy(true);
+    setError(null);
+    setMsg(null);
+    try {
+      const res = await fetch("/api/jobs/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobType: "o365_pdf_live" }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Live-Job starten fehlgeschlagen");
+      setMsg("Live-Import gestartet (ein Durchlauf).");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const live = status?.live?.active ? status.live : null;
+  const liveSync = status?.liveSync;
   const log = status?.log || [];
+  const mailCap =
+    status?.limits?.messagesPerRun || live?.messageTotal || 800;
+  const pdfCap = status?.limits?.pdfsPerRun || live?.pdfsMaxThisBatch || 80;
 
   return (
     <Card>
@@ -301,8 +397,10 @@ export function O365PdfBackfillPanel() {
           <span className="font-medium text-foreground">
             älteste → neueste
           </span>{" "}
-          ab Startdatum. Catch-up in Blöcken (~600 Mails / 80 neue PDFs),
-          parallel prüfen/hochladen, verkettet sich automatisch —{" "}
+          ab Startdatum. Catch-up in Blöcken (~
+          {status?.limits?.messagesPerRun ?? 800} Mails /{" "}
+          {status?.limits?.pdfsPerRun ?? 80} neue PDFs), parallel
+          prüfen/hochladen, verkettet sich automatisch —{" "}
           <span className="font-medium text-foreground">Stop</span> beendet die
           Kette. «Weiter» setzt am Cursor fort (kein Neustart).
         </p>
@@ -323,6 +421,100 @@ export function O365PdfBackfillPanel() {
 
         {status ? (
           <>
+            <div className="space-y-2 rounded-lg border border-border/60 px-3 py-2.5 text-xs">
+              <p className="font-medium text-foreground">
+                Laufender Import (neue Mails)
+              </p>
+              <p className="text-muted-foreground">
+                Periodisch nur PDFs seit Wasserzeichen —{" "}
+                <span className="font-medium text-foreground">standardmässig aus</span>
+                , damit der historische Catch-up nicht gestört wird. Während
+                aktivem Catch-up wartet Live automatisch.
+              </p>
+              <label className="flex items-center gap-2 pt-1">
+                <input
+                  type="checkbox"
+                  className="accent-teal-700"
+                  checked={Boolean(liveSync?.enabled)}
+                  disabled={busy}
+                  onChange={(e) => void setLiveEnabled(e.target.checked)}
+                />
+                <span>Neue PDF-Anhänge automatisch importieren</span>
+              </label>
+              <div className="flex flex-wrap items-end gap-2">
+                <label className="block space-y-1">
+                  <span className="font-medium text-muted-foreground">
+                    Intervall (Minuten)
+                  </span>
+                  <input
+                    type="number"
+                    min={5}
+                    max={120}
+                    className="h-9 w-24 rounded-lg border border-border bg-background px-2 text-sm"
+                    value={liveSync?.intervalMinutes ?? 15}
+                    disabled={busy || !liveSync?.enabled}
+                    onChange={(e) => {
+                      const n = Number(e.target.value);
+                      if (Number.isFinite(n)) {
+                        setStatus((prev) =>
+                          prev?.liveSync
+                            ? {
+                                ...prev,
+                                liveSync: {
+                                  ...prev.liveSync,
+                                  intervalMinutes: n,
+                                },
+                              }
+                            : prev
+                        );
+                      }
+                    }}
+                    onBlur={(e) => {
+                      const n = Number(e.target.value);
+                      if (Number.isFinite(n)) void saveLiveInterval(n);
+                    }}
+                  />
+                </label>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={
+                    busy ||
+                    !liveSync?.enabled ||
+                    Boolean(status.enabled) ||
+                    Boolean(status.job?.o365Running)
+                  }
+                  onClick={() => void runLiveOnce()}
+                >
+                  Jetzt einmal prüfen
+                </Button>
+              </div>
+              {liveSync ? (
+                <div className="space-y-1 text-muted-foreground">
+                  <p>
+                    Wasserzeichen:{" "}
+                    <span className="font-medium text-foreground">
+                      {fmtTs(liveSync.watermark)}
+                    </span>
+                    {" · "}
+                    letzter Lauf: {fmtTs(liveSync.lastRunAt)}
+                  </p>
+                  {liveSync.blockedByBackfill ? (
+                    <p className="text-amber-800">
+                      Catch-up aktiv — Live-Import pausiert automatisch.
+                    </p>
+                  ) : null}
+                  {liveSync.lastNote ? (
+                    <p className="text-foreground/90">{liveSync.lastNote}</p>
+                  ) : null}
+                  {liveSync.lastError ? (
+                    <p className="text-destructive">{liveSync.lastError}</p>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+
             <div className="flex flex-wrap items-end gap-2">
               <label className="block space-y-1 text-xs">
                 <span className="font-medium text-muted-foreground">
@@ -332,7 +524,10 @@ export function O365PdfBackfillPanel() {
                   type="date"
                   className="h-9 rounded-lg border border-border bg-background px-2 text-sm"
                   value={sinceYmd}
-                  onChange={(e) => setSinceYmd(e.target.value)}
+                  onChange={(e) => {
+                    setSinceDirty(true);
+                    setSinceYmd(e.target.value);
+                  }}
                   disabled={busy}
                 />
               </label>
@@ -345,10 +540,25 @@ export function O365PdfBackfillPanel() {
               >
                 Zeitraum setzen (Neustart)
               </Button>
+              {sinceDirty ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  disabled={busy}
+                  onClick={() => {
+                    setSinceDirty(false);
+                    setSinceYmd(status.sinceYmd);
+                  }}
+                >
+                  Zurücksetzen
+                </Button>
+              ) : null}
             </div>
             <p className="text-[11px] text-muted-foreground">
-              «Zeitraum setzen» löscht Cursor, Zähler und Log — nur für einen
-              bewussten Neustart. Für Fortsetzen nach Pause: «Weiter».
+              «Zeitraum setzen» stoppt einen laufenden Batch und löscht Cursor,
+              Zähler und Log — nur für einen bewussten Neustart. Für Fortsetzen
+              nach Pause: «Weiter».
             </p>
 
             <div className="rounded-lg border border-teal-600/25 bg-teal-500/5 px-3 py-2.5 text-xs">
@@ -385,19 +595,15 @@ export function O365PdfBackfillPanel() {
                   Empfangen: {fmtMailDate(live.receivedDateTime)}
                   {live.detail ? ` · ${live.detail}` : ""}
                 </p>
-                {live.messageTotal > 0 ? (
-                  <ProgressBar
-                    label="Mails in diesem Lauf"
-                    value={live.messageIndex}
-                    max={live.messageTotal}
-                  />
-                ) : (
-                  <div className="h-2 animate-pulse rounded-full bg-muted" />
-                )}
+                <ProgressBar
+                  label="Mails in diesem Lauf"
+                  value={live.messageIndex}
+                  max={mailCap}
+                />
                 <ProgressBar
                   label="PDFs neu (Lauf-Limit)"
                   value={live.pdfsUploadedThisBatch}
-                  max={live.pdfsMaxThisBatch}
+                  max={pdfCap}
                 />
               </div>
             ) : null}

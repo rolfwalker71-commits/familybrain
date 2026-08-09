@@ -1,13 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { Clock3, Play, RefreshCw } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { IconCircle } from "@/components/layout/icon-circle";
+import { cn } from "@/lib/utils";
 
 type JobRun = {
   id: number;
@@ -29,6 +32,16 @@ type JobItem = {
   created_at: string;
 };
 
+type InternalJobRow = {
+  id: string;
+  label: string;
+  enabled: boolean;
+  state: "active" | "due" | "scheduled" | "idle" | "off" | "blocked";
+  nextAt: string | null;
+  detail?: string | null;
+  href?: string | null;
+};
+
 type StatusResponse = {
   settings: { enabled: boolean; intervalMinutes: number };
   scheduler: {
@@ -39,6 +52,7 @@ type StatusResponse = {
   initialization: { syncComplete: boolean; complete: boolean };
   activeRun: JobRun | null;
   activeRunLabel?: string | null;
+  internalJobs?: InternalJobRow[];
 };
 
 function formatDate(value: string | null): string {
@@ -54,6 +68,54 @@ function statusLabel(status: string): string {
   if (status === "success") return "Erfolgreich";
   if (status === "error") return "Fehler";
   return status;
+}
+
+function internalStateLabel(state: InternalJobRow["state"]): string {
+  switch (state) {
+    case "active":
+      return "Läuft";
+    case "due":
+      return "Fällig";
+    case "scheduled":
+      return "Geplant";
+    case "idle":
+      return "Idle";
+    case "blocked":
+      return "Wartet";
+    case "off":
+      return "Aus";
+    default:
+      return state;
+  }
+}
+
+function internalStateClass(state: InternalJobRow["state"]): string {
+  switch (state) {
+    case "active":
+      return "bg-teal-700 text-white";
+    case "due":
+      return "bg-amber-100 text-amber-900";
+    case "scheduled":
+      return "bg-emerald-50 text-emerald-900 border border-emerald-200";
+    case "blocked":
+      return "bg-amber-50 text-amber-900 border border-amber-200";
+    case "idle":
+      return "bg-muted text-muted-foreground";
+    case "off":
+      return "bg-muted/60 text-muted-foreground";
+    default:
+      return "";
+  }
+}
+
+function formatNextAt(iso: string | null, state: InternalJobRow["state"]): string {
+  if (state === "off") return "—";
+  if (state === "blocked") return "—";
+  if (state === "idle" && !iso) return "—";
+  if (state === "active") return "jetzt";
+  if (state === "due") return "gleich / fällig";
+  if (!iso) return "—";
+  return formatDate(iso);
 }
 
 function parseSummary(value: string | null): Record<string, unknown> {
@@ -287,6 +349,62 @@ export function AutomationPanel() {
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         ) : null}
+
+        <div className="space-y-3">
+          <h3 className="font-medium">Interne Jobs</h3>
+          <p className="text-sm text-muted-foreground">
+            Periodische Hintergrundarbeit — Kurzname, Status und nächster
+            geplanter Lauf (Näherung über Scheduler / Throttles).
+          </p>
+          {(status?.internalJobs || []).length === 0 ? (
+            <p className="text-sm text-muted-foreground">Noch keine Daten…</p>
+          ) : (
+            <ul className="divide-y divide-border/50 rounded-xl border border-border/60">
+              {(status?.internalJobs || []).map((job) => {
+                const body = (
+                  <>
+                    <span className="min-w-[9rem] font-medium text-foreground">
+                      {job.label}
+                    </span>
+                    <Badge
+                      variant="secondary"
+                      className={cn(
+                        "shrink-0 text-[10px] font-medium",
+                        internalStateClass(job.state)
+                      )}
+                    >
+                      {internalStateLabel(job.state)}
+                    </Badge>
+                    <span className="tabular-nums text-muted-foreground">
+                      {formatNextAt(job.nextAt, job.state)}
+                    </span>
+                    {job.detail ? (
+                      <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+                        {job.detail}
+                      </span>
+                    ) : null}
+                  </>
+                );
+                return (
+                  <li key={job.id}>
+                    {job.href ? (
+                      <Link
+                        href={job.href}
+                        className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-3 py-2.5 text-sm hover:bg-muted/40"
+                      >
+                        {body}
+                      </Link>
+                    ) : (
+                      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-3 py-2.5 text-sm">
+                        {body}
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
 
         <div className="space-y-3">
           <h3 className="font-medium">Laufhistorie</h3>

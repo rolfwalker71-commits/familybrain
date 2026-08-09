@@ -23,6 +23,8 @@ import { daysFromNow, toSwissDate } from "@/lib/utils/dates";
 import type { IcsCalendarType } from "@/lib/calendar/ics-types";
 import { getDriveMirrorStatus } from "@/lib/buddy/drive-mirror";
 import type { DayBriefingPayload } from "@/lib/dashboard/day-briefing";
+import { getSchedulerSettings } from "@/lib/jobs/queries";
+import { getSchedulerRuntimeStatus } from "@/lib/jobs/scheduler";
 
 function attachAgendaAiIconMeta<T extends AgendaItem>(items: T[]): T[] {
   return items.map((item) => {
@@ -260,6 +262,12 @@ export type OverviewPayload = {
     complete: boolean;
     lastRunAt: string | null;
     lastError: string | null;
+  } | null;
+  /** In-process scheduler teaser for dashboard Zustand card. */
+  scheduler: {
+    enabled: boolean;
+    intervalMinutes: number;
+    nextTickAt: string | null;
   } | null;
   /** Context pulse + optional AI prose (Morgen / Tag / Abend). */
   briefing: DayBriefingPayload | null;
@@ -940,6 +948,19 @@ export async function getDashboardOverview(
           complete: st.complete,
           lastRunAt: st.lastRunAt,
           lastError: st.lastError,
+        };
+      } catch {
+        return null;
+      }
+    })(),
+    scheduler: (() => {
+      try {
+        const settings = getSchedulerSettings();
+        const runtime = getSchedulerRuntimeStatus();
+        return {
+          enabled: settings.enabled,
+          intervalMinutes: settings.intervalMinutes,
+          nextTickAt: settings.enabled ? runtime.nextTickAt : null,
         };
       } catch {
         return null;

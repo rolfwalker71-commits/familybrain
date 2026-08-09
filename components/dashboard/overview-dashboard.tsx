@@ -485,7 +485,43 @@ function SystemStatusCard({
           </ul>
         ) : null}
 
+        {(() => {
+          const sched = data.scheduler;
+          const tickLabel = !sched
+            ? null
+            : !sched.enabled
+              ? "Scheduler aus"
+              : sched.nextTickAt
+                ? `Nächster Tick · ${new Date(sched.nextTickAt).toLocaleString(
+                    "de-CH",
+                    {
+                      day: "2-digit",
+                      month: "2-digit",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    }
+                  )}`
+                : "Scheduler · wartet";
+          return tickLabel ? (
+            <p className="border-t border-border/50 pt-2 text-[12px] text-muted-foreground">
+              <Clock3
+                className="mr-1 inline size-3.5 align-[-2px]"
+                strokeWidth={APP_ICON_STROKE}
+                absoluteStrokeWidth
+                aria-hidden
+              />
+              {tickLabel}
+            </p>
+          ) : null;
+        })()}
+
         <div className="flex flex-wrap gap-x-3 gap-y-1 border-t border-border/50 pt-2 text-[12px]">
+          <Link
+            href="/sync?tab=automation"
+            className="font-medium text-foreground underline-offset-2 hover:underline"
+          >
+            Interne Jobs
+          </Link>
           <Link
             href="/account"
             className="font-medium text-foreground underline-offset-2 hover:underline"

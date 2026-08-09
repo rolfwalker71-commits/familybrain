@@ -12,6 +12,7 @@ import {
   getSchedulerRuntimeStatus,
   rescheduleFromNow,
 } from "@/lib/jobs/scheduler";
+import { listInternalJobsOverview } from "@/lib/jobs/internal-jobs-overview";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,6 +28,7 @@ export async function GET() {
     },
     activeRun,
     activeRunLabel: activeRun ? jobTypeLabel(activeRun.job_type) : null,
+    internalJobs: listInternalJobsOverview(),
   });
 }
 

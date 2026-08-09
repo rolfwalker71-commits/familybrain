@@ -148,8 +148,18 @@ export async function ingestMicrosoftPdfAttachment(input: {
   tagIds?: number[];
   /** Faster Paperless task polling during catch-up. */
   waitIntervalMs?: number;
+  waitTimeoutMs?: number;
+  shouldAbort?: () => boolean;
 }): Promise<O365PdfIngestResult> {
   const { userId, messageId, attachment } = input;
+  if (input.shouldAbort?.()) {
+    return {
+      attachmentId: attachment.id,
+      filename: attachment.name,
+      ok: false,
+      error: "Abgebrochen",
+    };
+  }
   const existing = findDocumentForMicrosoftAttachment(
     messageId,
     attachment.id
@@ -189,6 +199,15 @@ export async function ingestMicrosoftPdfAttachment(input: {
       ? attachment.name
       : `${attachment.name}.pdf`;
 
+    if (input.shouldAbort?.()) {
+      return {
+        attachmentId: attachment.id,
+        filename,
+        ok: false,
+        error: "Abgebrochen",
+      };
+    }
+
     const tagIds = input.tagIds ?? (await resolveO365TagIdsCached());
     const ingested = await uploadAndIngestPaperlessDocument({
       buffer,
@@ -197,6 +216,8 @@ export async function ingestMicrosoftPdfAttachment(input: {
       tagIds,
       markAsBusiness: true,
       waitIntervalMs: input.waitIntervalMs,
+      waitTimeoutMs: input.waitTimeoutMs,
+      shouldAbort: input.shouldAbort,
     });
 
     sealAsO365Business({
@@ -236,6 +257,8 @@ export async function ingestMicrosoftMessagePdfs(input: {
   force?: boolean;
   tagIds?: number[];
   waitIntervalMs?: number;
+  waitTimeoutMs?: number;
+  shouldAbort?: () => boolean;
   /** Parallel PDF uploads for one mail (default 1). */
   concurrency?: number;
 }): Promise<{
@@ -262,8 +285,16 @@ export async function ingestMicrosoftMessagePdfs(input: {
   const tagIds = input.tagIds ?? (await resolveO365TagIdsCached());
   const concurrency = Math.max(1, Math.min(input.concurrency ?? 1, 4));
 
-  const results = await mapPool(pdfs, concurrency, (att) =>
-    ingestMicrosoftPdfAttachment({
+  const results = await mapPool(pdfs, concurrency, async (att) => {
+    if (input.shouldAbort?.()) {
+      return {
+        attachmentId: att.id,
+        filename: att.name,
+        ok: false,
+        error: "Abgebrochen",
+      } satisfies O365PdfIngestResult;
+    }
+    return ingestMicrosoftPdfAttachment({
       userId: input.userId,
       messageId: input.messageId,
       attachment: att,
@@ -271,7 +302,9 @@ export async function ingestMicrosoftMessagePdfs(input: {
       force: input.force,
       tagIds,
       waitIntervalMs: input.waitIntervalMs,
-    })
-  );
+      waitTimeoutMs: input.waitTimeoutMs,
+      shouldAbort: input.shouldAbort,
+    });
+  });
   return { subject, results };
 }

@@ -642,12 +642,20 @@ export class PaperlessClient {
    */
   async waitForPostedDocument(
     taskId: string,
-    options?: { timeoutMs?: number; intervalMs?: number }
+    options?: {
+      timeoutMs?: number;
+      intervalMs?: number;
+      /** Cooperative cancel (e.g. O365 Catch-up Stop). */
+      shouldAbort?: () => boolean;
+    }
   ): Promise<number> {
     const timeoutMs = options?.timeoutMs ?? 90_000;
     const intervalMs = options?.intervalMs ?? 1_500;
     const started = Date.now();
     while (Date.now() - started < timeoutMs) {
+      if (options?.shouldAbort?.()) {
+        throw new PaperlessError("Import abgebrochen.", 499);
+      }
       const task = await this.getTaskById(taskId);
       if (task) {
         const related = Number(task.related_document);

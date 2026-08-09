@@ -406,8 +406,12 @@ export async function uploadAndIngestPaperlessDocument(input: {
   /** Paperless task poll interval (default 1500ms). */
   waitIntervalMs?: number;
   waitTimeoutMs?: number;
+  shouldAbort?: () => boolean;
 }): Promise<{ localId: number; paperlessId: number }> {
   const client = createClient();
+  if (input.shouldAbort?.()) {
+    throw new Error("Import abgebrochen.");
+  }
   const taskId = await client.postDocument({
     buffer: input.buffer,
     filename: input.filename,
@@ -417,6 +421,7 @@ export async function uploadAndIngestPaperlessDocument(input: {
   const paperlessId = await client.waitForPostedDocument(taskId, {
     intervalMs: input.waitIntervalMs,
     timeoutMs: input.waitTimeoutMs,
+    shouldAbort: input.shouldAbort,
   });
   const ingested = await ingestPaperlessDocumentById(paperlessId);
   if (input.markAsBusiness) {

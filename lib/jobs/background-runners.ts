@@ -10,6 +10,7 @@ import {
   JOB_TYPE_PAPERLESS_WRITEBACK,
   JOB_TYPE_DRIVE_MIRROR,
   JOB_TYPE_O365_PDF_BACKFILL,
+  JOB_TYPE_O365_PDF_LIVE,
   DRIVE_MIRROR_BATCH_SIZE,
   MAX_DRIVE_MIRROR_PER_RUN,
   PAPERLESS_WRITEBACK_BATCH_SIZE,
@@ -797,6 +798,119 @@ export async function runO365PdfBackfillJob(
       }, O365_PDF_BACKFILL_CHAIN_RETRY_MS);
     }
 
+    return {
+      ok: true,
+      runId: run.id,
+      status: "error",
+      summary,
+      error: message,
+    };
+  }
+}
+
+export async function runO365PdfLiveJob(
+  trigger: JobTrigger = "manual"
+): Promise<BackgroundRunResult> {
+  recoverExpiredJobLeases();
+
+  const {
+    getO365PdfLiveStatus,
+    isO365PdfLiveEnabled,
+    isO365PdfLiveDue,
+    isO365PdfBackfillBlockingLive,
+    runO365PdfLiveBatch,
+    O365_PDF_LIVE_LAST_ERROR_KEY,
+    O365_PDF_LIVE_LAST_NOTE_KEY,
+  } = await import("@/lib/microsoft/mail-paperless-live");
+  const { setSetting } = await import("@/lib/db/migrations");
+  const {
+    hasMicrosoftMailScope,
+    isMicrosoftConnected,
+  } = await import("@/lib/microsoft/oauth");
+  const { findRolfAppUserId } = await import("@/lib/calendar/ics-calendars");
+
+  if (!isO365PdfLiveEnabled()) {
+    return {
+      ok: false,
+      status: "skipped",
+      reason: "O365-PDF-Live-Import ist aus.",
+    };
+  }
+
+  if (isO365PdfBackfillBlockingLive()) {
+    setSetting(
+      O365_PDF_LIVE_LAST_NOTE_KEY,
+      "Übersprungen: historischer Catch-up ist aktiv — Live wartet."
+    );
+    return {
+      ok: false,
+      status: "skipped",
+      reason: "Catch-up aktiv — Live wartet.",
+    };
+  }
+
+  if (trigger === "schedule" && !isO365PdfLiveDue()) {
+    return {
+      ok: false,
+      status: "skipped",
+      reason: "Live-Import noch nicht fällig.",
+    };
+  }
+
+  const userId = findRolfAppUserId();
+  if (
+    userId == null ||
+    !isMicrosoftConnected(userId) ||
+    !hasMicrosoftMailScope(userId)
+  ) {
+    const reason = "Microsoft Mail nicht verbunden oder Scope fehlt.";
+    setSetting(O365_PDF_LIVE_LAST_ERROR_KEY, reason);
+    return {
+      ok: false,
+      status: "skipped",
+      reason,
+    };
+  }
+
+  const run = tryAcquireJobRun(trigger, JOB_TYPE_O365_PDF_LIVE);
+  if (!run) {
+    return {
+      ok: false,
+      status: "skipped",
+      reason: "Ein anderer Hintergrund-Job läuft bereits.",
+    };
+  }
+
+  const status = getO365PdfLiveStatus();
+  const summary: JobRunSummary = {
+    processed: 0,
+    succeeded: 0,
+    failed: 0,
+    remaining: 0,
+  };
+
+  try {
+    const batch = await runO365PdfLiveBatch(userId);
+    summary.processed = batch.messagesSeen;
+    summary.succeeded = batch.pdfsUploaded;
+    summary.failed = batch.pdfsFailed;
+
+    addJobRunItem({
+      runId: run.id,
+      itemKind: "phase",
+      status: batch.skipped ? "info" : "success",
+      title: "O365 Live → Paperless",
+      message: batch.skipped
+        ? `Übersprungen (${batch.skipped}) · Intervall ${status.intervalMinutes} Min`
+        : `${batch.pdfsUploaded} neu, ${batch.pdfsSkipped} übersprungen, ${batch.pdfsFailed} Fehler · ${batch.messagesSeen} Mails`,
+    });
+    finishJobRun(run.id, "success", summary);
+    return { ok: true, runId: run.id, status: "success", summary };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    setSetting(O365_PDF_LIVE_LAST_ERROR_KEY, message);
+    setSetting(O365_PDF_LIVE_LAST_NOTE_KEY, `Fehler: ${message}`);
+    finishJobRun(run.id, "error", summary, message);
     return {
       ok: true,
       runId: run.id,
