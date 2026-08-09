@@ -1,10 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { FileStack, RefreshCw } from "lucide-react";
+import { FileStack, RefreshCw, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { IconCircle } from "@/components/layout/icon-circle";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 type LiveProgress = {
   active: boolean;
@@ -19,10 +21,22 @@ type LiveProgress = {
   updatedAt: string;
 };
 
+type LogEntry = {
+  at: string;
+  receivedAt: string | null;
+  receivedYmd: string | null;
+  subject: string;
+  outcome: string;
+  pdfNew?: number;
+  pdfFailed?: number;
+  detail?: string | null;
+};
+
 type BackfillStatus = {
   enabled: boolean;
   sinceYmd: string;
   hasCursor: boolean;
+  reachedYmd: string | null;
   lastRunAt: string | null;
   lastAttemptAt: string | null;
   lastError: string | null;
@@ -31,6 +45,7 @@ type BackfillStatus = {
   phase: "idle" | "queued" | "running_or_waiting" | "error" | "complete";
   documentsFromO365: number;
   live: LiveProgress | null;
+  log: LogEntry[];
   stats: {
     messagesSeen: number;
     messagesWithPdf?: number;
@@ -65,7 +80,10 @@ function phaseLabel(status: BackfillStatus): string {
     if (!status.lastRunAt && status.lastAttemptAt) {
       return "Versuch lief — Batch noch ohne Erfolg (Fehler oder Abbruch)";
     }
-    return "Crawl aktiv — nächster Batch per Scheduler / «Weiter»";
+    if (status.enabled) {
+      return "Crawl aktiv — verkettet automatisch (Stop beendet die Kette)";
+    }
+    return "Pausiert — Cursor bleibt · «Weiter» setzt fort";
   }
   return "Pausiert / idle";
 }
@@ -89,6 +107,44 @@ function fmtMailDate(iso: string | null | undefined): string {
   } catch {
     return iso;
   }
+}
+
+function fmtYmd(ymd: string | null | undefined): string {
+  if (!ymd) return "—";
+  try {
+    return new Date(`${ymd}T12:00:00`).toLocaleDateString("de-CH", {
+      dateStyle: "medium",
+    });
+  } catch {
+    return ymd;
+  }
+}
+
+function outcomeLabel(outcome: string): string {
+  switch (outcome) {
+    case "uploaded":
+      return "Neu";
+    case "skipped_already":
+      return "Bereits";
+    case "skipped_no_pdf":
+      return "Kein PDF";
+    case "attachment_error":
+      return "Anhang-Fehler";
+    case "upload_error":
+      return "Upload-Fehler";
+    case "stopped":
+      return "Stop";
+    default:
+      return outcome;
+  }
+}
+
+function outcomeClass(outcome: string): string {
+  if (outcome === "uploaded") return "bg-emerald-100 text-emerald-900";
+  if (outcome === "skipped_already") return "bg-slate-100 text-slate-700";
+  if (outcome === "skipped_no_pdf") return "bg-muted text-muted-foreground";
+  if (outcome === "stopped") return "bg-amber-100 text-amber-950";
+  return "bg-rose-100 text-rose-900";
 }
 
 function ProgressBar(props: {
@@ -162,7 +218,7 @@ export function O365PdfBackfillPanel() {
       if (!res.ok) throw new Error(json.error || "Speichern fehlgeschlagen");
       setStatus(json as BackfillStatus);
       setMsg(
-        "Zeitraum gesetzt — Crawl-Zähler genullt. «Docs in Buddy» bleibt. Danach Batch starten."
+        "Zeitraum gesetzt — Cursor, Zähler und Log genullt. Danach «Backfill starten»."
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -171,6 +227,7 @@ export function O365PdfBackfillPanel() {
     }
   }
 
+  /** Continue or start without resetting the Graph cursor. */
   async function startBackfill() {
     setBusy(true);
     setError(null);
@@ -179,10 +236,7 @@ export function O365PdfBackfillPanel() {
       await fetch("/api/buddy/o365-pdf-backfill", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          enabled: true,
-          sinceYmd: sinceYmd || undefined,
-        }),
+        body: JSON.stringify({ enabled: true }),
       });
       const res = await fetch("/api/jobs/run", {
         method: "POST",
@@ -191,7 +245,11 @@ export function O365PdfBackfillPanel() {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Job starten fehlgeschlagen");
-      setMsg("Batch gestartet — Live-Fortschritt aktualisiert sich unten.");
+      setMsg(
+        status?.hasCursor
+          ? "Fortsetzung gestartet — Cursor bleibt, kein Neustart ab Startdatum."
+          : "Batch gestartet — chronologisch ab Startdatum (älteste → neueste)."
+      );
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -206,12 +264,15 @@ export function O365PdfBackfillPanel() {
       const res = await fetch("/api/buddy/o365-pdf-backfill", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ enabled: false }),
+        body: JSON.stringify({ stop: true }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Stoppen fehlgeschlagen");
       setStatus(json as BackfillStatus);
-      setMsg("Backfill pausiert (Cursor bleibt erhalten).");
+      setMsg(
+        "Stop angefordert — laufende Mail endet noch, dann keine Auto-Fortsetzung. Cursor bleibt."
+      );
+      await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -220,6 +281,7 @@ export function O365PdfBackfillPanel() {
   }
 
   const live = status?.live?.active ? status.live : null;
+  const log = status?.log || [];
 
   return (
     <Card>
@@ -235,12 +297,14 @@ export function O365PdfBackfillPanel() {
           <span className="font-medium text-foreground">
             O365 · ANG · geschäftlich
           </span>
-          ). Catch-up läuft in Blöcken (bis ~400 Mails / 40 neue PDFs) und
-          verkettet sich automatisch alle paar Sekunden — nicht nur alle
-          Scheduler-Minuten. Hochgeladen werden nur PDFs. Manuelle Imports
-          zählen unter{" "}
-          <span className="font-medium text-foreground">Docs in Buddy</span>,
-          nicht unter den Crawl-Batch-Zählern.
+          ). Reihenfolge:{" "}
+          <span className="font-medium text-foreground">
+            älteste → neueste
+          </span>{" "}
+          ab Startdatum. Catch-up in Blöcken (~400 Mails / 40 neue PDFs),
+          verkettet sich automatisch —{" "}
+          <span className="font-medium text-foreground">Stop</span> beendet die
+          Kette. «Weiter» setzt am Cursor fort (kein Neustart).
         </p>
 
         {loading && !status ? (
@@ -279,8 +343,30 @@ export function O365PdfBackfillPanel() {
                 disabled={busy || !sinceYmd}
                 onClick={() => void saveSince()}
               >
-                Zeitraum setzen
+                Zeitraum setzen (Neustart)
               </Button>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              «Zeitraum setzen» löscht Cursor, Zähler und Log — nur für einen
+              bewussten Neustart. Für Fortsetzen nach Pause: «Weiter».
+            </p>
+
+            <div className="rounded-lg border border-teal-600/25 bg-teal-500/5 px-3 py-2.5 text-xs">
+              <p className="font-medium text-foreground">
+                Fortschritt (chronologisch)
+              </p>
+              <p className="mt-1 text-muted-foreground">
+                Start:{" "}
+                <span className="font-medium text-foreground">
+                  {fmtYmd(status.sinceYmd)}
+                </span>
+                {" · "}
+                bisher erreicht:{" "}
+                <span className="font-medium text-foreground">
+                  {fmtYmd(status.reachedYmd)}
+                </span>
+                {status.hasCursor ? " · Cursor aktiv (Fortsetzung möglich)" : ""}
+              </p>
             </div>
 
             {live ? (
@@ -346,6 +432,56 @@ export function O365PdfBackfillPanel() {
               ) : null}
             </div>
 
+            <div className="space-y-2 rounded-lg border border-border/60 px-3 py-2.5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs font-medium text-foreground">
+                  Crawl-Log (neueste zuerst)
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  Datum = Empfangen — für «Ab Datum» beim 2. Versuch nutzbar
+                </p>
+              </div>
+              {log.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  Noch keine Log-Einträge in diesem Crawl.
+                </p>
+              ) : (
+                <ul className="max-h-64 space-y-1.5 overflow-y-auto text-xs">
+                  {log.slice(0, 80).map((e, i) => (
+                    <li
+                      key={`${e.at}-${i}`}
+                      className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 border-b border-border/40 pb-1.5 last:border-0"
+                    >
+                      <span className="shrink-0 tabular-nums text-muted-foreground">
+                        {e.receivedYmd
+                          ? fmtYmd(e.receivedYmd)
+                          : fmtMailDate(e.receivedAt)}
+                      </span>
+                      <Badge
+                        variant="secondary"
+                        className={cn(
+                          "shrink-0 text-[10px] font-medium",
+                          outcomeClass(e.outcome)
+                        )}
+                      >
+                        {outcomeLabel(e.outcome)}
+                        {e.pdfNew ? ` · ${e.pdfNew}` : ""}
+                        {e.pdfFailed ? ` · ${e.pdfFailed}✗` : ""}
+                      </Badge>
+                      <span className="min-w-0 flex-1 truncate text-foreground">
+                        {e.subject}
+                      </span>
+                      {e.detail ? (
+                        <span className="basis-full truncate text-[11px] text-muted-foreground">
+                          {e.detail}
+                        </span>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
             <div className="flex flex-wrap gap-2">
               <Button
                 type="button"
@@ -360,18 +496,22 @@ export function O365PdfBackfillPanel() {
                 {live || status.job?.o365Running
                   ? "Batch läuft…"
                   : status.enabled || status.hasCursor
-                    ? "Weiter / Batch starten"
+                    ? "Weiter (fortsetzen)"
                     : "Backfill starten"}
               </Button>
-              {status.enabled || status.hasCursor ? (
+              {status.enabled ||
+              status.hasCursor ||
+              live ||
+              status.job?.o365Running ? (
                 <Button
                   type="button"
                   size="sm"
-                  variant="outline"
+                  variant="destructive"
                   disabled={busy}
                   onClick={() => void stopBackfill()}
                 >
-                  Pausieren
+                  <Square className="size-3.5 fill-current" />
+                  Stop / Abbrechen
                 </Button>
               ) : null}
               <Button

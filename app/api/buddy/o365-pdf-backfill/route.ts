@@ -16,6 +16,8 @@ export const dynamic = "force-dynamic";
 
 const PatchSchema = z.object({
   enabled: z.boolean().optional(),
+  /** Soft-stop: disable + cancel auto-chain; keeps Graph cursor. */
+  stop: z.boolean().optional(),
   sinceYmd: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)

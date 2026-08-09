@@ -673,7 +673,15 @@ export async function runO365PdfBackfillJob(
 
   const status = getO365PdfBackfillStatus();
   if (!status.enabled && trigger === "schedule") {
-    setO365PdfBackfillNote("Übersprungen: Crawl ist nicht aktiv (pausiert/fertig).");
+    const note = status.lastNote || "";
+    if (
+      !/gestoppt|pausiert|manuell gestoppt/i.test(note) &&
+      !status.complete
+    ) {
+      setO365PdfBackfillNote(
+        "Übersprungen: Crawl ist nicht aktiv (pausiert/fertig)."
+      );
+    }
     return {
       ok: false,
       status: "skipped",
@@ -733,11 +741,15 @@ export async function runO365PdfBackfillJob(
     });
     finishJobRun(run.id, "success", summary);
 
-    // Catch-up: nicht auf den 2h-Scheduler warten — nächster Block nach kurzer Pause.
-    if (!batch.done) {
-      const again = getO365PdfBackfillStatus();
-      if (again.enabled) {
-        setTimeout(() => {
+    // Catch-up: verkettet nur wenn noch aktiv (Stop bricht die Kette ab).
+    if (!batch.done && !batch.stopped) {
+      const {
+        getO365PdfBackfillStatus: getStatus,
+        isO365PdfBackfillEnabled,
+        scheduleO365PdfBackfillChain,
+      } = await import("@/lib/microsoft/mail-paperless-backfill");
+      if (isO365PdfBackfillEnabled() && getStatus().enabled) {
+        scheduleO365PdfBackfillChain(() => {
           void runO365PdfBackfillJob("schedule").catch((error) => {
             console.warn("[o365-backfill] chain:", error);
           });
