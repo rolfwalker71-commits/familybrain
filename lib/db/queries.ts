@@ -250,14 +250,18 @@ export function listDocuments(filters: DocumentFilters = {}) {
     params.push(q, q, q, q, q, q, q, q);
   }
   if (filters.category) {
-    if (filters.category === "Arbeit") {
+    if (filters.category === "Geschäftlich") {
+      // UI badge uses is_business (tags / O365 link / category) — not category alone
+      where.push(SQL_DOC_IS_BUSINESS);
+    } else if (filters.category === "Arbeit") {
       where.push(
         `(s.category = ? OR instr(COALESCE(s.also_categories, ''), '"Arbeit"') > 0)`
       );
+      params.push(filters.category);
     } else {
       where.push(`s.category = ?`);
+      params.push(filters.category);
     }
-    params.push(filters.category);
   }
   if (filters.correspondent) {
     where.push(`d.correspondent_name = ?`);
@@ -269,7 +273,10 @@ export function listDocuments(filters: DocumentFilters = {}) {
   }
   if (filters.analysisStatus) {
     if (filters.analysisStatus === "pending") {
-      where.push(`(s.analysis_status IS NULL OR s.analysis_status = 'pending' OR s.analysis_status = 'stale')`);
+      // Match statusBadge «Ausstehend» (incl. in-flight processing)
+      where.push(
+        `(s.analysis_status IS NULL OR TRIM(COALESCE(s.analysis_status, '')) = '' OR s.analysis_status IN ('pending', 'stale', 'processing'))`
+      );
     } else {
       where.push(`s.analysis_status = ?`);
       params.push(filters.analysisStatus);
