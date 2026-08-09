@@ -70,6 +70,29 @@ function addDaysYmdClient(ymd: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+function mailRangeKey(from: string, to: string): string {
+  return `${from}_${to}`;
+}
+
+function formatMailRangeLabel(from: string, to: string): string {
+  if (from === to) return toSwissDate(from);
+  return `${toSwissDate(from)} – ${toSwissDate(to)}`;
+}
+
+/** Inclusive max 7 days; clamp Bis ≥ Von and ≤ today. */
+function clampMailRange(from: string, to: string): { from: string; to: string } {
+  const today = zurichYmdClient();
+  let f = from;
+  let t = to;
+  if (t < f) t = f;
+  const maxTo = addDaysYmdClient(f, 6);
+  if (t > maxTo) t = maxTo;
+  if (t > today) t = today;
+  if (f > today) f = today;
+  if (t < f) t = f;
+  return { from: f, to: t };
+}
+
 type Tab = "calendar" | "inbox" | "triage" | "day";
 
 function parseTab(raw: string | null): Tab {
@@ -251,7 +274,8 @@ export function GoogleWorkspaceClient() {
 
   const [inbox, setInbox] = useState<MsMail[]>([]);
   const [sent, setSent] = useState<MsMail[]>([]);
-  const [mailDay, setMailDay] = useState(() => zurichYmdClient());
+  const [mailFrom, setMailFrom] = useState(() => zurichYmdClient());
+  const [mailTo, setMailTo] = useState(() => zurichYmdClient());
   const [mailLoading, setMailLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeNotice, setAnalyzeNotice] = useState<string | null>(null);
@@ -301,25 +325,28 @@ export function GoogleWorkspaceClient() {
     }
   }, []);
 
-  const loadMail = useCallback(async (day?: string) => {
-    const target = day || mailDay;
+  const loadMail = useCallback(async (from?: string, to?: string) => {
+    const clamped = clampMailRange(from || mailFrom, to || mailTo);
     setMailLoading(true);
     setError(null);
     try {
-      const res = await fetch(
-        `/api/google/mail/today?date=${encodeURIComponent(target)}`
-      );
+      const qs = new URLSearchParams({
+        from: clamped.from,
+        to: clamped.to,
+      });
+      const res = await fetch(`/api/google/mail/today?${qs}`);
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Mails laden fehlgeschlagen");
       setInbox((json.inbox || []) as MsMail[]);
       setSent((json.sent || []) as MsMail[]);
-      if (json.dayIso) setMailDay(json.dayIso);
+      if (json.fromYmd) setMailFrom(json.fromYmd);
+      if (json.toYmd) setMailTo(json.toYmd);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setMailLoading(false);
     }
-  }, [mailDay]);
+  }, [mailFrom, mailTo]);
 
   useEffect(() => {
     void loadConnection();
@@ -343,7 +370,7 @@ export function GoogleWorkspaceClient() {
   useEffect(() => {
     if (connected) {
       void loadCalendar();
-      void loadMail(mailDay);
+      void loadMail(mailFrom, mailTo);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- initial load when connected
   }, [connected]);
@@ -499,6 +526,9 @@ export function GoogleWorkspaceClient() {
       job: {
         status: string;
         dayIso: string;
+        fromYmd?: string;
+        toYmd?: string;
+        rangeKey?: string;
         finishedAt?: string | null;
         error?: string | null;
         mail?: { inbox?: MsMail[]; sent?: MsMail[]; dayIso?: string } | null;
@@ -507,6 +537,9 @@ export function GoogleWorkspaceClient() {
       opts?: { syncDay?: boolean; fromCache?: boolean }
     ) => {
       const syncDay = Boolean(opts?.syncDay);
+      const fromYmd = job.fromYmd || job.dayIso;
+      const toYmd = job.toYmd || job.dayIso;
+      const label = formatMailRangeLabel(fromYmd, toYmd);
       if (job.mail) {
         setInbox((job.mail.inbox || []) as MsMail[]);
         setSent((job.mail.sent || []) as MsMail[]);
@@ -514,16 +547,20 @@ export function GoogleWorkspaceClient() {
       if (job.status === "running") {
         setAnalyzing(true);
         setAnalysisFromCache(false);
-        setAnalyzeNotice(
-          `Analyse für ${toSwissDate(job.dayIso)} läuft im Hintergrund…`
-        );
-        if (syncDay && job.dayIso) setMailDay(job.dayIso);
+        setAnalyzeNotice(`Analyse für ${label} läuft im Hintergrund…`);
+        if (syncDay && fromYmd && toYmd) {
+          setMailFrom(fromYmd);
+          setMailTo(toYmd);
+        }
         return;
       }
       if (job.status === "done" && job.analysis) {
         setAnalyzing(false);
-        if (syncDay && job.dayIso) setMailDay(job.dayIso);
-        applyAnalysisPayload(job.analysis, job.dayIso, job.finishedAt, {
+        if (syncDay && fromYmd && toYmd) {
+          setMailFrom(fromYmd);
+          setMailTo(toYmd);
+        }
+        applyAnalysisPayload(job.analysis, label, job.finishedAt, {
           fromCache: opts?.fromCache,
         });
         return;
@@ -539,17 +576,19 @@ export function GoogleWorkspaceClient() {
   );
 
   const pollJobOnce = useCallback(async () => {
+    const key = mailRangeKey(mailFrom, mailTo);
     try {
-      const res = await fetch(
-        `/api/google/mail/analyze?date=${encodeURIComponent(mailDay)}`
-      );
+      const qs = new URLSearchParams({ from: mailFrom, to: mailTo });
+      const res = await fetch(`/api/google/mail/analyze?${qs}`);
       const json = await res.json();
       if (!res.ok) return json.status as string | undefined;
       if (Array.isArray(json.cachedDays)) setCachedDays(json.cachedDays);
       if (json.job) {
-        // Während/nach dem Lauf Tag nur syncen, wenn er zum gestarteten Job gehört
+        const jobKey =
+          json.job.rangeKey ||
+          mailRangeKey(json.job.fromYmd || json.job.dayIso, json.job.toYmd || json.job.dayIso);
         hydrateFromJob(json.job, {
-          syncDay: json.job.dayIso === mailDay || json.status === "running",
+          syncDay: jobKey === key || json.status === "running",
           fromCache: false,
         });
       }
@@ -561,7 +600,7 @@ export function GoogleWorkspaceClient() {
     } catch {
       return undefined;
     }
-  }, [hydrateFromJob, mailDay, stopPoll]);
+  }, [hydrateFromJob, mailFrom, mailTo, stopPoll]);
 
   const startPolling = useCallback(() => {
     stopPoll();
@@ -571,18 +610,30 @@ export function GoogleWorkspaceClient() {
     }, 2500);
   }, [pollJobOnce, stopPoll]);
 
-  const loadAnalysisForDay = useCallback(
-    async (day: string) => {
+  const loadAnalysisForRange = useCallback(
+    async (from: string, to: string) => {
+      const clamped = clampMailRange(from, to);
+      const key = mailRangeKey(clamped.from, clamped.to);
       try {
-        const res = await fetch(
-          `/api/google/mail/analyze?date=${encodeURIComponent(day)}`
-        );
+        const qs = new URLSearchParams({
+          from: clamped.from,
+          to: clamped.to,
+        });
+        const res = await fetch(`/api/google/mail/analyze?${qs}`);
         const json = await res.json();
         if (!res.ok) return;
         if (Array.isArray(json.cachedDays)) setCachedDays(json.cachedDays);
 
         if (json.status === "running") {
-          if (json.job?.dayIso === day) {
+          const jobKey =
+            json.job?.rangeKey ||
+            (json.job?.dayIso
+              ? mailRangeKey(
+                  json.job.fromYmd || json.job.dayIso,
+                  json.job.toYmd || json.job.dayIso
+                )
+              : null);
+          if (jobKey === key) {
             hydrateFromJob(json.job, { syncDay: false });
             startPolling();
             return;
@@ -596,7 +647,10 @@ export function GoogleWorkspaceClient() {
           }
           setAnalysis(null);
           setAnalyzeNotice(
-            `Analyse für ${toSwissDate(json.job?.dayIso || "")} läuft noch — dieser Tag hat keine gespeicherte Analyse.`
+            `Analyse für ${formatMailRangeLabel(
+              json.job?.fromYmd || json.job?.dayIso || "",
+              json.job?.toYmd || json.job?.dayIso || ""
+            )} läuft noch — dieser Zeitraum hat keine gespeicherte Analyse.`
           );
           setAnalysisFromCache(false);
           setPicks({ tasks: {}, events: {}, replies: {} });
@@ -626,8 +680,7 @@ export function GoogleWorkspaceClient() {
     return () => stopPoll();
   }, [stopPoll]);
 
-  // Einmalig nach Connect: letzten Job wiederherstellen — darf den Picker später
-  // nicht erneut auf job.dayIso zurücksetzen (startPolling ändert sich mit mailDay).
+  // Einmalig nach Connect: letzten Job wiederherstellen
   useEffect(() => {
     if (!connected) return;
     let cancelled = false;
@@ -650,22 +703,25 @@ export function GoogleWorkspaceClient() {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- nur bei Connect
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connected]);
 
   function startAnalyze() {
+    const clamped = clampMailRange(mailFrom, mailTo);
+    setMailFrom(clamped.from);
+    setMailTo(clamped.to);
     setError(null);
     setStatus(null);
     setAnalyzing(true);
     setAnalyzeNotice(
-      `Analyse für ${toSwissDate(mailDay)} läuft im Hintergrund…`
+      `Analyse für ${formatMailRangeLabel(clamped.from, clamped.to)} läuft im Hintergrund…`
     );
     void (async () => {
       try {
         const res = await fetch("/api/google/mail/analyze", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ date: mailDay }),
+          body: JSON.stringify({ from: clamped.from, to: clamped.to }),
         });
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || "Analyse starten fehlgeschlagen");
@@ -1162,28 +1218,55 @@ export function GoogleWorkspaceClient() {
               <div className="flex flex-wrap items-end justify-between gap-3">
                 <div className="space-y-1.5">
                   <h2 className="text-[15px] font-semibold">
-                    {toSwissDate(mailDay)} · {inbox.length} Posteingang ·{" "}
-                    {sent.length} Gesendet
+                    {formatMailRangeLabel(mailFrom, mailTo)} · {inbox.length}{" "}
+                    Posteingang · {sent.length} Gesendet
                   </h2>
                   <div className="flex flex-wrap items-center gap-2">
-                    <Label htmlFor="ms-mail-day" className="text-xs text-muted-foreground">
-                      Analysedatum
+                    <Label htmlFor="g-mail-from" className="text-xs text-muted-foreground">
+                      Von
                     </Label>
                     <Input
-                      id="g-mail-day"
+                      id="g-mail-from"
                       type="date"
                       className="h-8 w-auto min-w-[9.5rem]"
-                      value={mailDay}
+                      value={mailFrom}
                       max={zurichYmdClient()}
                       onValueChange={(v) => {
-                        if (!/^\d{4}-\d{2}-\d{2}$/.test(v) || v === mailDay) return;
-                        setMailDay(v);
+                        if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return;
+                        const next = clampMailRange(v, mailTo);
+                        if (next.from === mailFrom && next.to === mailTo) return;
+                        setMailFrom(next.from);
+                        setMailTo(next.to);
                         setAnalysis(null);
                         setAnalyzeNotice(null);
                         setAnalysisFromCache(false);
                         setPicks({ tasks: {}, events: {}, replies: {} });
-                        void loadMail(v);
-                        void loadAnalysisForDay(v);
+                        void loadMail(next.from, next.to);
+                        void loadAnalysisForRange(next.from, next.to);
+                      }}
+                    />
+                    <Label htmlFor="g-mail-to" className="text-xs text-muted-foreground">
+                      Bis
+                    </Label>
+                    <Input
+                      id="g-mail-to"
+                      type="date"
+                      className="h-8 w-auto min-w-[9.5rem]"
+                      value={mailTo}
+                      min={mailFrom}
+                      max={zurichYmdClient()}
+                      onValueChange={(v) => {
+                        if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return;
+                        const next = clampMailRange(mailFrom, v);
+                        if (next.from === mailFrom && next.to === mailTo) return;
+                        setMailFrom(next.from);
+                        setMailTo(next.to);
+                        setAnalysis(null);
+                        setAnalyzeNotice(null);
+                        setAnalysisFromCache(false);
+                        setPicks({ tasks: {}, events: {}, replies: {} });
+                        void loadMail(next.from, next.to);
+                        void loadAnalysisForRange(next.from, next.to);
                       }}
                     />
                     <Button
@@ -1191,11 +1274,11 @@ export function GoogleWorkspaceClient() {
                       size="sm"
                       variant="outline"
                       disabled={mailLoading}
-                      onClick={() => void loadMail(mailDay)}
+                      onClick={() => void loadMail(mailFrom, mailTo)}
                     >
                       Mails laden
                     </Button>
-                    {cachedDays.includes(mailDay) ? (
+                    {cachedDays.includes(mailRangeKey(mailFrom, mailTo)) ? (
                       <span className="text-[11px] text-muted-foreground">
                         Analyse gespeichert
                       </span>
@@ -1208,7 +1291,7 @@ export function GoogleWorkspaceClient() {
                     size="sm"
                     variant="outline"
                     disabled={mailLoading}
-                    onClick={() => void loadMail(mailDay)}
+                    onClick={() => void loadMail(mailFrom, mailTo)}
                   >
                     <RefreshCw
                       className={cn("size-3.5", mailLoading && "animate-spin")}
@@ -1226,7 +1309,8 @@ export function GoogleWorkspaceClient() {
                     />
                     {analyzing
                       ? "Analyse läuft…"
-                      : analysis && cachedDays.includes(mailDay)
+                      : analysis &&
+                          cachedDays.includes(mailRangeKey(mailFrom, mailTo))
                         ? "Neu analysieren"
                         : "AI Tagesanalyse"}
                   </Button>

@@ -583,6 +583,10 @@ export function emptyMailDayAnalysis(summary: string): MsDayMailAnalysis {
 /** AI day digest: Cluster nach Kunde/Thema/Thread → Tasks, Termine, Antworten. */
 export async function analyzeMicrosoftMailDay(input: {
   todayIso: string;
+  /** Inclusive range start (defaults to todayIso). */
+  fromYmd?: string;
+  /** Inclusive range end (defaults to todayIso). */
+  toYmd?: string;
   inbox: MsMailItem[];
   sent: MsMailItem[];
 }): Promise<MsDayMailAnalysis> {
@@ -590,11 +594,15 @@ export async function analyzeMicrosoftMailDay(input: {
     throw new Error("OpenAI API-Key fehlt (Einstellungen).");
   }
 
+  const fromYmd = input.fromYmd || input.todayIso;
+  const toYmd = input.toYmd || input.todayIso;
   const packed = packMailsForPrompt(input.inbox, input.sent);
-  const defaultDue = addDaysYmd(input.todayIso, 1);
+  const defaultDue = addDaysYmd(toYmd, 1);
+  const rangeLabel =
+    fromYmd === toYmd ? fromYmd : `${fromYmd}–${toYmd}`;
 
   const system = `Du bist Buddy, Büro-Assistent (Schweiz, Europe/Zurich).
-Analysiere die Mails des gewählten Tages (Posteingang + Gesendet).
+Analysiere die Mails des gewählten Zeitraums (Posteingang + Gesendet).
 
 Ablauf:
 1) Gruppiere nach Kunde/Firma und Thema/Thread. Gleiche conv=… = derselbe Thread.
@@ -619,7 +627,9 @@ EVENTS: nur bei klarem Datum/Zeit.
 
 Newsletter/Werbung weglassen. Keine erfundenen Fakten. NUR JSON.`;
 
-  const user = `Analysetag: ${input.todayIso}
+  const user = `Analysezeitraum: ${rangeLabel}${
+    fromYmd === toYmd ? "" : ` (von ${fromYmd} bis ${toYmd})`
+  }
 Default dueDate für Tasks ohne Frist: ${defaultDue}
 
 Vor dem JSON: gehe Cluster für Cluster die Inbox-Mails durch und entscheide bewusst, ob ein Reply fehlt. Lieber ein kurzer Zwischenstands-Reply als gar keiner, wenn der Absender auf Rückmeldung wartet.
@@ -715,7 +725,7 @@ JSON-Schema:
 
   const clusters = sortClusters(
     result.data.clusters
-      .map((c) => enrichCluster(c, byId, idSet, input.todayIso))
+      .map((c) => enrichCluster(c, byId, idSet, toYmd))
       .filter(
         (c) =>
           c.theme ||

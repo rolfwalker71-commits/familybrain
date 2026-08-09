@@ -1,5 +1,11 @@
 import { graphJson } from "@/lib/microsoft/graph";
-import { addDaysYmd, dayWindowLocal, zurichYmd } from "@/lib/microsoft/time";
+import { dayWindowLocal, zurichYmd } from "@/lib/microsoft/time";
+import {
+  isMailAnalysisYmd,
+  mailAnalysisListLimits,
+  mailAnalysisRangeExclusiveEnd,
+  resolveMailAnalysisRange,
+} from "@/lib/mail/mail-analysis-range";
 
 export type MsMailFolder = "inbox" | "sent";
 
@@ -92,24 +98,20 @@ function mapMessage(m: GraphMessage, folder: MsMailFolder): MsMailItem | null {
   };
 }
 
-function isYmd(value: string): boolean {
-  return /^\d{4}-\d{2}-\d{2}$/.test(value);
-}
-
-async function listFolderForDay(
+async function listFolderForRange(
   userId: number,
   folder: MsMailFolder,
-  dayIso: string,
+  fromYmd: string,
+  toYmd: string,
   limit: number
 ): Promise<MsMailItem[]> {
-  const ymd = isYmd(dayIso) ? dayIso : zurichYmd();
-  const { start } = dayWindowLocal(ymd);
-  const next = addDaysYmd(ymd, 1);
+  const { start } = dayWindowLocal(fromYmd);
+  const exclusiveEnd = mailAnalysisRangeExclusiveEnd(toYmd);
   const filterField =
     folder === "sent" ? "sentDateTime" : "receivedDateTime";
   const folderPath = folder === "sent" ? "sentitems" : "inbox";
   const qs = new URLSearchParams({
-    $filter: `${filterField} ge ${start} and ${filterField} lt ${next}T00:00:00`,
+    $filter: `${filterField} ge ${start} and ${filterField} lt ${exclusiveEnd}T00:00:00`,
     $orderby: `${filterField} desc`,
     $top: String(limit),
     $select:
@@ -131,7 +133,7 @@ async function listFolderForDay(
   } catch {
     const qs2 = new URLSearchParams({
       $orderby: `${filterField} desc`,
-      $top: String(Math.min(limit * 3, 60)),
+      $top: String(Math.min(limit * 3, 80)),
       $select:
         "id,subject,bodyPreview,body,from,toRecipients,receivedDateTime,sentDateTime,conversationId,webLink,isRead",
     });
@@ -144,9 +146,59 @@ async function listFolderForDay(
       .map((m) => mapMessage(m, folder))
       .filter((m): m is MsMailItem => Boolean(m));
     return items
-      .filter((m) => (m.receivedOrSentAt || "").slice(0, 10) === ymd)
+      .filter((m) => {
+        const ymd = (m.receivedOrSentAt || "").slice(0, 10);
+        return ymd >= fromYmd && ymd <= toYmd;
+      })
       .slice(0, limit);
   }
+}
+
+export type MicrosoftMailListResult = {
+  inbox: MsMailItem[];
+  sent: MsMailItem[];
+  dayIso: string;
+  fromYmd: string;
+  toYmd: string;
+  rangeKey: string;
+};
+
+/** Mails für einen Kalenderzeitraum (Europe/Zurich). */
+export async function listMicrosoftMailForRange(
+  userId: number,
+  fromYmd?: string | null,
+  toYmd?: string | null,
+  options?: { inboxLimit?: number; sentLimit?: number }
+): Promise<MicrosoftMailListResult> {
+  const resolved = resolveMailAnalysisRange({ from: fromYmd, to: toYmd });
+  if ("error" in resolved) throw new Error(resolved.error);
+  const caps = mailAnalysisListLimits(resolved.dayCount);
+  const inboxLimit = options?.inboxLimit ?? caps.inboxLimit;
+  const sentLimit = options?.sentLimit ?? caps.sentLimit;
+  const [inbox, sent] = await Promise.all([
+    listFolderForRange(
+      userId,
+      "inbox",
+      resolved.fromYmd,
+      resolved.toYmd,
+      inboxLimit
+    ),
+    listFolderForRange(
+      userId,
+      "sent",
+      resolved.fromYmd,
+      resolved.toYmd,
+      sentLimit
+    ),
+  ]);
+  return {
+    inbox,
+    sent,
+    dayIso: resolved.dayIso,
+    fromYmd: resolved.fromYmd,
+    toYmd: resolved.toYmd,
+    rangeKey: resolved.rangeKey,
+  };
 }
 
 /** Mails für einen Kalendertag (Europe/Zurich), Default: heute. */
@@ -154,15 +206,9 @@ export async function listMicrosoftMailForDay(
   userId: number,
   dayIso?: string | null,
   options?: { inboxLimit?: number; sentLimit?: number }
-): Promise<{ inbox: MsMailItem[]; sent: MsMailItem[]; dayIso: string }> {
-  const day = dayIso && isYmd(dayIso) ? dayIso : zurichYmd();
-  const inboxLimit = options?.inboxLimit ?? 25;
-  const sentLimit = options?.sentLimit ?? 15;
-  const [inbox, sent] = await Promise.all([
-    listFolderForDay(userId, "inbox", day, inboxLimit),
-    listFolderForDay(userId, "sent", day, sentLimit),
-  ]);
-  return { inbox, sent, dayIso: day };
+): Promise<MicrosoftMailListResult> {
+  const day = dayIso && isMailAnalysisYmd(dayIso) ? dayIso : zurichYmd();
+  return listMicrosoftMailForRange(userId, day, day, options);
 }
 
 /** @deprecated use listMicrosoftMailForDay */

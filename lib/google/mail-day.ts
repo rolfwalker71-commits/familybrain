@@ -1,19 +1,24 @@
 /**
- * Gmail inbox + sent for a Zurich calendar day — same shape as MsMailItem
+ * Gmail inbox + sent for a Zurich calendar day/range — same shape as MsMailItem
  * so the shared day-analysis prompt can be reused.
  */
 import { google, type gmail_v1 } from "googleapis";
 import { getAuthedGoogleClient } from "@/lib/google/oauth";
 import type { MsMailItem } from "@/lib/microsoft/mail-day";
-import { addDaysYmd, zurichYmd } from "@/lib/microsoft/time";
+import { zurichYmd } from "@/lib/microsoft/time";
+import {
+  isMailAnalysisYmd,
+  mailAnalysisListLimits,
+  mailAnalysisRangeExclusiveEnd,
+  resolveMailAnalysisRange,
+} from "@/lib/mail/mail-analysis-range";
 
-function isYmd(value: string): boolean {
-  return /^\d{4}-\d{2}-\d{2}$/.test(value);
-}
-
-function gmailDayBounds(dayIso: string): { after: string; before: string } {
-  const [y, m, d] = dayIso.split("-").map(Number);
-  const next = addDaysYmd(dayIso, 1);
+function gmailRangeBounds(
+  fromYmd: string,
+  toYmd: string
+): { after: string; before: string } {
+  const [y, m, d] = fromYmd.split("-").map(Number);
+  const next = mailAnalysisRangeExclusiveEnd(toYmd);
   const [ny, nm, nd] = next.split("-").map(Number);
   return {
     after: `${y}/${m}/${d}`,
@@ -102,14 +107,15 @@ function isoFromInternalDate(internalDate: string | null | undefined): string | 
   return new Date(n).toISOString();
 }
 
-async function listFolderForDay(
+async function listFolderForRange(
   userId: number,
   folder: "inbox" | "sent",
-  dayIso: string,
+  fromYmd: string,
+  toYmd: string,
   limit: number,
   request?: Request | null
 ): Promise<MsMailItem[]> {
-  const { after, before } = gmailDayBounds(dayIso);
+  const { after, before } = gmailRangeBounds(fromYmd, toYmd);
   const q =
     folder === "sent"
       ? `in:sent after:${after} before:${before}`
@@ -158,6 +164,58 @@ async function listFolderForDay(
   return out;
 }
 
+export type GoogleMailListResult = {
+  inbox: MsMailItem[];
+  sent: MsMailItem[];
+  dayIso: string;
+  fromYmd: string;
+  toYmd: string;
+  rangeKey: string;
+};
+
+export async function listGoogleMailForRange(
+  userId: number,
+  fromYmd?: string | null,
+  toYmd?: string | null,
+  options?: {
+    inboxLimit?: number;
+    sentLimit?: number;
+    request?: Request | null;
+  }
+): Promise<GoogleMailListResult> {
+  const resolved = resolveMailAnalysisRange({ from: fromYmd, to: toYmd });
+  if ("error" in resolved) throw new Error(resolved.error);
+  const caps = mailAnalysisListLimits(resolved.dayCount);
+  const inboxLimit = options?.inboxLimit ?? caps.inboxLimit;
+  const sentLimit = options?.sentLimit ?? caps.sentLimit;
+  const [inbox, sent] = await Promise.all([
+    listFolderForRange(
+      userId,
+      "inbox",
+      resolved.fromYmd,
+      resolved.toYmd,
+      inboxLimit,
+      options?.request
+    ),
+    listFolderForRange(
+      userId,
+      "sent",
+      resolved.fromYmd,
+      resolved.toYmd,
+      sentLimit,
+      options?.request
+    ),
+  ]);
+  return {
+    inbox,
+    sent,
+    dayIso: resolved.dayIso,
+    fromYmd: resolved.fromYmd,
+    toYmd: resolved.toYmd,
+    rangeKey: resolved.rangeKey,
+  };
+}
+
 export async function listGoogleMailForDay(
   userId: number,
   dayIso?: string | null,
@@ -166,23 +224,8 @@ export async function listGoogleMailForDay(
     sentLimit?: number;
     request?: Request | null;
   }
-): Promise<{ inbox: MsMailItem[]; sent: MsMailItem[]; dayIso: string }> {
-  const day = dayIso && isYmd(dayIso) ? dayIso : zurichYmd();
-  const [inbox, sent] = await Promise.all([
-    listFolderForDay(
-      userId,
-      "inbox",
-      day,
-      options?.inboxLimit ?? 25,
-      options?.request
-    ),
-    listFolderForDay(
-      userId,
-      "sent",
-      day,
-      options?.sentLimit ?? 15,
-      options?.request
-    ),
-  ]);
-  return { inbox, sent, dayIso: day };
+): Promise<GoogleMailListResult> {
+  const day =
+    dayIso && isMailAnalysisYmd(dayIso) ? dayIso : zurichYmd();
+  return listGoogleMailForRange(userId, day, day, options);
 }

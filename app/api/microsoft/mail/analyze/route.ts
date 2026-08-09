@@ -7,7 +7,7 @@ import {
   emptyMailDayAnalysis,
   type MsDayMailAnalysis,
 } from "@/lib/microsoft/analyze-mail-day";
-import { listMicrosoftMailForDay } from "@/lib/microsoft/mail-day";
+import { listMicrosoftMailForRange } from "@/lib/microsoft/mail-day";
 import {
   cachedToJob,
   finishMsMailDayJobError,
@@ -19,7 +19,11 @@ import {
   startMsMailDayJob,
   upsertMsMailDayCache,
 } from "@/lib/microsoft/mail-day-analysis-job";
-import { zurichYmd } from "@/lib/microsoft/time";
+import {
+  formatMailAnalysisRangeLabel,
+  resolveMailAnalysisRange,
+  type MailAnalysisRange,
+} from "@/lib/mail/mail-analysis-range";
 import {
   isMicrosoftConnected,
   resolveMicrosoftUserId,
@@ -31,25 +35,25 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
+const Ymd = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/)
+  .optional()
+  .nullable();
+
 const BodySchema = z.object({
-  date: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
-    .optional()
-    .nullable(),
+  date: Ymd,
+  from: Ymd,
+  to: Ymd,
 });
 
-function notifyDone(
-  userId: number,
-  dayIso: string,
-  analysis: MsDayMailAnalysis
-) {
+function notifyDone(rangeLabel: string, analysis: MsDayMailAnalysis) {
   const usageLine = formatTokenUsageLine(analysis.usage);
   const detail = [
     `${analysis.clusters.length} Cluster`,
     `${analysis.tasks.length} Aufgabe(n)`,
     `${analysis.replies.length} Antwort(en)`,
-    dayIso,
+    rangeLabel,
     usageLine,
   ]
     .filter(Boolean)
@@ -69,8 +73,8 @@ function notifyDone(
   });
 }
 
-function notifyError(userId: number, dayIso: string, message: string) {
-  const detail = `${dayIso}: ${message.slice(0, 180)}`;
+function notifyError(rangeLabel: string, message: string) {
+  const detail = `${rangeLabel}: ${message.slice(0, 180)}`;
   notifyAppChange({
     domain: "documents",
     reason: "buddy_status",
@@ -85,42 +89,55 @@ function notifyError(userId: number, dayIso: string, message: string) {
   });
 }
 
-async function runAnalysisJob(userId: number, day: string) {
+async function runAnalysisJob(userId: number, range: MailAnalysisRange) {
+  const label = formatMailAnalysisRangeLabel(range);
   try {
-    const mail = await listMicrosoftMailForDay(userId, day);
+    const mail = await listMicrosoftMailForRange(
+      userId,
+      range.fromYmd,
+      range.toYmd
+    );
+    const mailPayload = {
+      inbox: mail.inbox,
+      sent: mail.sent,
+      dayIso: mail.dayIso,
+      fromYmd: mail.fromYmd,
+      toYmd: mail.toYmd,
+      rangeKey: mail.rangeKey,
+    };
     if (mail.inbox.length === 0 && mail.sent.length === 0) {
       const analysis = emptyMailDayAnalysis(
-        `Keine Outlook-Mails für ${day} gefunden.`
+        `Keine Outlook-Mails für ${label} gefunden.`
       );
-      finishMsMailDayJobOk(
-        userId,
-        mail.dayIso,
-        { inbox: mail.inbox, sent: mail.sent, dayIso: mail.dayIso },
-        analysis
-      );
-      notifyDone(userId, mail.dayIso, analysis);
+      finishMsMailDayJobOk(userId, range, mailPayload, analysis);
+      notifyDone(label, analysis);
       return;
     }
     const analysis = await analyzeMicrosoftMailDay({
       todayIso: mail.dayIso,
+      fromYmd: mail.fromYmd,
+      toYmd: mail.toYmd,
       inbox: mail.inbox,
       sent: mail.sent,
     });
-    finishMsMailDayJobOk(
-      userId,
-      mail.dayIso,
-      { inbox: mail.inbox, sent: mail.sent, dayIso: mail.dayIso },
-      analysis
-    );
-    notifyDone(userId, mail.dayIso, analysis);
+    finishMsMailDayJobOk(userId, range, mailPayload, analysis);
+    notifyDone(label, analysis);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    finishMsMailDayJobError(userId, day, message);
-    notifyError(userId, day, message);
+    finishMsMailDayJobError(userId, range, message);
+    notifyError(label, message);
   }
 }
 
-/** Status / Cache für Tag (überlebt Seitenwechsel, max. 7 Tage). */
+function resolveRangeFromRequest(url: URL, body?: z.infer<typeof BodySchema>) {
+  return resolveMailAnalysisRange({
+    from: body?.from ?? url.searchParams.get("from"),
+    to: body?.to ?? url.searchParams.get("to"),
+    date: body?.date ?? url.searchParams.get("date")?.trim() ?? null,
+  });
+}
+
+/** Status / Cache für Zeitraum (überlebt Seitenwechsel, max. 7 Einträge). */
 export async function GET(request: Request) {
   ensureInitialized();
   const auth = await requireAuth();
@@ -133,32 +150,40 @@ export async function GET(request: Request) {
     );
   }
   const url = new URL(request.url);
-  const day = url.searchParams.get("date")?.trim() || null;
+  const hasRangeParams =
+    url.searchParams.has("from") ||
+    url.searchParams.has("to") ||
+    url.searchParams.has("date");
+  const rangeOrErr = hasRangeParams
+    ? resolveRangeFromRequest(url)
+    : null;
+  if (rangeOrErr && "error" in rangeOrErr) {
+    return NextResponse.json({ error: rangeOrErr.error }, { status: 400 });
+  }
+  const range = rangeOrErr && !("error" in rangeOrErr) ? rangeOrErr : null;
+  const rangeKey = range?.rangeKey ?? null;
   const cachedDays = listMsMailDayCachedDays(userId);
   const job = readMsMailDayJob(userId);
 
   if (job?.status === "running" && isMsMailDayJobBusy(job)) {
-    const sameDay = !day || job.dayIso === day;
     return NextResponse.json({
       ok: true,
       status: "running",
-      job: sameDay ? job : job,
+      job,
       cachedDays,
       fromCache: false,
-      // Wenn anderer Tag gewählt: Cache für diesen Tag mitliefern
       cachedJob:
-        day && job.dayIso !== day
+        rangeKey && job.rangeKey !== rangeKey
           ? (() => {
-              const c = getMsMailDayCached(userId, day);
+              const c = getMsMailDayCached(userId, rangeKey);
               return c ? cachedToJob(userId, c) : null;
             })()
           : null,
     });
   }
 
-  // Veraltetes running
   if (job?.status === "running" && !isMsMailDayJobBusy(job)) {
-    const cached = day ? getMsMailDayCached(userId, day) : null;
+    const cached = rangeKey ? getMsMailDayCached(userId, rangeKey) : null;
     if (cached) {
       return NextResponse.json({
         ok: true,
@@ -183,16 +208,17 @@ export async function GET(request: Request) {
     });
   }
 
-  // Aktueller Job passt zum Tag
   if (
     job?.status === "done" &&
     job.analysis &&
-    (!day || job.dayIso === day)
+    (!rangeKey || job.rangeKey === rangeKey)
   ) {
-    // Letzten Job in den Tages-Cache übernehmen (Migration / nach Analyse)
     if (job.finishedAt) {
       upsertMsMailDayCache(userId, {
         dayIso: job.dayIso,
+        fromYmd: job.fromYmd,
+        toYmd: job.toYmd,
+        rangeKey: job.rangeKey,
         finishedAt: job.finishedAt,
         analysis: job.analysis,
         inboxCount: job.mail?.inbox.length ?? 0,
@@ -208,9 +234,8 @@ export async function GET(request: Request) {
     });
   }
 
-  // Cache-Treffer für angefragten Tag
-  if (day) {
-    const cached = getMsMailDayCached(userId, day);
+  if (rangeKey) {
+    const cached = getMsMailDayCached(userId, rangeKey);
     if (cached) {
       return NextResponse.json({
         ok: true,
@@ -229,7 +254,6 @@ export async function GET(request: Request) {
     });
   }
 
-  // Ohne date: letzten Job oder neuesten Cache
   if (job?.status === "done" && job.analysis) {
     return NextResponse.json({
       ok: true,
@@ -239,9 +263,9 @@ export async function GET(request: Request) {
       fromCache: false,
     });
   }
-  const latestDay = cachedDays[0];
-  if (latestDay) {
-    const cached = getMsMailDayCached(userId, latestDay);
+  const latestKey = cachedDays[0];
+  if (latestKey) {
+    const cached = getMsMailDayCached(userId, latestKey);
     if (cached) {
       return NextResponse.json({
         ok: true,
@@ -275,13 +299,22 @@ export async function POST(request: Request) {
     );
   }
 
-  let day = zurichYmd();
+  let body: z.infer<typeof BodySchema> = {};
   try {
     const raw = await request.json().catch(() => ({}));
     const parsed = BodySchema.safeParse(raw);
-    if (parsed.success && parsed.data.date) day = parsed.data.date;
+    if (parsed.success) body = parsed.data;
   } catch {
     // empty body ok
+  }
+
+  const range = resolveMailAnalysisRange({
+    from: body.from,
+    to: body.to,
+    date: body.date,
+  });
+  if ("error" in range) {
+    return NextResponse.json({ error: range.error }, { status: 400 });
   }
 
   const existing = readMsMailDayJob(userId);
@@ -293,17 +326,21 @@ export async function POST(request: Request) {
         status: "running",
         job: existing,
         cachedDays: listMsMailDayCachedDays(userId),
-        message: `Analyse läuft bereits (${existing!.dayIso}).`,
+        message: `Analyse läuft bereits (${formatMailAnalysisRangeLabel({
+          fromYmd: existing!.fromYmd,
+          toYmd: existing!.toYmd,
+        })}).`,
       },
       { status: 202 }
     );
   }
 
-  const job = startMsMailDayJob(userId, day);
+  const job = startMsMailDayJob(userId, range);
   after(() => {
-    void runAnalysisJob(userId, day);
+    void runAnalysisJob(userId, range);
   });
 
+  const label = formatMailAnalysisRangeLabel(range);
   return NextResponse.json(
     {
       ok: true,
@@ -311,7 +348,7 @@ export async function POST(request: Request) {
       status: "running",
       job,
       cachedDays: listMsMailDayCachedDays(userId),
-      message: `Analyse für ${day} gestartet.`,
+      message: `Analyse für ${label} gestartet.`,
     },
     { status: 202 }
   );

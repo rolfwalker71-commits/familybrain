@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { isAuthError, requireAuth } from "@/lib/auth/current-user";
 import { ensureInitialized } from "@/lib/db/migrations";
-import { listMicrosoftMailForDay } from "@/lib/microsoft/mail-day";
-import { zurichYmd } from "@/lib/microsoft/time";
+import { listMicrosoftMailForRange } from "@/lib/microsoft/mail-day";
+import { resolveMailAnalysisRange } from "@/lib/mail/mail-analysis-range";
 import {
   isMicrosoftConnected,
   resolveMicrosoftUserId,
@@ -23,12 +23,23 @@ export async function GET(request: Request) {
     );
   }
   const url = new URL(request.url);
-  const day =
-    url.searchParams.get("date")?.trim() ||
-    url.searchParams.get("day")?.trim() ||
-    zurichYmd();
+  const range = resolveMailAnalysisRange({
+    from: url.searchParams.get("from"),
+    to: url.searchParams.get("to"),
+    date:
+      url.searchParams.get("date")?.trim() ||
+      url.searchParams.get("day")?.trim() ||
+      null,
+  });
+  if ("error" in range) {
+    return NextResponse.json({ error: range.error }, { status: 400 });
+  }
   try {
-    const data = await listMicrosoftMailForDay(userId, day);
+    const data = await listMicrosoftMailForRange(
+      userId,
+      range.fromYmd,
+      range.toYmd
+    );
     return NextResponse.json({
       ...data,
       todayIso: data.dayIso,

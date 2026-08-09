@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { isAuthError, requireAuth } from "@/lib/auth/current-user";
 import { ensureInitialized } from "@/lib/db/migrations";
-import { listGoogleMailForDay } from "@/lib/google/mail-day";
+import { listGoogleMailForRange } from "@/lib/google/mail-day";
+import { resolveMailAnalysisRange } from "@/lib/mail/mail-analysis-range";
 import {
   isGoogleMailConnected,
   resolveGoogleUserId,
 } from "@/lib/google/oauth";
-import { zurichYmd } from "@/lib/microsoft/time";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,12 +23,24 @@ export async function GET(request: Request) {
     );
   }
   const url = new URL(request.url);
-  const day =
-    url.searchParams.get("date")?.trim() ||
-    url.searchParams.get("day")?.trim() ||
-    zurichYmd();
+  const range = resolveMailAnalysisRange({
+    from: url.searchParams.get("from"),
+    to: url.searchParams.get("to"),
+    date:
+      url.searchParams.get("date")?.trim() ||
+      url.searchParams.get("day")?.trim() ||
+      null,
+  });
+  if ("error" in range) {
+    return NextResponse.json({ error: range.error }, { status: 400 });
+  }
   try {
-    const data = await listGoogleMailForDay(userId, day, { request });
+    const data = await listGoogleMailForRange(
+      userId,
+      range.fromYmd,
+      range.toYmd,
+      { request }
+    );
     return NextResponse.json({
       ...data,
       todayIso: data.dayIso,
