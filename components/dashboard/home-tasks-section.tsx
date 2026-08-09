@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import Link from "next/link";
-import { Check, CheckSquare, ChevronDown, ExternalLink } from "lucide-react";
+import { Check, CheckSquare, ChevronDown, ExternalLink, LayoutGrid } from "lucide-react";
 import { AgendaAiIconThumb } from "@/components/calendar/agenda-ai-icon-thumb";
 import { weekdayLabel } from "@/components/calendar/agenda-row";
 import { Badge } from "@/components/ui/badge";
@@ -28,7 +28,11 @@ export type HomeTaskRow = {
   listId: string | null;
   etag: string | null;
   listTitle?: string;
+  planId?: string | null;
+  bucketId?: string | null;
 };
+
+type PlannerBucketOption = { id: string; name: string };
 
 const SOURCE_LABEL: Record<HomeTaskRow["source"], string> = {
   google: "Google Tasks",
@@ -138,6 +142,9 @@ function TaskRow({
   onDueDraft,
   onComplete,
   onReschedule,
+  onMoveBucket,
+  buckets,
+  onEnsureBuckets,
   compact,
 }: {
   task: HomeTaskRow;
@@ -148,6 +155,9 @@ function TaskRow({
   onDueDraft: (v: string) => void;
   onComplete: () => void;
   onReschedule: () => void;
+  onMoveBucket?: (bucketId: string) => void;
+  buckets?: PlannerBucketOption[];
+  onEnsureBuckets?: () => void;
   compact?: boolean;
 }) {
   return (
@@ -234,6 +244,40 @@ function TaskRow({
             >
               Terminieren
             </Button>
+            {task.source === "planner" && task.planId && onMoveBucket ? (
+              <div className="inline-flex items-center gap-1.5">
+                <LayoutGrid
+                  className="size-3.5 text-muted-foreground"
+                  strokeWidth={APP_ICON_STROKE}
+                  aria-hidden
+                />
+                <select
+                  className="h-8 max-w-[12rem] rounded-md border border-border bg-background px-2 text-[12px]"
+                  disabled={busy}
+                  value={task.bucketId || ""}
+                  title="Planner-Bucket"
+                  aria-label="Planner-Bucket"
+                  onFocus={() => onEnsureBuckets?.()}
+                  onChange={(e) => {
+                    const bucketId = e.target.value;
+                    if (!bucketId || bucketId === (task.bucketId || "")) return;
+                    onMoveBucket(bucketId);
+                  }}
+                >
+                  {(buckets || []).length === 0 ? (
+                    <option value={task.bucketId || ""}>
+                      {task.bucketLabel || "Bucket laden…"}
+                    </option>
+                  ) : (
+                    (buckets || []).map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
+            ) : null}
           </div>
         ) : null}
       </div>
@@ -250,6 +294,8 @@ function SourceBlock({
   draftDue,
   setDraftDue,
   patch,
+  bucketsByPlan,
+  ensureBuckets,
   compact,
 }: {
   source: HomeTaskRow["source"];
@@ -261,9 +307,12 @@ function SourceBlock({
   setDraftDue: Dispatch<SetStateAction<Record<string, string>>>;
   patch: (
     task: HomeTaskRow,
-    action: "complete" | "reschedule",
-    dueDate?: string | null
+    action: "complete" | "reschedule" | "moveBucket",
+    dueDate?: string | null,
+    bucketId?: string
   ) => Promise<void>;
+  bucketsByPlan: Record<string, PlannerBucketOption[]>;
+  ensureBuckets: (planId: string) => void;
   compact?: boolean;
 }) {
   if (tasks.length === 0) return null;
@@ -297,6 +346,17 @@ function SourceBlock({
                 draftDue[t.key] ?? t.dueDate ?? null
               )
             }
+            onMoveBucket={
+              t.source === "planner"
+                ? (bucketId) => void patch(t, "moveBucket", undefined, bucketId)
+                : undefined
+            }
+            buckets={
+              t.planId ? bucketsByPlan[t.planId] || undefined : undefined
+            }
+            onEnsureBuckets={
+              t.planId ? () => ensureBuckets(t.planId!) : undefined
+            }
             compact={compact}
           />
         ))}
@@ -326,6 +386,10 @@ export function HomeTasksSection({
   const [notice, setNotice] = useState<string | null>(null);
   const [draftDue, setDraftDue] = useState<Record<string, string>>({});
   const [laterOpen, setLaterOpen] = useState(false);
+  const [bucketsByPlan, setBucketsByPlan] = useState<
+    Record<string, PlannerBucketOption[]>
+  >({});
+  const bucketsLoadingRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     setRows(items.filter((t) => !doneKeysRef.current.has(t.key)));
@@ -342,10 +406,39 @@ export function HomeTasksSection({
     [rows, today]
   );
 
+  function ensureBuckets(planId: string) {
+    if (!planId || bucketsByPlan[planId] || bucketsLoadingRef.current.has(planId)) {
+      return;
+    }
+    bucketsLoadingRef.current.add(planId);
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/microsoft/planner/tasks?planId=${encodeURIComponent(planId)}`
+        );
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(
+            (json as { error?: string }).error ||
+              "Buckets konnten nicht geladen werden."
+          );
+        }
+        const buckets = ((json as { buckets?: PlannerBucketOption[] }).buckets ||
+          []) as PlannerBucketOption[];
+        setBucketsByPlan((prev) => ({ ...prev, [planId]: buckets }));
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        bucketsLoadingRef.current.delete(planId);
+      }
+    })();
+  }
+
   async function patch(
     task: HomeTaskRow,
-    action: "complete" | "reschedule",
-    dueDate?: string | null
+    action: "complete" | "reschedule" | "moveBucket",
+    dueDate?: string | null,
+    bucketId?: string
   ) {
     setBusyKey(task.key);
     setError(null);
@@ -361,6 +454,7 @@ export function HomeTasksSection({
           etag: task.etag,
           action,
           dueDate: action === "reschedule" ? dueDate ?? null : undefined,
+          bucketId: action === "moveBucket" ? bucketId : undefined,
         }),
       });
       const json = await res.json().catch(() => ({}));
@@ -384,6 +478,46 @@ export function HomeTasksSection({
           setRows((prev) => prev.filter((t) => t.key !== task.key));
           setJustDoneKey((k) => (k === task.key ? null : k));
         }, 900);
+      } else if (action === "moveBucket") {
+        const updated = (json as {
+          task?: {
+            etag?: string;
+            bucketId?: string | null;
+            bucketName?: string | null;
+            planTitle?: string | null;
+          };
+        }).task;
+        const nextBucketId = updated?.bucketId ?? bucketId ?? task.bucketId;
+        const nextBucketName =
+          updated?.bucketName ??
+          (bucketId
+            ? bucketsByPlan[task.planId || ""]?.find((b) => b.id === bucketId)
+                ?.name
+            : null) ??
+          task.bucketLabel;
+        const plan = updated?.planTitle || task.accountLabel || "Planner";
+        setRows((prev) =>
+          prev.map((t) =>
+            t.key === task.key
+              ? {
+                  ...t,
+                  bucketId: nextBucketId ?? null,
+                  bucketLabel: nextBucketName ?? null,
+                  subtitle: [plan, nextBucketName].filter(Boolean).join(" · "),
+                  etag: updated?.etag ?? t.etag,
+                }
+              : t
+          )
+        );
+        const msg = nextBucketName
+          ? `«${task.title}» nach «${nextBucketName}» verschoben.`
+          : `«${task.title}» in anderen Bucket verschoben.`;
+        setNotice(msg);
+        showActionFeedback({
+          headline: msg,
+          detail: "Microsoft Planner",
+          tone: "success",
+        });
       } else {
         const nextDue = dueDate ?? null;
         setRows((prev) =>
@@ -511,6 +645,8 @@ export function HomeTasksSection({
               draftDue={draftDue}
               setDraftDue={setDraftDue}
               patch={patch}
+              bucketsByPlan={bucketsByPlan}
+              ensureBuckets={ensureBuckets}
             />
           ))
         )}
@@ -550,6 +686,8 @@ export function HomeTasksSection({
                     draftDue={draftDue}
                     setDraftDue={setDraftDue}
                     patch={patch}
+                    bucketsByPlan={bucketsByPlan}
+                    ensureBuckets={ensureBuckets}
                     compact
                   />
                 ))}

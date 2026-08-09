@@ -24,13 +24,14 @@ const PatchSchema = z.object({
   id: z.string().min(1).max(200),
   listId: z.string().max(200).nullable().optional(),
   etag: z.string().max(500).nullable().optional(),
-  /** complete = erledigen */
-  action: z.enum(["complete", "reopen", "reschedule"]),
+  /** complete / reopen / reschedule / moveBucket (Planner) */
+  action: z.enum(["complete", "reopen", "reschedule", "moveBucket"]),
   dueDate: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .nullable()
     .optional(),
+  bucketId: z.string().min(1).max(80).optional(),
 });
 
 export async function GET() {
@@ -125,6 +126,12 @@ export async function PATCH(request: Request) {
         { status: 403 }
       );
     }
+    if (body.action === "moveBucket" && !body.bucketId) {
+      return NextResponse.json(
+        { error: "bucketId fehlt für Bucket-Wechsel." },
+        { status: 400 }
+      );
+    }
     const task = await updatePlannerTask(userId, {
       taskId: body.id,
       etag: body.etag,
@@ -136,6 +143,7 @@ export async function PATCH(request: Request) {
             : undefined,
       dueDate:
         body.action === "reschedule" ? body.dueDate ?? null : undefined,
+      bucketId: body.action === "moveBucket" ? body.bucketId : undefined,
     });
     return NextResponse.json({ ok: true, task });
   } catch (error) {

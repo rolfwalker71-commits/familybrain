@@ -1746,6 +1746,8 @@ export function OverviewDashboard({
                     listId: t.listId ?? null,
                     etag: t.etag ?? null,
                     listTitle: t.listTitle,
+                    planId: t.planId ?? null,
+                    bucketId: t.bucketId ?? null,
                   }))}
                   today={today}
                   hasGoogleScope={Boolean(data.tasks?.hasGoogleScope)}

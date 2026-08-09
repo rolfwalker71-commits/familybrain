@@ -19,13 +19,16 @@ export type HomeTaskItem = {
   overdue: boolean;
   /** Legacy one-line meta (list / plan · bucket). */
   subtitle: string;
-  /** Account chip: Google / Microsoft. */
+  /** Account chip: Google / Microsoft / Plan-Titel. */
   accountLabel: string;
-  /** Bucket/list/plan chip. */
+  /** Bucket/list chip. */
   bucketLabel: string | null;
   href: string;
   listId: string | null;
   etag: string | null;
+  /** Planner only */
+  planId?: string | null;
+  bucketId?: string | null;
 };
 
 function zurichYmd(d = new Date()): string {
@@ -147,6 +150,8 @@ export async function loadHomeTasksBundle(
               href: t.href,
               listId: null,
               etag: t.etag || null,
+              planId: t.planId || null,
+              bucketId: t.bucketId || null,
             };
           });
       } catch {

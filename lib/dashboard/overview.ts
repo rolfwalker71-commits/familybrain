@@ -250,6 +250,8 @@ export type OverviewPayload = {
       href: string;
       listId: string | null;
       etag: string | null;
+      planId?: string | null;
+      bucketId?: string | null;
       /** legacy */
       listTitle?: string;
     }>;
