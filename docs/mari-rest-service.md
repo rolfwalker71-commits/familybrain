@@ -280,6 +280,8 @@ curl -sS -X POST -H "Authorization: Bearer $TOKEN" \
 
 **AI-Screenshots:** `GET /api/SupportIssueAttachment/{id}` liefert Base64; bis zu 4 Bilder (png/jpeg/webp, kleine GIF-Signaturen werden übersprungen) gehen mit Vision in die Analyse.
 
+**Verlauf-Anhänge:** Timeline reichert Lines mit `SupportIssueAttachmentList` an (`AttachmentID` = `RequestPosID`). Buddy `GET /api/maringo/attachments/{id}` proxied Bild/Datei (Auth). Mail-Stubs mit mehreren Dateien werden zu einer Anhangs-Zeile gruppiert.
+
 **AI → interner Kommentar:** Buddy `POST /api/maringo/tickets/{id}/internal-note` → MARI `POST /api/SupportIssueAttachment` mit `Internal: true`, `AttachmentTyp: 1`. Nie kunden-sichtbare Reply-Pfade.
 
 Menü: `/maringo` («Maringo Support»).

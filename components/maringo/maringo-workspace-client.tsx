@@ -9,9 +9,11 @@ import {
   Lock,
   MessageSquare,
   MoreHorizontal,
+  Paperclip,
   RefreshCw,
   Sparkles,
   User,
+  X,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -46,8 +48,104 @@ import type {
   MariEmployeeOption,
   MariTicketDetail,
   MariTicketListItem,
+  MariTimelineAttachment,
   MariTimelineItem,
 } from "@/lib/mari/tickets";
+
+function attachmentUrl(attachmentId: number, download = false): string {
+  const q = download ? "?download=1" : "";
+  return `/api/maringo/attachments/${attachmentId}${q}`;
+}
+
+function TimelineAttachments({
+  attachments,
+}: {
+  attachments: MariTimelineAttachment[];
+}) {
+  const [lightbox, setLightbox] = useState<MariTimelineAttachment | null>(null);
+  const images = attachments.filter((a) => a.isImage);
+  const files = attachments.filter((a) => !a.isImage);
+
+  return (
+    <>
+      {images.length > 0 ? (
+        <div className="flex flex-wrap gap-2 pt-0.5">
+          {images.map((a) => (
+            <button
+              key={a.attachmentId}
+              type="button"
+              className="group relative overflow-hidden rounded-lg border border-border/60 bg-background shadow-sm transition hover:border-orange-300"
+              onClick={() => setLightbox(a)}
+              title={a.orgFilename}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={attachmentUrl(a.attachmentId)}
+                alt={a.orgFilename}
+                loading="lazy"
+                className="h-24 w-auto max-w-[11rem] object-cover"
+              />
+              <span className="absolute inset-x-0 bottom-0 truncate bg-black/55 px-1.5 py-0.5 text-[10px] text-white opacity-0 transition group-hover:opacity-100">
+                {a.orgFilename}
+              </span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+      {files.length > 0 ? (
+        <ul className="flex flex-wrap gap-1.5 pt-0.5">
+          {files.map((a) => (
+            <li key={a.attachmentId}>
+              <a
+                href={attachmentUrl(a.attachmentId, true)}
+                className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-border/60 bg-background px-2 py-1 text-[11px] font-medium text-foreground hover:border-orange-300 hover:bg-orange-50/50"
+                title={a.orgFilename}
+              >
+                <Paperclip className="size-3 shrink-0 text-muted-foreground" />
+                <span className="truncate">{a.orgFilename}</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {lightbox ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label={lightbox.orgFilename}
+          onClick={() => setLightbox(null)}
+        >
+          <button
+            type="button"
+            className="absolute right-4 top-4 rounded-full bg-black/50 p-2 text-white hover:bg-black/70"
+            onClick={() => setLightbox(null)}
+            aria-label="Schliessen"
+          >
+            <X className="size-5" />
+          </button>
+          <div
+            className="flex max-h-full max-w-full flex-col items-center gap-2"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={attachmentUrl(lightbox.attachmentId)}
+              alt={lightbox.orgFilename}
+              className="max-h-[85vh] max-w-[95vw] rounded-lg object-contain shadow-2xl"
+            />
+            <a
+              href={attachmentUrl(lightbox.attachmentId, true)}
+              className="rounded-full bg-white/90 px-3 py-1 text-[12px] font-medium text-foreground hover:bg-white"
+            >
+              {lightbox.orgFilename} herunterladen
+            </a>
+          </div>
+        </div>
+      ) : null}
+    </>
+  );
+}
 
 function formatTimelineAt(iso: string): string {
   const d = new Date(iso);
@@ -142,18 +240,30 @@ function TimelineRow({ item }: { item: MariTimelineItem }) {
     );
   }
 
+  const attachments = item.attachments || [];
+  const hasAttachments = attachments.length > 0;
+  const isAttachmentOnly =
+    item.kind === "attachment" ||
+    (hasAttachments && /^Aus E-Mail gesendet/i.test(item.text.trim()));
   const inbound =
-    item.kind === "inbound" || item.kind === "customer" || item.kind === "system";
+    item.kind === "inbound" ||
+    item.kind === "customer" ||
+    item.kind === "system" ||
+    item.kind === "attachment";
   const bubble =
     item.kind === "reply"
       ? "ml-auto border-sky-200/80 bg-sky-50 text-sky-950"
       : item.kind === "system"
         ? "border-violet-200/70 bg-violet-50/60 text-violet-950"
-        : "border-border/70 bg-muted/40 text-foreground";
+        : item.kind === "attachment"
+          ? "border-teal-200/70 bg-teal-50/50 text-teal-950"
+          : "border-border/70 bg-muted/40 text-foreground";
   const dot =
     item.kind === "reply"
       ? "bg-sky-500"
-      : item.kind === "inbound" || item.kind === "customer"
+      : item.kind === "inbound" ||
+          item.kind === "customer" ||
+          item.kind === "attachment"
         ? "bg-teal-600"
         : "bg-muted-foreground";
 
@@ -165,23 +275,50 @@ function TimelineRow({ item }: { item: MariTimelineItem }) {
           dot
         )}
       />
-      <div className={cn("max-w-[92%] space-y-1", item.kind === "reply" && "ml-auto")}>
+      <div
+        className={cn(
+          "max-w-[92%] space-y-1",
+          item.kind === "reply" && "ml-auto"
+        )}
+      >
         <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
           {formatTimelineAt(item.at)} · {item.label}
           {item.actor ? ` · ${item.actor}` : ""}
           {item.meta ? ` · ${item.meta}` : ""}
         </p>
         {item.subject ? (
-          <p className="text-[12px] font-medium text-foreground/80">{item.subject}</p>
+          <p className="text-[12px] font-medium text-foreground/80">
+            {item.subject}
+          </p>
         ) : null}
         <div
           className={cn(
-            "rounded-2xl border px-3.5 py-2.5 text-[13px] leading-relaxed whitespace-pre-wrap",
+            "space-y-2 rounded-2xl border px-3.5 py-2.5 text-[13px] leading-relaxed",
             bubble,
-            !inbound && item.kind === "reply" ? "rounded-br-md" : "rounded-bl-md"
+            !inbound && item.kind === "reply"
+              ? "rounded-br-md"
+              : "rounded-bl-md"
           )}
         >
-          {item.text || "(kein Text)"}
+          {!isAttachmentOnly && item.text ? (
+            <div className="whitespace-pre-wrap">{item.text}</div>
+          ) : null}
+          {isAttachmentOnly && item.text && !hasAttachments ? (
+            <div className="whitespace-pre-wrap">{item.text}</div>
+          ) : null}
+          {isAttachmentOnly && hasAttachments ? (
+            <p className="text-[11px] text-muted-foreground">
+              {attachments.length === 1
+                ? "Anhang aus E-Mail / Ticket"
+                : `${attachments.length} Anhänge aus E-Mail / Ticket`}
+            </p>
+          ) : null}
+          {hasAttachments ? (
+            <TimelineAttachments attachments={attachments} />
+          ) : null}
+          {!item.text && !hasAttachments ? (
+            <span className="text-muted-foreground">(kein Text)</span>
+          ) : null}
         </div>
       </div>
     </li>
@@ -1065,6 +1202,57 @@ export function MaringoWorkspaceClient() {
                           <pre className="mt-2 whitespace-pre-wrap font-sans text-[12px] leading-relaxed text-sky-950/95">
                             {analysis.solutionSketch.outline}
                           </pre>
+                          {analysis.solutionSketch.steps.length > 0 ? (
+                            <ol className="mt-3 list-decimal space-y-2 pl-4 text-[12px] text-sky-950/95">
+                              {analysis.solutionSketch.steps.map((s, i) => (
+                                <li key={`${s.where}-${s.action}-${i}`}>
+                                  <span className="font-semibold">{s.where}</span>
+                                  <span className="text-sky-900/80"> — </span>
+                                  {s.action}
+                                  {s.detail ? (
+                                    <p className="mt-0.5 text-[11px] text-sky-900/75">
+                                      {s.detail}
+                                    </p>
+                                  ) : null}
+                                </li>
+                              ))}
+                            </ol>
+                          ) : null}
+                          {analysis.solutionSketch.artifacts.length > 0 ? (
+                            <div className="mt-3 space-y-2.5">
+                              <p className="text-[11px] font-semibold uppercase tracking-wide text-sky-900/80">
+                                Queries / Code
+                              </p>
+                              {analysis.solutionSketch.artifacts.map((a, i) => (
+                                <div
+                                  key={`${a.kind}-${a.title}-${i}`}
+                                  className="overflow-hidden rounded-lg border border-sky-200/70 bg-white/80"
+                                >
+                                  <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 border-b border-sky-100 px-2.5 py-1.5 text-[11px]">
+                                    <span className="font-semibold text-sky-950">
+                                      {a.title}
+                                    </span>
+                                    <span className="rounded bg-sky-100/80 px-1.5 py-0.5 font-mono text-[10px] text-sky-900">
+                                      {a.kind}
+                                    </span>
+                                    {a.language ? (
+                                      <span className="text-sky-900/60">
+                                        {a.language}
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                  {a.note ? (
+                                    <p className="border-b border-sky-100 px-2.5 py-1 text-[11px] text-sky-900/70">
+                                      {a.note}
+                                    </p>
+                                  ) : null}
+                                  <pre className="max-h-64 overflow-auto whitespace-pre-wrap p-2.5 font-mono text-[11px] leading-snug text-sky-950">
+                                    {a.code}
+                                  </pre>
+                                </div>
+                              ))}
+                            </div>
+                          ) : null}
                           {analysis.solutionSketch.caveats ? (
                             <p className="mt-2 text-[11px] text-sky-900/70">
                               {analysis.solutionSketch.caveats}

@@ -6,6 +6,11 @@ import {
   MariApiError,
 } from "@/lib/mari/client";
 import {
+  isMariImageMime,
+  listMariAttachments,
+  type MariAttachmentMeta,
+} from "@/lib/mari/attachments";
+import {
   PRIORITY_LABELS,
   STATUS_LABELS,
   WORK_STATUS_IDS,
@@ -80,7 +85,15 @@ export type MariTimelineKind =
   | "customer"
   | "system"
   | "note"
-  | "change";
+  | "change"
+  | "attachment";
+
+export type MariTimelineAttachment = {
+  attachmentId: number;
+  orgFilename: string;
+  mimeType: string;
+  isImage: boolean;
+};
 
 export type MariTimelineItem = {
   id: string;
@@ -91,6 +104,7 @@ export type MariTimelineItem = {
   text: string;
   actor: string | null;
   meta?: string | null;
+  attachments?: MariTimelineAttachment[];
 };
 
 export type MariTicketDetail = MariTicketListItem & {
@@ -336,20 +350,41 @@ ORDER BY
   });
 }
 
+function toTimelineAttachment(
+  meta: MariAttachmentMeta
+): MariTimelineAttachment {
+  return {
+    attachmentId: meta.attachmentId,
+    orgFilename: meta.orgFilename,
+    mimeType: meta.mimeType,
+    isImage: isMariImageMime(meta.mimeType, meta.orgFilename),
+  };
+}
+
+/** Mail-Platzhalter ohne echten Inhalt — oft nur Träger für Anhänge. */
+function isMailAttachmentStub(plain: string, subject: string | null): boolean {
+  if (subject?.trim()) return false;
+  const t = plain.trim();
+  if (!t) return true;
+  if (/^Aus E-Mail gesendet/i.test(t) && t.length < 220) return true;
+  return false;
+}
+
 async function loadTimeline(issueId: number): Promise<MariTimelineItem[]> {
   if (!Number.isInteger(issueId) || issueId <= 0) return [];
 
-  const lines = await mariSql<{
-    RequestPosID: number;
-    RequestPosType: number;
-    RequestPosSubject: string | null;
-    RequestText: string | null;
-    Originator: string | null;
-    HandledBy: string | null;
-    CreateDate: string;
-    VisibleInternOnly: number | null;
-  }>(
-    `SELECT TOP 200
+  const [lines, changes, attachmentMetas] = await Promise.all([
+    mariSql<{
+      RequestPosID: number;
+      RequestPosType: number;
+      RequestPosSubject: string | null;
+      RequestText: string | null;
+      Originator: string | null;
+      HandledBy: string | null;
+      CreateDate: string;
+      VisibleInternOnly: number | null;
+    }>(
+      `SELECT TOP 200
   "RequestPosID",
   "RequestPosType",
   "RequestPosSubject",
@@ -361,18 +396,17 @@ async function loadTimeline(issueId: number): Promise<MariTimelineItem[]> {
 FROM "MARISupportIssueLine"
 WHERE "IssueID" = ${issueId}
 ORDER BY "CreateDate", "RequestPosID"`
-  );
-
-  const changes = await mariSql<{
-    ChangeLogID: number;
-    FieldName: string | null;
-    FieldValue: string | null;
-    FieldValueNew: string | null;
-    HandledBy: string | null;
-    ChangeDate: string;
-    DBFieldName: string | null;
-  }>(
-    `SELECT TOP 100
+    ),
+    mariSql<{
+      ChangeLogID: number;
+      FieldName: string | null;
+      FieldValue: string | null;
+      FieldValueNew: string | null;
+      HandledBy: string | null;
+      ChangeDate: string;
+      DBFieldName: string | null;
+    }>(
+      `SELECT TOP 100
   "ChangeLogID",
   "FieldName",
   "FieldValue",
@@ -384,41 +418,108 @@ FROM "MARISupportIssueChangeLog"
 WHERE "IssueID" = ${issueId}
   AND "DBFieldName" IN ('Status','FaelligAm','Priority','Editor','EditorType','HandledBy')
 ORDER BY "ChangeDate", "ChangeLogID"`
-  );
+    ),
+    listMariAttachments(issueId).catch(() => [] as MariAttachmentMeta[]),
+  ]);
+
+  const fileByPosId = new Map<number, MariAttachmentMeta>();
+  for (const a of attachmentMetas) {
+    if (a.hasFile) fileByPosId.set(a.attachmentId, a);
+  }
 
   const items: MariTimelineItem[] = [];
+  type PendingGroup = {
+    ids: number[];
+    at: string;
+    posType: number;
+    actor: string | null;
+    meta: string | null;
+    stubText: string;
+    attachments: MariTimelineAttachment[];
+  };
+  let pending: PendingGroup | null = null;
+
+  const flushPending = () => {
+    if (!pending || pending.attachments.length === 0) {
+      pending = null;
+      return;
+    }
+    const n = pending.attachments.length;
+    items.push({
+      id: `att-${pending.ids[0]}${n > 1 ? `-${n}` : ""}`,
+      kind: "attachment",
+      at: pending.at,
+      label: n === 1 ? "Anhang" : `${n} Anhänge`,
+      subject: null,
+      text: pending.stubText.slice(0, 4000),
+      actor: pending.actor,
+      meta: pending.meta,
+      attachments: pending.attachments,
+    });
+    pending = null;
+  };
 
   for (const line of lines) {
     const plain = htmlToPlain(line.RequestText || "");
-    // Skip near-empty mail stubs that only say "Aus E-Mail gesendet…" when a fuller sibling exists nearby — keep all for now but trim short stubs under 40 chars that match pattern
-    if (
-      plain.length < 40 &&
-      /^Aus E-Mail gesendet/i.test(plain) &&
-      !line.RequestPosSubject
-    ) {
+    const subject = line.RequestPosSubject || null;
+    const file = fileByPosId.get(Number(line.RequestPosID));
+    const stub = isMailAttachmentStub(plain, subject);
+    const internMeta =
+      line.VisibleInternOnly != null && Number(line.VisibleInternOnly) !== 0
+        ? "Nur intern sichtbar"
+        : null;
+    const actor = line.Originator || line.HandledBy || null;
+
+    // Dateianhang: in Gruppe mergen wenn Mail-Stub, sonst an Text-Zeile hängen
+    if (file && stub) {
+      const att = toTimelineAttachment(file);
+      if (
+        pending &&
+        pending.stubText === plain.trim() &&
+        pending.posType === Number(line.RequestPosType)
+      ) {
+        pending.ids.push(Number(line.RequestPosID));
+        pending.attachments.push(att);
+        if (!pending.meta && internMeta) pending.meta = internMeta;
+        if (!pending.actor && actor) pending.actor = actor;
+      } else {
+        flushPending();
+        pending = {
+          ids: [Number(line.RequestPosID)],
+          at: line.CreateDate,
+          posType: Number(line.RequestPosType),
+          actor,
+          meta: internMeta,
+          stubText: plain.trim(),
+          attachments: [att],
+        };
+      }
       continue;
     }
+
+    flushPending();
+
+    if (stub && !file) {
+      // kurzer Mail-Stub ohne Datei → ausblenden
+      if (plain.length < 40 || /^Aus E-Mail gesendet/i.test(plain)) {
+        continue;
+      }
+    }
+
     const kind = lineKind(Number(line.RequestPosType));
-    const actor =
-      line.Originator ||
-      line.HandledBy ||
-      (kind === "inbound" || kind === "customer" ? null : null);
     items.push({
       id: `line-${line.RequestPosID}`,
       kind,
       at: line.CreateDate,
       label: lineLabel(Number(line.RequestPosType)),
-      subject: line.RequestPosSubject || null,
+      subject,
       text: plain.slice(0, 4000),
       actor,
-      meta:
-        // HANA: VisibleInternOnly = -1 (true) / 0 (false)
-        line.VisibleInternOnly != null &&
-        Number(line.VisibleInternOnly) !== 0
-          ? "Nur intern sichtbar"
-          : null,
+      meta: internMeta,
+      attachments: file ? [toTimelineAttachment(file)] : undefined,
     });
   }
+  flushPending();
 
   for (const ch of changes) {
     const field = ch.FieldName || ch.DBFieldName || "Feld";
@@ -436,7 +537,7 @@ ORDER BY "ChangeDate", "ChangeLogID"`
     });
   }
 
-  items.sort((a, b) => a.at.localeCompare(b.at));
+  items.sort((a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id));
   return items;
 }
 

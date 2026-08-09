@@ -73,6 +73,31 @@ export function formatAnalysisAsInternalCommentHtml(
       );
     }
     parts.push(preBlock(analysis.solutionSketch.outline));
+    if (analysis.solutionSketch.steps.length > 0) {
+      parts.push(`<div><br/></div><div><b>Schritte</b></div>`);
+      parts.push("<ol>");
+      for (const s of analysis.solutionSketch.steps) {
+        const detail = s.detail ? `<br/><i>${escapeHtml(s.detail)}</i>` : "";
+        parts.push(
+          `<li><b>${escapeHtml(s.where)}</b> — ${escapeHtml(s.action)}${detail}</li>`
+        );
+      }
+      parts.push("</ol>");
+    }
+    if (analysis.solutionSketch.artifacts.length > 0) {
+      parts.push(`<div><br/></div><div><b>Queries / Code-Vorschläge</b></div>`);
+      for (const a of analysis.solutionSketch.artifacts) {
+        parts.push(
+          `<div><b>${escapeHtml(a.title)}</b> <span>(${escapeHtml(a.kind)})</span></div>`
+        );
+        if (a.note) {
+          parts.push(`<div><i>${escapeHtml(a.note)}</i></div>`);
+        }
+        parts.push(
+          `<pre style="white-space:pre-wrap;font-family:ui-monospace,monospace;font-size:12px;margin:4px 0 12px;">${escapeHtml(a.code)}</pre>`
+        );
+      }
+    }
     if (analysis.solutionSketch.caveats) {
       parts.push(
         `<div><i>${escapeHtml(analysis.solutionSketch.caveats)}</i></div>`

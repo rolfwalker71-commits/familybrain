@@ -47,6 +47,27 @@ test("normalizes solutionSketch and keeps schema valid", () => {
       problemStillOpen: "true",
       outline: "In SAP Business One unter Administration prüfen…",
       vendors: ["SAP Business One", "Coresystems"],
+      steps: [
+        {
+          where: "SAP B1 → Verwaltung",
+          action: "UDF prüfen",
+          detail: "Feld U_XYZ am BP öffnen",
+        },
+      ],
+      artifacts: [
+        {
+          kind: "sql_hana",
+          title: "BP prüfen",
+          code: 'SELECT "CardCode" FROM "OCRD" WHERE "CardCode" = \'C00001\'',
+        },
+        {
+          kind: "coresuite_customize",
+          title: "BeforeAdd Regel",
+          language: "csharp",
+          code: "// placeholder customize\nif (true) { }",
+          note: "Nur Skizze",
+        },
+      ],
       caveats: null,
     },
   });
@@ -55,6 +76,13 @@ test("normalizes solutionSketch and keeps schema valid", () => {
   if (!r.success) return;
   assert.equal(r.data.solutionSketch?.problemStillOpen, true);
   assert.match(r.data.solutionSketch!.outline, /Business One/);
+  assert.equal(r.data.solutionSketch!.steps.length, 1);
+  assert.equal(r.data.solutionSketch!.artifacts.length, 2);
+  assert.equal(r.data.solutionSketch!.artifacts[0]!.kind, "sql_hana");
+  assert.equal(
+    r.data.solutionSketch!.artifacts[1]!.kind,
+    "coresuite_customize"
+  );
 });
 
 test("accepts string solutionSketch", () => {

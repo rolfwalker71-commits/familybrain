@@ -7,12 +7,23 @@ export type MariAttachmentMeta = {
   orgFilename: string;
   attachmentTyp: number | null;
   internal: boolean;
+  /** True when OrgFilename / MimeType indicate a real file (not note-only). */
+  hasFile: boolean;
 };
 
 export type MariImageAttachment = MariAttachmentMeta & {
   /** Raw base64 without data: prefix */
   base64: string;
   dataUrl: string;
+  byteLength: number;
+};
+
+export type MariAttachmentPayload = {
+  attachmentId: number;
+  issueId: number;
+  mimeType: string;
+  orgFilename: string;
+  bytes: Buffer;
   byteLength: number;
 };
 
@@ -26,9 +37,23 @@ type MariAttachmentApiRow = {
   DocumentData?: string | null;
 };
 
-const IMAGE_MIME = new Set(["png", "jpg", "jpeg", "webp", "gif", "image/png", "image/jpeg", "image/jpg", "image/webp", "image/gif"]);
+const IMAGE_MIME = new Set([
+  "png",
+  "jpg",
+  "jpeg",
+  "webp",
+  "gif",
+  "image/png",
+  "image/jpeg",
+  "image/jpg",
+  "image/webp",
+  "image/gif",
+]);
 
-function normalizeMime(raw: string | null | undefined, filename: string): string {
+export function normalizeMariMime(
+  raw: string | null | undefined,
+  filename: string
+): string {
   const m = (raw || "").trim().toLowerCase();
   if (m.startsWith("image/")) return m;
   if (m === "png" || m === "jpg" || m === "jpeg" || m === "webp" || m === "gif") {
@@ -39,7 +64,17 @@ function normalizeMime(raw: string | null | undefined, filename: string): string
   if (ext === "jpg" || ext === "jpeg") return "image/jpeg";
   if (ext === "webp") return "image/webp";
   if (ext === "gif") return "image/gif";
+  if (ext === "pdf") return "application/pdf";
+  if (ext === "msg") return "application/vnd.ms-outlook";
+  if (ext === "eml") return "message/rfc822";
   return m || "application/octet-stream";
+}
+
+export function isMariImageMime(mime: string, filename = ""): boolean {
+  const m = mime.toLowerCase();
+  if (m.startsWith("image/")) return true;
+  if (IMAGE_MIME.has(m)) return true;
+  return /\.(png|jpe?g|webp|gif)$/i.test(filename);
 }
 
 function isImageAttachment(row: MariAttachmentApiRow): boolean {
@@ -55,6 +90,12 @@ function approxBytesFromBase64(b64: string): number {
   return Math.floor((len * 3) / 4);
 }
 
+function rowHasFile(row: MariAttachmentApiRow): boolean {
+  const name = (row.OrgFilename || "").trim();
+  const mime = (row.MimeType || "").trim();
+  return Boolean(name) || Boolean(mime);
+}
+
 /** Meta-Liste ohne Binärdaten. */
 export async function listMariAttachments(
   issueId: number
@@ -68,17 +109,47 @@ export async function listMariAttachments(
     .map((r) => {
       const attachmentId = Number(r.AttachmentID);
       if (!Number.isInteger(attachmentId) || attachmentId <= 0) return null;
+      const orgFilename = (r.OrgFilename || "").trim();
+      const hasFile = rowHasFile(r);
       return {
         attachmentId,
         issueId: Number(r.IssueID) || issueId,
-        mimeType: normalizeMime(r.MimeType, r.OrgFilename || ""),
-        orgFilename: (r.OrgFilename || `anhang-${attachmentId}`).trim(),
+        mimeType: normalizeMariMime(r.MimeType, orgFilename),
+        orgFilename: orgFilename || `anhang-${attachmentId}`,
         attachmentTyp:
           r.AttachmentTyp == null ? null : Number(r.AttachmentTyp),
         internal: Boolean(r.Internal),
+        hasFile,
       };
     })
     .filter((x): x is MariAttachmentMeta => x != null);
+}
+
+/** Binärdaten eines Anhangs (Base64 aus MARI → Buffer). */
+export async function getMariAttachmentPayload(
+  attachmentId: number,
+  options?: { maxBytes?: number }
+): Promise<MariAttachmentPayload | null> {
+  if (!Number.isInteger(attachmentId) || attachmentId <= 0) return null;
+  const maxBytes = options?.maxBytes ?? 12_000_000;
+  const full = await mariJson<MariAttachmentApiRow>(
+    `/api/SupportIssueAttachment/${attachmentId}`
+  );
+  const raw = typeof full.DocumentData === "string" ? full.DocumentData : "";
+  const base64 = raw.replace(/\s/g, "");
+  if (!base64) return null;
+  const byteLength = approxBytesFromBase64(base64);
+  if (byteLength <= 0 || byteLength > maxBytes) return null;
+  const orgFilename = (full.OrgFilename || `anhang-${attachmentId}`).trim();
+  const mimeType = normalizeMariMime(full.MimeType, orgFilename);
+  return {
+    attachmentId: Number(full.AttachmentID) || attachmentId,
+    issueId: Number(full.IssueID) || 0,
+    mimeType,
+    orgFilename,
+    bytes: Buffer.from(base64, "base64"),
+    byteLength,
+  };
 }
 
 /**
@@ -97,8 +168,8 @@ export async function listMariImageAttachmentsForAi(
   const maxBytesPerImage = options?.maxBytesPerImage ?? 1_800_000;
   const maxTotalBytes = options?.maxTotalBytes ?? 4_500_000;
 
-  const meta = (await listMariAttachments(issueId)).filter((a) =>
-    a.mimeType.startsWith("image/")
+  const meta = (await listMariAttachments(issueId)).filter(
+    (a) => a.hasFile && a.mimeType.startsWith("image/")
   );
   if (meta.length === 0) return [];
 
@@ -128,7 +199,7 @@ export async function listMariImageAttachmentsForAi(
       if (byteLength > maxBytesPerImage) continue;
       if (total + byteLength > maxTotalBytes) continue;
 
-      const mime = normalizeMime(
+      const mime = normalizeMariMime(
         full.MimeType || item.mimeType,
         full.OrgFilename || item.orgFilename
       );
@@ -138,10 +209,14 @@ export async function listMariImageAttachmentsForAi(
         attachmentId: item.attachmentId,
         issueId: item.issueId,
         mimeType: mime,
-        orgFilename:
-          (full.OrgFilename || item.orgFilename || `image-${item.attachmentId}`).trim(),
+        orgFilename: (
+          full.OrgFilename ||
+          item.orgFilename ||
+          `image-${item.attachmentId}`
+        ).trim(),
         attachmentTyp: item.attachmentTyp,
         internal: item.internal,
+        hasFile: true,
         base64,
         dataUrl: `data:${mime};base64,${base64}`,
         byteLength,
@@ -159,7 +234,8 @@ export async function listMariImageAttachmentsForAi(
 export function countImageAttachmentMetas(
   metas: MariAttachmentMeta[]
 ): number {
-  return metas.filter((a) => a.mimeType.startsWith("image/")).length;
+  return metas.filter((a) => a.hasFile && a.mimeType.startsWith("image/"))
+    .length;
 }
 
 export function isImageAttachmentRow(row: MariAttachmentApiRow): boolean {
