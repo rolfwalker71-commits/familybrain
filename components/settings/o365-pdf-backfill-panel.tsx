@@ -301,8 +301,8 @@ export function O365PdfBackfillPanel() {
           <span className="font-medium text-foreground">
             älteste → neueste
           </span>{" "}
-          ab Startdatum. Catch-up in Blöcken (~400 Mails / 40 neue PDFs),
-          verkettet sich automatisch —{" "}
+          ab Startdatum. Catch-up in Blöcken (~600 Mails / 80 neue PDFs),
+          parallel prüfen/hochladen, verkettet sich automatisch —{" "}
           <span className="font-medium text-foreground">Stop</span> beendet die
           Kette. «Weiter» setzt am Cursor fort (kein Neustart).
         </p>

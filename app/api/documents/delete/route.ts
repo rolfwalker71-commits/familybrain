@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { isAuthError, requireAdmin } from "@/lib/auth/current-user";
 import { ensureInitialized } from "@/lib/db/migrations";
-import { deleteDocumentFully } from "@/lib/paperless/delete-document";
+import { deleteDocumentsFullyBatch } from "@/lib/paperless/delete-document";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -40,22 +40,17 @@ export async function POST(request: Request) {
     );
   }
 
-  const results: Array<{
-    id: number;
-    ok: boolean;
-    error?: string;
-    paperlessId?: number;
-  }> = [];
+  const batch = await deleteDocumentsFullyBatch(parsed.data.documentIds, {
+    concurrency: 8,
+    vectorWait: false,
+  });
 
-  for (const id of parsed.data.documentIds) {
-    const result = await deleteDocumentFully(id);
-    results.push({
-      id,
-      ok: result.ok,
-      error: result.error,
-      paperlessId: result.paperlessId,
-    });
-  }
+  const results = batch.map((result) => ({
+    id: result.id,
+    ok: result.ok,
+    error: result.error,
+    paperlessId: result.paperlessId,
+  }));
 
   const succeeded = results.filter((r) => r.ok).length;
   const failed = results.filter((r) => !r.ok);

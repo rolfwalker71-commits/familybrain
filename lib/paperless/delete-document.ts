@@ -4,15 +4,45 @@ import { PaperlessClient, PaperlessError } from "@/lib/paperless/client";
 import { clearDocumentAiIcon } from "@/lib/paperless/document-icon";
 import { deleteVectorPointsBySource } from "@/lib/vectors/client";
 
+export type DeleteDocumentResult = {
+  ok: boolean;
+  error?: string;
+  paperlessId?: number;
+};
+
+export type DeleteDocumentOptions = {
+  /** Qdrant wait (default true). Bulk uses false for speed. */
+  vectorWait?: boolean;
+};
+
+async function mapPool<T, R>(
+  items: T[],
+  concurrency: number,
+  fn: (item: T, index: number) => Promise<R>
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    while (true) {
+      const idx = next;
+      next += 1;
+      if (idx >= items.length) return;
+      results[idx] = await fn(items[idx]!, idx);
+    }
+  }
+  const n = Math.max(1, Math.min(concurrency, items.length || 1));
+  await Promise.all(Array.from({ length: n }, () => worker()));
+  return results;
+}
+
 /**
  * Remove local Buddy state for a document (row, icon, vectors).
  * Does not call Paperless. Related analysis rows cascade via FK.
  */
-export async function purgeDocumentLocally(localDocumentId: number): Promise<{
-  ok: boolean;
-  error?: string;
-  paperlessId?: number;
-}> {
+export async function purgeDocumentLocally(
+  localDocumentId: number,
+  options?: DeleteDocumentOptions
+): Promise<DeleteDocumentResult> {
   const db = getDb();
   const row = db
     .prepare(
@@ -29,7 +59,9 @@ export async function purgeDocumentLocally(localDocumentId: number): Promise<{
     /* ignore */
   }
   try {
-    await deleteVectorPointsBySource("paperless", String(localDocumentId));
+    await deleteVectorPointsBySource("paperless", String(localDocumentId), {
+      wait: options?.vectorWait !== false,
+    });
   } catch {
     /* ignore vector cleanup failures */
   }
@@ -68,11 +100,10 @@ export async function purgeDocumentLocally(localDocumentId: number): Promise<{
  * Delete document in Paperless (if configured), then remove local row + vectors + icon.
  * Paperless 404 counts as already deleted.
  */
-export async function deleteDocumentFully(localDocumentId: number): Promise<{
-  ok: boolean;
-  error?: string;
-  paperlessId?: number;
-}> {
+export async function deleteDocumentFully(
+  localDocumentId: number,
+  options?: DeleteDocumentOptions
+): Promise<DeleteDocumentResult> {
   const db = getDb();
   const row = db
     .prepare(
@@ -103,7 +134,28 @@ export async function deleteDocumentFully(localDocumentId: number): Promise<{
     }
   }
 
-  return purgeDocumentLocally(localDocumentId);
+  return purgeDocumentLocally(localDocumentId, options);
+}
+
+export type DeleteDocumentBatchItem = DeleteDocumentResult & {
+  id: number;
+};
+
+/** Concurrent bulk delete (Paperless + local). Default concurrency 8. */
+export async function deleteDocumentsFullyBatch(
+  localDocumentIds: number[],
+  options?: DeleteDocumentOptions & { concurrency?: number }
+): Promise<DeleteDocumentBatchItem[]> {
+  const ids = Array.from(
+    new Set(localDocumentIds.filter((id) => Number.isInteger(id) && id > 0))
+  );
+  const concurrency = Math.max(1, Math.min(options?.concurrency ?? 8, 16));
+  return mapPool(ids, concurrency, async (id) => {
+    const result = await deleteDocumentFully(id, {
+      vectorWait: options?.vectorWait ?? false,
+    });
+    return { id, ...result };
+  });
 }
 
 /**

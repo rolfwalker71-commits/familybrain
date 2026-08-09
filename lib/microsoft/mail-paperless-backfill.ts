@@ -6,8 +6,12 @@ import {
 } from "@/lib/buddy/source-links";
 import {
   listMicrosoftPdfAttachments,
+  type MicrosoftMailAttachmentMeta,
 } from "@/lib/microsoft/mail-attachments";
-import { ingestMicrosoftMessagePdfs } from "@/lib/microsoft/mail-to-paperless";
+import {
+  ingestMicrosoftMessagePdfs,
+  resolveO365TagIdsCached,
+} from "@/lib/microsoft/mail-to-paperless";
 
 export const O365_PDF_BACKFILL_ENABLED_KEY = "o365_pdf_backfill_enabled";
 export const O365_PDF_BACKFILL_SINCE_KEY = "o365_pdf_backfill_since_ymd";
@@ -56,12 +60,42 @@ export type O365PdfBackfillLogEntry = {
 /** Messages per Graph page ($top, Graph-seitig max. sinnvoll ~50). */
 export const O365_PDF_BACKFILL_PAGE_SIZE = 50;
 /** Max Graph-Seiten pro Job-Lauf. */
-export const O365_PDF_BACKFILL_MAX_PAGES_PER_RUN = 8;
+export const O365_PDF_BACKFILL_MAX_PAGES_PER_RUN = 12;
 /** Hartes Mail-Limit über alle Seiten eines Laufs. */
 export const O365_PDF_BACKFILL_MAX_MESSAGES_PER_RUN =
   O365_PDF_BACKFILL_PAGE_SIZE * O365_PDF_BACKFILL_MAX_PAGES_PER_RUN;
 /** Max neue PDFs pro Job-Lauf (Upload nach Paperless). */
-export const O365_PDF_BACKFILL_MAX_PDFS_PER_RUN = 40;
+export const O365_PDF_BACKFILL_MAX_PDFS_PER_RUN = 80;
+/** Parallel Graph attachment-list calls while scanning a page. */
+export const O365_PDF_BACKFILL_SCAN_CONCURRENCY = 12;
+/** Parallel PDF uploads within one mail. */
+export const O365_PDF_BACKFILL_UPLOAD_CONCURRENCY = 3;
+/** Delay between successful catch-up blocks. */
+export const O365_PDF_BACKFILL_CHAIN_DELAY_MS = 400;
+/** Retry when global job lease is busy. */
+export const O365_PDF_BACKFILL_CHAIN_RETRY_MS = 4_000;
+/** Paperless consume poll interval during catch-up. */
+export const O365_PDF_BACKFILL_PAPERLESS_POLL_MS = 400;
+
+async function mapPool<T, R>(
+  items: T[],
+  concurrency: number,
+  fn: (item: T, index: number) => Promise<R>
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    while (true) {
+      const idx = next;
+      next += 1;
+      if (idx >= items.length) return;
+      results[idx] = await fn(items[idx]!, idx);
+    }
+  }
+  const n = Math.max(1, Math.min(concurrency, items.length || 1));
+  await Promise.all(Array.from({ length: n }, () => worker()));
+  return results;
+}
 
 type GraphMessageLite = {
   id?: string;
@@ -135,7 +169,7 @@ export function clearO365PdfBackfillChainTimer(): void {
 /** Schedule next catch-up block; cleared by stop. */
 export function scheduleO365PdfBackfillChain(
   fn: () => void,
-  delayMs = 2_500
+  delayMs = O365_PDF_BACKFILL_CHAIN_DELAY_MS
 ): void {
   clearO365PdfBackfillChainTimer();
   chainGlobal.__o365PdfBackfillChainTimer = setTimeout(() => {
@@ -486,6 +520,9 @@ export async function runO365PdfBackfillBatch(
   let stoppedMidPage = false;
   let stopped = false;
 
+  // Tag-IDs einmal pro Batch — nicht pro PDF
+  const tagIds = await resolveO365TagIdsCached();
+
   while (
     pagesDone < O365_PDF_BACKFILL_MAX_PAGES_PER_RUN &&
     messagesSeen < O365_PDF_BACKFILL_MAX_MESSAGES_PER_RUN &&
@@ -528,7 +565,39 @@ export async function runO365PdfBackfillBatch(
       break;
     }
 
-    for (const msg of page.messages) {
+    writeLiveProgress({
+      active: true,
+      step: "scan_mail",
+      messageIndex: messagesSeen,
+      messageTotal: O365_PDF_BACKFILL_MAX_MESSAGES_PER_RUN,
+      pdfsUploadedThisBatch: pdfsUploaded,
+      detail: `Seite ${pagesDone}: Anhänge parallel prüfen (${pageTotal} Mails)…`,
+    });
+
+    type Scanned = {
+      msg: (typeof page.messages)[number];
+      pdfs: MicrosoftMailAttachmentMeta[] | null;
+      listError: boolean;
+    };
+
+    const scanned = await mapPool(
+      page.messages,
+      O365_PDF_BACKFILL_SCAN_CONCURRENCY,
+      async (msg): Promise<Scanned> => {
+        if (!isO365PdfBackfillEnabled()) {
+          return { msg, pdfs: null, listError: false };
+        }
+        try {
+          const pdfs = await listMicrosoftPdfAttachments(userId, msg.id);
+          return { msg, pdfs, listError: false };
+        } catch {
+          return { msg, pdfs: null, listError: true };
+        }
+      }
+    );
+
+    for (const item of scanned) {
+      const msg = item.msg;
       if (!isO365PdfBackfillEnabled()) {
         stopped = true;
         pageComplete = false;
@@ -545,54 +614,23 @@ export async function runO365PdfBackfillBatch(
       }
       messagesSeen += 1;
       bumpReachedYmd(msg.receivedDateTime);
-      writeLiveProgress({
-        active: true,
-        step: "scan_mail",
-        subject: msg.subject,
-        receivedDateTime: msg.receivedDateTime,
-        messageIndex: messagesSeen,
-        messageTotal: O365_PDF_BACKFILL_MAX_MESSAGES_PER_RUN,
-        pdfsUploadedThisBatch: pdfsUploaded,
-        detail: `Seite ${pagesDone} · Prüfe Anhänge…`,
-      });
 
-      let pdfs;
-      try {
-        pdfs = await listMicrosoftPdfAttachments(userId, msg.id);
-      } catch {
+      if (item.listError) {
         appendO365PdfBackfillLog({
           receivedAt: msg.receivedDateTime,
           subject: msg.subject,
           outcome: "attachment_error",
           detail: "Anhänge nicht lesbar",
         });
-        writeLiveProgress({
-          active: true,
-          step: "scan_mail",
-          subject: msg.subject,
-          receivedDateTime: msg.receivedDateTime,
-          messageIndex: messagesSeen,
-          messageTotal: O365_PDF_BACKFILL_MAX_MESSAGES_PER_RUN,
-          pdfsUploadedThisBatch: pdfsUploaded,
-          detail: "Anhänge konnten nicht gelesen werden — übersprungen",
-        });
         continue;
       }
+
+      const pdfs = item.pdfs || [];
       if (pdfs.length === 0) {
         appendO365PdfBackfillLog({
           receivedAt: msg.receivedDateTime,
           subject: msg.subject,
           outcome: "skipped_no_pdf",
-        });
-        writeLiveProgress({
-          active: true,
-          step: "scan_mail",
-          subject: msg.subject,
-          receivedDateTime: msg.receivedDateTime,
-          messageIndex: messagesSeen,
-          messageTotal: O365_PDF_BACKFILL_MAX_MESSAGES_PER_RUN,
-          pdfsUploadedThisBatch: pdfsUploaded,
-          detail: "Kein PDF — übersprungen",
         });
         continue;
       }
@@ -607,16 +645,6 @@ export async function runO365PdfBackfillBatch(
           receivedAt: msg.receivedDateTime,
           subject: msg.subject,
           outcome: "skipped_already",
-          detail: `${pdfs.length} PDF(s) bereits in Buddy`,
-        });
-        writeLiveProgress({
-          active: true,
-          step: "scan_mail",
-          subject: msg.subject,
-          receivedDateTime: msg.receivedDateTime,
-          messageIndex: messagesSeen,
-          messageTotal: O365_PDF_BACKFILL_MAX_MESSAGES_PER_RUN,
-          pdfsUploadedThisBatch: pdfsUploaded,
           detail: `${pdfs.length} PDF(s) bereits in Buddy`,
         });
         continue;
@@ -636,6 +664,11 @@ export async function runO365PdfBackfillBatch(
       const { results } = await ingestMicrosoftMessagePdfs({
         userId,
         messageId: msg.id,
+        attachments: pending,
+        subject: msg.subject,
+        tagIds,
+        waitIntervalMs: O365_PDF_BACKFILL_PAPERLESS_POLL_MS,
+        concurrency: O365_PDF_BACKFILL_UPLOAD_CONCURRENCY,
       });
       let mailNew = 0;
       let mailFail = 0;

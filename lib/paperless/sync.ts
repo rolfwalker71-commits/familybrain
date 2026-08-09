@@ -403,6 +403,9 @@ export async function uploadAndIngestPaperlessDocument(input: {
   tagIds?: number[];
   /** Force category Geschäftlich + skip household triage. */
   markAsBusiness?: boolean;
+  /** Paperless task poll interval (default 1500ms). */
+  waitIntervalMs?: number;
+  waitTimeoutMs?: number;
 }): Promise<{ localId: number; paperlessId: number }> {
   const client = createClient();
   const taskId = await client.postDocument({
@@ -411,7 +414,10 @@ export async function uploadAndIngestPaperlessDocument(input: {
     title: input.title,
     tagIds: input.tagIds,
   });
-  const paperlessId = await client.waitForPostedDocument(taskId);
+  const paperlessId = await client.waitForPostedDocument(taskId, {
+    intervalMs: input.waitIntervalMs,
+    timeoutMs: input.waitTimeoutMs,
+  });
   const ingested = await ingestPaperlessDocumentById(paperlessId);
   if (input.markAsBusiness) {
     const { markDocumentAsBusiness } = await import("@/lib/documents/business");

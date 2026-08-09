@@ -5,6 +5,7 @@ import { ensureInitialized } from "@/lib/db/migrations";
 import { hasOpenAIKey } from "@/lib/ai/client";
 import {
   importDocumentAsGuide,
+  importDocumentsAsGuidesBatch,
   importPendingGuideDocuments,
   listPendingGuideDocuments,
 } from "@/lib/guides/from-document";
@@ -13,8 +14,17 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
+/** Soft limit per request — UI chunks larger selections. */
+export const IMPORT_GUIDES_MAX_IDS = 10;
+
 const PostSchema = z.object({
   documentLocalId: z.number().int().positive().optional(),
+  /** Import these local document ids as guides (skip if already linked). */
+  documentLocalIds: z
+    .array(z.number().int().positive())
+    .min(1)
+    .max(IMPORT_GUIDES_MAX_IDS)
+    .optional(),
   /** Import all docs flagged «Für Guide». */
   importPending: z.boolean().optional().default(false),
   title: z.string().max(200).optional().nullable(),
@@ -58,9 +68,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, batch });
     }
 
+    if (parsed.data.documentLocalIds?.length) {
+      const batch = await importDocumentsAsGuidesBatch(
+        parsed.data.documentLocalIds,
+        { replaceExisting: parsed.data.replaceExisting }
+      );
+      return NextResponse.json({ ok: true, batch });
+    }
+
     if (!parsed.data.documentLocalId) {
       return NextResponse.json(
-        { error: "documentLocalId oder importPending nötig." },
+        {
+          error:
+            "documentLocalId, documentLocalIds oder importPending nötig.",
+        },
         { status: 400 }
       );
     }

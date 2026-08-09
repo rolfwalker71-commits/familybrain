@@ -705,8 +705,25 @@ export async function runO365PdfBackfillJob(
   const run = tryAcquireJobRun(trigger, JOB_TYPE_O365_PDF_BACKFILL);
   if (!run) {
     const reason = "Ein anderer Hintergrund-Job läuft bereits.";
+    // Manual start should still arm catch-up even if lease is busy.
+    if (trigger === "manual" && !status.enabled) {
+      configureO365PdfBackfill({ enabled: true });
+    }
     setO365PdfBackfillNote(`Wartet: ${reason}`);
     setO365PdfBackfillAttemptNow();
+    // Continuity: keep trying while catch-up is enabled (don't die on busy lease).
+    const {
+      isO365PdfBackfillEnabled,
+      scheduleO365PdfBackfillChain,
+      O365_PDF_BACKFILL_CHAIN_RETRY_MS,
+    } = await import("@/lib/microsoft/mail-paperless-backfill");
+    if (isO365PdfBackfillEnabled()) {
+      scheduleO365PdfBackfillChain(() => {
+        void runO365PdfBackfillJob("schedule").catch((error) => {
+          console.warn("[o365-backfill] lease-retry chain:", error);
+        });
+      }, O365_PDF_BACKFILL_CHAIN_RETRY_MS);
+    }
     return {
       ok: false,
       status: "skipped",
@@ -747,13 +764,14 @@ export async function runO365PdfBackfillJob(
         getO365PdfBackfillStatus: getStatus,
         isO365PdfBackfillEnabled,
         scheduleO365PdfBackfillChain,
+        O365_PDF_BACKFILL_CHAIN_DELAY_MS,
       } = await import("@/lib/microsoft/mail-paperless-backfill");
       if (isO365PdfBackfillEnabled() && getStatus().enabled) {
         scheduleO365PdfBackfillChain(() => {
           void runO365PdfBackfillJob("schedule").catch((error) => {
             console.warn("[o365-backfill] chain:", error);
           });
-        }, 2_500);
+        }, O365_PDF_BACKFILL_CHAIN_DELAY_MS);
       }
     }
 
@@ -764,6 +782,21 @@ export async function runO365PdfBackfillJob(
     setO365PdfBackfillNote(`Fehler: ${message}`);
     setSetting(O365_PDF_BACKFILL_PROGRESS_KEY, null);
     finishJobRun(run.id, "error", summary, message);
+
+    // Soft retry so a single Graph/Paperless blip doesn't kill catch-up.
+    const {
+      isO365PdfBackfillEnabled,
+      scheduleO365PdfBackfillChain,
+      O365_PDF_BACKFILL_CHAIN_RETRY_MS,
+    } = await import("@/lib/microsoft/mail-paperless-backfill");
+    if (isO365PdfBackfillEnabled()) {
+      scheduleO365PdfBackfillChain(() => {
+        void runO365PdfBackfillJob("schedule").catch((err) => {
+          console.warn("[o365-backfill] error-retry chain:", err);
+        });
+      }, O365_PDF_BACKFILL_CHAIN_RETRY_MS);
+    }
+
     return {
       ok: true,
       runId: run.id,

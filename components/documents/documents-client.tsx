@@ -222,7 +222,11 @@ export function DocumentsClient() {
   const [knowledgeAreas, setKnowledgeAreas] = useState<string[]>([]);
   const [bulkCategoryBusy, setBulkCategoryBusy] = useState(false);
   const [bulkForGuideBusy, setBulkForGuideBusy] = useState(false);
+  const [bulkForGuideProgress, setBulkForGuideProgress] = useState<string | null>(
+    null
+  );
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteProgress, setDeleteProgress] = useState<string | null>(null);
   const [missingAiIcons, setMissingAiIcons] = useState(0);
   const [iconBusy, setIconBusy] = useState(false);
   const [iconProgress, setIconProgress] = useState<string | null>(null);
@@ -400,55 +404,81 @@ export function DocumentsClient() {
   async function runBulkForGuide() {
     const ids = Array.from(selectedIds);
     if (ids.length === 0 || bulkForGuideBusy) return;
+    if (!hasOpenAIKey) {
+      setError("OpenAI API-Key fehlt (für Guide-Indexierung).");
+      return;
+    }
     const ok = window.confirm(
-      `${ids.length} Dokument(e) als «Für Guide» markieren?\n\nBereits in Guides übernommene PDFs werden übersprungen.`
+      `${ids.length} Dokument(e) als Guide importieren?\n\nPDFs werden unter Guides angelegt und indexiert. Bereits vorhandene Guides werden übersprungen.`
     );
     if (!ok) return;
 
     setBulkForGuideBusy(true);
+    setBulkForGuideProgress(ids.length > 1 ? `0/${ids.length}` : null);
     setError(null);
+    /** Import is heavy (PDF + embeddings) — small chunks keep requests under maxDuration. */
+    const CHUNK = 5;
     try {
-      const CHUNK = 200;
-      let marked = 0;
+      let succeeded = 0;
       let skippedInGuide = 0;
-      let skippedFlagged = 0;
-      const messages: string[] = [];
+      let failed = 0;
+      const failureNotes: string[] = [];
       for (let i = 0; i < ids.length; i += CHUNK) {
         const chunk = ids.slice(i, i + CHUNK);
-        const res = await fetch("/api/documents/for-guide/batch", {
+        setBulkForGuideProgress(
+          ids.length > 1 ? `${Math.min(i, ids.length)}/${ids.length}` : null
+        );
+        const res = await fetch("/api/guides/from-document", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ documentIds: chunk }),
+          body: JSON.stringify({
+            documentLocalIds: chunk,
+            replaceExisting: false,
+          }),
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
-          throw new Error(data.error || "Für-Guide-Markierung fehlgeschlagen");
+          throw new Error(data.error || "Guide-Import fehlgeschlagen");
         }
-        marked += Number(data.marked) || 0;
-        skippedInGuide += Number(data.skippedAlreadyInGuide) || 0;
-        skippedFlagged += Number(data.skippedAlreadyFlagged) || 0;
-        if (data.message) messages.push(String(data.message));
+        const batch = data.batch as {
+          succeeded?: number;
+          failed?: number;
+          skippedAlreadyInGuide?: number;
+          results?: Array<{ ok?: boolean; error?: string }>;
+        } | undefined;
+        succeeded += Number(batch?.succeeded) || 0;
+        skippedInGuide += Number(batch?.skippedAlreadyInGuide) || 0;
+        failed += Number(batch?.failed) || 0;
+        for (const r of batch?.results || []) {
+          if (r.ok === false && r.error) failureNotes.push(r.error);
+        }
+        setBulkForGuideProgress(
+          ids.length > 1
+            ? `${Math.min(i + chunk.length, ids.length)}/${ids.length}`
+            : null
+        );
       }
       setSelectedIds(new Set());
       await load();
+      router.refresh();
       const summary = [
-        marked > 0 ? `${marked} markiert` : null,
-        skippedInGuide > 0
-          ? `${skippedInGuide} schon in Guides (verworfen)`
-          : null,
-        skippedFlagged > 0 ? `${skippedFlagged} schon markiert` : null,
+        succeeded > 0 ? `${succeeded} als Guide importiert` : null,
+        skippedInGuide > 0 ? `${skippedInGuide} schon in Guides` : null,
+        failed > 0 ? `${failed} fehlgeschlagen` : null,
       ]
         .filter(Boolean)
         .join(" · ");
-      if (summary) {
+      if (failed > 0 && failureNotes[0]) {
+        setError(`${summary} — ${failureNotes[0]}`);
+      } else if (summary) {
         window.alert(summary);
-      } else if (messages[0]) {
-        window.alert(messages[0]);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+      await load().catch(() => undefined);
     } finally {
       setBulkForGuideBusy(false);
+      setBulkForGuideProgress(null);
     }
   }
 
@@ -464,14 +494,23 @@ export function DocumentsClient() {
     if (!ok) return;
 
     setDeleteBusy(true);
+    setDeleteProgress(ids.length > 1 ? `0/${ids.length}` : null);
     setError(null);
-    /** API accepts up to 250 per request — chunk larger selections. */
-    const CHUNK = 200;
+    /**
+     * Smaller chunks + server-side concurrency: one fat 200-id request could
+     * sit for minutes (sequential Paperless/Qdrant) and look stuck.
+     */
+    const CHUNK = 40;
     try {
       let succeeded = 0;
       const failures: string[] = [];
       for (let i = 0; i < ids.length; i += CHUNK) {
         const chunk = ids.slice(i, i + CHUNK);
+        setDeleteProgress(
+          ids.length > 1
+            ? `${Math.min(i, ids.length)}/${ids.length}`
+            : null
+        );
         const res = await fetch("/api/documents/delete", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -481,30 +520,44 @@ export function DocumentsClient() {
         if (!res.ok) {
           throw new Error(data.error || "Löschen fehlgeschlagen");
         }
-        succeeded += Number(data.succeeded) || 0;
+        const chunkOk = Number(data.succeeded) || 0;
+        succeeded += chunkOk;
+        setDeleteProgress(
+          ids.length > 1 ? `${succeeded}/${ids.length}` : null
+        );
         if (data.ok === false || Number(data.failed) > 0) {
           failures.push(
             data.error ||
               `${data.failed || "?"} Löschung(en) fehlgeschlagen (Chunk ${Math.floor(i / CHUNK) + 1})`
           );
         }
+        // Drop successfully deleted ids from selection so the list feels live
+        const failedIds = new Set(
+          Array.isArray(data.results)
+            ? data.results
+                .filter((r: { ok?: boolean }) => !r.ok)
+                .map((r: { id: number }) => r.id)
+            : []
+        );
+        setSelectedIds((prev) => {
+          const next = new Set(prev);
+          for (const id of chunk) {
+            if (!failedIds.has(id)) next.delete(id);
+          }
+          return next;
+        });
       }
-      setSelectedIds((prev) => {
-        const next = new Set(prev);
-        for (const id of ids) next.delete(id);
-        return next;
-      });
       await load();
       router.refresh();
       if (failures.length > 0) {
-        setError(
-          `${succeeded} gelöscht · ${failures.join("; ")}`
-        );
+        setError(`${succeeded} gelöscht · ${failures.join("; ")}`);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+      await load().catch(() => undefined);
     } finally {
       setDeleteBusy(false);
+      setDeleteProgress(null);
     }
   }
 
@@ -1192,6 +1245,7 @@ export function DocumentsClient() {
                 variant="outline"
                 className="gap-1.5"
                 disabled={
+                  !hasOpenAIKey ||
                   bulkForGuideBusy ||
                   deleteBusy ||
                   iconBusy ||
@@ -1199,13 +1253,19 @@ export function DocumentsClient() {
                   isRunning ||
                   bulkCategoryBusy
                 }
-                title="Als «Für Guide» markieren (bereits in Guides → überspringen)"
+                title={
+                  hasOpenAIKey
+                    ? "Als Guide importieren (PDF unter Guides anlegen + indexieren)"
+                    : "OpenAI API-Key nötig für Guide-Indexierung"
+                }
                 onClick={() => void runBulkForGuide()}
               >
                 <BookMarked className="size-3.5" />
                 {bulkForGuideBusy
-                  ? "Für Guide…"
-                  : `Für Guide (${selectedIds.size})`}
+                  ? bulkForGuideProgress
+                    ? `Guide ${bulkForGuideProgress}…`
+                    : "Guide…"
+                  : `In Guide (${selectedIds.size})`}
               </Button>
             ) : null}
             {selectedIds.size > 0 ? (
@@ -1225,7 +1285,9 @@ export function DocumentsClient() {
               >
                 <Trash2 className="size-3.5" />
                 {deleteBusy
-                  ? "Löschen…"
+                  ? deleteProgress
+                    ? `Lösche ${deleteProgress}…`
+                    : "Löschen…"
                   : `Löschen (${selectedIds.size})`}
               </Button>
             ) : null}

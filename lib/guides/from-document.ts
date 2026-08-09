@@ -242,39 +242,85 @@ export async function importPendingGuideDocuments(options?: {
   }>;
 }> {
   const pending = listPendingGuideDocuments(options?.limit ?? 20);
+  return importDocumentsAsGuidesBatch(
+    pending.map((row) => row.id),
+    { replaceExisting: options?.replaceExisting }
+  );
+}
+
+/**
+ * Import specific Paperless documents as knowledge guides (PDF + index).
+ * Skips ids that already have a guide linked via source_document_id.
+ */
+export async function importDocumentsAsGuidesBatch(
+  documentLocalIds: number[],
+  options?: { replaceExisting?: boolean }
+): Promise<{
+  processed: number;
+  succeeded: number;
+  failed: number;
+  skippedAlreadyInGuide: number;
+  results: Array<{
+    documentId: number;
+    ok: boolean;
+    guideId?: number;
+    skipped?: boolean;
+    error?: string;
+  }>;
+}> {
+  const ids = Array.from(
+    new Set(documentLocalIds.filter((id) => Number.isInteger(id) && id > 0))
+  );
   const results: Array<{
     documentId: number;
     ok: boolean;
     guideId?: number;
+    skipped?: boolean;
     error?: string;
   }> = [];
   let succeeded = 0;
   let failed = 0;
-  for (const row of pending) {
+  let skippedAlreadyInGuide = 0;
+
+  for (const id of ids) {
+    const existing = findKnowledgeGuideBySourceDocumentId(id);
+    if (existing) {
+      skippedAlreadyInGuide += 1;
+      results.push({
+        documentId: id,
+        ok: true,
+        guideId: existing.id,
+        skipped: true,
+      });
+      continue;
+    }
+
     try {
       const imported = await importDocumentAsGuide({
-        documentLocalId: row.id,
+        documentLocalId: id,
         replaceExisting: options?.replaceExisting !== false,
       });
       succeeded += 1;
       results.push({
-        documentId: row.id,
+        documentId: id,
         ok: true,
         guideId: imported.guideId,
       });
     } catch (err) {
       failed += 1;
       results.push({
-        documentId: row.id,
+        documentId: id,
         ok: false,
         error: err instanceof Error ? err.message : String(err),
       });
     }
   }
+
   return {
-    processed: pending.length,
+    processed: ids.length,
     succeeded,
     failed,
+    skippedAlreadyInGuide,
     results,
   };
 }

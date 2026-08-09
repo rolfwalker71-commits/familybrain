@@ -106,12 +106,13 @@ export async function upsertVectorPoints(
 
 export async function deleteVectorPointsBySource(
   sourceType: VectorChunkPayload["source_type"],
-  sourceId: string
+  sourceId: string,
+  options?: { wait?: boolean }
 ): Promise<void> {
   await ensureVectorCollection();
   const qdrant = getQdrantClient();
   await qdrant.delete(getQdrantCollection(), {
-    wait: true,
+    wait: options?.wait !== false,
     filter: {
       must: [
         { key: "source_type", match: { value: sourceType } },
