@@ -1,10 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
   CalendarDays,
-  Mail,
   Clock3,
   Trophy,
   Wallet,
@@ -13,19 +12,26 @@ import {
   ListChecks,
   StickyNote,
   X,
-  Sparkles,
-  HardDrive,
   Cake,
   Video,
   MapPin,
   AlertTriangle,
   Car,
+  CheckCircle2,
+  Monitor,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BackupStatusPanel } from "@/components/settings/backup-status-panel";
-import { KpiCorrectSheet } from "@/components/dashboard/kpi-correct-sheet";
 import { HomeTasksSection } from "@/components/dashboard/home-tasks-section";
+import {
+  GmailLogo,
+  GoogleDriveLogo,
+  GoogleLogo,
+  MicrosoftLogo,
+  MicrosoftPlannerLogo,
+  MicrosoftTeamsLogo,
+} from "@/components/branding/provider-logos";
 import { TeamLogo, weekdayLabel, AgendaTypeRail } from "@/components/calendar/agenda-row";
 import { AgendaAiIconThumb } from "@/components/calendar/agenda-ai-icon-thumb";
 import { AgendaEventDialog } from "@/components/calendar/agenda-event-dialog";
@@ -42,14 +48,7 @@ import type {
   OverviewPeriod,
 } from "@/lib/dashboard/overview";
 import type { MailListItem } from "@/lib/mail/gmail";
-
-const PERIODS: { id: OverviewPeriod; label: string }[] = [
-  { id: "week", label: "Woche" },
-  { id: "month", label: "Monat" },
-  { id: "quarter", label: "Quartal" },
-  { id: "half", label: "Halbjahr" },
-  { id: "year", label: "Jahr" },
-];
+import type { LucideIcon } from "lucide-react";
 
 function zurichTodayIso(): string {
   return new Intl.DateTimeFormat("en-CA", {
@@ -374,147 +373,151 @@ function HomeWeatherWidget({ weather }: { weather: HomeWeatherCard }) {
   );
 }
 
-/** Zustand: Drive-Spiegel und kurze System-Hinweise (keine doppelten Listen). */
-function SystemStatusCard({
-  data,
-}: {
-  data: OverviewPayload;
-}) {
-  const drive = data.driveMirror;
-  const mailPending = data.chips.mailSuggestionsPending;
-  const docTriage = data.chips.triagePending;
+function driveStatusMeta(drive: OverviewPayload["driveMirror"]): {
+  label: string;
+  ok: boolean;
+  percent: number | null;
+} {
+  if (!drive) return { label: "Unbekannt", ok: false, percent: null };
+  if (!drive.connected) return { label: "Nicht verbunden", ok: false, percent: null };
+  if (!drive.hasDriveScope)
+    return { label: "Recht fehlt", ok: false, percent: null };
+  if (!drive.enabled) return { label: "Aus", ok: false, percent: drive.percent };
+  if (drive.complete)
+    return { label: "Synchronisiert", ok: true, percent: drive.percent };
+  return {
+    label: `${drive.percent}%`,
+    ok: false,
+    percent: drive.percent,
+  };
+}
 
-  let driveLine = "Drive-Spiegel: Status unbekannt";
-  let driveTone: "ok" | "warn" | "muted" = "muted";
-  if (drive) {
-    if (!drive.connected) {
-      driveLine = "Google nicht verbunden";
-      driveTone = "warn";
-    } else if (!drive.hasDriveScope) {
-      driveLine = "Drive-Recht fehlt — unter Konto neu verbinden";
-      driveTone = "warn";
-    } else if (!drive.enabled) {
-      driveLine = "Drive-Spiegel aus";
-      driveTone = "muted";
-    } else if (drive.complete) {
-      driveLine = `Drive synchron · ${drive.mirrored}/${drive.totalDocuments}`;
-      driveTone = "ok";
-    } else {
-      driveLine = `Drive ${drive.percent}% · ${drive.pending} ausstehend`;
-      driveTone = "warn";
-    }
-  }
+function DriveAsideCard({ data }: { data: OverviewPayload }) {
+  const meta = driveStatusMeta(data.driveMirror);
+  return (
+    <Link
+      href="/account"
+      className="flex items-center gap-3 rounded-xl border border-border/70 bg-card px-3.5 py-3 shadow-sm transition-colors hover:bg-muted/30"
+    >
+      <GoogleDriveLogo className="size-5" />
+      <div className="min-w-0 flex-1">
+        <p className="text-[14px] font-black tracking-tight">Drive</p>
+        <p className="truncate text-[12px] text-muted-foreground">{meta.label}</p>
+      </div>
+      {meta.ok ? (
+        <CheckCircle2
+          className="size-5 shrink-0 text-emerald-600"
+          strokeWidth={APP_ICON_STROKE}
+          absoluteStrokeWidth
+          aria-label="OK"
+        />
+      ) : (
+        <ChevronRight
+          className="size-4 shrink-0 text-muted-foreground"
+          aria-hidden
+        />
+      )}
+    </Link>
+  );
+}
 
-  const extras: string[] = [];
-  if (mailPending > 0) extras.push(`${mailPending} Mail zur Triage`);
-  if (docTriage > 0) extras.push(`${docTriage} Belege offen`);
-  if (drive?.lastError) extras.push(`Drive-Fehler: ${drive.lastError}`);
+/** Systemstatus mit Markenlogos (Mockup). */
+function SystemStatusCard({ data }: { data: OverviewPayload }) {
+  const drive = driveStatusMeta(data.driveMirror);
+  const msOk = Boolean(data.tasks?.microsoftConnected);
+  const gOk = Boolean(data.tasks?.googleConnected);
+  const plannerOk = Boolean(data.tasks?.hasMicrosoftScope);
+  const allOk = msOk && gOk && drive.ok && plannerOk;
+
+  const rows: Array<{
+    key: string;
+    label: string;
+    ok: boolean;
+    logo: ReactNode;
+    href: string;
+  }> = [
+    {
+      key: "o365",
+      label: "O365",
+      ok: msOk,
+      logo: <MicrosoftLogo className="size-4" />,
+      href: "/microsoft",
+    },
+    {
+      key: "google",
+      label: "Google Workspace",
+      ok: gOk,
+      logo: <GoogleLogo className="size-4" />,
+      href: "/google",
+    },
+    {
+      key: "drive",
+      label: "Drive",
+      ok: drive.ok,
+      logo: <GoogleDriveLogo className="size-4" />,
+      href: "/account",
+    },
+    {
+      key: "planner",
+      label: "Planner",
+      ok: plannerOk,
+      logo: <MicrosoftPlannerLogo className="size-4" />,
+      href: "/microsoft?tab=planner",
+    },
+  ];
 
   return (
     <Card className="border-border/70">
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2 text-[16px] font-black">
-          <HardDrive
+          <Monitor
             className="size-4 text-muted-foreground"
             strokeWidth={APP_ICON_STROKE}
             absoluteStrokeWidth
             aria-hidden
           />
-          Zustand
+          Systemstatus
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        {drive ? (
-          <div className="space-y-1.5">
-            <div className="flex items-baseline justify-between gap-2">
-              <p
-                className={cn(
-                  "text-[13px] font-semibold",
-                  driveTone === "warn" && "text-amber-900",
-                  driveTone === "ok" && "text-emerald-900",
-                  driveTone === "muted" && "text-muted-foreground"
-                )}
+        <ul className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          {rows.map((row) => (
+            <li key={row.key}>
+              <Link
+                href={row.href}
+                className="inline-flex items-center gap-1.5 text-[12px] font-medium text-foreground/90 hover:underline"
               >
-                {driveLine}
-              </p>
-              <span className="tabular-nums text-[12px] text-muted-foreground">
-                {drive.percent}%
-              </span>
-            </div>
-            <div
-              className="h-2 overflow-hidden rounded-full bg-muted"
-              role="progressbar"
-              aria-valuenow={drive.percent}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-label="Drive-Spiegel Fortschritt"
-            >
-              <div
-                className={cn(
-                  "h-full rounded-full transition-[width]",
-                  drive.complete
-                    ? "bg-emerald-600/80"
-                    : "bg-[var(--brand-docs)]"
+                {row.logo}
+                <span>{row.label}</span>
+                {row.ok ? (
+                  <CheckCircle2
+                    className="size-3.5 text-emerald-600"
+                    aria-label="OK"
+                  />
+                ) : (
+                  <span className="text-[11px] font-semibold text-amber-700">
+                    —
+                  </span>
                 )}
-                style={{ width: `${drive.percent}%` }}
-              />
-            </div>
-            <p className="text-[11px] text-muted-foreground">
-              {drive.mirrored}/{drive.totalDocuments} Dokumente
-              {drive.lastRunAt
-                ? ` · zuletzt ${new Date(drive.lastRunAt).toLocaleString("de-CH", {
-                    day: "2-digit",
-                    month: "2-digit",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}`
-                : " · noch kein Lauf"}
-            </p>
-          </div>
-        ) : (
-          <p className="text-[13px] text-muted-foreground">{driveLine}</p>
-        )}
-
-        {extras.length > 0 ? (
-          <ul className="space-y-1 border-t border-border/50 pt-2 text-[12px] text-muted-foreground">
-            {extras.map((line) => (
-              <li key={line} className="truncate">
-                {line}
-              </li>
-            ))}
-          </ul>
-        ) : null}
-
-        {(() => {
-          const sched = data.scheduler;
-          const tickLabel = !sched
-            ? null
-            : !sched.enabled
-              ? "Scheduler aus"
-              : sched.nextTickAt
-                ? `Nächster Tick · ${new Date(sched.nextTickAt).toLocaleString(
-                    "de-CH",
-                    {
-                      day: "2-digit",
-                      month: "2-digit",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    }
-                  )}`
-                : "Scheduler · wartet";
-          return tickLabel ? (
-            <p className="border-t border-border/50 pt-2 text-[12px] text-muted-foreground">
-              <Clock3
-                className="mr-1 inline size-3.5 align-[-2px]"
-                strokeWidth={APP_ICON_STROKE}
-                absoluteStrokeWidth
-                aria-hidden
-              />
-              {tickLabel}
-            </p>
-          ) : null;
-        })()}
-
+              </Link>
+            </li>
+          ))}
+          <li
+            className={cn(
+              "ml-auto inline-flex items-center gap-1.5 text-[12px] font-semibold",
+              allOk ? "text-emerald-700" : "text-amber-800"
+            )}
+          >
+            {allOk ? (
+              <>
+                <CheckCircle2 className="size-3.5" aria-hidden />
+                Alle Systeme OK
+              </>
+            ) : (
+              "Prüfen"
+            )}
+          </li>
+        </ul>
         <div className="flex flex-wrap gap-x-3 gap-y-1 border-t border-border/50 pt-2 text-[12px]">
           <Link
             href="/sync?tab=automation"
@@ -526,24 +529,8 @@ function SystemStatusCard({
             href="/account"
             className="font-medium text-foreground underline-offset-2 hover:underline"
           >
-            Konto · Drive
+            Konto
           </Link>
-          {mailPending > 0 ? (
-            <Link
-              href="/google?tab=triage"
-              className="font-medium text-foreground underline-offset-2 hover:underline"
-            >
-              Mail-Triage
-            </Link>
-          ) : null}
-          {docTriage > 0 ? (
-            <Link
-              href="/inbox"
-              className="font-medium text-foreground underline-offset-2 hover:underline"
-            >
-              Inbox
-            </Link>
-          ) : null}
         </div>
       </CardContent>
     </Card>
@@ -823,15 +810,27 @@ function DayTimeline({
                     <div className="mt-2.5 space-y-2">
                       <div className="flex flex-wrap gap-2">
                         {item.meetUrl ? (
-                          <a
-                            href={item.meetUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex h-7 items-center gap-1.5 rounded-md border border-border/70 bg-background px-2 text-[12px] font-medium text-foreground hover:bg-muted/50"
-                          >
-                            <Video className="size-3.5" aria-hidden />
-                            Meet
-                          </a>
+                          (() => {
+                            const isTeams =
+                              /teams\.microsoft\.com|microsoft365\.com\/teams/i.test(
+                                item.meetUrl
+                              );
+                            return (
+                              <a
+                                href={item.meetUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex h-7 items-center gap-1.5 rounded-md border border-border/70 bg-background px-2 text-[12px] font-medium text-foreground hover:bg-muted/50"
+                              >
+                                {isTeams ? (
+                                  <MicrosoftTeamsLogo className="size-3.5" />
+                                ) : (
+                                  <Video className="size-3.5" aria-hidden />
+                                )}
+                                {isTeams ? "In Teams öffnen" : "Meet"}
+                              </a>
+                            );
+                          })()
                         ) : null}
                         {item.mapsUrl ? (
                           <a
@@ -875,166 +874,69 @@ function FocusTile({
   href,
   tone,
   icon: Icon,
+  logo,
   eyebrow,
   title,
   detail,
 }: {
   href: string;
   tone: "teal" | "rose" | "amber" | "sky";
-  icon: typeof CalendarDays;
+  icon?: LucideIcon;
+  logo?: ReactNode;
   eyebrow: string;
   title: string;
   detail: string;
 }) {
-  const toneCls = {
-    teal: "border-l-emerald-600 bg-emerald-50/40",
-    rose: "border-l-rose-600 bg-rose-50/40",
-    amber: "border-l-amber-500 bg-amber-50/40",
-    sky: "border-l-sky-600 bg-sky-50/40",
+  const railCls = {
+    teal: "border-l-teal-600",
+    rose: "border-l-rose-500",
+    amber: "border-l-amber-500",
+    sky: "border-l-sky-500",
   }[tone];
-  const iconCls = {
-    teal: "text-emerald-800",
-    rose: "text-rose-800",
-    amber: "text-amber-800",
-    sky: "text-sky-800",
+  const iconWrap = {
+    teal: "bg-teal-50 text-teal-800",
+    rose: "bg-rose-50 text-rose-800",
+    amber: "bg-amber-50 text-amber-800",
+    sky: "bg-sky-50 text-sky-800",
   }[tone];
 
   return (
     <Link
       href={href}
       className={cn(
-        "flex min-w-0 items-start gap-3 rounded-2xl border border-border/60 border-l-4 bg-card px-3.5 py-2.5 shadow-sm transition-colors hover:bg-muted/30",
-        toneCls
+        "relative flex min-w-0 items-start gap-3 rounded-2xl border border-border/60 border-l-[3px] bg-card px-3.5 py-3 shadow-sm transition-colors hover:bg-muted/25",
+        railCls
       )}
     >
-      <Icon
-        className={cn("mt-0.5 size-5 shrink-0", iconCls)}
-        strokeWidth={APP_ICON_STROKE}
-        absoluteStrokeWidth
-        aria-hidden
-      />
-      <div className="min-w-0">
-        <p className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">
+      <span
+        className={cn(
+          "mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl",
+          iconWrap
+        )}
+      >
+        {logo ? (
+          logo
+        ) : Icon ? (
+          <Icon
+            className="size-4"
+            strokeWidth={APP_ICON_STROKE}
+            absoluteStrokeWidth
+            aria-hidden
+          />
+        ) : null}
+      </span>
+      <div className="min-w-0 flex-1 pr-4">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
           {eyebrow}
         </p>
-        <p className="truncate text-[15px] font-black tracking-tight">
-          {title}
-        </p>
+        <p className="truncate text-[15px] font-black tracking-tight">{title}</p>
         <p className="truncate text-[13px] text-muted-foreground">{detail}</p>
       </div>
+      <ChevronRight
+        className="absolute bottom-3 right-3 size-4 text-muted-foreground/70"
+        aria-hidden
+      />
     </Link>
-  );
-}
-
-function formatMailAnalyseTime(iso: string | null | undefined): string | null {
-  if (!iso?.trim()) return null;
-  try {
-    const d = new Date(iso);
-    if (!Number.isFinite(d.getTime())) return null;
-    return new Intl.DateTimeFormat("de-CH", {
-      timeZone: "Europe/Zurich",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    }).format(d);
-  } catch {
-    return null;
-  }
-}
-
-function mailAnalyseLine(stats: {
-  analyzedToday: number;
-  pendingTriage: number;
-}): string {
-  if (stats.pendingTriage > 0) {
-    return `${stats.pendingTriage} zur Triage`;
-  }
-  if (stats.analyzedToday > 0) {
-    return `${stats.analyzedToday} analysiert`;
-  }
-  return "Noch keine Analyse";
-}
-
-function MailAnalyseFocusTile({
-  google,
-  microsoft,
-}: {
-  google: {
-    analyzedToday: number;
-    pendingTriage: number;
-    lastAnalyzedAt?: string | null;
-  };
-  microsoft: {
-    analyzedToday: number;
-    pendingTriage: number;
-    lastAnalyzedAt?: string | null;
-  };
-}) {
-  const msTime = formatMailAnalyseTime(microsoft.lastAnalyzedAt);
-  const gTime = formatMailAnalyseTime(google.lastAnalyzedAt);
-
-  return (
-    <div
-      className={cn(
-        "flex min-w-0 items-stretch gap-3 rounded-2xl border border-border/60 border-l-4 border-l-sky-600 bg-sky-50/40 shadow-sm"
-      )}
-    >
-      <div className="flex shrink-0 items-center pl-4">
-        <Sparkles
-          className="size-5 text-sky-800"
-          strokeWidth={APP_ICON_STROKE}
-          absoluteStrokeWidth
-          aria-hidden
-        />
-      </div>
-      <div className="min-w-0 flex-1">
-        <Link
-          href={
-            microsoft.pendingTriage > 0
-              ? "/microsoft?tab=triage"
-              : "/microsoft?tab=inbox"
-          }
-          className="block px-3.5 py-1.5 transition-colors hover:bg-muted/30"
-        >
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            O365 Mail
-          </p>
-          <p className="truncate text-[14px] font-black tracking-tight">
-            {mailAnalyseLine(microsoft)}
-          </p>
-          <p className="truncate text-[12px] text-muted-foreground">
-            {microsoft.pendingTriage > 0
-              ? `${microsoft.pendingTriage} offen`
-              : microsoft.analyzedToday > 0
-                ? `${microsoft.analyzedToday} heute`
-                : "Outlook"}
-            {msTime ? ` · ${msTime}` : ""}
-          </p>
-        </Link>
-        <div className="mx-3.5 border-t border-border/70" aria-hidden />
-        <Link
-          href={
-            google.pendingTriage > 0 ? "/google?tab=triage" : "/google"
-          }
-          className="block px-3.5 py-1.5 transition-colors hover:bg-muted/30"
-        >
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Google Workspace
-          </p>
-          <p className="truncate text-[14px] font-black tracking-tight">
-            {mailAnalyseLine(google)}
-          </p>
-          <p className="truncate text-[12px] text-muted-foreground">
-            {google.pendingTriage > 0
-              ? `${google.pendingTriage} offen`
-              : google.analyzedToday > 0
-                ? `${google.analyzedToday} heute`
-                : "Gmail"}
-            {gTime ? ` · ${gTime}` : ""}
-          </p>
-        </Link>
-      </div>
-    </div>
   );
 }
 
@@ -1043,148 +945,31 @@ function mailInboxSample(items: MailListItem[]): MailListItem | null {
   return unread || items[0] || null;
 }
 
-function mailReceivedLabel(item: MailListItem | null): string | null {
-  if (!item) return null;
-  const raw = item.date || item.internalDate;
-  if (!raw) return null;
-  const iso =
-    /^\d+$/.test(raw) ? new Date(Number(raw)).toISOString() : raw;
-  return formatMailAnalyseTime(iso);
-}
-
-function InboxFocusTile({
-  google,
-  microsoft,
-}: {
-  google: MailListItem[];
-  microsoft: MailListItem[];
-}) {
-  const ms = mailInboxSample(microsoft);
-  const g = mailInboxSample(google);
-  const msTime = mailReceivedLabel(ms);
-  const gTime = mailReceivedLabel(g);
-
-  return (
-    <div className="flex min-w-0 items-stretch gap-2.5 rounded-2xl border border-border/60 border-l-4 border-l-amber-500 bg-amber-50/40 shadow-sm">
-      <div className="flex shrink-0 items-center pl-3.5">
-        <Mail
-          className="size-5 text-amber-800"
-          strokeWidth={APP_ICON_STROKE}
-          absoluteStrokeWidth
-          aria-hidden
-        />
-      </div>
-      <div className="min-w-0 flex-1">
-        <Link
-          href={
-            ms
-              ? `/microsoft?tab=inbox&open=${encodeURIComponent(ms.id)}`
-              : "/microsoft?tab=inbox"
-          }
-          className="block px-3.5 py-1.5 transition-colors hover:bg-muted/30"
-        >
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            O365 Mail
-          </p>
-          <p className="truncate text-[14px] font-black tracking-tight">
-            {ms ? ms.subject || "(kein Betreff)" : "Keine Mails"}
-          </p>
-          <p className="truncate text-[12px] text-muted-foreground">
-            {ms
-              ? `${ms.fromName}${ms.unread ? " · neu" : ""}`
-              : "Outlook"}
-            {msTime ? ` · ${msTime}` : ""}
-          </p>
-        </Link>
-        <div className="mx-3.5 border-t border-border/70" aria-hidden />
-        <Link
-          href={
-            g ? `/google?open=${encodeURIComponent(g.id)}` : "/google"
-          }
-          className="block px-3.5 py-1.5 transition-colors hover:bg-muted/30"
-        >
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Google Workspace
-          </p>
-          <p className="truncate text-[14px] font-black tracking-tight">
-            {g ? g.subject || "(kein Betreff)" : "Keine Mails"}
-          </p>
-          <p className="truncate text-[12px] text-muted-foreground">
-            {g ? `${g.fromName}${g.unread ? " · neu" : ""}` : "Gmail"}
-            {gTime ? ` · ${gTime}` : ""}
-          </p>
-        </Link>
-      </div>
-    </div>
+function overviewStatusLine(
+  data: OverviewPayload,
+  todayEventCount: number
+): string {
+  const parts: string[] = [];
+  parts.push(
+    todayEventCount === 0
+      ? "Keine Termine heute"
+      : todayEventCount === 1
+        ? "1 Termin heute"
+        : `${todayEventCount} Termine heute`
   );
-}
-
-function TermineFocusTile({
-  items,
-  today,
-}: {
-  items: AgendaItem[];
-  today: string;
-}) {
-  const [first, second] = items;
-
-  function row(item: AgendaItem | undefined, label: string) {
-    const titleLine = !item
-      ? "Keine Termine"
-      : item.date === today
-        ? [item.time, item.title].filter(Boolean).join(" · ")
-        : item.date > today
-          ? [
-              `Morgen${item.time ? ` · ${item.time}` : ""}`,
-              item.title,
-            ]
-              .filter(Boolean)
-              .join(" · ")
-          : item.title;
-    return (
-      <Link
-        href={item ? itemHref(item) : "/calendar"}
-        className="block px-3.5 py-1.5 transition-colors hover:bg-muted/30"
-      >
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-          {label}
-        </p>
-        <p className="truncate text-[14px] font-black tracking-tight">
-          {titleLine}
-        </p>
-        <p className="truncate text-[12px] text-muted-foreground">
-          {item
-            ? [
-                shortPlace(item),
-                item.driveLabel,
-              ]
-                .filter(Boolean)
-                .join(" · ") ||
-              item.subtitle ||
-              "Kalender"
-            : "Kalender öffnen"}
-        </p>
-      </Link>
-    );
+  const triage =
+    (data.chips.mailByProvider?.microsoft?.pendingTriage || 0) +
+    (data.chips.mailByProvider?.google?.pendingTriage || 0);
+  if (triage > 0) {
+    parts.push(`${triage} Mail-Triage`);
+  } else if (data.briefing?.headline) {
+    /* keep compact — skip long briefing */
   }
-
-  return (
-    <div className="flex min-w-0 items-stretch gap-2.5 rounded-2xl border border-border/60 border-l-4 border-l-emerald-600 bg-emerald-50/40 shadow-sm">
-      <div className="flex shrink-0 items-center pl-3.5">
-        <CalendarDays
-          className="size-5 text-emerald-800"
-          strokeWidth={APP_ICON_STROKE}
-          absoluteStrokeWidth
-          aria-hidden
-        />
-      </div>
-      <div className="min-w-0 flex-1">
-        {row(first, "Nächster Termin")}
-        <div className="mx-3.5 border-t border-border/70" aria-hidden />
-        {row(second, "Danach")}
-      </div>
-    </div>
-  );
+  const drive = data.driveMirror;
+  if (drive && drive.connected && drive.hasDriveScope && drive.enabled) {
+    parts.push(`Drive ${drive.percent}%`);
+  }
+  return parts.join(" · ");
 }
 
 const OVERVIEW_LS_KEY = "buddy-overview-cache-v2";
@@ -1250,12 +1035,11 @@ export function OverviewDashboard({
 }: {
   greetingName: string | null;
 }) {
-  const [period, setPeriod] = useState<OverviewPeriod>("month");
+  const [period] = useState<OverviewPeriod>("month");
   const [data, setData] = useState<OverviewPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [correctOpen, setCorrectOpen] = useState(false);
   const [eventDetail, setEventDetail] = useState<AgendaItem | null>(null);
   const [fromCache, setFromCache] = useState(false);
   const [nowTick, setNowTick] = useState(0);
@@ -1459,81 +1243,81 @@ export function OverviewDashboard({
   const greeting =
     hour < 11 ? "Guten Morgen" : hour < 18 ? "Guten Tag" : "Guten Abend";
 
-  const kpiMax = Math.max(
-    ...(data?.kpi.byCategory.map((c) => c.total) || [1]),
-    1
-  );
-
   const mailFocusGoogle = (data?.todayMail || []) as MailListItem[];
   const mailFocusMicrosoft = (data?.todayMailMicrosoft ||
     []) as MailListItem[];
+  const todayEventCount = (data?.todayCalendar || []).length;
+  const nextEvent = nextFocusEvents[0];
+  const msMailStats = data?.chips.mailByProvider?.microsoft;
+  const gMailStats = data?.chips.mailByProvider?.google;
+  const msSample = mailInboxSample(mailFocusMicrosoft);
+  const gSample = mailInboxSample(mailFocusGoogle);
 
   return (
     <div className="min-w-0 space-y-6 pb-10">
-      <header className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(16rem,22rem)] lg:items-start lg:gap-6">
-        <div className="min-w-0 space-y-1">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h1 className="text-[30px] font-black tracking-tight">
-              {greeting}
-              {greetingName ? `, ${greetingName}` : ""}
-            </h1>
-            {refreshing || fromCache ? (
-              <p className="text-[12px] text-muted-foreground">
-                {refreshing ? "Aktualisiere…" : "Zwischengespeicherte Ansicht"}
+      <header className="relative overflow-hidden rounded-2xl border border-border/50 bg-gradient-to-br from-sky-100/70 via-background to-emerald-50/40 px-4 py-5 sm:px-6 sm:py-6">
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.35]"
+          style={{
+            backgroundImage:
+              "radial-gradient(ellipse 80% 60% at 70% 20%, rgba(147,197,253,0.45), transparent 55%), radial-gradient(ellipse 60% 50% at 20% 90%, rgba(167,243,208,0.35), transparent 50%)",
+          }}
+          aria-hidden
+        />
+        <div className="relative grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(16rem,22rem)] lg:items-start lg:gap-6">
+          <div className="min-w-0 space-y-1">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h1 className="text-[30px] font-black tracking-tight">
+                {greeting}
+                {greetingName ? `, ${greetingName}` : ""}
+              </h1>
+              {refreshing || fromCache ? (
+                <p className="text-[12px] text-muted-foreground">
+                  {refreshing ? "Aktualisiere…" : "Zwischengespeicherte Ansicht"}
+                </p>
+              ) : null}
+            </div>
+            <p className="text-[15px] capitalize text-muted-foreground">
+              {formatLongDeDate()}
+            </p>
+            {data ? (
+              <p className="pt-1 text-[13px] text-muted-foreground">
+                {overviewStatusLine(data, todayEventCount)}
               </p>
             ) : null}
-          </div>
-          <p className="text-[15px] capitalize text-muted-foreground">
-            {formatLongDeDate()}
-          </p>
-          {data?.briefing ? (
-            <div className="space-y-1.5 pt-1">
-              <p className="text-[15px] font-medium leading-snug text-foreground/90">
-                {data.briefing.headline}
-              </p>
-              {data.briefing.prose ? (
-                <p className="max-w-2xl text-[14px] leading-relaxed text-muted-foreground">
-                  {data.briefing.prose}
-                </p>
-              ) : data.briefing.detail ? (
-                <p className="max-w-2xl text-[14px] leading-relaxed text-muted-foreground">
-                  {data.briefing.detail}
-                </p>
-              ) : null}
-              {data.briefing.mode === "evening" &&
-              (data.briefing.done.length > 0 ||
-                data.briefing.open.length > 0) ? (
-                <div className="grid max-w-2xl gap-3 pt-1 sm:grid-cols-2">
-                  <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      Erledigt
-                    </p>
-                    <ul className="mt-1 space-y-0.5 text-[13px] text-foreground/85">
-                      {data.briefing.done.map((line) => (
-                        <li key={`done-${line}`}>{line}</li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      Offen
-                    </p>
-                    <ul className="mt-1 space-y-0.5 text-[13px] text-foreground/85">
-                      {data.briefing.open.map((line) => (
-                        <li key={`open-${line}`}>{line}</li>
-                      ))}
-                    </ul>
-                  </div>
+            {data?.briefing?.mode === "evening" &&
+            (data.briefing.done.length > 0 ||
+              data.briefing.open.length > 0) ? (
+              <div className="grid max-w-2xl gap-3 pt-2 sm:grid-cols-2">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Erledigt
+                  </p>
+                  <ul className="mt-1 space-y-0.5 text-[13px] text-foreground/85">
+                    {data.briefing.done.map((line) => (
+                      <li key={`done-${line}`}>{line}</li>
+                    ))}
+                  </ul>
                 </div>
-              ) : null}
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Offen
+                  </p>
+                  <ul className="mt-1 space-y-0.5 text-[13px] text-foreground/85">
+                    {data.briefing.open.map((line) => (
+                      <li key={`open-${line}`}>{line}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            ) : null}
+          </div>
+          {data?.homeWeather ? (
+            <div className="min-w-0 lg:justify-self-end">
+              <HomeWeatherWidget weather={data.homeWeather} />
             </div>
           ) : null}
         </div>
-        {data?.homeWeather ? (
-          <div className="min-w-0 lg:justify-self-end">
-            <HomeWeatherWidget weather={data.homeWeather} />
-          </div>
-        ) : null}
       </header>
 
       {error ? (
@@ -1548,28 +1332,42 @@ export function OverviewDashboard({
             <h2 className="text-[14px] font-black tracking-tight text-foreground">
               Heute handeln
             </h2>
-            <ul className="divide-y divide-border/60 overflow-hidden rounded-xl border border-border/70 bg-card text-sm">
+            <ul className="overflow-hidden rounded-xl border border-border/70 bg-card shadow-sm">
               {(() => {
                 const rows: Array<{
                   key: string;
                   href: string;
                   label: string;
-                  meta: string;
+                  tone: "teal" | "amber" | "rose" | "sky";
+                  icon: LucideIcon | "teams" | "ms" | "gmail";
                 }> = [];
                 for (const ev of nextFocusEvents.slice(0, 2)) {
+                  const isTeams =
+                    ev.meetUrl &&
+                    /teams\.microsoft\.com|microsoft365\.com\/teams/i.test(
+                      ev.meetUrl
+                    );
                   rows.push({
                     key: `ev-${ev.id}`,
                     href: "/calendar",
-                    label: ev.title,
-                    meta: `${ev.time || "ganztags"}${ev.location ? ` · ${ev.location}` : ""} · Termin`,
+                    label: [
+                      ev.title,
+                      ev.time || null,
+                      isTeams ? "Teams" : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" "),
+                    tone: "teal",
+                    icon: isTeams ? "teams" : CalendarDays,
                   });
                 }
                 if (data.chips.openDueCount > 0) {
                   rows.push({
                     key: "finance-open",
                     href: "/finance",
-                    label: `${data.chips.openDueCount} offene Zahlung${data.chips.openDueCount === 1 ? "" : "en"}`,
-                    meta: `${formatCHF(data.chips.openDueAmount)} · Finanzen`,
+                    label: `${data.chips.openDueCount} offene Zahlung${data.chips.openDueCount === 1 ? "" : "en"} · ${formatCHF(data.chips.openDueAmount)}`,
+                    tone: "rose",
+                    icon: Wallet,
                   });
                 }
                 const msPending =
@@ -1581,10 +1379,9 @@ export function OverviewDashboard({
                   rows.push({
                     key: "ms-triage",
                     href: "/microsoft?tab=triage",
-                    label: sample
-                      ? `O365: ${sample}`
-                      : `${msPending} O365-Mail zur Triage`,
-                    meta: `${msPending} offen · Outlook`,
+                    label: sample || `${msPending} O365-Mail zur Triage`,
+                    tone: "amber",
+                    icon: "ms",
                   });
                 }
                 if (gPending > 0) {
@@ -1592,37 +1389,58 @@ export function OverviewDashboard({
                   rows.push({
                     key: "g-triage",
                     href: "/google?tab=triage",
-                    label: sample
-                      ? `Workspace: ${sample}`
-                      : `${gPending} Gmail zur Triage`,
-                    meta: `${gPending} offen · Gmail`,
+                    label: sample || `${gPending} Gmail zur Triage`,
+                    tone: "sky",
+                    icon: "gmail",
                   });
                 }
                 if (rows.length === 0) {
                   rows.push({
                     key: "empty",
                     href: "/calendar",
-                    label: "Nichts Dringendes",
-                    meta: "Agenda & Postfächer sind ruhig",
+                    label: "Nichts Dringendes — Agenda & Postfächer ruhig",
+                    tone: "teal",
+                    icon: CalendarDays,
                   });
                 }
+                const rail = {
+                  teal: "border-l-teal-600",
+                  amber: "border-l-amber-500",
+                  rose: "border-l-rose-500",
+                  sky: "border-l-sky-500",
+                } as const;
                 return rows.slice(0, 6).map((row) => (
-                  <li key={row.key}>
+                  <li key={row.key} className="border-b border-border/50 last:border-0">
                     <Link
                       href={row.href}
-                      className="flex items-start justify-between gap-3 px-3 py-2.5 transition-colors hover:bg-muted/40"
+                      className={cn(
+                        "flex items-center gap-3 border-l-[3px] px-3 py-2.5 transition-colors hover:bg-muted/40",
+                        rail[row.tone]
+                      )}
                     >
-                      <span className="min-w-0">
-                        <span className="block truncate font-medium">
-                          {row.label}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {row.meta}
-                        </span>
+                      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted/60">
+                        {row.icon === "teams" ? (
+                          <MicrosoftTeamsLogo className="size-4" />
+                        ) : row.icon === "ms" ? (
+                          <MicrosoftLogo className="size-4" />
+                        ) : row.icon === "gmail" ? (
+                          <GmailLogo className="size-4" />
+                        ) : (
+                          <row.icon
+                            className="size-4 text-muted-foreground"
+                            strokeWidth={APP_ICON_STROKE}
+                            absoluteStrokeWidth
+                            aria-hidden
+                          />
+                        )}
                       </span>
-                      <span className="shrink-0 text-xs text-muted-foreground">
-                        →
+                      <span className="min-w-0 flex-1 truncate text-[14px] font-medium">
+                        {row.label}
                       </span>
+                      <ChevronRight
+                        className="size-4 shrink-0 text-muted-foreground/70"
+                        aria-hidden
+                      />
                     </Link>
                   </li>
                 ));
@@ -1635,41 +1453,90 @@ export function OverviewDashboard({
               Heute im Fokus
             </h2>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <TermineFocusTile items={nextFocusEvents} today={today} />
+              <FocusTile
+                href={nextEvent ? itemHref(nextEvent) : "/calendar"}
+                tone="teal"
+                icon={CalendarDays}
+                eyebrow="Nächster Termin"
+                title={nextEvent?.title || "Keine Termine"}
+                detail={
+                  nextEvent
+                    ? [
+                        nextEvent.time && nextEvent.endTime
+                          ? `${nextEvent.time}–${nextEvent.endTime}`
+                          : nextEvent.time ||
+                            (nextEvent.date === today ? "Heute" : weekdayLabel(nextEvent.date)),
+                        shortPlace(nextEvent),
+                      ]
+                        .filter(Boolean)
+                        .join(" · ") || "Kalender"
+                    : "Kalender öffnen"
+                }
+              />
               <FocusTile
                 href="/finance"
                 tone="rose"
                 icon={Wallet}
-                eyebrow="Offen"
+                eyebrow="Finanzen offen"
                 title={
                   data.chips.openDueCount > 0
-                    ? formatCHF(data.chips.openDueAmount)
+                    ? `${data.chips.openDueCount} Beleg${data.chips.openDueCount === 1 ? "" : "e"}`
                     : "Nichts offen"
                 }
                 detail={
                   data.chips.openDueCount > 0
-                    ? `${data.chips.openDueCount} Zahlung${data.chips.openDueCount === 1 ? "" : "en"}`
+                    ? formatCHF(data.chips.openDueAmount)
                     : "Finanzen im Blick"
                 }
               />
-              <InboxFocusTile
-                google={mailFocusGoogle}
-                microsoft={mailFocusMicrosoft}
-              />
-              <MailAnalyseFocusTile
-                google={
-                  data.chips.mailByProvider?.google ?? {
-                    analyzedToday: 0,
-                    pendingTriage: 0,
-                    lastAnalyzedAt: null,
-                  }
+              <FocusTile
+                href={
+                  (msMailStats?.pendingTriage || 0) > 0
+                    ? "/microsoft?tab=triage"
+                    : msSample
+                      ? `/microsoft?tab=inbox&open=${encodeURIComponent(msSample.id)}`
+                      : "/microsoft?tab=inbox"
                 }
-                microsoft={
-                  data.chips.mailByProvider?.microsoft ?? {
-                    analyzedToday: 0,
-                    pendingTriage: 0,
-                    lastAnalyzedAt: null,
-                  }
+                tone="amber"
+                logo={<MicrosoftLogo className="size-5" />}
+                eyebrow="O365 Mail"
+                title={
+                  (msMailStats?.pendingTriage || 0) > 0
+                    ? `${msMailStats!.pendingTriage} Mail-Triage`
+                    : msSample
+                      ? msSample.subject || "(kein Betreff)"
+                      : "Posteingang"
+                }
+                detail={
+                  (msMailStats?.pendingTriage || 0) > 0
+                    ? "Priorität: Normal"
+                    : msSample
+                      ? msSample.fromName || "Outlook"
+                      : "Keine wichtigen"
+                }
+              />
+              <FocusTile
+                href={
+                  (gMailStats?.pendingTriage || 0) > 0
+                    ? "/google?tab=triage"
+                    : gSample
+                      ? `/google?open=${encodeURIComponent(gSample.id)}`
+                      : "/google"
+                }
+                tone="sky"
+                logo={<GmailLogo className="size-5" />}
+                eyebrow="Google Mail"
+                title={
+                  (gMailStats?.pendingTriage || 0) > 0
+                    ? `${gMailStats!.pendingTriage} Mail-Triage`
+                    : "Posteingang"
+                }
+                detail={
+                  (gMailStats?.pendingTriage || 0) > 0
+                    ? "Zur Prüfung"
+                    : gSample?.unread
+                      ? gSample.subject || "Ungelesen"
+                      : "Keine wichtigen"
                 }
               />
             </div>
@@ -1815,80 +1682,7 @@ export function OverviewDashboard({
                 <NextHockeyCard game={data.hockey.nextGame} />
               ) : null}
 
-              <Card className="border-border/70">
-                <CardHeader className="space-y-3 pb-2">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <CardTitle className="text-[16px] font-black">Kennzahlen</CardTitle>
-                    <div className="flex flex-wrap gap-1">
-                      {PERIODS.map((p) => (
-                        <Button
-                          key={p.id}
-                          type="button"
-                          size="sm"
-                          variant={period === p.id ? "default" : "ghost"}
-                          className={cn(
-                            "h-7 px-2 text-[13px]",
-                            period === p.id &&
-                              "bg-[var(--brand-docs)] text-white hover:bg-[var(--brand-docs)]/90"
-                          )}
-                          onClick={() => setPeriod(p.id)}
-                        >
-                          {p.label}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <p className="text-[25px] font-semibold tabular-nums">
-                    {formatCHF(data.kpi.total)}
-                  </p>
-                  <p className="text-[13px] text-muted-foreground">
-                    Ausgaben · {PERIODS.find((p) => p.id === period)?.label}
-                  </p>
-                  <div className="space-y-2">
-                    {data.kpi.byCategory.slice(0, 5).map((slice) => (
-                      <div key={slice.category} className="space-y-1">
-                        <div className="flex justify-between text-[13px]">
-                          <span className="truncate">{slice.category}</span>
-                          <span className="tabular-nums text-muted-foreground">
-                            {formatCHF(slice.total)}
-                          </span>
-                        </div>
-                        <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                          <div
-                            className="h-full rounded-full bg-[var(--brand-finance)]"
-                            style={{
-                              width: `${Math.max(6, (slice.total / kpiMax) * 100)}%`,
-                            }}
-                          />
-                        </div>
-                      </div>
-                    ))}
-                    {data.kpi.byCategory.length === 0 ? (
-                      <p className="text-[13px] text-muted-foreground">
-                        Keine Ausgaben in diesem Zeitraum.
-                      </p>
-                    ) : null}
-                  </div>
-                  <div className="flex flex-wrap gap-2 pt-1">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setCorrectOpen(true)}
-                    >
-                      Korrigieren
-                    </Button>
-                    <Link
-                      href="/finance"
-                      className="inline-flex h-8 items-center text-[13px] font-medium text-[var(--brand-finance)] underline-offset-2 hover:underline"
-                    >
-                      Analyse →
-                    </Link>
-                  </div>
-                </CardContent>
-              </Card>
+              <DriveAsideCard data={data} />
             </aside>
           </div>
 
@@ -1896,59 +1690,50 @@ export function OverviewDashboard({
             <h2 className="text-[14px] font-black tracking-tight">
               Später im Monat
             </h2>
-            <div className="grid gap-2 sm:grid-cols-3">
+            <div className="flex flex-col overflow-hidden rounded-xl border border-border/70 bg-card shadow-sm sm:flex-row sm:divide-x sm:divide-border/60">
               <Link
                 href="/travel"
-                className="flex items-start gap-3 rounded-xl border border-border/60 bg-card px-3 py-3 hover:bg-muted/30"
+                className="flex flex-1 items-center gap-3 px-4 py-3.5 transition-colors hover:bg-muted/30"
               >
-                <Plane className="mt-0.5 size-4 shrink-0 text-sky-700" />
+                <Plane className="size-4 shrink-0 text-sky-700" />
                 <div className="min-w-0">
-                  <p className="text-[14px] font-black">
-                    Reisen · {laterCounts.travel}
-                  </p>
-                  <p className="truncate text-[13px] text-muted-foreground">
-                    {laterCounts.travelSample || "Keine Reisen geplant"}
+                  <p className="text-[14px] font-black">Reisen</p>
+                  <p className="truncate text-[12px] text-muted-foreground">
+                    {laterCounts.travel > 0
+                      ? `${laterCounts.travel} · ${laterCounts.travelSample || "geplant"}`
+                      : "Keine Reisen geplant"}
                   </p>
                 </div>
               </Link>
               <Link
                 href="/deadlines"
-                className="flex items-start gap-3 rounded-xl border border-border/60 bg-card px-3 py-3 hover:bg-muted/30"
+                className="flex flex-1 items-center gap-3 border-t border-border/60 px-4 py-3.5 transition-colors hover:bg-muted/30 sm:border-t-0"
               >
-                <Clock3 className="mt-0.5 size-4 shrink-0 text-teal-700" />
+                <Clock3 className="size-4 shrink-0 text-teal-700" />
                 <div className="min-w-0">
-                  <p className="text-[14px] font-black">
-                    Fristen · {laterCounts.deadlines || data.chips.urgentDeadlines}
-                  </p>
-                  <p className="truncate text-[13px] text-muted-foreground">
-                    {laterCounts.deadlineSample || "Keine offenen Fristen"}
+                  <p className="text-[14px] font-black">Fristen</p>
+                  <p className="truncate text-[12px] text-muted-foreground">
+                    {laterCounts.deadlines || data.chips.urgentDeadlines
+                      ? `${laterCounts.deadlines || data.chips.urgentDeadlines} · ${laterCounts.deadlineSample || "offen"}`
+                      : "Keine offenen Fristen"}
                   </p>
                 </div>
               </Link>
               <Link
                 href="/finance"
-                className="flex items-start gap-3 rounded-xl border border-border/60 bg-card px-3 py-3 hover:bg-muted/30"
+                className="flex flex-1 items-center gap-3 border-t border-border/60 px-4 py-3.5 transition-colors hover:bg-muted/30 sm:border-t-0"
               >
-                <ListChecks className="mt-0.5 size-4 shrink-0 text-[var(--brand-finance)]" />
+                <ListChecks className="size-4 shrink-0 text-[var(--brand-finance)]" />
                 <div className="min-w-0">
-                  <p className="text-[14px] font-black">
-                    Pipeline · {laterCounts.pipeline}
-                  </p>
-                  <p className="truncate text-[13px] text-muted-foreground">
-                    {laterCounts.pipelineSample || "Keine geplanten Zahlungen"}
+                  <p className="text-[14px] font-black">Pipeline</p>
+                  <p className="truncate text-[12px] text-muted-foreground">
+                    {laterCounts.pipeline > 0
+                      ? `${laterCounts.pipeline} · ${laterCounts.pipelineSample || "Zahlungen"}`
+                      : "Keine geplanten Zahlungen"}
                   </p>
                 </div>
               </Link>
             </div>
-            {data.chips.triagePending > 0 ? (
-              <Link
-                href="/inbox"
-                className="inline-flex items-center gap-2 text-[13px] font-medium text-[var(--brand-docs)] underline-offset-2 hover:underline"
-              >
-                <Mail className="size-3.5" />
-                {data.chips.triagePending} Triage in der Inbox →
-              </Link>
-            ) : null}
           </section>
 
           <div className="grid gap-4 pt-2 md:grid-cols-2">
@@ -1958,12 +1743,6 @@ export function OverviewDashboard({
         </>
       ) : null}
 
-      <KpiCorrectSheet
-        open={correctOpen}
-        onOpenChange={setCorrectOpen}
-        items={data?.financeItems || []}
-        onSaved={() => void load()}
-      />
       <AgendaEventDialog
         item={eventDetail}
         open={Boolean(eventDetail)}

@@ -5,6 +5,10 @@ import Link from "next/link";
 import { Check, CheckSquare, ChevronDown, ExternalLink, LayoutGrid } from "lucide-react";
 import { AgendaAiIconThumb } from "@/components/calendar/agenda-ai-icon-thumb";
 import { weekdayLabel } from "@/components/calendar/agenda-row";
+import {
+  GoogleTasksLogo,
+  MicrosoftPlannerLogo,
+} from "@/components/branding/provider-logos";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -595,17 +599,19 @@ export function HomeTasksSection({
             {hasMicrosoftScope ? (
               <Link
                 href="/microsoft?tab=planner"
-                className="underline-offset-2 hover:underline"
+                className="inline-flex items-center gap-1.5 font-medium underline-offset-2 hover:underline"
               >
-                Planner →
+                <MicrosoftPlannerLogo className="size-3.5" />
+                Planner
               </Link>
             ) : null}
             {hasGoogleScope ? (
               <Link
                 href="/google?tab=tasks"
-                className="underline-offset-2 hover:underline"
+                className="inline-flex items-center gap-1.5 font-medium underline-offset-2 hover:underline"
               >
-                Google Tasks →
+                <GoogleTasksLogo className="size-3.5" />
+                Google Tasks
               </Link>
             ) : null}
           </div>
