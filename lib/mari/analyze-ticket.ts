@@ -5,6 +5,7 @@ import {
   type AiTokenUsage,
 } from "@/lib/ai/usage-cost";
 import type { MariTicketDetail } from "@/lib/mari/tickets";
+import { timelineSideLabel } from "@/lib/mari/tickets";
 
 function clip(s: string, max: number): string {
   const t = s.trim();
@@ -331,6 +332,13 @@ const SYSTEM = `Du bist Buddy, Assistent für Maringo/MARI Support-Tickets (Schw
 Kontext der Agentur: SAP Business One (B1) + typische Add-ons (z.B. Coresystems/coresuite customize), Microsoft 365/Outlook, verwandte Hersteller.
 WICHTIG zu SAP: Es geht IMMER um SAP Business One — NIEMALS um SAP R/3, ECC oder S/4HANA. Keine S/4-/R3-Transaktionscodes, Fiori-Apps oder ECC-Hinweise vorschlagen.
 
+Verlauf-Legende (jede Zeile beginnt mit [Seite: …]):
+- «Support (wir)» = Antwort, Rückfrage, interne Notiz oder Bearbeitung durch euer Support-Team. Das sind KEINE Kundenaussagen.
+- «Kunde» = Anfrage/Antwort/Anhang vom Kunden (Eingang).
+- «System» = automatische Status-/Feldänderungen.
+- «Unklar» = Zuordnung unsicher — nicht als Kundenfakt behandeln.
+Werte Informationen von Support und Kunde getrennt aus: was der Kunde berichtet hat vs. was Support bereits gefragt/geantwortet/versucht hat.
+
 Analysiere das Ticket inkl. Verlauf und liefere ein JSON-Objekt genau in diesem Schema:
 {
   "summary": "string, max ~800 Zeichen",
@@ -387,6 +395,7 @@ Zu solutionSketch — AUSFORMULIERT und HANDLUNGSFÄHIG:
 - Code darf Platzhalter enthalten (z.B. @CardCode, 'KUNDENNR') — klar markieren. Keine erfundenen Note-/KB-Nummern.
 - Klar als Vorschlag kennzeichnen; kein Live-Schreiben auf Produktivsysteme ohne Prüfung.
 - Bei SAP immer B1-Begriffe (Belegarten, UDF, Addon, DI-API, Service Layer, Formatted Search) — nicht S/4.
+- Beziehe bereits gegebene Support-Antworten/Rückfragen ein (nicht erneut dasselbe fragen, wenn Kunde schon geantwortet hat).
 
 Falls Screenshots/Bilder mitgeliefert werden: Fehlerdialoge, Fehlermeldungen, UI-Zustände und relevante Details daraus in summary, missing[], suggestedTasks und solutionSketch (steps/artifacts) einbeziehen.
 
@@ -419,8 +428,16 @@ export async function analyzeMariTicket(
   const timelineText = ticket.timeline
     .slice(-40)
     .map((t) => {
-      const actor = t.actor ? ` · ${t.actor}` : "";
-      return `[${t.at}] ${t.label}${actor}\n${t.subject ? t.subject + "\n" : ""}${t.text.slice(0, 800)}`;
+      const side = timelineSideLabel(t.side || "unknown");
+      const actor = t.actor ? ` · Actor: ${t.actor}` : "";
+      const meta = t.meta ? ` · ${t.meta}` : "";
+      const att =
+        t.attachments && t.attachments.length > 0
+          ? `\nAnhänge: ${t.attachments.map((a) => a.orgFilename).join(", ")}`
+          : "";
+      return `[Seite: ${side}] [${t.at}] ${t.label}${actor}${meta}\n${
+        t.subject ? t.subject + "\n" : ""
+      }${t.text.slice(0, 800)}${att}`;
     })
     .join("\n\n");
 
@@ -440,10 +457,10 @@ Screenshots/Bilder: ${
       : "keine"
   }
 
-Anfragetext:
+Anfragetext (ursprünglich, oft Kunde):
 ${ticket.requestTextPlain.slice(0, 6000)}
 
-Verlauf (chronologisch):
+Verlauf (chronologisch; [Seite: Support (wir)|Kunde|System|Unklar] markiert den Absender):
 ${timelineText.slice(0, 14000) || "(keine Positionen)"}`;
 
   type ContentPart =

@@ -50,7 +50,22 @@ import type {
   MariTicketListItem,
   MariTimelineAttachment,
   MariTimelineItem,
+  MariTimelineSide,
 } from "@/lib/mari/tickets";
+import { timelineSideLabel } from "@/lib/mari/tickets";
+
+function sideChipClass(side: MariTimelineSide): string {
+  switch (side) {
+    case "support":
+      return "border-sky-200 bg-sky-100/80 text-sky-950";
+    case "customer":
+      return "border-teal-200 bg-teal-100/80 text-teal-950";
+    case "system":
+      return "border-violet-200 bg-violet-100/70 text-violet-950";
+    default:
+      return "border-border bg-muted text-muted-foreground";
+  }
+}
 
 function attachmentUrl(attachmentId: number, download = false): string {
   const q = download ? "?download=1" : "";
@@ -227,13 +242,15 @@ function StatusChip({
 }
 
 function TimelineRow({ item }: { item: MariTimelineItem }) {
+  const side = item.side || "unknown";
+
   if (item.kind === "change") {
     return (
       <li className="relative pl-8">
         <span className="absolute left-[0.55rem] top-2 size-2.5 rounded-full bg-violet-500 ring-4 ring-background" />
         <div className="inline-flex max-w-full items-center rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-[12px] text-violet-950">
           <span className="font-medium">
-            {formatTimelineAt(item.at)} · {item.text}
+            {formatTimelineAt(item.at)} · System · {item.text}
           </span>
         </div>
       </li>
@@ -245,27 +262,23 @@ function TimelineRow({ item }: { item: MariTimelineItem }) {
   const isAttachmentOnly =
     item.kind === "attachment" ||
     (hasAttachments && /^Aus E-Mail gesendet/i.test(item.text.trim()));
-  const inbound =
-    item.kind === "inbound" ||
-    item.kind === "customer" ||
-    item.kind === "system" ||
-    item.kind === "attachment";
+  const fromSupport = side === "support";
   const bubble =
-    item.kind === "reply"
+    side === "support"
       ? "ml-auto border-sky-200/80 bg-sky-50 text-sky-950"
-      : item.kind === "system"
+      : side === "system"
         ? "border-violet-200/70 bg-violet-50/60 text-violet-950"
-        : item.kind === "attachment"
+        : side === "customer"
           ? "border-teal-200/70 bg-teal-50/50 text-teal-950"
           : "border-border/70 bg-muted/40 text-foreground";
   const dot =
-    item.kind === "reply"
+    side === "support"
       ? "bg-sky-500"
-      : item.kind === "inbound" ||
-          item.kind === "customer" ||
-          item.kind === "attachment"
+      : side === "customer"
         ? "bg-teal-600"
-        : "bg-muted-foreground";
+        : side === "system"
+          ? "bg-violet-500"
+          : "bg-muted-foreground";
 
   return (
     <li className="relative pl-8">
@@ -276,15 +289,22 @@ function TimelineRow({ item }: { item: MariTimelineItem }) {
         )}
       />
       <div
-        className={cn(
-          "max-w-[92%] space-y-1",
-          item.kind === "reply" && "ml-auto"
-        )}
+        className={cn("max-w-[92%] space-y-1", fromSupport && "ml-auto")}
       >
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-          {formatTimelineAt(item.at)} · {item.label}
-          {item.actor ? ` · ${item.actor}` : ""}
-          {item.meta ? ` · ${item.meta}` : ""}
+        <p className="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <span
+            className={cn(
+              "rounded-full border px-1.5 py-0.5 text-[10px] font-bold normal-case tracking-normal",
+              sideChipClass(side)
+            )}
+          >
+            {timelineSideLabel(side)}
+          </span>
+          <span>
+            {formatTimelineAt(item.at)} · {item.label}
+            {item.actor ? ` · ${item.actor}` : ""}
+            {item.meta ? ` · ${item.meta}` : ""}
+          </span>
         </p>
         {item.subject ? (
           <p className="text-[12px] font-medium text-foreground/80">
@@ -295,9 +315,7 @@ function TimelineRow({ item }: { item: MariTimelineItem }) {
           className={cn(
             "space-y-2 rounded-2xl border px-3.5 py-2.5 text-[13px] leading-relaxed",
             bubble,
-            !inbound && item.kind === "reply"
-              ? "rounded-br-md"
-              : "rounded-bl-md"
+            fromSupport ? "rounded-br-md" : "rounded-bl-md"
           )}
         >
           {!isAttachmentOnly && item.text ? (

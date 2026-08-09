@@ -88,6 +88,9 @@ export type MariTimelineKind =
   | "change"
   | "attachment";
 
+/** Wer hat den Beitrag geschrieben / geliefert. */
+export type MariTimelineSide = "support" | "customer" | "system" | "unknown";
+
 export type MariTimelineAttachment = {
   attachmentId: number;
   orgFilename: string;
@@ -98,6 +101,8 @@ export type MariTimelineAttachment = {
 export type MariTimelineItem = {
   id: string;
   kind: MariTimelineKind;
+  /** Support (wir) / Kunde / System — für UI und AI-Kontext */
+  side: MariTimelineSide;
   at: string;
   label: string;
   subject: string | null;
@@ -204,6 +209,45 @@ function lineLabel(posType: number): string {
       return "Kunde";
     default:
       return `Typ ${posType}`;
+  }
+}
+
+/**
+ * Seite des Beitrags für AI/UI.
+ * Typ 1 Antwort / 5 Notiz = Support (wir); 3 Eingang / 8 Kunde = Kunde;
+ * 4 System / ChangeLog = System. EmployeeNumber M… stützt Support.
+ */
+export function resolveTimelineSide(params: {
+  kind: MariTimelineKind;
+  posType?: number | null;
+  actor?: string | null;
+  internalOnly?: boolean;
+}): MariTimelineSide {
+  const { kind, actor, internalOnly } = params;
+  if (kind === "change" || kind === "system") return "system";
+  if (kind === "reply" || kind === "note") return "support";
+  if (kind === "customer" || kind === "inbound") return "customer";
+  if (kind === "attachment") {
+    const pos = params.posType;
+    if (pos === 1 || pos === 5) return "support";
+    if (pos === 3 || pos === 8) return "customer";
+    if (pos === 4) return "system";
+  }
+  if (internalOnly) return "support";
+  if (actor && /^M\d+/i.test(actor.trim())) return "support";
+  return "unknown";
+}
+
+export function timelineSideLabel(side: MariTimelineSide): string {
+  switch (side) {
+    case "support":
+      return "Support (wir)";
+    case "customer":
+      return "Kunde";
+    case "system":
+      return "System";
+    default:
+      return "Unklar";
   }
 }
 
@@ -445,9 +489,16 @@ ORDER BY "ChangeDate", "ChangeLogID"`
       return;
     }
     const n = pending.attachments.length;
+    const side = resolveTimelineSide({
+      kind: "attachment",
+      posType: pending.posType,
+      actor: pending.actor,
+      internalOnly: Boolean(pending.meta),
+    });
     items.push({
       id: `att-${pending.ids[0]}${n > 1 ? `-${n}` : ""}`,
       kind: "attachment",
+      side,
       at: pending.at,
       label: n === 1 ? "Anhang" : `${n} Anhänge`,
       subject: null,
@@ -507,9 +558,16 @@ ORDER BY "ChangeDate", "ChangeLogID"`
     }
 
     const kind = lineKind(Number(line.RequestPosType));
+    const side = resolveTimelineSide({
+      kind,
+      posType: Number(line.RequestPosType),
+      actor,
+      internalOnly: Boolean(internMeta),
+    });
     items.push({
       id: `line-${line.RequestPosID}`,
       kind,
+      side,
       at: line.CreateDate,
       label: lineLabel(Number(line.RequestPosType)),
       subject,
@@ -528,6 +586,7 @@ ORDER BY "ChangeDate", "ChangeLogID"`
     items.push({
       id: `chg-${ch.ChangeLogID}`,
       kind: "change",
+      side: "system",
       at: ch.ChangeDate,
       label: "Änderung",
       subject: null,
