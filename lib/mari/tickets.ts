@@ -106,7 +106,58 @@ export type ListTicketsOptions = {
   statuses?: number[];
   overdueOnly?: boolean;
   limit?: number;
+  /** Override HandledBy (EmployeeNumber, z.B. M2055). Default: konfigurierte Personalnummer. */
+  employeeNumber?: string | null;
 };
+
+export type MariEmployeeOption = {
+  employeeNumber: string;
+  matchcode: string;
+  employeeName: string | null;
+  nameInitials: string | null;
+};
+
+/** Personalnummer wie in MARI (z.B. M1010). */
+export function normalizeMariEmployeeNumber(
+  raw: string | null | undefined
+): string | null {
+  const v = (raw || "").trim().toUpperCase();
+  if (!v) return null;
+  if (!/^[A-Z0-9]{2,20}$/.test(v)) return null;
+  return v;
+}
+
+export async function listMariEmployees(): Promise<MariEmployeeOption[]> {
+  requireMariConfig();
+  const rows = await mariSql<{
+    EmployeeNumber: string;
+    Matchcode: string | null;
+    EmployeeName: string | null;
+    NameInitials: string | null;
+  }>(
+    `SELECT TOP 300
+  e."EmployeeNumber",
+  e."Matchcode",
+  e."EmployeeName",
+  e."NameInitials"
+FROM "MARIEmployeeMaster" e
+WHERE (e."Inactive" = 0 OR e."Inactive" IS NULL)
+  AND e."EmployeeNumber" LIKE 'M%'
+ORDER BY e."Matchcode", e."EmployeeNumber"`
+  );
+  return rows
+    .map((r) => {
+      const employeeNumber = normalizeMariEmployeeNumber(r.EmployeeNumber);
+      if (!employeeNumber) return null;
+      return {
+        employeeNumber,
+        matchcode: (r.Matchcode || "").trim() || employeeNumber,
+        employeeName: (r.EmployeeName || "").trim() || null,
+        nameInitials: (r.NameInitials || "").trim() || null,
+      };
+    })
+    .filter((x): x is MariEmployeeOption => x != null);
+}
 
 function lineKind(posType: number): MariTimelineKind {
   switch (posType) {
@@ -152,7 +203,16 @@ export async function listMyTickets(
       : [...WORK_STATUS_IDS];
   if (statuses.length === 0) return [];
   const limit = Math.min(Math.max(options.limit ?? 100, 1), 200);
-  const emp = sqlQuote(cfg.employeeNumber);
+  const empRaw =
+    normalizeMariEmployeeNumber(options.employeeNumber) ||
+    normalizeMariEmployeeNumber(cfg.employeeNumber);
+  if (!empRaw) {
+    throw new MariApiError(
+      "Personalnummer fehlt oder ungültig (z.B. M1010).",
+      400
+    );
+  }
+  const emp = sqlQuote(empRaw);
   const statusList = statuses.join(",");
   const overdueClause = options.overdueOnly
     ? ` AND i."DueDate" IS NOT NULL AND i."DueDate" < CURRENT_DATE `

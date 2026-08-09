@@ -40,6 +40,45 @@ function asStringArray(v: unknown, maxItems: number, maxLen: number): string[] {
     .slice(0, maxItems);
 }
 
+function asBoolean(v: unknown, fallback = false): boolean {
+  if (typeof v === "boolean") return v;
+  if (typeof v === "number") return v !== 0;
+  if (typeof v === "string") {
+    const s = v.trim().toLowerCase();
+    if (["true", "1", "yes", "ja"].includes(s)) return true;
+    if (["false", "0", "no", "nein"].includes(s)) return false;
+  }
+  return fallback;
+}
+
+function normalizeSolutionSketch(raw: unknown): unknown {
+  if (raw == null || raw === "") return null;
+  if (typeof raw === "string") {
+    const outline = clip(raw, 2500);
+    if (!outline) return null;
+    return {
+      problemStillOpen: true,
+      outline,
+      vendors: [],
+      caveats:
+        "Vorschlag aus allgemeinem Herstellerwissen — mit offizieller Doku abgleichen.",
+    };
+  }
+  if (typeof raw !== "object" || Array.isArray(raw)) return null;
+  const o = raw as Record<string, unknown>;
+  const outline = asNullableString(o.outline ?? o.sketch ?? o.text, 2500);
+  if (!outline) return null;
+  return {
+    problemStillOpen: asBoolean(
+      o.problemStillOpen ?? o.applicable ?? o.open,
+      true
+    ),
+    outline,
+    vendors: asStringArray(o.vendors ?? o.hersteller, 6, 80),
+    caveats: asNullableString(o.caveats ?? o.hinweis, 500),
+  };
+}
+
 /** Normalize loose AI JSON before Zod (common type/length drift). */
 export function normalizeMariTicketAnalysisInput(raw: unknown): unknown {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
@@ -50,6 +89,7 @@ export function normalizeMariTicketAnalysisInput(raw: unknown): unknown {
       suggestions: [],
       recommendedStatus: null,
       nextReplyDraft: null,
+      solutionSketch: null,
     };
   }
   const o = raw as Record<string, unknown>;
@@ -107,8 +147,17 @@ export function normalizeMariTicketAnalysisInput(raw: unknown): unknown {
     suggestions: asStringArray(o.suggestions, 8, 300),
     recommendedStatus,
     nextReplyDraft: asNullableString(o.nextReplyDraft, 2000),
+    solutionSketch: normalizeSolutionSketch(o.solutionSketch),
   };
 }
+
+export const MariSolutionSketchSchema = z.object({
+  /** false wenn Fall bereits gelöst/obsolet — dann UI ausblenden */
+  problemStillOpen: z.boolean(),
+  outline: z.string().min(1).max(2500),
+  vendors: z.array(z.string().max(80)).max(6).default([]),
+  caveats: z.string().max(500).nullable().optional(),
+});
 
 export const MariTicketAnalysisSchema = z.object({
   summary: z.string().min(1).max(800),
@@ -136,11 +185,16 @@ export const MariTicketAnalysisSchema = z.object({
     .nullable()
     .optional(),
   nextReplyDraft: z.string().max(2000).nullable().optional(),
+  solutionSketch: MariSolutionSketchSchema.nullable().optional(),
 });
 
 export type MariTicketAnalysis = z.infer<typeof MariTicketAnalysisSchema>;
+export type MariSolutionSketch = z.infer<typeof MariSolutionSketchSchema>;
 
 const SYSTEM = `Du bist Buddy, Assistent für Maringo/MARI Support-Tickets (Schweiz, de-CH).
+Kontext der Agentur: SAP Business One (B1) + typische Add-ons (z.B. Coresystems/coresuite), Microsoft 365/Outlook, verwandte Hersteller.
+WICHTIG zu SAP: Es geht IMMER um SAP Business One — NIEMALS um SAP R/3, ECC oder S/4HANA. Keine S/4-/R3-Transaktionscodes, Fiori-Apps oder ECC-Hinweise vorschlagen.
+
 Analysiere das Ticket inkl. Verlauf und liefere ein JSON-Objekt genau in diesem Schema:
 {
   "summary": "string, max ~800 Zeichen",
@@ -158,18 +212,47 @@ Analysiere das Ticket inkl. Verlauf und liefere ein JSON-Objekt genau in diesem 
     "label": "optional",
     "reason": "optional"
   } | null,
-  "nextReplyDraft": "Kundenantwort DE oder null"
+  "nextReplyDraft": "Kundenantwort DE oder null",
+  "solutionSketch": {
+    "problemStillOpen": true|false,
+    "outline": "möglicher Lösungsansatz (Schritte, Checks, wo in öffentlicher Hersteller-Doku nachschlagen)",
+    "vendors": ["SAP Business One", "Microsoft", "Coresystems", "..."],
+    "caveats": "Unsicherheiten / bitte offizielle Docs prüfen — oder null"
+  } | null
 }
+
+Zu solutionSketch:
+- Nur wenn das Problem laut Status/Verlauf noch relevant/offen wirkt (nicht klar gelöst/geschlossen/obsolet). Sonst problemStillOpen=false und outline kurz «nicht nötig» ODER solutionSketch=null.
+- Skizziere einen plausiblen Lösungsansatz gestützt auf allgemein bekanntes, öffentlich verfügbares Herstellerwissen (SAP Business One Help/Notes-Themen, Microsoft Learn/Graph/Outlook, Coresystems/coresuite Doku, andere erkennbare Vendoren).
+- Keine erfundenen Note-/KB-/Ticket-Nummern. Keine internen Geheimnisse. Klar als Vorschlag kennzeichnen.
+- Bei SAP immer B1-Begriffe (z.B. Belegarten, Addon, DI-API, Service Layer) — nicht S/4.
+
+Falls Screenshots/Bilder mitgeliefert werden: Fehlerdialoge, Fehlermeldungen, UI-Zustände und relevante Details daraus in summary, missing[], suggestedTasks und solutionSketch einbeziehen.
 
 Status-IDs: 11 NEU, 1 Offen, 3 In Arbeit, 6 Warte auf Kunden, 7 Warte auf Hersteller, 14 Eskalation, 2 Gelöst.
 Keine erfundenen Fakten. score als Zahl. Arrays nie weglassen (leer ok). Antworte NUR als JSON-Objekt.`;
 
+export type AnalyzeMariTicketResult = MariTicketAnalysis & {
+  imagesAnalyzed: number;
+  imageNames: string[];
+};
+
 export async function analyzeMariTicket(
-  ticket: MariTicketDetail
-): Promise<MariTicketAnalysis> {
+  ticket: MariTicketDetail,
+  options?: {
+    images?: Array<{
+      dataUrl: string;
+      orgFilename: string;
+      mimeType: string;
+    }>;
+  }
+): Promise<AnalyzeMariTicketResult> {
   if (!hasOpenAIKey()) {
     throw new Error("OpenAI API-Key fehlt (Einstellungen → OpenAI).");
   }
+
+  const images = (options?.images || []).slice(0, 6);
+  const imageNames = images.map((i) => i.orgFilename).filter(Boolean);
 
   const timelineText = ticket.timeline
     .slice(-40)
@@ -182,16 +265,41 @@ export async function analyzeMariTicket(
   const userPrompt = `Ticket #${ticket.issueId}
 Betreff: ${ticket.briefDescription}
 Status: ${ticket.statusName} (${ticket.status})
+Typ: ${ticket.issueTypeName || "–"}
+Produkt: ${ticket.productName || "–"} (SAP-Kontext = Business One, nicht S/4)
 Priorität: ${ticket.priorityName}
-Kunde: ${ticket.cardCode || "–"}
+Kunde: ${ticket.cardCode || "–"}${ticket.addressMatchcode ? ` · ${ticket.addressMatchcode}` : ""}
+Supportgruppe: ${ticket.supportGroupName || "–"}
 Fällig: ${ticket.dueDate || "–"}
-Zuständig: ${ticket.responsible || "–"}
+Zuständig: ${ticket.handledByName || ticket.responsible || "–"}
+Screenshots/Bilder: ${
+    imageNames.length
+      ? `${imageNames.length} Datei(en): ${imageNames.join(", ")}`
+      : "keine"
+  }
 
 Anfragetext:
 ${ticket.requestTextPlain.slice(0, 6000)}
 
 Verlauf (chronologisch):
 ${timelineText.slice(0, 14000) || "(keine Positionen)"}`;
+
+  type ContentPart =
+    | { type: "text"; text: string }
+    | { type: "image_url"; image_url: { url: string; detail: "low" | "auto" } };
+
+  const userContent: string | ContentPart[] =
+    images.length === 0
+      ? userPrompt
+      : [
+          { type: "text", text: userPrompt },
+          ...images.map(
+            (img): ContentPart => ({
+              type: "image_url",
+              image_url: { url: img.dataUrl, detail: "low" },
+            })
+          ),
+        ];
 
   const client = getOpenAIClient();
   const model = getOpenAIModel();
@@ -201,7 +309,7 @@ ${timelineText.slice(0, 14000) || "(keine Positionen)"}`;
     response_format: { type: "json_object" },
     messages: [
       { role: "system", content: SYSTEM },
-      { role: "user", content: userPrompt },
+      { role: "user", content: userContent },
     ],
   });
 
@@ -226,5 +334,9 @@ ${timelineText.slice(0, 14000) || "(keine Positionen)"}`;
         : "AI-Antwort entsprach nicht dem Schema."
     );
   }
-  return result.data;
+  return {
+    ...result.data,
+    imagesAnalyzed: images.length,
+    imageNames,
+  };
 }

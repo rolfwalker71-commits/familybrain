@@ -40,6 +40,7 @@ import { cn } from "@/lib/utils";
 import { toSwissDate } from "@/lib/utils/dates";
 import type { MariTicketAnalysis } from "@/lib/mari/analyze-ticket";
 import type {
+  MariEmployeeOption,
   MariTicketDetail,
   MariTicketListItem,
   MariTimelineItem,
@@ -190,6 +191,8 @@ export function MaringoWorkspaceClient() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [detail, setDetail] = useState<MariTicketDetail | null>(null);
   const [analysis, setAnalysis] = useState<MariTicketAnalysis | null>(null);
+  const [imagesAnalyzed, setImagesAnalyzed] = useState(0);
+  const [imageNames, setImageNames] = useState<string[]>([]);
   const [listLoading, setListLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
@@ -197,8 +200,53 @@ export function MaringoWorkspaceClient() {
   const [error, setError] = useState<string | null>(null);
   const [configured, setConfigured] = useState(true);
   const [dueDraft, setDueDraft] = useState("");
+  const [employees, setEmployees] = useState<MariEmployeeOption[]>([]);
+  const [defaultHandledBy, setDefaultHandledBy] = useState("");
+  const [handledBy, setHandledBy] = useState("");
+  const [manualHandledBy, setManualHandledBy] = useState("");
+  const [handlerMode, setHandlerMode] = useState<"list" | "manual">("list");
 
   const statusParam = useMemo(() => statuses.join(","), [statuses]);
+
+  const effectiveHandledBy = useMemo(() => {
+    if (handlerMode === "manual") {
+      return manualHandledBy.trim().toUpperCase();
+    }
+    return (handledBy || defaultHandledBy).trim().toUpperCase();
+  }, [handlerMode, manualHandledBy, handledBy, defaultHandledBy]);
+
+  const [listHandledBy, setListHandledBy] = useState("");
+  useEffect(() => {
+    if (handlerMode !== "manual") {
+      setListHandledBy(effectiveHandledBy);
+      return;
+    }
+    const t = window.setTimeout(() => {
+      setListHandledBy(effectiveHandledBy);
+    }, 450);
+    return () => window.clearTimeout(t);
+  }, [handlerMode, effectiveHandledBy]);
+
+  const loadEmployees = useCallback(async () => {
+    try {
+      const res = await fetch("/api/maringo/employees");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return;
+      const list = Array.isArray(data.employees)
+        ? (data.employees as MariEmployeeOption[])
+        : [];
+      setEmployees(list);
+      const def = String(data.defaultEmployeeNumber || "")
+        .trim()
+        .toUpperCase();
+      if (def) {
+        setDefaultHandledBy(def);
+        setHandledBy((prev) => prev || def);
+      }
+    } catch {
+      /* optional — manuelle Eingabe bleibt möglich */
+    }
+  }, []);
 
   const loadList = useCallback(async () => {
     setListLoading(true);
@@ -207,6 +255,7 @@ export function MaringoWorkspaceClient() {
       const q = new URLSearchParams();
       if (statusParam) q.set("status", statusParam);
       if (overdueOnly) q.set("overdue", "1");
+      if (listHandledBy) q.set("handledBy", listHandledBy);
       const res = await fetch(`/api/maringo/tickets?${q}`);
       const data = await res.json().catch(() => ({}));
       if (res.status === 503) {
@@ -218,17 +267,26 @@ export function MaringoWorkspaceClient() {
       setConfigured(true);
       if (!res.ok) throw new Error(data.error || "Liste fehlgeschlagen");
       setTickets(Array.isArray(data.tickets) ? data.tickets : []);
+      if (typeof data.defaultHandledBy === "string" && data.defaultHandledBy) {
+        setDefaultHandledBy(String(data.defaultHandledBy).toUpperCase());
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setTickets([]);
     } finally {
       setListLoading(false);
     }
-  }, [statusParam, overdueOnly]);
+  }, [statusParam, overdueOnly, listHandledBy]);
+
+  useEffect(() => {
+    void loadEmployees();
+  }, [loadEmployees]);
 
   const loadDetail = useCallback(async (id: number) => {
     setDetailLoading(true);
     setAnalysis(null);
+    setImagesAnalyzed(0);
+    setImageNames([]);
     setError(null);
     try {
       const res = await fetch(`/api/maringo/tickets/${id}`);
@@ -277,6 +335,19 @@ export function MaringoWorkspaceClient() {
   function selectAllWorkStatuses() {
     setStatuses([...WORK_STATUS_IDS]);
     setOverdueOnly(false);
+    setHandlerMode("list");
+    if (defaultHandledBy) setHandledBy(defaultHandledBy);
+    setManualHandledBy("");
+  }
+
+  function onHandlerSelectChange(value: string) {
+    if (value === "__manual__") {
+      setHandlerMode("manual");
+      setManualHandledBy((prev) => prev || handledBy || defaultHandledBy);
+      return;
+    }
+    setHandlerMode("list");
+    setHandledBy(value);
   }
 
   async function runAnalyze() {
@@ -290,6 +361,12 @@ export function MaringoWorkspaceClient() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Analyse fehlgeschlagen");
       setAnalysis(data.analysis as MariTicketAnalysis);
+      setImagesAnalyzed(Number(data.imagesAnalyzed) || 0);
+      setImageNames(
+        Array.isArray(data.imageNames)
+          ? data.imageNames.map((n: unknown) => String(n))
+          : []
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -326,7 +403,7 @@ export function MaringoWorkspaceClient() {
     <div className="min-w-0 space-y-4 pb-10">
       <PageHeader
         title="Maringo Support"
-        description="Meine Support-Tickets — Liste, Verlauf und AI-Analyse."
+        description="Support-Tickets — Liste, Verlauf und AI-Analyse (auch fremde Bearbeiter)."
         icon={pageVisuals.maringo.icon}
         tone={pageVisuals.maringo.tone}
       />
@@ -445,6 +522,63 @@ export function MaringoWorkspaceClient() {
                   <StatusChip status={id} className="cursor-pointer" />
                 </button>
               ))}
+            </div>
+            <div className="space-y-1.5 pt-1">
+              <Label
+                htmlFor="mari-handler"
+                className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
+              >
+                Bearbeiter
+              </Label>
+              <select
+                id="mari-handler"
+                className="h-8 w-full rounded-lg border border-border/70 bg-background px-2 text-[12px] outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
+                value={
+                  handlerMode === "manual"
+                    ? "__manual__"
+                    : handledBy || defaultHandledBy || ""
+                }
+                onChange={(e) => onHandlerSelectChange(e.target.value)}
+                disabled={!configured}
+              >
+                {!handledBy && !defaultHandledBy ? (
+                  <option value="">Laden…</option>
+                ) : null}
+                {employees.map((e) => (
+                  <option key={e.employeeNumber} value={e.employeeNumber}>
+                    {e.matchcode} ({e.employeeNumber})
+                    {defaultHandledBy &&
+                    e.employeeNumber === defaultHandledBy
+                      ? " · ich"
+                      : ""}
+                  </option>
+                ))}
+                {handledBy &&
+                !employees.some((e) => e.employeeNumber === handledBy) ? (
+                  <option value={handledBy}>{handledBy}</option>
+                ) : null}
+                <option value="__manual__">Andere Nummer…</option>
+              </select>
+              {handlerMode === "manual" ? (
+                <Input
+                  value={manualHandledBy}
+                  onChange={(e) =>
+                    setManualHandledBy(e.target.value.toUpperCase())
+                  }
+                  placeholder="z.B. M2055"
+                  className="h-8 text-[12px]"
+                  spellCheck={false}
+                  autoComplete="off"
+                />
+              ) : null}
+              {effectiveHandledBy &&
+              defaultHandledBy &&
+              effectiveHandledBy !== defaultHandledBy ? (
+                <p className="text-[10px] text-muted-foreground">
+                  Ansicht: {effectiveHandledBy} (nicht deine Nummer{" "}
+                  {defaultHandledBy})
+                </p>
+              ) : null}
             </div>
           </div>
 
@@ -786,6 +920,19 @@ export function MaringoWorkspaceClient() {
                         <Sparkles className="size-3.5" />
                         AI-Zusammenfassung
                       </p>
+                      {imagesAnalyzed > 0 ? (
+                        <p className="text-[11px] text-orange-900/80">
+                          Inkl. {imagesAnalyzed} Screenshot
+                          {imagesAnalyzed === 1 ? "" : "s"}
+                          {imageNames.length
+                            ? `: ${imageNames.slice(0, 4).join(", ")}`
+                            : ""}
+                        </p>
+                      ) : (
+                        <p className="text-[11px] text-muted-foreground">
+                          Keine Bild-Anhänge für die Analyse geladen (nur Text).
+                        </p>
+                      )}
                       <p className="leading-relaxed">{analysis.summary}</p>
                       <div className="rounded-xl border border-orange-200/60 bg-white/70 px-3 py-2">
                         <p className="font-semibold">
@@ -832,6 +979,34 @@ export function MaringoWorkspaceClient() {
                               <li key={s}>{s}</li>
                             ))}
                           </ul>
+                        </div>
+                      ) : null}
+                      {analysis.solutionSketch &&
+                      analysis.solutionSketch.problemStillOpen ? (
+                        <div className="rounded-xl border border-sky-200/80 bg-sky-50/70 px-3 py-2.5">
+                          <p className="font-semibold text-sky-950">
+                            Möglicher Lösungsansatz
+                          </p>
+                          {analysis.solutionSketch.vendors.length > 0 ? (
+                            <p className="mt-1 text-[11px] text-sky-900/80">
+                              Hersteller:{" "}
+                              {analysis.solutionSketch.vendors.join(" · ")}
+                            </p>
+                          ) : null}
+                          <pre className="mt-2 whitespace-pre-wrap font-sans text-[12px] leading-relaxed text-sky-950/95">
+                            {analysis.solutionSketch.outline}
+                          </pre>
+                          {analysis.solutionSketch.caveats ? (
+                            <p className="mt-2 text-[11px] text-sky-900/70">
+                              {analysis.solutionSketch.caveats}
+                            </p>
+                          ) : (
+                            <p className="mt-2 text-[11px] text-sky-900/70">
+                              Vorschlag aus allgemein verfügbarem
+                              Herstellerwissen (u.a. SAP Business One, nicht
+                              S/4) — bitte mit offizieller Doku abgleichen.
+                            </p>
+                          )}
                         </div>
                       ) : null}
                       {analysis.nextReplyDraft ? (

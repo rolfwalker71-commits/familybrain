@@ -274,9 +274,11 @@ curl -sS -X POST -H "Authorization: Bearer $TOKEN" \
 ## Buddy-Integration
 
 1. Credentials: Einstellungen → Maringo (oder Env).
-2. Client: `lib/mari/*` — Token-Cache, SQL-Liste, GET/PATCH Issue, Timeline, AI-Analyse.
-3. UI: `/maringo` — Liste mit Status-Multiselect, Detail + Verlauf, Status/Fälligkeit ändern, AI.
+2. Client: `lib/mari/*` — Token-Cache, SQL-Liste, GET/PATCH Issue, Timeline, Anhänge (Vision), AI-Analyse.
+3. UI: `/maringo` — Liste mit Status-Multiselect + Bearbeiter-Wahl, Detail + Verlauf, Status/Fälligkeit ändern, AI (Text + Screenshots).
 4. Keine Secrets committen; SystemTools-SQL nur lesend.
+
+**AI-Screenshots:** `GET /api/SupportIssueAttachment/{id}` liefert Base64; bis zu 4 Bilder (png/jpeg/webp, kleine GIF-Signaturen werden übersprungen) gehen mit Vision in die Analyse.
 
 Menü: `/maringo` («Maringo Support»).
 ---

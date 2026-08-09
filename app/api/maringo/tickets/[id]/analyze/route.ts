@@ -4,11 +4,14 @@ import { isAuthError, requireAuth } from "@/lib/auth/current-user";
 import { hasOpenAIKey } from "@/lib/ai/client";
 import { MariApiError } from "@/lib/mari/client";
 import { hasMariConfig } from "@/lib/mari/config";
+import { listMariImageAttachmentsForAi } from "@/lib/mari/attachments";
 import { analyzeMariTicket } from "@/lib/mari/analyze-ticket";
 import { getTicketDetail } from "@/lib/mari/tickets";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+/** Vision + Attachments können länger dauern */
+export const maxDuration = 120;
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -37,8 +40,26 @@ export async function POST(_request: Request, context: Ctx) {
 
   try {
     const ticket = await getTicketDetail(id);
-    const analysis = await analyzeMariTicket(ticket);
-    return NextResponse.json({ analysis, issueId: id });
+    let images: Awaited<ReturnType<typeof listMariImageAttachmentsForAi>> = [];
+    try {
+      images = await listMariImageAttachmentsForAi(id, { maxImages: 4 });
+    } catch {
+      images = [];
+    }
+    const analysis = await analyzeMariTicket(ticket, {
+      images: images.map((img) => ({
+        dataUrl: img.dataUrl,
+        orgFilename: img.orgFilename,
+        mimeType: img.mimeType,
+      })),
+    });
+    const { imagesAnalyzed, imageNames, ...payload } = analysis;
+    return NextResponse.json({
+      analysis: payload,
+      issueId: id,
+      imagesAnalyzed,
+      imageNames,
+    });
   } catch (err) {
     const message =
       err instanceof MariApiError

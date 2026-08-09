@@ -36,3 +36,37 @@ test("clips overlong summary and clamps score", () => {
   assert.ok(r.data.summary.length <= 800);
   assert.equal(r.data.completeness.score, 100);
 });
+
+test("normalizes solutionSketch and keeps schema valid", () => {
+  const n = normalizeMariTicketAnalysisInput({
+    summary: "Open issue",
+    completeness: { score: 50, missing: [] },
+    suggestedTasks: [],
+    suggestions: [],
+    solutionSketch: {
+      problemStillOpen: "true",
+      outline: "In SAP Business One unter Administration prüfen…",
+      vendors: ["SAP Business One", "Coresystems"],
+      caveats: null,
+    },
+  });
+  const r = MariTicketAnalysisSchema.safeParse(n);
+  assert.equal(r.success, true);
+  if (!r.success) return;
+  assert.equal(r.data.solutionSketch?.problemStillOpen, true);
+  assert.match(r.data.solutionSketch!.outline, /Business One/);
+});
+
+test("accepts string solutionSketch", () => {
+  const n = normalizeMariTicketAnalysisInput({
+    summary: "Open issue",
+    completeness: { score: 40, missing: [] },
+    suggestedTasks: [],
+    suggestions: [],
+    solutionSketch: "Kurz prüfen und neu starten.",
+  });
+  const r = MariTicketAnalysisSchema.safeParse(n);
+  assert.equal(r.success, true);
+  if (!r.success) return;
+  assert.equal(r.data.solutionSketch?.problemStillOpen, true);
+});
