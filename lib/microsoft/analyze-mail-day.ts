@@ -30,6 +30,21 @@ export const MsDayTaskSuggestionSchema = z.object({
   reason: z.string().max(400).optional(),
 });
 
+export const ExistingDayTaskRefSchema = z.object({
+  id: z.string().min(1).max(200),
+  title: z.string().min(1).max(300),
+  status: z.enum(["open", "done"]),
+  doneAt: z.string().max(80).nullable().optional(),
+  href: z.string().max(500).nullable().optional(),
+  match: z.enum(["title", "theme", "notes"]),
+  source: z.enum(["todo", "planner", "google"]).nullable().optional(),
+});
+
+/** Apply-Body: AI-Felder + optionaler To-Do-Treffer. */
+export const MsDayTaskApplySchema = MsDayTaskSuggestionSchema.extend({
+  existingTask: ExistingDayTaskRefSchema.nullable().optional(),
+});
+
 export const MsDayEventSuggestionSchema = z.object({
   title: z.string().min(1).max(200),
   date: Ymd,
@@ -76,11 +91,19 @@ export const MsDayMailAnalysisSchema = z.object({
   clusters: z.array(MsDayClusterSchema).max(16),
 });
 
-export type MsDayTaskSuggestion = z.infer<typeof MsDayTaskSuggestionSchema>;
+export type ExistingDayTaskRef = z.infer<typeof ExistingDayTaskRefSchema>;
+
+export type MsDayTaskSuggestion = z.infer<typeof MsDayTaskSuggestionSchema> & {
+  /** Treffer in Google Tasks / Outlook To Do (nach Analyse angereichert). */
+  existingTask?: ExistingDayTaskRef | null;
+};
 export type MsDayEventSuggestion = z.infer<typeof MsDayEventSuggestionSchema>;
 export type MsDayReplyDraft = z.infer<typeof MsDayReplyDraftSchema>;
-export type MsDayCluster = z.infer<typeof MsDayClusterSchema>;
+export type MsDayCluster = z.infer<typeof MsDayClusterSchema> & {
+  tasks: MsDayTaskSuggestion[];
+};
 export type MsDayMailAnalysis = z.infer<typeof MsDayMailAnalysisSchema> & {
+  clusters: MsDayCluster[];
   tasks: MsDayTaskSuggestion[];
   events: MsDayEventSuggestion[];
   replies: MsDayReplyDraft[];

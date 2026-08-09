@@ -24,6 +24,8 @@ import {
   resolveMailAnalysisRange,
   type MailAnalysisRange,
 } from "@/lib/mail/mail-analysis-range";
+import { attachExistingTasksToAnalysis } from "@/lib/mail/day-task-catalog";
+import { listGoogleTasksForMatch } from "@/lib/google/tasks";
 import {
   isGoogleMailConnected,
   resolveGoogleUserId,
@@ -113,6 +115,7 @@ async function runAnalysisJob(userId: number, range: MailAnalysisRange) {
       notifyDone(label, analysis);
       return;
     }
+    const catalogPromise = listGoogleTasksForMatch(userId).catch(() => []);
     const analysis = await analyzeMicrosoftMailDay({
       todayIso: mail.dayIso,
       fromYmd: mail.fromYmd,
@@ -120,8 +123,12 @@ async function runAnalysisJob(userId: number, range: MailAnalysisRange) {
       inbox: mail.inbox,
       sent: mail.sent,
     });
-    finishGoogleMailDayJobOk(userId, range, mailPayload, analysis);
-    notifyDone(label, analysis);
+    const enriched = attachExistingTasksToAnalysis(
+      analysis,
+      await catalogPromise
+    );
+    finishGoogleMailDayJobOk(userId, range, mailPayload, enriched);
+    notifyDone(label, enriched);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     finishGoogleMailDayJobError(userId, range, message);

@@ -5,7 +5,7 @@ import { ensureInitialized } from "@/lib/db/migrations";
 import {
   MsDayEventSuggestionSchema,
   MsDayReplyDraftSchema,
-  MsDayTaskSuggestionSchema,
+  MsDayTaskApplySchema,
 } from "@/lib/microsoft/analyze-mail-day";
 import { createGoogleCalendarEvent } from "@/lib/google/calendar-write";
 import { listGoogleCalendarsForUser } from "@/lib/google/calendars";
@@ -24,7 +24,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const BodySchema = z.object({
-  tasks: z.array(MsDayTaskSuggestionSchema).max(12).optional().default([]),
+  tasks: z.array(MsDayTaskApplySchema).max(12).optional().default([]),
   events: z.array(MsDayEventSuggestionSchema).max(8).optional().default([]),
   replies: z.array(MsDayReplyDraftSchema).max(8).optional().default([]),
 });
@@ -97,6 +97,10 @@ export async function POST(request: Request) {
   }> = [];
 
   for (const task of body.tasks) {
+    if (task.existingTask?.id) {
+      // Bereits in Google Tasks — nicht erneut anlegen.
+      continue;
+    }
     const counterpart = [
       task.company?.trim() || null,
       task.counterpartEmail?.trim() || null,

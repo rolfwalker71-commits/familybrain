@@ -8,6 +8,7 @@ import {
   CalendarClock,
   Cloud,
   Inbox,
+  LayoutGrid,
   ListChecks,
   Mail,
   RefreshCw,
@@ -34,6 +35,7 @@ import { formatTokenUsageLine } from "@/lib/ai/usage-cost";
 import type { AiTokenUsage } from "@/lib/ai/usage-cost";
 import { toSwissDate } from "@/lib/utils/dates";
 import { MicrosoftMailInboxPanel } from "@/components/microsoft/microsoft-mail-inbox-panel";
+import { MicrosoftPlannerPanel } from "@/components/microsoft/microsoft-planner-panel";
 import {
   detectReplyLanguage,
   type ReplyLang,
@@ -93,10 +95,16 @@ function clampMailRange(from: string, to: string): { from: string; to: string } 
   return { from: f, to: t };
 }
 
-type Tab = "calendar" | "inbox" | "triage" | "day";
+type Tab = "calendar" | "inbox" | "triage" | "day" | "planner";
 
 function parseTab(raw: string | null): Tab {
-  if (raw === "inbox" || raw === "triage" || raw === "day" || raw === "calendar") {
+  if (
+    raw === "calendar" ||
+    raw === "inbox" ||
+    raw === "triage" ||
+    raw === "day" ||
+    raw === "planner"
+  ) {
     return raw;
   }
   if (raw === "mail") return "day";
@@ -143,6 +151,15 @@ type DayTask = {
   senderInitials?: string | null;
   theme?: string | null;
   reason?: string;
+  existingTask?: {
+    id: string;
+    title: string;
+    status: "open" | "done";
+    doneAt?: string | null;
+    href?: string | null;
+    match?: "title" | "theme" | "notes";
+    source?: "todo" | "planner" | "google" | null;
+  } | null;
 };
 
 type DayEventSug = {
@@ -457,8 +474,9 @@ export function MicrosoftDayClient() {
         usage: a.usage || null,
       });
       const next: PickState = { tasks: {}, events: {}, replies: {} };
-      (a.tasks || []).forEach((_, i) => {
-        next.tasks[i] = true;
+      (a.tasks || []).forEach((t, i) => {
+        // Bereits in To Do → nicht erneut übernehmen (erledigt = OK).
+        next.tasks[i] = !t.existingTask?.id;
       });
       (a.events || []).forEach((_, i) => {
         next.events[i] = true;
@@ -899,7 +917,7 @@ export function MicrosoftDayClient() {
     <div className="min-w-0 space-y-5 pb-10">
       <PageHeader
         title="Microsoft 365"
-        description="Outlook-Mails analysieren, Triage und Kalender-Review — Tagesanalyse und Slot-Suche zusätzlich."
+        description="Outlook-Mails, Planner-Aufgaben, Triage und Kalender — Tagesanalyse und Slot-Suche zusätzlich."
         icon={Cloud}
         tone="blue"
       />
@@ -997,6 +1015,21 @@ export function MicrosoftDayClient() {
                 <span className="inline-flex items-center gap-1.5">
                   <Mail className="size-3.5" strokeWidth={APP_ICON_STROKE} />
                   Tagesanalyse
+                </span>
+              </button>
+              <button
+                type="button"
+                className={cn(
+                  "rounded-md px-3 py-1.5 text-sm font-medium",
+                  tab === "planner"
+                    ? "bg-muted text-foreground"
+                    : "text-muted-foreground"
+                )}
+                onClick={() => setTab("planner")}
+              >
+                <span className="inline-flex items-center gap-1.5">
+                  <LayoutGrid className="size-3.5" strokeWidth={APP_ICON_STROKE} />
+                  Planner
                 </span>
               </button>
             </div>
@@ -1184,6 +1217,15 @@ export function MicrosoftDayClient() {
               openMessageId={openMailId}
               onPendingChange={setInboxPending}
             />
+          ) : tab === "planner" ? (
+            <section className="space-y-3">
+              <h2 className="text-[15px] font-semibold">Microsoft Planner</h2>
+              <p className="text-sm text-muted-foreground">
+                Aufgaben, die dir zugewiesen sind — erledigen oder in einen
+                anderen Bucket im gleichen Plan verschieben.
+              </p>
+              <MicrosoftPlannerPanel />
+            </section>
           ) : (
             <section className="space-y-4">
               <div className="flex flex-wrap items-end justify-between gap-3">
@@ -1351,6 +1393,8 @@ export function MicrosoftDayClient() {
                                 </p>
                                 {cluster.tasks.map((t, li) => {
                                   const i = flatTaskIndex(ci, li);
+                                  const existing = t.existingTask;
+                                  const matched = Boolean(existing?.id);
                                   return (
                                     <label
                                       key={`t-${ci}-${li}`}
@@ -1359,7 +1403,12 @@ export function MicrosoftDayClient() {
                                       <input
                                         type="checkbox"
                                         className="mt-1"
-                                        checked={Boolean(picks.tasks[i])}
+                                        disabled={matched}
+                                        checked={
+                                          matched
+                                            ? false
+                                            : Boolean(picks.tasks[i])
+                                        }
                                         onChange={(e) =>
                                           setPicks((prev) => ({
                                             ...prev,
@@ -1374,16 +1423,53 @@ export function MicrosoftDayClient() {
                                         <span className="block text-sm font-medium">
                                           {t.title}
                                         </span>
-                                        <span className="block text-[11px] text-muted-foreground">
-                                          {[
-                                            t.dueDate
-                                              ? `fällig ${toSwissDate(t.dueDate)}`
-                                              : null,
-                                            t.reason,
-                                          ]
-                                            .filter(Boolean)
-                                            .join(" · ")}
-                                        </span>
+                                        {existing ? (
+                                          <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px]">
+                                            <Badge
+                                              variant={
+                                                existing.status === "done"
+                                                  ? "secondary"
+                                                  : "outline"
+                                              }
+                                              className="text-[10px]"
+                                            >
+                                              {existing.status === "done"
+                                                ? existing.source === "planner"
+                                                  ? "Erledigt in Planner"
+                                                  : "Erledigt in To Do"
+                                                : existing.source === "planner"
+                                                  ? "Offen in Planner"
+                                                  : "Offen in To Do"}
+                                            </Badge>
+                                            <span className="text-muted-foreground">
+                                              {existing.title}
+                                            </span>
+                                            {existing.href ? (
+                                              <a
+                                                href={existing.href}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="text-primary underline-offset-2 hover:underline"
+                                                onClick={(e) =>
+                                                  e.stopPropagation()
+                                                }
+                                              >
+                                                öffnen
+                                              </a>
+                                            ) : null}
+                                          </span>
+                                        ) : (
+                                          <span className="block text-[11px] text-muted-foreground">
+                                            {[
+                                              t.dueDate
+                                                ? `fällig ${toSwissDate(t.dueDate)}`
+                                                : null,
+                                              t.reason,
+                                            ]
+                                              .filter(Boolean)
+                                              .join(" · ")}
+                                          </span>
+                                        )}
                                       </span>
                                     </label>
                                   );

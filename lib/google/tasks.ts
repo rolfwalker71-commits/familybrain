@@ -146,6 +146,88 @@ export async function listUpcomingGoogleTasks(
   return out;
 }
 
+/** Offene + kürzlich erledigte Tasks für Tagesanalyse-Abgleich. */
+export async function listGoogleTasksForMatch(
+  userId: number,
+  options?: {
+    completedWithinDays?: number;
+    maxPerList?: number;
+    request?: Request | null;
+  }
+): Promise<
+  Array<{
+    id: string;
+    title: string;
+    notes: string | null;
+    status: "open" | "done";
+    doneAt: string | null;
+    href: string | null;
+  }>
+> {
+  if (!isGoogleMailConnected(userId) || !hasGoogleTasksScope(userId)) {
+    return [];
+  }
+  const completedWithinDays = options?.completedWithinDays ?? 30;
+  const maxPerList = options?.maxPerList ?? 100;
+  const cutoff = new Date();
+  cutoff.setUTCDate(cutoff.getUTCDate() - completedWithinDays);
+  const cutoffMs = cutoff.getTime();
+
+  const auth = await getAuthedGoogleClient(userId, options?.request);
+  const tasksApi = google.tasks({ version: "v1", auth });
+  const lists = await listGoogleTaskLists(userId, options?.request);
+  if (lists.length === 0) return [];
+
+  const out: Array<{
+    id: string;
+    title: string;
+    notes: string | null;
+    status: "open" | "done";
+    doneAt: string | null;
+    href: string | null;
+  }> = [];
+
+  for (const list of lists) {
+    let pageToken: string | undefined;
+    let taken = 0;
+    do {
+      const res = await tasksApi.tasks.list({
+        tasklist: list.id,
+        showCompleted: true,
+        showHidden: true,
+        maxResults: 100,
+        pageToken,
+      });
+      for (const t of res.data.items || []) {
+        if (!t.id || t.deleted) continue;
+        const title = (t.title || "").trim();
+        if (!title) continue;
+        const isDone = (t.status || "").toLowerCase() === "completed";
+        const doneAt = t.completed || null;
+        if (isDone) {
+          if (!doneAt) continue;
+          const doneMs = Date.parse(doneAt);
+          if (Number.isFinite(doneMs) && doneMs < cutoffMs) continue;
+        }
+        out.push({
+          id: t.id,
+          title,
+          notes: t.notes?.trim() || null,
+          status: isDone ? "done" : "open",
+          doneAt,
+          href: "https://tasks.google.com/",
+        });
+        taken += 1;
+        if (taken >= maxPerList) break;
+      }
+      if (taken >= maxPerList) break;
+      pageToken = res.data.nextPageToken || undefined;
+    } while (pageToken);
+  }
+
+  return out;
+}
+
 export async function createGoogleTask(
   userId: number,
   input: {
@@ -189,6 +271,55 @@ export async function createGoogleTask(
     notes: res.data.notes || input.notes || null,
     dueDate,
     status: res.data.status || "needsAction",
+    overdue: Boolean(dueDate && dueDate < today),
+    href: "https://tasks.google.com/",
+  };
+}
+
+/** Erledigen und/oder Fälligkeit neu setzen. */
+export async function updateGoogleTask(
+  userId: number,
+  input: {
+    taskId: string;
+    listId: string;
+    status?: "needsAction" | "completed";
+    dueDate?: string | null;
+  },
+  request?: Request | null
+): Promise<GoogleTaskItem> {
+  if (!hasGoogleTasksScope(userId)) {
+    throw new Error(
+      "Google Tasks-Recht fehlt — bitte unter Konto neu verbinden."
+    );
+  }
+  const auth = await getAuthedGoogleClient(userId, request);
+  const tasksApi = google.tasks({ version: "v1", auth });
+  const body: {
+    id: string;
+    status?: string;
+    due?: string | null;
+  } = { id: input.taskId };
+  if (input.status) body.status = input.status;
+  if (input.dueDate !== undefined) {
+    body.due = input.dueDate
+      ? `${input.dueDate}T00:00:00.000Z`
+      : null;
+  }
+  const res = await tasksApi.tasks.patch({
+    tasklist: input.listId,
+    task: input.taskId,
+    requestBody: body,
+  });
+  const today = zurichYmd();
+  const dueDate = dueDateFromTask(res.data.due);
+  return {
+    id: res.data.id || input.taskId,
+    listId: input.listId,
+    listTitle: "",
+    title: (res.data.title || "").trim() || "Aufgabe",
+    notes: res.data.notes?.trim() || null,
+    dueDate,
+    status: res.data.status || input.status || "needsAction",
     overdue: Boolean(dueDate && dueDate < today),
     href: "https://tasks.google.com/",
   };

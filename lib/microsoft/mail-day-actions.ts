@@ -175,11 +175,7 @@ type TodoList = {
   wellknownListName?: string | null;
 };
 
-/** Microsoft To Do Aufgabe (O365). */
-export async function createOutlookTodoTask(
-  userId: number,
-  input: CreateOutlookTodoInput
-): Promise<CreatedOutlookTodo> {
+async function resolveOutlookTodoListId(userId: number): Promise<string> {
   const lists = await graphJson<{ value?: TodoList[] }>(
     userId,
     "/me/todo/lists?$top=50"
@@ -193,6 +189,286 @@ export async function createOutlookTodoTask(
       "Keine Microsoft To Do-Liste gefunden. Bitte Microsoft 365 neu verbinden (Scope Tasks.ReadWrite)."
     );
   }
+  return list.id;
+}
+
+type GraphTodoTask = {
+  id?: string;
+  title?: string;
+  status?: string;
+  body?: { content?: string | null; contentType?: string } | null;
+  dueDateTime?: { dateTime?: string | null; timeZone?: string | null } | null;
+  completedDateTime?: { dateTime?: string | null } | null;
+};
+
+function mapOutlookTodoStatus(
+  status: string | undefined
+): "open" | "done" {
+  return (status || "").toLowerCase() === "completed" ? "done" : "open";
+}
+
+function todoDueYmd(
+  due: GraphTodoTask["dueDateTime"]
+): string | null {
+  const raw = due?.dateTime;
+  if (!raw) return null;
+  return raw.slice(0, 10);
+}
+
+export type OutlookTodoTaskItem = {
+  id: string;
+  listId: string;
+  title: string;
+  notes: string | null;
+  dueDate: string | null;
+  status: "open" | "done";
+  overdue: boolean;
+  href: string;
+};
+
+function zurichYmdTodo(d = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Zurich",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
+}
+
+function addDaysYmdTodo(iso: string, days: number): string {
+  const d = new Date(`${iso}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Offene To-Do-Aufgaben: überfällig + Horizont + undatiert (begrenzt). */
+export async function listOutlookTodoTasksUpcoming(
+  userId: number,
+  options?: { horizonDays?: number; undatedLimit?: number; maxPerList?: number }
+): Promise<OutlookTodoTaskItem[]> {
+  const horizonDays = options?.horizonDays ?? 7;
+  const undatedLimit = options?.undatedLimit ?? 8;
+  const maxPerList = options?.maxPerList ?? 100;
+  const listId = await resolveOutlookTodoListId(userId);
+  const today = zurichYmdTodo();
+  const horizon = addDaysYmdTodo(today, horizonDays);
+
+  const out: OutlookTodoTaskItem[] = [];
+  let undated = 0;
+
+  type TodoPage = {
+    value?: GraphTodoTask[];
+    "@odata.nextLink"?: string;
+  };
+
+  let url: string | null =
+    `/me/todo/lists/${encodeURIComponent(listId)}/tasks?$top=${maxPerList}&$filter=status ne 'completed'&$orderby=dueDateTime/dateTime asc`;
+
+  // Filter may fail on some tenants — fallback without filter.
+  try {
+    while (url && out.length < maxPerList) {
+      const page: TodoPage = await graphJson<TodoPage>(userId, url);
+      for (const t of page.value || []) {
+        if (!t.id || !(t.title || "").trim()) continue;
+        if (mapOutlookTodoStatus(t.status) === "done") continue;
+        const dueDate = todoDueYmd(t.dueDateTime);
+        if (!dueDate) {
+          if (undated >= undatedLimit) continue;
+          undated += 1;
+          out.push({
+            id: t.id,
+            listId,
+            title: (t.title || "").trim(),
+            notes: t.body?.content?.trim() || null,
+            dueDate: null,
+            status: "open",
+            overdue: false,
+            href: "https://to-do.office.com/tasks/",
+          });
+          continue;
+        }
+        if (dueDate > horizon) continue;
+        out.push({
+          id: t.id,
+          listId,
+          title: (t.title || "").trim(),
+          notes: t.body?.content?.trim() || null,
+          dueDate,
+          status: "open",
+          overdue: dueDate < today,
+          href: "https://to-do.office.com/tasks/",
+        });
+      }
+      const next: string | undefined = page["@odata.nextLink"];
+      url = next
+        ? next.replace("https://graph.microsoft.com/v1.0", "")
+        : null;
+      if ((page.value || []).length < maxPerList) break;
+    }
+  } catch {
+    const page: TodoPage = await graphJson<TodoPage>(
+      userId,
+      `/me/todo/lists/${encodeURIComponent(listId)}/tasks?$top=${maxPerList}`
+    );
+    for (const t of page.value || []) {
+      if (!t.id || !(t.title || "").trim()) continue;
+      if (mapOutlookTodoStatus(t.status) === "done") continue;
+      const dueDate = todoDueYmd(t.dueDateTime);
+      if (!dueDate) {
+        if (undated >= undatedLimit) continue;
+        undated += 1;
+      } else if (dueDate > horizon) {
+        continue;
+      }
+      out.push({
+        id: t.id,
+        listId,
+        title: (t.title || "").trim(),
+        notes: t.body?.content?.trim() || null,
+        dueDate,
+        status: "open",
+        overdue: Boolean(dueDate && dueDate < today),
+        href: "https://to-do.office.com/tasks/",
+      });
+    }
+  }
+
+  out.sort((a, b) => {
+    if (a.overdue !== b.overdue) return a.overdue ? -1 : 1;
+    const da = a.dueDate || "9999-99-99";
+    const db = b.dueDate || "9999-99-99";
+    const c = da.localeCompare(db);
+    if (c !== 0) return c;
+    return a.title.localeCompare(b.title, "de");
+  });
+  return out;
+}
+
+export async function updateOutlookTodoTask(
+  userId: number,
+  input: {
+    taskId: string;
+    listId?: string | null;
+    status?: "notStarted" | "completed";
+    dueDate?: string | null;
+  }
+): Promise<OutlookTodoTaskItem> {
+  const listId = input.listId?.trim() || (await resolveOutlookTodoListId(userId));
+  const body: Record<string, unknown> = {};
+  if (input.status) body.status = input.status;
+  if (input.dueDate !== undefined) {
+    if (input.dueDate && /^\d{4}-\d{2}-\d{2}$/.test(input.dueDate)) {
+      body.dueDateTime = {
+        dateTime: `${input.dueDate}T17:00:00`,
+        timeZone: "Europe/Zurich",
+      };
+    } else {
+      body.dueDateTime = null;
+    }
+  }
+  if (Object.keys(body).length === 0) {
+    throw new Error("Keine Änderung angegeben.");
+  }
+  const updated = await graphJson<GraphTodoTask>(
+    userId,
+    `/me/todo/lists/${encodeURIComponent(listId)}/tasks/${encodeURIComponent(input.taskId)}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }
+  );
+  const dueDate = todoDueYmd(updated.dueDateTime);
+  const today = zurichYmdTodo();
+  const status = mapOutlookTodoStatus(updated.status);
+  return {
+    id: updated.id || input.taskId,
+    listId,
+    title: (updated.title || "").trim() || "Aufgabe",
+    notes: updated.body?.content?.trim() || null,
+    dueDate,
+    status,
+    overdue: Boolean(status === "open" && dueDate && dueDate < today),
+    href: "https://to-do.office.com/tasks/",
+  };
+}
+
+/** Offene + kürzlich erledigte To-Do-Aufgaben für Tagesanalyse-Abgleich. */
+export async function listOutlookTodoTasksForMatch(
+  userId: number,
+  options?: { completedWithinDays?: number; maxPerList?: number }
+): Promise<
+  Array<{
+    id: string;
+    title: string;
+    notes: string | null;
+    status: "open" | "done";
+    doneAt: string | null;
+    href: string | null;
+    source: "todo";
+  }>
+> {
+  const completedWithinDays = options?.completedWithinDays ?? 30;
+  const maxPerList = options?.maxPerList ?? 100;
+  const listId = await resolveOutlookTodoListId(userId);
+  const cutoff = new Date();
+  cutoff.setUTCDate(cutoff.getUTCDate() - completedWithinDays);
+  const cutoffMs = cutoff.getTime();
+
+  const out: Array<{
+    id: string;
+    title: string;
+    notes: string | null;
+    status: "open" | "done";
+    doneAt: string | null;
+    href: string | null;
+    source: "todo";
+  }> = [];
+
+  type TodoPage = {
+    value?: GraphTodoTask[];
+    "@odata.nextLink"?: string;
+  };
+
+  let url: string | null =
+    `/me/todo/lists/${encodeURIComponent(listId)}/tasks?$top=${maxPerList}&$orderby=lastModifiedDateTime desc`;
+
+  while (url && out.length < maxPerList * 2) {
+    const page: TodoPage = await graphJson<TodoPage>(userId, url);
+    for (const t of page.value || []) {
+      if (!t.id || !(t.title || "").trim()) continue;
+      const status = mapOutlookTodoStatus(t.status);
+      const doneAt = t.completedDateTime?.dateTime || null;
+      if (status === "done") {
+        if (!doneAt) continue;
+        const doneMs = Date.parse(doneAt);
+        if (Number.isFinite(doneMs) && doneMs < cutoffMs) continue;
+      }
+      out.push({
+        id: t.id,
+        title: (t.title || "").trim(),
+        notes: t.body?.content?.trim() || null,
+        status,
+        doneAt,
+        href: "https://to-do.office.com/tasks/",
+        source: "todo" as const,
+      });
+    }
+    const next: string | undefined = page["@odata.nextLink"];
+    url = next
+      ? next.replace("https://graph.microsoft.com/v1.0", "")
+      : null;
+    if ((page.value || []).length < maxPerList) break;
+  }
+
+  return out;
+}
+
+/** Microsoft To Do Aufgabe (O365). */
+export async function createOutlookTodoTask(
+  userId: number,
+  input: CreateOutlookTodoInput
+): Promise<CreatedOutlookTodo> {
+  const listId = await resolveOutlookTodoListId(userId);
 
   const body: Record<string, unknown> = {
     title: input.title.trim(),
@@ -211,7 +487,7 @@ export async function createOutlookTodoTask(
     id?: string;
     title?: string;
     webLink?: string | null;
-  }>(userId, `/me/todo/lists/${encodeURIComponent(list.id)}/tasks`, {
+  }>(userId, `/me/todo/lists/${encodeURIComponent(listId)}/tasks`, {
     method: "POST",
     body: JSON.stringify(body),
   });

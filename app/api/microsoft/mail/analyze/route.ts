@@ -24,6 +24,9 @@ import {
   resolveMailAnalysisRange,
   type MailAnalysisRange,
 } from "@/lib/mail/mail-analysis-range";
+import { attachExistingTasksToAnalysis } from "@/lib/mail/day-task-catalog";
+import { listOutlookTodoTasksForMatch } from "@/lib/microsoft/mail-day-actions";
+import { listPlannerTasksForMatch } from "@/lib/microsoft/planner";
 import {
   isMicrosoftConnected,
   resolveMicrosoftUserId,
@@ -113,6 +116,10 @@ async function runAnalysisJob(userId: number, range: MailAnalysisRange) {
       notifyDone(label, analysis);
       return;
     }
+    const catalogPromise = Promise.all([
+      listOutlookTodoTasksForMatch(userId).catch(() => []),
+      listPlannerTasksForMatch(userId).catch(() => []),
+    ]).then(([todo, planner]) => [...todo, ...planner]);
     const analysis = await analyzeMicrosoftMailDay({
       todayIso: mail.dayIso,
       fromYmd: mail.fromYmd,
@@ -120,8 +127,12 @@ async function runAnalysisJob(userId: number, range: MailAnalysisRange) {
       inbox: mail.inbox,
       sent: mail.sent,
     });
-    finishMsMailDayJobOk(userId, range, mailPayload, analysis);
-    notifyDone(label, analysis);
+    const enriched = attachExistingTasksToAnalysis(
+      analysis,
+      await catalogPromise
+    );
+    finishMsMailDayJobOk(userId, range, mailPayload, enriched);
+    notifyDone(label, enriched);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     finishMsMailDayJobError(userId, range, message);

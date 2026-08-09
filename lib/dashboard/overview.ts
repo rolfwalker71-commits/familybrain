@@ -229,16 +229,27 @@ export type OverviewPayload = {
   };
   /** Current weather at home (Altdorf UR). */
   homeWeather: HomeWeatherCard | null;
-  /** Google Tasks: overdue + next 7 days (+ some undated). */
+  /** Google Tasks + Outlook To Do + Planner (offen, Horizont ~7 Tage). */
   tasks: {
+    googleConnected: boolean;
+    microsoftConnected: boolean;
+    hasGoogleScope: boolean;
+    hasMicrosoftScope: boolean;
+    /** @deprecated use hasGoogleScope || hasMicrosoftScope */
     hasScope: boolean;
     items: Array<{
+      key: string;
       id: string;
+      source: "google" | "todo" | "planner";
       title: string;
       dueDate: string | null;
       overdue: boolean;
-      listTitle: string;
+      subtitle: string;
       href: string;
+      listId: string | null;
+      etag: string | null;
+      /** legacy */
+      listTitle?: string;
     }>;
   };
   /** Recent reference notes (tracking etc. from mail). */
@@ -773,33 +784,15 @@ export async function getDashboardOverview(
       fetchHomeWeather(),
       (async () => {
         if (calendarUserId == null) {
-          return { hasScope: false, items: [] as const };
-        }
-        const { hasGoogleTasksScope } = await import("@/lib/google/oauth");
-        if (!hasGoogleTasksScope(calendarUserId)) {
-          return { hasScope: false, items: [] as const };
-        }
-        try {
-          const { listUpcomingGoogleTasks } = await import(
-            "@/lib/google/tasks"
+          const { loadHomeTasksBundle } = await import(
+            "@/lib/dashboard/home-tasks"
           );
-          const items = await listUpcomingGoogleTasks(calendarUserId, {
-            horizonDays: 7,
-          });
-          return {
-            hasScope: true,
-            items: items.map((t) => ({
-              id: t.id,
-              title: t.title,
-              dueDate: t.dueDate,
-              overdue: t.overdue,
-              listTitle: t.listTitle,
-              href: t.href,
-            })),
-          };
-        } catch {
-          return { hasScope: true, items: [] as const };
+          return loadHomeTasksBundle(null);
         }
+        const { loadHomeTasksBundle } = await import(
+          "@/lib/dashboard/home-tasks"
+        );
+        return loadHomeTasksBundle(calendarUserId, { horizonDays: 7 });
       })(),
       (async () => {
         if (calendarUserId == null) {
@@ -929,8 +922,15 @@ export async function getDashboardOverview(
     },
     homeWeather,
     tasks: {
-      hasScope: tasksBundle.hasScope,
-      items: [...tasksBundle.items],
+      googleConnected: tasksBundle.googleConnected,
+      microsoftConnected: tasksBundle.microsoftConnected,
+      hasGoogleScope: tasksBundle.hasGoogleScope,
+      hasMicrosoftScope: tasksBundle.hasMicrosoftScope,
+      hasScope: tasksBundle.hasGoogleScope || tasksBundle.hasMicrosoftScope,
+      items: tasksBundle.items.map((t) => ({
+        ...t,
+        listTitle: t.subtitle,
+      })),
     },
     referenceNotes: [...referenceNotes],
     upcomingBirthdays: attachAgendaAiIconMeta([...upcomingBirthdays]),

@@ -11,7 +11,6 @@ import {
   ChevronRight,
   Plane,
   ListChecks,
-  CheckSquare,
   StickyNote,
   X,
   Sparkles,
@@ -26,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BackupStatusPanel } from "@/components/settings/backup-status-panel";
 import { KpiCorrectSheet } from "@/components/dashboard/kpi-correct-sheet";
+import { HomeTasksSection } from "@/components/dashboard/home-tasks-section";
 import { TeamLogo, weekdayLabel, AgendaTypeRail } from "@/components/calendar/agenda-row";
 import { AgendaAiIconThumb } from "@/components/calendar/agenda-ai-icon-thumb";
 import { AgendaEventDialog } from "@/components/calendar/agenda-event-dialog";
@@ -1669,6 +1669,30 @@ export function OverviewDashboard({
             </div>
           </section>
 
+          <section className="space-y-3">
+            <h2 className="text-[14px] font-black tracking-tight text-foreground">
+              Aufgaben
+            </h2>
+            <HomeTasksSection
+              items={(data.tasks?.items || []).map((t) => ({
+                key: t.key || `${t.source || "google"}:${t.id}`,
+                id: t.id,
+                source: t.source || "google",
+                title: t.title,
+                dueDate: t.dueDate,
+                overdue: t.overdue,
+                subtitle: t.subtitle || t.listTitle || "",
+                href: t.href,
+                listId: t.listId ?? null,
+                etag: t.etag ?? null,
+              }))}
+              today={today}
+              hasGoogleScope={Boolean(data.tasks?.hasGoogleScope)}
+              hasMicrosoftScope={Boolean(data.tasks?.hasMicrosoftScope)}
+              onChanged={() => void load()}
+            />
+          </section>
+
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(17rem,0.85fr)]">
             <section className="min-w-0 space-y-3">
               <div className="flex items-baseline justify-between gap-2">
@@ -1730,78 +1754,6 @@ export function OverviewDashboard({
 
             <aside className="min-w-0 space-y-4">
               <BirthdaysAsideCard items={upcomingBirthdays} today={today} />
-
-              <Card className="border-border/70">
-                <CardHeader className="pb-2">
-                  <CardTitle className="flex items-center gap-2 text-[16px] font-black">
-                    <CheckSquare
-                      className="size-4 text-muted-foreground"
-                      strokeWidth={APP_ICON_STROKE}
-                      absoluteStrokeWidth
-                      aria-hidden
-                    />
-                    Aufgaben · 7 Tage
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {!data.tasks?.hasScope ? (
-                    <p className="text-[13px] text-muted-foreground">
-                      Google Tasks noch nicht verbunden — unter{" "}
-                      <Link
-                        href="/account"
-                        className="font-medium underline-offset-2 hover:underline"
-                      >
-                        Konto
-                      </Link>{" "}
-                      neu verbinden (Tasks-API + Consent).
-                    </p>
-                  ) : data.tasks.items.length === 0 ? (
-                    <p className="text-[13px] text-muted-foreground">
-                      Keine offenen Aufgaben in den nächsten 7 Tagen.
-                    </p>
-                  ) : (
-                    <ul className="space-y-2">
-                      {data.tasks.items.slice(0, 10).map((t) => (
-                        <li key={t.id}>
-                          <a
-                            href={t.href}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-start gap-2 rounded-lg px-1 py-0.5 hover:bg-muted/40"
-                          >
-                            <span
-                              className={cn(
-                                "mt-1.5 size-1.5 shrink-0 rounded-full",
-                                t.overdue
-                                  ? "bg-rose-600"
-                                  : t.dueDate === today
-                                    ? "bg-emerald-600"
-                                    : "bg-muted-foreground/40"
-                              )}
-                              aria-hidden
-                            />
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate text-[14px] font-black leading-snug">
-                                {t.title}
-                              </p>
-                              <p className="text-[12px] text-muted-foreground">
-                                {t.overdue
-                                  ? "Überfällig"
-                                  : t.dueDate
-                                    ? t.dueDate === today
-                                      ? "Heute"
-                                      : weekdayLabel(t.dueDate)
-                                    : "Ohne Datum"}
-                                {t.listTitle ? ` · ${t.listTitle}` : ""}
-                              </p>
-                            </div>
-                          </a>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </CardContent>
-              </Card>
 
               {data.referenceNotes && data.referenceNotes.length > 0 ? (
                 <Card className="border-border/70">
