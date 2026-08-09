@@ -2,7 +2,18 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowDown, ArrowUp, CalendarDays, ChevronRight, Filter, MoreHorizontal, Search, Sparkles, Trash2 } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  BookMarked,
+  CalendarDays,
+  ChevronRight,
+  Filter,
+  MoreHorizontal,
+  Search,
+  Sparkles,
+  Trash2,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -210,6 +221,7 @@ export function DocumentsClient() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [knowledgeAreas, setKnowledgeAreas] = useState<string[]>([]);
   const [bulkCategoryBusy, setBulkCategoryBusy] = useState(false);
+  const [bulkForGuideBusy, setBulkForGuideBusy] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [missingAiIcons, setMissingAiIcons] = useState(0);
   const [iconBusy, setIconBusy] = useState(false);
@@ -385,6 +397,61 @@ export function DocumentsClient() {
     }
   }
 
+  async function runBulkForGuide() {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0 || bulkForGuideBusy) return;
+    const ok = window.confirm(
+      `${ids.length} Dokument(e) als «Für Guide» markieren?\n\nBereits in Guides übernommene PDFs werden übersprungen.`
+    );
+    if (!ok) return;
+
+    setBulkForGuideBusy(true);
+    setError(null);
+    try {
+      const CHUNK = 200;
+      let marked = 0;
+      let skippedInGuide = 0;
+      let skippedFlagged = 0;
+      const messages: string[] = [];
+      for (let i = 0; i < ids.length; i += CHUNK) {
+        const chunk = ids.slice(i, i + CHUNK);
+        const res = await fetch("/api/documents/for-guide/batch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ documentIds: chunk }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data.error || "Für-Guide-Markierung fehlgeschlagen");
+        }
+        marked += Number(data.marked) || 0;
+        skippedInGuide += Number(data.skippedAlreadyInGuide) || 0;
+        skippedFlagged += Number(data.skippedAlreadyFlagged) || 0;
+        if (data.message) messages.push(String(data.message));
+      }
+      setSelectedIds(new Set());
+      await load();
+      const summary = [
+        marked > 0 ? `${marked} markiert` : null,
+        skippedInGuide > 0
+          ? `${skippedInGuide} schon in Guides (verworfen)`
+          : null,
+        skippedFlagged > 0 ? `${skippedFlagged} schon markiert` : null,
+      ]
+        .filter(Boolean)
+        .join(" · ");
+      if (summary) {
+        window.alert(summary);
+      } else if (messages[0]) {
+        window.alert(messages[0]);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBulkForGuideBusy(false);
+    }
+  }
+
   async function deleteDocuments(ids: number[]) {
     if (ids.length === 0 || deleteBusy) return;
     const label =
@@ -398,15 +465,29 @@ export function DocumentsClient() {
 
     setDeleteBusy(true);
     setError(null);
+    /** API accepts up to 250 per request — chunk larger selections. */
+    const CHUNK = 200;
     try {
-      const res = await fetch("/api/documents/delete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ documentIds: ids, confirm: true }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || data.ok === false) {
-        throw new Error(data.error || "Löschen fehlgeschlagen");
+      let succeeded = 0;
+      const failures: string[] = [];
+      for (let i = 0; i < ids.length; i += CHUNK) {
+        const chunk = ids.slice(i, i + CHUNK);
+        const res = await fetch("/api/documents/delete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ documentIds: chunk, confirm: true }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data.error || "Löschen fehlgeschlagen");
+        }
+        succeeded += Number(data.succeeded) || 0;
+        if (data.ok === false || Number(data.failed) > 0) {
+          failures.push(
+            data.error ||
+              `${data.failed || "?"} Löschung(en) fehlgeschlagen (Chunk ${Math.floor(i / CHUNK) + 1})`
+          );
+        }
       }
       setSelectedIds((prev) => {
         const next = new Set(prev);
@@ -415,6 +496,11 @@ export function DocumentsClient() {
       });
       await load();
       router.refresh();
+      if (failures.length > 0) {
+        setError(
+          `${succeeded} gelöscht · ${failures.join("; ")}`
+        );
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -1073,6 +1159,7 @@ export function DocumentsClient() {
                 className="h-8 max-w-[12rem] rounded-lg border border-border bg-background px-2 text-sm disabled:opacity-50"
                 disabled={
                   bulkCategoryBusy ||
+                  bulkForGuideBusy ||
                   iconBusy ||
                   analyzeBusy ||
                   isRunning ||
@@ -1103,9 +1190,36 @@ export function DocumentsClient() {
               <Button
                 size="sm"
                 variant="outline"
+                className="gap-1.5"
+                disabled={
+                  bulkForGuideBusy ||
+                  deleteBusy ||
+                  iconBusy ||
+                  analyzeBusy ||
+                  isRunning ||
+                  bulkCategoryBusy
+                }
+                title="Als «Für Guide» markieren (bereits in Guides → überspringen)"
+                onClick={() => void runBulkForGuide()}
+              >
+                <BookMarked className="size-3.5" />
+                {bulkForGuideBusy
+                  ? "Für Guide…"
+                  : `Für Guide (${selectedIds.size})`}
+              </Button>
+            ) : null}
+            {selectedIds.size > 0 ? (
+              <Button
+                size="sm"
+                variant="outline"
                 className="gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive"
                 disabled={
-                  deleteBusy || iconBusy || analyzeBusy || isRunning || bulkCategoryBusy
+                  deleteBusy ||
+                  iconBusy ||
+                  analyzeBusy ||
+                  isRunning ||
+                  bulkCategoryBusy ||
+                  bulkForGuideBusy
                 }
                 onClick={() => void deleteDocuments(Array.from(selectedIds))}
               >

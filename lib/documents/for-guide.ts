@@ -34,6 +34,77 @@ export function documentHasGuide(documentId: number): boolean {
 }
 
 /**
+ * Batch «Für Guide»: setzt Flag lokal + Paperless.
+ * Dokumente mit bestehendem Knowledge-Guide werden verworfen (skipped).
+ */
+export async function markDocumentsForGuideBatch(documentIds: number[]): Promise<{
+  marked: number;
+  skippedAlreadyInGuide: number;
+  skippedAlreadyFlagged: number;
+  missing: number;
+  failed: Array<{ id: number; error: string }>;
+}> {
+  const ids = Array.from(
+    new Set(documentIds.filter((id) => Number.isInteger(id) && id > 0))
+  );
+  let marked = 0;
+  let skippedAlreadyInGuide = 0;
+  let skippedAlreadyFlagged = 0;
+  let missing = 0;
+  const failed: Array<{ id: number; error: string }> = [];
+
+  const { getDocumentById } = await import("@/lib/db/queries");
+  const { writebackStatusFlagsToPaperless } = await import(
+    "@/lib/paperless/writeback"
+  );
+
+  for (const id of ids) {
+    if (!getDocumentById(id)?.document) {
+      missing += 1;
+      continue;
+    }
+    if (documentHasGuide(id)) {
+      skippedAlreadyInGuide += 1;
+      continue;
+    }
+    if (getDocumentForGuide(id)) {
+      skippedAlreadyFlagged += 1;
+      continue;
+    }
+    try {
+      const result = await writebackStatusFlagsToPaperless({
+        localDocumentId: id,
+        forGuide: true,
+      });
+      if (!result.ok) {
+        // Local flag still useful for Guides-Batch even if Paperless writeback fails
+        setDocumentForGuide(id, true);
+        failed.push({
+          id,
+          error: result.error || "Paperless-Writeback fehlgeschlagen",
+        });
+        marked += 1;
+        continue;
+      }
+      marked += 1;
+    } catch (err) {
+      failed.push({
+        id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  return {
+    marked,
+    skippedAlreadyInGuide,
+    skippedAlreadyFlagged,
+    missing,
+    failed,
+  };
+}
+
+/**
  * Nachziehen: alle Dokumente mit bestehendem Guide bekommen for_guide = 1.
  * Idempotent — bei jedem Bootstrap unproblematisch.
  */

@@ -8,8 +8,14 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
+/** Soft limit per request; UI may batch larger selections. */
+export const DELETE_DOCUMENTS_MAX_IDS = 250;
+
 const BodySchema = z.object({
-  documentIds: z.array(z.number().int().positive()).min(1).max(100),
+  documentIds: z
+    .array(z.number().int().positive())
+    .min(1)
+    .max(DELETE_DOCUMENTS_MAX_IDS),
   confirm: z.literal(true),
 });
 
@@ -21,10 +27,14 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const parsed = BodySchema.safeParse(body);
   if (!parsed.success) {
+    const tooMany = parsed.error.issues.some(
+      (i) => i.path.includes("documentIds") && i.code === "too_big"
+    );
     return NextResponse.json(
       {
-        error:
-          "Ungültige Eingabe — documentIds und confirm:true erforderlich.",
+        error: tooMany
+          ? `Zu viele Dokumente auf einmal (max. ${DELETE_DOCUMENTS_MAX_IDS}). Bitte Auswahl verkleinern oder in mehreren Schritten löschen.`
+          : "Ungültige Eingabe — documentIds und confirm:true erforderlich.",
       },
       { status: 400 }
     );
