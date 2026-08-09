@@ -21,6 +21,7 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -58,13 +59,22 @@ function formatTimelineAt(iso: string): string {
   }).format(d);
 }
 
-function dueShort(iso: string | null): string | null {
+function formatDateTimeShort(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return null;
+  return formatTimelineAt(iso);
+}
+
+function formatDateShort(iso: string | null | undefined): string | null {
   if (!iso) return null;
   const swiss = toSwissDate(iso);
-  if (swiss === "–") return null;
-  const parts = swiss.split(".");
-  if (parts.length >= 2) return `Due ${parts[0]}.${parts[1]}`;
-  return `Due ${swiss}`;
+  return swiss === "–" ? null : swiss;
+}
+
+function primaryContact(raw: string | null | undefined): string | null {
+  if (!raw?.trim()) return null;
+  return raw.split(";")[0]?.trim() || null;
 }
 
 function isOverdue(iso: string | null): boolean {
@@ -74,6 +84,24 @@ function isOverdue(iso: string | null): boolean {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   return d < today;
+}
+
+function MetaBit({
+  label,
+  value,
+}: {
+  label: string;
+  value: string | null | undefined;
+}) {
+  if (!value) return null;
+  return (
+    <span className="inline-flex min-w-0 max-w-full items-baseline gap-1">
+      <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/80">
+        {label}
+      </span>
+      <span className="truncate text-[11px] text-foreground/90">{value}</span>
+    </span>
+  );
 }
 
 function StatusChip({
@@ -329,7 +357,7 @@ export function MaringoWorkspaceClient() {
         </p>
       ) : null}
 
-      <div className="grid min-h-[70vh] gap-0 overflow-hidden rounded-2xl border border-border/60 bg-card shadow-[0_4px_18px_rgba(15,23,42,0.05)] lg:grid-cols-[minmax(16rem,22rem)_minmax(0,1fr)]">
+      <div className="grid min-h-[70vh] gap-0 overflow-hidden rounded-2xl border border-border/60 bg-card shadow-[0_4px_18px_rgba(15,23,42,0.05)] lg:grid-cols-[minmax(22rem,36rem)_minmax(0,1fr)]">
         {/* List pane */}
         <section className="flex min-h-0 flex-col border-b border-border/60 lg:border-r lg:border-b-0">
           <div className="flex items-center justify-between gap-2 border-b border-border/50 px-3 py-2.5">
@@ -390,17 +418,18 @@ export function MaringoWorkspaceClient() {
                   Status ({statuses.length})
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className="w-56">
-                  <DropdownMenuLabel>Status (Mehrfachauswahl)</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  {WORK_STATUS_IDS.map((id) => (
-                    <DropdownMenuCheckboxItem
-                      key={id}
-                      checked={statuses.includes(id)}
-                      onCheckedChange={() => toggleStatus(id)}
-                    >
-                      {STATUS_LABELS[id] || `Status ${id}`}
-                    </DropdownMenuCheckboxItem>
-                  ))}
+                  <DropdownMenuGroup>
+                    <DropdownMenuLabel>Status (Mehrfachauswahl)</DropdownMenuLabel>
+                    {WORK_STATUS_IDS.map((id) => (
+                      <DropdownMenuCheckboxItem
+                        key={id}
+                        checked={statuses.includes(id)}
+                        onCheckedChange={() => toggleStatus(id)}
+                      >
+                        {STATUS_LABELS[id] || `Status ${id}`}
+                      </DropdownMenuCheckboxItem>
+                    ))}
+                  </DropdownMenuGroup>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={selectAllWorkStatuses}>
                     Alle Arbeitsstatus
@@ -435,8 +464,9 @@ export function MaringoWorkspaceClient() {
             ) : null}
             {tickets.map((t) => {
               const active = t.issueId === selectedId;
-              const due = dueShort(t.dueDate);
+              const due = formatDateShort(t.dueDate);
               const overdue = isOverdue(t.dueDate);
+              const contact = primaryContact(t.contactPerson);
               return (
                 <li key={t.issueId}>
                   <button
@@ -449,11 +479,24 @@ export function MaringoWorkspaceClient() {
                         : "border-border/70 bg-background hover:border-orange-200/80 hover:bg-orange-50/40"
                     )}
                   >
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-1.5">
                       <span className="text-[12px] font-bold text-foreground">
                         #{t.issueId}
                       </span>
+                      {t.issueTypeName ? (
+                        <Badge
+                          variant="outline"
+                          className="h-5 rounded-full border-border/70 px-2 text-[10px] font-semibold text-muted-foreground"
+                        >
+                          {t.issueTypeName}
+                        </Badge>
+                      ) : null}
                       <StatusChip status={t.status} statusName={t.statusName} />
+                      {t.priorityName ? (
+                        <span className="text-[10px] font-semibold text-muted-foreground">
+                          {t.priorityName}
+                        </span>
+                      ) : null}
                       {due ? (
                         <span
                           className={cn(
@@ -461,17 +504,39 @@ export function MaringoWorkspaceClient() {
                             overdue ? "text-rose-700" : "text-muted-foreground"
                           )}
                         >
-                          {due}
+                          Stichtag {due}
                         </span>
                       ) : null}
                     </div>
                     <p className="line-clamp-2 text-[13px] font-medium leading-snug">
                       {t.briefDescription}
                     </p>
-                    <p className="text-[11px] text-muted-foreground">
-                      {t.cardCode || "–"}
-                      {t.handledBy ? ` · ${t.handledBy}` : ""}
-                    </p>
+                    <div className="flex flex-wrap gap-x-3 gap-y-1">
+                      <MetaBit label="Matchcode" value={t.addressMatchcode} />
+                      <MetaBit label="Adresse" value={t.cardCode} />
+                      <MetaBit label="Produkt" value={t.productName} />
+                    </div>
+                    <div className="flex flex-wrap gap-x-3 gap-y-1">
+                      <MetaBit
+                        label="Zuständig"
+                        value={t.handledByName || t.handledBy}
+                      />
+                      <MetaBit label="Gruppe" value={t.supportGroupName} />
+                      <MetaBit label="Kontakt" value={contact} />
+                    </div>
+                    <div className="flex flex-wrap gap-x-3 gap-y-1">
+                      <MetaBit
+                        label="Datum"
+                        value={formatDateTimeShort(t.requestDate)}
+                      />
+                      <MetaBit
+                        label="Geändert"
+                        value={formatDateTimeShort(t.changeAtDate)}
+                      />
+                      <MetaBit label="Referenz" value={t.referenceText} />
+                      <MetaBit label="Freigabe" value={t.stdFreigabe} />
+                      <MetaBit label="AI" value={t.aiLabel} />
+                    </div>
                   </button>
                 </li>
               );
@@ -525,62 +590,157 @@ export function MaringoWorkspaceClient() {
                       <MoreHorizontal className="size-4" />
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-52">
-                      <DropdownMenuLabel>Status setzen</DropdownMenuLabel>
-                      {[11, 1, 3, 6, 7, 13, 14, 2, 5].map((id) => (
-                        <DropdownMenuItem
-                          key={id}
-                          disabled={patching || detail.status === id}
-                          onClick={() => void patchTicket({ status: id })}
-                        >
-                          {STATUS_LABELS[id] || id}
-                        </DropdownMenuItem>
-                      ))}
+                      <DropdownMenuGroup>
+                        <DropdownMenuLabel>Status setzen</DropdownMenuLabel>
+                        {[11, 1, 3, 6, 7, 13, 14, 2, 5].map((id) => (
+                          <DropdownMenuItem
+                            key={id}
+                            disabled={patching || detail.status === id}
+                            onClick={() => void patchTicket({ status: id })}
+                          >
+                            {STATUS_LABELS[id] || id}
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuGroup>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
 
-                <div className="grid gap-2 sm:grid-cols-3">
-                  <div className="flex items-center gap-2 rounded-xl border border-border/50 bg-muted/20 px-2.5 py-2 text-[12px]">
-                    <Flag className="size-3.5 text-muted-foreground" />
-                    <span>
-                      Priorität:{" "}
-                      <strong className="font-semibold">{detail.priorityName}</strong>
-                    </span>
+                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                  <div className="rounded-xl border border-border/50 bg-muted/20 px-2.5 py-2 text-[12px]">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Typ
+                    </p>
+                    <p className="font-semibold">
+                      {detail.issueTypeName || "–"}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-border/50 bg-muted/20 px-2.5 py-2 text-[12px]">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Produkt
+                    </p>
+                    <p className="font-semibold">{detail.productName || "–"}</p>
+                  </div>
+                  <div className="rounded-xl border border-border/50 bg-muted/20 px-2.5 py-2 text-[12px]">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Matchcode
+                    </p>
+                    <p className="font-semibold">
+                      {detail.addressMatchcode || "–"}
+                    </p>
                   </div>
                   <div className="flex items-center gap-2 rounded-xl border border-border/50 bg-muted/20 px-2.5 py-2 text-[12px]">
-                    <User className="size-3.5 text-muted-foreground" />
-                    <span>
-                      Kunde:{" "}
-                      <strong className="font-semibold">
+                    <Flag className="size-3.5 shrink-0 text-muted-foreground" />
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        Prio
+                      </p>
+                      <p className="font-semibold">{detail.priorityName}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 rounded-xl border border-border/50 bg-muted/20 px-2.5 py-2 text-[12px]">
+                    <User className="size-3.5 shrink-0 text-muted-foreground" />
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        Adresse
+                      </p>
+                      <p className="truncate font-semibold">
                         {detail.cardCode || "–"}
-                      </strong>
-                    </span>
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border/50 bg-muted/20 px-2.5 py-2 text-[12px]">
+                  <div className="rounded-xl border border-border/50 bg-muted/20 px-2.5 py-2 text-[12px]">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Zuständig
+                    </p>
+                    <p className="font-semibold">
+                      {detail.handledByName || detail.handledBy || "–"}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-border/50 bg-muted/20 px-2.5 py-2 text-[12px]">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Supportgruppe
+                    </p>
+                    <p className="font-semibold">
+                      {detail.supportGroupName || "–"}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-border/50 bg-muted/20 px-2.5 py-2 text-[12px]">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Ansprechpartner
+                    </p>
+                    <p className="font-semibold">
+                      {primaryContact(detail.contactPerson) || "–"}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-border/50 bg-muted/20 px-2.5 py-2 text-[12px]">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Datum
+                    </p>
+                    <p className="font-semibold">
+                      {formatDateTimeShort(detail.requestDate) || "–"}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-border/50 bg-muted/20 px-2.5 py-2 text-[12px]">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Geändert am
+                    </p>
+                    <p className="font-semibold">
+                      {formatDateTimeShort(detail.changeAtDate) || "–"}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-border/50 bg-muted/20 px-2.5 py-2 text-[12px]">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Referenz
+                    </p>
+                    <p className="font-semibold">{detail.referenceText || "–"}</p>
+                  </div>
+                  <div className="rounded-xl border border-border/50 bg-muted/20 px-2.5 py-2 text-[12px]">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Std. Freigabe
+                    </p>
+                    <p className="font-semibold">{detail.stdFreigabe || "–"}</p>
+                  </div>
+                  {detail.aiLabel ? (
+                    <div className="rounded-xl border border-border/50 bg-muted/20 px-2.5 py-2 text-[12px]">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        AI
+                      </p>
+                      <p className="font-semibold">{detail.aiLabel}</p>
+                    </div>
+                  ) : null}
+                  <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border/50 bg-muted/20 px-2.5 py-2 text-[12px] sm:col-span-2 xl:col-span-1">
                     <Calendar className="size-3.5 text-muted-foreground" />
                     <Label htmlFor="dueDate" className="sr-only">
-                      Fällig
+                      Stichtag
                     </Label>
-                    <Input
-                      id="dueDate"
-                      type="date"
-                      className="h-7 w-auto border-0 bg-transparent px-0 shadow-none"
-                      value={dueDraft}
-                      onChange={(e) => setDueDraft(e.target.value)}
-                      disabled={patching}
-                    />
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className="h-7 text-[11px]"
-                      disabled={patching || !dueDraft}
-                      onClick={() =>
-                        void patchTicket({ dueDate: dueDraft || null })
-                      }
-                    >
-                      Setzen
-                    </Button>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        Stichtag
+                      </p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Input
+                          id="dueDate"
+                          type="date"
+                          className="h-7 w-auto border-0 bg-transparent px-0 shadow-none"
+                          value={dueDraft}
+                          onChange={(e) => setDueDraft(e.target.value)}
+                          disabled={patching}
+                        />
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-[11px]"
+                          disabled={patching || !dueDraft}
+                          onClick={() =>
+                            void patchTicket({ dueDate: dueDraft || null })
+                          }
+                        >
+                          Setzen
+                        </Button>
+                      </div>
+                    </div>
                   </div>
                 </div>
 

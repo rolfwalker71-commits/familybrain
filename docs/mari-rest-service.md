@@ -98,7 +98,8 @@ Relevante Felder (`clsImportSupportIssue`):
 | `BusinessPartnerCode` | BP / CardCode |
 | `ProductID` | Produkt (oft Pflicht bei PATCH) |
 | `ParentType` | Parent-Modus; `-1` kann PATCH blockieren |
-| `HotlineClassType` | Ticket-Dimension (Support / Task / …) |
+| `HotlineClassType` | Ticket-Dimension: **17 = Support** (Buddy-Liste), u.a. **676 = Projektaufgaben** (nicht in Buddy-Liste) |
+| List enrichment | `IssueType`→Typ, `ProductID`→`MARISupportProduct.ProductName`, `AddressMatchcode`, `HandledBy`→`MARIEmployeeMaster.Matchcode`, `SupportGroupID`→`MARISupportGroup.Description`, `ContactPerson`, `RequestDate`/`ChangeAtDate`, `ReferenceText`, `USER_U_Std_Freigegeben_Kunde`, AI-Felder |
 
 Attachments (nur mit bekannter Issue-ID):
 
@@ -158,6 +159,7 @@ LEFT JOIN "MPHOTLINESETTINGS" p
   ON p."SETTING" = 3 AND p."ID" = i."Priority"
 WHERE i."HandledBy" = 'M1010'
   AND i."EditorType" = 3
+  AND i."HotlineClassType" = 17
   AND i."Status" IN (1, 3, 4, 6, 7, 11, 13, 14)
 ORDER BY
   CASE WHEN i."DueDate" IS NULL THEN 1 ELSE 0 END,
@@ -201,6 +203,8 @@ View-Spalten vs. API-Namen (Auswahl):
 **Arbeitsfilter (vereinbart 2026-08-09):**  
 `Status IN (1, 3, 4, 6, 7, 11, 13, 14)`  
 → Offen, In Arbeit, Wieder geöffnet, Warte auf Kunden Feedback, Warte auf Hersteller, NEU, Aktualisiert, Eskalation.
+
+**Klasse:** nur `HotlineClassType = 17` (Support). Projektaufgaben (z.B. 676, «TESTAUFGABE HZI») erscheinen sonst fälschlich als «meine» Tickets mit Status NEU, obwohl sie in der Support-UI nicht geführt werden.
 
 Andere `SETTING`-Gruppen (Kurz):
 

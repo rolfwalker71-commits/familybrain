@@ -60,7 +60,7 @@ export function normalizeMariTicketAnalysisInput(raw: unknown): unknown {
 
   const tasksRaw = Array.isArray(o.suggestedTasks) ? o.suggestedTasks : [];
   const suggestedTasks = tasksRaw.slice(0, 8).map((item) => {
-    const t =
+    const t: Record<string, unknown> =
       item && typeof item === "object" && !Array.isArray(item)
         ? (item as Record<string, unknown>)
         : { title: item };

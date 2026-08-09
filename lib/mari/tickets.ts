@@ -16,6 +16,13 @@ function sqlQuote(value: string): string {
   return `'${value.replace(/'/g, "''")}'`;
 }
 
+/**
+ * Maringo «Support»-Klasse in MPHOTLINECLASSTYPE.
+ * Andere Klassen (z.B. 676 Projektaufgaben) haben eigene Status-/UI-Welten
+ * und dürfen nicht in «Meine Support-Tickets» landen.
+ */
+export const SUPPORT_HOTLINE_CLASS_TYPE = 17;
+
 function htmlToPlain(html: string): string {
   return html
     .replace(/<script[\s\S]*?<\/script>/gi, " ")
@@ -47,6 +54,24 @@ export type MariTicketListItem = {
   dueDate: string | null;
   handledBy: string | null;
   changeAtDate: string | null;
+  /** IssueType Bezeichnung (Supportanfrage, Auftrag, …) */
+  issueType: number | null;
+  issueTypeName: string | null;
+  /** Produktname (Applikation, Technik, …) */
+  productId: number | null;
+  productName: string | null;
+  /** Firmen-Matchcode */
+  addressMatchcode: string | null;
+  referenceText: string | null;
+  handledByName: string | null;
+  supportGroupId: number | null;
+  supportGroupName: string | null;
+  requestDate: string | null;
+  contactPerson: string | null;
+  /** USER_U_Std_Freigegeben_Kunde */
+  stdFreigabe: string | null;
+  /** AI-Kurzinfo (Topic/Category) */
+  aiLabel: string | null;
 };
 
 export type MariTimelineKind =
@@ -73,7 +98,6 @@ export type MariTicketDetail = MariTicketListItem & {
   requestTextPlain: string;
   responsible: string | null;
   responsibleType: number | null;
-  productId: number | null;
   parentType: number | null;
   timeline: MariTimelineItem[];
 };
@@ -138,32 +162,69 @@ export async function listMyTickets(
     IssueID: number;
     StatusName: string | null;
     PriorityName: string | null;
+    IssueTypeName: string | null;
+    ProductName: string | null;
     BriefDescription: string | null;
+    AddressMatchcode: string | null;
+    ReferenceText: string | null;
     CardCode: string | null;
     DueDate: string | null;
+    RequestDate: string | null;
+    ChangeAtDate: string | null;
     Status: number;
     Priority: number;
+    IssueType: number | null;
+    ProductID: number | null;
     HandledBy: string | null;
-    ChangeAtDate: string | null;
+    HandledByName: string | null;
+    SupportGroupID: number | null;
+    SupportGroupName: string | null;
+    ContactPerson: string | null;
+    StdFreigabe: string | null;
+    AiTopic: string | null;
+    AiCategory: string | null;
   }>(
     `SELECT TOP ${limit}
   i."IssueID",
   s."BEZEICHNUNG" AS "StatusName",
   p."BEZEICHNUNG" AS "PriorityName",
+  t."BEZEICHNUNG" AS "IssueTypeName",
+  pr."ProductName" AS "ProductName",
   i."BriefDescription",
+  i."AddressMatchcode",
+  i."ReferenceText",
   i."CardCode",
   i."DueDate",
+  i."RequestDate",
+  i."ChangeAtDate",
   i."Status",
   i."Priority",
+  i."IssueType",
+  i."ProductID",
   i."HandledBy",
-  i."ChangeAtDate"
+  e."Matchcode" AS "HandledByName",
+  i."SupportGroupID",
+  g."Description" AS "SupportGroupName",
+  i."ContactPerson",
+  i."USER_U_Std_Freigegeben_Kunde" AS "StdFreigabe",
+  i."USER_ANG_AI_TOPIC" AS "AiTopic",
+  i."USER_ANG_AI_CATEGORY" AS "AiCategory"
 FROM "MARISupportIssue" i
 LEFT JOIN "MPHOTLINESETTINGS" s
   ON s."SETTING" = 1 AND s."ID" = i."Status"
 LEFT JOIN "MPHOTLINESETTINGS" p
   ON p."SETTING" = 3 AND p."ID" = i."Priority"
+LEFT JOIN "MPHOTLINESETTINGS" t
+  ON t."SETTING" = 2 AND t."ID" = i."IssueType"
+LEFT JOIN "MARISupportProduct" pr
+  ON pr."ProductID" = i."ProductID"
+LEFT JOIN "MARIEmployeeMaster" e
+  ON e."EmployeeNumber" = i."HandledBy"
+LEFT JOIN "MARISupportGroup" g
+  ON g."GroupId" = i."SupportGroupID"
 WHERE i."HandledBy" = ${emp}
   AND i."EditorType" = 3
+  AND i."HotlineClassType" = ${SUPPORT_HOTLINE_CLASS_TYPE}
   AND i."Status" IN (${statusList})
   ${overdueClause}
 ORDER BY
@@ -172,24 +233,47 @@ ORDER BY
   i."IssueID"`
   );
 
-  return rows.map((r) => ({
-    issueId: Number(r.IssueID),
-    briefDescription: r.BriefDescription || "(ohne Betreff)",
-    status: Number(r.Status),
-    statusName: statusChipLabel(
-      Number(r.Status),
-      r.StatusName || undefined
-    ),
-    priority: Number(r.Priority),
-    priorityName:
-      r.PriorityName ||
-      PRIORITY_LABELS[Number(r.Priority)] ||
-      `Prio ${r.Priority}`,
-    cardCode: r.CardCode || null,
-    dueDate: r.DueDate || null,
-    handledBy: r.HandledBy || null,
-    changeAtDate: r.ChangeAtDate || null,
-  }));
+  return rows.map((r) => {
+    const ai =
+      (r.AiTopic || "").trim() ||
+      (r.AiCategory || "").trim() ||
+      null;
+    return {
+      issueId: Number(r.IssueID),
+      briefDescription: r.BriefDescription || "(ohne Betreff)",
+      status: Number(r.Status),
+      statusName: statusChipLabel(
+        Number(r.Status),
+        r.StatusName || undefined
+      ),
+      priority: Number(r.Priority),
+      priorityName:
+        r.PriorityName ||
+        PRIORITY_LABELS[Number(r.Priority)] ||
+        `Prio ${r.Priority}`,
+      cardCode: r.CardCode || null,
+      dueDate: r.DueDate || null,
+      handledBy: r.HandledBy || null,
+      changeAtDate: r.ChangeAtDate || null,
+      issueType: r.IssueType == null ? null : Number(r.IssueType),
+      issueTypeName: r.IssueTypeName || null,
+      productId: r.ProductID == null ? null : Number(r.ProductID),
+      productName: r.ProductName || null,
+      addressMatchcode: r.AddressMatchcode || null,
+      referenceText: (r.ReferenceText || "").trim() || null,
+      handledByName: r.HandledByName || null,
+      supportGroupId:
+        r.SupportGroupID == null ? null : Number(r.SupportGroupID),
+      supportGroupName: r.SupportGroupName || null,
+      requestDate: r.RequestDate || null,
+      contactPerson: (r.ContactPerson || "").trim() || null,
+      stdFreigabe:
+        r.StdFreigabe == null || String(r.StdFreigabe).trim() === ""
+          ? null
+          : String(r.StdFreigabe).trim(),
+      aiLabel: ai,
+    };
+  });
 }
 
 async function loadTimeline(issueId: number): Promise<MariTimelineItem[]> {
@@ -305,28 +389,114 @@ export async function getTicketDetail(
     typeof issue.RequestText === "string" ? issue.RequestText : "";
   const timeline = await loadTimeline(issueId);
 
-  // Prefer status name from settings join when list not used
+  // Prefer labels from settings / master joins
   let statusName = statusChipLabel(status, STATUS_LABELS[status]);
-  let priorityName =
-    PRIORITY_LABELS[priority] || `Prio ${priority}`;
+  let priorityName = PRIORITY_LABELS[priority] || `Prio ${priority}`;
+  let issueTypeName: string | null = null;
+  let productName: string | null = null;
+  let addressMatchcode: string | null = null;
+  let referenceText: string | null = null;
+  let handledByName: string | null = null;
+  let supportGroupName: string | null = null;
+  let requestDate: string | null = null;
+  let changeAtDate: string | null = null;
+  let contactPerson: string | null = null;
+  let stdFreigabe: string | null = null;
+  let aiLabel: string | null = null;
+  let issueType: number | null = null;
+  let supportGroupId: number | null = null;
+  let productIdFromView: number | null = null;
+  let cardCodeFromView: string | null = null;
+  let handledByFromView: string | null = null;
+  let dueDateFromView: string | null = null;
+
   try {
     const names = await mariSql<{
       StatusName: string | null;
       PriorityName: string | null;
+      IssueTypeName: string | null;
+      ProductName: string | null;
+      AddressMatchcode: string | null;
+      ReferenceText: string | null;
+      HandledByName: string | null;
+      SupportGroupName: string | null;
+      RequestDate: string | null;
+      ChangeAtDate: string | null;
+      ContactPerson: string | null;
+      StdFreigabe: string | null;
+      AiTopic: string | null;
+      AiCategory: string | null;
+      IssueType: number | null;
+      SupportGroupID: number | null;
+      ProductID: number | null;
+      CardCode: string | null;
+      HandledBy: string | null;
+      DueDate: string | null;
     }>(
       `SELECT
   s."BEZEICHNUNG" AS "StatusName",
-  p."BEZEICHNUNG" AS "PriorityName"
+  p."BEZEICHNUNG" AS "PriorityName",
+  t."BEZEICHNUNG" AS "IssueTypeName",
+  pr."ProductName" AS "ProductName",
+  i."AddressMatchcode",
+  i."ReferenceText",
+  e."Matchcode" AS "HandledByName",
+  g."Description" AS "SupportGroupName",
+  i."RequestDate",
+  i."ChangeAtDate",
+  i."ContactPerson",
+  i."USER_U_Std_Freigegeben_Kunde" AS "StdFreigabe",
+  i."USER_ANG_AI_TOPIC" AS "AiTopic",
+  i."USER_ANG_AI_CATEGORY" AS "AiCategory",
+  i."IssueType",
+  i."SupportGroupID",
+  i."ProductID",
+  i."CardCode",
+  i."HandledBy",
+  i."DueDate"
 FROM "MARISupportIssue" i
 LEFT JOIN "MPHOTLINESETTINGS" s ON s."SETTING"=1 AND s."ID"=i."Status"
 LEFT JOIN "MPHOTLINESETTINGS" p ON p."SETTING"=3 AND p."ID"=i."Priority"
+LEFT JOIN "MPHOTLINESETTINGS" t ON t."SETTING"=2 AND t."ID"=i."IssueType"
+LEFT JOIN "MARISupportProduct" pr ON pr."ProductID"=i."ProductID"
+LEFT JOIN "MARIEmployeeMaster" e ON e."EmployeeNumber"=i."HandledBy"
+LEFT JOIN "MARISupportGroup" g ON g."GroupId"=i."SupportGroupID"
 WHERE i."IssueID"=${issueId}`
     );
-    if (names[0]?.StatusName) statusName = statusChipLabel(status, names[0].StatusName);
-    if (names[0]?.PriorityName) priorityName = names[0].PriorityName;
+    const n = names[0];
+    if (n?.StatusName) statusName = statusChipLabel(status, n.StatusName);
+    if (n?.PriorityName) priorityName = n.PriorityName;
+    issueTypeName = n?.IssueTypeName || null;
+    productName = n?.ProductName || null;
+    addressMatchcode = n?.AddressMatchcode || null;
+    referenceText = (n?.ReferenceText || "").trim() || null;
+    handledByName = n?.HandledByName || null;
+    supportGroupName = n?.SupportGroupName || null;
+    requestDate = n?.RequestDate || null;
+    changeAtDate = n?.ChangeAtDate || null;
+    contactPerson = (n?.ContactPerson || "").trim() || null;
+    stdFreigabe =
+      n?.StdFreigabe == null || String(n.StdFreigabe).trim() === ""
+        ? null
+        : String(n.StdFreigabe).trim();
+    aiLabel =
+      (n?.AiTopic || "").trim() || (n?.AiCategory || "").trim() || null;
+    issueType = n?.IssueType != null ? Number(n.IssueType) : null;
+    supportGroupId =
+      n?.SupportGroupID != null ? Number(n.SupportGroupID) : null;
+    productIdFromView = n?.ProductID != null ? Number(n.ProductID) : null;
+    cardCodeFromView = n?.CardCode || null;
+    handledByFromView = n?.HandledBy || null;
+    dueDateFromView = n?.DueDate || null;
   } catch {
     /* ignore */
   }
+
+  const productId =
+    productIdFromView ??
+    (typeof issue.ProductID === "number"
+      ? issue.ProductID
+      : Number(issue.ProductID) || null);
 
   return {
     issueId,
@@ -338,13 +508,30 @@ WHERE i."IssueID"=${issueId}`
     priority,
     priorityName,
     cardCode:
-      typeof issue.BusinessPartnerCode === "string"
+      cardCodeFromView ||
+      (typeof issue.BusinessPartnerCode === "string"
         ? issue.BusinessPartnerCode
-        : null,
-    dueDate: typeof issue.DueDate === "string" ? issue.DueDate : null,
+        : null),
+    dueDate:
+      dueDateFromView ||
+      (typeof issue.DueDate === "string" ? issue.DueDate : null),
     handledBy:
-      typeof issue.Responsible === "string" ? issue.Responsible : null,
-    changeAtDate: null,
+      handledByFromView ||
+      (typeof issue.Responsible === "string" ? issue.Responsible : null),
+    changeAtDate,
+    issueType,
+    issueTypeName,
+    productId,
+    productName,
+    addressMatchcode,
+    referenceText,
+    handledByName,
+    supportGroupId,
+    supportGroupName,
+    requestDate,
+    contactPerson,
+    stdFreigabe,
+    aiLabel,
     requestText,
     requestTextPlain: htmlToPlain(requestText),
     responsible:
@@ -353,10 +540,6 @@ WHERE i."IssueID"=${issueId}`
       typeof issue.ResponsibleType === "number"
         ? issue.ResponsibleType
         : Number(issue.ResponsibleType) || null,
-    productId:
-      typeof issue.ProductID === "number"
-        ? issue.ProductID
-        : Number(issue.ProductID) || null,
     parentType:
       typeof issue.ParentType === "number"
         ? issue.ParentType
