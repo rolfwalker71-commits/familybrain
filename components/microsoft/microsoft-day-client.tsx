@@ -1301,7 +1301,7 @@ export function MicrosoftDayClient() {
           ) : (
             <section className="space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="font-serif text-[22px] font-semibold tracking-tight text-foreground">
+                <h2 className="text-[22px] font-semibold tracking-tight text-foreground">
                   Tagesanalysen
                 </h2>
                 <Button

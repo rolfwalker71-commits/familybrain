@@ -32,6 +32,7 @@ export const ALL_NOTIFY_REASONS: NotifyReason[] = [
   "finance_expense_updated",
   "finance_expense_ai_image",
   "finance_settlement",
+  "mari_ticket_changed",
 ];
 
 export const NOTIFY_REASON_LABELS: Record<NotifyReason, string> = {
@@ -54,6 +55,7 @@ export const NOTIFY_REASON_LABELS: Record<NotifyReason, string> = {
   finance_expense_updated: "Ausgabe geändert",
   finance_expense_ai_image: "Ausgaben-KI-Bild",
   finance_settlement: "Rückzahlung",
+  mari_ticket_changed: "Maringo Ticket-Update",
 };
 
 export const NOTIFY_REASON_DOMAIN: Record<
@@ -79,6 +81,7 @@ export const NOTIFY_REASON_DOMAIN: Record<
   finance_expense_updated: "finance",
   finance_expense_ai_image: "finance",
   finance_settlement: "finance",
+  mari_ticket_changed: "documents",
 };
 
 export type UserNotificationPrefs = {

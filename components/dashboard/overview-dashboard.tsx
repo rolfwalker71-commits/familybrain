@@ -19,6 +19,7 @@ import {
   Car,
   CheckCircle2,
   Monitor,
+  Ticket,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -48,6 +49,7 @@ import type {
   OverviewPeriod,
 } from "@/lib/dashboard/overview";
 import type { MailListItem } from "@/lib/mail/gmail";
+import { statusChipClass } from "@/lib/mari/status";
 import type { LucideIcon } from "lucide-react";
 
 function zurichTodayIso(): string {
@@ -648,6 +650,116 @@ function BirthdaysAsideCard({
         >
           Kalender →
         </Link>
+      </CardContent>
+    </Card>
+  );
+}
+
+function formatPollAt(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return null;
+  return new Intl.DateTimeFormat("de-CH", {
+    timeZone: "Europe/Zurich",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(d);
+}
+
+function MariTicketsAsideCard({
+  data,
+}: {
+  data: NonNullable<OverviewPayload["mariTickets"]>;
+}) {
+  if (!data.configured) return null;
+  const pollLabel = formatPollAt(data.lastPollAt);
+
+  return (
+    <Card className="border-border/60 shadow-[0_4px_18px_rgba(15,23,42,0.05)]">
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-2 text-[16px] font-black">
+          <Ticket
+            className="size-4 text-orange-700"
+            strokeWidth={APP_ICON_STROKE}
+            absoluteStrokeWidth
+            aria-hidden
+          />
+          Tickets von mir
+        </CardTitle>
+        <p className="text-[12px] text-muted-foreground">
+          {data.employeeNumber
+            ? `${data.employeeNumber} · ${data.total} offen`
+            : `${data.total} offen`}
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {data.countsByStatus.length > 0 ? (
+          <ul className="flex flex-wrap gap-1.5">
+            {data.countsByStatus.map((c) => (
+              <li key={c.statusId}>
+                <span
+                  className={cn(
+                    "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold",
+                    statusChipClass(c.statusId)
+                  )}
+                >
+                  {c.label}
+                  <span className="tabular-nums opacity-80">{c.count}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-[12px] text-muted-foreground">
+            {data.lastPollAt
+              ? "Keine offenen Support-Tickets."
+              : "Noch kein Poll — Scheduler lädt gleich."}
+          </p>
+        )}
+
+        {data.recentChanges.length > 0 ? (
+          <div>
+            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Letzte Änderungen
+            </p>
+            <ul className="space-y-1.5">
+              {data.recentChanges.slice(0, 6).map((ch, i) => (
+                <li
+                  key={`${ch.issueId}-${ch.at}-${i}`}
+                  className="min-w-0 text-[12px] leading-snug"
+                >
+                  <span className="font-semibold tabular-nums">
+                    #{ch.issueId}
+                  </span>{" "}
+                  <span className="text-muted-foreground">{ch.detail}</span>
+                  {ch.title ? (
+                    <span className="mt-0.5 block truncate text-[11px] text-foreground/80">
+                      {ch.title}
+                    </span>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
+          <Link
+            href="/maringo"
+            className="text-[12px] font-medium text-muted-foreground underline-offset-2 hover:underline"
+          >
+            Maringo →
+          </Link>
+          <p className="text-[10px] text-muted-foreground">
+            {pollLabel
+              ? `Zuletzt geprüft: ${pollLabel}`
+              : "Noch nicht geprüft"}
+          </p>
+        </div>
       </CardContent>
     </Card>
   );
@@ -1647,6 +1759,10 @@ export function OverviewDashboard({
 
             <aside className="min-w-0 space-y-4">
               <BirthdaysAsideCard items={upcomingBirthdays} today={today} />
+
+              {data.mariTickets?.configured ? (
+                <MariTicketsAsideCard data={data.mariTickets} />
+              ) : null}
 
               {data.referenceNotes && data.referenceNotes.length > 0 ? (
                 <Card className="border-border/60 shadow-[0_4px_18px_rgba(15,23,42,0.05)]">

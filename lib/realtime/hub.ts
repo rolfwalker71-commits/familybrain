@@ -23,7 +23,8 @@ export type NotifyReason =
   | "finance_expense_created"
   | "finance_expense_updated"
   | "finance_expense_ai_image"
-  | "finance_settlement";
+  | "finance_settlement"
+  | "mari_ticket_changed";
 
 /** @deprecated use NotifyReason */
 export type DocumentNotifyReason = NotifyReason;

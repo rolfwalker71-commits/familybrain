@@ -15,6 +15,11 @@ import {
   AGENDA_AI_SYNC_INTERVAL_MS,
 } from "@/lib/dashboard/sync-agenda-ai-icons-if-due";
 import {
+  MARI_TICKETS_LAST_POLL_KEY,
+  MARI_TICKETS_SYNC_INTERVAL_MS,
+} from "@/lib/mari/sync-tickets-if-due";
+import { hasMariConfig } from "@/lib/mari/config";
+import {
   getO365PdfBackfillStatus,
   isO365PdfBackfillEnabled,
 } from "@/lib/microsoft/mail-paperless-backfill";
@@ -299,6 +304,30 @@ export function listInternalJobsOverview(now = new Date()): InternalJobRow[] {
     nextAt: agendaDue ? now.toISOString() : agendaNext,
     detail: "Throttle 20 Min · abends Morgen-Vorbereitung",
     href: "/sync?tab=automation",
+  });
+
+  const mariOn = hasMariConfig();
+  const mariLast = getSetting(MARI_TICKETS_LAST_POLL_KEY);
+  const mariNext = mariLast
+    ? addMs(mariLast, MARI_TICKETS_SYNC_INTERVAL_MS)
+    : settings.enabled && mariOn
+      ? tickAt || now.toISOString()
+      : null;
+  const mariDue =
+    mariNext != null && new Date(mariNext).getTime() <= now.getTime();
+  rows.push({
+    id: "mari_tickets",
+    label: "Maringo Tickets",
+    enabled: mariOn,
+    state: stateFromNext(
+      mariDue ? now.toISOString() : mariNext,
+      mariOn
+    ),
+    nextAt: mariDue ? now.toISOString() : mariNext,
+    detail: mariOn
+      ? "Throttle 10 Min · Status/Stichtag/Updates"
+      : "MARI nicht konfiguriert",
+    href: "/maringo",
   });
 
   const briefingNext = nextBriefingPushAt(now);

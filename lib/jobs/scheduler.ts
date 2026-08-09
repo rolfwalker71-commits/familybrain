@@ -91,6 +91,21 @@ async function tick(): Promise<void> {
     }
 
     try {
+      const { syncMariTicketsIfDue } = await import(
+        "@/lib/mari/sync-tickets-if-due"
+      );
+      const mariSync = await syncMariTicketsIfDue().catch((error) => {
+        console.warn("[scheduler] maringo tickets:", error);
+        return null;
+      });
+      if (mariSync?.attempted) {
+        state.lastResult = `${state.lastResult}|mari:t${mariSync.ticketCount ?? 0}/c${mariSync.changeCount ?? 0}`;
+      }
+    } catch (error) {
+      console.warn("[scheduler] maringo tickets:", error);
+    }
+
+    try {
       const { syncAgendaNotesWritebackIfDue } = await import(
         "@/lib/dashboard/agenda-notes-writeback"
       );

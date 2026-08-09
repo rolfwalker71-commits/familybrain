@@ -25,6 +25,7 @@ import { getDriveMirrorStatus } from "@/lib/buddy/drive-mirror";
 import type { DayBriefingPayload } from "@/lib/dashboard/day-briefing";
 import { getSchedulerSettings } from "@/lib/jobs/queries";
 import { getSchedulerRuntimeStatus } from "@/lib/jobs/scheduler";
+import { getMariTicketsWatchState } from "@/lib/mari/sync-tickets-if-due";
 
 function attachAgendaAiIconMeta<T extends AgendaItem>(items: T[]): T[] {
   return items.map((item) => {
@@ -283,6 +284,24 @@ export type OverviewPayload = {
     enabled: boolean;
     intervalMinutes: number;
     nextTickAt: string | null;
+  } | null;
+  /** Maringo «Tickets von mir» — Status-Zähler + Änderungen vom Poll. */
+  mariTickets: {
+    configured: boolean;
+    employeeNumber: string | null;
+    lastPollAt: string | null;
+    countsByStatus: Array<{
+      statusId: number;
+      label: string;
+      count: number;
+    }>;
+    total: number;
+    recentChanges: Array<{
+      at: string;
+      issueId: number;
+      title: string;
+      detail: string;
+    }>;
   } | null;
   /** Context pulse + optional AI prose (Morgen / Tag / Abend). */
   briefing: DayBriefingPayload | null;
@@ -965,6 +984,26 @@ export async function getDashboardOverview(
           enabled: settings.enabled,
           intervalMinutes: settings.intervalMinutes,
           nextTickAt: settings.enabled ? runtime.nextTickAt : null,
+        };
+      } catch {
+        return null;
+      }
+    })(),
+    mariTickets: (() => {
+      try {
+        const st = getMariTicketsWatchState();
+        return {
+          configured: st.configured,
+          employeeNumber: st.employeeNumber,
+          lastPollAt: st.lastPollAt,
+          countsByStatus: st.countsByStatus,
+          total: st.total,
+          recentChanges: st.recentChanges.map((c) => ({
+            at: c.at,
+            issueId: c.issueId,
+            title: c.title,
+            detail: c.detail,
+          })),
         };
       } catch {
         return null;
