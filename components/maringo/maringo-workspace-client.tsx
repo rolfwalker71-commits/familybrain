@@ -72,6 +72,16 @@ function formatDateShort(iso: string | null | undefined): string | null {
   return swiss === "–" ? null : swiss;
 }
 
+/** Nur Tag.Monat für kompakte Listenzeilen */
+function formatDayMonth(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const swiss = toSwissDate(iso);
+  if (swiss === "–") return null;
+  const parts = swiss.split(".");
+  if (parts.length >= 2) return `${parts[0]}.${parts[1]}`;
+  return swiss;
+}
+
 function primaryContact(raw: string | null | undefined): string | null {
   if (!raw?.trim()) return null;
   return raw.split(";")[0]?.trim() || null;
@@ -86,22 +96,9 @@ function isOverdue(iso: string | null): boolean {
   return d < today;
 }
 
-function MetaBit({
-  label,
-  value,
-}: {
-  label: string;
-  value: string | null | undefined;
-}) {
-  if (!value) return null;
-  return (
-    <span className="inline-flex min-w-0 max-w-full items-baseline gap-1">
-      <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/80">
-        {label}
-      </span>
-      <span className="truncate text-[11px] text-foreground/90">{value}</span>
-    </span>
-  );
+function joinMeta(parts: Array<string | null | undefined>): string | null {
+  const cleaned = parts.map((p) => p?.trim()).filter(Boolean) as string[];
+  return cleaned.length ? cleaned.join(" · ") : null;
 }
 
 function StatusChip({
@@ -357,7 +354,7 @@ export function MaringoWorkspaceClient() {
         </p>
       ) : null}
 
-      <div className="grid min-h-[70vh] gap-0 overflow-hidden rounded-2xl border border-border/60 bg-card shadow-[0_4px_18px_rgba(15,23,42,0.05)] lg:grid-cols-[minmax(22rem,36rem)_minmax(0,1fr)]">
+      <div className="grid min-h-[70vh] gap-0 overflow-hidden rounded-2xl border border-border/60 bg-card shadow-[0_4px_18px_rgba(15,23,42,0.05)] lg:grid-cols-[minmax(16rem,22rem)_minmax(0,1fr)]">
         {/* List pane */}
         <section className="flex min-h-0 flex-col border-b border-border/60 lg:border-r lg:border-b-0">
           <div className="flex items-center justify-between gap-2 border-b border-border/50 px-3 py-2.5">
@@ -464,79 +461,102 @@ export function MaringoWorkspaceClient() {
             ) : null}
             {tickets.map((t) => {
               const active = t.issueId === selectedId;
-              const due = formatDateShort(t.dueDate);
+              const due = formatDayMonth(t.dueDate);
               const overdue = isOverdue(t.dueDate);
               const contact = primaryContact(t.contactPerson);
+              const companyLine = joinMeta([
+                t.addressMatchcode,
+                t.cardCode,
+              ]);
+              const classLine = joinMeta([
+                t.issueTypeName,
+                t.productName,
+                t.priorityName && t.priorityName !== "Normal"
+                  ? t.priorityName
+                  : null,
+                t.supportGroupName,
+              ]);
+              const peopleLine = joinMeta([
+                t.handledByName || t.handledBy,
+                contact,
+              ]);
+              const whenLine = joinMeta([
+                formatDayMonth(t.requestDate)
+                  ? `seit ${formatDayMonth(t.requestDate)}`
+                  : null,
+                formatDayMonth(t.changeAtDate)
+                  ? `änd. ${formatDayMonth(t.changeAtDate)}`
+                  : null,
+                t.referenceText,
+                t.stdFreigabe ? `Freigabe ${t.stdFreigabe}` : null,
+                t.aiLabel,
+              ]);
               return (
                 <li key={t.issueId}>
                   <button
                     type="button"
                     onClick={() => setSelectedId(t.issueId)}
                     className={cn(
-                      "flex w-full flex-col gap-1.5 rounded-xl border px-3 py-2.5 text-left shadow-sm transition-[background-color,border-color,box-shadow]",
+                      "flex w-full flex-col gap-1 rounded-xl border px-3 py-2.5 text-left shadow-sm transition-[background-color,border-color,box-shadow]",
                       active
                         ? "border-orange-300 bg-orange-50 shadow-[0_1px_0_rgba(251,146,60,0.25)] ring-1 ring-orange-200/80"
                         : "border-border/70 bg-background hover:border-orange-200/80 hover:bg-orange-50/40"
                     )}
                   >
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="text-[12px] font-bold text-foreground">
-                        #{t.issueId}
-                      </span>
-                      {t.issueTypeName ? (
-                        <Badge
-                          variant="outline"
-                          className="h-5 rounded-full border-border/70 px-2 text-[10px] font-semibold text-muted-foreground"
-                        >
-                          {t.issueTypeName}
-                        </Badge>
-                      ) : null}
-                      <StatusChip status={t.status} statusName={t.statusName} />
-                      {t.priorityName ? (
-                        <span className="text-[10px] font-semibold text-muted-foreground">
-                          {t.priorityName}
-                        </span>
-                      ) : null}
+                    <div className="flex items-start gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="text-[12px] font-bold text-foreground">
+                            #{t.issueId}
+                          </span>
+                          <StatusChip
+                            status={t.status}
+                            statusName={t.statusName}
+                          />
+                        </div>
+                        <p className="mt-1 line-clamp-2 text-[13px] font-semibold leading-snug tracking-tight">
+                          {t.briefDescription}
+                        </p>
+                      </div>
                       {due ? (
                         <span
                           className={cn(
-                            "ml-auto shrink-0 text-[11px] font-semibold",
+                            "shrink-0 pt-0.5 text-right text-[11px] font-semibold leading-tight",
                             overdue ? "text-rose-700" : "text-muted-foreground"
                           )}
+                          title={
+                            formatDateShort(t.dueDate)
+                              ? `Stichtag ${formatDateShort(t.dueDate)}`
+                              : undefined
+                          }
                         >
-                          Stichtag {due}
+                          <span className="block text-[9px] font-bold uppercase tracking-wide opacity-70">
+                            Stichtag
+                          </span>
+                          {due}
                         </span>
                       ) : null}
                     </div>
-                    <p className="line-clamp-2 text-[13px] font-medium leading-snug">
-                      {t.briefDescription}
-                    </p>
-                    <div className="flex flex-wrap gap-x-3 gap-y-1">
-                      <MetaBit label="Matchcode" value={t.addressMatchcode} />
-                      <MetaBit label="Adresse" value={t.cardCode} />
-                      <MetaBit label="Produkt" value={t.productName} />
-                    </div>
-                    <div className="flex flex-wrap gap-x-3 gap-y-1">
-                      <MetaBit
-                        label="Zuständig"
-                        value={t.handledByName || t.handledBy}
-                      />
-                      <MetaBit label="Gruppe" value={t.supportGroupName} />
-                      <MetaBit label="Kontakt" value={contact} />
-                    </div>
-                    <div className="flex flex-wrap gap-x-3 gap-y-1">
-                      <MetaBit
-                        label="Datum"
-                        value={formatDateTimeShort(t.requestDate)}
-                      />
-                      <MetaBit
-                        label="Geändert"
-                        value={formatDateTimeShort(t.changeAtDate)}
-                      />
-                      <MetaBit label="Referenz" value={t.referenceText} />
-                      <MetaBit label="Freigabe" value={t.stdFreigabe} />
-                      <MetaBit label="AI" value={t.aiLabel} />
-                    </div>
+                    {companyLine ? (
+                      <p className="truncate text-[12px] font-medium text-foreground/85">
+                        {companyLine}
+                      </p>
+                    ) : null}
+                    {classLine ? (
+                      <p className="truncate text-[11px] text-muted-foreground">
+                        {classLine}
+                      </p>
+                    ) : null}
+                    {peopleLine ? (
+                      <p className="truncate text-[11px] text-muted-foreground">
+                        {peopleLine}
+                      </p>
+                    ) : null}
+                    {whenLine ? (
+                      <p className="truncate text-[10px] text-muted-foreground/90">
+                        {whenLine}
+                      </p>
+                    ) : null}
                   </button>
                 </li>
               );
