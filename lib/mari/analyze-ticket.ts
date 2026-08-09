@@ -5,7 +5,7 @@ import {
   type AiTokenUsage,
 } from "@/lib/ai/usage-cost";
 import type { MariTicketDetail } from "@/lib/mari/tickets";
-import { timelineSideLabel } from "@/lib/mari/tickets";
+import { timelineSideLabel } from "@/lib/mari/timeline-side";
 
 function clip(s: string, max: number): string {
   const t = s.trim();

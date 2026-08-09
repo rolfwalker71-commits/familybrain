@@ -3,7 +3,7 @@ import test from "node:test";
 import {
   resolveTimelineSide,
   timelineSideLabel,
-} from "@/lib/mari/tickets";
+} from "@/lib/mari/timeline-side";
 
 test("resolveTimelineSide maps reply/note to support", () => {
   assert.equal(

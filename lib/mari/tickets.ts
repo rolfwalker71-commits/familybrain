@@ -11,11 +11,22 @@ import {
   type MariAttachmentMeta,
 } from "@/lib/mari/attachments";
 import {
+  resolveTimelineSide,
+  type MariTimelineKind,
+  type MariTimelineSide,
+} from "@/lib/mari/timeline-side";
+import {
   PRIORITY_LABELS,
   STATUS_LABELS,
   WORK_STATUS_IDS,
   statusChipLabel,
 } from "@/lib/mari/status";
+
+export type { MariTimelineKind, MariTimelineSide } from "@/lib/mari/timeline-side";
+export {
+  resolveTimelineSide,
+  timelineSideLabel,
+} from "@/lib/mari/timeline-side";
 
 function sqlQuote(value: string): string {
   return `'${value.replace(/'/g, "''")}'`;
@@ -78,18 +89,6 @@ export type MariTicketListItem = {
   /** AI-Kurzinfo (Topic/Category) */
   aiLabel: string | null;
 };
-
-export type MariTimelineKind =
-  | "inbound"
-  | "reply"
-  | "customer"
-  | "system"
-  | "note"
-  | "change"
-  | "attachment";
-
-/** Wer hat den Beitrag geschrieben / geliefert. */
-export type MariTimelineSide = "support" | "customer" | "system" | "unknown";
 
 export type MariTimelineAttachment = {
   attachmentId: number;
@@ -209,45 +208,6 @@ function lineLabel(posType: number): string {
       return "Kunde";
     default:
       return `Typ ${posType}`;
-  }
-}
-
-/**
- * Seite des Beitrags für AI/UI.
- * Typ 1 Antwort / 5 Notiz = Support (wir); 3 Eingang / 8 Kunde = Kunde;
- * 4 System / ChangeLog = System. EmployeeNumber M… stützt Support.
- */
-export function resolveTimelineSide(params: {
-  kind: MariTimelineKind;
-  posType?: number | null;
-  actor?: string | null;
-  internalOnly?: boolean;
-}): MariTimelineSide {
-  const { kind, actor, internalOnly } = params;
-  if (kind === "change" || kind === "system") return "system";
-  if (kind === "reply" || kind === "note") return "support";
-  if (kind === "customer" || kind === "inbound") return "customer";
-  if (kind === "attachment") {
-    const pos = params.posType;
-    if (pos === 1 || pos === 5) return "support";
-    if (pos === 3 || pos === 8) return "customer";
-    if (pos === 4) return "system";
-  }
-  if (internalOnly) return "support";
-  if (actor && /^M\d+/i.test(actor.trim())) return "support";
-  return "unknown";
-}
-
-export function timelineSideLabel(side: MariTimelineSide): string {
-  switch (side) {
-    case "support":
-      return "Support (wir)";
-    case "customer":
-      return "Kunde";
-    case "system":
-      return "System";
-    default:
-      return "Unklar";
   }
 }
 

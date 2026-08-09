@@ -85,9 +85,49 @@ function isImageAttachment(row: MariAttachmentApiRow): boolean {
   return false;
 }
 
-function approxBytesFromBase64(b64: string): number {
-  const len = b64.replace(/\s/g, "").length;
-  return Math.floor((len * 3) / 4);
+function decodeMariBase64(raw: string): Buffer | null {
+  let s = raw.replace(/\s/g, "");
+  if (!s) return null;
+  // data:-URL aus manchen Exporten
+  const dataUrl = /^data:[^;]+;base64,(.+)$/i.exec(s);
+  if (dataUrl?.[1]) s = dataUrl[1].replace(/\s/g, "");
+  try {
+    const buf = Buffer.from(s, "base64");
+    return buf.length > 0 ? buf : null;
+  } catch {
+    return null;
+  }
+}
+
+function sniffImageMime(bytes: Buffer, fallback: string): string {
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
+    return "image/jpeg";
+  }
+  if (
+    bytes.length >= 8 &&
+    bytes[0] === 0x89 &&
+    bytes[1] === 0x50 &&
+    bytes[2] === 0x4e &&
+    bytes[3] === 0x47
+  ) {
+    return "image/png";
+  }
+  if (
+    bytes.length >= 6 &&
+    bytes[0] === 0x47 &&
+    bytes[1] === 0x49 &&
+    bytes[2] === 0x46
+  ) {
+    return "image/gif";
+  }
+  if (
+    bytes.length >= 12 &&
+    bytes.toString("ascii", 0, 4) === "RIFF" &&
+    bytes.toString("ascii", 8, 12) === "WEBP"
+  ) {
+    return "image/webp";
+  }
+  return fallback.startsWith("image/") ? fallback : fallback || "application/octet-stream";
 }
 
 function rowHasFile(row: MariAttachmentApiRow): boolean {
@@ -136,19 +176,21 @@ export async function getMariAttachmentPayload(
     `/api/SupportIssueAttachment/${attachmentId}`
   );
   const raw = typeof full.DocumentData === "string" ? full.DocumentData : "";
-  const base64 = raw.replace(/\s/g, "");
-  if (!base64) return null;
-  const byteLength = approxBytesFromBase64(base64);
-  if (byteLength <= 0 || byteLength > maxBytes) return null;
+  const bytes = decodeMariBase64(raw);
+  if (!bytes) return null;
+  if (bytes.length > maxBytes) return null;
   const orgFilename = (full.OrgFilename || `anhang-${attachmentId}`).trim();
-  const mimeType = normalizeMariMime(full.MimeType, orgFilename);
+  const mimeType = sniffImageMime(
+    bytes,
+    normalizeMariMime(full.MimeType, orgFilename)
+  );
   return {
     attachmentId: Number(full.AttachmentID) || attachmentId,
     issueId: Number(full.IssueID) || 0,
     mimeType,
     orgFilename,
-    bytes: Buffer.from(base64, "base64"),
-    byteLength,
+    bytes,
+    byteLength: bytes.length,
   };
 }
 
@@ -190,21 +232,24 @@ export async function listMariImageAttachmentsForAi(
         `/api/SupportIssueAttachment/${item.attachmentId}`
       );
       const raw = typeof full.DocumentData === "string" ? full.DocumentData : "";
-      const base64 = raw.replace(/\s/g, "");
-      if (!base64) continue;
-      const byteLength = approxBytesFromBase64(base64);
+      const bytes = decodeMariBase64(raw);
+      if (!bytes) continue;
+      const byteLength = bytes.length;
       // Skip tiny signature GIFs / icons
-      if (item.mimeType === "image/gif" && byteLength < 12_000) continue;
+      const mime = sniffImageMime(
+        bytes,
+        normalizeMariMime(
+          full.MimeType || item.mimeType,
+          full.OrgFilename || item.orgFilename
+        )
+      );
+      if (mime === "image/gif" && byteLength < 12_000) continue;
       if (byteLength < 2_500) continue;
       if (byteLength > maxBytesPerImage) continue;
       if (total + byteLength > maxTotalBytes) continue;
-
-      const mime = normalizeMariMime(
-        full.MimeType || item.mimeType,
-        full.OrgFilename || item.orgFilename
-      );
       if (!mime.startsWith("image/")) continue;
 
+      const base64 = bytes.toString("base64");
       out.push({
         attachmentId: item.attachmentId,
         issueId: item.issueId,

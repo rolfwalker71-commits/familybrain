@@ -1,18 +1,25 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { isImageAttachmentRow } from "@/lib/mari/attachments";
+import { normalizeMariMime, isMariImageMime } from "@/lib/mari/attachments";
 
-test("detects image attachments by mime and filename", () => {
-  assert.equal(
-    isImageAttachmentRow({ MimeType: "png", OrgFilename: "x.bin" }),
-    true
-  );
-  assert.equal(
-    isImageAttachmentRow({ MimeType: "application/pdf", OrgFilename: "a.pdf" }),
-    false
-  );
-  assert.equal(
-    isImageAttachmentRow({ MimeType: "", OrgFilename: "shot.JPEG" }),
-    true
-  );
+test("normalizeMariMime maps bare png/jpg to image/*", () => {
+  assert.equal(normalizeMariMime("png", "x.png"), "image/png");
+  assert.equal(normalizeMariMime("jpg", "x.jpg"), "image/jpeg");
+  assert.equal(normalizeMariMime(null, "shot.WEBP"), "image/webp");
+});
+
+test("isMariImageMime accepts filename fallback", () => {
+  assert.equal(isMariImageMime("application/octet-stream", "a.PNG"), true);
+  assert.equal(isMariImageMime("application/pdf", "a.pdf"), false);
+});
+
+test("base64 padding length matches Buffer length", () => {
+  // Regression: Content-Length used floor(len*3/4) without padding → +1 byte
+  // and browsers showed broken image placeholders.
+  const padded = Buffer.from("hello world!!").toString("base64"); // ends with =
+  assert.ok(padded.endsWith("="));
+  const actual = Buffer.from(padded, "base64").length;
+  const naive = Math.floor(padded.length * 3 / 4);
+  assert.notEqual(naive, actual);
+  assert.equal(actual, 13);
 });

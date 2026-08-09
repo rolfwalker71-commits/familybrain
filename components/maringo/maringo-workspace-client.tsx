@@ -50,9 +50,11 @@ import type {
   MariTicketListItem,
   MariTimelineAttachment,
   MariTimelineItem,
-  MariTimelineSide,
 } from "@/lib/mari/tickets";
-import { timelineSideLabel } from "@/lib/mari/tickets";
+import {
+  timelineSideLabel,
+  type MariTimelineSide,
+} from "@/lib/mari/timeline-side";
 
 function sideChipClass(side: MariTimelineSide): string {
   switch (side) {
@@ -72,38 +74,129 @@ function attachmentUrl(attachmentId: number, download = false): string {
   return `/api/maringo/attachments/${attachmentId}${q}`;
 }
 
+function TimelineImageThumb({
+  attachment,
+  onOpen,
+}: {
+  attachment: MariTimelineAttachment;
+  onOpen: () => void;
+}) {
+  const [src, setSrc] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    let objectUrl: string | null = null;
+    setSrc(null);
+    setFailed(false);
+    void (async () => {
+      try {
+        const res = await fetch(attachmentUrl(attachment.attachmentId), {
+          credentials: "same-origin",
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const blob = await res.blob();
+        if (blob.size < 32) throw new Error("empty");
+        objectUrl = URL.createObjectURL(blob);
+        if (!cancelled) setSrc(objectUrl);
+      } catch {
+        if (!cancelled) setFailed(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [attachment.attachmentId]);
+
+  if (failed) {
+    return (
+      <a
+        href={attachmentUrl(attachment.attachmentId, true)}
+        className="inline-flex h-24 w-28 flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border/70 bg-muted/30 px-2 text-center text-[10px] text-muted-foreground hover:border-orange-300 hover:text-foreground"
+        title={`${attachment.orgFilename} herunterladen`}
+      >
+        <Paperclip className="size-3.5" />
+        <span className="line-clamp-2 w-full break-all">
+          {attachment.orgFilename}
+        </span>
+      </a>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      className="group relative overflow-hidden rounded-lg border border-border/60 bg-background shadow-sm transition hover:border-orange-300"
+      onClick={onOpen}
+      title={attachment.orgFilename}
+      disabled={!src}
+    >
+      {src ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={src}
+          alt={attachment.orgFilename}
+          className="h-24 w-auto max-w-[11rem] object-cover"
+        />
+      ) : (
+        <span className="flex h-24 w-28 items-center justify-center text-[10px] text-muted-foreground">
+          Lädt…
+        </span>
+      )}
+      <span className="absolute inset-x-0 bottom-0 truncate bg-black/55 px-1.5 py-0.5 text-[10px] text-white opacity-0 transition group-hover:opacity-100">
+        {attachment.orgFilename}
+      </span>
+    </button>
+  );
+}
+
 function TimelineAttachments({
   attachments,
 }: {
   attachments: MariTimelineAttachment[];
 }) {
   const [lightbox, setLightbox] = useState<MariTimelineAttachment | null>(null);
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const images = attachments.filter((a) => a.isImage);
   const files = attachments.filter((a) => !a.isImage);
+
+  useEffect(() => {
+    if (!lightbox) {
+      setLightboxSrc(null);
+      return;
+    }
+    let cancelled = false;
+    let objectUrl: string | null = null;
+    void (async () => {
+      try {
+        const res = await fetch(attachmentUrl(lightbox.attachmentId), {
+          credentials: "same-origin",
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const blob = await res.blob();
+        objectUrl = URL.createObjectURL(blob);
+        if (!cancelled) setLightboxSrc(objectUrl);
+      } catch {
+        if (!cancelled) setLightboxSrc(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [lightbox]);
 
   return (
     <>
       {images.length > 0 ? (
         <div className="flex flex-wrap gap-2 pt-0.5">
           {images.map((a) => (
-            <button
+            <TimelineImageThumb
               key={a.attachmentId}
-              type="button"
-              className="group relative overflow-hidden rounded-lg border border-border/60 bg-background shadow-sm transition hover:border-orange-300"
-              onClick={() => setLightbox(a)}
-              title={a.orgFilename}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={attachmentUrl(a.attachmentId)}
-                alt={a.orgFilename}
-                loading="lazy"
-                className="h-24 w-auto max-w-[11rem] object-cover"
-              />
-              <span className="absolute inset-x-0 bottom-0 truncate bg-black/55 px-1.5 py-0.5 text-[10px] text-white opacity-0 transition group-hover:opacity-100">
-                {a.orgFilename}
-              </span>
-            </button>
+              attachment={a}
+              onOpen={() => setLightbox(a)}
+            />
           ))}
         </div>
       ) : null}
@@ -143,12 +236,18 @@ function TimelineAttachments({
             className="flex max-h-full max-w-full flex-col items-center gap-2"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={attachmentUrl(lightbox.attachmentId)}
-              alt={lightbox.orgFilename}
-              className="max-h-[85vh] max-w-[95vw] rounded-lg object-contain shadow-2xl"
-            />
+            {lightboxSrc ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={lightboxSrc}
+                alt={lightbox.orgFilename}
+                className="max-h-[85vh] max-w-[95vw] rounded-lg object-contain shadow-2xl"
+              />
+            ) : (
+              <p className="rounded-lg bg-white/90 px-4 py-3 text-sm text-foreground">
+                Bild wird geladen…
+              </p>
+            )}
             <a
               href={attachmentUrl(lightbox.attachmentId, true)}
               className="rounded-full bg-white/90 px-3 py-1 text-[12px] font-medium text-foreground hover:bg-white"

@@ -42,7 +42,9 @@ export async function GET(request: Request, context: Ctx) {
 
     const headers = new Headers();
     headers.set("Content-Type", payload.mimeType || "application/octet-stream");
-    headers.set("Content-Length", String(payload.byteLength));
+    // Wichtig: echte Buffer-Länge — Approximierung aus Base64 mit Padding
+    // lag oft 1 Byte daneben und Browser zeigten kaputte Platzhalter.
+    headers.set("Content-Length", String(payload.bytes.length));
     headers.set("Cache-Control", "private, max-age=300");
     const safeName = payload.orgFilename.replace(/[^\w.\- ()äöüÄÖÜß]+/g, "_");
     headers.set(
