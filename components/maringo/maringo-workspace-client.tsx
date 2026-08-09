@@ -422,14 +422,14 @@ export function MaringoWorkspaceClient() {
             </div>
           </div>
 
-          <ul className="min-h-0 flex-1 overflow-y-auto">
+          <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto bg-muted/20 p-2.5">
             {listLoading && tickets.length === 0 ? (
-              <li className="px-3 py-6 text-sm text-muted-foreground">
+              <li className="rounded-xl border border-dashed border-border/60 bg-background/80 px-3 py-6 text-sm text-muted-foreground">
                 Lade Tickets…
               </li>
             ) : null}
             {!listLoading && tickets.length === 0 ? (
-              <li className="px-3 py-6 text-center text-sm text-muted-foreground">
+              <li className="rounded-xl border border-dashed border-border/60 bg-background/80 px-3 py-6 text-center text-sm text-muted-foreground">
                 Keine Tickets für die gewählten Status.
               </li>
             ) : null}
@@ -443,8 +443,10 @@ export function MaringoWorkspaceClient() {
                     type="button"
                     onClick={() => setSelectedId(t.issueId)}
                     className={cn(
-                      "flex w-full flex-col gap-1 border-b border-border/40 px-3 py-2.5 text-left transition-colors",
-                      active ? "bg-orange-50/80" : "hover:bg-muted/30"
+                      "flex w-full flex-col gap-1.5 rounded-xl border px-3 py-2.5 text-left shadow-sm transition-[background-color,border-color,box-shadow]",
+                      active
+                        ? "border-orange-300 bg-orange-50 shadow-[0_1px_0_rgba(251,146,60,0.25)] ring-1 ring-orange-200/80"
+                        : "border-border/70 bg-background hover:border-orange-200/80 hover:bg-orange-50/40"
                     )}
                   >
                     <div className="flex items-center gap-2">
@@ -455,7 +457,7 @@ export function MaringoWorkspaceClient() {
                       {due ? (
                         <span
                           className={cn(
-                            "ml-auto text-[11px] font-semibold",
+                            "ml-auto shrink-0 text-[11px] font-semibold",
                             overdue ? "text-rose-700" : "text-muted-foreground"
                           )}
                         >
