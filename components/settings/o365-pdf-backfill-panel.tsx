@@ -17,6 +17,9 @@ type LiveProgress = {
   messageTotal: number;
   pdfsUploadedThisBatch: number;
   pdfsMaxThisBatch: number;
+  messagesWithPdfThisBatch?: number;
+  pdfsSkippedThisBatch?: number;
+  pdfsFailedThisBatch?: number;
   detail: string | null;
   updatedAt: string;
 };
@@ -297,7 +300,7 @@ export function O365PdfBackfillPanel() {
       if (!res.ok) throw new Error(json.error || "Stoppen fehlgeschlagen");
       setStatus(json as BackfillStatus);
       setMsg(
-        "Stop — Kette und Job-Lease beendet. Offene Paperless-Uploads brechen kooperativ ab (max. ~45 s). Cursor bleibt."
+        "Stop — Kette und Job-Lease beendet. Offene Paperless-Uploads brechen kooperativ ab (max. ~90 s). Cursor bleibt."
       );
       await load();
     } catch (err) {
@@ -617,10 +620,30 @@ export function O365PdfBackfillPanel() {
                   Docs in Buddy (O365): {status.documentsFromO365}
                 </span>
                 {" · "}
-                Crawl — Mails: {status.stats.messagesSeen} · mit PDF:{" "}
-                {status.stats.messagesWithPdf ?? 0} · neu:{" "}
-                {status.stats.pdfsUploaded} · übersprungen:{" "}
-                {status.stats.pdfsSkipped} · Fehler: {status.stats.pdfsFailed}
+                {live ? (
+                  <>
+                    Dieser Lauf — Mails: {live.messageIndex} · mit PDF:{" "}
+                    {live.messagesWithPdfThisBatch ?? 0} · neu:{" "}
+                    {live.pdfsUploadedThisBatch} · übersprungen:{" "}
+                    {live.pdfsSkippedThisBatch ?? 0} · Fehler:{" "}
+                    {live.pdfsFailedThisBatch ?? 0}
+                    {status.stats.messagesSeen > 0 ? (
+                      <>
+                        {" · "}
+                        Gesamt bisher: {status.stats.messagesSeen} Mails /{" "}
+                        {status.stats.pdfsUploaded} neu
+                      </>
+                    ) : null}
+                  </>
+                ) : (
+                  <>
+                    Crawl — Mails: {status.stats.messagesSeen} · mit PDF:{" "}
+                    {status.stats.messagesWithPdf ?? 0} · neu:{" "}
+                    {status.stats.pdfsUploaded} · übersprungen:{" "}
+                    {status.stats.pdfsSkipped} · Fehler:{" "}
+                    {status.stats.pdfsFailed}
+                  </>
+                )}
               </p>
               <p className="text-muted-foreground">
                 Letzter erfolgreicher Batch: {fmtTs(status.lastRunAt)}
@@ -644,7 +667,7 @@ export function O365PdfBackfillPanel() {
                   Crawl-Log (neueste zuerst)
                 </p>
                 <p className="text-[11px] text-muted-foreground">
-                  Datum = Empfangen — für «Ab Datum» beim 2. Versuch nutzbar
+                  Datum = Empfangen · Log schreibt nach jeder Mail (nicht sekündlich)
                 </p>
               </div>
               {log.length === 0 ? (
@@ -671,8 +694,8 @@ export function O365PdfBackfillPanel() {
                         )}
                       >
                         {outcomeLabel(e.outcome)}
-                        {e.pdfNew ? ` · ${e.pdfNew}` : ""}
-                        {e.pdfFailed ? ` · ${e.pdfFailed}✗` : ""}
+                        {e.pdfNew ? ` · ${e.pdfNew} neu` : ""}
+                        {e.pdfFailed ? ` · ${e.pdfFailed} PDF` : ""}
                       </Badge>
                       <span className="min-w-0 flex-1 truncate text-foreground">
                         {e.subject}

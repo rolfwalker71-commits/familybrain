@@ -7,6 +7,11 @@ import type {
   PaperlessTag,
 } from "./types";
 import { isPaidFieldName, isToPayFieldName } from "./custom-fields";
+import {
+  extractPaperlessTaskDocumentId,
+  paperlessTaskFailureMessage,
+  type PaperlessTaskLike,
+} from "./task-result";
 
 export class PaperlessError extends Error {
   status: number;
@@ -604,11 +609,7 @@ export class PaperlessClient {
     return taskId;
   }
 
-  async getTaskById(taskId: string): Promise<{
-    status: string;
-    result: string | null;
-    related_document: string | number | null;
-  } | null> {
+  async getTaskById(taskId: string): Promise<PaperlessTaskLike | null> {
     const params = new URLSearchParams({ task_id: taskId });
     const response = await this.fetchRaw(
       `/api/tasks/?${params.toString()}`,
@@ -622,23 +623,14 @@ export class PaperlessClient {
           Array.isArray((data as { results?: unknown }).results)
         ? (data as { results: unknown[] }).results
         : [];
-    const row = rows[0] as
-      | {
-          status?: string;
-          result?: string | null;
-          related_document?: string | number | null;
-        }
-      | undefined;
+    const row = rows[0] as PaperlessTaskLike | undefined;
     if (!row) return null;
-    return {
-      status: String(row.status || ""),
-      result: row.result ?? null,
-      related_document: row.related_document ?? null,
-    };
+    return row;
   }
 
   /**
    * Poll consumption until a document id is available (or timeout).
+   * Handles Paperless API v9 and v10+ task payloads.
    */
   async waitForPostedDocument(
     taskId: string,
@@ -658,19 +650,21 @@ export class PaperlessClient {
       }
       const task = await this.getTaskById(taskId);
       if (task) {
-        const related = Number(task.related_document);
-        if (Number.isFinite(related) && related > 0) return related;
-        const fromResult =
-          /document id (\d+)/i.exec(task.result || "") ||
-          /#(\d+)/.exec(task.result || "");
-        if (fromResult) {
-          const id = Number(fromResult[1]);
-          if (Number.isFinite(id) && id > 0) return id;
-        }
-        const status = task.status.toUpperCase();
+        const docId = extractPaperlessTaskDocumentId(task);
+        if (docId) return docId;
+        const status = String(task.status || "").toUpperCase();
         if (status === "FAILURE" || status === "REVOKED") {
           throw new PaperlessError(
-            task.result?.trim() || "Paperless-Import fehlgeschlagen.",
+            paperlessTaskFailureMessage(task) ||
+              "Paperless-Import fehlgeschlagen.",
+            502
+          );
+        }
+        // SUCCESS without a document id = API shape mismatch / empty payload
+        if (status === "SUCCESS") {
+          throw new PaperlessError(
+            paperlessTaskFailureMessage(task) ||
+              "Paperless-Task erfolgreich, aber keine Dokument-ID gefunden.",
             502
           );
         }

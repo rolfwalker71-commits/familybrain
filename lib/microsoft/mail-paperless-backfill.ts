@@ -77,8 +77,8 @@ export const O365_PDF_BACKFILL_CHAIN_DELAY_MS = 400;
 export const O365_PDF_BACKFILL_CHAIN_RETRY_MS = 4_000;
 /** Paperless consume poll interval during catch-up. */
 export const O365_PDF_BACKFILL_PAPERLESS_POLL_MS = 400;
-/** Cap wait per PDF so Stop/Fehler nicht minutenlang blockieren. */
-export const O365_PDF_BACKFILL_PAPERLESS_TIMEOUT_MS = 45_000;
+/** Cap wait per PDF (Stop bricht kooperativ ab; API-v10-ID-Erkennung ist schneller). */
+export const O365_PDF_BACKFILL_PAPERLESS_TIMEOUT_MS = 90_000;
 
 async function mapPool<T, R>(
   items: T[],
@@ -123,6 +123,10 @@ export type O365PdfBackfillLiveProgress = {
   messageTotal: number;
   pdfsUploadedThisBatch: number;
   pdfsMaxThisBatch: number;
+  /** Live batch counters (UI while stats JSON still shows last finished run). */
+  messagesWithPdfThisBatch?: number;
+  pdfsSkippedThisBatch?: number;
+  pdfsFailedThisBatch?: number;
   detail: string | null;
   updatedAt: string;
 };
@@ -325,6 +329,12 @@ function writeLiveProgress(
       partial.pdfsMaxThisBatch ??
       prev?.pdfsMaxThisBatch ??
       O365_PDF_BACKFILL_MAX_PDFS_PER_RUN,
+    messagesWithPdfThisBatch:
+      partial.messagesWithPdfThisBatch ?? prev?.messagesWithPdfThisBatch ?? 0,
+    pdfsSkippedThisBatch:
+      partial.pdfsSkippedThisBatch ?? prev?.pdfsSkippedThisBatch ?? 0,
+    pdfsFailedThisBatch:
+      partial.pdfsFailedThisBatch ?? prev?.pdfsFailedThisBatch ?? 0,
     detail: partial.detail !== undefined ? partial.detail : prev?.detail ?? null,
     updatedAt: new Date().toISOString(),
   };
@@ -351,6 +361,9 @@ function parseLiveProgress(
       pdfsUploadedThisBatch: Number(j.pdfsUploadedThisBatch) || 0,
       pdfsMaxThisBatch:
         Number(j.pdfsMaxThisBatch) || O365_PDF_BACKFILL_MAX_PDFS_PER_RUN,
+      messagesWithPdfThisBatch: Number(j.messagesWithPdfThisBatch) || 0,
+      pdfsSkippedThisBatch: Number(j.pdfsSkippedThisBatch) || 0,
+      pdfsFailedThisBatch: Number(j.pdfsFailedThisBatch) || 0,
       detail: j.detail ?? null,
       updatedAt: j.updatedAt || new Date().toISOString(),
     };
@@ -531,6 +544,9 @@ export async function runO365PdfBackfillBatch(
     messageTotal: 0,
     pdfsUploadedThisBatch: 0,
     pdfsMaxThisBatch: O365_PDF_BACKFILL_MAX_PDFS_PER_RUN,
+    messagesWithPdfThisBatch: 0,
+    pdfsSkippedThisBatch: 0,
+    pdfsFailedThisBatch: 0,
     detail: cursor
       ? "Lade nächste Graph-Seite…"
       : `Lade Inbox ab ${sinceYmd} (älteste → neueste)…`,
@@ -685,6 +701,9 @@ export async function runO365PdfBackfillBatch(
         messageIndex: messagesSeen,
         messageTotal: O365_PDF_BACKFILL_MAX_MESSAGES_PER_RUN,
         pdfsUploadedThisBatch: pdfsUploaded,
+        messagesWithPdfThisBatch: messagesWithPdf,
+        pdfsSkippedThisBatch: pdfsSkipped,
+        pdfsFailedThisBatch: pdfsFailed,
         detail: `Lade ${pending.length} PDF(s) nach Paperless…`,
       });
 
@@ -724,6 +743,23 @@ export async function runO365PdfBackfillBatch(
           pdfFailed: mailFail,
           detail: errBits[0] || `${mailFail} PDF-Fehler`,
         });
+        // Cursor bleibt auf dieser Seite — nächster Lauf retried fehlgeschlagene PDFs.
+        pageComplete = false;
+        stoppedMidPage = true;
+        writeLiveProgress({
+          active: true,
+          step: "upload_pdf",
+          subject: msg.subject,
+          receivedDateTime: msg.receivedDateTime,
+          messageIndex: messagesSeen,
+          messageTotal: O365_PDF_BACKFILL_MAX_MESSAGES_PER_RUN,
+          pdfsUploadedThisBatch: pdfsUploaded,
+          messagesWithPdfThisBatch: messagesWithPdf,
+          pdfsSkippedThisBatch: pdfsSkipped,
+          pdfsFailedThisBatch: pdfsFailed,
+          detail: `Upload-Fehler · Seite wird wiederholt (${mailFail} PDF)`,
+        });
+        break;
       } else if (mailNew > 0) {
         appendO365PdfBackfillLog({
           receivedAt: msg.receivedDateTime,
@@ -748,6 +784,9 @@ export async function runO365PdfBackfillBatch(
         messageIndex: messagesSeen,
         messageTotal: O365_PDF_BACKFILL_MAX_MESSAGES_PER_RUN,
         pdfsUploadedThisBatch: pdfsUploaded,
+        messagesWithPdfThisBatch: messagesWithPdf,
+        pdfsSkippedThisBatch: pdfsSkipped,
+        pdfsFailedThisBatch: pdfsFailed,
         detail: `PDFs · neu ${pdfsUploaded}/${O365_PDF_BACKFILL_MAX_PDFS_PER_RUN} · Seite ${pagesDone}`,
       });
     }
