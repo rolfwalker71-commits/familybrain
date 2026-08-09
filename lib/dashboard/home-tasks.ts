@@ -17,7 +17,12 @@ export type HomeTaskItem = {
   title: string;
   dueDate: string | null;
   overdue: boolean;
+  /** Legacy one-line meta (list / plan · bucket). */
   subtitle: string;
+  /** Account chip: Google / Microsoft. */
+  accountLabel: string;
+  /** Bucket/list/plan chip. */
+  bucketLabel: string | null;
   href: string;
   listId: string | null;
   etag: string | null;
@@ -83,6 +88,8 @@ export async function loadHomeTasksBundle(
           dueDate: t.dueDate,
           overdue: t.overdue,
           subtitle: t.listTitle || "Google Tasks",
+          accountLabel: "Google",
+          bucketLabel: t.listTitle || "Tasks",
           href: t.href,
           listId: t.listId,
           etag: null,
@@ -104,7 +111,9 @@ export async function loadHomeTasksBundle(
           title: t.title,
           dueDate: t.dueDate,
           overdue: t.overdue,
-          subtitle: "Outlook To Do",
+          subtitle: t.listTitle || "Outlook To Do",
+          accountLabel: "Microsoft",
+          bucketLabel: t.listTitle || "To Do",
           href: t.href,
           listId: t.listId,
           etag: null,
@@ -122,20 +131,24 @@ export async function loadHomeTasksBundle(
             if (!t.dueDate) return true;
             return t.dueDate <= horizon;
           })
-          .map((t) => ({
-            key: `planner:${t.id}`,
-            id: t.id,
-            source: "planner" as const,
-            title: t.title,
-            dueDate: t.dueDate,
-            overdue: Boolean(t.dueDate && t.dueDate < today),
-            subtitle: [t.planTitle || "Planner", t.bucketName]
-              .filter(Boolean)
-              .join(" · "),
-            href: t.href,
-            listId: null,
-            etag: t.etag || null,
-          }));
+          .map((t) => {
+            const plan = t.planTitle || "Planner";
+            const bucket = t.bucketName || null;
+            return {
+              key: `planner:${t.id}`,
+              id: t.id,
+              source: "planner" as const,
+              title: t.title,
+              dueDate: t.dueDate,
+              overdue: Boolean(t.dueDate && t.dueDate < today),
+              subtitle: [plan, bucket].filter(Boolean).join(" · "),
+              accountLabel: plan,
+              bucketLabel: bucket,
+              href: t.href,
+              listId: null,
+              etag: t.etag || null,
+            };
+          });
       } catch {
         return [] as HomeTaskItem[];
       }

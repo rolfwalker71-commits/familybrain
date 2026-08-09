@@ -2,14 +2,16 @@
 
 import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import Link from "next/link";
-import { Check, CheckSquare, ExternalLink, ListTodo } from "lucide-react";
+import { Check, CheckSquare, ChevronDown, ExternalLink } from "lucide-react";
 import { AgendaAiIconThumb } from "@/components/calendar/agenda-ai-icon-thumb";
 import { weekdayLabel } from "@/components/calendar/agenda-row";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { APP_ICON_STROKE } from "@/lib/branding/app-icons";
 import { showActionFeedback } from "@/lib/ui/action-feedback";
+import { toSwissDate } from "@/lib/utils/dates";
 import { cn } from "@/lib/utils";
 
 export type HomeTaskRow = {
@@ -20,6 +22,8 @@ export type HomeTaskRow = {
   dueDate: string | null;
   overdue: boolean;
   subtitle: string;
+  accountLabel?: string | null;
+  bucketLabel?: string | null;
   href: string;
   listId: string | null;
   etag: string | null;
@@ -33,6 +37,18 @@ const SOURCE_LABEL: Record<HomeTaskRow["source"], string> = {
 };
 
 const SOURCE_ORDER: HomeTaskRow["source"][] = ["planner", "todo", "google"];
+
+const ACCOUNT_CHIP: Record<HomeTaskRow["source"], string> = {
+  google: "border-sky-200/80 bg-sky-100 text-sky-950",
+  todo: "border-violet-200/80 bg-violet-100 text-violet-950",
+  planner: "border-teal-200/80 bg-teal-100 text-teal-950",
+};
+
+const BUCKET_CHIP: Record<HomeTaskRow["source"], string> = {
+  google: "border-sky-200/60 bg-sky-50 text-sky-900",
+  todo: "border-violet-200/60 bg-violet-50 text-violet-900",
+  planner: "border-teal-200/60 bg-teal-50 text-teal-900",
+};
 
 function addDaysYmd(iso: string, days: number): string {
   const d = new Date(`${iso}T12:00:00Z`);
@@ -64,6 +80,55 @@ function sortTasks(a: HomeTaskRow, b: HomeTaskRow): number {
   return a.title.localeCompare(b.title, "de");
 }
 
+function accountChipLabel(task: HomeTaskRow): string {
+  const raw = (task.accountLabel || "").trim();
+  if (raw) return raw;
+  if (task.source === "google") return "Google";
+  if (task.source === "todo") return "Microsoft";
+  return "Planner";
+}
+
+function bucketChipLabel(task: HomeTaskRow): string | null {
+  const raw = (task.bucketLabel || task.listTitle || "").trim();
+  if (raw) return raw;
+  const sub = (task.subtitle || "").trim();
+  if (!sub) return null;
+  if (task.source === "planner" && sub.includes(" · ")) {
+    return sub.split(" · ").slice(1).join(" · ") || null;
+  }
+  return sub;
+}
+
+function TaskChips({ task }: { task: HomeTaskRow }) {
+  const account = accountChipLabel(task);
+  const bucket = bucketChipLabel(task);
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <Badge
+        variant="outline"
+        className={cn(
+          "h-5 rounded-md border px-1.5 text-[10px] font-semibold",
+          ACCOUNT_CHIP[task.source]
+        )}
+      >
+        {account}
+      </Badge>
+      {bucket ? (
+        <Badge
+          variant="outline"
+          className={cn(
+            "h-5 max-w-[14rem] truncate rounded-md border px-1.5 text-[10px] font-medium",
+            BUCKET_CHIP[task.source]
+          )}
+          title={bucket}
+        >
+          {bucket}
+        </Badge>
+      ) : null}
+    </div>
+  );
+}
+
 function TaskRow({
   task,
   today,
@@ -73,6 +138,7 @@ function TaskRow({
   onDueDraft,
   onComplete,
   onReschedule,
+  compact,
 }: {
   task: HomeTaskRow;
   today: string;
@@ -82,6 +148,7 @@ function TaskRow({
   onDueDraft: (v: string) => void;
   onComplete: () => void;
   onReschedule: () => void;
+  compact?: boolean;
 }) {
   return (
     <li
@@ -100,25 +167,31 @@ function TaskRow({
         location={task.subtitle}
         description={`${SOURCE_LABEL[task.source]} · ${task.subtitle}`}
         className="shrink-0"
-        imgClassName="size-11 rounded-lg sm:size-12"
+        imgClassName={cn(
+          "rounded-lg",
+          compact ? "size-9 sm:size-10" : "size-11 sm:size-12"
+        )}
       />
       <div className="min-w-0 flex-1 space-y-1.5">
         <div className="flex flex-wrap items-start justify-between gap-2">
-          <div className="min-w-0">
+          <div className="min-w-0 space-y-1">
             <p className="text-[14px] font-black leading-snug">{task.title}</p>
             {justDone ? (
               <p className="text-[12px] font-medium text-emerald-800">
                 Als erledigt markiert
               </p>
             ) : (
-              <p className="text-[12px] text-muted-foreground">
-                <span
-                  className={cn(task.overdue && "font-medium text-rose-700")}
-                >
-                  {dueLabel(task.dueDate, today, task.overdue)}
-                </span>
-                {task.subtitle ? ` · ${task.subtitle}` : ""}
-              </p>
+              <>
+                <p className="text-[12px] text-muted-foreground">
+                  <span
+                    className={cn(task.overdue && "font-medium text-rose-700")}
+                  >
+                    {dueLabel(task.dueDate, today, task.overdue)}
+                  </span>
+                  {` · ${SOURCE_LABEL[task.source]}`}
+                </p>
+                <TaskChips task={task} />
+              </>
             )}
           </div>
           {!justDone ? (
@@ -177,6 +250,7 @@ function SourceBlock({
   draftDue,
   setDraftDue,
   patch,
+  compact,
 }: {
   source: HomeTaskRow["source"];
   tasks: HomeTaskRow[];
@@ -190,6 +264,7 @@ function SourceBlock({
     action: "complete" | "reschedule",
     dueDate?: string | null
   ) => Promise<void>;
+  compact?: boolean;
 }) {
   if (tasks.length === 0) return null;
   return (
@@ -222,6 +297,7 @@ function SourceBlock({
                 draftDue[t.key] ?? t.dueDate ?? null
               )
             }
+            compact={compact}
           />
         ))}
       </ul>
@@ -249,6 +325,7 @@ export function HomeTasksSection({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [draftDue, setDraftDue] = useState<Record<string, string>>({});
+  const [laterOpen, setLaterOpen] = useState(false);
 
   useEffect(() => {
     setRows(items.filter((t) => !doneKeysRef.current.has(t.key)));
@@ -256,6 +333,12 @@ export function HomeTasksSection({
 
   const focusRows = useMemo(
     () => rows.filter((t) => isFocusHomeTask(t, today)).sort(sortTasks),
+    [rows, today]
+  );
+
+  const laterRows = useMemo(
+    () =>
+      rows.filter((t) => !isFocusHomeTask(t, today)).sort(sortTasks),
     [rows, today]
   );
 
@@ -317,7 +400,7 @@ export function HomeTasksSection({
           )
         );
         const msg = nextDue
-          ? `«${task.title}» neu terminiert auf ${nextDue}.`
+          ? `«${task.title}» neu terminiert auf ${toSwissDate(nextDue)}.`
           : `Termin bei «${task.title}» entfernt.`;
         setNotice(msg);
         showActionFeedback({
@@ -431,172 +514,48 @@ export function HomeTasksSection({
             />
           ))
         )}
-      </CardContent>
-    </Card>
-  );
-}
 
-/** Rechte Seitenleiste: weitere offene Aufgaben (nicht heute/morgen). */
-export function HomeTasksOtherAside({
-  items,
-  today,
-  onChanged,
-}: {
-  items: HomeTaskRow[];
-  today: string;
-  onChanged?: () => void;
-}) {
-  const doneKeysRef = useRef<Set<string>>(new Set());
-  const [rows, setRows] = useState(items);
-  const [busyKey, setBusyKey] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    setRows(items.filter((t) => !doneKeysRef.current.has(t.key)));
-  }, [items]);
-
-  const other = useMemo(
-    () =>
-      rows.filter((t) => !isFocusHomeTask(t, today)).sort(sortTasks),
-    [rows, today]
-  );
-
-  async function complete(task: HomeTaskRow) {
-    setBusyKey(task.key);
-    setError(null);
-    setNotice(null);
-    try {
-      const res = await fetch("/api/dashboard/tasks", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          source: task.source,
-          id: task.id,
-          listId: task.listId,
-          etag: task.etag,
-          action: "complete",
-        }),
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(
-          (json as { error?: string }).error ||
-            `Update fehlgeschlagen (${res.status})`
-        );
-      }
-      const msg = `«${task.title}» ist erledigt.`;
-      doneKeysRef.current.add(task.key);
-      setRows((prev) => prev.filter((t) => t.key !== task.key));
-      setNotice(msg);
-      showActionFeedback({
-        headline: msg,
-        detail: `${SOURCE_LABEL[task.source]} · weitere Aufgaben`,
-        tone: "success",
-      });
-      window.setTimeout(() => onChanged?.(), 400);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      setError(message);
-      showActionFeedback({
-        headline: "Aufgabe konnte nicht aktualisiert werden",
-        detail: message,
-        tone: "error",
-      });
-    } finally {
-      setBusyKey(null);
-    }
-  }
-
-  if (other.length === 0 && !notice) return null;
-
-  const bySource = SOURCE_ORDER.map((source) => ({
-    source,
-    count: other.filter((t) => t.source === source).length,
-  })).filter((g) => g.count > 0);
-
-  return (
-    <Card className="border-border/70">
-      <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2 text-[16px] font-black">
-          <ListTodo
-            className="size-4 text-muted-foreground"
-            strokeWidth={APP_ICON_STROKE}
-            absoluteStrokeWidth
-            aria-hidden
-          />
-          Weitere Aufgaben
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <p className="text-[25px] font-semibold tabular-nums">
-          {other.length}
-        </p>
-        <p className="text-[13px] text-muted-foreground">
-          Offen ausserhalb heute/morgen
-          {bySource.length > 0
-            ? ` · ${bySource
-                .map((g) => `${g.count} ${SOURCE_LABEL[g.source]}`)
-                .join(", ")}`
-            : ""}
-        </p>
-        {notice ? (
-          <p className="text-[12px] text-emerald-800" role="status">
-            {notice}
-          </p>
-        ) : null}
-        {error ? (
-          <p className="text-[12px] text-destructive" role="alert">
-            {error}
-          </p>
-        ) : null}
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          onClick={() => setOpen((v) => !v)}
-        >
-          {open ? "Liste schliessen" : "Liste zeigen"}
-        </Button>
-        {open ? (
-          <ul className="max-h-72 space-y-2 overflow-y-auto">
-            {other.slice(0, 40).map((t) => (
-              <li
-                key={t.key}
-                className="rounded-lg border border-border/40 px-2 py-1.5"
-              >
-                <p className="truncate text-[13px] font-semibold leading-snug">
-                  {t.title}
-                </p>
-                <p className="text-[11px] text-muted-foreground">
-                  {dueLabel(t.dueDate, today, t.overdue)} ·{" "}
-                  {SOURCE_LABEL[t.source]}
-                </p>
-                <div className="mt-1 flex flex-wrap gap-1.5">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="secondary"
-                    className="h-7"
-                    disabled={busyKey === t.key}
-                    onClick={() => void complete(t)}
-                  >
-                    <Check className="size-3" strokeWidth={APP_ICON_STROKE} />
-                    Erledigen
-                  </Button>
-                  <a
-                    href={t.href}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex h-7 items-center text-[11px] text-primary underline-offset-2 hover:underline"
-                  >
-                    öffnen
-                  </a>
-                </div>
-              </li>
-            ))}
-          </ul>
+        {connected && laterRows.length > 0 ? (
+          <div className="border-t border-border/60 pt-3">
+            <button
+              type="button"
+              className="flex w-full items-center justify-between gap-2 rounded-lg px-1 py-1.5 text-left hover:bg-muted/40"
+              onClick={() => setLaterOpen((v) => !v)}
+              aria-expanded={laterOpen}
+            >
+              <span className="text-[13px] font-bold tracking-tight">
+                Später fällig
+                <span className="ml-2 font-medium text-muted-foreground">
+                  {laterRows.length}
+                </span>
+              </span>
+              <ChevronDown
+                className={cn(
+                  "size-4 shrink-0 text-muted-foreground transition-transform",
+                  laterOpen && "rotate-180"
+                )}
+                aria-hidden
+              />
+            </button>
+            {laterOpen ? (
+              <div className="mt-3 space-y-4">
+                {bySource(laterRows).map(({ source, tasks }) => (
+                  <SourceBlock
+                    key={`later-${source}`}
+                    source={source}
+                    tasks={tasks}
+                    today={today}
+                    busyKey={busyKey}
+                    justDoneKey={justDoneKey}
+                    draftDue={draftDue}
+                    setDraftDue={setDraftDue}
+                    patch={patch}
+                    compact
+                  />
+                ))}
+              </div>
+            ) : null}
+          </div>
         ) : null}
       </CardContent>
     </Card>

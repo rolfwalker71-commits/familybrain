@@ -25,7 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BackupStatusPanel } from "@/components/settings/backup-status-panel";
 import { KpiCorrectSheet } from "@/components/dashboard/kpi-correct-sheet";
-import { HomeTasksOtherAside, HomeTasksSection } from "@/components/dashboard/home-tasks-section";
+import { HomeTasksSection } from "@/components/dashboard/home-tasks-section";
 import { TeamLogo, weekdayLabel, AgendaTypeRail } from "@/components/calendar/agenda-row";
 import { AgendaAiIconThumb } from "@/components/calendar/agenda-ai-icon-thumb";
 import { AgendaEventDialog } from "@/components/calendar/agenda-event-dialog";
@@ -1669,30 +1669,6 @@ export function OverviewDashboard({
             </div>
           </section>
 
-          <section className="space-y-3">
-            <h2 className="text-[14px] font-black tracking-tight text-foreground">
-              Aufgaben
-            </h2>
-            <HomeTasksSection
-              items={(data.tasks?.items || []).map((t) => ({
-                key: t.key || `${t.source || "google"}:${t.id}`,
-                id: t.id,
-                source: t.source || "google",
-                title: t.title,
-                dueDate: t.dueDate,
-                overdue: t.overdue,
-                subtitle: t.subtitle || t.listTitle || "",
-                href: t.href,
-                listId: t.listId ?? null,
-                etag: t.etag ?? null,
-              }))}
-              today={today}
-              hasGoogleScope={Boolean(data.tasks?.hasGoogleScope)}
-              hasMicrosoftScope={Boolean(data.tasks?.hasMicrosoftScope)}
-              onChanged={() => void load()}
-            />
-          </section>
-
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(17rem,0.85fr)]">
             <section className="min-w-0 space-y-3">
               <div className="flex items-baseline justify-between gap-2">
@@ -1750,27 +1726,37 @@ export function OverviewDashboard({
                   />
                 </CardContent>
               </Card>
+
+              <div className="space-y-3 pt-2">
+                <h2 className="text-[14px] font-black tracking-tight text-foreground">
+                  Aufgaben
+                </h2>
+                <HomeTasksSection
+                  items={(data.tasks?.items || []).map((t) => ({
+                    key: t.key || `${t.source || "google"}:${t.id}`,
+                    id: t.id,
+                    source: t.source || "google",
+                    title: t.title,
+                    dueDate: t.dueDate,
+                    overdue: t.overdue,
+                    subtitle: t.subtitle || t.listTitle || "",
+                    accountLabel: t.accountLabel ?? null,
+                    bucketLabel: t.bucketLabel ?? null,
+                    href: t.href,
+                    listId: t.listId ?? null,
+                    etag: t.etag ?? null,
+                    listTitle: t.listTitle,
+                  }))}
+                  today={today}
+                  hasGoogleScope={Boolean(data.tasks?.hasGoogleScope)}
+                  hasMicrosoftScope={Boolean(data.tasks?.hasMicrosoftScope)}
+                  onChanged={() => void load()}
+                />
+              </div>
             </section>
 
             <aside className="min-w-0 space-y-4">
               <BirthdaysAsideCard items={upcomingBirthdays} today={today} />
-
-              <HomeTasksOtherAside
-                items={(data.tasks?.items || []).map((t) => ({
-                  key: t.key || `${t.source || "google"}:${t.id}`,
-                  id: t.id,
-                  source: t.source || "google",
-                  title: t.title,
-                  dueDate: t.dueDate,
-                  overdue: t.overdue,
-                  subtitle: t.subtitle || t.listTitle || "",
-                  href: t.href,
-                  listId: t.listId ?? null,
-                  etag: t.etag ?? null,
-                }))}
-                today={today}
-                onChanged={() => void load()}
-              />
 
               {data.referenceNotes && data.referenceNotes.length > 0 ? (
                 <Card className="border-border/70">

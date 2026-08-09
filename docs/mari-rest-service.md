@@ -1,0 +1,284 @@
+# MARI Rest Service (Support Issues)
+
+Stand: 2026-08-09 · Probe gegen `https://marirestservice.an-group.international/`
+
+Referenzen:
+
+- Service-Übersicht: <https://marirestservice.an-group.international/>
+- Swagger UI: <https://marirestservice.an-group.international/swagger/ui/index>
+- SupportIssue: <https://marirestservice.an-group.international/swagger/ui/index#/SupportIssue>
+- OpenAPI JSON: `GET /swagger/docs/v1`
+
+Credentials **nicht** in dieses File schreiben. Lokal in `.env.local` (siehe unten).
+
+---
+
+## Credentials (`.env.local`)
+
+```bash
+MARI_REST_BASE_URL=https://marirestservice.an-group.international
+MARI_REST_USERNAME=...
+MARI_REST_PASSWORD=...
+# Optional / Klarstellung:
+# MARI_EMPLOYEE_NUMBER war bei uns als UserCode=12 gesetzt.
+# Für Ticket-Zuweisung zählt EmployeeNumber (z.B. M1010), nicht UserCode.
+MARI_EMPLOYEE_NUMBER=M1010
+```
+
+Mapping (Beispiel Rolf Walker, Login `RWA`):
+
+| Feld | Wert |
+|------|------|
+| REST username | `RWA` (= NameInitials) |
+| `MARIEmployeeMaster.UserCode` | `12` |
+| `MARIEmployeeMaster.EmployeeNumber` | `M1010` |
+| Ticket-Feld `HandledBy` / API `Responsible` | `M1010` |
+| `EditorType` / API `ResponsibleType` | `3` (= Employee) |
+
+---
+
+## Auth
+
+`POST {BASE}/token`  
+`Content-Type: application/x-www-form-urlencoded`
+
+```
+username=...&password=...&grant_type=password
+```
+
+Antwort:
+
+```json
+{
+  "access_token": "...",
+  "token_type": "bearer",
+  "expires_in": 3599
+}
+```
+
+Folgeaufrufe:
+
+```
+Authorization: Bearer <access_token>
+Content-Type: application/json
+Accept: application/json
+```
+
+Hinweise:
+
+- Token-URL ist `{BASE}/token` (nicht `/MARIRestService/token` auf diesem Host).
+- `SystemInfo` ohne Auth: `GET /api/SystemInfo` → InterfaceVersion, LinkedDatabase (hier HANA `MARI_PROJEKTANG`).
+
+---
+
+## SupportIssue REST API
+
+| Methode | Pfad | Zweck |
+|---------|------|--------|
+| GET | `/api/SupportIssue/{id}` | Ein Ticket lesen |
+| POST | `/api/SupportIssue` | Neues Ticket |
+| PATCH | `/api/SupportIssue/{id}` | Ticket aktualisieren (JSON Partial) |
+| DELETE | `/api/SupportIssue/{id}` | Ticket + Anhänge löschen |
+
+**Kein Listen-Endpoint.** `GET /api/SupportIssue` → 405.
+
+Relevante Felder (`clsImportSupportIssue`):
+
+| API-Feld | Bedeutung |
+|----------|-----------|
+| `IssueID` | Ticket-ID |
+| `BriefDescription` | Betreff |
+| `RequestText` | Text (HTML erlaubt) |
+| `Status` | Status-ID (siehe unten) |
+| `Priority` | Prioritäts-ID |
+| `DueDate` | Fälligkeit (`YYYY-MM-DDTHH:mm:ss`) |
+| `Responsible` | Zuständig-Key (z.B. `M1010`) |
+| `ResponsibleType` | 3 = Employee, 4 = SupportGroup, … |
+| `BusinessPartnerCode` | BP / CardCode |
+| `ProductID` | Produkt (oft Pflicht bei PATCH) |
+| `ParentType` | Parent-Modus; `-1` kann PATCH blockieren |
+| `HotlineClassType` | Ticket-Dimension (Support / Task / …) |
+
+Attachments (nur mit bekannter Issue-ID):
+
+- `GET /api/SupportIssueAttachmentList/{id}`
+- `GET /api/SupportIssueAttachmentListData/{id}` (inkl. Base64)
+- `GET|DELETE /api/SupportIssueAttachment/{attachmentId}`
+- `POST /api/SupportIssueAttachment`
+
+Parallel existieren `/wopi/...`-Spiegelpfade derselben Operationen.
+
+---
+
+## Listen / SQL: `SystemToolsReadDataFromDB`
+
+Weil SupportIssue keine Liste hat:
+
+`POST /api/SystemToolsReadDataFromDB`
+
+Body:
+
+```json
+{ "SQL": "SELECT TOP 10 \"IssueID\", \"BriefDescription\" FROM \"MARISupportIssue\"" }
+```
+
+Regeln (dieser Server):
+
+- Nur **ein** `SELECT` — kein `;`, kein UPDATE/DELETE.
+- Backend ist **SAP HANA** → Identifier oft **quoted** (`"MARISupportIssue"`), sonst Uppercase-Lookup und „table not found“.
+- `TOP n` funktioniert; `LIMIT` wurde vom Validator abgelehnt („not a SELECT / no `;`“).
+- Antwort: JSON-Array von Row-Objekten.
+
+Wichtige Views/Tables:
+
+| Objekt | Zweck |
+|--------|--------|
+| `"MARISupportIssue"` | Tickets (View) |
+| `"MPHOTLINEANFRAGE"` | Roh-Tabelle Tickets |
+| `"MPHOTLINESETTINGS"` | Status/Typ/Prio-Bezeichnungen (`SETTING` + `ID`) |
+| `"MARIEmployeeMaster"` | Mitarbeiter |
+| `SYS.TABLES` / `SYS.VIEWS` / `SYS.VIEW_COLUMNS` | Katalog (Schema `MARI_PROJEKTANG`) |
+
+### Meine Tickets (Beispiel)
+
+```sql
+SELECT TOP 100
+  i."IssueID",
+  s."BEZEICHNUNG" AS "StatusName",
+  p."BEZEICHNUNG" AS "PriorityName",
+  i."BriefDescription",
+  i."CardCode",
+  i."DueDate",
+  i."ChangeAtDate"
+FROM "MARISupportIssue" i
+LEFT JOIN "MPHOTLINESETTINGS" s
+  ON s."SETTING" = 1 AND s."ID" = i."Status"
+LEFT JOIN "MPHOTLINESETTINGS" p
+  ON p."SETTING" = 3 AND p."ID" = i."Priority"
+WHERE i."HandledBy" = 'M1010'
+  AND i."EditorType" = 3
+  AND i."Status" IN (1, 3, 4, 6, 7, 11, 13, 14)
+ORDER BY
+  CASE WHEN i."DueDate" IS NULL THEN 1 ELSE 0 END,
+  i."DueDate",
+  i."IssueID"
+```
+
+View-Spalten vs. API-Namen (Auswahl):
+
+| View | API |
+|------|-----|
+| `HandledBy` + `EditorType` | `Responsible` + `ResponsibleType` |
+| `CardCode` | `BusinessPartnerCode` |
+| `RequestDate` | `IssueDate` |
+| `IssueType` | `IssueTyp` |
+| `SolutionMethod` | `SolutionApproach` |
+
+---
+
+## Status-IDs (`MPHOTLINESETTINGS`, `SETTING = 1`)
+
+| ID | Bezeichnung |
+|---:|-------------|
+| 11 | NEU |
+| 1 | Offen |
+| 3 | In Arbeit |
+| 13 | Aktualisiert |
+| 6 | Warte auf Kunden Feedback |
+| 9 | Beim Kunden nachfassen |
+| 7 | Warte auf Hersteller |
+| 10 | Beim Hersteller nachfassen |
+| 4 | Wieder geöffnet |
+| 2 | Gelöst |
+| 12 | Gelöst - Wartet |
+| 8 | Verrechnet |
+| 5 | Geschlossen |
+| 14 | Eskalation |
+| 15 | On Hold |
+| 16 | Abklärung Notwendig |
+
+**Arbeitsfilter (vereinbart 2026-08-09):**  
+`Status IN (1, 3, 4, 6, 7, 11, 13, 14)`  
+→ Offen, In Arbeit, Wieder geöffnet, Warte auf Kunden Feedback, Warte auf Hersteller, NEU, Aktualisiert, Eskalation.
+
+Andere `SETTING`-Gruppen (Kurz):
+
+| SETTING | Inhalt |
+|--------:|--------|
+| 2 | Issue-Typen (Bug, Supportanfrage, …) |
+| 3 | Prioritäten (Eskalation, Hoch, Normal, …) |
+| 4 | SolutionMethod |
+| 5 | Medium (Telefon, E-Mail, …) |
+
+---
+
+## Due Date setzen (PATCH)
+
+```http
+PATCH /api/SupportIssue/{id}
+Authorization: Bearer …
+Content-Type: application/json
+
+{ "DueDate": "2026-08-16T00:00:00" }
+```
+
+Erfahrungen:
+
+- Bei „normalen“ Tickets reicht oft nur `DueDate`.
+- Tickets mit `ProductID = 0` und `ParentType = -1` schlagen fehl (`ParentType unknown`, `ProductID required`).
+- Workaround: zusätzlich gültiges Produkt + Parent mitschicken, z.B.:
+
+```json
+{
+  "DueDate": "2026-08-16T00:00:00",
+  "ProductID": 100001,
+  "ParentType": 0
+}
+```
+
+- `IMPORT_Feedback = 0` und leeres `IMPORT_ErrorMessage` = OK.
+- SQL-UPDATE über SystemTools ist **nicht** erlaubt (nur SELECT).
+
+Häufige ProductIDs in dieser DB (Orientierung): `100001`, `100000`.
+
+---
+
+## Quick curl-Skizze
+
+```bash
+# Token
+TOKEN=$(curl -sS -X POST "$MARI_REST_BASE_URL/token" \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  --data-urlencode "username=$MARI_REST_USERNAME" \
+  --data-urlencode "password=$MARI_REST_PASSWORD" \
+  --data-urlencode 'grant_type=password' | jq -r .access_token)
+
+# Ein Ticket
+curl -sS -H "Authorization: Bearer $TOKEN" \
+  "$MARI_REST_BASE_URL/api/SupportIssue/143752"
+
+# Liste via SQL
+curl -sS -X POST -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"SQL":"SELECT TOP 5 \"IssueID\",\"BriefDescription\",\"Status\",\"DueDate\" FROM \"MARISupportIssue\" WHERE \"HandledBy\"='\''M1010'\'' AND \"EditorType\"=3"}' \
+  "$MARI_REST_BASE_URL/api/SystemToolsReadDataFromDB"
+```
+
+---
+
+## Buddy-Integration (noch offen)
+
+Mögliche nächste Schritte, wenn das Thema wieder aufgenommen wird:
+
+1. Env-Vars wie oben; EmployeeNumber (`M1010`) fest oder aus Login/`MARIEmployeeMaster` auflösen.
+2. Client-Modul `lib/mari/...`: token (cache bis `expires_in`), SQL-list, GET/PATCH issue.
+3. UI: „Meine Tickets“ mit Status-Filter `1,3,4,6,7,11,13,14`, Due Date ändern.
+4. Keine Secrets committen; SystemTools-SQL nur lesend und parametrisiert (EmployeeNumber / Status-Liste).
+
+---
+
+## Probe 2026-08-09 (Kurz)
+
+- Login OK, Interface `8.0.000.4`, DB `MARI_PROJEKTANG`.
+- 12 Tickets für `M1010` mit Arbeitsfilter; Due Date aller 12 auf `2026-08-16` gesetzt.
+- Zwei NEU-Tickets (`#130330`, `#131164`) brauchten PATCH mit `ProductID`/`ParentType`.

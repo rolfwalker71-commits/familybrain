@@ -175,7 +175,9 @@ type TodoList = {
   wellknownListName?: string | null;
 };
 
-async function resolveOutlookTodoListId(userId: number): Promise<string> {
+async function resolveOutlookTodoList(
+  userId: number
+): Promise<{ id: string; displayName: string }> {
   const lists = await graphJson<{ value?: TodoList[] }>(
     userId,
     "/me/todo/lists?$top=50"
@@ -189,7 +191,14 @@ async function resolveOutlookTodoListId(userId: number): Promise<string> {
       "Keine Microsoft To Do-Liste gefunden. Bitte Microsoft 365 neu verbinden (Scope Tasks.ReadWrite)."
     );
   }
-  return list.id;
+  return {
+    id: list.id,
+    displayName: (list.displayName || "Tasks").trim() || "Tasks",
+  };
+}
+
+async function resolveOutlookTodoListId(userId: number): Promise<string> {
+  return (await resolveOutlookTodoList(userId)).id;
 }
 
 type GraphTodoTask = {
@@ -218,6 +227,7 @@ function todoDueYmd(
 export type OutlookTodoTaskItem = {
   id: string;
   listId: string;
+  listTitle: string;
   title: string;
   notes: string | null;
   dueDate: string | null;
@@ -249,7 +259,9 @@ export async function listOutlookTodoTasksUpcoming(
   const horizonDays = options?.horizonDays ?? 7;
   const undatedLimit = options?.undatedLimit ?? 8;
   const maxPerList = options?.maxPerList ?? 100;
-  const listId = await resolveOutlookTodoListId(userId);
+  const list = await resolveOutlookTodoList(userId);
+  const listId = list.id;
+  const listTitle = list.displayName;
   const today = zurichYmdTodo();
   const horizon = addDaysYmdTodo(today, horizonDays);
 
@@ -278,6 +290,7 @@ export async function listOutlookTodoTasksUpcoming(
           out.push({
             id: t.id,
             listId,
+            listTitle,
             title: (t.title || "").trim(),
             notes: t.body?.content?.trim() || null,
             dueDate: null,
@@ -291,6 +304,7 @@ export async function listOutlookTodoTasksUpcoming(
         out.push({
           id: t.id,
           listId,
+          listTitle,
           title: (t.title || "").trim(),
           notes: t.body?.content?.trim() || null,
           dueDate,
@@ -323,6 +337,7 @@ export async function listOutlookTodoTasksUpcoming(
       out.push({
         id: t.id,
         listId,
+        listTitle,
         title: (t.title || "").trim(),
         notes: t.body?.content?.trim() || null,
         dueDate,
@@ -383,6 +398,7 @@ export async function updateOutlookTodoTask(
   return {
     id: updated.id || input.taskId,
     listId,
+    listTitle: "Tasks",
     title: (updated.title || "").trim() || "Aufgabe",
     notes: updated.body?.content?.trim() || null,
     dueDate,

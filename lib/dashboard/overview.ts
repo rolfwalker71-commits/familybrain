@@ -245,6 +245,8 @@ export type OverviewPayload = {
       dueDate: string | null;
       overdue: boolean;
       subtitle: string;
+      accountLabel: string;
+      bucketLabel: string | null;
       href: string;
       listId: string | null;
       etag: string | null;

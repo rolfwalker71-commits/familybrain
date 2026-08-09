@@ -117,7 +117,7 @@ export function MicrosoftPlannerPanel() {
             : `«${task.title}» wieder geöffnet.`;
       } else if (patch.dueDate !== undefined) {
         msg = patch.dueDate
-          ? `«${task.title}» neu terminiert auf ${patch.dueDate}.`
+          ? `«${task.title}» neu terminiert auf ${toSwissDate(patch.dueDate) || patch.dueDate}.`
           : `Termin bei «${task.title}» entfernt.`;
       } else if (patch.bucketId) {
         msg = `«${task.title}» in anderen Bucket verschoben.`;
