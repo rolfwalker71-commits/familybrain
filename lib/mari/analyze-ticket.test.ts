@@ -67,8 +67,13 @@ test("normalizes solutionSketch and keeps schema valid", () => {
           code: "// placeholder customize\nif (true) { }",
           note: "Nur Skizze",
         },
+        {
+          kind: "tn",
+          title: "Transaction Notification",
+          code: "-- SBO_SP_TransactionNotification skizze\nIF @object_type = '2' BEGIN SELECT 1 END",
+        },
       ],
-      caveats: null,
+      caveats: "help.sap.com → SAP Business One prüfen",
     },
   });
   const r = MariTicketAnalysisSchema.safeParse(n);
@@ -77,11 +82,15 @@ test("normalizes solutionSketch and keeps schema valid", () => {
   assert.equal(r.data.solutionSketch?.problemStillOpen, true);
   assert.match(r.data.solutionSketch!.outline, /Business One/);
   assert.equal(r.data.solutionSketch!.steps.length, 1);
-  assert.equal(r.data.solutionSketch!.artifacts.length, 2);
+  assert.equal(r.data.solutionSketch!.artifacts.length, 3);
   assert.equal(r.data.solutionSketch!.artifacts[0]!.kind, "sql_hana");
   assert.equal(
     r.data.solutionSketch!.artifacts[1]!.kind,
     "coresuite_customize"
+  );
+  assert.equal(
+    r.data.solutionSketch!.artifacts[2]!.kind,
+    "transaction_notification"
   );
 });
 

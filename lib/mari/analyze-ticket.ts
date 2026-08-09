@@ -62,7 +62,7 @@ function normalizeSolutionStep(raw: unknown): {
   detail: string | null;
 } | null {
   if (typeof raw === "string") {
-    const action = clip(raw, 300);
+    const action = clip(raw, 500);
     if (!action) return null;
     return { where: "Allgemein", action, detail: null };
   }
@@ -70,13 +70,13 @@ function normalizeSolutionStep(raw: unknown): {
   const o = raw as Record<string, unknown>;
   const action = asString(
     o.action ?? o.step ?? o.what ?? o.title ?? o.text,
-    300
+    500
   );
   if (!action) return null;
   return {
-    where: asString(o.where ?? o.app ?? o.location ?? o.ort, 120) || "Allgemein",
+    where: asString(o.where ?? o.app ?? o.location ?? o.ort, 200) || "Allgemein",
     action,
-    detail: asNullableString(o.detail ?? o.how ?? o.beschreibung, 600),
+    detail: asNullableString(o.detail ?? o.how ?? o.beschreibung, 1600),
   };
 }
 
@@ -84,6 +84,8 @@ const ARTIFACT_KINDS = new Set([
   "sql_hana",
   "sql_sqlserver",
   "sql",
+  "transaction_notification",
+  "formatted_search",
   "coresuite_customize",
   "stored_procedure",
   "di_api",
@@ -103,13 +105,25 @@ function normalizeSolutionArtifact(raw: unknown): {
 } | null {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   const o = raw as Record<string, unknown>;
-  const code = asString(o.code ?? o.content ?? o.body ?? o.sql ?? o.script, 4500);
+  const code = asString(
+    o.code ?? o.content ?? o.body ?? o.sql ?? o.script,
+    9000
+  );
   if (!code) return null;
   let kind = asString(o.kind ?? o.type ?? o.format, 40).toLowerCase() || "other";
+  if (kind === "tn" || kind === "sbo_sp_transactionnotification") {
+    kind = "transaction_notification";
+  }
+  if (kind === "fs" || kind === "formattedsearch") {
+    kind = "formatted_search";
+  }
   if (!ARTIFACT_KINDS.has(kind)) kind = "other";
   const language =
     asString(o.language ?? o.lang, 40) ||
-    (kind.startsWith("sql")
+    (kind.startsWith("sql") ||
+    kind === "transaction_notification" ||
+    kind === "stored_procedure" ||
+    kind === "formatted_search"
       ? kind === "sql_hana"
         ? "sql-hana"
         : "sql"
@@ -117,22 +131,20 @@ function normalizeSolutionArtifact(raw: unknown): {
         ? "csharp"
         : kind === "powershell"
           ? "powershell"
-          : kind === "stored_procedure"
-            ? "sql"
-            : "text");
+          : "text");
   return {
     kind,
-    title: asString(o.title ?? o.name ?? o.label, 120) || "Artefakt",
+    title: asString(o.title ?? o.name ?? o.label, 160) || "Artefakt",
     language,
     code,
-    note: asNullableString(o.note ?? o.hinweis ?? o.caveat, 400),
+    note: asNullableString(o.note ?? o.hinweis ?? o.caveat, 800),
   };
 }
 
 function normalizeSolutionSketch(raw: unknown): unknown {
   if (raw == null || raw === "") return null;
   if (typeof raw === "string") {
-    const outline = clip(raw, 3500);
+    const outline = clip(raw, 6000);
     if (!outline) return null;
     return {
       problemStillOpen: true,
@@ -141,12 +153,12 @@ function normalizeSolutionSketch(raw: unknown): unknown {
       steps: [],
       artifacts: [],
       caveats:
-        "Vorschlag aus allgemeinem Herstellerwissen — mit offizieller Doku abgleichen.",
+        "Vorschlag aus allgemeinem Herstellerwissen — mit help.sap.com / offizieller Doku abgleichen.",
     };
   }
   if (typeof raw !== "object" || Array.isArray(raw)) return null;
   const o = raw as Record<string, unknown>;
-  const outline = asNullableString(o.outline ?? o.sketch ?? o.text, 3500);
+  const outline = asNullableString(o.outline ?? o.sketch ?? o.text, 6000);
   if (!outline) return null;
 
   const stepsRaw = Array.isArray(o.steps)
@@ -157,7 +169,7 @@ function normalizeSolutionSketch(raw: unknown): unknown {
   const steps = stepsRaw
     .map(normalizeSolutionStep)
     .filter((x): x is NonNullable<typeof x> => x != null)
-    .slice(0, 10);
+    .slice(0, 16);
 
   const artifactsRaw = Array.isArray(o.artifacts)
     ? o.artifacts
@@ -167,7 +179,7 @@ function normalizeSolutionSketch(raw: unknown): unknown {
   const artifacts = artifactsRaw
     .map(normalizeSolutionArtifact)
     .filter((x): x is NonNullable<typeof x> => x != null)
-    .slice(0, 5);
+    .slice(0, 8);
 
   return {
     problemStillOpen: asBoolean(
@@ -175,10 +187,10 @@ function normalizeSolutionSketch(raw: unknown): unknown {
       true
     ),
     outline,
-    vendors: asStringArray(o.vendors ?? o.hersteller, 6, 80),
+    vendors: asStringArray(o.vendors ?? o.hersteller, 8, 80),
     steps,
     artifacts,
-    caveats: asNullableString(o.caveats ?? o.hinweis, 800),
+    caveats: asNullableString(o.caveats ?? o.hinweis, 1500),
   };
 }
 
@@ -256,11 +268,11 @@ export function normalizeMariTicketAnalysisInput(raw: unknown): unknown {
 
 export const MariSolutionStepSchema = z.object({
   /** App / Modul / Ort (z.B. «SAP B1 → Verwaltung → …», «coresuite Designer») */
-  where: z.string().min(1).max(120),
+  where: z.string().min(1).max(200),
   /** Was tun */
-  action: z.string().min(1).max(300),
-  /** Wie genau (Klicks, Felder, Werte) */
-  detail: z.string().max(600).nullable().optional(),
+  action: z.string().min(1).max(500),
+  /** Wie genau: Klicks, Felder, Werte, Reihenfolge */
+  detail: z.string().max(1600).nullable().optional(),
 });
 
 export const MariSolutionArtifactSchema = z.object({
@@ -268,6 +280,8 @@ export const MariSolutionArtifactSchema = z.object({
     "sql_hana",
     "sql_sqlserver",
     "sql",
+    "transaction_notification",
+    "formatted_search",
     "coresuite_customize",
     "stored_procedure",
     "di_api",
@@ -277,23 +291,23 @@ export const MariSolutionArtifactSchema = z.object({
     "config",
     "other",
   ]),
-  title: z.string().min(1).max(120),
+  title: z.string().min(1).max(160),
   language: z.string().max(40).default("text"),
-  code: z.string().min(1).max(4500),
-  note: z.string().max(400).nullable().optional(),
+  code: z.string().min(1).max(9000),
+  note: z.string().max(800).nullable().optional(),
 });
 
 export const MariSolutionSketchSchema = z.object({
   /** false wenn Fall bereits gelöst/obsolet — dann UI ausblenden */
   problemStillOpen: z.boolean(),
-  /** Kurze Zusammenfassung des Ansatzes */
-  outline: z.string().min(1).max(3500),
-  vendors: z.array(z.string().max(80)).max(6).default([]),
-  /** Konkrete Schritte in Apps / Administration */
-  steps: z.array(MariSolutionStepSchema).max(10).default([]),
-  /** SQL, Customize-Code, SP, Scripts usw. */
-  artifacts: z.array(MariSolutionArtifactSchema).max(5).default([]),
-  caveats: z.string().max(800).nullable().optional(),
+  /** Ausführliche Analyse / Lösungsstrategie */
+  outline: z.string().min(1).max(6000),
+  vendors: z.array(z.string().max(80)).max(8).default([]),
+  /** Step-by-step in Apps / Administration */
+  steps: z.array(MariSolutionStepSchema).max(16).default([]),
+  /** SQL/HANA, TN, Customize, SP, Scripts usw. */
+  artifacts: z.array(MariSolutionArtifactSchema).max(8).default([]),
+  caveats: z.string().max(1500).nullable().optional(),
 });
 
 export const MariTicketAnalysisSchema = z.object({
@@ -328,79 +342,75 @@ export const MariTicketAnalysisSchema = z.object({
 export type MariTicketAnalysis = z.infer<typeof MariTicketAnalysisSchema>;
 export type MariSolutionSketch = z.infer<typeof MariSolutionSketchSchema>;
 
-const SYSTEM = `Du bist Buddy, Assistent für Maringo/MARI Support-Tickets (Schweiz, de-CH).
-Kontext der Agentur: SAP Business One (B1) + typische Add-ons (z.B. Coresystems/coresuite customize), Microsoft 365/Outlook, verwandte Hersteller.
-WICHTIG zu SAP: Es geht IMMER um SAP Business One — NIEMALS um SAP R/3, ECC oder S/4HANA. Keine S/4-/R3-Transaktionscodes, Fiori-Apps oder ECC-Hinweise vorschlagen.
+const SYSTEM = `Du bist Buddy, Senior-Support-Assistent für Maringo/MARI Tickets (Schweiz, de-CH).
+Kontext: SAP Business One (B1) inkl. HANA/SQL Server, Transaction Notification (SBO_SP_TransactionNotification), Formatted Search, UDFs/UDT, DI-API, Service Layer, Add-ons (Coresystems/coresuite customize), Microsoft 365/Outlook u.ä.
+WICHTIG zu SAP: IMMER SAP Business One — NIEMALS R/3, ECC, S/4HANA, Fiori oder ECC-T-Codes.
 
-Verlauf-Legende (jede Zeile beginnt mit [Seite: …]):
-- «Support (wir)» = Antwort, Rückfrage, interne Notiz oder Bearbeitung durch euer Support-Team. Das sind KEINE Kundenaussagen.
-- «Kunde» = Anfrage/Antwort/Anhang vom Kunden (Eingang).
-- «System» = automatische Status-/Feldänderungen.
-- «Unklar» = Zuordnung unsicher — nicht als Kundenfakt behandeln.
-Werte Informationen von Support und Kunde getrennt aus: was der Kunde berichtet hat vs. was Support bereits gefragt/geantwortet/versucht hat.
+Nachschlagewerke (in caveats/outline nennen, wenn relevant — keine erfundenen Note-Nummern):
+- https://help.sap.com → SAP Business One (Produktbereich), auch Partner Edge / Support Launchpad Themen
+- Microsoft Learn für Graph/Outlook/M365
+- Coresystems/coresuite öffentliche Doku für Customize
 
-Analysiere das Ticket inkl. Verlauf und liefere ein JSON-Objekt genau in diesem Schema:
+Verlauf-Legende ([Seite: …]):
+- «Support (wir)» = eure Antworten/Rückfragen/Notizen — keine Kundenfakten.
+- «Kunde» = Kundenmeldung/Eingang.
+- «System» = automatische Feldänderungen.
+- «Unklar» = nicht als Kundenfakt werten.
+Support- und Kundenaussagen getrennt auswerten; bereits geklärte Punkte nicht erneut fragen.
+
+Liefere JSON genau in diesem Schema:
 {
   "summary": "string, max ~800 Zeichen",
-  "completeness": {
-    "score": 0-100 (Zahl, nicht String),
-    "missing": ["fehlende Info", ...],
-    "notes": "optional string"
-  },
-  "suggestedTasks": [
-    { "title": "string", "reason": "optional", "dueHint": "YYYY-MM-DD oder null" }
-  ],
-  "suggestions": ["Handlungsempfehlung", ...],
-  "recommendedStatus": {
-    "statusId": 11|1|3|6|7|14|2|null,
-    "label": "optional",
-    "reason": "optional"
-  } | null,
+  "completeness": { "score": 0-100, "missing": ["…"], "notes": "optional" },
+  "suggestedTasks": [{ "title": "…", "reason": "optional", "dueHint": "YYYY-MM-DD|null" }],
+  "suggestions": ["…"],
+  "recommendedStatus": { "statusId": 11|1|3|6|7|14|2|null, "label": "optional", "reason": "optional" } | null,
   "nextReplyDraft": "Kundenantwort DE oder null",
   "solutionSketch": {
     "problemStillOpen": true|false,
-    "outline": "Kurzfassung des Lösungsansatzes (warum dieser Weg)",
-    "vendors": ["SAP Business One", "Microsoft", "Coresystems", "..."],
+    "outline": "AUSFÜHRLICHE Analyse: Hypothesen, warum der Fehler auftritt, betroffene B1-Objekte/Tabellen (OCRD, OINV, …), Risiken, Alternativen",
+    "vendors": ["SAP Business One", "…"],
     "steps": [
       {
-        "where": "App/Modul/Ort, z.B. SAP B1 → Verwaltung → Systeminitialisierung",
-        "action": "Was tun (kurz)",
-        "detail": "Wie genau: Menüpfad, Felder, Werte, Reihenfolge — oder null"
+        "where": "konkreter Ort (Client-Menü, SQL Studio, B1 Studio, coresuite Designer, …)",
+        "action": "Was genau",
+        "detail": "Step-by-step: Klicks, Felder, erwartetes Ergebnis, Fallback wenn Schritt scheitert"
       }
     ],
     "artifacts": [
       {
-        "kind": "sql_hana|sql_sqlserver|sql|coresuite_customize|stored_procedure|di_api|service_layer|powershell|script|config|other",
-        "title": "kurzer Titel",
+        "kind": "sql_hana|sql_sqlserver|sql|transaction_notification|formatted_search|coresuite_customize|stored_procedure|di_api|service_layer|powershell|script|config|other",
+        "title": "…",
         "language": "sql-hana|sql|csharp|js|powershell|json|text|…",
-        "code": "vollständiger Vorschlags-Code / Query",
-        "note": "optional: wann welche Variante / Vorsicht"
+        "code": "AUSFÜHRLICHES, lauffähig skizziertes Skript (Kommentare, Platzhalter klar)",
+        "note": "DB-Variante, Deploy-Hinweis, Test auf Testfirma, help.sap.com Thema"
       }
     ],
-    "caveats": "Unsicherheiten / bitte offizielle Docs prüfen — oder null"
+    "caveats": "Unsicherheiten + wo in help.sap.com / Doku nachschlagen"
   } | null
 }
 
-Zu solutionSketch — AUSFORMULIERT und HANDLUNGSFÄHIG:
-- Nur wenn das Problem laut Status/Verlauf noch relevant/offen wirkt. Sonst problemStillOpen=false und outline kurz «nicht nötig» ODER solutionSketch=null.
-- outline: kurze Zusammenfassung. Die Detailarbeit gehört in steps + artifacts.
-- steps: konkrete UI-/Admin-Schritte («wo klicken», «welches Fenster», «welches Feld setzen»). Nicht vage («prüfen»), sondern navigierbar.
-- artifacts: IMMER liefern, wenn Diagnose oder Fix Code/SQL/Script braucht:
-  - Daten prüfen / Ursache finden → Diagnose-Query. Wenn unklar ob HANA oder SQL Server: BEIDE Varianten als zwei artifacts (kind sql_hana und sql_sqlserver), mit note welche DB.
-  - HANA: quoted Identifiers ("OCRD"), oft Schema beachten; SQL Server: eckige Klammern ok.
-  - coresuite / Coresystems Customize-Regel → kind coresuite_customize, plausibler C#-ähnlicher Customize-Code (Event, Bedingung, Aktion) als Vorschlag.
-  - Stored Procedure / Function → kind stored_procedure inkl. CREATE/ALTER-Skizze.
-  - DI-API / Service Layer → kurzes Snippet (kind di_api bzw. service_layer).
-  - Config/JSON/XML → kind config.
-- Code darf Platzhalter enthalten (z.B. @CardCode, 'KUNDENNR') — klar markieren. Keine erfundenen Note-/KB-Nummern.
-- Klar als Vorschlag kennzeichnen; kein Live-Schreiben auf Produktivsysteme ohne Prüfung.
-- Bei SAP immer B1-Begriffe (Belegarten, UDF, Addon, DI-API, Service Layer, Formatted Search) — nicht S/4.
-- Beziehe bereits gegebene Support-Antworten/Rückfragen ein (nicht erneut dasselbe fragen, wenn Kunde schon geantwortet hat).
+solutionSketch — UMFANGREICH und PRAXISTAUGICH (Support-Qualität):
+- Nur wenn Problem noch offen; sonst problemStillOpen=false oder null.
+- outline: nicht nur 2 Sätze — Ursache, Auswirkungen, Lösungsstrategie, was man zuerst prüft vs. was man ändert. Bei B1: Objekttypen, Belegfluss, Autorisierung, Addon-Einfluss.
+- steps: 4–12 navigierbare Schritte wo sinnvoll (Diagnose → Fix → Verifikation). Detail pro Schritt ausführlich.
+- artifacts: LIEFERE substanzielle Skripte, sobald Daten/Regeln involviert sind:
+  1) Diagnose-SELECTs (Joins auf Standardtabellen, Filter mit Platzhaltern @CardCode / 'DOCNR').
+  2) Wenn DB unklar: BEIDES sql_hana UND sql_sqlserver.
+     HANA: "Quoted" Identifiers; SQL Server: [Klammern] ok.
+  3) Transaction Notification: kind transaction_notification — vollständige SBO_SP_TransactionNotification-Skizze mit @object_type, @transaction_type, @num_of_cols_in_key, @list_of_key_cols_tab_del, @list_of_cols_val_tab_del, error/@error/@error_message Pattern, IF-Blöcke, Kommentare wo einhängen. Hinweis: nur auf Testfirma prüfen.
+  4) Formatted Search: kind formatted_search — Query + wo im Formular zuweisen.
+  5) coresuite_customize: Event/Bedingung/Aktion als C#-ähnlicher Vorschlag.
+  6) stored_procedure / DI-API / Service Layer / PowerShell / Config wenn passend.
+- Skripte: kommentiert, idempotent wo möglich, keine destruktiven UPDATEs ohne klaren WHERE und Warnung in note.
+- Keine erfundenen SAP-Note-/KB-Nummern; lieber Themenpfad («help.sap.com → Business One → …»).
+- Klar als Vorschlag; kein Blind-Deploy auf Produktiv.
+- Bereits gegebene Support-Infos im Verlauf berücksichtigen.
 
-Falls Screenshots/Bilder mitgeliefert werden: Fehlerdialoge, Fehlermeldungen, UI-Zustände und relevante Details daraus in summary, missing[], suggestedTasks und solutionSketch (steps/artifacts) einbeziehen.
+Screenshots: Fehlermeldungen/UI in summary, missing, steps und artifacts einbeziehen.
 
 Status-IDs: 11 NEU, 1 Offen, 3 In Arbeit, 6 Warte auf Kunden, 7 Warte auf Hersteller, 14 Eskalation, 2 Gelöst.
-Keine erfundenen Fakten. score als Zahl. Arrays nie weglassen (leer ok). Antworte NUR als JSON-Objekt.`;
+score als Zahl. Arrays nie weglassen (leer ok). NUR JSON-Objekt.`;
 
 export type AnalyzeMariTicketResult = MariTicketAnalysis & {
   imagesAnalyzed: number;
@@ -484,7 +494,8 @@ ${timelineText.slice(0, 14000) || "(keine Positionen)"}`;
   const model = getOpenAIModel();
   const completion = await client.chat.completions.create({
     model,
-    temperature: 0.2,
+    temperature: 0.25,
+    max_tokens: 8000,
     response_format: { type: "json_object" },
     messages: [
       { role: "system", content: SYSTEM },

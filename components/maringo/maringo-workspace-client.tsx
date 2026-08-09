@@ -1308,7 +1308,7 @@ export function MaringoWorkspaceClient() {
                       analysis.solutionSketch.problemStillOpen ? (
                         <div className="rounded-xl border border-sky-200/80 bg-sky-50/70 px-3 py-2.5">
                           <p className="font-semibold text-sky-950">
-                            Möglicher Lösungsansatz
+                            Lösungsansatz (ausführlich)
                           </p>
                           {analysis.solutionSketch.vendors.length > 0 ? (
                             <p className="mt-1 text-[11px] text-sky-900/80">
@@ -1338,7 +1338,7 @@ export function MaringoWorkspaceClient() {
                           {analysis.solutionSketch.artifacts.length > 0 ? (
                             <div className="mt-3 space-y-2.5">
                               <p className="text-[11px] font-semibold uppercase tracking-wide text-sky-900/80">
-                                Queries / Code
+                                Queries / Skripte / Code
                               </p>
                               {analysis.solutionSketch.artifacts.map((a, i) => (
                                 <div
@@ -1363,7 +1363,7 @@ export function MaringoWorkspaceClient() {
                                       {a.note}
                                     </p>
                                   ) : null}
-                                  <pre className="max-h-64 overflow-auto whitespace-pre-wrap p-2.5 font-mono text-[11px] leading-snug text-sky-950">
+                                  <pre className="max-h-[28rem] overflow-auto whitespace-pre-wrap p-2.5 font-mono text-[11px] leading-snug text-sky-950">
                                     {a.code}
                                   </pre>
                                 </div>
