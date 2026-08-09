@@ -296,7 +296,7 @@ function HomeWeatherWidget({ weather }: { weather: HomeWeatherCard }) {
   const week = weather.week ?? [];
 
   return (
-    <div className="w-full min-w-0 rounded-xl border border-border/70 bg-sky-50/50 px-3 py-2.5 sm:max-w-md sm:px-3.5 sm:py-3">
+    <div className="w-full min-w-0 rounded-2xl border border-white/70 bg-white/95 px-3.5 py-3 shadow-[0_8px_30px_rgba(15,23,42,0.08)] backdrop-blur-sm sm:max-w-md sm:px-4 sm:py-3.5">
       <div className="flex items-start gap-3">
         <div className="flex shrink-0 flex-col items-center pt-0.5">
           <span className="text-[2.25rem] leading-none" aria-hidden>
@@ -306,14 +306,14 @@ function HomeWeatherWidget({ weather }: { weather: HomeWeatherCard }) {
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
-              <p className="truncate text-[14px] font-semibold tracking-tight">
+              <p className="truncate text-[14px] font-semibold tracking-tight text-foreground">
                 {weather.placeLabel}
               </p>
               <p className="truncate text-[12px] capitalize text-muted-foreground">
                 {weather.weatherLabelDe}
               </p>
             </div>
-            <p className="shrink-0 text-[28px] font-bold tabular-nums leading-none tracking-tight">
+            <p className="shrink-0 text-[28px] font-bold tabular-nums leading-none tracking-tight text-foreground">
               {weather.temperatureC}°
             </p>
           </div>
@@ -338,7 +338,7 @@ function HomeWeatherWidget({ weather }: { weather: HomeWeatherCard }) {
 
       {week.length > 0 ? (
         <ul
-          className="mt-2.5 grid gap-0.5 border-t border-sky-200/60 pt-2"
+          className="mt-2.5 grid gap-0.5 border-t border-border/50 pt-2"
           style={{
             gridTemplateColumns: `repeat(${Math.min(7, Math.max(1, week.length))}, minmax(0, 1fr))`,
           }}
@@ -349,7 +349,7 @@ function HomeWeatherWidget({ weather }: { weather: HomeWeatherCard }) {
               key={day.date}
               className={cn(
                 "flex min-w-0 flex-col items-center rounded-md px-0.5 py-1 text-center",
-                i === 0 && "bg-white/70"
+                i === 0 && "bg-sky-50"
               )}
               title={`${weekdayShortDe(day.date)}: ${day.weatherLabelDe}, ${day.temperatureMinC}–${day.temperatureMaxC}°`}
             >
@@ -397,7 +397,7 @@ function DriveAsideCard({ data }: { data: OverviewPayload }) {
   return (
     <Link
       href="/account"
-      className="flex items-center gap-3 rounded-xl border border-border/70 bg-card px-3.5 py-3 shadow-sm transition-colors hover:bg-muted/30"
+      className="flex items-center gap-3 rounded-2xl border border-border/60 bg-card px-3.5 py-3 shadow-[0_4px_18px_rgba(15,23,42,0.05)] transition-colors hover:bg-muted/30"
     >
       <GoogleDriveLogo className="size-5" />
       <div className="min-w-0 flex-1">
@@ -467,7 +467,7 @@ function SystemStatusCard({ data }: { data: OverviewPayload }) {
   ];
 
   return (
-    <Card className="border-border/70">
+    <Card className="border-border/60 shadow-[0_4px_18px_rgba(15,23,42,0.05)]">
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2 text-[16px] font-black">
           <Monitor
@@ -539,7 +539,7 @@ function SystemStatusCard({ data }: { data: OverviewPayload }) {
 
 function NextHockeyCard({ game }: { game: HockeyGameCard }) {
   return (
-    <Card className="border-border/70">
+    <Card className="border-border/60 shadow-[0_4px_18px_rgba(15,23,42,0.05)]">
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2 text-[16px] font-black">
           <Trophy className="size-4 text-rose-700" />
@@ -607,7 +607,7 @@ function BirthdaysAsideCard({
   if (items.length === 0) return null;
 
   return (
-    <Card className="border-border/70">
+    <Card className="border-border/60 shadow-[0_4px_18px_rgba(15,23,42,0.05)]">
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2 text-[16px] font-black">
           <Cake
@@ -730,8 +730,8 @@ function DayTimeline({
             </div>
             <div
               className={cn(
-                "mb-5 min-w-0 overflow-hidden rounded-xl border border-border/60 bg-card last:mb-1",
-                active && "border-emerald-200/90",
+                "mb-5 min-w-0 overflow-hidden rounded-2xl border border-border/60 bg-card shadow-[0_4px_18px_rgba(15,23,42,0.05)] last:mb-1",
+                active && "border-emerald-200/90 shadow-[0_4px_18px_rgba(5,150,105,0.12)]",
                 !active &&
                   item.calendarId?.startsWith("google-cal:") &&
                   "border-sky-200/80 bg-sky-50/35",
@@ -744,16 +744,16 @@ function DayTimeline({
                 <AgendaTypeRail item={item} className="w-9 sm:w-[3.25rem]" />
                 <div
                   className={cn(
-                    "min-w-0 flex-1 px-3 py-2.5 transition-colors",
-                    active && "bg-emerald-50/60"
+                    "flex min-w-0 flex-1 items-stretch gap-2",
+                    active && "bg-emerald-50/40"
                   )}
                 >
-                  <button
-                    type="button"
-                    className="flex w-full items-start justify-between gap-2 text-left hover:opacity-90"
-                    onClick={() => onSelect(item)}
-                  >
-                    <div className="min-w-0 flex-1">
+                  <div className="min-w-0 flex-1 px-3 py-2.5">
+                    <button
+                      type="button"
+                      className="w-full text-left hover:opacity-90"
+                      onClick={() => onSelect(item)}
+                    >
                       <p className="truncate text-[14px] font-black tracking-tight">
                         {item.title}
                       </p>
@@ -776,90 +776,98 @@ function DayTimeline({
                           {item.driveLabel}
                         </p>
                       ) : null}
-                    </div>
-                    <div className="flex shrink-0 items-start gap-1.5">
-                      <AgendaAiIconThumb
-                        itemId={item.id}
-                        title={item.title}
-                        location={item.location}
-                        description={item.description}
-                        calendarType={item.calendarType}
-                        calendarName={item.calendarName}
-                        kind={item.kind}
-                        meetUrl={item.meetUrl}
-                        time={item.time}
-                        endTime={item.endTime}
-                        driveMinutes={item.driveMinutes}
-                        distanceKm={item.distanceKm}
-                        coords={
-                          item.coords
-                            ? { lat: item.coords.lat, lon: item.coords.lon }
-                            : null
-                        }
-                        aiIconKey={item.aiIconKey}
-                        aiIconUrl={item.aiIconUrl}
-                      />
-                      <ChevronRight
-                        className="mt-0.5 size-4 shrink-0 text-muted-foreground/70"
-                        aria-hidden
-                      />
-                    </div>
-                  </button>
+                    </button>
 
-                  {item.meetUrl || item.mapsUrl || showMap ? (
-                    <div className="mt-2.5 space-y-2">
-                      <div className="flex flex-wrap gap-2">
-                        {item.meetUrl ? (
-                          (() => {
-                            const isTeams =
-                              /teams\.microsoft\.com|microsoft365\.com\/teams/i.test(
-                                item.meetUrl
+                    {item.meetUrl || item.mapsUrl || showMap ? (
+                      <div className="mt-2.5 space-y-2">
+                        <div className="flex flex-wrap gap-2">
+                          {item.meetUrl ? (
+                            (() => {
+                              const isTeams =
+                                /teams\.microsoft\.com|microsoft365\.com\/teams/i.test(
+                                  item.meetUrl
+                                );
+                              return (
+                                <a
+                                  href={item.meetUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border/70 bg-background px-2.5 text-[12px] font-medium text-foreground shadow-sm hover:bg-muted/50"
+                                >
+                                  {isTeams ? (
+                                    <MicrosoftTeamsLogo className="size-3.5" />
+                                  ) : (
+                                    <Video className="size-3.5" aria-hidden />
+                                  )}
+                                  {isTeams ? "In Teams öffnen" : "Meet"}
+                                </a>
                               );
-                            return (
-                              <a
-                                href={item.meetUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex h-7 items-center gap-1.5 rounded-md border border-border/70 bg-background px-2 text-[12px] font-medium text-foreground hover:bg-muted/50"
-                              >
-                                {isTeams ? (
-                                  <MicrosoftTeamsLogo className="size-3.5" />
-                                ) : (
-                                  <Video className="size-3.5" aria-hidden />
-                                )}
-                                {isTeams ? "In Teams öffnen" : "Meet"}
-                              </a>
-                            );
-                          })()
-                        ) : null}
-                        {item.mapsUrl ? (
-                          <a
-                            href={item.mapsUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex h-7 items-center gap-1.5 rounded-md border border-border/70 bg-background px-2 text-[12px] font-medium text-foreground hover:bg-muted/50"
-                          >
-                            <MapPin className="size-3.5" aria-hidden />
-                            Route
-                          </a>
+                            })()
+                          ) : null}
+                          {item.mapsUrl ? (
+                            <a
+                              href={item.mapsUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border/70 bg-background px-2.5 text-[12px] font-medium text-foreground shadow-sm hover:bg-muted/50"
+                            >
+                              <MapPin className="size-3.5" aria-hidden />
+                              Route
+                            </a>
+                          ) : null}
+                        </div>
+                        {showMap && item.coords ? (
+                          <TripMap
+                            points={[
+                              {
+                                lat: item.coords.lat,
+                                lon: item.coords.lon,
+                                label: item.coords.label,
+                              },
+                            ]}
+                            heightClassName="h-28"
+                            className="rounded-lg"
+                            compact
+                          />
                         ) : null}
                       </div>
-                      {showMap && item.coords ? (
-                        <TripMap
-                          points={[
-                            {
-                              lat: item.coords.lat,
-                              lon: item.coords.lon,
-                              label: item.coords.label,
-                            },
-                          ]}
-                          heightClassName="h-28"
-                          className="rounded-lg"
-                          compact
-                        />
-                      ) : null}
-                    </div>
-                  ) : null}
+                    ) : null}
+                  </div>
+
+                  <div className="flex shrink-0 flex-col items-end justify-between gap-2 py-2.5 pr-2.5">
+                    <AgendaAiIconThumb
+                      itemId={item.id}
+                      title={item.title}
+                      location={item.location}
+                      description={item.description}
+                      calendarType={item.calendarType}
+                      calendarName={item.calendarName}
+                      kind={item.kind}
+                      meetUrl={item.meetUrl}
+                      time={item.time}
+                      endTime={item.endTime}
+                      driveMinutes={item.driveMinutes}
+                      distanceKm={item.distanceKm}
+                      coords={
+                        item.coords
+                          ? { lat: item.coords.lat, lon: item.coords.lon }
+                          : null
+                      }
+                      aiIconKey={item.aiIconKey}
+                      aiIconUrl={item.aiIconUrl}
+                      showAiBadge
+                      className="shadow-md"
+                      imgClassName="h-[4.5rem] w-[5.25rem] sm:h-[5rem] sm:w-[6rem]"
+                    />
+                    <button
+                      type="button"
+                      className="rounded-md p-1 text-muted-foreground/70 hover:bg-muted/50 hover:text-foreground"
+                      aria-label="Details"
+                      onClick={() => onSelect(item)}
+                    >
+                      <ChevronRight className="size-4" aria-hidden />
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -887,11 +895,11 @@ function FocusTile({
   title: string;
   detail: string;
 }) {
-  const railCls = {
-    teal: "border-l-teal-600",
-    rose: "border-l-rose-500",
-    amber: "border-l-amber-500",
-    sky: "border-l-sky-500",
+  const topCls = {
+    teal: "border-t-teal-600",
+    rose: "border-t-rose-500",
+    amber: "border-t-amber-500",
+    sky: "border-t-sky-500",
   }[tone];
   const iconWrap = {
     teal: "bg-teal-50 text-teal-800",
@@ -904,13 +912,13 @@ function FocusTile({
     <Link
       href={href}
       className={cn(
-        "relative flex min-w-0 items-start gap-3 rounded-2xl border border-border/60 border-l-[3px] bg-card px-3.5 py-3 shadow-sm transition-colors hover:bg-muted/25",
-        railCls
+        "relative flex min-h-[7.5rem] min-w-0 flex-col gap-2.5 rounded-2xl border border-border/60 border-t-[3px] bg-card px-3.5 py-3.5 shadow-[0_4px_18px_rgba(15,23,42,0.05)] transition-colors hover:bg-muted/20",
+        topCls
       )}
     >
       <span
         className={cn(
-          "mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl",
+          "flex size-9 shrink-0 items-center justify-center rounded-xl",
           iconWrap
         )}
       >
@@ -925,15 +933,17 @@ function FocusTile({
           />
         ) : null}
       </span>
-      <div className="min-w-0 flex-1 pr-4">
+      <div className="min-w-0 flex-1 pr-5">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
           {eyebrow}
         </p>
-        <p className="truncate text-[15px] font-black tracking-tight">{title}</p>
+        <p className="mt-0.5 truncate text-[15px] font-black tracking-tight">
+          {title}
+        </p>
         <p className="truncate text-[13px] text-muted-foreground">{detail}</p>
       </div>
       <ChevronRight
-        className="absolute bottom-3 right-3 size-4 text-muted-foreground/70"
+        className="absolute bottom-3.5 right-3 size-4 text-muted-foreground/70"
         aria-hidden
       />
     </Link>
@@ -1255,19 +1265,26 @@ export function OverviewDashboard({
 
   return (
     <div className="min-w-0 space-y-6 pb-10">
-      <header className="relative overflow-hidden rounded-2xl border border-border/50 bg-gradient-to-br from-sky-100/70 via-background to-emerald-50/40 px-4 py-5 sm:px-6 sm:py-6">
-        <div
-          className="pointer-events-none absolute inset-0 opacity-[0.35]"
-          style={{
-            backgroundImage:
-              "radial-gradient(ellipse 80% 60% at 70% 20%, rgba(147,197,253,0.45), transparent 55%), radial-gradient(ellipse 60% 50% at 20% 90%, rgba(167,243,208,0.35), transparent 50%)",
-          }}
+      <header className="relative overflow-hidden rounded-2xl border border-border/40 shadow-[0_8px_30px_rgba(15,23,42,0.06)]">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/images/overview-hero.jpg"
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover object-[center_40%]"
           aria-hidden
         />
-        <div className="relative grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(16rem,22rem)] lg:items-start lg:gap-6">
+        <div
+          className="absolute inset-0 bg-gradient-to-r from-white/92 via-white/78 to-white/45"
+          aria-hidden
+        />
+        <div
+          className="absolute inset-0 bg-gradient-to-t from-white/55 via-transparent to-sky-50/30"
+          aria-hidden
+        />
+        <div className="relative grid gap-4 px-4 py-6 sm:px-6 sm:py-7 lg:grid-cols-[minmax(0,1fr)_minmax(16rem,22rem)] lg:items-start lg:gap-6">
           <div className="min-w-0 space-y-1">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h1 className="text-[30px] font-black tracking-tight">
+              <h1 className="text-[30px] font-black tracking-tight text-foreground drop-shadow-sm sm:text-[32px]">
                 {greeting}
                 {greetingName ? `, ${greetingName}` : ""}
               </h1>
@@ -1332,7 +1349,7 @@ export function OverviewDashboard({
             <h2 className="text-[14px] font-black tracking-tight text-foreground">
               Heute handeln
             </h2>
-            <ul className="overflow-hidden rounded-xl border border-border/70 bg-card shadow-sm">
+            <ul className="space-y-2">
               {(() => {
                 const rows: Array<{
                   key: string;
@@ -1410,15 +1427,15 @@ export function OverviewDashboard({
                   sky: "border-l-sky-500",
                 } as const;
                 return rows.slice(0, 6).map((row) => (
-                  <li key={row.key} className="border-b border-border/50 last:border-0">
+                  <li key={row.key}>
                     <Link
                       href={row.href}
                       className={cn(
-                        "flex items-center gap-3 border-l-[3px] px-3 py-2.5 transition-colors hover:bg-muted/40",
+                        "flex items-center gap-3 rounded-2xl border border-border/60 border-l-[3px] bg-card px-3 py-3 shadow-[0_4px_18px_rgba(15,23,42,0.05)] transition-colors hover:bg-muted/30",
                         rail[row.tone]
                       )}
                     >
-                      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted/60">
+                      <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-muted/50">
                         {row.icon === "teams" ? (
                           <MicrosoftTeamsLogo className="size-4" />
                         ) : row.icon === "ms" ? (
@@ -1589,7 +1606,7 @@ export function OverviewDashboard({
                   </Button>
                 </div>
               ) : null}
-              <Card className="border-border/70">
+              <Card className="border-border/60 shadow-[0_4px_18px_rgba(15,23,42,0.05)]">
                 <CardContent className="px-3 py-3 sm:px-5 sm:py-4">
                   <DayTimeline
                     items={timelineItems}
@@ -1634,7 +1651,7 @@ export function OverviewDashboard({
               <BirthdaysAsideCard items={upcomingBirthdays} today={today} />
 
               {data.referenceNotes && data.referenceNotes.length > 0 ? (
-                <Card className="border-border/70">
+                <Card className="border-border/60 shadow-[0_4px_18px_rgba(15,23,42,0.05)]">
                   <CardHeader className="pb-2">
                     <CardTitle className="flex items-center gap-2 text-[16px] font-black">
                       <StickyNote
@@ -1690,7 +1707,7 @@ export function OverviewDashboard({
             <h2 className="text-[14px] font-black tracking-tight">
               Später im Monat
             </h2>
-            <div className="flex flex-col overflow-hidden rounded-xl border border-border/70 bg-card shadow-sm sm:flex-row sm:divide-x sm:divide-border/60">
+            <div className="flex flex-col overflow-hidden rounded-2xl border border-border/60 bg-card shadow-[0_4px_18px_rgba(15,23,42,0.05)] sm:flex-row sm:divide-x sm:divide-border/60">
               <Link
                 href="/travel"
                 className="flex flex-1 items-center gap-3 px-4 py-3.5 transition-colors hover:bg-muted/30"

@@ -34,9 +34,10 @@ import type { AiTokenUsage } from "@/lib/ai/usage-cost";
 import { toSwissDate } from "@/lib/utils/dates";
 import { GoogleMailInboxPanel } from "@/components/google/google-mail-inbox-panel";
 import { GoogleTasksPanel } from "@/components/google/google-tasks-panel";
-import { MailWorkspaceSubnav, type MailWorkspaceView } from "@/components/mail/mail-workspace-subnav";
+import { MailWorkspaceSubnav, type MailWorkspaceView, mailWorkspacePrimaryBtnClass, mailWorkspaceTabClass } from "@/components/mail/mail-workspace-subnav";
 import {
   MailChronikList,
+  MailChronikSummary,
   mergeMailChronik,
 } from "@/components/mail/mail-chronik-list";
 import { MailTagesanalysenList } from "@/components/mail/mail-tagesanalysen-list";
@@ -986,84 +987,60 @@ export function GoogleWorkspaceClient() {
 
       {connected ? (
         <>
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="text-sm text-muted-foreground">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-teal-800">
               Verbunden als{" "}
-              <span className="font-medium text-foreground">
+              <span className="font-semibold">
                 {connectedEmail || "Google"}
               </span>
             </p>
-            <div className="flex flex-wrap gap-1 rounded-lg border border-border/70 p-0.5">
+            <nav className="flex flex-wrap gap-0.5 border-b border-border/50">
               <button
                 type="button"
-                className={cn(
-                  "rounded-md px-3 py-1.5 text-sm font-medium",
-                  tab === "mail"
-                    ? "bg-muted text-foreground"
-                    : "text-muted-foreground"
-                )}
+                className={mailWorkspaceTabClass(tab === "mail", "google")}
                 onClick={() => setTab("mail")}
               >
-                <span className="inline-flex items-center gap-1.5">
-                  <Mail className="size-3.5" strokeWidth={APP_ICON_STROKE} />
-                  Mails
-                </span>
+                <Mail className="size-3.5" strokeWidth={APP_ICON_STROKE} />
+                Mails
               </button>
               <button
                 type="button"
-                className={cn(
-                  "rounded-md px-3 py-1.5 text-sm font-medium",
-                  tab === "triage"
-                    ? "bg-muted text-foreground"
-                    : "text-muted-foreground"
-                )}
+                className={mailWorkspaceTabClass(tab === "triage", "google")}
                 onClick={() => setTab("triage")}
               >
-                <span className="inline-flex items-center gap-1.5">
-                  <ListChecks className="size-3.5" strokeWidth={APP_ICON_STROKE} />
-                  Triage
-                  {inboxPending > 0 ? (
-                    <Badge variant="secondary" className="text-[10px]">
-                      {inboxPending}
-                    </Badge>
-                  ) : null}
-                </span>
+                <ListChecks className="size-3.5" strokeWidth={APP_ICON_STROKE} />
+                Triage
+                {inboxPending > 0 ? (
+                  <Badge variant="secondary" className="text-[10px]">
+                    {inboxPending}
+                  </Badge>
+                ) : null}
               </button>
               <button
                 type="button"
-                className={cn(
-                  "rounded-md px-3 py-1.5 text-sm font-medium",
-                  tab === "calendar"
-                    ? "bg-muted text-foreground"
-                    : "text-muted-foreground"
-                )}
+                className={mailWorkspaceTabClass(tab === "calendar", "google")}
                 onClick={() => setTab("calendar")}
               >
-                <span className="inline-flex items-center gap-1.5">
-                  <CalendarClock className="size-3.5" strokeWidth={APP_ICON_STROKE} />
-                  Kalender
-                </span>
+                <CalendarClock className="size-3.5" strokeWidth={APP_ICON_STROKE} />
+                Kalender
               </button>
               <button
                 type="button"
-                className={cn(
-                  "rounded-md px-3 py-1.5 text-sm font-medium",
-                  tab === "tasks"
-                    ? "bg-sky-100 text-sky-950"
-                    : "text-muted-foreground"
-                )}
+                className={mailWorkspaceTabClass(tab === "tasks", "google")}
                 onClick={() => setTab("tasks")}
               >
-                <span className="inline-flex items-center gap-1.5">
-                  <ListTodo className="size-3.5" strokeWidth={APP_ICON_STROKE} />
-                  Tasks
-                </span>
+                <ListTodo className="size-3.5" strokeWidth={APP_ICON_STROKE} />
+                Tasks
               </button>
-            </div>
+            </nav>
           </div>
 
           {tab === "mail" ? (
-            <MailWorkspaceSubnav view={mailView} onChange={setMailView} />
+            <MailWorkspaceSubnav
+              view={mailView}
+              onChange={setMailView}
+              accent="google"
+            />
           ) : null}
 
           {error ? (
@@ -1252,20 +1229,16 @@ export function GoogleWorkspaceClient() {
             <GoogleTasksPanel />
           ) : tab === "mail" && mailView === "chronik" ? (
             <section className="space-y-4">
-              <div className="flex flex-wrap items-end justify-between gap-3">
-                <div className="space-y-1.5">
-                  <h2 className="text-[15px] font-semibold">
-                    {formatMailRangeLabel(mailFrom, mailTo)} · {inbox.length}{" "}
-                    Eingang · {sent.length} Gesendet
-                  </h2>
-                  <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-end justify-between gap-3 rounded-2xl border border-border/60 bg-card px-3.5 py-3 shadow-[0_4px_18px_rgba(15,23,42,0.05)]">
+                <div className="flex flex-wrap items-end gap-2">
+                  <div className="space-y-1">
                     <Label htmlFor="g-mail-from" className="text-xs text-muted-foreground">
                       Von
                     </Label>
                     <Input
                       id="g-mail-from"
                       type="date"
-                      className="h-8 w-auto min-w-[9.5rem]"
+                      className="h-9 w-auto min-w-[9.5rem]"
                       value={mailFrom}
                       max={zurichYmdClient()}
                       onValueChange={(v) => {
@@ -1277,13 +1250,15 @@ export function GoogleWorkspaceClient() {
                         void loadMail(next.from, next.to);
                       }}
                     />
+                  </div>
+                  <div className="space-y-1">
                     <Label htmlFor="g-mail-to" className="text-xs text-muted-foreground">
                       Bis
                     </Label>
                     <Input
                       id="g-mail-to"
                       type="date"
-                      className="h-8 w-auto min-w-[9.5rem]"
+                      className="h-9 w-auto min-w-[9.5rem]"
                       value={mailTo}
                       min={mailFrom}
                       max={zurichYmdClient()}
@@ -1296,21 +1271,25 @@ export function GoogleWorkspaceClient() {
                         void loadMail(next.from, next.to);
                       }}
                     />
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      disabled={mailLoading}
-                      onClick={() => void loadMail(mailFrom, mailTo)}
-                    >
-                      Mails laden
-                    </Button>
                   </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className={cn("h-9", mailWorkspacePrimaryBtnClass("google"))}
+                    disabled={mailLoading}
+                    onClick={() => void loadMail(mailFrom, mailTo)}
+                  >
+                    <RefreshCw
+                      className={cn("size-3.5", mailLoading && "animate-spin")}
+                    />
+                    Mails laden
+                  </Button>
                 </div>
                 <Button
                   type="button"
                   size="sm"
                   variant="outline"
+                  className="h-9"
                   disabled={mailLoading}
                   onClick={() => void loadMail(mailFrom, mailTo)}
                 >
@@ -1320,18 +1299,29 @@ export function GoogleWorkspaceClient() {
                   Aktualisieren
                 </Button>
               </div>
+              <MailChronikSummary
+                rangeLabel={formatMailRangeLabel(mailFrom, mailTo)}
+                inboxCount={inbox.length}
+                sentCount={sent.length}
+              />
               <MailChronikList
                 items={mergeMailChronik(inbox, sent)}
                 loading={mailLoading}
               />
+              <p className="text-[12px] text-muted-foreground">
+                Gleiche Struktur auch unter Microsoft 365
+              </p>
             </section>
           ) : (
             <section className="space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-[15px] font-semibold">Tagesanalysen</h2>
+                <h2 className="font-serif text-[22px] font-semibold tracking-tight text-foreground">
+                  Tagesanalysen
+                </h2>
                 <Button
                   type="button"
                   size="sm"
+                  className={cn("h-9", mailWorkspacePrimaryBtnClass("google"))}
                   disabled={analyzing}
                   onClick={() => startAnalyze()}
                 >
@@ -1349,6 +1339,7 @@ export function GoogleWorkspaceClient() {
               <MailTagesanalysenList
                 entries={cachedEntries}
                 selectedKey={mailRangeKey(mailFrom, mailTo)}
+                accent="google"
                 onSelect={(entry) => {
                   setMailFrom(entry.fromYmd);
                   setMailTo(entry.toYmd);
@@ -1723,6 +1714,9 @@ export function GoogleWorkspaceClient() {
                 </Card>
               ) : null}
 
+              <p className="text-[12px] text-muted-foreground">
+                Spiegelbild unter Microsoft 365 · Outlook
+              </p>
             </section>
           )}
         </>

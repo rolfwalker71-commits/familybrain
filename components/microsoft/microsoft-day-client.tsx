@@ -35,9 +35,10 @@ import type { AiTokenUsage } from "@/lib/ai/usage-cost";
 import { toSwissDate } from "@/lib/utils/dates";
 import { MicrosoftMailInboxPanel } from "@/components/microsoft/microsoft-mail-inbox-panel";
 import { MicrosoftPlannerPanel } from "@/components/microsoft/microsoft-planner-panel";
-import { MailWorkspaceSubnav, type MailWorkspaceView } from "@/components/mail/mail-workspace-subnav";
+import { MailWorkspaceSubnav, type MailWorkspaceView, mailWorkspacePrimaryBtnClass, mailWorkspaceTabClass } from "@/components/mail/mail-workspace-subnav";
 import {
   MailChronikList,
+  MailChronikSummary,
   mergeMailChronik,
 } from "@/components/mail/mail-chronik-list";
 import { MailTagesanalysenList } from "@/components/mail/mail-tagesanalysen-list";
@@ -971,84 +972,60 @@ export function MicrosoftDayClient() {
 
       {connected ? (
         <>
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="text-sm text-muted-foreground">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-[var(--brand-docs)]">
               Verbunden als{" "}
-              <span className="font-medium text-foreground">
+              <span className="font-semibold">
                 {connectedEmail || "Microsoft 365"}
               </span>
             </p>
-            <div className="flex flex-wrap gap-1 rounded-lg border border-border/70 p-0.5">
+            <nav className="flex flex-wrap gap-0.5 border-b border-border/50">
               <button
                 type="button"
-                className={cn(
-                  "rounded-md px-3 py-1.5 text-sm font-medium",
-                  tab === "mail"
-                    ? "bg-muted text-foreground"
-                    : "text-muted-foreground"
-                )}
+                className={mailWorkspaceTabClass(tab === "mail", "microsoft")}
                 onClick={() => setTab("mail")}
               >
-                <span className="inline-flex items-center gap-1.5">
-                  <Mail className="size-3.5" strokeWidth={APP_ICON_STROKE} />
-                  Mails
-                </span>
+                <Mail className="size-3.5" strokeWidth={APP_ICON_STROKE} />
+                Mails
               </button>
               <button
                 type="button"
-                className={cn(
-                  "rounded-md px-3 py-1.5 text-sm font-medium",
-                  tab === "triage"
-                    ? "bg-muted text-foreground"
-                    : "text-muted-foreground"
-                )}
+                className={mailWorkspaceTabClass(tab === "triage", "microsoft")}
                 onClick={() => setTab("triage")}
               >
-                <span className="inline-flex items-center gap-1.5">
-                  <ListChecks className="size-3.5" strokeWidth={APP_ICON_STROKE} />
-                  Triage
-                  {inboxPending > 0 ? (
-                    <Badge variant="secondary" className="text-[10px]">
-                      {inboxPending}
-                    </Badge>
-                  ) : null}
-                </span>
+                <ListChecks className="size-3.5" strokeWidth={APP_ICON_STROKE} />
+                Triage
+                {inboxPending > 0 ? (
+                  <Badge variant="secondary" className="text-[10px]">
+                    {inboxPending}
+                  </Badge>
+                ) : null}
               </button>
               <button
                 type="button"
-                className={cn(
-                  "rounded-md px-3 py-1.5 text-sm font-medium",
-                  tab === "calendar"
-                    ? "bg-muted text-foreground"
-                    : "text-muted-foreground"
-                )}
+                className={mailWorkspaceTabClass(tab === "calendar", "microsoft")}
                 onClick={() => setTab("calendar")}
               >
-                <span className="inline-flex items-center gap-1.5">
-                  <CalendarClock className="size-3.5" strokeWidth={APP_ICON_STROKE} />
-                  Kalender
-                </span>
+                <CalendarClock className="size-3.5" strokeWidth={APP_ICON_STROKE} />
+                Kalender
               </button>
               <button
                 type="button"
-                className={cn(
-                  "rounded-md px-3 py-1.5 text-sm font-medium",
-                  tab === "planner"
-                    ? "bg-muted text-foreground"
-                    : "text-muted-foreground"
-                )}
+                className={mailWorkspaceTabClass(tab === "planner", "microsoft")}
                 onClick={() => setTab("planner")}
               >
-                <span className="inline-flex items-center gap-1.5">
-                  <LayoutGrid className="size-3.5" strokeWidth={APP_ICON_STROKE} />
-                  Planner
-                </span>
+                <LayoutGrid className="size-3.5" strokeWidth={APP_ICON_STROKE} />
+                Planner
               </button>
-            </div>
+            </nav>
           </div>
 
           {tab === "mail" ? (
-            <MailWorkspaceSubnav view={mailView} onChange={setMailView} />
+            <MailWorkspaceSubnav
+              view={mailView}
+              onChange={setMailView}
+              accent="microsoft"
+            />
           ) : null}
 
           {error ? (
@@ -1238,20 +1215,16 @@ export function MicrosoftDayClient() {
             </section>
           ) : tab === "mail" && mailView === "chronik" ? (
             <section className="space-y-4">
-              <div className="flex flex-wrap items-end justify-between gap-3">
-                <div className="space-y-1.5">
-                  <h2 className="text-[15px] font-semibold">
-                    {formatMailRangeLabel(mailFrom, mailTo)} · {inbox.length}{" "}
-                    Eingang · {sent.length} Gesendet
-                  </h2>
-                  <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-end justify-between gap-3 rounded-2xl border border-border/60 bg-card px-3.5 py-3 shadow-[0_4px_18px_rgba(15,23,42,0.05)]">
+                <div className="flex flex-wrap items-end gap-2">
+                  <div className="space-y-1">
                     <Label htmlFor="ms-mail-from" className="text-xs text-muted-foreground">
                       Von
                     </Label>
                     <Input
                       id="ms-mail-from"
                       type="date"
-                      className="h-8 w-auto min-w-[9.5rem]"
+                      className="h-9 w-auto min-w-[9.5rem]"
                       value={mailFrom}
                       max={zurichYmdClient()}
                       onValueChange={(v) => {
@@ -1263,13 +1236,15 @@ export function MicrosoftDayClient() {
                         void loadMail(next.from, next.to);
                       }}
                     />
+                  </div>
+                  <div className="space-y-1">
                     <Label htmlFor="ms-mail-to" className="text-xs text-muted-foreground">
                       Bis
                     </Label>
                     <Input
                       id="ms-mail-to"
                       type="date"
-                      className="h-8 w-auto min-w-[9.5rem]"
+                      className="h-9 w-auto min-w-[9.5rem]"
                       value={mailTo}
                       min={mailFrom}
                       max={zurichYmdClient()}
@@ -1282,21 +1257,25 @@ export function MicrosoftDayClient() {
                         void loadMail(next.from, next.to);
                       }}
                     />
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      disabled={mailLoading}
-                      onClick={() => void loadMail(mailFrom, mailTo)}
-                    >
-                      Mails laden
-                    </Button>
                   </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className={cn("h-9", mailWorkspacePrimaryBtnClass("microsoft"))}
+                    disabled={mailLoading}
+                    onClick={() => void loadMail(mailFrom, mailTo)}
+                  >
+                    <RefreshCw
+                      className={cn("size-3.5", mailLoading && "animate-spin")}
+                    />
+                    Mails laden
+                  </Button>
                 </div>
                 <Button
                   type="button"
                   size="sm"
                   variant="outline"
+                  className="h-9"
                   disabled={mailLoading}
                   onClick={() => void loadMail(mailFrom, mailTo)}
                 >
@@ -1306,18 +1285,29 @@ export function MicrosoftDayClient() {
                   Aktualisieren
                 </Button>
               </div>
+              <MailChronikSummary
+                rangeLabel={formatMailRangeLabel(mailFrom, mailTo)}
+                inboxCount={inbox.length}
+                sentCount={sent.length}
+              />
               <MailChronikList
                 items={mergeMailChronik(inbox, sent)}
                 loading={mailLoading}
               />
+              <p className="text-[12px] text-muted-foreground">
+                Gleiche Struktur auch unter Google Workspace
+              </p>
             </section>
           ) : (
             <section className="space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-[15px] font-semibold">Tagesanalysen</h2>
+                <h2 className="font-serif text-[22px] font-semibold tracking-tight text-foreground">
+                  Tagesanalysen
+                </h2>
                 <Button
                   type="button"
                   size="sm"
+                  className={cn("h-9", mailWorkspacePrimaryBtnClass("microsoft"))}
                   disabled={analyzing}
                   onClick={() => startAnalyze()}
                 >
@@ -1335,6 +1325,7 @@ export function MicrosoftDayClient() {
               <MailTagesanalysenList
                 entries={cachedEntries}
                 selectedKey={mailRangeKey(mailFrom, mailTo)}
+                accent="microsoft"
                 onSelect={(entry) => {
                   setMailFrom(entry.fromYmd);
                   setMailTo(entry.toYmd);
@@ -1343,6 +1334,9 @@ export function MicrosoftDayClient() {
                   void loadAnalysisForRange(entry.fromYmd, entry.toYmd);
                 }}
               />
+              <p className="text-[12px] text-muted-foreground">
+                Spiegelbild unter Google Workspace · Gmail
+              </p>
 
               <div className="flex flex-wrap items-end justify-between gap-3">
                 <div className="space-y-1.5">

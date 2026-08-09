@@ -1,10 +1,12 @@
 "use client";
 
-import { ChevronRight } from "lucide-react";
+import { CalendarDays, Check, ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { APP_ICON_STROKE } from "@/lib/branding/app-icons";
 import { toSwissDate } from "@/lib/utils/dates";
 import type { MailDayCachedSummary } from "@/lib/mail/mail-day-cache-summary";
+import type { MailWorkspaceAccent } from "@/components/mail/mail-workspace-subnav";
 
 function finishedLabel(iso: string): string {
   try {
@@ -32,23 +34,34 @@ export function MailTagesanalysenList({
   selectedKey,
   onSelect,
   emptyHint,
+  accent = "google",
 }: {
   entries: MailDayCachedSummary[];
   selectedKey: string | null;
   onSelect: (entry: MailDayCachedSummary) => void;
   emptyHint?: string;
+  accent?: MailWorkspaceAccent;
 }) {
   if (entries.length === 0) {
     return (
-      <p className="rounded-xl border border-dashed border-border/70 bg-card px-4 py-6 text-sm text-muted-foreground">
+      <p className="rounded-2xl border border-dashed border-border/70 bg-card px-4 py-8 text-center text-sm text-muted-foreground shadow-sm">
         {emptyHint ||
           "Noch keine Tagesanalysen gespeichert. Starte eine neue AI-Tagesanalyse."}
       </p>
     );
   }
 
+  const activeBorder =
+    accent === "google"
+      ? "border-teal-700/70 bg-teal-50/30"
+      : "border-[var(--brand-docs)]/50 bg-[var(--brand-docs-soft)]/40";
+  const iconWrap =
+    accent === "google"
+      ? "bg-teal-50 text-teal-800"
+      : "bg-[var(--brand-docs-soft)] text-[var(--brand-docs)]";
+
   return (
-    <ul className="space-y-2">
+    <ul className="space-y-2.5">
       {entries.map((e) => {
         const active = e.rangeKey === selectedKey;
         return (
@@ -57,31 +70,41 @@ export function MailTagesanalysenList({
               type="button"
               onClick={() => onSelect(e)}
               className={cn(
-                "flex w-full items-start gap-3 rounded-xl border px-3.5 py-3 text-left shadow-sm transition-colors",
+                "flex w-full items-start gap-3 rounded-2xl border px-3.5 py-3.5 text-left shadow-[0_4px_18px_rgba(15,23,42,0.05)] transition-colors",
                 active
-                  ? "border-[var(--brand-docs)]/40 bg-[var(--brand-docs)]/5"
-                  : "border-border/70 bg-card hover:bg-muted/30"
+                  ? activeBorder
+                  : "border-border/60 bg-card hover:bg-muted/20"
               )}
             >
+              <span
+                className={cn(
+                  "mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl",
+                  iconWrap
+                )}
+              >
+                <CalendarDays
+                  className="size-4"
+                  strokeWidth={APP_ICON_STROKE}
+                  absoluteStrokeWidth
+                  aria-hidden
+                />
+              </span>
               <div className="min-w-0 flex-1 space-y-1.5">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-[14px] font-black tracking-tight">
-                    {rangeLabel(e.fromYmd, e.toYmd)}
-                  </p>
-                  <span className="text-[12px] text-muted-foreground">
-                    {finishedLabel(e.finishedAt)}
+                <p className="text-[12px] text-muted-foreground">
+                  {finishedLabel(e.finishedAt)}
+                  <span className="text-muted-foreground/70">
+                    {" "}
+                    · {rangeLabel(e.fromYmd, e.toYmd)}
                   </span>
-                  <Badge
-                    variant="secondary"
-                    className="h-5 rounded-md bg-emerald-50 text-[10px] font-semibold text-emerald-900"
-                  >
-                    Fertig
-                  </Badge>
-                </div>
-                <p className="line-clamp-2 text-[13px] leading-snug text-foreground/90">
-                  {e.daySummary || "AI · Tagesbild"}
                 </p>
-                <div className="flex flex-wrap gap-1.5">
+                <p className="text-[15px] font-black tracking-tight">
+                  AI · Tagesbild
+                </p>
+                <p className="line-clamp-2 text-[13px] leading-snug text-muted-foreground">
+                  {e.daySummary ||
+                    `Analyse von Posteingang und Gesendet. ${e.clusterCount} Cluster, ${e.taskCount} Aufgabe(n).`}
+                </p>
+                <div className="flex flex-wrap gap-1.5 pt-0.5">
                   <Badge variant="outline" className="h-5 text-[10px]">
                     {e.clusterCount} Cluster
                   </Badge>
@@ -105,10 +128,16 @@ export function MailTagesanalysenList({
                   ) : null}
                 </div>
               </div>
-              <ChevronRight
-                className="mt-1 size-4 shrink-0 text-muted-foreground/70"
-                aria-hidden
-              />
+              <div className="flex shrink-0 flex-col items-end gap-2 self-stretch pt-0.5">
+                <Badge className="h-6 gap-1 rounded-full border-transparent bg-emerald-100 px-2 text-[11px] font-semibold text-emerald-900 hover:bg-emerald-100">
+                  <Check className="size-3" aria-hidden />
+                  Fertig
+                </Badge>
+                <ChevronRight
+                  className="mt-auto size-4 text-muted-foreground/70"
+                  aria-hidden
+                />
+              </div>
             </button>
           </li>
         );

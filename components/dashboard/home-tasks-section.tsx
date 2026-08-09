@@ -167,29 +167,12 @@ function TaskRow({
   return (
     <li
       className={cn(
-        "flex flex-wrap items-start gap-3 rounded-xl border px-2.5 py-2 sm:flex-nowrap transition-colors",
+        "flex flex-wrap items-stretch gap-3 rounded-2xl border bg-card px-3 py-2.5 shadow-[0_4px_18px_rgba(15,23,42,0.05)] sm:flex-nowrap transition-colors",
         justDone
           ? "border-emerald-300 bg-emerald-50"
-          : task.source === "google"
-            ? "border-sky-200/80 bg-sky-50/40"
-            : task.source === "todo"
-              ? "border-violet-200/70 bg-violet-50/30"
-              : "border-teal-200/70 bg-teal-50/30"
+          : "border-border/60"
       )}
     >
-      <AgendaAiIconThumb
-        itemId={`home-task-${task.key}`}
-        title={task.title}
-        kind="task"
-        calendarName={SOURCE_LABEL[task.source]}
-        location={task.subtitle}
-        description={`${SOURCE_LABEL[task.source]} · ${task.subtitle}`}
-        className="shrink-0"
-        imgClassName={cn(
-          "rounded-lg",
-          compact ? "size-9 sm:size-10" : "size-11 sm:size-12"
-        )}
-      />
       <div className="min-w-0 flex-1 space-y-1.5">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0 space-y-1">
@@ -289,6 +272,22 @@ function TaskRow({
           </div>
         ) : null}
       </div>
+      <AgendaAiIconThumb
+        itemId={`home-task-${task.key}`}
+        title={task.title}
+        kind="task"
+        calendarName={SOURCE_LABEL[task.source]}
+        location={task.subtitle}
+        description={`${SOURCE_LABEL[task.source]} · ${task.subtitle}`}
+        showAiBadge
+        className="ml-auto shrink-0 self-center shadow-md"
+        imgClassName={cn(
+          "rounded-lg",
+          compact
+            ? "h-14 w-16 sm:h-16 sm:w-[4.5rem]"
+            : "h-16 w-[4.75rem] sm:h-[4.5rem] sm:w-[5.5rem]"
+        )}
+      />
     </li>
   );
 }
@@ -583,7 +582,7 @@ export function HomeTasksSection({
   const connected = hasGoogleScope || hasMicrosoftScope;
 
   return (
-    <Card className="border-border/70">
+    <Card className="border-border/60 shadow-[0_4px_18px_rgba(15,23,42,0.05)]">
       <CardHeader className="pb-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <CardTitle className="flex items-center gap-2 text-[16px] font-black">

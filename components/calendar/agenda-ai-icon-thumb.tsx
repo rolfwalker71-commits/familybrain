@@ -26,6 +26,7 @@ export function AgendaAiIconThumb({
   aiIconUrl,
   className,
   imgClassName,
+  showAiBadge = false,
 }: {
   itemId: string;
   title: string;
@@ -45,6 +46,8 @@ export function AgendaAiIconThumb({
   className?: string;
   /** Override default size-12 / sm:size-14 thumbnail */
   imgClassName?: string;
+  /** Grünes «AI»-Badge unten rechts (Mockup). */
+  showAiBadge?: boolean;
 }) {
   const [url, setUrl] = useState<string | null>(aiIconUrl ?? null);
   const [loading, setLoading] = useState(
@@ -220,6 +223,11 @@ export function AgendaAiIconThumb({
             setFailed(true);
           }}
         />
+        {showAiBadge ? (
+          <span className="absolute bottom-1 right-1 rounded bg-emerald-600 px-1 py-px text-[8px] font-bold uppercase leading-none tracking-wide text-white shadow-sm">
+            AI
+          </span>
+        ) : null}
       </button>
       {zoomOpen ? (
         <AiImageZoom src={url} onClose={() => setZoomOpen(false)} />
