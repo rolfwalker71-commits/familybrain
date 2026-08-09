@@ -379,8 +379,8 @@ export function O365PdfBackfillPanel() {
   const liveSync = status?.liveSync;
   const log = status?.log || [];
   const mailCap =
-    status?.limits?.messagesPerRun || live?.messageTotal || 800;
-  const pdfCap = status?.limits?.pdfsPerRun || live?.pdfsMaxThisBatch || 80;
+    status?.limits?.messagesPerRun || live?.messageTotal || 2000;
+  const pdfCap = status?.limits?.pdfsPerRun || live?.pdfsMaxThisBatch || 200;
 
   return (
     <Card>
@@ -396,13 +396,16 @@ export function O365PdfBackfillPanel() {
           <span className="font-medium text-foreground">
             O365 · ANG · geschäftlich
           </span>
-          ). Reihenfolge:{" "}
+          ). Graph filtert bereits{" "}
+          <span className="font-medium text-foreground">nur Mails mit Anhang</span>
+          {" "}
+          (nicht die ganze Inbox) — «PDF only» kann die API nicht. Reihenfolge:{" "}
           <span className="font-medium text-foreground">
             älteste → neueste
           </span>{" "}
           ab Startdatum. Catch-up in Blöcken (~
-          {status?.limits?.messagesPerRun ?? 800} Mails /{" "}
-          {status?.limits?.pdfsPerRun ?? 80} neue PDFs), parallel
+          {status?.limits?.messagesPerRun ?? 2000} Mails mit Anhang /{" "}
+          {status?.limits?.pdfsPerRun ?? 200} neue PDFs), parallel
           prüfen/hochladen, verkettet sich automatisch —{" "}
           <span className="font-medium text-foreground">Stop</span> beendet die
           Kette. «Weiter» setzt am Cursor fort (kein Neustart).
@@ -599,7 +602,7 @@ export function O365PdfBackfillPanel() {
                   {live.detail ? ` · ${live.detail}` : ""}
                 </p>
                 <ProgressBar
-                  label="Mails in diesem Lauf"
+                  label="Mails mit Anhang (dieser Lauf)"
                   value={live.messageIndex}
                   max={mailCap}
                 />
@@ -667,7 +670,8 @@ export function O365PdfBackfillPanel() {
                   Crawl-Log (neueste zuerst)
                 </p>
                 <p className="text-[11px] text-muted-foreground">
-                  Datum = Empfangen · Log schreibt nach jeder Mail (nicht sekündlich)
+                  Nur Uploads/Fehler/bereits — Mails ohne PDF werden still
+                  übersprungen
                 </p>
               </div>
               {log.length === 0 ? (

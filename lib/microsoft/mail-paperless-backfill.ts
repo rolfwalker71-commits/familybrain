@@ -5,6 +5,7 @@ import {
   findDocumentForMicrosoftAttachment,
 } from "@/lib/buddy/source-links";
 import {
+  isPdfAttachment,
   listMicrosoftPdfAttachments,
   type MicrosoftMailAttachmentMeta,
 } from "@/lib/microsoft/mail-attachments";
@@ -60,13 +61,13 @@ export type O365PdfBackfillLogEntry = {
  */
 /** Messages per Graph page ($top, Graph-seitig max. sinnvoll ~50). */
 export const O365_PDF_BACKFILL_PAGE_SIZE = 50;
-/** Max Graph-Seiten pro Job-Lauf (50×16 = 800 Mails). */
-export const O365_PDF_BACKFILL_MAX_PAGES_PER_RUN = 16;
-/** Hartes Mail-Limit über alle Seiten eines Laufs. */
+/** Max Graph-Seiten pro Job-Lauf (50×40 = 2000 Mails mit Anhang). */
+export const O365_PDF_BACKFILL_MAX_PAGES_PER_RUN = 40;
+/** Hartes Mail-Limit über alle Seiten eines Laufs (nur hasAttachments). */
 export const O365_PDF_BACKFILL_MAX_MESSAGES_PER_RUN =
   O365_PDF_BACKFILL_PAGE_SIZE * O365_PDF_BACKFILL_MAX_PAGES_PER_RUN;
 /** Max neue PDFs pro Job-Lauf (Upload nach Paperless). */
-export const O365_PDF_BACKFILL_MAX_PDFS_PER_RUN = 80;
+export const O365_PDF_BACKFILL_MAX_PDFS_PER_RUN = 200;
 /** Parallel Graph attachment-list calls while scanning a page. */
 export const O365_PDF_BACKFILL_SCAN_CONCURRENCY = 12;
 /** Parallel PDF uploads within one mail. */
@@ -105,7 +106,46 @@ type GraphMessageLite = {
   subject?: string | null;
   hasAttachments?: boolean;
   receivedDateTime?: string | null;
+  attachments?: Array<{
+    id?: string;
+    name?: string | null;
+    contentType?: string | null;
+    size?: number;
+    isInline?: boolean;
+    "@odata.type"?: string;
+  }>;
 };
+
+const MAX_ATTACHMENT_BYTES = 40 * 1024 * 1024;
+
+/** Prefer Graph $expand; null = expand missing → separate attachments call. */
+function pdfsFromExpandedMessage(
+  msg: GraphMessageLite
+): MicrosoftMailAttachmentMeta[] | null {
+  if (!Array.isArray(msg.attachments)) return null;
+  const out: MicrosoftMailAttachmentMeta[] = [];
+  for (const a of msg.attachments) {
+    if (!a.id) continue;
+    const odataType = a["@odata.type"] || "";
+    if (odataType && !odataType.includes("fileAttachment")) continue;
+    const meta: MicrosoftMailAttachmentMeta = {
+      id: a.id,
+      name: (a.name || "anhang").trim() || "anhang",
+      contentType: (a.contentType || "application/octet-stream").trim(),
+      size: Number(a.size) || 0,
+      isInline: Boolean(a.isInline),
+      odataType,
+    };
+    if (
+      !meta.isInline &&
+      isPdfAttachment(meta) &&
+      meta.size <= MAX_ATTACHMENT_BYTES
+    ) {
+      out.push(meta);
+    }
+  }
+  return out;
+}
 
 export type O365PdfBackfillLiveProgress = {
   active: boolean;
@@ -460,9 +500,9 @@ export function configureO365PdfBackfill(input: {
 }
 
 /**
- * List inbox messages that Graph marks as having attachments since `sinceYmd`.
- * Graph cannot filter by «PDF only» on the message list — we then inspect
- * attachment metadata and skip non-PDFs without downloading.
+ * Inbox page: Graph already filters `hasAttachments eq true` (not all inbox mails).
+ * Graph cannot filter «PDF only» server-side — we inspect attachment metadata.
+ * `$expand=attachments` avoids an extra API call for most non-PDF attachment mails.
  */
 export async function listMicrosoftInboxWithAttachmentsPage(
   userId: number,
@@ -472,7 +512,13 @@ export async function listMicrosoftInboxWithAttachmentsPage(
     pageSize?: number;
   }
 ): Promise<{
-  messages: Array<{ id: string; subject: string; receivedDateTime: string | null }>;
+  messages: Array<{
+    id: string;
+    subject: string;
+    receivedDateTime: string | null;
+    /** Pre-resolved from $expand; null means caller should list attachments. */
+    pdfs: MicrosoftMailAttachmentMeta[] | null;
+  }>;
   nextLink: string | null;
 }> {
   const pageSize = Math.min(100, Math.max(1, options.pageSize ?? 50));
@@ -492,11 +538,26 @@ export async function listMicrosoftInboxWithAttachmentsPage(
       $orderby: "receivedDateTime asc",
       $top: String(pageSize),
       $select: "id,subject,hasAttachments,receivedDateTime",
+      $expand: "attachments($select=id,name,contentType,size,isInline)",
     });
-    data = await graphJson(
-      userId,
-      `/me/mailFolders/inbox/messages?${qs}`
-    );
+    try {
+      data = await graphJson(
+        userId,
+        `/me/mailFolders/inbox/messages?${qs}`
+      );
+    } catch {
+      // Some tenants reject expand on list — fall back without it
+      const qsPlain = new URLSearchParams({
+        $filter: filter,
+        $orderby: "receivedDateTime asc",
+        $top: String(pageSize),
+        $select: "id,subject,hasAttachments,receivedDateTime",
+      });
+      data = await graphJson(
+        userId,
+        `/me/mailFolders/inbox/messages?${qsPlain}`
+      );
+    }
   }
 
   const messages = (data.value || [])
@@ -505,6 +566,7 @@ export async function listMicrosoftInboxWithAttachmentsPage(
       id: m.id!,
       subject: (m.subject || "").trim() || "(kein Betreff)",
       receivedDateTime: m.receivedDateTime || null,
+      pdfs: pdfsFromExpandedMessage(m),
     }));
 
   return {
@@ -614,7 +676,7 @@ export async function runO365PdfBackfillBatch(
       messageIndex: messagesSeen,
       messageTotal: O365_PDF_BACKFILL_MAX_MESSAGES_PER_RUN,
       pdfsUploadedThisBatch: pdfsUploaded,
-      detail: `Seite ${pagesDone}: Anhänge parallel prüfen (${pageTotal} Mails)…`,
+      detail: `Seite ${pagesDone}: Anhänge prüfen (${pageTotal} Mails mit Anhang)…`,
     });
 
     type Scanned = {
@@ -629,6 +691,10 @@ export async function runO365PdfBackfillBatch(
       async (msg): Promise<Scanned> => {
         if (!isO365PdfBackfillEnabled()) {
           return { msg, pdfs: null, listError: false };
+        }
+        // $expand already gave us attachment metas (possibly empty = no PDF)
+        if (msg.pdfs !== null) {
+          return { msg, pdfs: msg.pdfs, listError: false };
         }
         try {
           const pdfs = await listMicrosoftPdfAttachments(userId, msg.id);
@@ -670,11 +736,7 @@ export async function runO365PdfBackfillBatch(
 
       const pdfs = item.pdfs || [];
       if (pdfs.length === 0) {
-        appendO365PdfBackfillLog({
-          receivedAt: msg.receivedDateTime,
-          subject: msg.subject,
-          outcome: "skipped_no_pdf",
-        });
+        // Graph hasAttachments, aber kein PDF (Word/Excel/…) — still & ohne Log-Spam
         continue;
       }
       messagesWithPdf += 1;
