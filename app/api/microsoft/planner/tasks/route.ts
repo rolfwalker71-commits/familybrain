@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
 
 const PatchSchema = z.object({
   taskId: z.string().min(1).max(200),
-  etag: z.string().min(1).max(500),
+  etag: z.string().max(500).optional(),
   percentComplete: z.number().int().min(0).max(100).optional(),
   bucketId: z.string().min(1).max(80).optional(),
   dueDate: z

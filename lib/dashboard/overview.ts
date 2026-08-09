@@ -792,7 +792,7 @@ export async function getDashboardOverview(
         const { loadHomeTasksBundle } = await import(
           "@/lib/dashboard/home-tasks"
         );
-        return loadHomeTasksBundle(calendarUserId, { horizonDays: 7 });
+        return loadHomeTasksBundle(calendarUserId, { horizonDays: 45 });
       })(),
       (async () => {
         if (calendarUserId == null) {

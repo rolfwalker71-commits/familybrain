@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { APP_ICON_STROKE } from "@/lib/branding/app-icons";
 import { toSwissDate } from "@/lib/utils/dates";
+import { showActionFeedback } from "@/lib/ui/action-feedback";
 import { cn } from "@/lib/utils";
 
 type PlannerTask = {
@@ -34,6 +35,7 @@ export function MicrosoftPlannerPanel() {
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [showDone, setShowDone] = useState(false);
   const [bucketsByPlan, setBucketsByPlan] = useState<
     Record<string, PlannerBucket[]>
@@ -90,6 +92,7 @@ export function MicrosoftPlannerPanel() {
   ) {
     setBusyId(task.id);
     setError(null);
+    setNotice(null);
     try {
       const res = await fetch("/api/microsoft/planner/tasks", {
         method: "PATCH",
@@ -106,9 +109,33 @@ export function MicrosoftPlannerPanel() {
       setTasks((prev) =>
         prev.map((t) => (t.id === updated.id ? { ...t, ...updated } : t))
       );
+      let msg = `«${task.title}» aktualisiert.`;
+      if (typeof patch.percentComplete === "number") {
+        msg =
+          patch.percentComplete >= 100
+            ? `«${task.title}» ist erledigt.`
+            : `«${task.title}» wieder geöffnet.`;
+      } else if (patch.dueDate !== undefined) {
+        msg = patch.dueDate
+          ? `«${task.title}» neu terminiert auf ${patch.dueDate}.`
+          : `Termin bei «${task.title}» entfernt.`;
+      } else if (patch.bucketId) {
+        msg = `«${task.title}» in anderen Bucket verschoben.`;
+      }
+      setNotice(msg);
+      showActionFeedback({
+        headline: msg,
+        detail: "Microsoft Planner",
+        tone: "success",
+      });
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-      // ETag oft veraltet → Liste neu laden
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message);
+      showActionFeedback({
+        headline: "Planner-Update fehlgeschlagen",
+        detail: message,
+        tone: "error",
+      });
       await load();
     } finally {
       setBusyId(null);
@@ -152,8 +179,18 @@ export function MicrosoftPlannerPanel() {
         </div>
       </div>
 
+      {notice ? (
+        <p
+          className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900"
+          role="status"
+        >
+          {notice}
+        </p>
+      ) : null}
       {error ? (
-        <p className="text-sm text-destructive">{error}</p>
+        <p className="text-sm text-destructive" role="alert">
+          {error}
+        </p>
       ) : null}
 
       {loading && tasks.length === 0 ? (

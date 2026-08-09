@@ -25,7 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BackupStatusPanel } from "@/components/settings/backup-status-panel";
 import { KpiCorrectSheet } from "@/components/dashboard/kpi-correct-sheet";
-import { HomeTasksSection } from "@/components/dashboard/home-tasks-section";
+import { HomeTasksOtherAside, HomeTasksSection } from "@/components/dashboard/home-tasks-section";
 import { TeamLogo, weekdayLabel, AgendaTypeRail } from "@/components/calendar/agenda-row";
 import { AgendaAiIconThumb } from "@/components/calendar/agenda-ai-icon-thumb";
 import { AgendaEventDialog } from "@/components/calendar/agenda-event-dialog";
@@ -1754,6 +1754,23 @@ export function OverviewDashboard({
 
             <aside className="min-w-0 space-y-4">
               <BirthdaysAsideCard items={upcomingBirthdays} today={today} />
+
+              <HomeTasksOtherAside
+                items={(data.tasks?.items || []).map((t) => ({
+                  key: t.key || `${t.source || "google"}:${t.id}`,
+                  id: t.id,
+                  source: t.source || "google",
+                  title: t.title,
+                  dueDate: t.dueDate,
+                  overdue: t.overdue,
+                  subtitle: t.subtitle || t.listTitle || "",
+                  href: t.href,
+                  listId: t.listId ?? null,
+                  etag: t.etag ?? null,
+                }))}
+                today={today}
+                onChanged={() => void load()}
+              />
 
               {data.referenceNotes && data.referenceNotes.length > 0 ? (
                 <Card className="border-border/70">

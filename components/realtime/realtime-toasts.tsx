@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { BellOff, X } from "lucide-react";
+import { BellOff, Check, X } from "lucide-react";
 import { DocumentAiIcon } from "@/components/documents/document-ai-icon";
 import type { AppNotifyPayload, NotifyReason } from "@/lib/realtime/hub";
 import { showDesktopNotification } from "@/lib/realtime/desktop-notify";
@@ -12,12 +12,18 @@ import {
   passesScopeFilter,
   type UserNotificationPrefs,
 } from "@/lib/realtime/prefs-client";
+import {
+  BUDDY_ACTION_FEEDBACK_EVENT,
+  type ActionFeedbackDetail,
+} from "@/lib/ui/action-feedback";
 import { cn } from "@/lib/utils";
 
 type ToastItem = {
   id: string;
   notification: AppNotifyPayload;
   at: string;
+  local?: boolean;
+  tone?: "success" | "error" | "info";
 };
 
 function playBling() {
@@ -61,7 +67,7 @@ function sourceLabel(n: AppNotifyPayload): string {
 }
 
 /**
- * Global toasts for app events (SSE).
+ * Global toasts for app events (SSE) + lokale Aktions-Bestätigungen.
  * Dismiss: X, click outside, Escape. Prefs from /api/me/notification-prefs.
  */
 export function RealtimeToasts() {
@@ -88,6 +94,44 @@ export function RealtimeToasts() {
     setToasts([]);
   }, []);
 
+  const enqueueToast = useCallback(
+    (
+      notification: AppNotifyPayload,
+      at: string,
+      opts?: { local?: boolean; tone?: ToastItem["tone"]; forceSound?: boolean }
+    ) => {
+      const id = `${notification.reason}-${at}-${Math.random().toString(36).slice(2, 7)}`;
+      setToasts((prev) =>
+        [
+          {
+            id,
+            notification,
+            at,
+            local: opts?.local,
+            tone: opts?.tone,
+          },
+          ...prev,
+        ].slice(0, 4)
+      );
+      const p = prefsRef.current;
+      if (opts?.local || p.soundEnabled) {
+        playBling();
+      }
+      if (
+        !opts?.local &&
+        p.desktopEnabled &&
+        typeof document !== "undefined" &&
+        document.visibilityState === "hidden"
+      ) {
+        showDesktopNotification(notification);
+      }
+      const ms = Math.max(4, opts?.local ? 5 : p.durationSec) * 1000;
+      const timer = window.setTimeout(() => dismiss(id), ms);
+      timersRef.current.set(id, timer);
+    },
+    [dismiss]
+  );
+
   const pushToast = useCallback(
     (notification: AppNotifyPayload, at: string) => {
       const p = prefsRef.current;
@@ -100,23 +144,9 @@ export function RealtimeToasts() {
       ) {
         return;
       }
-
-      const id = `${notification.reason}-${at}-${Math.random().toString(36).slice(2, 7)}`;
-      setToasts((prev) => [{ id, notification, at }, ...prev].slice(0, 4));
-      if (p.soundEnabled) playBling();
-      // Windows / OS notification when Buddy tab is open but in the background
-      if (
-        p.desktopEnabled &&
-        typeof document !== "undefined" &&
-        document.visibilityState === "hidden"
-      ) {
-        showDesktopNotification(notification);
-      }
-      const ms = Math.max(3, p.durationSec) * 1000;
-      const timer = window.setTimeout(() => dismiss(id), ms);
-      timersRef.current.set(id, timer);
+      enqueueToast(notification, at);
     },
-    [dismiss]
+    [enqueueToast]
   );
 
   useEffect(() => {
@@ -169,6 +199,39 @@ export function RealtimeToasts() {
   }, [pushToast]);
 
   useEffect(() => {
+    const onFeedback = (ev: Event) => {
+      const raw = (ev as CustomEvent<ActionFeedbackDetail>).detail;
+      if (!raw?.headline) return;
+      const tone = raw.tone || "success";
+      const notification: AppNotifyPayload = {
+        domain: "documents",
+        reason: "buddy_status",
+        headline:
+          tone === "error"
+            ? "Fehler"
+            : tone === "info"
+              ? "Hinweis"
+              : "Aktion bestätigt",
+        detail: raw.detail || null,
+        title: raw.headline,
+        href: null,
+        aiIconUrl: null,
+        category: null,
+        meta: null,
+        source: "buddy",
+      };
+      enqueueToast(notification, new Date().toISOString(), {
+        local: true,
+        tone,
+        forceSound: tone === "success",
+      });
+    };
+    window.addEventListener(BUDDY_ACTION_FEEDBACK_EVENT, onFeedback);
+    return () =>
+      window.removeEventListener(BUDDY_ACTION_FEEDBACK_EVENT, onFeedback);
+  }, [enqueueToast]);
+
+  useEffect(() => {
     if (toasts.length === 0) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -190,7 +253,7 @@ export function RealtimeToasts() {
 
   async function disableNotifications() {
     setPrefs((prev) => ({ ...prev, enabled: false }));
-    dismissAll();
+    setToasts((prev) => prev.filter((t) => t.local));
     try {
       await fetch("/api/me/notification-prefs", {
         method: "PUT",
@@ -202,7 +265,8 @@ export function RealtimeToasts() {
     }
   }
 
-  if (!prefs.enabled || toasts.length === 0) return null;
+  const visible = prefs.enabled ? toasts : toasts.filter((t) => t.local);
+  if (visible.length === 0) return null;
 
   return (
     <>
@@ -216,30 +280,48 @@ export function RealtimeToasts() {
         className="pointer-events-none fixed inset-x-0 bottom-0 z-[80] flex flex-col items-end gap-2 p-3 sm:bottom-4 sm:right-4 sm:left-auto sm:w-[min(100%,24rem)] sm:p-0"
         aria-live="polite"
       >
-        {toasts.map((toast) => {
+        {visible.map((toast) => {
           const n = toast.notification;
           return (
             <div
               key={toast.id}
               className={cn(
-                "pointer-events-auto relative w-full overflow-hidden rounded-2xl border border-border/70",
+                "pointer-events-auto relative w-full overflow-hidden rounded-2xl border",
                 "bg-background/95 shadow-[0_12px_40px_rgba(20,32,28,0.18)] backdrop-blur-md",
-                "animate-in slide-in-from-bottom-4 fade-in duration-300"
+                "animate-in slide-in-from-bottom-4 fade-in duration-300",
+                toast.tone === "error"
+                  ? "border-rose-300"
+                  : toast.tone === "success" || toast.local
+                    ? "border-emerald-300"
+                    : "border-border/70"
               )}
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex gap-3 p-3 pr-11">
-                <DocumentAiIcon
-                  aiIconUrl={n.aiIconUrl}
-                  category={n.category}
-                  size="md"
-                  zoomable={false}
-                />
+                {toast.local && toast.tone !== "error" ? (
+                  <span className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-800">
+                    <Check className="size-5" aria-hidden />
+                  </span>
+                ) : (
+                  <DocumentAiIcon
+                    aiIconUrl={n.aiIconUrl}
+                    category={n.category}
+                    size="md"
+                    zoomable={false}
+                  />
+                )}
                 <div className="min-w-0 flex-1">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--brand-docs)]">
+                  <p
+                    className={cn(
+                      "text-[11px] font-semibold uppercase tracking-wide",
+                      toast.tone === "error"
+                        ? "text-rose-700"
+                        : "text-[var(--brand-docs)]"
+                    )}
+                  >
                     {n.headline}
                     <span className="ml-1.5 font-normal normal-case tracking-normal text-muted-foreground">
-                      · {sourceLabel(n)}
+                      · {toast.local ? "Aufgabe" : sourceLabel(n)}
                     </span>
                   </p>
                   <p className="mt-0.5 truncate text-sm font-semibold leading-snug">
@@ -285,15 +367,17 @@ export function RealtimeToasts() {
           >
             Alle schliessen
           </button>
-          <button
-            type="button"
-            className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-background/90 px-3 py-1.5 text-[11px] text-muted-foreground shadow-sm backdrop-blur hover:bg-muted hover:text-foreground"
-            onClick={() => void disableNotifications()}
-            title="Live-Benachrichtigungen ausschalten"
-          >
-            <BellOff className="size-3" />
-            Benachrichtigungen aus
-          </button>
+          {prefs.enabled ? (
+            <button
+              type="button"
+              className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-background/90 px-3 py-1.5 text-[11px] text-muted-foreground shadow-sm backdrop-blur hover:bg-muted hover:text-foreground"
+              onClick={() => void disableNotifications()}
+              title="Live-Benachrichtigungen ausschalten"
+            >
+              <BellOff className="size-3" />
+              Benachrichtigungen aus
+            </button>
+          ) : null}
         </div>
       </div>
     </>

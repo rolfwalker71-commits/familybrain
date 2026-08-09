@@ -125,12 +125,6 @@ export async function PATCH(request: Request) {
         { status: 403 }
       );
     }
-    if (!body.etag) {
-      return NextResponse.json(
-        { error: "etag fehlt für Planner-Task." },
-        { status: 400 }
-      );
-    }
     const task = await updatePlannerTask(userId, {
       taskId: body.id,
       etag: body.etag,

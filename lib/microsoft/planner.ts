@@ -192,18 +192,56 @@ export async function listPlannerTasksForMatch(userId: number): Promise<
   }));
 }
 
+export async function getPlannerTask(
+  userId: number,
+  taskId: string
+): Promise<PlannerTaskItem> {
+  const t = await graphJson<GraphPlannerTask>(
+    userId,
+    `/planner/tasks/${encodeURIComponent(taskId)}`
+  );
+  if (!t.id) throw new Error("Planner-Aufgabe nicht gefunden.");
+  const planId = t.planId || "";
+  const bucketId = t.bucketId || null;
+  const [planTitle, bucketName] = await Promise.all([
+    planId ? getPlanTitle(userId, planId, new Map()) : Promise.resolve(null),
+    bucketId
+      ? getBucketName(userId, bucketId, new Map())
+      : Promise.resolve(null),
+  ]);
+  const percent = Number(t.percentComplete) || 0;
+  return {
+    id: t.id,
+    title: (t.title || "").trim() || "Aufgabe",
+    percentComplete: percent,
+    status: percent >= 100 ? "done" : "open",
+    dueDate: dueYmd(t.dueDateTime),
+    planId,
+    planTitle,
+    bucketId,
+    bucketName,
+    etag: t["@odata.etag"] || "",
+    href: plannerTaskHref(t.id),
+  };
+}
+
 export async function updatePlannerTask(
   userId: number,
   input: {
     taskId: string;
-    etag: string;
+    etag?: string | null;
     percentComplete?: number;
     bucketId?: string;
     /** YYYY-MM-DD — Fälligkeit neu setzen; null entfernt das Datum. */
     dueDate?: string | null;
   }
 ): Promise<PlannerTaskItem> {
-  if (!input.etag?.trim()) {
+  let etag = input.etag?.trim() || "";
+  if (!etag) {
+    const fresh = await getPlannerTask(userId, input.taskId);
+    etag = fresh.etag;
+  }
+  if (!etag) {
     throw new Error("Planner-Aufgabe: ETag fehlt (bitte Liste neu laden).");
   }
   const body: Record<string, unknown> = {};
@@ -230,7 +268,7 @@ export async function updatePlannerTask(
     {
       method: "PATCH",
       headers: {
-        "If-Match": input.etag,
+        "If-Match": etag,
         Prefer: "return=representation",
       },
       body: JSON.stringify(body),
@@ -238,11 +276,46 @@ export async function updatePlannerTask(
   );
   const text = await res.text();
   if (!res.ok) {
+    // Veraltetes ETag → einmal neu laden und retry
+    if (res.status === 412 || res.status === 409) {
+      const fresh = await getPlannerTask(userId, input.taskId);
+      const retry = await graphFetch(
+        userId,
+        `/planner/tasks/${encodeURIComponent(input.taskId)}`,
+        {
+          method: "PATCH",
+          headers: {
+            "If-Match": fresh.etag,
+            Prefer: "return=representation",
+          },
+          body: JSON.stringify(body),
+        }
+      );
+      const retryText = await retry.text();
+      if (!retry.ok) {
+        throw new Error(
+          `Planner-Update fehlgeschlagen (${retry.status}): ${retryText.slice(0, 240)}`
+        );
+      }
+      const updated = retryText
+        ? (JSON.parse(retryText) as GraphPlannerTask)
+        : {};
+      return await mapUpdatedPlannerTask(userId, updated, input.taskId, fresh.etag);
+    }
     throw new Error(
       `Planner-Update fehlgeschlagen (${res.status}): ${text.slice(0, 240)}`
     );
   }
   const updated = text ? (JSON.parse(text) as GraphPlannerTask) : {};
+  return mapUpdatedPlannerTask(userId, updated, input.taskId, etag);
+}
+
+async function mapUpdatedPlannerTask(
+  userId: number,
+  updated: GraphPlannerTask,
+  fallbackId: string,
+  fallbackEtag: string
+): Promise<PlannerTaskItem> {
   const planId = updated.planId || "";
   const planTitle = planId
     ? await getPlanTitle(userId, planId, new Map())
@@ -252,7 +325,7 @@ export async function updatePlannerTask(
     ? await getBucketName(userId, bucketId, new Map())
     : null;
   const percent = Number(updated.percentComplete) || 0;
-  const id = updated.id || input.taskId;
+  const id = updated.id || fallbackId;
   return {
     id,
     title: (updated.title || "").trim() || "Aufgabe",
@@ -263,7 +336,7 @@ export async function updatePlannerTask(
     planTitle,
     bucketId,
     bucketName,
-    etag: updated["@odata.etag"] || input.etag,
+    etag: updated["@odata.etag"] || fallbackEtag,
     href: plannerTaskHref(id),
   };
 }
