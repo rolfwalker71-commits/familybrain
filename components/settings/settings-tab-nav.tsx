@@ -12,6 +12,7 @@ export type SettingsTab =
   | "chat"
   | "users"
   | "family"
+  | "maringo"
   | "more";
 
 export type SettingsTabItem = AppTabItem<SettingsTab>;
@@ -29,6 +30,7 @@ export function parseSettingsTab(
     raw === "chat" ||
     raw === "users" ||
     raw === "family" ||
+    raw === "maringo" ||
     raw === "more"
   ) {
     return raw;

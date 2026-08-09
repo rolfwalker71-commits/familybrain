@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { KeyRound, Server, BookOpen, MessageSquareText, Luggage, HandCoins, Mail, MoreHorizontal, Users, Bell, Heart, CalendarDays, Sparkles } from "lucide-react";
+import { KeyRound, Server, BookOpen, MessageSquareText, Luggage, HandCoins, Mail, MoreHorizontal, Users, Bell, Heart, CalendarDays, Sparkles, Ticket } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,6 +32,7 @@ import { SettingsMicrosoftPanel } from "@/components/settings/settings-microsoft
 import { SettingsAgendaAiIconsPanel } from "@/components/settings/settings-agenda-ai-icons-panel";
 import { NotificationPrefsPanel } from "@/components/settings/notification-prefs-panel";
 import { SettingsTelegramPanel } from "@/components/settings/settings-telegram-panel";
+import { SettingsMaringoPanel } from "@/components/settings/settings-maringo-panel";
 import { SettingsCategorySuggestionsPanel } from "@/components/settings/settings-category-suggestions-panel";
 import { BackupStatusPanel } from "@/components/settings/backup-status-panel";
 
@@ -1245,6 +1246,7 @@ function SettingsPageInner() {
     { id: "chat", label: "Chat", icon: MessageSquareText },
     { id: "users", label: "User", icon: Users },
     { id: "family", label: "Familie", icon: Heart },
+    { id: "maringo", label: "Maringo", icon: Ticket },
     { id: "more", label: "Mehr", icon: MoreHorizontal },
   ];
 
@@ -2715,6 +2717,7 @@ function SettingsPageInner() {
 
       {activeTab === "users" ? <SettingsUsersPanel /> : null}
       {activeTab === "family" ? <SettingsFamilyPanel /> : null}
+      {activeTab === "maringo" ? <SettingsMaringoPanel /> : null}
       {activeTab === "calendars" ? (
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">

@@ -126,6 +126,11 @@ import {
   isAuthError,
   requireAdmin,
 } from "@/lib/auth/current-user";
+import {
+  getMariSettingsPublic,
+  saveMariSettings,
+} from "@/lib/mari/settings";
+import { clearMariTokenCache } from "@/lib/mari/client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -217,6 +222,7 @@ export async function GET(request: Request) {
     ...getTriageAfterAnalysisSettingsPublic(),
     ...getTriageMassPausePublic(),
     triageDiagnostics: getTriageDiagnostics(),
+    ...getMariSettingsPublic(),
   });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -274,6 +280,11 @@ const PutSchema = z.object({
   triageMailRecipients: z.string().max(2000).nullable().optional(),
   triageMailFrom: z.string().max(320).nullable().optional(),
   triageAfterAnalysisEnabled: z.boolean().optional(),
+  mariBaseUrl: z.union([z.string().url(), z.literal("")]).optional(),
+  mariUsername: z.string().max(80).optional(),
+  mariPassword: z.string().max(200).optional(),
+  clearMariPassword: z.boolean().optional(),
+  mariEmployeeNumber: z.string().max(40).optional(),
 });
 
 export async function PUT(request: Request) {
@@ -523,6 +534,28 @@ export async function PUT(request: Request) {
     });
   }
 
+  if (
+    parsed.data.mariBaseUrl !== undefined ||
+    parsed.data.mariUsername !== undefined ||
+    parsed.data.mariPassword !== undefined ||
+    parsed.data.clearMariPassword ||
+    parsed.data.mariEmployeeNumber !== undefined
+  ) {
+    try {
+      saveMariSettings({
+        baseUrl: parsed.data.mariBaseUrl,
+        username: parsed.data.mariUsername,
+        password: parsed.data.mariPassword,
+        clearPassword: parsed.data.clearMariPassword,
+        employeeNumber: parsed.data.mariEmployeeNumber,
+      });
+      clearMariTokenCache();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return NextResponse.json({ error: message }, { status: 400 });
+    }
+  }
+
   const paperless = getPaperlessSettings();
   const openai = getOpenAISettings();
   const trilium = getTriliumSettings();
@@ -589,5 +622,6 @@ export async function PUT(request: Request) {
     ...getTriageAfterAnalysisSettingsPublic(),
     ...getTriageMassPausePublic(),
     triageDiagnostics: getTriageDiagnostics(),
+    ...getMariSettingsPublic(),
   });
 }

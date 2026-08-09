@@ -13,18 +13,19 @@ Credentials **nicht** in dieses File schreiben. Lokal in `.env.local` (siehe unt
 
 ---
 
-## Credentials (`.env.local`)
+## Credentials
+
+Bevorzugt in der App: **Einstellungen → Maringo** (SQLite). Alternativ `.env.local`:
 
 ```bash
 MARI_REST_BASE_URL=https://marirestservice.an-group.international
 MARI_REST_USERNAME=...
 MARI_REST_PASSWORD=...
-# Optional / Klarstellung:
-# MARI_EMPLOYEE_NUMBER war bei uns als UserCode=12 gesetzt.
-# Für Ticket-Zuweisung zählt EmployeeNumber (z.B. M1010), nicht UserCode.
+# Personalnummer (EmployeeNumber), nicht UserCode:
 MARI_EMPLOYEE_NUMBER=M1010
 ```
 
+Gespeicherte Einstellungen haben Vorrang vor Env-Variablen.
 Mapping (Beispiel Rolf Walker, Login `RWA`):
 
 | Feld | Wert |
@@ -266,14 +267,41 @@ curl -sS -X POST -H "Authorization: Bearer $TOKEN" \
 
 ---
 
-## Buddy-Integration (noch offen)
+## Buddy-Integration
 
-Mögliche nächste Schritte, wenn das Thema wieder aufgenommen wird:
+1. Credentials: Einstellungen → Maringo (oder Env).
+2. Client: `lib/mari/*` — Token-Cache, SQL-Liste, GET/PATCH Issue, Timeline, AI-Analyse.
+3. UI: `/maringo` — Liste mit Status-Multiselect, Detail + Verlauf, Status/Fälligkeit ändern, AI.
+4. Keine Secrets committen; SystemTools-SQL nur lesend.
 
-1. Env-Vars wie oben; EmployeeNumber (`M1010`) fest oder aus Login/`MARIEmployeeMaster` auflösen.
-2. Client-Modul `lib/mari/...`: token (cache bis `expires_in`), SQL-list, GET/PATCH issue.
-3. UI: „Meine Tickets“ mit Status-Filter `1,3,4,6,7,11,13,14`, Due Date ändern.
-4. Keine Secrets committen; SystemTools-SQL nur lesend und parametrisiert (EmployeeNumber / Status-Liste).
+Menü: `/maringo` («Maringo Support»).
+---
+
+## Verlauf / History (Live-Probe 2026-08-09)
+
+Zusätzlich zu `SupportIssue` + Attachments gibt es in HANA:
+
+| View / Table | Zweck |
+|--------------|--------|
+| `"MARISupportIssueLine"` | Ticket-Positionen / Thread (Mail rein/raus, Notizen) mit `CreateDate`, `RequestPosType`, `RequestText` |
+| `"MARISupportIssueChangeLog"` | Feldänderungen Alt→Neu (`Status`, `Bearbeiter`, `Stichtag`, …) mit `ChangeDate` |
+| `"MARISupportIssueVersions"` | Produktversionen am Ticket |
+| `"MPHOTLINEANFRAGELOG"` | Roh-Log (leer / wenig genutzt in Probe) |
+
+**RequestPosType (Häufigkeit in DB, Interpretation aus Samples):**
+
+| Typ | Beobachtung |
+|----:|-------------|
+| 1 | Antwort / Bearbeitung (oft `Originator`/`HandledBy` = Employee z.B. M1010) |
+| 3 | E-Mail-Eingang |
+| 4 | System / Undeliverable |
+| 5 | (häufig, Typ noch zu beschriften) |
+| 8 | Kundennachricht / RE: |
+| 10 / 11 | selten |
+
+Timeline-UI = Lines chronologisch + optional ChangeLog-Einträge als Meta-Events.
+
+**Env-Hinweis:** `MARI_EMPLOYEE_NUMBER` muss die **EmployeeNumber** sein (`M1010`), nicht `UserCode` (`12`). Mit `12` liefert die «Meine Tickets»-Query 0 Zeilen.
 
 ---
 

@@ -215,6 +215,7 @@ export const pageVisuals = {
   summaries: appIcons.summaries,
   guides: appIcons.guides,
   microsoft: appIcons.microsoft,
+  maringo: appIcons.maringo,
 } as const;
 
 export function knowledgeVisual(name: string): {

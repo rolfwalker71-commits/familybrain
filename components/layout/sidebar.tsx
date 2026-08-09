@@ -61,6 +61,12 @@ const myBrainNavItems: NavItem[] = [
     tone: pageVisuals.microsoft.tone,
   },
   {
+    href: "/maringo",
+    label: "Maringo Support",
+    icon: pageVisuals.maringo.icon,
+    tone: pageVisuals.maringo.tone,
+  },
+  {
     href: "/inbox",
     label: "Inbox",
     icon: pageVisuals.inbox.icon,
