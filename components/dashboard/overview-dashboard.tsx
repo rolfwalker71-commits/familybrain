@@ -1494,8 +1494,8 @@ export function OverviewDashboard({
                   (msMailStats?.pendingTriage || 0) > 0
                     ? "/microsoft?tab=triage"
                     : msSample
-                      ? `/microsoft?tab=inbox&open=${encodeURIComponent(msSample.id)}`
-                      : "/microsoft?tab=inbox"
+                      ? `/microsoft?tab=triage&open=${encodeURIComponent(msSample.id)}`
+                      : "/microsoft?tab=mail&view=chronik"
                 }
                 tone="amber"
                 logo={<MicrosoftLogo className="size-5" />}
@@ -1520,8 +1520,8 @@ export function OverviewDashboard({
                   (gMailStats?.pendingTriage || 0) > 0
                     ? "/google?tab=triage"
                     : gSample
-                      ? `/google?open=${encodeURIComponent(gSample.id)}`
-                      : "/google"
+                      ? `/google?tab=triage&open=${encodeURIComponent(gSample.id)}`
+                      : "/google?tab=mail&view=chronik"
                 }
                 tone="sky"
                 logo={<GmailLogo className="size-5" />}

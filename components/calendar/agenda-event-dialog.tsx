@@ -437,7 +437,7 @@ export function AgendaEventDialog({
                       Google · Kalender
                     </Link>
                     <Link
-                      href="/google?tab=day"
+                      href="/google?tab=mail&view=tagesanalysen"
                       className={cn(
                         buttonVariants({ size: "sm", variant: "outline" }),
                         "gap-1.5"
@@ -455,7 +455,7 @@ export function AgendaEventDialog({
                       Microsoft · Kalender
                     </Link>
                     <Link
-                      href="/microsoft?tab=day"
+                      href="/microsoft?tab=mail&view=tagesanalysen"
                       className={cn(
                         buttonVariants({ size: "sm", variant: "outline" }),
                         "gap-1.5"

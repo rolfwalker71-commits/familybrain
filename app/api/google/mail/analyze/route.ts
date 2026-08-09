@@ -15,6 +15,7 @@ import {
   getGoogleMailDayCached,
   isGoogleMailDayJobBusy,
   listGoogleMailDayCachedDays,
+  listGoogleMailDayCachedSummaries,
   readGoogleMailDayJob,
   startGoogleMailDayJob,
   upsertGoogleMailDayCache,
@@ -67,7 +68,7 @@ function notifyDone(rangeLabel: string, analysis: MsDayMailAnalysis) {
     headline: "Gmail-Tagesanalyse fertig",
     detail,
     title: null,
-    href: "/google?tab=day",
+    href: "/google?tab=mail&view=tagesanalysen",
     aiIconUrl: null,
     category: null,
     meta: null,
@@ -83,7 +84,7 @@ function notifyError(rangeLabel: string, message: string) {
     headline: "Gmail-Tagesanalyse fehlgeschlagen",
     detail,
     title: null,
-    href: "/google?tab=day",
+    href: "/google?tab=mail&view=tagesanalysen",
     aiIconUrl: null,
     category: null,
     meta: null,
@@ -166,6 +167,7 @@ export async function GET(request: Request) {
   const range = rangeOrErr && !("error" in rangeOrErr) ? rangeOrErr : null;
   const rangeKey = range?.rangeKey ?? null;
   const cachedDays = listGoogleMailDayCachedDays(userId);
+  const cachedEntries = listGoogleMailDayCachedSummaries(userId);
   const job = readGoogleMailDayJob(userId);
 
   if (job?.status === "running" && isGoogleMailDayJobBusy(job)) {
@@ -174,6 +176,7 @@ export async function GET(request: Request) {
       status: "running",
       job,
       cachedDays,
+      cachedEntries,
       fromCache: false,
       cachedJob:
         rangeKey && job.rangeKey !== rangeKey
@@ -193,6 +196,7 @@ export async function GET(request: Request) {
         status: "done",
         job: cachedToJob(userId, cached),
         cachedDays,
+        cachedEntries,
         fromCache: true,
         stale: true,
       });
@@ -207,6 +211,7 @@ export async function GET(request: Request) {
         finishedAt: new Date().toISOString(),
       },
       cachedDays,
+      cachedEntries,
       stale: true,
     });
   }
@@ -233,6 +238,7 @@ export async function GET(request: Request) {
       status: "done",
       job,
       cachedDays: listGoogleMailDayCachedDays(userId),
+      cachedEntries: listGoogleMailDayCachedSummaries(userId),
       fromCache: false,
     });
   }
@@ -245,6 +251,7 @@ export async function GET(request: Request) {
         status: "done",
         job: cachedToJob(userId, cached),
         cachedDays,
+        cachedEntries,
         fromCache: true,
       });
     }
@@ -253,6 +260,7 @@ export async function GET(request: Request) {
       status: "idle",
       job: null,
       cachedDays,
+      cachedEntries,
       fromCache: false,
     });
   }
@@ -263,6 +271,7 @@ export async function GET(request: Request) {
       status: "done",
       job,
       cachedDays,
+      cachedEntries,
       fromCache: false,
     });
   }
@@ -275,6 +284,7 @@ export async function GET(request: Request) {
         status: "done",
         job: cachedToJob(userId, cached),
         cachedDays,
+        cachedEntries,
         fromCache: true,
       });
     }
@@ -285,6 +295,7 @@ export async function GET(request: Request) {
     status: "idle",
     job: null,
     cachedDays,
+    cachedEntries,
     fromCache: false,
   });
 }
@@ -328,6 +339,7 @@ export async function POST(request: Request) {
         status: "running",
         job: existing,
         cachedDays: listGoogleMailDayCachedDays(userId),
+      cachedEntries: listGoogleMailDayCachedSummaries(userId),
         message: `Analyse läuft bereits (${formatMailAnalysisRangeLabel({
           fromYmd: existing!.fromYmd,
           toYmd: existing!.toYmd,
@@ -350,6 +362,7 @@ export async function POST(request: Request) {
       status: "running",
       job,
       cachedDays: listGoogleMailDayCachedDays(userId),
+      cachedEntries: listGoogleMailDayCachedSummaries(userId),
       message: `Analyse für ${label} gestartet.`,
     },
     { status: 202 }

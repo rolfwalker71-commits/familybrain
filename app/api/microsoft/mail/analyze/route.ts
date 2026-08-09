@@ -15,6 +15,7 @@ import {
   getMsMailDayCached,
   isMsMailDayJobBusy,
   listMsMailDayCachedDays,
+  listMsMailDayCachedSummaries,
   readMsMailDayJob,
   startMsMailDayJob,
   upsertMsMailDayCache,
@@ -68,7 +69,7 @@ function notifyDone(rangeLabel: string, analysis: MsDayMailAnalysis) {
     headline: "Mail-Tagesanalyse fertig",
     detail,
     title: null,
-    href: "/microsoft",
+    href: "/microsoft?tab=mail&view=tagesanalysen",
     aiIconUrl: null,
     category: null,
     meta: null,
@@ -84,7 +85,7 @@ function notifyError(rangeLabel: string, message: string) {
     headline: "Mail-Tagesanalyse fehlgeschlagen",
     detail,
     title: null,
-    href: "/microsoft",
+    href: "/microsoft?tab=mail&view=tagesanalysen",
     aiIconUrl: null,
     category: null,
     meta: null,
@@ -174,6 +175,7 @@ export async function GET(request: Request) {
   const range = rangeOrErr && !("error" in rangeOrErr) ? rangeOrErr : null;
   const rangeKey = range?.rangeKey ?? null;
   const cachedDays = listMsMailDayCachedDays(userId);
+  const cachedEntries = listMsMailDayCachedSummaries(userId);
   const job = readMsMailDayJob(userId);
 
   if (job?.status === "running" && isMsMailDayJobBusy(job)) {
@@ -182,6 +184,7 @@ export async function GET(request: Request) {
       status: "running",
       job,
       cachedDays,
+      cachedEntries,
       fromCache: false,
       cachedJob:
         rangeKey && job.rangeKey !== rangeKey
@@ -201,6 +204,7 @@ export async function GET(request: Request) {
         status: "done",
         job: cachedToJob(userId, cached),
         cachedDays,
+        cachedEntries,
         fromCache: true,
         stale: true,
       });
@@ -215,6 +219,7 @@ export async function GET(request: Request) {
         finishedAt: new Date().toISOString(),
       },
       cachedDays,
+      cachedEntries,
       stale: true,
     });
   }
@@ -241,6 +246,7 @@ export async function GET(request: Request) {
       status: "done",
       job,
       cachedDays: listMsMailDayCachedDays(userId),
+      cachedEntries: listMsMailDayCachedSummaries(userId),
       fromCache: false,
     });
   }
@@ -253,6 +259,7 @@ export async function GET(request: Request) {
         status: "done",
         job: cachedToJob(userId, cached),
         cachedDays,
+        cachedEntries,
         fromCache: true,
       });
     }
@@ -261,6 +268,7 @@ export async function GET(request: Request) {
       status: "idle",
       job: null,
       cachedDays,
+      cachedEntries,
       fromCache: false,
     });
   }
@@ -271,6 +279,7 @@ export async function GET(request: Request) {
       status: "done",
       job,
       cachedDays,
+      cachedEntries,
       fromCache: false,
     });
   }
@@ -283,6 +292,7 @@ export async function GET(request: Request) {
         status: "done",
         job: cachedToJob(userId, cached),
         cachedDays,
+        cachedEntries,
         fromCache: true,
       });
     }
@@ -293,6 +303,7 @@ export async function GET(request: Request) {
     status: "idle",
     job: null,
     cachedDays,
+    cachedEntries,
     fromCache: false,
   });
 }
@@ -337,6 +348,7 @@ export async function POST(request: Request) {
         status: "running",
         job: existing,
         cachedDays: listMsMailDayCachedDays(userId),
+      cachedEntries: listMsMailDayCachedSummaries(userId),
         message: `Analyse läuft bereits (${formatMailAnalysisRangeLabel({
           fromYmd: existing!.fromYmd,
           toYmd: existing!.toYmd,
@@ -359,6 +371,7 @@ export async function POST(request: Request) {
       status: "running",
       job,
       cachedDays: listMsMailDayCachedDays(userId),
+      cachedEntries: listMsMailDayCachedSummaries(userId),
       message: `Analyse für ${label} gestartet.`,
     },
     { status: 202 }

@@ -6,6 +6,10 @@ import {
   mailAnalysisRangeKey,
   parseMailAnalysisRangeKey,
 } from "@/lib/mail/mail-analysis-range";
+import {
+  toMailDayCachedSummary,
+  type MailDayCachedSummary,
+} from "@/lib/mail/mail-day-cache-summary";
 
 export type GoogleMailDayJobStatus = "running" | "done" | "error";
 
@@ -180,10 +184,16 @@ export function getGoogleMailDayCached(
 }
 
 export function listGoogleMailDayCachedDays(userId: number): string[] {
+  return listGoogleMailDayCachedSummaries(userId).map((e) => e.rangeKey);
+}
+
+export function listGoogleMailDayCachedSummaries(
+  userId: number
+): MailDayCachedSummary[] {
   return readGoogleMailDayCache(userId)
     .slice()
     .sort((a, b) => b.finishedAt.localeCompare(a.finishedAt))
-    .map((e) => e.rangeKey);
+    .map(toMailDayCachedSummary);
 }
 
 export function upsertGoogleMailDayCache(

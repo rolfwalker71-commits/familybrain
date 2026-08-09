@@ -6,6 +6,10 @@ import {
   mailAnalysisRangeKey,
   parseMailAnalysisRangeKey,
 } from "@/lib/mail/mail-analysis-range";
+import {
+  toMailDayCachedSummary,
+  type MailDayCachedSummary,
+} from "@/lib/mail/mail-day-cache-summary";
 
 export type MsMailDayJobStatus = "running" | "done" | "error";
 
@@ -184,10 +188,16 @@ export function getMsMailDayCached(
 
 /** Cached range keys (newest finishedAt first). */
 export function listMsMailDayCachedDays(userId: number): string[] {
+  return listMsMailDayCachedSummaries(userId).map((e) => e.rangeKey);
+}
+
+export function listMsMailDayCachedSummaries(
+  userId: number
+): MailDayCachedSummary[] {
   return readMsMailDayCache(userId)
     .slice()
     .sort((a, b) => b.finishedAt.localeCompare(a.finishedAt))
-    .map((e) => e.rangeKey);
+    .map(toMailDayCachedSummary);
 }
 
 /** Speichert/aktualisiert eine Analyse; hält max. MS_MAIL_DAY_CACHE_MAX. */

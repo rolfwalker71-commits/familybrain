@@ -6,7 +6,6 @@ import { useSearchParams } from "next/navigation";
 import {
   Check,
   CalendarClock,
-  Inbox,
   ListChecks,
   ListTodo,
   Mail,
@@ -35,6 +34,14 @@ import type { AiTokenUsage } from "@/lib/ai/usage-cost";
 import { toSwissDate } from "@/lib/utils/dates";
 import { GoogleMailInboxPanel } from "@/components/google/google-mail-inbox-panel";
 import { GoogleTasksPanel } from "@/components/google/google-tasks-panel";
+import { MailWorkspaceSubnav, type MailWorkspaceView } from "@/components/mail/mail-workspace-subnav";
+import {
+  MailChronikList,
+  mergeMailChronik,
+} from "@/components/mail/mail-chronik-list";
+import { MailTagesanalysenList } from "@/components/mail/mail-tagesanalysen-list";
+import type { MailDayCachedSummary } from "@/lib/mail/mail-day-cache-summary";
+import type { MsMailItem } from "@/lib/microsoft/mail-day";
 import { pageVisuals } from "@/components/layout/icon-circle";
 import {
   detectReplyLanguage,
@@ -95,21 +102,25 @@ function clampMailRange(from: string, to: string): { from: string; to: string } 
   return { from: f, to: t };
 }
 
-type Tab = "calendar" | "inbox" | "triage" | "day" | "tasks";
+type Tab = "calendar" | "mail" | "triage" | "tasks";
 
-function parseTab(raw: string | null): Tab {
-  if (
-    raw === "inbox" ||
-    raw === "triage" ||
-    raw === "day" ||
-    raw === "calendar" ||
-    raw === "tasks"
-  ) {
+function parseTab(raw: string | null, openId: string | null): Tab {
+  if (openId && (!raw || raw === "inbox" || raw === "mail")) return "triage";
+  if (raw === "triage" || raw === "calendar" || raw === "tasks" || raw === "mail") {
     return raw;
   }
-  if (raw === "mail") return "day";
-  return "inbox";
+  if (raw === "inbox") return "mail";
+  if (raw === "day") return "mail";
+  return "mail";
 }
+
+function parseMailView(raw: string | null, tabRaw: string | null): MailWorkspaceView {
+  if (raw === "chronik" || raw === "tagesanalysen") return raw;
+  if (tabRaw === "day") return "tagesanalysen";
+  return "chronik";
+}
+
+type MsMail = MsMailItem;
 
 type GCalEvent = {
   id: string;
@@ -129,15 +140,6 @@ type FreeSlot = {
   startHm: string;
   endHm: string;
   durationMinutes: number;
-};
-
-type MsMail = {
-  id: string;
-  folder: "inbox" | "sent";
-  subject: string;
-  from: string;
-  preview: string;
-  receivedOrSentAt: string | null;
 };
 
 type DayTask = {
@@ -269,7 +271,10 @@ const STATUS_LABEL: Record<string, string> = {
 export function GoogleWorkspaceClient() {
   const searchParams = useSearchParams();
   const [tab, setTab] = useState<Tab>(() =>
-    parseTab(searchParams.get("tab"))
+    parseTab(searchParams.get("tab"), searchParams.get("open"))
+  );
+  const [mailView, setMailView] = useState<MailWorkspaceView>(() =>
+    parseMailView(searchParams.get("view"), searchParams.get("tab"))
   );
   const [openMailId, setOpenMailId] = useState<string | null>(
     () => searchParams.get("open")
@@ -297,6 +302,9 @@ export function GoogleWorkspaceClient() {
   const [analyzeNotice, setAnalyzeNotice] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<DayAnalysis | null>(null);
   const [cachedDays, setCachedDays] = useState<string[]>([]);
+  const [cachedEntries, setCachedEntries] = useState<MailDayCachedSummary[]>(
+    []
+  );
   const [analysisFromCache, setAnalysisFromCache] = useState(false);
   const [picks, setPicks] = useState<PickState>({
     tasks: {},
@@ -380,7 +388,8 @@ export function GoogleWorkspaceClient() {
       );
     }
     const t = searchParams.get("tab");
-    if (t) setTab(parseTab(t));
+    if (t) setTab(parseTab(t, searchParams.get("open")));
+    setMailView(parseMailView(searchParams.get("view"), t));
   }, [searchParams]);
 
   useEffect(() => {
@@ -525,7 +534,8 @@ export function GoogleWorkspaceClient() {
           .filter(Boolean)
           .join(" ")
       );
-      setTab("day");
+      setTab("mail");
+      setMailView("tagesanalysen");
     },
     []
   );
@@ -599,6 +609,9 @@ export function GoogleWorkspaceClient() {
       const json = await res.json();
       if (!res.ok) return json.status as string | undefined;
       if (Array.isArray(json.cachedDays)) setCachedDays(json.cachedDays);
+        if (Array.isArray(json.cachedEntries)) {
+          setCachedEntries(json.cachedEntries as MailDayCachedSummary[]);
+        }
       if (json.job) {
         const jobKey =
           json.job.rangeKey ||
@@ -639,6 +652,9 @@ export function GoogleWorkspaceClient() {
         const json = await res.json();
         if (!res.ok) return;
         if (Array.isArray(json.cachedDays)) setCachedDays(json.cachedDays);
+        if (Array.isArray(json.cachedEntries)) {
+          setCachedEntries(json.cachedEntries as MailDayCachedSummary[]);
+        }
 
         if (json.status === "running") {
           const jobKey =
@@ -706,6 +722,9 @@ export function GoogleWorkspaceClient() {
         const json = await res.json();
         if (cancelled || !res.ok) return;
         if (Array.isArray(json.cachedDays)) setCachedDays(json.cachedDays);
+        if (Array.isArray(json.cachedEntries)) {
+          setCachedEntries(json.cachedEntries as MailDayCachedSummary[]);
+        }
         if (!json.job) return;
         hydrateFromJob(json.job, {
           syncDay: true,
@@ -742,6 +761,9 @@ export function GoogleWorkspaceClient() {
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || "Analyse starten fehlgeschlagen");
         if (Array.isArray(json.cachedDays)) setCachedDays(json.cachedDays);
+        if (Array.isArray(json.cachedEntries)) {
+          setCachedEntries(json.cachedEntries as MailDayCachedSummary[]);
+        }
         if (json.job) hydrateFromJob(json.job, { fromCache: false });
         startPolling();
       } catch (err) {
@@ -941,7 +963,7 @@ export function GoogleWorkspaceClient() {
     <div className="min-w-0 space-y-5 pb-10">
       <PageHeader
         title="Google Workspace"
-        description="Gmail analysieren, Triage und Kalender-Review — Tagesanalyse und Slot-Suche zusätzlich."
+        description="Gmail-Chronik, Triage, Kalender und Tagesanalysen — plus Slot-Suche."
         icon={pageVisuals.google.icon}
         tone={pageVisuals.google.tone}
       />
@@ -976,15 +998,15 @@ export function GoogleWorkspaceClient() {
                 type="button"
                 className={cn(
                   "rounded-md px-3 py-1.5 text-sm font-medium",
-                  tab === "inbox"
+                  tab === "mail"
                     ? "bg-muted text-foreground"
                     : "text-muted-foreground"
                 )}
-                onClick={() => setTab("inbox")}
+                onClick={() => setTab("mail")}
               >
                 <span className="inline-flex items-center gap-1.5">
-                  <Inbox className="size-3.5" strokeWidth={APP_ICON_STROKE} />
-                  Posteingang
+                  <Mail className="size-3.5" strokeWidth={APP_ICON_STROKE} />
+                  Mails
                 </span>
               </button>
               <button
@@ -1026,21 +1048,6 @@ export function GoogleWorkspaceClient() {
                 type="button"
                 className={cn(
                   "rounded-md px-3 py-1.5 text-sm font-medium",
-                  tab === "day"
-                    ? "bg-muted text-foreground"
-                    : "text-muted-foreground"
-                )}
-                onClick={() => setTab("day")}
-              >
-                <span className="inline-flex items-center gap-1.5">
-                  <Mail className="size-3.5" strokeWidth={APP_ICON_STROKE} />
-                  Tagesanalyse
-                </span>
-              </button>
-              <button
-                type="button"
-                className={cn(
-                  "rounded-md px-3 py-1.5 text-sm font-medium",
                   tab === "tasks"
                     ? "bg-sky-100 text-sky-950"
                     : "text-muted-foreground"
@@ -1054,6 +1061,10 @@ export function GoogleWorkspaceClient() {
               </button>
             </div>
           </div>
+
+          {tab === "mail" ? (
+            <MailWorkspaceSubnav view={mailView} onChange={setMailView} />
+          ) : null}
 
           {error ? (
             <p className="text-sm text-destructive" role="alert">
@@ -1230,13 +1241,6 @@ export function GoogleWorkspaceClient() {
                 </ul>
               )}
             </section>
-          ) : tab === "inbox" ? (
-            <GoogleMailInboxPanel
-              mode="inbox"
-              openMessageId={openMailId}
-              onPendingChange={setInboxPending}
-              onRequestTriageTab={() => setTab("triage")}
-            />
           ) : tab === "triage" ? (
             <GoogleMailInboxPanel
               mode="triage"
@@ -1246,13 +1250,13 @@ export function GoogleWorkspaceClient() {
             />
           ) : tab === "tasks" ? (
             <GoogleTasksPanel />
-          ) : (
+          ) : tab === "mail" && mailView === "chronik" ? (
             <section className="space-y-4">
               <div className="flex flex-wrap items-end justify-between gap-3">
                 <div className="space-y-1.5">
                   <h2 className="text-[15px] font-semibold">
                     {formatMailRangeLabel(mailFrom, mailTo)} · {inbox.length}{" "}
-                    Posteingang · {sent.length} Gesendet
+                    Eingang · {sent.length} Gesendet
                   </h2>
                   <div className="flex flex-wrap items-center gap-2">
                     <Label htmlFor="g-mail-from" className="text-xs text-muted-foreground">
@@ -1260,6 +1264,111 @@ export function GoogleWorkspaceClient() {
                     </Label>
                     <Input
                       id="g-mail-from"
+                      type="date"
+                      className="h-8 w-auto min-w-[9.5rem]"
+                      value={mailFrom}
+                      max={zurichYmdClient()}
+                      onValueChange={(v) => {
+                        if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return;
+                        const next = clampMailRange(v, mailTo);
+                        if (next.from === mailFrom && next.to === mailTo) return;
+                        setMailFrom(next.from);
+                        setMailTo(next.to);
+                        void loadMail(next.from, next.to);
+                      }}
+                    />
+                    <Label htmlFor="g-mail-to" className="text-xs text-muted-foreground">
+                      Bis
+                    </Label>
+                    <Input
+                      id="g-mail-to"
+                      type="date"
+                      className="h-8 w-auto min-w-[9.5rem]"
+                      value={mailTo}
+                      min={mailFrom}
+                      max={zurichYmdClient()}
+                      onValueChange={(v) => {
+                        if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return;
+                        const next = clampMailRange(mailFrom, v);
+                        if (next.from === mailFrom && next.to === mailTo) return;
+                        setMailFrom(next.from);
+                        setMailTo(next.to);
+                        void loadMail(next.from, next.to);
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={mailLoading}
+                      onClick={() => void loadMail(mailFrom, mailTo)}
+                    >
+                      Mails laden
+                    </Button>
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={mailLoading}
+                  onClick={() => void loadMail(mailFrom, mailTo)}
+                >
+                  <RefreshCw
+                    className={cn("size-3.5", mailLoading && "animate-spin")}
+                  />
+                  Aktualisieren
+                </Button>
+              </div>
+              <MailChronikList
+                items={mergeMailChronik(inbox, sent)}
+                loading={mailLoading}
+              />
+            </section>
+          ) : (
+            <section className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-[15px] font-semibold">Tagesanalysen</h2>
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={analyzing}
+                  onClick={() => startAnalyze()}
+                >
+                  <Sparkles
+                    className={cn("size-3.5", analyzing && "animate-pulse")}
+                  />
+                  {analyzing
+                    ? "Analyse läuft…"
+                    : analysis &&
+                        cachedDays.includes(mailRangeKey(mailFrom, mailTo))
+                      ? "Neu analysieren"
+                      : "Neue AI Tagesanalyse"}
+                </Button>
+              </div>
+              <MailTagesanalysenList
+                entries={cachedEntries}
+                selectedKey={mailRangeKey(mailFrom, mailTo)}
+                onSelect={(entry) => {
+                  setMailFrom(entry.fromYmd);
+                  setMailTo(entry.toYmd);
+                  setPicks({ tasks: {}, events: {}, replies: {} });
+                  void loadMail(entry.fromYmd, entry.toYmd);
+                  void loadAnalysisForRange(entry.fromYmd, entry.toYmd);
+                }}
+              />
+
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <div className="space-y-1.5">
+                  <h2 className="text-[15px] font-semibold">
+                    Zeitraum · {formatMailRangeLabel(mailFrom, mailTo)}
+                  </h2>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Label htmlFor="g-day-from" className="text-xs text-muted-foreground">
+                      Von
+                    </Label>
+                    <Input
+                      id="g-day-from"
                       type="date"
                       className="h-8 w-auto min-w-[9.5rem]"
                       value={mailFrom}
@@ -1278,11 +1387,11 @@ export function GoogleWorkspaceClient() {
                         void loadAnalysisForRange(next.from, next.to);
                       }}
                     />
-                    <Label htmlFor="g-mail-to" className="text-xs text-muted-foreground">
+                    <Label htmlFor="g-day-to" className="text-xs text-muted-foreground">
                       Bis
                     </Label>
                     <Input
-                      id="g-mail-to"
+                      id="g-day-to"
                       type="date"
                       className="h-8 w-auto min-w-[9.5rem]"
                       value={mailTo}
@@ -1330,22 +1439,6 @@ export function GoogleWorkspaceClient() {
                       className={cn("size-3.5", mailLoading && "animate-spin")}
                     />
                     Aktualisieren
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    disabled={analyzing}
-                    onClick={() => startAnalyze()}
-                  >
-                    <Sparkles
-                      className={cn("size-3.5", analyzing && "animate-pulse")}
-                    />
-                    {analyzing
-                      ? "Analyse läuft…"
-                      : analysis &&
-                          cachedDays.includes(mailRangeKey(mailFrom, mailTo))
-                        ? "Neu analysieren"
-                        : "AI Tagesanalyse"}
                   </Button>
                 </div>
               </div>
@@ -1629,54 +1722,6 @@ export function GoogleWorkspaceClient() {
                   </CardContent>
                 </Card>
               ) : null}
-
-              <div className="grid gap-3 md:grid-cols-2">
-                <Card className="border-border/70">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm">Posteingang</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    {inbox.length === 0 ? (
-                      <p className="text-xs text-muted-foreground">Keine.</p>
-                    ) : (
-                      inbox.slice(0, 12).map((m) => (
-                        <div key={m.id} className="border-b border-border/40 pb-2 last:border-0">
-                          <p className="text-sm font-medium leading-snug">
-                            {m.subject}
-                          </p>
-                          <p className="text-[11px] text-muted-foreground">
-                            {m.from}
-                          </p>
-                          <p className="line-clamp-2 text-xs text-muted-foreground">
-                            {m.preview}
-                          </p>
-                        </div>
-                      ))
-                    )}
-                  </CardContent>
-                </Card>
-                <Card className="border-border/70">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm">Gesendet</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    {sent.length === 0 ? (
-                      <p className="text-xs text-muted-foreground">Keine.</p>
-                    ) : (
-                      sent.slice(0, 10).map((m) => (
-                        <div key={m.id} className="border-b border-border/40 pb-2 last:border-0">
-                          <p className="text-sm font-medium leading-snug">
-                            {m.subject}
-                          </p>
-                          <p className="line-clamp-2 text-xs text-muted-foreground">
-                            {m.preview}
-                          </p>
-                        </div>
-                      ))
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
 
             </section>
           )}
