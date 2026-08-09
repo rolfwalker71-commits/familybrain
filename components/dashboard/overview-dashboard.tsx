@@ -895,30 +895,30 @@ function FocusTile({
   title: string;
   detail: string;
 }) {
-  const topCls = {
-    teal: "border-t-teal-600",
-    rose: "border-t-rose-500",
-    amber: "border-t-amber-500",
-    sky: "border-t-sky-500",
+  const cardCls = {
+    teal: "border-teal-200/70 bg-teal-50/60",
+    rose: "border-rose-200/70 bg-rose-50/60",
+    amber: "border-amber-200/70 bg-amber-50/60",
+    sky: "border-sky-200/70 bg-sky-50/60",
   }[tone];
   const iconWrap = {
-    teal: "bg-teal-50 text-teal-800",
-    rose: "bg-rose-50 text-rose-800",
-    amber: "bg-amber-50 text-amber-800",
-    sky: "bg-sky-50 text-sky-800",
+    teal: "bg-teal-100/80 text-teal-800",
+    rose: "bg-rose-100/80 text-rose-800",
+    amber: "bg-amber-100/80 text-amber-800",
+    sky: "bg-sky-100/80 text-sky-800",
   }[tone];
 
   return (
     <Link
       href={href}
       className={cn(
-        "relative flex min-h-[7.5rem] min-w-0 flex-col gap-2.5 rounded-2xl border border-border/60 border-t-[3px] bg-card px-3.5 py-3.5 shadow-[0_4px_18px_rgba(15,23,42,0.05)] transition-colors hover:bg-muted/20",
-        topCls
+        "flex min-w-0 items-center gap-3 rounded-2xl border px-3.5 py-3 shadow-[0_4px_18px_rgba(15,23,42,0.04)] transition-colors hover:brightness-[0.98]",
+        cardCls
       )}
     >
       <span
         className={cn(
-          "flex size-9 shrink-0 items-center justify-center rounded-xl",
+          "flex size-9 shrink-0 items-center justify-center rounded-full",
           iconWrap
         )}
       >
@@ -933,17 +933,15 @@ function FocusTile({
           />
         ) : null}
       </span>
-      <div className="min-w-0 flex-1 pr-5">
+      <div className="min-w-0 flex-1">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
           {eyebrow}
         </p>
-        <p className="mt-0.5 truncate text-[15px] font-black tracking-tight">
-          {title}
-        </p>
+        <p className="truncate text-[15px] font-black tracking-tight">{title}</p>
         <p className="truncate text-[13px] text-muted-foreground">{detail}</p>
       </div>
       <ChevronRight
-        className="absolute bottom-3.5 right-3 size-4 text-muted-foreground/70"
+        className="size-4 shrink-0 text-muted-foreground/70"
         aria-hidden
       />
     </Link>
