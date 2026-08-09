@@ -66,8 +66,12 @@ export const O365_PDF_BACKFILL_MAX_PAGES_PER_RUN = 40;
 /** Hartes Mail-Limit über alle Seiten eines Laufs (nur hasAttachments). */
 export const O365_PDF_BACKFILL_MAX_MESSAGES_PER_RUN =
   O365_PDF_BACKFILL_PAGE_SIZE * O365_PDF_BACKFILL_MAX_PAGES_PER_RUN;
-/** Max neue PDFs pro Job-Lauf (Upload nach Paperless). */
-export const O365_PDF_BACKFILL_MAX_PDFS_PER_RUN = 200;
+/**
+ * Max neue PDFs pro Job-Lauf — bewusst ≥ Mail-Limit (oft >1 PDF/Mail).
+ * Primärer Scan-Stop bleibt Seiten/Mails; dies drosselt nur sehr große Uploads.
+ */
+export const O365_PDF_BACKFILL_MAX_PDFS_PER_RUN =
+  O365_PDF_BACKFILL_MAX_MESSAGES_PER_RUN * 2;
 /** Parallel Graph attachment-list calls while scanning a page. */
 export const O365_PDF_BACKFILL_SCAN_CONCURRENCY = 12;
 /** Parallel PDF uploads within one mail. */

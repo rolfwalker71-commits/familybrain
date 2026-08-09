@@ -380,7 +380,7 @@ export function O365PdfBackfillPanel() {
   const log = status?.log || [];
   const mailCap =
     status?.limits?.messagesPerRun || live?.messageTotal || 2000;
-  const pdfCap = status?.limits?.pdfsPerRun || live?.pdfsMaxThisBatch || 200;
+  const pdfCap = status?.limits?.pdfsPerRun || live?.pdfsMaxThisBatch || 4000;
 
   return (
     <Card>
@@ -404,8 +404,8 @@ export function O365PdfBackfillPanel() {
             älteste → neueste
           </span>{" "}
           ab Startdatum. Catch-up in Blöcken (~
-          {status?.limits?.messagesPerRun ?? 2000} Mails mit Anhang /{" "}
-          {status?.limits?.pdfsPerRun ?? 200} neue PDFs), parallel
+          {status?.limits?.messagesPerRun ?? 2000} Mails mit Anhang / bis{" "}
+          {status?.limits?.pdfsPerRun ?? 4000} neue PDFs), parallel
           prüfen/hochladen, verkettet sich automatisch —{" "}
           <span className="font-medium text-foreground">Stop</span> beendet die
           Kette. «Weiter» setzt am Cursor fort (kein Neustart).
