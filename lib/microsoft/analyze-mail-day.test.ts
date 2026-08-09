@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  applySwissOrthography,
   flattenAnalysis,
   guessCompanyLabel,
   packMailsForPrompt,
@@ -30,6 +31,47 @@ function mail(
     ...partial,
   };
 }
+
+test("applySwissOrthography replaces ß with ss", () => {
+  assert.equal(
+    applySwissOrthography("Viele Grüße,\nRolf Walker"),
+    "Viele Grüsse,\nRolf Walker"
+  );
+  assert.equal(applySwissOrthography("Strasse heisst so"), "Strasse heisst so");
+});
+
+test("flattenAnalysis applies Swiss orthography to replies", () => {
+  const out = flattenAnalysis(
+    [
+      {
+        company: "Test",
+        counterpartEmail: null,
+        theme: "Thema",
+        conversationId: null,
+        summary: "Großes Update",
+        mailIds: [],
+        status: "open",
+        tasks: [],
+        events: [],
+        replies: [
+          {
+            to: "a@b.ch",
+            subject: "AW: Test",
+            body: "Freundliche Grüße",
+            language: "de",
+            sourceMailId: null,
+            sourceSubject: null,
+            company: null,
+          },
+        ],
+      },
+    ],
+    "Überblick mit Maßnahme"
+  );
+  assert.equal(out.daySummary, "Überblick mit Massnahme");
+  assert.equal(out.clusters[0]?.summary, "Grosses Update");
+  assert.equal(out.replies[0]?.body, "Freundliche Grüsse");
+});
 
 test("guessCompanyLabel uses company domain, not gmail", () => {
   assert.equal(

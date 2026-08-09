@@ -559,19 +559,46 @@ export function flattenAnalysis(
   daySummary: string,
   usage?: AiTokenUsage | null
 ): MsDayMailAnalysis {
-  return {
+  return applySwissOrthographyToAnalysis({
     daySummary,
     clusters,
     tasks: clusters.flatMap((c) => c.tasks),
     events: clusters.flatMap((c) => c.events),
     replies: clusters.flatMap((c) => c.replies),
     usage: usage || null,
+  });
+}
+
+/** Schweizer Orthografie: ß → ss (gesamte Tagesanalyse-Texte). */
+export function applySwissOrthography(text: string): string {
+  return text.replace(/\u00df/g, "ss").replace(/\u1e9e/g, "SS");
+}
+
+export function applySwissOrthographyToAnalysis(
+  analysis: MsDayMailAnalysis
+): MsDayMailAnalysis {
+  const walk = (value: unknown): unknown => {
+    if (typeof value === "string") return applySwissOrthography(value);
+    if (Array.isArray(value)) return value.map(walk);
+    if (value && typeof value === "object") {
+      const out: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+        if (k === "usage") {
+          out[k] = v;
+          continue;
+        }
+        out[k] = walk(v);
+      }
+      return out;
+    }
+    return value;
   };
+  return walk(analysis) as MsDayMailAnalysis;
 }
 
 export function emptyMailDayAnalysis(summary: string): MsDayMailAnalysis {
   return {
-    daySummary: summary,
+    daySummary: applySwissOrthography(summary),
     clusters: [],
     tasks: [],
     events: [],
@@ -604,6 +631,11 @@ export async function analyzeMicrosoftMailDay(input: {
   const system = `Du bist Buddy, Büro-Assistent (Schweiz, Europe/Zurich).
 Analysiere die Mails des gewählten Zeitraums (Posteingang + Gesendet).
 
+SCHREIBWEISE (hart, gesamtes JSON):
+- Schweizer Hochdeutsch: kein scharfes s (ß). Immer «ss» (Gruss, heissen, Strasse, grosse, Massnahme).
+- Schlussformel DE z. B. «Freundliche Grüsse» / «Mit freundlichen Grüssen» — nie «Grüße».
+- Schweiz-Kultur: klar, höflich, knapp; CHF/Datumsstil wo relevant.
+
 Ablauf:
 1) Gruppiere nach Kunde/Firma und Thema/Thread. Gleiche conv=… = derselbe Thread.
 2) Pro Cluster: kurze Zusammenfassung + status.
@@ -618,7 +650,7 @@ REPLIES (sehr wichtig — oft vergessen):
 - VERBOTEN: nur Task «Antworten an …» / «Rückmeldung an …» / «Bescheid geben» OHNE replies[] — der Text gehört in replies.body.
 - SPRACHE (hart): Schreibe subject+body AUSSCHLIESSLICH in der Sprache der Kunden-Anfrage (Inbox-Text / «Textsprache»). Buddy-UI ist Deutsch — das ist IRRELEVANT für den Reply.
   · Kundenmail EN (z. B. «Dear…», «please», englischer Fliesstext) → language="en", subject «Re: …», body komplett Englisch (Dear… / Best regards).
-  · Kundenmail DE → language="de", subject «AW: …», body komplett Deutsch.
+  · Kundenmail DE → language="de", subject «AW: …», body komplett Deutsch (Schweizer Schreibweise, kein ß).
   · Nie deutschen Reply auf englische Anfrage und umgekehrt. Feld "language" immer setzen.
 - body höflich, knapp, absendfertig (Anrede + Schlussformel).
 - Kein Reply bei reiner FYI/Newsletter/Werbung oder wenn du im Thread bereits klar geantwortet hast und nichts Offen ist.

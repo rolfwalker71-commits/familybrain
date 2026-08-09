@@ -12,6 +12,7 @@ import {
   normalizeReplySubject,
   type ReplyLang,
 } from "@/lib/microsoft/reply-language-shared";
+import { applySwissOrthography } from "@/lib/microsoft/analyze-mail-day";
 
 export type { ReplyLang };
 export {
@@ -53,7 +54,8 @@ export async function translateMailReply(input: {
             ? `You translate business e-mail reply drafts into clear, professional English.
 Keep facts, names, dates and numbers. Use an appropriate greeting and closing.
 Subject must use "Re:" (not AW:). Return JSON only: {"subject","body","language":"en"}.`
-            : `Du übersetzt geschäftliche Mail-Antwortentwürfe in klares, professionelles Deutsch (Schweiz ok: ss statt ß).
+            : `Du übersetzt geschäftliche Mail-Antwortentwürfe in klares, professionelles Schweizer Hochdeutsch.
+Kein scharfes s (ß) — immer ss (Gruss, heissen, Strasse). Schlussformel z. B. «Freundliche Grüsse».
 Fakten, Namen, Daten und Zahlen bleiben. Passende Anrede und Schlussformel.
 Betreff mit «AW:» (nicht Re:). Nur JSON: {"subject","body","language":"de"}.`,
       },
@@ -77,9 +79,12 @@ Betreff mit «AW:» (nicht Re:). Nur JSON: {"subject","body","language":"de"}.`,
   }
   const data = TranslateSchema.parse(parsed);
   const language = data.language === "en" ? "en" : "de";
+  const subjectRaw = normalizeReplySubject(data.subject, language);
+  const bodyRaw = data.body.trim();
   return {
-    subject: normalizeReplySubject(data.subject, language),
-    body: data.body.trim(),
+    subject:
+      language === "de" ? applySwissOrthography(subjectRaw) : subjectRaw,
+    body: language === "de" ? applySwissOrthography(bodyRaw) : bodyRaw,
     language,
     usage,
   };
