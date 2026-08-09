@@ -15,6 +15,7 @@ import {
   isMicrosoftConnected,
 } from "@/lib/microsoft/oauth";
 import { updatePlannerTask } from "@/lib/microsoft/planner";
+import { invalidateOverviewCache } from "@/lib/dashboard/overview-cache";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -94,6 +95,7 @@ export async function PATCH(request: Request) {
         },
         request
       );
+      invalidateOverviewCache(userId);
       return NextResponse.json({ ok: true, task });
     }
 
@@ -116,6 +118,7 @@ export async function PATCH(request: Request) {
         dueDate:
           body.action === "reschedule" ? body.dueDate ?? null : undefined,
       });
+      invalidateOverviewCache(userId);
       return NextResponse.json({ ok: true, task });
     }
 
@@ -145,6 +148,7 @@ export async function PATCH(request: Request) {
         body.action === "reschedule" ? body.dueDate ?? null : undefined,
       bucketId: body.action === "moveBucket" ? body.bucketId : undefined,
     });
+    invalidateOverviewCache(userId);
     return NextResponse.json({ ok: true, task });
   } catch (error) {
     return NextResponse.json(

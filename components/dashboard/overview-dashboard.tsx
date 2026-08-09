@@ -744,7 +744,13 @@ function DayTimeline({
             <div
               className={cn(
                 "mb-5 min-w-0 overflow-hidden rounded-xl border border-border/60 bg-card last:mb-1",
-                active && "border-emerald-200/90"
+                active && "border-emerald-200/90",
+                !active &&
+                  item.calendarId?.startsWith("google-cal:") &&
+                  "border-sky-200/80 bg-sky-50/35",
+                !active &&
+                  item.calendarId?.startsWith("ms-cal:") &&
+                  "border-violet-200/70 bg-violet-50/30"
               )}
             >
               <div className="flex items-stretch">

@@ -40,7 +40,9 @@ export async function POST(request: Request) {
   const byId: Record<string, { key: string; url: string }> = {};
   const byKey: Record<string, string> = {};
   let generated = 0;
-  const maxGenerate = force ? 4 : 3;
+  // Tasks oft einzeln angefragt — etwas mehr Generierungen erlauben
+  const hasTask = capped.some((i) => String(i.kind || "") === "task");
+  const maxGenerate = force ? 6 : hasTask ? 5 : 3;
 
   for (const item of capped) {
     if (!shouldHaveAgendaAiIcon(item)) continue;

@@ -219,9 +219,45 @@ function mapOutlookTodoStatus(
 function todoDueYmd(
   due: GraphTodoTask["dueDateTime"]
 ): string | null {
-  const raw = due?.dateTime;
+  const raw = due?.dateTime?.trim();
   if (!raw) return null;
-  return raw.slice(0, 10);
+  const tz = (due?.timeZone || "").trim();
+
+  // Lokale Wandzeit in Zürich / W. Europe → Datumsteil ist der Fälligkeitstag
+  if (
+    tz &&
+    /Europe\/Zurich|W\. Europe Standard Time|Central European Standard Time|CET|CEST/i.test(
+      tz
+    ) &&
+    !/[zZ]|[+-]\d{2}:?\d{2}$/.test(raw)
+  ) {
+    const day = raw.slice(0, 10);
+    return /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : null;
+  }
+
+  let iso = raw;
+  // Graph oft: "2026-08-09T22:00:00.0000000" ohne Z, timeZone=UTC
+  if (!/[zZ]|[+-]\d{2}:?\d{2}$/.test(iso)) {
+    iso = iso.replace(/\.\d{1,7}$/, "");
+    if (!tz || /^UTC$|^Etc\/GMT$/i.test(tz)) {
+      iso = `${iso}Z`;
+    } else {
+      const day = raw.slice(0, 10);
+      return /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : null;
+    }
+  }
+
+  const instant = new Date(iso);
+  if (!Number.isFinite(instant.getTime())) {
+    const day = raw.slice(0, 10);
+    return /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : null;
+  }
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Zurich",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(instant);
 }
 
 export type OutlookTodoTaskItem = {
@@ -373,8 +409,9 @@ export async function updateOutlookTodoTask(
   if (input.status) body.status = input.status;
   if (input.dueDate !== undefined) {
     if (input.dueDate && /^\d{4}-\d{2}-\d{2}$/.test(input.dueDate)) {
+      // Mittag Zürich → stabiler Kalendertag beim Lesen (UTC-Konvertierung)
       body.dueDateTime = {
-        dateTime: `${input.dueDate}T17:00:00`,
+        dateTime: `${input.dueDate}T12:00:00`,
         timeZone: "Europe/Zurich",
       };
     } else {
@@ -494,7 +531,7 @@ export async function createOutlookTodoTask(
   }
   if (input.dueDate && /^\d{4}-\d{2}-\d{2}$/.test(input.dueDate)) {
     body.dueDateTime = {
-      dateTime: `${input.dueDate}T17:00:00`,
+      dateTime: `${input.dueDate}T12:00:00`,
       timeZone: "Europe/Zurich",
     };
   }

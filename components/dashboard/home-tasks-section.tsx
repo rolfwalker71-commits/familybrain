@@ -86,10 +86,10 @@ function sortTasks(a: HomeTaskRow, b: HomeTaskRow): number {
 
 function accountChipLabel(task: HomeTaskRow): string {
   const raw = (task.accountLabel || "").trim();
+  if (task.source === "google") return raw || "Privat · Google";
   if (raw) return raw;
-  if (task.source === "google") return "Google";
-  if (task.source === "todo") return "Microsoft";
-  return "Planner";
+  if (task.source === "todo") return "Arbeit · Microsoft";
+  return "Arbeit · Planner";
 }
 
 function bucketChipLabel(task: HomeTaskRow): string | null {
@@ -166,7 +166,11 @@ function TaskRow({
         "flex flex-wrap items-start gap-3 rounded-xl border px-2.5 py-2 sm:flex-nowrap transition-colors",
         justDone
           ? "border-emerald-300 bg-emerald-50"
-          : "border-border/50 bg-muted/15"
+          : task.source === "google"
+            ? "border-sky-200/80 bg-sky-50/40"
+            : task.source === "todo"
+              ? "border-violet-200/70 bg-violet-50/30"
+              : "border-teal-200/70 bg-teal-50/30"
       )}
     >
       <AgendaAiIconThumb
@@ -321,6 +325,15 @@ function SourceBlock({
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-[13px] font-bold tracking-tight">
           {SOURCE_LABEL[source]}
+          {source === "google" ? (
+            <span className="ml-1.5 text-[11px] font-medium text-sky-800">
+              privat
+            </span>
+          ) : source === "todo" || source === "planner" ? (
+            <span className="ml-1.5 text-[11px] font-medium text-violet-800">
+              Arbeit
+            </span>
+          ) : null}
         </h3>
         <span className="text-[11px] text-muted-foreground">
           {tasks.length}
@@ -588,14 +601,12 @@ export function HomeTasksSection({
               </Link>
             ) : null}
             {hasGoogleScope ? (
-              <a
-                href="https://tasks.google.com/"
-                target="_blank"
-                rel="noreferrer"
+              <Link
+                href="/google?tab=tasks"
                 className="underline-offset-2 hover:underline"
               >
                 Google Tasks →
-              </a>
+              </Link>
             ) : null}
           </div>
         </div>

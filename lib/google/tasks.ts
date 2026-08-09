@@ -324,3 +324,156 @@ export async function updateGoogleTask(
     href: "https://tasks.google.com/",
   };
 }
+
+/**
+ * Panel-Ansicht: offene Tasks (weiter Horizont) + optional kürzlich erledigte.
+ * Im Gegensatz zu listUpcomingGoogleTasks ohne undatiert-Cap und mit showCompleted.
+ */
+export async function listManagedGoogleTasks(
+  userId: number,
+  options?: {
+    horizonDays?: number;
+    includeCompleted?: boolean;
+    completedWithinDays?: number;
+    request?: Request | null;
+  }
+): Promise<GoogleTaskItem[]> {
+  if (!isGoogleMailConnected(userId) || !hasGoogleTasksScope(userId)) {
+    return [];
+  }
+  const horizonDays = options?.horizonDays ?? 45;
+  const includeCompleted = Boolean(options?.includeCompleted);
+  const completedWithinDays = options?.completedWithinDays ?? 21;
+  const today = zurichYmd();
+  const horizon = addDaysIso(today, horizonDays);
+  const cutoff = new Date();
+  cutoff.setUTCDate(cutoff.getUTCDate() - completedWithinDays);
+  const cutoffMs = cutoff.getTime();
+
+  const auth = await getAuthedGoogleClient(userId, options?.request);
+  const tasksApi = google.tasks({ version: "v1", auth });
+  const lists = await listGoogleTaskLists(userId, options?.request);
+  if (lists.length === 0) return [];
+
+  const out: GoogleTaskItem[] = [];
+  for (const list of lists) {
+    let pageToken: string | undefined;
+    do {
+      const res = await tasksApi.tasks.list({
+        tasklist: list.id,
+        showCompleted: includeCompleted,
+        showHidden: includeCompleted,
+        maxResults: 100,
+        pageToken,
+      });
+      for (const t of res.data.items || []) {
+        if (!t.id || t.deleted) continue;
+        const title = (t.title || "").trim() || "Aufgabe";
+        const status = t.status || "needsAction";
+        const isDone = status.toLowerCase() === "completed";
+        const dueDate = dueDateFromTask(t.due);
+        if (isDone) {
+          if (!includeCompleted) continue;
+          const doneAt = t.completed || null;
+          if (!doneAt) continue;
+          const doneMs = Date.parse(doneAt);
+          if (Number.isFinite(doneMs) && doneMs < cutoffMs) continue;
+        } else if (dueDate && dueDate > horizon) {
+          continue;
+        }
+        out.push({
+          id: t.id,
+          listId: list.id,
+          listTitle: list.title,
+          title,
+          notes: t.notes?.trim() || null,
+          dueDate,
+          status,
+          overdue: Boolean(!isDone && dueDate && dueDate < today),
+          href: "https://tasks.google.com/",
+        });
+      }
+      pageToken = res.data.nextPageToken || undefined;
+    } while (pageToken);
+  }
+
+  out.sort((a, b) => {
+    const aDone = a.status.toLowerCase() === "completed" ? 1 : 0;
+    const bDone = b.status.toLowerCase() === "completed" ? 1 : 0;
+    if (aDone !== bDone) return aDone - bDone;
+    if (a.overdue !== b.overdue) return a.overdue ? -1 : 1;
+    const da = a.dueDate || "9999-99-99";
+    const db = b.dueDate || "9999-99-99";
+    const c = da.localeCompare(db);
+    if (c !== 0) return c;
+    return a.title.localeCompare(b.title, "de");
+  });
+  return out;
+}
+
+/** Task in eine andere Google-Liste verschieben (kopieren + löschen). */
+export async function moveGoogleTaskToList(
+  userId: number,
+  input: {
+    taskId: string;
+    listId: string;
+    targetListId: string;
+  },
+  request?: Request | null
+): Promise<GoogleTaskItem> {
+  if (!hasGoogleTasksScope(userId)) {
+    throw new Error(
+      "Google Tasks-Recht fehlt — bitte unter Konto neu verbinden."
+    );
+  }
+  const targetListId = input.targetListId.trim();
+  if (!targetListId) throw new Error("Ziel-Liste fehlt.");
+  if (targetListId === input.listId) {
+    throw new Error("Aufgabe ist bereits in dieser Liste.");
+  }
+  const auth = await getAuthedGoogleClient(userId, request);
+  const tasksApi = google.tasks({ version: "v1", auth });
+  const current = await tasksApi.tasks.get({
+    tasklist: input.listId,
+    task: input.taskId,
+  });
+  const title = (current.data.title || "").trim() || "Aufgabe";
+  const inserted = await tasksApi.tasks.insert({
+    tasklist: targetListId,
+    requestBody: {
+      title,
+      notes: current.data.notes || undefined,
+      due: current.data.due || undefined,
+      status: current.data.status || "needsAction",
+    },
+  });
+  const newId = inserted.data.id;
+  if (!newId) throw new Error("Verschieben fehlgeschlagen (keine neue ID).");
+  try {
+    await tasksApi.tasks.delete({
+      tasklist: input.listId,
+      task: input.taskId,
+    });
+  } catch {
+    // Ziel ist angelegt — Quell-Löschen optional soft-fail
+  }
+  const lists = await listGoogleTaskLists(userId, request);
+  const listTitle =
+    lists.find((l) => l.id === targetListId)?.title || "Google Tasks";
+  const today = zurichYmd();
+  const dueDate = dueDateFromTask(inserted.data.due);
+  const status = inserted.data.status || current.data.status || "needsAction";
+  return {
+    id: newId,
+    listId: targetListId,
+    listTitle,
+    title: inserted.data.title || title,
+    notes: inserted.data.notes?.trim() || current.data.notes?.trim() || null,
+    dueDate,
+    status,
+    overdue: Boolean(
+      status.toLowerCase() !== "completed" && dueDate && dueDate < today
+    ),
+    href: "https://tasks.google.com/",
+  };
+}

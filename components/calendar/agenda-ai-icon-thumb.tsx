@@ -50,19 +50,29 @@ export function AgendaAiIconThumb({
   const [loading, setLoading] = useState(
     () => !aiIconUrl && Boolean(aiIconKey || title?.trim())
   );
+  const [failed, setFailed] = useState(false);
   const [zoomOpen, setZoomOpen] = useState(false);
 
   useEffect(() => {
     setUrl(aiIconUrl ?? null);
+    if (aiIconUrl) {
+      setFailed(false);
+      setLoading(false);
+    }
   }, [aiIconUrl]);
 
   useEffect(() => {
     if (url) return;
-    if (!aiIconKey && !title?.trim()) return;
+    if (!aiIconKey && !title?.trim()) {
+      setLoading(false);
+      return;
+    }
 
     let cancelled = false;
     setLoading(true);
-    void (async () => {
+    setFailed(false);
+
+    async function fetchIcon(attempt: number): Promise<void> {
       try {
         const res = await fetch("/api/calendar/ai-icons", {
           method: "POST",
@@ -87,8 +97,17 @@ export function AgendaAiIconThumb({
             ],
           }),
         });
-        const data = await res.json();
-        if (!res.ok || cancelled) return;
+        const data = await res.json().catch(() => ({}));
+        if (cancelled) return;
+        if (!res.ok) {
+          if (attempt < 1) {
+            await new Promise((r) => setTimeout(r, 600));
+            if (!cancelled) await fetchIcon(attempt + 1);
+            return;
+          }
+          setFailed(true);
+          return;
+        }
         const fromId = data.byId?.[itemId]?.url as string | undefined;
         const fromPropKey = aiIconKey
           ? (data.byKey?.[aiIconKey] as string | undefined)
@@ -97,13 +116,29 @@ export function AgendaAiIconThumb({
           (data.byKey || {}) as Record<string, string>
         )[0];
         const next = fromId || fromPropKey || fromAnyKey || null;
-        if (next) setUrl(next);
+        if (next) {
+          setUrl(next);
+          setFailed(false);
+        } else if (attempt < 1) {
+          await new Promise((r) => setTimeout(r, 600));
+          if (!cancelled) await fetchIcon(attempt + 1);
+        } else {
+          setFailed(true);
+        }
       } catch {
-        /* optional */
+        if (cancelled) return;
+        if (attempt < 1) {
+          await new Promise((r) => setTimeout(r, 600));
+          if (!cancelled) await fetchIcon(attempt + 1);
+          return;
+        }
+        setFailed(true);
       } finally {
         if (!cancelled) setLoading(false);
       }
-    })();
+    }
+
+    void fetchIcon(0);
 
     return () => {
       cancelled = true;
@@ -127,18 +162,37 @@ export function AgendaAiIconThumb({
     coords?.lon,
   ]);
 
-  if (!url && !aiIconKey && !loading) return null;
+  const sizeClass = imgClassName || "size-12 sm:size-14";
+  const initial = (title || "?").trim().charAt(0).toUpperCase() || "?";
 
-  if (!url) {
+  if (!url && loading) {
     return (
       <span
         className={cn(
           "shrink-0 animate-pulse rounded-lg bg-muted/70",
-          imgClassName || "size-12 sm:size-14",
+          sizeClass,
           className
         )}
         aria-hidden
       />
+    );
+  }
+
+  if (!url) {
+    // Kein Endlos-Puls: Buchstaben-Fallback wenn Generierung ausbleibt
+    return (
+      <span
+        className={cn(
+          "inline-flex shrink-0 items-center justify-center rounded-lg border border-border/40 bg-muted/50 text-[13px] font-bold text-muted-foreground",
+          sizeClass,
+          className,
+          failed && "opacity-80"
+        )}
+        aria-hidden
+        title={title}
+      >
+        {initial}
+      </span>
     );
   }
 
@@ -160,7 +214,11 @@ export function AgendaAiIconThumb({
         <img
           src={url}
           alt=""
-          className={cn("object-cover", imgClassName || "size-12 sm:size-14")}
+          className={cn("object-cover", sizeClass)}
+          onError={() => {
+            setUrl(null);
+            setFailed(true);
+          }}
         />
       </button>
       {zoomOpen ? (

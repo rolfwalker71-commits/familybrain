@@ -8,6 +8,7 @@ import {
   CalendarClock,
   Inbox,
   ListChecks,
+  ListTodo,
   Mail,
   RefreshCw,
   Sparkles,
@@ -33,6 +34,7 @@ import { formatTokenUsageLine } from "@/lib/ai/usage-cost";
 import type { AiTokenUsage } from "@/lib/ai/usage-cost";
 import { toSwissDate } from "@/lib/utils/dates";
 import { GoogleMailInboxPanel } from "@/components/google/google-mail-inbox-panel";
+import { GoogleTasksPanel } from "@/components/google/google-tasks-panel";
 import { pageVisuals } from "@/components/layout/icon-circle";
 import {
   detectReplyLanguage,
@@ -93,10 +95,16 @@ function clampMailRange(from: string, to: string): { from: string; to: string } 
   return { from: f, to: t };
 }
 
-type Tab = "calendar" | "inbox" | "triage" | "day";
+type Tab = "calendar" | "inbox" | "triage" | "day" | "tasks";
 
 function parseTab(raw: string | null): Tab {
-  if (raw === "inbox" || raw === "triage" || raw === "day" || raw === "calendar") {
+  if (
+    raw === "inbox" ||
+    raw === "triage" ||
+    raw === "day" ||
+    raw === "calendar" ||
+    raw === "tasks"
+  ) {
     return raw;
   }
   if (raw === "mail") return "day";
@@ -1029,6 +1037,21 @@ export function GoogleWorkspaceClient() {
                   Tagesanalyse
                 </span>
               </button>
+              <button
+                type="button"
+                className={cn(
+                  "rounded-md px-3 py-1.5 text-sm font-medium",
+                  tab === "tasks"
+                    ? "bg-sky-100 text-sky-950"
+                    : "text-muted-foreground"
+                )}
+                onClick={() => setTab("tasks")}
+              >
+                <span className="inline-flex items-center gap-1.5">
+                  <ListTodo className="size-3.5" strokeWidth={APP_ICON_STROKE} />
+                  Tasks
+                </span>
+              </button>
             </div>
           </div>
 
@@ -1221,6 +1244,8 @@ export function GoogleWorkspaceClient() {
               onPendingChange={setInboxPending}
               onRequestTriageTab={() => setTab("triage")}
             />
+          ) : tab === "tasks" ? (
+            <GoogleTasksPanel />
           ) : (
             <section className="space-y-4">
               <div className="flex flex-wrap items-end justify-between gap-3">
