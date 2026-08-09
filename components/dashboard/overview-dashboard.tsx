@@ -670,6 +670,32 @@ function formatPollAt(iso: string | null | undefined): string | null {
   }).format(d);
 }
 
+/** Datum + Uhrzeit für Inbox-Mails (Gmail Header/Date oder Graph receivedDateTime). */
+function formatMailDateTime(
+  item: Pick<MailListItem, "date" | "internalDate"> | null | undefined
+): string | null {
+  if (!item) return null;
+  let d: Date | null = null;
+  if (item.date) {
+    const parsed = new Date(item.date);
+    if (Number.isFinite(parsed.getTime())) d = parsed;
+  }
+  if (!d && item.internalDate) {
+    const n = Number(item.internalDate);
+    if (Number.isFinite(n) && n > 0) d = new Date(n);
+  }
+  if (!d) return null;
+  return new Intl.DateTimeFormat("de-CH", {
+    timeZone: "Europe/Zurich",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(d);
+}
+
 function MariTicketsAsideCard({
   data,
 }: {
@@ -1465,6 +1491,7 @@ export function OverviewDashboard({
                   key: string;
                   href: string;
                   label: string;
+                  when?: string | null;
                   tone: "teal" | "amber" | "rose" | "sky";
                   icon: LucideIcon | "teams" | "ms" | "gmail";
                 }> = [];
@@ -1502,21 +1529,25 @@ export function OverviewDashboard({
                 const gPending =
                   data.chips.mailByProvider?.google?.pendingTriage || 0;
                 if (msPending > 0) {
-                  const sample = mailFocusMicrosoft[0]?.subject;
+                  const sample = mailFocusMicrosoft[0];
                   rows.push({
                     key: "ms-triage",
                     href: "/microsoft?tab=triage",
-                    label: sample || `${msPending} O365-Mail zur Triage`,
+                    label:
+                      sample?.subject || `${msPending} O365-Mail zur Triage`,
+                    when: formatMailDateTime(sample),
                     tone: "amber",
                     icon: "ms",
                   });
                 }
                 if (gPending > 0) {
-                  const sample = mailFocusGoogle[0]?.subject;
+                  const sample = mailFocusGoogle[0];
                   rows.push({
                     key: "g-triage",
                     href: "/google?tab=triage",
-                    label: sample || `${gPending} Gmail zur Triage`,
+                    label:
+                      sample?.subject || `${gPending} Gmail zur Triage`,
+                    when: formatMailDateTime(sample),
                     tone: "sky",
                     icon: "gmail",
                   });
@@ -1564,6 +1595,11 @@ export function OverviewDashboard({
                       <span className="min-w-0 flex-1 truncate text-[14px] font-medium">
                         {row.label}
                       </span>
+                      {row.when ? (
+                        <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+                          {row.when}
+                        </span>
+                      ) : null}
                       <ChevronRight
                         className="size-4 shrink-0 text-muted-foreground/70"
                         aria-hidden
@@ -1636,9 +1672,19 @@ export function OverviewDashboard({
                 }
                 detail={
                   (msMailStats?.pendingTriage || 0) > 0
-                    ? "Priorität: Normal"
+                    ? [
+                        "Priorität: Normal",
+                        formatMailDateTime(mailFocusMicrosoft[0]),
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")
                     : msSample
-                      ? msSample.fromName || "Outlook"
+                      ? [
+                          msSample.fromName || "Outlook",
+                          formatMailDateTime(msSample),
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")
                       : "Keine wichtigen"
                 }
               />
@@ -1660,9 +1706,19 @@ export function OverviewDashboard({
                 }
                 detail={
                   (gMailStats?.pendingTriage || 0) > 0
-                    ? "Zur Prüfung"
+                    ? [
+                        "Zur Prüfung",
+                        formatMailDateTime(mailFocusGoogle[0]),
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")
                     : gSample?.unread
-                      ? gSample.subject || "Ungelesen"
+                      ? [
+                          gSample.subject || "Ungelesen",
+                          formatMailDateTime(gSample),
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")
                       : "Keine wichtigen"
                 }
               />
