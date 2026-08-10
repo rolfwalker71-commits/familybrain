@@ -1,4 +1,4 @@
-import { mariJson } from "@/lib/mari/client";
+import { MariApiError, mariFetch, mariJson, mariSql } from "@/lib/mari/client";
 
 export type MariAttachmentMeta = {
   attachmentId: number;
@@ -191,6 +191,116 @@ export async function getMariAttachmentPayload(
     orgFilename,
     bytes,
     byteLength: bytes.length,
+  };
+}
+
+/**
+ * Löscht einen SupportIssueAttachment (Notiz oder Datei) in MARI.
+ * Für interne Buddy-Notizen: AttachmentTyp 1, ohne Datei.
+ */
+export async function deleteMariSupportAttachment(
+  attachmentId: number
+): Promise<void> {
+  if (!Number.isInteger(attachmentId) || attachmentId <= 0) {
+    throw new MariApiError("Anhang-ID ungültig.", 400);
+  }
+  const res = await mariFetch(`/api/SupportIssueAttachment/${attachmentId}`, {
+    method: "DELETE",
+  });
+  const text = (await res.text()).trim();
+  if (res.ok) return;
+  let detail = "";
+  if (text) {
+    try {
+      const parsed = JSON.parse(text) as { Message?: string };
+      detail = String(parsed.Message || "").trim();
+    } catch {
+      detail = text.slice(0, 300);
+    }
+  }
+  if (!detail || /^an error has occurred\.?$/i.test(detail)) {
+    detail = `Löschen in MARI fehlgeschlagen (HTTP ${res.status}).`;
+  }
+  throw new MariApiError(detail, res.status || 502, text || null);
+}
+
+/**
+ * Löscht nur interne Notizen (ohne Datei) eines Tickets.
+ * Prüft Zugehörigkeit zum Issue und Internal/Notiz-Charakter.
+ */
+export async function deleteMariInternalNote(params: {
+  issueId: number;
+  attachmentId: number;
+}): Promise<{ attachmentId: number; subject: string | null }> {
+  const { issueId, attachmentId } = params;
+  if (!Number.isInteger(issueId) || issueId <= 0) {
+    throw new MariApiError("Ungültige Ticket-ID", 400);
+  }
+  if (!Number.isInteger(attachmentId) || attachmentId <= 0) {
+    throw new MariApiError("Ungültige Notiz-ID", 400);
+  }
+
+  const [attachments, lines] = await Promise.all([
+    listMariAttachments(issueId),
+    mariSql<{
+      RequestPosID: number;
+      RequestPosType: number;
+      RequestPosSubject: string | null;
+      VisibleInternOnly: number | null;
+      IssueID: number;
+    }>(
+      `SELECT TOP 1
+  "RequestPosID",
+  "RequestPosType",
+  "RequestPosSubject",
+  "VisibleInternOnly",
+  "IssueID"
+FROM "MARISupportIssueLine"
+WHERE "IssueID" = ${issueId}
+  AND "RequestPosID" = ${attachmentId}`
+    ),
+  ]);
+
+  const line = lines[0];
+  if (!line) {
+    throw new MariApiError(
+      "Interner Kommentar nicht gefunden (oder gehört nicht zu diesem Ticket).",
+      404
+    );
+  }
+  const internalOnly =
+    line.VisibleInternOnly != null && Number(line.VisibleInternOnly) !== 0;
+  if (!internalOnly) {
+    throw new MariApiError(
+      "Nur interne Kommentare können hier gelöscht werden.",
+      403
+    );
+  }
+
+  const meta = attachments.find((a) => a.attachmentId === attachmentId);
+  if (meta?.hasFile) {
+    throw new MariApiError(
+      "Dateianhänge können hier nicht gelöscht werden — nur interne Text-Notizen.",
+      403
+    );
+  }
+  const posType = Number(line.RequestPosType);
+  const isNoteType =
+    posType === 5 ||
+    meta?.attachmentTyp === 1 ||
+    (meta != null && !meta.hasFile) ||
+    meta == null;
+  if (!isNoteType) {
+    throw new MariApiError(
+      "Dieser Verlaufseintrag ist keine löschbare interne Notiz.",
+      403
+    );
+  }
+
+  await deleteMariSupportAttachment(attachmentId);
+  return {
+    attachmentId,
+    subject: line.RequestPosSubject?.trim() || null,
   };
 }
 

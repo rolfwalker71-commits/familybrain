@@ -14,6 +14,7 @@ import {
   Paperclip,
   RefreshCw,
   Sparkles,
+  Trash2,
   User,
   X,
 } from "lucide-react";
@@ -393,7 +394,15 @@ function StatusChip({
   );
 }
 
-function TimelineRow({ item }: { item: MariTimelineItem }) {
+function TimelineRow({
+  item,
+  onDeleteInternalNote,
+  deletingAttachmentId,
+}: {
+  item: MariTimelineItem;
+  onDeleteInternalNote?: (attachmentId: number) => void;
+  deletingAttachmentId?: number | null;
+}) {
   const side = item.side || "unknown";
 
   if (item.kind === "change") {
@@ -415,9 +424,12 @@ function TimelineRow({ item }: { item: MariTimelineItem }) {
     item.kind === "attachment" ||
     (hasAttachments && isMariMailStubText(item.text));
   const showBody =
-    Boolean(item.text?.trim()) &&
+    Boolean(item.text?.trim() || item.html?.trim()) &&
     !(isAttachmentOnly && isMariMailStubText(item.text));
   const fromSupport = side === "support";
+  const deletableId = item.deletableAttachmentId ?? null;
+  const deleting =
+    deletableId != null && deletingAttachmentId === deletableId;
   const bubble =
     side === "support"
       ? "ml-auto border-sky-200/80 bg-sky-50 text-sky-950"
@@ -460,6 +472,20 @@ function TimelineRow({ item }: { item: MariTimelineItem }) {
             {item.actor ? ` · ${item.actor}` : ""}
             {item.meta ? ` · ${item.meta}` : ""}
           </span>
+          {deletableId != null && onDeleteInternalNote ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-6 gap-1 px-1.5 text-[10px] text-muted-foreground hover:text-destructive"
+              disabled={deleting}
+              title="Internen Kommentar löschen"
+              onClick={() => onDeleteInternalNote(deletableId)}
+            >
+              <Trash2 className="size-3" />
+              {deleting ? "Lösche…" : "Löschen"}
+            </Button>
+          ) : null}
         </p>
         {item.subject ? (
           <p className="text-[12px] font-medium text-foreground/80">
@@ -528,6 +554,9 @@ export function MaringoWorkspaceClient() {
   const [manualNoteDraft, setManualNoteDraft] = useState("");
   const [postingManualNote, setPostingManualNote] = useState(false);
   const [manualNoteHint, setManualNoteHint] = useState<string | null>(null);
+  const [deletingAttachmentId, setDeletingAttachmentId] = useState<
+    number | null
+  >(null);
   const [patching, setPatching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [configured, setConfigured] = useState(true);
@@ -1026,6 +1055,38 @@ export function MaringoWorkspaceClient() {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setPostingManualNote(false);
+    }
+  }
+
+  async function deleteInternalNote(attachmentId: number) {
+    if (!selectedId) return;
+    const ok = window.confirm(
+      "Internen Kommentar wirklich löschen?\n\nDer Eintrag wird in Maringo entfernt."
+    );
+    if (!ok) return;
+    setDeletingAttachmentId(attachmentId);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/maringo/tickets/${selectedId}/internal-note?attachmentId=${attachmentId}`,
+        { method: "DELETE" }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || "Löschen fehlgeschlagen");
+      }
+      if (data.ticket) {
+        setDetail(data.ticket as MariTicketDetail);
+      } else {
+        await loadDetail(selectedId);
+      }
+      if (data.clearedAnalysisMarker) {
+        setAnalysisInternalNotePostedAt(null);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDeletingAttachmentId(null);
     }
   }
 
@@ -2056,7 +2117,14 @@ export function MaringoWorkspaceClient() {
                   ) : (
                     <ol className="relative space-y-4 before:absolute before:top-2 before:bottom-2 before:left-[0.7rem] before:w-px before:bg-border">
                       {detail.timeline.map((item) => (
-                        <TimelineRow key={item.id} item={item} />
+                        <TimelineRow
+                          key={item.id}
+                          item={item}
+                          deletingAttachmentId={deletingAttachmentId}
+                          onDeleteInternalNote={(attachmentId) =>
+                            void deleteInternalNote(attachmentId)
+                          }
+                        />
                       ))}
                     </ol>
                   )}

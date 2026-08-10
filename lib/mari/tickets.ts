@@ -128,6 +128,11 @@ export type MariTimelineItem = {
   actor: string | null;
   meta?: string | null;
   attachments?: MariTimelineAttachment[];
+  /**
+   * Wenn gesetzt: interner Kommentar (ohne Datei) — kann über
+   * DELETE SupportIssueAttachment gelöscht werden (AttachmentID = RequestPosID).
+   */
+  deletableAttachmentId?: number | null;
 };
 
 export type MariTicketDetail = MariTicketListItem & {
@@ -462,7 +467,9 @@ ORDER BY "ChangeDate", "ChangeLogID"`
   ]);
 
   const fileByPosId = new Map<number, MariAttachmentMeta>();
+  const attById = new Map<number, MariAttachmentMeta>();
   for (const a of attachmentMetas) {
+    attById.set(a.attachmentId, a);
     if (a.hasFile) fileByPosId.set(a.attachmentId, a);
   }
 
@@ -561,6 +568,15 @@ ORDER BY "ChangeDate", "ChangeLogID"`
       actor,
       internalOnly: Boolean(internMeta),
     });
+    const posId = Number(line.RequestPosID);
+    const attMeta = attById.get(posId);
+    // Interne Notiz ohne Datei → löschbar (MARI AttachmentID = RequestPosID)
+    const deletableAttachmentId =
+      Boolean(internMeta) &&
+      !file &&
+      (kind === "note" || attMeta?.attachmentTyp === 1)
+        ? posId
+        : null;
     // HTML-Notizen (Buddy-Analyse) vollständig behalten — früher Slice 4000
     // hat Codebeispiele und Lösungsansatz abgeschnitten.
     const textLimit = asHtml || kind === "note" ? 100_000 : 4000;
@@ -576,6 +592,7 @@ ORDER BY "ChangeDate", "ChangeLogID"`
       actor,
       meta: internMeta,
       attachments: file ? [toTimelineAttachment(file)] : undefined,
+      deletableAttachmentId,
     });
   }
   flushPending();

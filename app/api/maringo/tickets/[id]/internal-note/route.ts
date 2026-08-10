@@ -6,11 +6,15 @@ import { ownerKeyFromAuth } from "@/lib/auth/owner-key";
 import { MariApiError } from "@/lib/mari/client";
 import { hasMariConfig } from "@/lib/mari/config";
 import { MariTicketAnalysisSchema } from "@/lib/mari/analyze-ticket";
+import { deleteMariInternalNote } from "@/lib/mari/attachments";
 import {
   postAnalysisAsInternalNote,
   postPlainInternalNote,
 } from "@/lib/mari/internal-note";
-import { markMariTicketAnalysisInternalNotePosted } from "@/lib/mari/ticket-analysis-store";
+import {
+  clearMariTicketAnalysisInternalNotePosted,
+  markMariTicketAnalysisInternalNotePosted,
+} from "@/lib/mari/ticket-analysis-store";
 import { getTicketDetail } from "@/lib/mari/tickets";
 
 export const runtime = "nodejs";
@@ -33,6 +37,10 @@ const BodySchema = z
       });
     }
   });
+
+const DeleteBodySchema = z.object({
+  attachmentId: z.number().int().positive(),
+});
 
 export async function POST(request: Request, context: Ctx) {
   ensureInitialized();
@@ -87,6 +95,78 @@ export async function POST(request: Request, context: Ctx) {
       attachmentId: posted.attachmentId,
       internal: posted.internal,
       internalNotePostedAt,
+      ticket,
+    });
+  } catch (err) {
+    const message =
+      err instanceof MariApiError
+        ? err.message
+        : err instanceof Error
+          ? err.message
+          : String(err);
+    const status = err instanceof MariApiError ? err.status || 502 : 502;
+    return NextResponse.json({ error: message }, { status });
+  }
+}
+
+/** Löscht einen internen Kommentar (SupportIssueAttachment / Notiz) am Ticket. */
+export async function DELETE(request: Request, context: Ctx) {
+  ensureInitialized();
+  const auth = await requireAuth();
+  if (isAuthError(auth)) return auth;
+  if (!hasMariConfig()) {
+    return NextResponse.json(
+      { error: "MARI nicht konfiguriert." },
+      { status: 503 }
+    );
+  }
+
+  const { id: raw } = await context.params;
+  const id = Number(raw);
+  if (!Number.isInteger(id) || id <= 0) {
+    return NextResponse.json({ error: "Ungültige Ticket-ID" }, { status: 400 });
+  }
+
+  const url = new URL(request.url);
+  const fromQuery = Number(url.searchParams.get("attachmentId"));
+  let attachmentId = fromQuery;
+  if (!Number.isInteger(attachmentId) || attachmentId <= 0) {
+    const json = await request.json().catch(() => null);
+    const parsed = DeleteBodySchema.safeParse(json);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "attachmentId fehlt oder ungültig." },
+        { status: 400 }
+      );
+    }
+    attachmentId = parsed.data.attachmentId;
+  }
+
+  try {
+    const deleted = await deleteMariInternalNote({
+      issueId: id,
+      attachmentId,
+    });
+
+    const subject = (deleted.subject || "").toLowerCase();
+    const wasAnalysisNote =
+      subject.includes("buddy ai") || subject.includes("ai-analyse");
+    let internalNotePostedAt: string | null | undefined;
+    if (wasAnalysisNote) {
+      const cleared = clearMariTicketAnalysisInternalNotePosted(
+        ownerKeyFromAuth(auth),
+        id
+      );
+      internalNotePostedAt = cleared?.internalNotePostedAt ?? null;
+    }
+
+    const ticket = await getTicketDetail(id);
+    return NextResponse.json({
+      ok: true,
+      deletedAttachmentId: deleted.attachmentId,
+      clearedAnalysisMarker: wasAnalysisNote,
+      internalNotePostedAt:
+        wasAnalysisNote ? internalNotePostedAt ?? null : undefined,
       ticket,
     });
   } catch (err) {

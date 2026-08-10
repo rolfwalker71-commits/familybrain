@@ -155,6 +155,25 @@ export function markMariTicketAnalysisInternalNotePosted(
   return getMariTicketAnalysis(ownerKey, issueId);
 }
 
+/** Entfernt die «bereits intern gespeichert»-Markierung (z.B. nach Löschen der Notiz). */
+export function clearMariTicketAnalysisInternalNotePosted(
+  ownerKey: string,
+  issueId: number
+): StoredMariTicketAnalysis | null {
+  const existing = getMariTicketAnalysis(ownerKey, issueId);
+  if (!existing) return null;
+  if (!existing.internalNotePostedAt) return existing;
+  const now = new Date().toISOString();
+  getDb()
+    .prepare(
+      `UPDATE mari_ticket_analyses
+       SET internal_note_posted_at = NULL, updated_at = ?
+       WHERE owner_key = ? AND issue_id = ?`
+    )
+    .run(now, ownerKey, issueId);
+  return getMariTicketAnalysis(ownerKey, issueId);
+}
+
 export function listMariTicketAnalysisIssueIds(
   ownerKey: string,
   issueIds: number[]
