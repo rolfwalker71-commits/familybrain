@@ -15,19 +15,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { IconCircle } from "@/components/layout/icon-circle";
+import {
+  ICS_CALENDAR_TYPES,
+  ICS_TYPE_META,
+  isWorkCalendarType,
+  type IcsCalendarType,
+} from "@/lib/calendar/ics-types";
 import { cn } from "@/lib/utils";
 
-type CalType =
-  | "hockey"
-  | "school"
-  | "waste"
-  | "church"
-  | "sports"
-  | "family"
-  | "birthday"
-  | "work"
-  | "holiday"
-  | "other";
+type CalType = IcsCalendarType;
 
 type MsCal = {
   id: string;
@@ -54,23 +50,17 @@ const PRESET_COLORS = [
   "#db2777",
   "#ec4899",
   "#0f766e",
+  "#0d9488",
   "#8b5cf6",
   "#64748b",
   "#ca8a04",
 ];
 
-const FALLBACK_TYPES: TypeMeta[] = [
-  { id: "hockey", label: "Hockey", defaultColor: "#e11d48" },
-  { id: "school", label: "Schule", defaultColor: "#2563eb" },
-  { id: "waste", label: "Abfall", defaultColor: "#78836c" },
-  { id: "church", label: "Kirche", defaultColor: "#7c3aed" },
-  { id: "sports", label: "Sport", defaultColor: "#ea580c" },
-  { id: "family", label: "Familie", defaultColor: "#db2777" },
-  { id: "birthday", label: "Geburtstage", defaultColor: "#ec4899" },
-  { id: "work", label: "Arbeit", defaultColor: "#0f766e" },
-  { id: "holiday", label: "Ferien / Feiertage", defaultColor: "#8b5cf6" },
-  { id: "other", label: "Sonstiges", defaultColor: "#64748b" },
-];
+const FALLBACK_TYPES: TypeMeta[] = ICS_CALENDAR_TYPES.map((id) => ({
+  id,
+  label: ICS_TYPE_META[id].label,
+  defaultColor: ICS_TYPE_META[id].defaultColor,
+}));
 
 type DraftRow = {
   on: boolean;
@@ -442,10 +432,13 @@ export function SettingsMicrosoftCalendarsPanel() {
                               </label>
                             </div>
                           ) : null}
-                          {d.on && d.type === "work" ? (
+                          {d.on && isWorkCalendarType(d.type) ? (
                             <p className="text-[11px] text-muted-foreground">
-                              Arbeit: typisch für O365-Geschäftskalender —
-                              erscheint in Übersicht und Kalender-Ansicht.
+                              {d.type === "work_rolf"
+                                ? "Arbeit Rolf: AI-Bilder mit Mann."
+                                : d.type === "work_valentyna"
+                                  ? "Arbeit Valentyna: AI-Bilder mit Frau."
+                                  : "Arbeit: AI-Bilder standardmässig mit Mann (außer Valentyna im Kalendernamen)."}
                             </p>
                           ) : null}
                         </div>

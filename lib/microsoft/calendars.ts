@@ -70,6 +70,12 @@ export function parseMicrosoftCalendarSourceId(
 function guessType(name: string | null | undefined): IcsCalendarType {
   const s = (name || "").toLowerCase();
   if (/geburtstag|birthday/.test(s)) return "birthday";
+  if (/valentyna/.test(s) && /arbeit|work|job|geschäft|business|office|arbeitsplan|schicht/.test(s)) {
+    return "work_valentyna";
+  }
+  if (/rolf/.test(s) && /arbeit|work|job|geschäft|business|office|arbeitsplan|schicht/.test(s)) {
+    return "work_rolf";
+  }
   if (/arbeit|work|job|geschäft|business|office/.test(s)) return "work";
   if (/familie|family/.test(s)) return "family";
   if (/ferien|feiertag|holiday/.test(s)) return "holiday";

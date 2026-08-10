@@ -9,6 +9,8 @@ export const ICS_CALENDAR_TYPES = [
   "family",
   "birthday",
   "work",
+  "work_rolf",
+  "work_valentyna",
   "holiday",
   "other",
 ] as const;
@@ -59,6 +61,16 @@ export const ICS_TYPE_META: Record<
     defaultColor: "#0f766e",
     defaultName: "Arbeit",
   },
+  work_rolf: {
+    label: "Arbeit Rolf (Mann)",
+    defaultColor: "#0f766e",
+    defaultName: "Arbeit Rolf",
+  },
+  work_valentyna: {
+    label: "Arbeit Valentyna (Frau)",
+    defaultColor: "#0d9488",
+    defaultName: "Arbeit Valentyna",
+  },
   holiday: {
     label: "Ferien / Feiertage",
     defaultColor: "#8b5cf6",
@@ -70,3 +82,11 @@ export const ICS_TYPE_META: Record<
     defaultName: "Kalender",
   },
 };
+
+/** Generic or person-specific work calendars. */
+export function isWorkCalendarType(
+  type: string | null | undefined
+): boolean {
+  const t = String(type || "").toLowerCase();
+  return t === "work" || t === "work_rolf" || t === "work_valentyna";
+}

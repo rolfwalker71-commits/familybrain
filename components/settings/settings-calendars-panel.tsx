@@ -15,19 +15,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { IconCircle } from "@/components/layout/icon-circle";
+import type { IcsCalendarType } from "@/lib/calendar/ics-types";
 import { cn } from "@/lib/utils";
 
-type CalType =
-  | "hockey"
-  | "school"
-  | "waste"
-  | "church"
-  | "sports"
-  | "family"
-  | "birthday"
-  | "work"
-  | "holiday"
-  | "other";
+type CalType = IcsCalendarType;
 
 type IcsCalendar = {
   id: string;
@@ -51,6 +42,7 @@ const PRESET_COLORS = [
   "#db2777",
   "#ec4899",
   "#0f766e",
+  "#0d9488",
   "#8b5cf6",
   "#64748b",
   "#ca8a04",

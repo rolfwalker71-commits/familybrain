@@ -126,6 +126,8 @@ const CALENDAR_TYPE_ICON: Record<IcsCalendarType, typeof FileText> = {
   family: Heart,
   birthday: Cake,
   work: BriefcaseBusiness,
+  work_rolf: BriefcaseBusiness,
+  work_valentyna: BriefcaseBusiness,
   holiday: Palmtree,
   other: Calendar,
 };

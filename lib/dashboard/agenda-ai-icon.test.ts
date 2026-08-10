@@ -8,8 +8,10 @@ import {
   isDayCloseRitualSubject,
   isOnlineAgendaMeeting,
   isValentynaWorkCalendar,
+  isRolfWorkSubject,
   shouldDepictManForWork,
   shouldHaveAgendaAiIcon,
+  workPersonDepict,
 } from "./agenda-ai-icon.ts";
 
 test("birthday prompt has no itinerary panels", () => {
@@ -95,7 +97,7 @@ test("online recurring meetings share cache key across times", () => {
   assert.equal(a, b);
 });
 
-test("Valentyna work calendar skips man depiction", () => {
+test("Valentyna work calendar depicts woman; Rolf depicts man", () => {
   assert.ok(isValentynaWorkCalendar("Arbeitsplan Valentyna"));
   assert.equal(
     shouldDepictManForWork({
@@ -107,6 +109,14 @@ test("Valentyna work calendar skips man depiction", () => {
     false
   );
   assert.equal(
+    workPersonDepict({
+      title: "F2 Früh",
+      calendarType: "work",
+      calendarName: "Arbeitsplan Valentyna",
+    }),
+    "woman"
+  );
+  assert.equal(
     shouldDepictManForWork({
       title: "F2 Früh",
       calendarType: "work",
@@ -115,6 +125,43 @@ test("Valentyna work calendar skips man depiction", () => {
     }),
     true
   );
+  assert.equal(
+    workPersonDepict({
+      title: "Spätdienst",
+      calendarType: "work_rolf",
+      calendarName: "Schicht",
+    }),
+    "man"
+  );
+  assert.equal(
+    workPersonDepict({
+      title: "Spätdienst",
+      calendarType: "work_valentyna",
+      calendarName: "Schicht",
+    }),
+    "woman"
+  );
+  const womanPrompt = buildAgendaAiIconPrompt({
+    title: "F2 Früh",
+    calendarType: "work_valentyna",
+    calendarName: "Arbeit Valentyna",
+    location: "Kantonsspital Uri",
+  });
+  assert.match(womanPrompt, /adult woman/i);
+  assert.doesNotMatch(womanPrompt, /adult man/i);
+
+  const rolfPrompt = buildAgendaAiIconPrompt({
+    title: "Kunden-Call",
+    calendarType: "work_rolf",
+    calendarName: "Arbeit Rolf",
+    meetUrl: "https://teams.microsoft.com/l/meetup-join/x",
+    location: "Microsoft Teams Besprechung",
+  });
+  assert.match(rolfPrompt, /SAP/i);
+  assert.match(rolfPrompt, /Maringo/i);
+  assert.match(rolfPrompt, /technical IT support/i);
+  assert.match(rolfPrompt, /adult man/i);
+  assert.ok(isRolfWorkSubject({ calendarType: "work_rolf", title: "x" }));
 });
 
 test("Tagesabschluss ritual reuses one cache key and evening prompt", () => {

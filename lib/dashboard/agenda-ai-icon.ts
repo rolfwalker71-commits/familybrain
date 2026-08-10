@@ -6,6 +6,7 @@ import { isPhysicalAgendaLocation } from "@/lib/dashboard/agenda-location";
 import { getTripsDataRoot } from "@/lib/trips/paths";
 import {
   ICS_TYPE_META,
+  isWorkCalendarType,
   type IcsCalendarType,
 } from "@/lib/calendar/ics-types";
 import { isDayCloseRitualId } from "@/lib/dashboard/day-close-ritual";
@@ -16,9 +17,11 @@ const AGENDA_AI_ICON_STYLE = "travel-poster-v5";
 const TRAVEL_STYLE =
   "Style: clean modern editorial illustration, soft flat colors with gentle shading, friendly travel poster vibe. Any text in the image must be spelled correctly and clearly readable. No logos, watermarks, prices, or UI chrome. Suitable as a small card thumbnail.";
 
-/** Partner work calendar — do not force a male figure in the illustration. */
+/** Partner work calendar — name fallback when type is still generic «work». */
 const VALENTYNA_WORK_CAL_RE =
-  /arbeitsplan\s*valentyna|valentyna.*arbeitsplan/i;
+  /arbeitsplan\s*valentyna|valentyna.*arbeitsplan|arbeit\s*valentyna|valentyna.*arbeit/i;
+const ROLF_WORK_CAL_RE =
+  /arbeitsplan\s*rolf|rolf.*arbeitsplan|arbeit\s*rolf|rolf.*arbeit/i;
 
 export function getAgendaAiIconDir(): string {
   return path.join(getTripsDataRoot(), "agenda-ai-icons");
@@ -108,12 +111,48 @@ export function isValentynaWorkCalendar(
   return VALENTYNA_WORK_CAL_RE.test(calendarName || "");
 }
 
-/** Work calendars (except Valentyna’s plan): show an adult man in the scene. */
-export function shouldDepictManForWork(input: AgendaIconSubject): boolean {
+export function isRolfWorkCalendar(
+  calendarName: string | null | undefined
+): boolean {
+  return ROLF_WORK_CAL_RE.test(calendarName || "");
+}
+
+export type WorkPersonDepict = "man" | "woman";
+
+/**
+ * Person in work-calendar AI icons: Rolf → Mann, Valentyna → Frau.
+ * Generic «Arbeit» falls back to calendar name, then Mann.
+ */
+export function workPersonDepict(
+  input: AgendaIconSubject
+): WorkPersonDepict | null {
   const type = String(input.calendarType || "").toLowerCase();
-  if (type !== "work") return false;
-  if (isValentynaWorkCalendar(input.calendarName)) return false;
-  return true;
+  if (type === "work_rolf") return "man";
+  if (type === "work_valentyna") return "woman";
+  if (type === "work") {
+    if (isValentynaWorkCalendar(input.calendarName)) return "woman";
+    if (isRolfWorkCalendar(input.calendarName)) return "man";
+    return "man";
+  }
+  return null;
+}
+
+/** Rolf’s own work calendar (typed or named) — SAP/Maringo support profile. */
+export function isRolfWorkSubject(input: AgendaIconSubject): boolean {
+  const type = String(input.calendarType || "").toLowerCase();
+  if (type === "work_rolf") return true;
+  if (type === "work_valentyna") return false;
+  if (type === "work" && isRolfWorkCalendar(input.calendarName)) return true;
+  return false;
+}
+
+/** @deprecated Prefer workPersonDepict — kept for existing tests/callers. */
+export function shouldDepictManForWork(input: AgendaIconSubject): boolean {
+  return workPersonDepict(input) === "man";
+}
+
+export function shouldDepictWomanForWork(input: AgendaIconSubject): boolean {
+  return workPersonDepict(input) === "woman";
 }
 
 export function hasDriveAgendaContext(input: AgendaIconSubject): boolean {
@@ -128,8 +167,11 @@ export function hasDriveAgendaContext(input: AgendaIconSubject): boolean {
 }
 
 function workPersonVariant(input: AgendaIconSubject): string {
-  if (!shouldDepictManForWork(input)) return "";
-  return "man";
+  const who = workPersonDepict(input);
+  if (!who) return "";
+  // Profile tag so Rolf icons refresh when support-role hints change.
+  if (isRolfWorkSubject(input)) return `${who}|sap-maringo-support-v1`;
+  return who;
 }
 
 /**
@@ -210,9 +252,24 @@ function formatTimeRange(input: AgendaIconSubject): string | null {
   return null;
 }
 
-function workManClause(input: AgendaIconSubject): string {
-  if (!shouldDepictManForWork(input)) return "";
-  return "Include one friendly adult man as a natural part of the scene (not a portrait headshot).";
+/** Soft role cue for Rolf’s work illustrations (no brand logos). */
+const ROLF_SUPPORT_ROLE_HINT =
+  "Role context: technical IT support engineer for SAP (e.g. SAP Business One), Maringo, and similar enterprise software — calm ticket/support desk energy, dual monitors or laptop with abstract dashboards, lightly technical mood. Not a hospital ward, not factory floor. Do NOT show SAP, Maringo, Microsoft, or other brand logos.";
+
+function workPersonClause(input: AgendaIconSubject): string {
+  const who = workPersonDepict(input);
+  if (who === "man") {
+    const base =
+      "Include one friendly adult man as a natural part of the scene (not a portrait headshot).";
+    if (isRolfWorkSubject(input)) {
+      return `${base} ${ROLF_SUPPORT_ROLE_HINT}`;
+    }
+    return base;
+  }
+  if (who === "woman") {
+    return "Include one friendly adult woman as a natural part of the scene (not a portrait headshot).";
+  }
+  return "";
 }
 
 /** Scene hint keyed by calendar type (Arbeit, Sport, Ferien, …). */
@@ -224,8 +281,17 @@ function sceneForAgenda(input: AgendaIconSubject): string {
   if (type === "hockey" || /\bhockey|spiel|match\b/i.test(title)) {
     return `${label}: ice hockey arena atmosphere, game day mood`;
   }
-  if (type === "work" || /\bf\d|schicht|dienst|früh|spät|nacht\b/i.test(title)) {
-    return `${label}: professional work day / hospital or office shift atmosphere`;
+  if (isRolfWorkSubject(input)) {
+    return `${label}: technical SAP / Maringo support desk — focused IT consultant atmosphere`;
+  }
+  if (
+    type === "work_valentyna" ||
+    (type === "work" && isValentynaWorkCalendar(input.calendarName))
+  ) {
+    return `${label}: professional hospital or clinic shift atmosphere`;
+  }
+  if (isWorkCalendarType(type) || /\bf\d|schicht|dienst|früh|spät|nacht\b/i.test(title)) {
+    return `${label}: professional work day / office shift atmosphere`;
   }
   if (type === "school" || /\bschule|unterricht\b/i.test(title)) {
     return `${label}: school day atmosphere`;
@@ -288,6 +354,11 @@ function onlineTopicVisualHint(title: string, notes: string): string {
       "subtle AI theme (soft neural/network glow, abstract nodes — not sci-fi overload)"
     );
   }
+  if (/\bsap\b|maringo|business\s*one|b1\b|erp|hana|support|ticket/.test(blob)) {
+    hints.push(
+      "subtle enterprise-software / support-ticket desk mood (no brand logos)"
+    );
+  }
   if (/woche|weekly|standup|daily|jour fixe|sync|call|meeting|besprechung/.test(blob)) {
     hints.push("recurring team-meeting / weekly check-in mood");
   }
@@ -330,7 +401,7 @@ function buildOnlineMeetingPrompt(input: AgendaIconSubject): string {
       : "",
     `Topic visualization: ${theme}.`,
     "Do NOT invent participant lists, fake URLs, or Microsoft/Google logos.",
-    workManClause(input),
+    workPersonClause(input),
     TRAVEL_STYLE,
   ]
     .filter(Boolean)
@@ -381,7 +452,7 @@ function buildDrivePrompt(input: AgendaIconSubject): string {
     "Rear Swiss license plate clearly readable: white plate with black border, Swiss coat of arms (red shield, white cross) on the left, Uri canton arms (yellow shield with black bull head, red tongue and nose ring) on the right, bold black text «UR · 15716» (canton code UR, middle dot, number 15716) — authentic Swiss Uri plate layout, correct spelling.",
     "Include exactly one illustrated destination map inset / map-card of the goal area (Swiss local map vibe, editorial illustration — not a photoreal OSM/satellite tile). Do not stack a second map.",
     "Friendly road-trip / arrival atmosphere; keep editorial travel-poster layout.",
-    workManClause(input),
+    workPersonClause(input),
     "No dealer frames, no watermarks, no UI chrome, no prices; no logos except the Swiss/Uri plate emblems and subtle VW identity.",
     TRAVEL_STYLE,
   ]
@@ -411,7 +482,7 @@ function buildStandardPrompt(input: AgendaIconSubject): string {
     `Scene idea: ${sceneForAgenda(input)}.`,
     "Lean on the calendar category mood (Arbeit, Sport, Ferien, Familie, …).",
     "Do not add fake flight/train itinerary panels unless the appointment is clearly travel.",
-    workManClause(input),
+    workPersonClause(input),
     TRAVEL_STYLE,
   ]
     .filter(Boolean)

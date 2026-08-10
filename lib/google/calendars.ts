@@ -107,6 +107,15 @@ function guessType(summary: string | null | undefined): IcsCalendarType {
   if (s.includes("feiertag") || s.includes("holiday") || s.includes("ferien")) {
     return "holiday";
   }
+  if (
+    /valentyna/.test(s) &&
+    /arbeit|work|job|arbeitsplan|schicht/.test(s)
+  ) {
+    return "work_valentyna";
+  }
+  if (/rolf/.test(s) && /arbeit|work|job|arbeitsplan|schicht/.test(s)) {
+    return "work_rolf";
+  }
   if (s.includes("arbeit") || s.includes("work") || s.includes("job")) {
     return "work";
   }
