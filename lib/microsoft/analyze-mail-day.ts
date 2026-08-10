@@ -1,4 +1,4 @@
-import { getChatClient, getChatModel, hasChatKey } from "@/lib/ai/client";
+import { getChatClient, getChatJsonRequestExtras, getChatModel, hasChatKey } from "@/lib/ai/client";
 import {
   buildAiTokenUsage,
   type AiTokenUsage,
@@ -12,6 +12,7 @@ import {
   type ReplyLang,
 } from "@/lib/microsoft/reply-language-shared";
 import { addDaysYmd } from "@/lib/microsoft/time";
+import type OpenAI from "openai";
 import { z } from "zod";
 
 const Ymd = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -121,6 +122,8 @@ function aiItemArray<T extends z.ZodTypeAny>(itemSchema: T, max: number) {
 }
 
 export const MsDayClusterSchema = z.object({
+  /** Echo of THREAD seedKey — preferred for matching. */
+  seedKey: aiNullableString(200).optional(),
   company: aiStringRequired(120, "Unbekannt"),
   counterpartEmail: aiNullableString(200).optional(),
   theme: aiStringRequired(200, "Thema"),
@@ -359,7 +362,10 @@ function formatMailBlock(
   indexLabel: string,
   bodyLimit = 2200
 ): string {
-  const body = (m.bodyText || m.preview || "").slice(0, bodyLimit);
+  const body = stripMailBodyNoise(m.bodyText || m.preview || "").slice(
+    0,
+    bodyLimit
+  );
   const { email, company } = counterpartForMail(m);
   const absender =
     m.folder === "inbox"
@@ -380,6 +386,48 @@ Zeit: ${m.receivedOrSentAt || "—"}
 Textsprache (Heuristik): ${langHint === "en" ? "EN" : "DE"}
 Text:
 ${body || "(leer)"}`;
+}
+
+/** Strip signatures / separator junk before the model sees the body. */
+export function stripMailBodyNoise(text: string): string {
+  let t = text.replace(/\r\n/g, "\n");
+  const cuts: RegExp[] = [
+    /\n-- \n/,
+    /\n_{5,}\n/,
+    /\nMit freundlichen Gr(?:ü|ue)ssen\b/i,
+    /\nFreundliche Gr(?:ü|ue)sse\b/i,
+    /\nBeste Gr(?:ü|ue)sse\b/i,
+    /\nBest regards\b/i,
+    /\nKind regards\b/i,
+    /\nViele Gr(?:ü|ue)sse\b/i,
+    /\nSent from (?:my )?/i,
+    /\nVon meinem (?:iPhone|iPad|Galaxy)\b/i,
+    /\nGet Outlook for\b/i,
+    /\nDiese E-Mail und alle Anh(?:ä|ae)nge\b/i,
+    /\nThis (?:e-?mail|message) and any attachments\b/i,
+    /\nConfidential(?:ity)? notice\b/i,
+  ];
+  for (const re of cuts) {
+    const m = re.exec(t);
+    if (m && typeof m.index === "number" && m.index > 60) {
+      t = t.slice(0, m.index);
+    }
+  }
+  t = t
+    .split("\n")
+    .filter((line) => !/^\s*[\*\-=_]{5,}\s*$/.test(line))
+    .join("\n");
+  return t.replace(/\*{5,}/g, "").trim();
+}
+
+export function cleanClusterSummaryNoise(summary: string): string {
+  return summary
+    .split("\n")
+    .filter((line) => !/^\s*[\*\-=_]{5,}\s*$/.test(line))
+    .join("\n")
+    .replace(/\*{5,}/g, " ")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
 }
 
 export function packMailsForPrompt(
@@ -690,7 +738,7 @@ function enrichCluster(
     counterpartEmail,
     theme,
     conversationId,
-    summary: cluster.summary.trim(),
+    summary: cleanClusterSummaryNoise(cluster.summary.trim()),
     mailIds: mailIds.length
       ? mailIds
       : fromMails.map((m) => m.id).slice(0, 40),
@@ -731,9 +779,11 @@ function normalizeActionNeeded(
   eventCount: number,
   replyCount: number
 ): boolean {
-  if (typeof raw === "boolean") return raw;
+  // Concrete deliverables always win over a soft "false".
   if (taskCount > 0 || eventCount > 0 || replyCount > 0) return true;
+  // Open / waiting must stay actionable even if the model sets false.
   if (status === "open" || status === "waiting") return true;
+  if (typeof raw === "boolean") return raw;
   return false;
 }
 
@@ -854,9 +904,9 @@ export async function analyzeMicrosoftMailDay(input: {
   );
   const idSet = new Set(byId.keys());
 
-  // Kleinere Batches bei vielen Threads: sonst JSON-Truncation → 0 Tasks.
+  // Mit DeepSeek-Thinking aus: etwas grössere Batches = weniger Roundtrips.
   const BATCH =
-    seeds.length > 40 ? 3 : seeds.length > 20 ? 4 : seeds.length > 10 ? 5 : 8;
+    seeds.length > 50 ? 5 : seeds.length > 25 ? 6 : seeds.length > 12 ? 8 : 10;
   const bodyLimit =
     seeds.length > 40 ? 700 : seeds.length > 20 ? 1100 : 1800;
   const mailsPerThread =
@@ -890,10 +940,16 @@ export async function analyzeMicrosoftMailDay(input: {
     const user = `Analysezeitraum: ${rangeLabel} (nur dieser Zeitraum — keine Mails ausserhalb als «heute» interpretieren).
 Batch ${bi + 1}/${batches.length} · Default dueDate: ${defaultDue}
 
-PFLICHT: Genau ${batch.length} Cluster — einer pro seedKey unten. Keine zusammenfassen, keine weglassen.
-Newsletter/System/noreply → status=fyi, actionNeeded=false, tasks/replies/events leer, kurze Summary.
-Handlung nötig → actionNeeded=true UND mindestens 1 task und/oder 1 reply (nicht beides leer!).
-Kundenfragen / offene Zusagen / Bitten um Rückmeldung = immer actionNeeded mit Reply und/oder Task.
+PFLICHT: Genau ${batch.length} Cluster — einer pro seedKey unten. seedKey in jedem Cluster echoen. Keine zusammenfassen, keine weglassen.
+
+AKTION vs INFO (wichtig):
+- Default bei Business-Mail von Menschen: actionNeeded=true, status=open oder waiting.
+- actionNeeded=false / status=fyi NUR bei klaren Newslettern, noreply-Automails, reinen Empfangsbestätigungen oder endgültig erledigten Threads ohne offene Frage.
+- Offene Kundenfragen, «bitte», Rückmeldung erbeten, Zusagen, Deadlines, Ticket-Nachfragen, Terminabsprachen = IMMER actionNeeded=true und mindestens 1 task und/oder 1 reply.
+- «In Arbeit» / Support-Tickets / Nachfass-Mails sind KEINE reinen Infos.
+
+SUMMARY: 3–6 Sätze inhaltlicher Kern (wer will was, Stand, offene Punkte). NIEMALS Signaturen, Grussformeln, Adressen, Disclaimer, Trennlinien (***/---), «Sent from…».
+
 SYSTEM INFOBOARD ist bereits ausgefiltert — nicht erfinden.
 
 Seed-Liste:
@@ -905,11 +961,12 @@ JSON:
 {
   "clusters": [
     {
+      "seedKey": "exakter seedKey aus der Liste",
       "company": "…",
       "counterpartEmail": "…"|null,
       "theme": "…",
       "conversationId": "conv oder null",
-      "summary": "3–6 Sätze",
+      "summary": "3–6 Sätze ohne Signatur/Trennlinien",
       "mailIds": ["id"],
       "status": "open"|"waiting"|"done"|"fyi",
       "actionNeeded": true|false,
@@ -922,21 +979,28 @@ JSON:
 
     const completion = await client.chat.completions.create({
       model,
-      temperature: 0.25,
+      temperature: 0.2,
       max_tokens: 8000,
       response_format: { type: "json_object" },
       messages: [
         { role: "system", content: system },
         { role: "user", content: user },
       ],
-    });
+      ...getChatJsonRequestExtras(),
+    } as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming);
     const usage = buildAiTokenUsage(model, completion.usage);
     if (usage) usages.push(usage);
 
-    const raw = completion.choices[0]?.message?.content ?? "{}";
+    const raw = completion.choices[0]?.message?.content?.trim() || "";
+    if (!raw) {
+      console.warn(
+        `[mail-day-analyze] Batch ${bi + 1}/${batches.length}: leerer AI-Content — Fallback Seeds`
+      );
+      continue;
+    }
     let parsed: unknown;
     try {
-      parsed = JSON.parse(raw);
+      parsed = JSON.parse(raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, ""));
     } catch {
       console.warn(
         `[mail-day-analyze] Batch ${bi + 1}/${batches.length}: JSON kaputt — Fallback Seeds`
@@ -1097,13 +1161,17 @@ function buildClusterBatchSystemPrompt(defaultDue: string): string {
 SCHREIBWEISE: Schweizer Hochdeutsch, kein ß (ss). Klar, vollständig.
 
 CLUSTER (hart):
-- Genau ein Cluster pro seedKey / THREAD-Block — keine Verdichtung.
+- Genau ein Cluster pro seedKey / THREAD-Block — seedKey immer zurückgeben.
 - conversationId und mailIds aus dem Thread übernehmen.
-- actionNeeded=true wenn Task, Reply oder Event sinnvoll; sonst false.
+- actionNeeded: Default true bei menschlicher Business-Mail. false nur bei Newsletter/System/noreply/reiner Empfangsbestätigung/erledigt ohne offene Frage.
+- status=open|waiting wenn etwas offen ist; fyi nur bei klarer Info ohne Handlungsbedarf.
 - Wenn actionNeeded=true: tasks und replies dürfen NICHT beide leer sein — mindestens eine konkrete Aufgabe oder eine Antwort.
-- Newsletter / System / noreply: status=fyi, actionNeeded=false, keine tasks/replies/events, 2–4 Sätze Summary.
-- Offene Kundenfragen: actionNeeded=true, Reply pflicht (Sprache der Anfrage de/en), optional Task.
+- Offene Kundenfragen / Nachfassen / Ticket-Statusfragen: actionNeeded=true, Reply pflicht (Sprache der Anfrage de/en), optional Task.
 - Nur Zeitraum der Analyse — keine Halluzinationen.
+
+SUMMARY:
+- Nur inhaltlicher Kern: Absicht, Stand, offene Punkte.
+- Niemals Signaturen, Grussformeln, Adressen, Telefon, Disclaimer, Trennlinien (*** --- ___), «Sent from…».
 
 TASKS: dueDate Default ${defaultDue}, Titel ohne Absender-Suffix.
 REPLIES: to = E-Mail mit @; language de|en; subject und body als Strings (nie null); AW:/Re: passend.
@@ -1153,6 +1221,11 @@ function matchClusterToSeedKey(
   cluster: z.infer<typeof MsDayClusterSchema>,
   batch: ThreadSeed[]
 ): string | null {
+  const seedKey = cluster.seedKey?.trim();
+  if (seedKey) {
+    const bySeed = batch.find((s) => s.key === seedKey);
+    if (bySeed) return bySeed.key;
+  }
   const conv = cluster.conversationId?.trim();
   if (conv) {
     const byConv = batch.find((s) => s.conversationId === conv);
@@ -1260,7 +1333,8 @@ async function writeDaySummaryOverview(input: {
           content: `Zeitraum ${input.rangeLabel}${excludedNote}. Überblick aus ${input.clusters.length} Thread-Clustern (${actionCount} mit Aktion, ${taskCount} Tasks, ${replyCount} Replies):\n${lines}`,
         },
       ],
-    });
+      ...getChatJsonRequestExtras(),
+    } as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming);
     const usage = buildAiTokenUsage(input.model, completion.usage);
     if (usage) input.usages.push(usage);
     const raw = completion.choices[0]?.message?.content ?? "{}";

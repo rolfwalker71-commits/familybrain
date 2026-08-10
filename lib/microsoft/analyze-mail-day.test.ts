@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   applySwissOrthography,
+  cleanClusterSummaryNoise,
+  clusterNeedsAction,
   flattenAnalysis,
   guessCompanyLabel,
   MsDayClusterSchema,
@@ -9,6 +11,7 @@ import {
   resolveReplyToEmail,
   senderDisplayName,
   sortClusters,
+  stripMailBodyNoise,
   withSenderLabel,
   type MsDayCluster,
 } from "@/lib/microsoft/analyze-mail-day";
@@ -293,4 +296,46 @@ test("cluster schema keeps cluster when one event has invalid date", () => {
   assert.equal(parsed.data.events.length, 1);
   assert.equal(parsed.data.tasks.length, 1);
   assert.equal(parsed.data.replies.length, 1);
+});
+
+test("clusterNeedsAction ignores false when status is open", () => {
+  assert.equal(
+    clusterNeedsAction({
+      actionNeeded: false,
+      status: "open",
+      tasks: [],
+      events: [],
+      replies: [],
+    }),
+    true
+  );
+  assert.equal(
+    clusterNeedsAction({
+      actionNeeded: false,
+      status: "fyi",
+      tasks: [],
+      events: [],
+      replies: [],
+    }),
+    false
+  );
+});
+
+test("stripMailBodyNoise removes signatures and separators", () => {
+  const raw = [
+    "Hallo, bitte um Rückmeldung zum Ticket.",
+    "",
+    "****************************************",
+    "Mit freundlichen Grüssen",
+    "Andreas Thomet",
+    "CT-X Holding AG",
+  ].join("\n");
+  const cleaned = stripMailBodyNoise(raw);
+  assert.match(cleaned, /Rückmeldung/);
+  assert.equal(cleaned.includes("Andreas Thomet"), false);
+  assert.equal(cleaned.includes("****"), false);
+  assert.equal(
+    cleanClusterSummaryNoise("Stand ok.\n********\nWeiteres"),
+    "Stand ok.\nWeiteres"
+  );
 });

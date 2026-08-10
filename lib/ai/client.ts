@@ -131,6 +131,16 @@ export function hasChatKey(): boolean {
 }
 
 /**
+ * Extra request fields for JSON chat jobs on OpenAI-compatible providers.
+ * DeepSeek V4 enables thinking by default — that burns max_tokens, slows
+ * multi-batch jobs (Tagesanalyse) a lot, and can leave message.content empty.
+ */
+export function getChatJsonRequestExtras(): Record<string, unknown> {
+  if (getChatProvider() !== "deepseek") return {};
+  return { thinking: { type: "disabled" } };
+}
+
+/**
  * Text chat/completions (no images) → chat provider.
  * Multimodal / vision → official OpenAI.
  */
