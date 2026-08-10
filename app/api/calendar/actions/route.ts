@@ -42,6 +42,7 @@ const BodySchema = z.discriminatedUnion("action", [
     action: z.literal("suggest_slots"),
     agendaItemId: z.string().min(1),
     calendarSourceId: z.string().min(1),
+    durationMinutes: z.number().int().min(15).max(240).optional(),
   }),
   z.object({
     action: z.literal("reschedule"),
@@ -149,6 +150,7 @@ export async function POST(request: Request) {
         );
         const slots = await suggestGoogleFreeSlotsForEvent(userId, event, {
           request,
+          durationMinutes: body.durationMinutes,
         });
         return NextResponse.json({
           ok: true,
@@ -206,7 +208,9 @@ export async function POST(request: Request) {
     }
     if (body.action === "suggest_slots") {
       const event = await getMicrosoftEvent(userId, parsed.eventId);
-      const slots = await suggestFreeSlotsForEvent(userId, event);
+      const slots = await suggestFreeSlotsForEvent(userId, event, {
+        durationMinutes: body.durationMinutes,
+      });
       return NextResponse.json({
         ok: true,
         provider: "microsoft",

@@ -15,7 +15,7 @@ import {
   withReschedulePrefix,
   type MsCalendarEvent,
 } from "@/lib/microsoft/calendar-review";
-import { addDaysYmd, hmToMinutes, zurichYmd } from "@/lib/microsoft/time";
+import { addDaysYmd, hmToMinutes, zurichHm, zurichYmd } from "@/lib/microsoft/time";
 import { updateGoogleCalendarEvent } from "@/lib/google/calendar-write";
 
 export const GOOGLE_BUDDY_DONE_PROP = "buddyDone";
@@ -160,18 +160,28 @@ export async function suggestGoogleFreeSlotsForEvent(
     rangeStart?: string;
     rangeEnd?: string;
     request?: Request | null;
+    durationMinutes?: number;
+    fromToday?: boolean;
+    maxSlots?: number;
   }
 ): Promise<FreeSlot[]> {
   const today = zurichYmd();
-  const rangeStart = options?.rangeStart || addDaysYmd(today, 1);
+  const fromToday = Boolean(options?.fromToday);
+  const rangeStart = options?.rangeStart || (fromToday ? today : addDaysYmd(today, 1));
   const rangeEnd = options?.rangeEnd || addDaysYmd(today, 7);
-  const duration =
+  const eventDuration =
     event.startHm && event.endHm
       ? Math.max(
           15,
           (hmToMinutes(event.endHm) ?? 0) - (hmToMinutes(event.startHm) ?? 0)
         )
       : 60;
+  const duration = Math.max(
+    15,
+    options?.durationMinutes != null
+      ? Math.round(options.durationMinutes)
+      : eventDuration || 60
+  );
 
   const events = await listGoogleCalendarEventsInRange(
     userId,
@@ -207,8 +217,11 @@ export async function suggestGoogleFreeSlotsForEvent(
     events: mapped,
     rangeStart,
     rangeEnd,
-    durationMinutes: duration || 60,
-    maxSlots: 12,
+    durationMinutes: duration,
+    maxSlots: options?.maxSlots ?? 12,
+    notBefore: fromToday
+      ? { date: today, hm: zurichHm() }
+      : null,
   });
 }
 

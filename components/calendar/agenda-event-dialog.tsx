@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
   CalendarDays,
@@ -24,6 +24,7 @@ import {
   AgendaTypeRail,
   weekdayLabel,
 } from "@/components/calendar/agenda-row";
+import { SLOT_DURATION_PRESETS } from "@/lib/calendar/slot-duration";
 import { APP_ICON_STROKE } from "@/lib/branding/app-icons";
 import { ICS_TYPE_META } from "@/lib/calendar/ics-types";
 import type { AgendaItem } from "@/lib/dashboard/overview";
@@ -64,6 +65,16 @@ function durationLabel(item: AgendaItem): string | null {
   const h = Math.floor(mins / 60);
   const m = mins % 60;
   return m === 0 ? `${h} Std` : `${h} Std ${m} Min`;
+}
+
+function eventDurationMinutes(item: AgendaItem | null): number {
+  if (!item?.time || !item.endTime) return 60;
+  const [sh, sm] = item.time.split(":").map(Number);
+  const [eh, em] = item.endTime.split(":").map(Number);
+  if (![sh, sm, eh, em].every((n) => Number.isFinite(n))) return 60;
+  let mins = eh! * 60 + em! - (sh! * 60 + sm!);
+  if (mins <= 0) mins += 24 * 60;
+  return Math.max(15, mins);
 }
 
 function typeLabel(item: AgendaItem): string {
@@ -129,6 +140,16 @@ export function AgendaEventDialog({
   const [actionError, setActionError] = useState<string | null>(null);
   const [slots, setSlots] = useState<FreeSlot[]>([]);
   const [localDone, setLocalDone] = useState(false);
+  const [slotDuration, setSlotDuration] = useState(60);
+
+  useEffect(() => {
+    if (!open || !item) return;
+    setSlotDuration(eventDurationMinutes(item));
+    setSlots([]);
+    setActionMsg(null);
+    setActionError(null);
+    setLocalDone(false);
+  }, [open, item?.id, item?.time, item?.endTime]);
 
   const description = item ? stripIcsDescription(item.description) : null;
   const duration = item ? durationLabel(item) : null;
@@ -189,12 +210,15 @@ export function AgendaEventDialog({
     setActionError(null);
     setActionMsg(null);
     try {
-      const json = await runAction({ action: "suggest_slots" });
+      const json = await runAction({
+        action: "suggest_slots",
+        durationMinutes: slotDuration,
+      });
       const next = (json.slots || []) as FreeSlot[];
       setSlots(next);
       setActionMsg(
         next.length
-          ? `${next.length} freie Slots (nächste 7 Tage, 08–18).`
+          ? `${next.length} freie Slots à ${slotDuration} Min (nächste 7 Tage, 08–18).`
           : "Keine freien Slots gefunden."
       );
     } catch (err) {
@@ -470,6 +494,48 @@ export function AgendaEventDialog({
               {cloud ? (
                 <DetailRow label="Buddy-Aktionen">
                   <div className="space-y-2">
+                    {!done && item?.time ? (
+                      <div className="space-y-1.5">
+                        <p className="text-[11px] text-muted-foreground">
+                          Dauer für Slot-Suche (kürzer = engere Lücken, Termin
+                          wird angepasst)
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {SLOT_DURATION_PRESETS.map((m) => (
+                            <Button
+                              key={m}
+                              type="button"
+                              size="sm"
+                              variant={
+                                slotDuration === m ? "default" : "outline"
+                              }
+                              className="h-7 tabular-nums"
+                              disabled={busy}
+                              onClick={() => {
+                                setSlotDuration(m);
+                                setSlots([]);
+                                setActionMsg(null);
+                              }}
+                            >
+                              {m} Min
+                            </Button>
+                          ))}
+                          {!SLOT_DURATION_PRESETS.includes(
+                            slotDuration as (typeof SLOT_DURATION_PRESETS)[number]
+                          ) ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="default"
+                              className="h-7 tabular-nums"
+                              disabled={busy}
+                            >
+                              {slotDuration} Min
+                            </Button>
+                          ) : null}
+                        </div>
+                      </div>
+                    ) : null}
                     <div className="flex flex-wrap gap-2">
                       {!done ? (
                         <>
@@ -507,7 +573,7 @@ export function AgendaEventDialog({
                     {slots.length > 0 ? (
                       <div className="space-y-1.5 rounded-lg border border-border/60 bg-muted/20 p-2">
                         <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                          Verschieben nach
+                          Verschieben nach ({slotDuration} Min)
                         </p>
                         <ul className="flex flex-wrap gap-1.5">
                           {slots.map((s) => (
@@ -519,7 +585,7 @@ export function AgendaEventDialog({
                                 disabled={busy}
                                 onClick={() => void reschedule(s)}
                               >
-                                {s.date.slice(5)} {s.startHm}
+                                {s.date.slice(5)} {s.startHm}–{s.endHm}
                               </Button>
                             </li>
                           ))}

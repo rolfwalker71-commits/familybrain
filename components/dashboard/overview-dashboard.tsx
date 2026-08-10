@@ -36,6 +36,7 @@ import {
 import { TeamLogo, weekdayLabel, AgendaTypeRail } from "@/components/calendar/agenda-row";
 import { AgendaAiIconThumb } from "@/components/calendar/agenda-ai-icon-thumb";
 import { AgendaEventDialog } from "@/components/calendar/agenda-event-dialog";
+import { AdhocEventDialog } from "@/components/calendar/adhoc-event-dialog";
 import { formatCHF } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
 import { APP_ICON_STROKE } from "@/lib/branding/app-icons";
@@ -1200,6 +1201,7 @@ export function OverviewDashboard({
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [eventDetail, setEventDetail] = useState<AgendaItem | null>(null);
+  const [adhocOpen, setAdhocOpen] = useState(false);
   const [fromCache, setFromCache] = useState(false);
   const [nowTick, setNowTick] = useState(0);
   const dataRef = useRef<OverviewPayload | null>(null);
@@ -1614,12 +1616,23 @@ export function OverviewDashboard({
                 <h2 className="text-[14px] font-black tracking-tight">
                   Heute · Ablauf
                 </h2>
-                <Link
-                  href="/calendar"
-                  className="text-[13px] font-medium text-muted-foreground underline-offset-2 hover:underline"
-                >
-                  Alle Termine →
-                </Link>
+                <div className="flex shrink-0 items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 rounded-full px-2.5 text-[12px] font-semibold"
+                    onClick={() => setAdhocOpen(true)}
+                  >
+                    Ad-hoc einplanen
+                  </Button>
+                  <Link
+                    href="/calendar"
+                    className="text-[13px] font-medium text-muted-foreground underline-offset-2 hover:underline"
+                  >
+                    Alle Termine →
+                  </Link>
+                </div>
               </div>
               {visibleConflicts.length > 0 ? (
                 <div
@@ -1820,6 +1833,11 @@ export function OverviewDashboard({
           if (!open) setEventDetail(null);
         }}
         onChanged={() => void load()}
+      />
+      <AdhocEventDialog
+        open={adhocOpen}
+        onOpenChange={setAdhocOpen}
+        onCreated={() => void load()}
       />
     </div>
   );

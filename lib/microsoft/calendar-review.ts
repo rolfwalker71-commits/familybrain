@@ -4,6 +4,7 @@ import {
   dayWindowLocal,
   hmToMinutes,
   minutesToHm,
+  zurichHm,
   zurichYmd,
 } from "@/lib/microsoft/time";
 
@@ -254,6 +255,8 @@ export function findFreeSlots(input: {
   lunchEndHm?: string;
   maxSlots?: number;
   stepMinutes?: number;
+  /** Skip slot starts before this local wall time on `notBefore.date` (e.g. now). */
+  notBefore?: { date: string; hm: string } | null;
 }): FreeSlot[] {
   const workStart = Math.max(
     8 * 60,
@@ -270,6 +273,10 @@ export function findFreeSlots(input: {
   const need = Math.max(15, input.durationMinutes);
   const step = Math.max(15, input.stepMinutes ?? SLOT_STEP_MINUTES);
   const maxSlots = input.maxSlots ?? 12;
+  const notBeforeMins =
+    input.notBefore && input.notBefore.date
+      ? hmToMinutes(input.notBefore.hm)
+      : null;
   const slots: FreeSlot[] = [];
 
   if (workEnd - workStart < need) return slots;
@@ -317,6 +324,14 @@ export function findFreeSlots(input: {
         t + need <= gap.end && slots.length < maxSlots;
         t += step
       ) {
+        if (
+          input.notBefore &&
+          day === input.notBefore.date &&
+          notBeforeMins != null &&
+          t < notBeforeMins
+        ) {
+          continue;
+        }
         const end = t + need;
         if (
           !isAllowedWorkSlot({
@@ -344,26 +359,59 @@ export function findFreeSlots(input: {
   return slots;
 }
 
+export type SuggestFreeSlotsOptions = {
+  rangeStart?: string;
+  rangeEnd?: string;
+  workStartHm?: string;
+  workEndHm?: string;
+  /** Override event length (minutes). */
+  durationMinutes?: number;
+  /** Include today and skip past starts (Zurich now). Default false → from tomorrow. */
+  fromToday?: boolean;
+  maxSlots?: number;
+};
+
+function resolveSlotSearchWindow(options?: SuggestFreeSlotsOptions): {
+  rangeStart: string;
+  rangeEnd: string;
+  notBefore: { date: string; hm: string } | null;
+} {
+  const today = zurichYmd();
+  if (options?.fromToday) {
+    const rangeStart = options.rangeStart || today;
+    const rangeEnd = options.rangeEnd || addDaysYmd(today, 7);
+    return {
+      rangeStart,
+      rangeEnd,
+      notBefore: { date: today, hm: zurichHm() },
+    };
+  }
+  return {
+    rangeStart: options?.rangeStart || addDaysYmd(today, 1),
+    rangeEnd: options?.rangeEnd || addDaysYmd(today, 7),
+    notBefore: null,
+  };
+}
+
 export async function suggestFreeSlotsForEvent(
   userId: number,
   event: MsCalendarEvent,
-  options?: {
-    rangeStart?: string;
-    rangeEnd?: string;
-    workStartHm?: string;
-    workEndHm?: string;
-  }
+  options?: SuggestFreeSlotsOptions
 ): Promise<FreeSlot[]> {
-  const today = zurichYmd();
-  const rangeStart = options?.rangeStart || addDaysYmd(today, 1);
-  const rangeEnd = options?.rangeEnd || addDaysYmd(today, 7);
-  const duration =
+  const { rangeStart, rangeEnd, notBefore } = resolveSlotSearchWindow(options);
+  const eventDuration =
     event.startHm && event.endHm
       ? Math.max(
           15,
           (hmToMinutes(event.endHm) ?? 0) - (hmToMinutes(event.startHm) ?? 0)
         )
       : 60;
+  const duration = Math.max(
+    15,
+    options?.durationMinutes != null
+      ? Math.round(options.durationMinutes)
+      : eventDuration || 60
+  );
   const events = await listMicrosoftEventsInRange(
     userId,
     rangeStart,
@@ -373,9 +421,38 @@ export async function suggestFreeSlotsForEvent(
     events: events.filter((e) => e.id !== event.id),
     rangeStart,
     rangeEnd,
-    durationMinutes: duration || 60,
+    durationMinutes: duration,
     workStartHm: options?.workStartHm || MS_WORK_START_HM,
     workEndHm: options?.workEndHm || MS_WORK_END_HM,
+    notBefore,
+    maxSlots: options?.maxSlots ?? 12,
+  });
+}
+
+/** Freie Slots für neue Ad-hoc-Termine (ohne bestehendes Event). */
+export async function suggestFreeSlotsForDuration(
+  userId: number,
+  options: SuggestFreeSlotsOptions & { durationMinutes: number }
+): Promise<FreeSlot[]> {
+  const { rangeStart, rangeEnd, notBefore } = resolveSlotSearchWindow({
+    ...options,
+    fromToday: options.fromToday !== false,
+  });
+  const duration = Math.max(15, Math.round(options.durationMinutes));
+  const events = await listMicrosoftEventsInRange(
+    userId,
+    rangeStart,
+    rangeEnd
+  );
+  return findFreeSlots({
+    events,
+    rangeStart,
+    rangeEnd,
+    durationMinutes: duration,
+    workStartHm: options.workStartHm || MS_WORK_START_HM,
+    workEndHm: options.workEndHm || MS_WORK_END_HM,
+    notBefore,
+    maxSlots: options.maxSlots ?? 12,
   });
 }
 

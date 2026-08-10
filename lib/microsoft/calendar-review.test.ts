@@ -147,6 +147,46 @@ test("isAllowedWorkSlot rejects lunch and late ends", () => {
   );
 });
 
+test("findFreeSlots skips starts before notBefore on that day", () => {
+  const slots = findFreeSlots({
+    events: [],
+    rangeStart: "2026-08-10",
+    rangeEnd: "2026-08-10",
+    durationMinutes: 60,
+    maxSlots: 40,
+    notBefore: { date: "2026-08-10", hm: "14:00" },
+  });
+  assert.ok(slots.length > 0);
+  assert.ok(slots.every((s) => s.startHm >= "14:00"));
+  assert.ok(!slots.some((s) => s.startHm === "08:00"));
+});
+
+test("findFreeSlots shorter duration finds tighter gaps", () => {
+  const events = [
+    ev({ id: "1", date: "2026-08-10", startHm: "08:00", endHm: "11:00" }),
+    ev({ id: "2", date: "2026-08-10", startHm: "12:00", endHm: "13:00" }),
+    ev({ id: "3", date: "2026-08-10", startHm: "13:45", endHm: "18:00" }),
+  ];
+  const long = findFreeSlots({
+    events,
+    rangeStart: "2026-08-10",
+    rangeEnd: "2026-08-10",
+    durationMinutes: 90,
+    maxSlots: 20,
+  });
+  const short = findFreeSlots({
+    events,
+    rangeStart: "2026-08-10",
+    rangeEnd: "2026-08-10",
+    durationMinutes: 30,
+    maxSlots: 20,
+  });
+  assert.ok(short.length >= long.length);
+  assert.ok(short.some((s) => s.startHm === "13:00" && s.endHm === "13:30"));
+  assert.ok(!long.some((s) => s.startHm === "13:00"));
+  assert.ok(short.every((s) => s.durationMinutes === 30));
+});
+
 test("withReschedulePrefix adds arrow once", () => {
   assert.equal(withReschedulePrefix("MorgenCall"), "➡️ MorgenCall");
   assert.equal(withReschedulePrefix("➡️ MorgenCall"), "➡️ MorgenCall");
