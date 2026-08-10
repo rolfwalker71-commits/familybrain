@@ -63,12 +63,12 @@ export const ICS_TYPE_META: Record<
     defaultName: "Arbeit",
   },
   work_rolf: {
-    label: "Arbeit Rolf (Mann)",
+    label: "Arbeit Rolf",
     defaultColor: "#0f766e",
     defaultName: "Arbeit Rolf",
   },
   work_valentyna: {
-    label: "Arbeit Valentyna (Frau)",
+    label: "Arbeit Valentyna",
     defaultColor: "#0d9488",
     defaultName: "Arbeit Valentyna",
   },

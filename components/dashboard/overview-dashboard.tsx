@@ -716,29 +716,45 @@ function MariTicketsAsideCard({
           />
           Tickets von mir
         </CardTitle>
-        <p className="text-[12px] text-muted-foreground">
-          {data.employeeNumber
-            ? `${data.employeeNumber} · ${data.total} offen`
-            : `${data.total} offen`}
-        </p>
+        {data.employeeNumber ? (
+          <p className="text-[12px] text-muted-foreground">
+            {data.employeeNumber}
+          </p>
+        ) : null}
       </CardHeader>
       <CardContent className="space-y-3">
-        {data.countsByStatus.length > 0 ? (
-          <ul className="flex flex-wrap gap-1.5">
-            {data.countsByStatus.map((c) => (
-              <li key={c.statusId}>
-                <span
-                  className={cn(
-                    "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold",
-                    statusChipClass(c.statusId)
-                  )}
-                >
-                  {c.label}
-                  <span className="tabular-nums opacity-80">{c.count}</span>
-                </span>
-              </li>
-            ))}
-          </ul>
+        {data.countsByStatus.length > 0 || data.total > 0 ? (
+          <div className="flex items-start gap-3">
+            <div className="flex min-w-[4.5rem] shrink-0 flex-col items-start leading-none">
+              <span className="text-[2.75rem] font-black tabular-nums tracking-tight text-foreground">
+                {data.total}
+              </span>
+              <span className="mt-1 text-[11px] font-medium text-muted-foreground">
+                offen
+              </span>
+            </div>
+            {data.countsByStatus.length > 0 ? (
+              <ul className="grid min-w-0 flex-1 grid-cols-2 gap-2 pt-0.5">
+                {data.countsByStatus.map((c) => (
+                  <li
+                    key={c.statusId}
+                    className={cn(
+                      "min-w-0 rounded-lg border px-2 py-1.5",
+                      statusChipClass(c.statusId)
+                    )}
+                    title={`${c.label}: ${c.count}`}
+                  >
+                    <p className="truncate text-[11px] leading-tight opacity-90">
+                      {c.label}
+                    </p>
+                    <p className="mt-1 text-[20px] font-bold tabular-nums leading-none">
+                      {c.count}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
         ) : (
           <p className="text-[12px] text-muted-foreground">
             {data.lastPollAt
