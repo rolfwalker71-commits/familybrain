@@ -14,6 +14,22 @@ test("estimateOpenAiCostUsd for gpt-4o-mini", () => {
   assert.equal(estimateOpenAiCostUsd("unknown-model", 100, 100), null);
 });
 
+test("estimateOpenAiCostUsd for deepseek-v4-flash", () => {
+  // 1M in + 1M out = 0.14 + 0.28
+  assert.ok(
+    Math.abs(
+      (estimateOpenAiCostUsd("deepseek-v4-flash", 1_000_000, 1_000_000) ?? 0) -
+        0.42
+    ) < 1e-9
+  );
+  assert.ok(
+    Math.abs(
+      (estimateOpenAiCostUsd("deepseek-v4-pro", 1_000_000, 1_000_000) ?? 0) -
+        1.305
+    ) < 1e-9
+  );
+});
+
 test("buildAiTokenUsage + format", () => {
   const u = buildAiTokenUsage("gpt-4o-mini", {
     prompt_tokens: 2000,

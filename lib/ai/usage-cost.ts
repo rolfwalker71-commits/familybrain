@@ -1,4 +1,7 @@
-/** Approximate OpenAI list prices (USD per 1M tokens). Update when pricing changes. */
+/**
+ * Approximate list prices (USD per 1M tokens). Update when pricing changes.
+ * DeepSeek input uses cache-miss rate (conservative if cache hits occur).
+ */
 const MODEL_USD_PER_MTOK: Record<string, { input: number; output: number }> = {
   "gpt-4o-mini": { input: 0.15, output: 0.6 },
   "gpt-4o": { input: 2.5, output: 10 },
@@ -6,6 +9,12 @@ const MODEL_USD_PER_MTOK: Record<string, { input: number; output: number }> = {
   "gpt-4.1": { input: 2, output: 8 },
   "gpt-4.1-nano": { input: 0.1, output: 0.4 },
   "o4-mini": { input: 1.1, output: 4.4 },
+  // DeepSeek API — https://api-docs.deepseek.com/quick_start/pricing
+  "deepseek-v4-flash": { input: 0.14, output: 0.28 },
+  "deepseek-v4-pro": { input: 0.435, output: 0.87 },
+  // Legacy aliases (retired 2026-07-24; map to Flash non-/thinking pricing)
+  "deepseek-chat": { input: 0.14, output: 0.28 },
+  "deepseek-reasoner": { input: 0.14, output: 0.28 },
 };
 
 export type AiTokenUsage = {
