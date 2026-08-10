@@ -1390,6 +1390,7 @@ export function GoogleWorkspaceClient() {
               <MailChronikList
                 items={mergeMailChronik(inbox, sent)}
                 loading={mailLoading}
+                provider="google"
               />
               <p className="text-[12px] text-muted-foreground">
                 Gleiche Struktur auch unter Microsoft 365
@@ -1397,54 +1398,22 @@ export function GoogleWorkspaceClient() {
             </section>
           ) : (
             <section className="space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-[22px] font-semibold tracking-tight text-foreground">
-                  Tagesanalysen
-                </h2>
-                <Button
-                  type="button"
-                  size="sm"
-                  className={cn("h-9", mailWorkspacePrimaryBtnClass("google"))}
-                  disabled={analyzing}
-                  onClick={() => startAnalyze()}
-                >
-                  <Sparkles
-                    className={cn("size-3.5", analyzing && "animate-pulse")}
-                  />
-                  {analyzing
-                    ? "Analyse läuft…"
-                    : analysis &&
-                        cachedDays.includes(mailRangeKey(mailFrom, mailTo))
-                      ? "Neu analysieren"
-                      : "Neue AI Tagesanalyse"}
-                </Button>
-              </div>
-              <MailTagesanalysenList
-                entries={cachedEntries}
-                selectedKey={mailRangeKey(mailFrom, mailTo)}
-                accent="google"
-                onSelect={(entry) => {
-                  setMailFrom(entry.fromYmd);
-                  setMailTo(entry.toYmd);
-                  setPicks({ tasks: {}, events: {}, replies: {} });
-                  void loadMail(entry.fromYmd, entry.toYmd);
-                  void loadAnalysisForRange(entry.fromYmd, entry.toYmd);
-                }}
-              />
-
-              <div className="flex flex-wrap items-end justify-between gap-3">
-                <div className="space-y-1.5">
-                  <h2 className="text-[15px] font-semibold">
-                    Zeitraum · {formatMailRangeLabel(mailFrom, mailTo)}
+              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+                <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+                  <h2 className="text-[22px] font-semibold tracking-tight text-foreground">
+                    Tagesanalysen
                   </h2>
                   <div className="flex flex-wrap items-center gap-2">
-                    <Label htmlFor="g-day-from" className="text-xs text-muted-foreground">
+                    <Label
+                      htmlFor="g-day-from"
+                      className="text-xs text-muted-foreground"
+                    >
                       Von
                     </Label>
                     <Input
                       id="g-day-from"
                       type="date"
-                      className="h-8 w-auto min-w-[9.5rem]"
+                      className="h-9 w-auto min-w-[9.5rem]"
                       value={mailFrom}
                       max={zurichYmdClient()}
                       onValueChange={(v) => {
@@ -1461,13 +1430,16 @@ export function GoogleWorkspaceClient() {
                         void loadAnalysisForRange(next.from, next.to);
                       }}
                     />
-                    <Label htmlFor="g-day-to" className="text-xs text-muted-foreground">
+                    <Label
+                      htmlFor="g-day-to"
+                      className="text-xs text-muted-foreground"
+                    >
                       Bis
                     </Label>
                     <Input
                       id="g-day-to"
                       type="date"
-                      className="h-8 w-auto min-w-[9.5rem]"
+                      className="h-9 w-auto min-w-[9.5rem]"
                       value={mailTo}
                       min={mailFrom}
                       max={zurichYmdClient()}
@@ -1485,15 +1457,6 @@ export function GoogleWorkspaceClient() {
                         void loadAnalysisForRange(next.from, next.to);
                       }}
                     />
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      disabled={mailLoading}
-                      onClick={() => void loadMail(mailFrom, mailTo)}
-                    >
-                      Mails laden
-                    </Button>
                     {cachedDays.includes(mailRangeKey(mailFrom, mailTo)) ? (
                       <span className="text-[11px] text-muted-foreground">
                         Analyse gespeichert
@@ -1501,11 +1464,12 @@ export function GoogleWorkspaceClient() {
                     ) : null}
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <Button
                     type="button"
                     size="sm"
                     variant="outline"
+                    className="h-9"
                     disabled={mailLoading}
                     onClick={() => void loadMail(mailFrom, mailTo)}
                   >
@@ -1514,8 +1478,37 @@ export function GoogleWorkspaceClient() {
                     />
                     Aktualisieren
                   </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className={cn("h-9", mailWorkspacePrimaryBtnClass("google"))}
+                    disabled={analyzing}
+                    onClick={() => startAnalyze()}
+                  >
+                    <Sparkles
+                      className={cn("size-3.5", analyzing && "animate-pulse")}
+                    />
+                    {analyzing
+                      ? "Analyse läuft…"
+                      : analysis &&
+                          cachedDays.includes(mailRangeKey(mailFrom, mailTo))
+                        ? "Neu analysieren"
+                        : "Neue AI Tagesanalyse"}
+                  </Button>
                 </div>
               </div>
+              <MailTagesanalysenList
+                entries={cachedEntries}
+                selectedKey={mailRangeKey(mailFrom, mailTo)}
+                accent="google"
+                onSelect={(entry) => {
+                  setMailFrom(entry.fromYmd);
+                  setMailTo(entry.toYmd);
+                  setPicks({ tasks: {}, events: {}, replies: {} });
+                  void loadMail(entry.fromYmd, entry.toYmd);
+                  void loadAnalysisForRange(entry.fromYmd, entry.toYmd);
+                }}
+              />
 
               {analysis ? (
                 <Card className="border-border/70">

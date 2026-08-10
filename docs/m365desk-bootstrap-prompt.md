@@ -3,9 +3,9 @@
 > **Zweck:** Dieses Dokument 1:1 in den Chat eines **neuen, leeren** Cursor-Workspaces kopieren.
 > Der Agent soll daraus eine eigenständige Docker-App aufsetzen (M365 + Kalender + Mail + AI + Tasks).
 >
-> **Stand:** 2026-08-09 · abgeleitet aus Buddy (`/microsoft`, `lib/microsoft/*`), ohne Maringo/Google/Paperless/Bild-KI.
+> **Stand:** 2026-08-10 · abgeleitet aus Buddy (`/microsoft`, `lib/microsoft/*`; optional `/maringo` / `lib/mari/*`). Ohne Google/Paperless/Bild-KI.
 >
-> **Vor dem Start optional anpassen:** Produktname, `APP_PUBLIC_URL`, Host-Port.
+> **Vor dem Start optional anpassen:** Produktname, `APP_PUBLIC_URL`, Host-Port, ob **Maringo/MARI** mitgebaut wird (siehe §17).
 
 ---
 
@@ -13,7 +13,7 @@
 
 Du bist ein Senior Full-Stack Agent. Baue in DIESEM leeren Workspace eine **eigenständige, Docker-basierte Web-App** für Kollegen: Microsoft 365 (Outlook Mail, Kalender, To Do, optional Planner) + AI-Unterstützung.
 
-Das ist **kein Clone von Buddy/FamilyBrain**. Orientier dich an den Spezifikationen unten (Architektur, APIs, OAuth, Features), aber starte ein **sauberes neues Projekt** mit klarer Namensgebung. Keine Legacy-Module aus Buddy (Paperless, Google, Maringo/MARI, Finance, Trips, Travel, Hockey, Trilium, Qdrant/Embeddings, Web-Push, AI-Bilder/DALL·E).
+Das ist **kein Clone von Buddy/FamilyBrain**. Orientier dich an den Spezifikationen unten (Architektur, APIs, OAuth, Features), aber starte ein **sauberes neues Projekt** mit klarer Namensgebung. Keine Legacy-Module aus Buddy (Paperless, Google, Finance, Trips, Travel, Hockey, Trilium, Qdrant/Embeddings, Web-Push, AI-Bilder/DALL·E). **Maringo/MARI** nur wenn der User es ausdrücklich will — Spezifikation in §17 (Stand Buddy 2026-08).
 
 Arbeite möglichst selbständig: Scaffold → Implementierung → Docker → `.env.example` → README (Setup Entra + Docker) → Sanity-Checks. Lies vor Next.js-Code die lokalen Next.js-Docs unter `node_modules/next/dist/docs/` (Next 16 hat Breaking Changes).
 
@@ -27,8 +27,7 @@ Arbeite möglichst selbständig: Scaffold → Implementierung → Docker → `.e
 
 **Nicht-Ziele (explizit ausschließen):**
 
-- Maringo / MARI / Support-Tickets
-- AI-Bildgenerierung / Vision / DALL·E / Bild-Uploads zur Bildanalyse
+- AI-Bildgenerierung / DALL·E (Ausnahme nur bei Maringo-Ticket-Analyse: bis 4 Vision-Bilder aus MARI-Attachments, siehe §17)
 - Google Workspace / Gmail / Google Calendar / Google Tasks
 - Paperless-ngx, DMS, PDF-Archiv-Pipeline
 - Finanz-/Reise-/Familien-Features
@@ -36,7 +35,9 @@ Arbeite möglichst selbständig: Scaffold → Implementierung → Docker → `.e
 - Voller Outlook-Ersatz (kein kompletter Mail-Client mit Ordnerbaum wie Outlook)
 - Qdrant / Embeddings / RAG (nicht nötig für v1)
 
-**Leitbild:** Assistenz-Hub über Microsoft Graph: Tagesübersicht, Mail lesen/triagieren, Kalender-Review, Aufgaben, AI schlägt To-dos/Termine/Antwortentwürfe vor → User bestätigt → Write zurück nach Outlook.
+**Optional (nur auf Wunsch):** Maringo / MARI Support-Tickets — §17. Sonst **nicht** bauen.
+
+**Leitbild:** Assistenz-Hub über Microsoft Graph: Tagesübersicht, Mail lesen/triagieren, Kalender-Review, Aufgaben, AI schlägt To-dos/Termine/Antwortentwürfe vor → User bestätigt → Write zurück nach Outlook. Optional: Support-Tickets aus MARI.
 
 UI-Sprache: **Deutsch** (Schweiz: Zeitzone `Europe/Zurich`, Datumsformat UI `DD.MM.YYYY`, AI intern oft `YYYY-MM-DD`). Schweizer Hochdeutsch in AI-Texten (kein ß → ss; «Grüsse»).
 
@@ -237,7 +238,7 @@ Optional:
 - Day-analysis Job/Cache in **settings** als JSON: `ms_mail_day_analysis_u{userId}`, `ms_mail_day_cache_u{userId}` (max ~7 Tage-Caches)
 - Kalender-Auswahl: `microsoft_calendars_json_u{userId}` falls mehrere Kalender
 
-**Nicht** anlegen: Paperless-Tabellen, Qdrant, Finance, Trips, Maringo.
+**Nicht** anlegen: Paperless-Tabellen, Qdrant, Finance, Trips. Maringo nur bei optionalem Modul (§17): Settings-Keys für MARI-Credentials + Poll-State, keine eigenen Ticket-Tabellen nötig (Live-SQL/API + Snapshot in settings).
 
 ---
 
@@ -247,9 +248,10 @@ Optional:
 
 Sidebar (deutsch):
 
-- **Übersicht** `/` — heute: Termine, offene Tasks, kurze Mail-Highlights, Connect-Status
+- **Übersicht** `/` — heute: Termine, offene Tasks, kurze Mail-Highlights, Connect-Status; bei Maringo: Aside «Tickets von mir» (§17)
 - **Microsoft 365** `/microsoft` — Hauptworkspace (Tabs)
-- **Einstellungen** `/settings` — OpenAI, Entra App, Users (Admin), eigener M365-Connect (oder Connect unter Konto)
+- Optional **Maringo Support** `/maringo` — Ticket-Workspace (§17)
+- **Einstellungen** `/settings` — OpenAI, Entra App, Users (Admin), eigener M365-Connect (oder Connect unter Konto); bei Maringo: Tab `?tab=maringo`
 - Optional **Konto** `/account` — Connect/Disconnect/Probe/Kalenderauswahl
 
 ### 6.2 Workspace `/microsoft` — Tabs
@@ -408,7 +410,8 @@ Calendar actions body:
 - System-Prompt: Büro-Assistent Schweiz, `Europe/Zurich`, absolute Daten, keine Halluzinationen, Newsletter/Werbung → leere suggestions
 - Zod-parse; bei Fail Retry einmal oder klare Error-UI
 - Token-Usage optional anzeigen
-- **Kein** Image-Input, **kein** `images.generate`, **kein** Vision
+- **Kein** Image-Input / Vision in M365-Mail/Day-Flows; **kein** `images.generate`
+- Ausnahme nur optional Maringo-Ticket-Analyse (§17.8): bis 4 Attachment-Bilder als Vision-Input
 - Keys nur Server-side; nie an Client leaken (masked in settings GET)
 - Post-process: Firmen/Absender-Labels aus Domain; Schweizer Orthografie; Task-Due Default sinnvoll (z.B. Range-Ende + 1 Tag)
 
@@ -518,6 +521,7 @@ Lokal aus calendarView-Busy-Blöcken im Arbeitsfenster berechnen.
 10. Planner panel (graceful)
 11. Admin user management
 12. README + manuelle Checkliste
+13. **Optional:** Maringo (§17) — erst nach explizitem Go
 
 Nach jedem großen Schritt: Typecheck/build grün halten.
 
@@ -536,7 +540,8 @@ Nach jedem großen Schritt: Typecheck/build grün halten.
 - [ ] To Do-Aufgaben sichtbar/erledigbar
 - [ ] Planner zeigt Tasks oder eine klare Fehlermeldung
 - [ ] Zweiter App-User kann eigenes M365 verbinden (getrennte Tokens)
-- [ ] Kein Maringo-, Google-, Paperless-, Image-AI-, Qdrant-Code im Repo
+- [ ] Kein Google-, Paperless-, Image-AI-(außer optional Maringo-Vision)-, Qdrant-Code im Repo
+- [ ] **Optional Maringo:** Credentials + Probe; Liste mit Arbeitsstatus-Default; Status-Filter inkl. «Alle Status»; Overview-KPI «Tickets von mir»; Poll 10 Min; AI-Analyse + interner Kommentar (§17)
 
 ---
 
@@ -557,6 +562,7 @@ Modul-Ideen (neu schreiben, nicht 1:1 porten):
 - `lib/microsoft/oauth.ts`, `graph.ts`, `calendar-review.ts`, `mail-day.ts`, `mail-day-actions.ts`, `analyze-mail-day.ts`, `planner.ts`
 - `lib/mail/analyze-mail.ts`, `mail-action-schema.ts`, `mail-analysis-store.ts`
 - UI: eine Workspace-Client-Komponente mit Tabs
+- Optional Maringo: `lib/mari/*` (status, tickets, client, sync, analyze, timeline-side), `components/maringo/*`, Overview-Aside
 
 ---
 
@@ -567,5 +573,172 @@ Modul-Ideen (neu schreiben, nicht 1:1 porten):
 - Wenn Entra-Tenant-Details unbekannt: Default `organizations` + klare UI-Felder
 - Bei Unklarheiten kurze Annahme im README dokumentieren und weiterbauen (nicht blockieren)
 - Next-16-Docs lesen bevor APIs geraten werden
+- Maringo nur nach explizitem Go des Users; dann §17 vollständig umsetzen
 
-**Starte jetzt mit Projekt-Scaffold und Docker-Grundgerüst, dann OAuth, dann Kalender/Mail, dann AI.**
+**Starte jetzt mit Projekt-Scaffold und Docker-Grundgerüst, dann OAuth, dann Kalender/Mail, dann AI. Maringo erst danach / nur auf Wunsch.**
+
+---
+
+## 17. Optional-Modul: Maringo Support (MARI) — Stand Buddy 2026-08
+
+Nur bauen, wenn der User Support-Tickets aus dem **MARI Rest Service** will. Referenzverhalten aus Buddy (`/maringo`, `lib/mari/*`, `docs/mari-rest-service.md`).
+
+### 17.1 Ziel & UI
+
+- Sidebar: **Maringo Support** → `/maringo`
+- PageHeader: «Support-Tickets — Liste, Verlauf und AI-Analyse (auch fremde Bearbeiter).»
+- Zwei-Pane: Ticketliste | Detail (Meta, Verlauf/Timeline, AI-Panel)
+- Einstellungen: `/settings?tab=maringo` — REST-Base-URL, Username, Passwort, **EmployeeNumber**, Probe
+- Overview-Aside: Karte **«Tickets von mir»** (nur wenn MARI konfiguriert)
+
+### 17.2 Credentials (kritisch)
+
+Settings (SQLite) schlagen Env:
+
+```bash
+MARI_REST_BASE_URL=https://marirestservice.an-group.international
+MARI_REST_USERNAME=...
+MARI_REST_PASSWORD=...
+# Personalnummer = EmployeeNumber (z.B. M1010), NICHT UserCode (z.B. 12)
+MARI_EMPLOYEE_NUMBER=M1010
+```
+
+| Feld | Bedeutung |
+|------|-----------|
+| REST username | oft NameInitials (z.B. `RWA`) |
+| `EmployeeNumber` | z.B. `M1010` → Ticket-Feld `HandledBy` / API `Responsible` |
+| `UserCode` | numerisch, **falsch** für «meine» Tickets → 0 Treffer |
+| `EditorType` / `ResponsibleType` | `3` (= Employee) |
+
+Auth: `POST {BASE}/token` (`application/x-www-form-urlencoded`, `grant_type=password`) → Bearer für Folgeaufrufe.
+
+### 17.3 Listen-Filter (SQL / SystemTools)
+
+Immer mitsenden (Buddy-Konstante):
+
+- `HandledBy = <EmployeeNumber>`
+- `EditorType = 3`
+- **`HotlineClassType = 17` (nur Support)** — Klasse **676** (Projektaufgaben) u.a. **nicht** listen (sonst falsche «meine» NEU-Tickets)
+- Status `IN (...)` — siehe unten
+- Limit z.B. 200
+
+Lesen über SystemTools-SQL (read-only) oder SupportIssue-API; PATCH Status/DueDate/Priority über SupportIssue.
+
+### 17.4 Status-IDs (`lib/mari/status.ts`)
+
+**Arbeitsfilter (Default Liste, Poll, Chip «Meine»):**
+
+`WORK_STATUS_IDS = [1, 3, 4, 6, 7, 11, 13, 14]`
+
+**Alle Status (Filter-UI Checklist + «Alle Status»):**
+
+`ALL_STATUS_IDS = [11, 1, 3, 13, 6, 9, 7, 10, 4, 2, 12, 8, 5, 14, 15, 16]`
+
+| ID | Label | Arbeitsfilter |
+|---:|-------|:-------------:|
+| 11 | NEU | ja |
+| 1 | Offen | ja |
+| 3 | In Arbeit | ja |
+| 13 | Aktualisiert | ja |
+| 6 | Warte auf Kunden *(Chip; DB oft «… Feedback»)* | ja |
+| 9 | Beim Kunden nachfassen | nein |
+| 7 | Warte auf Hersteller | ja |
+| 10 | Beim Hersteller nachfassen | nein |
+| 4 | Wieder geöffnet | ja |
+| 2 | Gelöst | nein |
+| 12 | Gelöst - Wartet | nein |
+| 8 | Verrechnet | nein |
+| 5 | Geschlossen | nein |
+| 14 | Eskalation | ja |
+| 15 | On Hold | nein |
+| 16 | Abklärung Notwendig | nein |
+
+Prioritäten (`SETTING=3`): 1 Eskalation … 5 Niedrig.
+
+**Filter-UI:**
+
+- Chip **«Meine»** → `WORK_STATUS_IDS`, Überfällig aus, Bearbeiter = Default-Employee
+- Chip **«Überfällig»**
+- Dropdown **Status (n)** — Mehrfachauswahl über `ALL_STATUS_IDS`; mind. ein Status bleibt aktiv
+- Menü: **«Alle Arbeitsstatus»** / **«Alle Status»**
+- API: `GET /api/maringo/tickets?status=1,3,…` — Parser-Fallback = `WORK_STATUS_IDS`
+- Bearbeiter: Employee-Liste oder manuell `M…` (fremde Tickets anzeigbar)
+
+### 17.5 Overview-Widget «Tickets von mir»
+
+- Daten aus **persistiertem Poll-State** (kein Live-MARI-Call beim Overview-Load)
+- Layout: **große Total-Zahl** + **2-Spalten-Grid** Status-Chips (Label + Count, Farben wie Workspace); **kein** Extra-Text «offen» unter der Total-Zahl
+- Optional: `employeeNumber`, bis 6 «Letzte Änderungen» (`#id` + Detail + Titel), letzter Poll (`Europe/Zurich`)
+- Leer: «Keine offenen Support-Tickets.» bzw. «Noch kein Poll — Scheduler lädt gleich.»
+- Poll-Scope = `WORK_STATUS_IDS` (wie Default-Liste)
+- Overview-Client darf Payload periodisch refreshen (z.B. Visibility + ~90s) — das ersetzt nicht den MARI-Scheduler
+
+### 17.6 Polling / Sync / Notify
+
+| Item | Wert |
+|------|------|
+| Intervall | 10 Minuten (`MARI_TICKETS_SYNC_INTERVAL_MS`) |
+| Query | `HandledBy` = konfigurierter Employee, `WORK_STATUS_IDS`, Klasse 17, Limit 200 |
+| Erster Lauf | nur Baseline-Snapshot — **keine** Notification |
+| Diff | `new`, `status`, `due`, `update` (ChangeAt ohne Statuswechsel) |
+| Persist | Settings-Keys `mari_tickets_*` (Snapshot, Counts, Recent ≤12, `last_poll_at`) |
+| Notify | `reason: "mari_ticket_changed"`, Link `/maringo`, Kategorie «Maringo» |
+| Jobs-UI | «Maringo Tickets» · Throttle 10 Min · Status/Stichtag/Updates |
+
+### 17.7 Detail, Timeline, Attachments
+
+- Timeline aus Issue-Attachments/PosTypes; Seiten-Labels für AI:
+
+| Label | Bedeutung |
+|-------|-----------|
+| Support (wir) | Antwort/Notiz; PosType 1/5; Actor `M…` |
+| Kunde | Eingang/Kunde; PosType 3/8 |
+| System | PosType 4 |
+| Unklar | sonst |
+
+- RequestPosType → Kind: 1 Antwort, 3 Eingang, 4 System, 5 Notiz, 8 Kunde
+- Attachment-Proxy: `GET /api/maringo/attachments/[id]` (+ `?download=1`); Thumbs/Lightbox in Timeline
+- Mail-Stubs mit mehreren Dateien → eine Attachment-Timeline-Zeile
+
+### 17.8 AI-Analyse
+
+- `POST /api/maringo/tickets/[id]/analyze` (`maxDuration` hoch, z.B. 120)
+- Input: Ticket + Timeline (ca. letzte 40 Zeilen) mit `[Seite: …]` + bis **4** Vision-Bilder (bevorzugt eingehende Attachments Typ 3; winzige GIFs skippen)
+- Domain: SAP **Business One** (nicht S/4) — Hypothesen, Tabellen (OCRD, OINV, …)
+- Schema u.a.: summary, completeness, suggestedTasks, suggestions, recommendedStatus, nextReplyDraft, **solutionSketch** (`problemStillOpen`, outline, vendors, steps, artifacts/code, caveats) — Sketch-UI nur wenn Problem noch offen
+- Interner Kommentar: `POST …/internal-note` → MARI `SupportIssueAttachment` mit `Internal: true`, `AttachmentTyp: 1` (nie Kunden-Reply-Pfad); HTML inkl. Sketch
+
+### 17.9 API-Routen (Soll)
+
+| Route | Methoden | Zweck |
+|-------|----------|--------|
+| `/api/maringo/probe` | POST | Credentials/Employee prüfen |
+| `/api/maringo/employees` | GET | Bearbeiter-Liste |
+| `/api/maringo/tickets` | GET | Liste (`status`, overdue, `handledBy`, …) |
+| `/api/maringo/tickets/[id]` | GET/PATCH | Detail; Status/Due/Priority |
+| `/api/maringo/tickets/[id]/analyze` | POST | AI |
+| `/api/maringo/tickets/[id]/internal-note` | POST | Analyse als interne Notiz |
+| `/api/maringo/attachments/[id]` | GET | Proxy/Download |
+
+### 17.10 Env / Compose-Ergänzung (wenn Modul aktiv)
+
+```bash
+MARI_REST_BASE_URL=
+MARI_REST_USERNAME=
+MARI_REST_PASSWORD=
+MARI_EMPLOYEE_NUMBER=
+```
+
+README: EmployeeNumber vs UserCode, Klasse 17, Status-Filter Arbeits vs Alle, Poll-Throttle, interne Notizen ≠ Kundenantwort.
+
+### 17.11 Liefer-Reihenfolge (nach M365-Kern)
+
+1. Settings-Panel + Token-Client + Probe
+2. Ticket-Liste (Klasse 17, WORK_STATUS Default) + Detail/PATCH
+3. Status-UI inkl. `ALL_STATUS_IDS` / Alle Arbeitsstatus / Alle Status
+4. Timeline + Attachment-Proxy
+5. Poll-Scheduler + Overview-KPI-Widget
+6. AI-Analyse (+ Vision) + solutionSketch + internal-note
+7. Notifications bei Diff (optional, wenn App Notify hat)
+
+**Akzeptanz Maringo:** falsches UserCode → dokumentierter Fail; Klasse 676 erscheint nicht; Overview zeigt Total + Status-Grid ohne «offen»-Unterzeile; Filter kann Gelöst/Geschlossen u.a. einblenden.
