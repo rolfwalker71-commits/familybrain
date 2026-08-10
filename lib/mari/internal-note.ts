@@ -116,6 +116,27 @@ export function formatAnalysisAsInternalCommentHtml(
   return parts.join("");
 }
 
+/** Freitext-Notiz als intern sichtbares HTML (wie Desktop-Kommentar). */
+export function formatPlainTextAsInternalCommentHtml(
+  text: string,
+  opts?: { issueId?: number }
+): string {
+  const body = text.trim();
+  const parts: string[] = [
+    `<!DOCTYPE HTML>`,
+    `<div><b>Buddy Notiz</b> (nur intern — nicht für Kunden)</div>`,
+  ];
+  if (opts?.issueId) {
+    parts.push(`<div>Ticket #${opts.issueId}</div>`);
+  }
+  parts.push(`<div><br/></div>`);
+  parts.push(preBlock(body));
+  parts.push(
+    `<div><br/></div><div><i>Manuell aus Buddy · nur für internes Support-Personal sichtbar.</i></div>`
+  );
+  return parts.join("");
+}
+
 export type MariInternalNotePostResult = {
   attachmentId: number;
   issueId: number;
@@ -206,5 +227,20 @@ export async function postAnalysisAsInternalNote(
     issueId,
     subject: "Buddy AI-Analyse (intern)",
     commentHtml: formatAnalysisAsInternalCommentHtml(analysis, { issueId }),
+  });
+}
+
+export async function postPlainInternalNote(
+  issueId: number,
+  text: string
+): Promise<MariInternalNotePostResult> {
+  const trimmed = text.trim();
+  if (!trimmed) {
+    throw new MariApiError("Kommentar leer", 400);
+  }
+  return postMariInternalNote({
+    issueId,
+    subject: "Buddy Notiz (intern)",
+    commentHtml: formatPlainTextAsInternalCommentHtml(trimmed, { issueId }),
   });
 }

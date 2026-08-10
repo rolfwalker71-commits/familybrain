@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -515,6 +516,9 @@ export function MaringoWorkspaceClient() {
   const [postingInternalNote, setPostingInternalNote] = useState(false);
   const [translatingReplyDraft, setTranslatingReplyDraft] = useState(false);
   const [replyDraftLang, setReplyDraftLang] = useState<ReplyLang | null>(null);
+  const [manualNoteDraft, setManualNoteDraft] = useState("");
+  const [postingManualNote, setPostingManualNote] = useState(false);
+  const [manualNoteHint, setManualNoteHint] = useState<string | null>(null);
   const [patching, setPatching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notePostedHint, setNotePostedHint] = useState<string | null>(null);
@@ -639,6 +643,9 @@ export function MaringoWorkspaceClient() {
     setAnalysisUsage(null);
     setReplyDraftLang(null);
     setTranslatingReplyDraft(false);
+    setManualNoteDraft("");
+    setManualNoteHint(null);
+    setPostingManualNote(false);
     setNotePostedHint(null);
     setError(null);
     try {
@@ -962,6 +969,49 @@ export function MaringoWorkspaceClient() {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setPostingInternalNote(false);
+    }
+  }
+
+  async function postManualInternalNote() {
+    if (!selectedId) return;
+    const text = manualNoteDraft.trim();
+    if (!text) {
+      setError("Kommentar ist leer.");
+      return;
+    }
+    const ok = window.confirm(
+      "Internen Kommentar auf dem Ticket speichern?\n\nNur für internes Support-Personal sichtbar — nicht für den Kunden."
+    );
+    if (!ok) return;
+    setPostingManualNote(true);
+    setError(null);
+    setManualNoteHint(null);
+    try {
+      const res = await fetch(
+        `/api/maringo/tickets/${selectedId}/internal-note`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text }),
+        }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || "Interner Kommentar fehlgeschlagen");
+      }
+      if (data.ticket) {
+        setDetail(data.ticket as MariTicketDetail);
+      } else {
+        await loadDetail(selectedId);
+      }
+      setManualNoteDraft("");
+      setManualNoteHint(
+        "Interner Kommentar gespeichert (nur intern sichtbar)."
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setPostingManualNote(false);
     }
   }
 
@@ -1897,6 +1947,53 @@ export function MaringoWorkspaceClient() {
                     onDelete={deleteTicketLine}
                     busyLineId={busyTicketLineId}
                   />
+                </div>
+
+                <div>
+                  <h3 className="mb-3 flex items-center gap-2 text-[13px] font-black tracking-tight">
+                    <Lock className="size-3.5 text-muted-foreground" />
+                    Interner Kommentar
+                  </h3>
+                  <div className="rounded-2xl border border-amber-200/70 bg-amber-50/40 px-3.5 py-3">
+                    <Label htmlFor="manual-internal-note" className="sr-only">
+                      Interner Kommentar
+                    </Label>
+                    <Textarea
+                      id="manual-internal-note"
+                      rows={5}
+                      value={manualNoteDraft}
+                      onChange={(e) => setManualNoteDraft(e.target.value)}
+                      placeholder="Eigene Notiz fürs Support-Team (nicht für den Kunden)…"
+                      disabled={postingManualNote}
+                      className="resize-y border-amber-200/80 bg-white/80 text-[13px]"
+                    />
+                    <div className="mt-2.5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <p className="text-[11px] text-amber-950/70">
+                        Wird mit Flag «Internal» nach Maringo geschrieben — nur
+                        intern sichtbar.
+                      </p>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="shrink-0 border-amber-300/80 bg-white/80 text-amber-950 hover:bg-amber-100/80"
+                        disabled={
+                          postingManualNote || !manualNoteDraft.trim()
+                        }
+                        onClick={() => void postManualInternalNote()}
+                      >
+                        <Lock className="size-3.5" />
+                        {postingManualNote
+                          ? "Speichere…"
+                          : "Intern speichern"}
+                      </Button>
+                    </div>
+                    {manualNoteHint ? (
+                      <p className="mt-2 text-[11px] font-medium text-emerald-800">
+                        {manualNoteHint}
+                      </p>
+                    ) : null}
+                  </div>
                 </div>
 
                 <div>

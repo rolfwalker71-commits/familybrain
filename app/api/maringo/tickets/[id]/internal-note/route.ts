@@ -5,7 +5,10 @@ import { isAuthError, requireAuth } from "@/lib/auth/current-user";
 import { MariApiError } from "@/lib/mari/client";
 import { hasMariConfig } from "@/lib/mari/config";
 import { MariTicketAnalysisSchema } from "@/lib/mari/analyze-ticket";
-import { postAnalysisAsInternalNote } from "@/lib/mari/internal-note";
+import {
+  postAnalysisAsInternalNote,
+  postPlainInternalNote,
+} from "@/lib/mari/internal-note";
 import { getTicketDetail } from "@/lib/mari/tickets";
 
 export const runtime = "nodejs";
@@ -13,9 +16,21 @@ export const dynamic = "force-dynamic";
 
 type Ctx = { params: Promise<{ id: string }> };
 
-const BodySchema = z.object({
-  analysis: MariTicketAnalysisSchema,
-});
+const BodySchema = z
+  .object({
+    analysis: MariTicketAnalysisSchema.optional(),
+    text: z.string().max(20_000).optional(),
+  })
+  .superRefine((val, ctx) => {
+    const hasAnalysis = val.analysis != null;
+    const hasText = Boolean(val.text?.trim());
+    if (hasAnalysis === hasText) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Entweder analysis oder text (nicht beides, nicht keines).",
+      });
+    }
+  });
 
 export async function POST(request: Request, context: Ctx) {
   ensureInitialized();
@@ -38,7 +53,10 @@ export async function POST(request: Request, context: Ctx) {
   const parsed = BodySchema.safeParse(json);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: "Ungültige Analyse-Daten", details: parsed.error.flatten() },
+      {
+        error: "Ungültige Anfrage",
+        details: parsed.error.flatten(),
+      },
       { status: 400 }
     );
   }
@@ -46,7 +64,9 @@ export async function POST(request: Request, context: Ctx) {
   try {
     // Ticket muss existieren; verhindert Blind-Writes
     await getTicketDetail(id);
-    const posted = await postAnalysisAsInternalNote(id, parsed.data.analysis);
+    const posted = parsed.data.analysis
+      ? await postAnalysisAsInternalNote(id, parsed.data.analysis)
+      : await postPlainInternalNote(id, parsed.data.text || "");
     const ticket = await getTicketDetail(id);
     return NextResponse.json({
       ok: true,
