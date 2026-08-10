@@ -37,6 +37,16 @@ export function annotateMailInRange(
   };
 }
 
+/**
+ * Mails die die Tagesanalyse standardmässig überspringt (Noise).
+ * Chronik kann sie weiterhin zeigen.
+ */
+export function isExcludedFromMailAnalysis(mail: {
+  subject?: string | null;
+}): boolean {
+  return /\[SYSTEM\s+INFOBOARD\]/i.test(mail.subject || "");
+}
+
 /** Always date + time (Europe/Zurich), e.g. «10.08.2026 · 12:19». */
 export function chronikDateTimeLabel(iso: string | null | undefined): string {
   if (!iso) return "–";

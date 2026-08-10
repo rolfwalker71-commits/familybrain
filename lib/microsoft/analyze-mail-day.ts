@@ -4,6 +4,7 @@ import {
   type AiTokenUsage,
 } from "@/lib/ai/usage-cost";
 import { emailDomain } from "@/lib/mail/mail-sender-prefs";
+import { isExcludedFromMailAnalysis } from "@/lib/mail/mail-threads";
 import type { MsMailItem } from "@/lib/microsoft/mail-day";
 import {
   detectReplyLanguage,
@@ -104,6 +105,19 @@ export const MsDayReplyDraftSchema = z.object({
   reason: aiString(400).optional(),
 });
 
+function aiItemArray<T extends z.ZodTypeAny>(itemSchema: T, max: number) {
+  return z.preprocess((v) => {
+    if (!Array.isArray(v)) return [];
+    const out: z.infer<T>[] = [];
+    for (const el of v) {
+      const r = itemSchema.safeParse(el);
+      if (r.success) out.push(r.data);
+      if (out.length >= max) break;
+    }
+    return out;
+  }, z.array(itemSchema).max(max));
+}
+
 export const MsDayClusterSchema = z.object({
   company: aiStringRequired(120, "Unbekannt"),
   counterpartEmail: aiNullableString(200).optional(),
@@ -114,9 +128,9 @@ export const MsDayClusterSchema = z.object({
   status: z.enum(["open", "waiting", "done", "fyi"]).optional(),
   /** false = nur Info / keine Task/Reply nötig (UI-Chip). */
   actionNeeded: z.boolean().optional(),
-  tasks: z.array(MsDayTaskSuggestionSchema).max(6).default([]),
-  events: z.array(MsDayEventSuggestionSchema).max(4).default([]),
-  replies: z.array(MsDayReplyDraftSchema).max(3).default([]),
+  tasks: aiItemArray(MsDayTaskSuggestionSchema, 6).default([]),
+  events: aiItemArray(MsDayEventSuggestionSchema, 4).default([]),
+  replies: aiItemArray(MsDayReplyDraftSchema, 3).default([]),
 });
 
 export const MsDayMailAnalysisSchema = z.object({
@@ -339,8 +353,12 @@ export function originalSenderForCluster(mails: MsMailItem[]): {
   };
 }
 
-function formatMailBlock(m: MsMailItem, indexLabel: string): string {
-  const body = (m.bodyText || m.preview || "").slice(0, 2200);
+function formatMailBlock(
+  m: MsMailItem,
+  indexLabel: string,
+  bodyLimit = 2200
+): string {
+  const body = (m.bodyText || m.preview || "").slice(0, bodyLimit);
   const { email, company } = counterpartForMail(m);
   const absender =
     m.folder === "inbox"
@@ -777,17 +795,38 @@ export async function analyzeMicrosoftMailDay(input: {
   const rangeLabel =
     fromYmd === toYmd ? fromYmd : `${fromYmd}–${toYmd}`;
 
-  const seeds = buildThreadSeeds(input.inbox, input.sent);
+  const inbox = input.inbox.filter((m) => !isExcludedFromMailAnalysis(m));
+  const sent = input.sent.filter((m) => !isExcludedFromMailAnalysis(m));
+  const excludedCount =
+    input.inbox.length +
+    input.sent.length -
+    inbox.length -
+    sent.length;
+
+  const seeds = buildThreadSeeds(inbox, sent);
   if (seeds.length === 0) {
-    return emptyMailDayAnalysis(`Keine Mails für ${rangeLabel} gefunden.`);
+    const extra =
+      excludedCount > 0
+        ? ` (${excludedCount} SYSTEM INFOBOARD übersprungen)`
+        : "";
+    return emptyMailDayAnalysis(
+      `Keine Mails für ${rangeLabel} gefunden.${extra}`
+    );
   }
 
   const byId = new Map(
-    [...input.inbox, ...input.sent].map((m) => [m.id, m] as const)
+    [...inbox, ...sent].map((m) => [m.id, m] as const)
   );
   const idSet = new Set(byId.keys());
 
-  const BATCH = 10;
+  // Kleinere Batches bei vielen Threads: sonst JSON-Truncation → 0 Tasks.
+  const BATCH =
+    seeds.length > 40 ? 3 : seeds.length > 20 ? 4 : seeds.length > 10 ? 5 : 8;
+  const bodyLimit =
+    seeds.length > 40 ? 700 : seeds.length > 20 ? 1100 : 1800;
+  const mailsPerThread =
+    seeds.length > 40 ? 4 : seeds.length > 20 ? 6 : 10;
+
   const batches: ThreadSeed[][] = [];
   for (let i = 0; i < seeds.length; i += BATCH) {
     batches.push(seeds.slice(i, i + BATCH));
@@ -802,7 +841,10 @@ export async function analyzeMicrosoftMailDay(input: {
 
   for (let bi = 0; bi < batches.length; bi++) {
     const batch = batches[bi]!;
-    const packed = packThreadSeedsForPrompt(batch);
+    const packed = packThreadSeedsForPrompt(batch, {
+      bodyLimit,
+      maxMailsPerThread: mailsPerThread,
+    });
     const required = batch
       .map(
         (s, i) =>
@@ -815,7 +857,9 @@ Batch ${bi + 1}/${batches.length} · Default dueDate: ${defaultDue}
 
 PFLICHT: Genau ${batch.length} Cluster — einer pro seedKey unten. Keine zusammenfassen, keine weglassen.
 Newsletter/System/noreply → status=fyi, actionNeeded=false, tasks/replies/events leer, kurze Summary.
-Handlung nötig → actionNeeded=true + tasks und/oder replies.
+Handlung nötig → actionNeeded=true UND mindestens 1 task und/oder 1 reply (nicht beides leer!).
+Kundenfragen / offene Zusagen / Bitten um Rückmeldung = immer actionNeeded mit Reply und/oder Task.
+SYSTEM INFOBOARD ist bereits ausgefiltert — nicht erfinden.
 
 Seed-Liste:
 ${required}
@@ -830,7 +874,7 @@ JSON:
       "counterpartEmail": "…"|null,
       "theme": "…",
       "conversationId": "conv oder null",
-      "summary": "4–8 Sätze",
+      "summary": "3–6 Sätze",
       "mailIds": ["id"],
       "status": "open"|"waiting"|"done"|"fyi",
       "actionNeeded": true|false,
@@ -844,6 +888,7 @@ JSON:
     const completion = await client.chat.completions.create({
       model,
       temperature: 0.25,
+      max_tokens: 8000,
       response_format: { type: "json_object" },
       messages: [
         { role: "system", content: system },
@@ -858,20 +903,26 @@ JSON:
     try {
       parsed = JSON.parse(raw);
     } catch {
-      throw new Error(`AI-Antwort Batch ${bi + 1} war kein gültiges JSON.`);
-    }
-    const result = MsDayBatchClustersSchema.safeParse(parsed);
-    if (!result.success) {
-      // Einzelne Bad-Batches → Seed-Fallback statt kompletter Tagesanalyse-Abbruch
-      // (Telegram/UI meldete sonst z. B. null statt string bei replies.subject).
       console.warn(
-        `[mail-day-analyze] AI-Schema Batch ${bi + 1}/${batches.length} ungültig — Fallback:`,
-        result.error.message.slice(0, 500)
+        `[mail-day-analyze] Batch ${bi + 1}/${batches.length}: JSON kaputt — Fallback Seeds`
       );
       continue;
     }
 
-    for (const c of result.data.clusters) {
+    const clustersRaw =
+      parsed &&
+      typeof parsed === "object" &&
+      Array.isArray((parsed as { clusters?: unknown }).clusters)
+        ? (parsed as { clusters: unknown[] }).clusters
+        : [];
+    const accepted = parseAiClustersLenient(clustersRaw);
+    if (accepted.length === 0 && clustersRaw.length > 0) {
+      console.warn(
+        `[mail-day-analyze] Batch ${bi + 1}/${batches.length}: keine gültigen Cluster — Fallback Seeds`
+      );
+    }
+
+    for (const c of accepted) {
       const key = matchClusterToSeedKey(c, batch);
       if (key) aiByKey.set(key, c);
     }
@@ -912,6 +963,7 @@ JSON:
     rangeLabel,
     clusters,
     usages,
+    excludedCount,
   });
 
   const mergedUsage = mergeUsages(model, usages);
@@ -979,13 +1031,27 @@ function buildThreadSeeds(
   });
 }
 
-function packThreadSeedsForPrompt(seeds: ThreadSeed[]): string {
+function packThreadSeedsForPrompt(
+  seeds: ThreadSeed[],
+  opts?: { bodyLimit?: number; maxMailsPerThread?: number }
+): string {
+  const bodyLimit = opts?.bodyLimit ?? 1800;
+  const maxMails = opts?.maxMailsPerThread ?? 10;
   return seeds
     .map((s, i) => {
-      const blocks = s.mails
-        .map((m, j) => formatMailBlock(m, `#${i + 1}.${j + 1}`))
+      // Neueste Mails priorisieren (Antwortbedarf meist am Ende).
+      const ordered = [...s.mails].sort((a, b) =>
+        (b.receivedOrSentAt || "").localeCompare(a.receivedOrSentAt || "")
+      );
+      const picked = ordered.slice(0, maxMails).reverse();
+      const blocks = picked
+        .map((m, j) => formatMailBlock(m, `#${i + 1}.${j + 1}`, bodyLimit))
         .join("\n\n");
-      return `=== THREAD seedKey=${s.key} · ${s.mails.length} Mails · ${s.company} ===\n${blocks}`;
+      const omitted =
+        s.mails.length > picked.length
+          ? ` · +${s.mails.length - picked.length} ältere Mails weggelassen`
+          : "";
+      return `=== THREAD seedKey=${s.key} · ${picked.length}/${s.mails.length} Mails · ${s.company}${omitted} ===\n${blocks}`;
     })
     .join("\n\n---\n\n");
 }
@@ -999,14 +1065,53 @@ CLUSTER (hart):
 - Genau ein Cluster pro seedKey / THREAD-Block — keine Verdichtung.
 - conversationId und mailIds aus dem Thread übernehmen.
 - actionNeeded=true wenn Task, Reply oder Event sinnvoll; sonst false.
-- Newsletter / System / noreply / Infoboard: status=fyi, actionNeeded=false, keine tasks/replies/events, 2–4 Sätze Summary.
+- Wenn actionNeeded=true: tasks und replies dürfen NICHT beide leer sein — mindestens eine konkrete Aufgabe oder eine Antwort.
+- Newsletter / System / noreply: status=fyi, actionNeeded=false, keine tasks/replies/events, 2–4 Sätze Summary.
 - Offene Kundenfragen: actionNeeded=true, Reply pflicht (Sprache der Anfrage de/en), optional Task.
 - Nur Zeitraum der Analyse — keine Halluzinationen.
 
 TASKS: dueDate Default ${defaultDue}, Titel ohne Absender-Suffix.
-REPLIES: to = E-Mail mit @; language de|en; AW:/Re: passend.
-EVENTS: nur bei klarem Termin.
+REPLIES: to = E-Mail mit @; language de|en; subject und body als Strings (nie null); AW:/Re: passend.
+EVENTS: nur bei klarem Termin und gültigem date YYYY-MM-DD.
 NUR JSON.`;
+}
+
+/** Per-cluster salvage: ein kaputter Event/Reply killt nicht den ganzen Batch. */
+function parseAiClustersLenient(
+  rawClusters: unknown[]
+): z.infer<typeof MsDayClusterSchema>[] {
+  const out: z.infer<typeof MsDayClusterSchema>[] = [];
+  for (const raw of rawClusters) {
+    const full = MsDayClusterSchema.safeParse(raw);
+    if (full.success) {
+      out.push(full.data);
+      continue;
+    }
+    if (!raw || typeof raw !== "object") continue;
+    const o = raw as Record<string, unknown>;
+    const stripped = MsDayClusterSchema.safeParse({
+      ...o,
+      tasks: Array.isArray(o.tasks) ? o.tasks : [],
+      events: [],
+      replies: Array.isArray(o.replies) ? o.replies : [],
+    });
+    if (stripped.success) {
+      out.push(stripped.data);
+      continue;
+    }
+    const summaryOnly = MsDayClusterSchema.safeParse({
+      ...o,
+      tasks: [],
+      events: [],
+      replies: [],
+      summary:
+        typeof o.summary === "string" && o.summary.trim()
+          ? o.summary
+          : "Thread erfasst (Teilantwort der AI).",
+    });
+    if (summaryOnly.success) out.push(summaryOnly.data);
+  }
+  return out;
 }
 
 function matchClusterToSeedKey(
@@ -1086,7 +1191,15 @@ async function writeDaySummaryOverview(input: {
   rangeLabel: string;
   clusters: MsDayCluster[];
   usages: AiTokenUsage[];
+  excludedCount?: number;
 }): Promise<string> {
+  const actionCount = input.clusters.filter((c) => clusterNeedsAction(c)).length;
+  const taskCount = input.clusters.reduce((n, c) => n + c.tasks.length, 0);
+  const replyCount = input.clusters.reduce((n, c) => n + c.replies.length, 0);
+  const excludedNote =
+    input.excludedCount && input.excludedCount > 0
+      ? ` (${input.excludedCount} SYSTEM-INFOBOARD-Mails ausgeklammert)`
+      : "";
   const lines = input.clusters
     .slice(0, 80)
     .map((c) => {
@@ -1099,16 +1212,17 @@ async function writeDaySummaryOverview(input: {
     const completion = await input.client.chat.completions.create({
       model: input.model,
       temperature: 0.3,
+      max_tokens: 1200,
       response_format: { type: "json_object" },
       messages: [
         {
           role: "system",
           content:
-            "Buddy Büro-Assistent CH. Schreibe daySummary (5–10 Sätze, Schweizer Deutsch, kein ß). NUR JSON {\"daySummary\":\"…\"}.",
+            "Buddy Büro-Assistent CH. Schreibe daySummary (5–10 Sätze, Schweizer Deutsch, kein ß). Erwähne grob Handlung vs. Info. NUR JSON {\"daySummary\":\"…\"}.",
         },
         {
           role: "user",
-          content: `Zeitraum ${input.rangeLabel}. Überblick aus ${input.clusters.length} Thread-Clustern:\n${lines}`,
+          content: `Zeitraum ${input.rangeLabel}${excludedNote}. Überblick aus ${input.clusters.length} Thread-Clustern (${actionCount} mit Aktion, ${taskCount} Tasks, ${replyCount} Replies):\n${lines}`,
         },
       ],
     });
@@ -1123,8 +1237,9 @@ async function writeDaySummaryOverview(input: {
     /* fall through */
   }
 
-  const openN = input.clusters.filter((c) => clusterNeedsAction(c)).length;
   return applySwissOrthography(
-    `Zeitraum ${input.rangeLabel}: ${input.clusters.length} Threads analysiert, davon ${openN} mit Handlungsbedarf. Details in den einzelnen Clustern.`
+    `Zeitraum ${input.rangeLabel}: ${input.clusters.length} Threads analysiert` +
+      `${excludedNote}, davon ${actionCount} mit Handlungsbedarf` +
+      ` (${taskCount} Aufgaben, ${replyCount} Antwort-Entwürfe). Details in den einzelnen Clustern.`
   );
 }

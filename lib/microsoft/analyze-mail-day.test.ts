@@ -268,3 +268,29 @@ test("cluster schema coerces null reply subject/body from AI", () => {
   assert.equal(parsed.data.replies[0]?.subject, "");
   assert.equal(parsed.data.replies[0]?.body, "");
 });
+
+test("cluster schema keeps cluster when one event has invalid date", () => {
+  const parsed = MsDayClusterSchema.safeParse({
+    company: "Kunde",
+    theme: "Projekt",
+    summary: "Offene Frage",
+    actionNeeded: true,
+    tasks: [{ title: "Rückruf" }],
+    events: [
+      { title: "Call", date: null },
+      { title: "Call OK", date: "2026-08-12", startTime: "10:00" },
+    ],
+    replies: [
+      {
+        to: "a@b.com",
+        subject: "AW: Projekt",
+        body: "Danke, wir melden uns.",
+      },
+    ],
+  });
+  assert.equal(parsed.success, true);
+  if (!parsed.success) return;
+  assert.equal(parsed.data.events.length, 1);
+  assert.equal(parsed.data.tasks.length, 1);
+  assert.equal(parsed.data.replies.length, 1);
+});

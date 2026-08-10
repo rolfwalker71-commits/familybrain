@@ -3,6 +3,7 @@ import { test } from "node:test";
 import {
   buildMailChronikThreads,
   chronikDateTimeLabel,
+  isExcludedFromMailAnalysis,
   isMailInSelectedRange,
   mergeMailItemsById,
   summarizeMailThreadCoverage,
@@ -119,4 +120,22 @@ test("summarizeMailThreadCoverage counts context vs in-range", () => {
   assert.equal(cov.context, 1);
   assert.equal(cov.threads, 2);
   assert.equal(cov.threadsWithContext, 1);
+});
+
+test("isExcludedFromMailAnalysis matches SYSTEM INFOBOARD subjects", () => {
+  assert.equal(
+    isExcludedFromMailAnalysis({
+      subject:
+        "[SYSTEM INFOBOARD] [WARNUNG] Heads-Up: Alert noch offen: Presentation Server Support",
+    }),
+    true
+  );
+  assert.equal(
+    isExcludedFromMailAnalysis({ subject: "[system infoboard] test" }),
+    true
+  );
+  assert.equal(
+    isExcludedFromMailAnalysis({ subject: "Kundenanfrage Angebot" }),
+    false
+  );
 });

@@ -83,9 +83,10 @@ export function MailAnalysisThreadHint({
           <strong className="font-semibold">
             pro Thread (bzw. Einzelmail) einen eigenen Cluster
           </strong>{" "}
-          an — inkl. FYI/Newsletter und erledigter Themen. Offene Handlungen
-          stehen zuerst; der Rest hinter «Alle Threads zeigen». Frühere Analysen
-          blenden nichts aus.
+          an — inkl. FYI/Newsletter und erledigter Themen. Mails mit
+          Betreff «[SYSTEM INFOBOARD]» werden aus der Analyse ausgeklammert.
+          Offene Handlungen stehen zuerst; der Rest hinter «Alle Threads zeigen».
+          Frühere Analysen blenden nichts aus.
         </p>
         {stats ? (
           <p className="text-[12px] font-medium tabular-nums text-sky-900">
