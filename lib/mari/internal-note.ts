@@ -9,8 +9,8 @@ function escapeHtml(raw: string): string {
     .replace(/"/g, "&quot;");
 }
 
-function preBlock(text: string): string {
-  return `<pre style="white-space:pre-wrap;font-family:inherit;margin:0;">${escapeHtml(text)}</pre>`;
+function nl2brEscaped(text: string): string {
+  return escapeHtml(text).replace(/\n/g, "<br/>");
 }
 
 function listHtml(items: string[]): string {
@@ -18,101 +18,142 @@ function listHtml(items: string[]): string {
   return `<ul>${items.map((i) => `<li>${escapeHtml(i)}</li>`).join("")}</ul>`;
 }
 
-/** HTML-Kommentar wie Maringo-Desktop-Notizen (AttachmentTyp 1). */
+function sectionTitle(title: string): string {
+  return `<div style="margin:14px 0 6px;font-weight:700;font-size:14px;">${escapeHtml(title)}</div>`;
+}
+
+function codeBlock(code: string): string {
+  return `<div style="margin:6px 0 12px;padding:10px;border:1px solid #cbd5e1;background:#f8fafc;font-family:Consolas,'Courier New',monospace;font-size:12px;line-height:1.45;white-space:pre-wrap;word-break:break-word;">${escapeHtml(code)}</div>`;
+}
+
+function proseBlock(text: string): string {
+  return `<div style="margin:4px 0 8px;white-space:pre-wrap;line-height:1.5;">${escapeHtml(text)}</div>`;
+}
+
+/**
+ * HTML-Kommentar 1:1 zur Buddy-Analyse-UI (inkl. Lösungsansatz, Schritte, Code).
+ * AttachmentTyp 1 / Maringo-Desktop-Notiz.
+ */
 export function formatAnalysisAsInternalCommentHtml(
   analysis: MariTicketAnalysis,
   opts?: { issueId?: number }
 ): string {
   const parts: string[] = [
     `<!DOCTYPE HTML>`,
-    `<div><b>Buddy AI-Analyse</b> (nur intern — nicht für Kunden)</div>`,
+    `<div style="font-family:Segoe UI,Arial,sans-serif;font-size:13px;color:#0f172a;line-height:1.45;">`,
+    `<div style="font-weight:800;font-size:15px;margin-bottom:4px;">Buddy AI-Analyse</div>`,
+    `<div style="color:#9a3412;font-size:12px;margin-bottom:10px;">Nur intern — nicht für Kunden</div>`,
   ];
   if (opts?.issueId) {
-    parts.push(`<div>Ticket #${opts.issueId}</div>`);
+    parts.push(`<div style="margin-bottom:8px;">Ticket #${opts.issueId}</div>`);
   }
-  parts.push(`<div><br/></div>`);
-  parts.push(`<div><b>Zusammenfassung</b></div>`);
-  parts.push(`<div>${escapeHtml(analysis.summary).replace(/\n/g, "<br/>")}</div>`);
 
-  parts.push(`<div><br/></div>`);
-  parts.push(
-    `<div><b>Vollständigkeit:</b> ${analysis.completeness.score}/100</div>`
-  );
+  parts.push(sectionTitle("Zusammenfassung"));
+  parts.push(proseBlock(analysis.summary));
+
+  parts.push(sectionTitle(`Vollständigkeit: ${analysis.completeness.score}/100`));
   if (analysis.completeness.missing.length > 0) {
     parts.push(`<div>Fehlend:</div>`);
     parts.push(listHtml(analysis.completeness.missing));
+  } else {
+    parts.push(
+      `<div style="color:#64748b;">Keine kritischen Lücken erkannt.</div>`
+    );
   }
   if (analysis.completeness.notes) {
-    parts.push(`<div>${escapeHtml(analysis.completeness.notes)}</div>`);
+    parts.push(proseBlock(analysis.completeness.notes));
   }
 
   if (analysis.suggestedTasks.length > 0) {
-    parts.push(`<div><br/></div><div><b>Aufgaben</b></div>`);
-    parts.push(
-      listHtml(
-        analysis.suggestedTasks.map((t) =>
-          t.reason ? `${t.title} — ${t.reason}` : t.title
-        )
-      )
-    );
+    parts.push(sectionTitle("Aufgaben"));
+    parts.push("<ul>");
+    for (const t of analysis.suggestedTasks) {
+      const reason = t.reason ? ` — ${escapeHtml(t.reason)}` : "";
+      const due = t.dueHint ? ` <i>(fällig ${escapeHtml(t.dueHint)})</i>` : "";
+      parts.push(
+        `<li><b>${escapeHtml(t.title)}</b>${reason}${due}</li>`
+      );
+    }
+    parts.push("</ul>");
   }
 
   if (analysis.suggestions.length > 0) {
-    parts.push(`<div><br/></div><div><b>Vorschläge</b></div>`);
+    parts.push(sectionTitle("Vorschläge"));
     parts.push(listHtml(analysis.suggestions));
   }
 
-  if (
-    analysis.solutionSketch?.problemStillOpen &&
-    analysis.solutionSketch.outline
-  ) {
-    parts.push(`<div><br/></div><div><b>Möglicher Lösungsansatz</b></div>`);
-    if (analysis.solutionSketch.vendors.length > 0) {
+  if (analysis.recommendedStatus) {
+    const rs = analysis.recommendedStatus;
+    const label =
+      rs.label ||
+      (rs.statusId != null ? `Status-ID ${rs.statusId}` : "Status-Empfehlung");
+    parts.push(sectionTitle("Empfohlener Status"));
+    parts.push(
+      `<div><b>${escapeHtml(label)}</b>${
+        rs.reason ? ` — ${escapeHtml(rs.reason)}` : ""
+      }</div>`
+    );
+  }
+
+  const sketch = analysis.solutionSketch;
+  if (sketch?.problemStillOpen && sketch.outline) {
+    parts.push(sectionTitle("Lösungsansatz (ausführlich)"));
+    if (sketch.vendors.length > 0) {
       parts.push(
-        `<div>Hersteller: ${escapeHtml(analysis.solutionSketch.vendors.join(" · "))}</div>`
+        `<div style="color:#0369a1;font-size:12px;margin-bottom:6px;">Hersteller: ${escapeHtml(sketch.vendors.join(" · "))}</div>`
       );
     }
-    parts.push(preBlock(analysis.solutionSketch.outline));
-    if (analysis.solutionSketch.steps.length > 0) {
-      parts.push(`<div><br/></div><div><b>Schritte</b></div>`);
+    parts.push(proseBlock(sketch.outline));
+
+    if (sketch.steps.length > 0) {
+      parts.push(sectionTitle("Schritte"));
       parts.push("<ol>");
-      for (const s of analysis.solutionSketch.steps) {
-        const detail = s.detail ? `<br/><i>${escapeHtml(s.detail)}</i>` : "";
+      for (const s of sketch.steps) {
+        const detail = s.detail
+          ? `<div style="margin-top:2px;color:#475569;font-size:12px;">${nl2brEscaped(s.detail)}</div>`
+          : "";
         parts.push(
-          `<li><b>${escapeHtml(s.where)}</b> — ${escapeHtml(s.action)}${detail}</li>`
+          `<li style="margin-bottom:8px;"><b>${escapeHtml(s.where)}</b> — ${escapeHtml(s.action)}${detail}</li>`
         );
       }
       parts.push("</ol>");
     }
-    if (analysis.solutionSketch.artifacts.length > 0) {
-      parts.push(`<div><br/></div><div><b>Queries / Code-Vorschläge</b></div>`);
-      for (const a of analysis.solutionSketch.artifacts) {
+
+    if (sketch.artifacts.length > 0) {
+      parts.push(sectionTitle("Queries / Skripte / Code"));
+      for (const a of sketch.artifacts) {
+        const meta = [a.kind, a.language].filter(Boolean).join(" · ");
         parts.push(
-          `<div><b>${escapeHtml(a.title)}</b> <span>(${escapeHtml(a.kind)})</span></div>`
+          `<div style="margin:10px 0 4px;"><b>${escapeHtml(a.title)}</b>${
+            meta ? ` <span style="color:#64748b;">(${escapeHtml(meta)})</span>` : ""
+          }</div>`
         );
         if (a.note) {
-          parts.push(`<div><i>${escapeHtml(a.note)}</i></div>`);
+          parts.push(
+            `<div style="color:#64748b;font-size:12px;font-style:italic;margin-bottom:4px;">${escapeHtml(a.note)}</div>`
+          );
         }
-        parts.push(
-          `<pre style="white-space:pre-wrap;font-family:ui-monospace,monospace;font-size:12px;margin:4px 0 12px;">${escapeHtml(a.code)}</pre>`
-        );
+        parts.push(codeBlock(a.code));
       }
     }
-    if (analysis.solutionSketch.caveats) {
-      parts.push(
-        `<div><i>${escapeHtml(analysis.solutionSketch.caveats)}</i></div>`
-      );
-    }
+
+    const caveats =
+      sketch.caveats?.trim() ||
+      "Vorschlag aus allgemein verfügbarem Herstellerwissen (u.a. SAP Business One, nicht S/4) — bitte mit offizieller Doku abgleichen.";
+    parts.push(
+      `<div style="margin-top:8px;color:#64748b;font-size:12px;">${escapeHtml(caveats)}</div>`
+    );
   }
 
-  if (analysis.nextReplyDraft) {
-    parts.push(`<div><br/></div><div><b>Antwort-Entwurf</b></div>`);
-    parts.push(preBlock(analysis.nextReplyDraft));
+  if (analysis.nextReplyDraft?.trim()) {
+    parts.push(sectionTitle("Antwort-Entwurf"));
+    parts.push(proseBlock(analysis.nextReplyDraft));
   }
 
   parts.push(
-    `<div><br/></div><div><i>Automatisch aus Buddy · nur für internes Support-Personal sichtbar.</i></div>`
+    `<div style="margin-top:16px;padding-top:8px;border-top:1px solid #e2e8f0;color:#64748b;font-size:11px;font-style:italic;">Automatisch aus Buddy · nur für internes Support-Personal sichtbar. Inhalt 1:1 zur Analyse in Buddy.</div>`
   );
+  parts.push(`</div>`);
   return parts.join("");
 }
 
@@ -124,17 +165,37 @@ export function formatPlainTextAsInternalCommentHtml(
   const body = text.trim();
   const parts: string[] = [
     `<!DOCTYPE HTML>`,
-    `<div><b>Buddy Notiz</b> (nur intern — nicht für Kunden)</div>`,
+    `<div style="font-family:Segoe UI,Arial,sans-serif;font-size:13px;color:#0f172a;">`,
+    `<div style="font-weight:800;margin-bottom:4px;">Buddy Notiz</div>`,
+    `<div style="color:#9a3412;font-size:12px;margin-bottom:10px;">Nur intern — nicht für Kunden</div>`,
   ];
   if (opts?.issueId) {
-    parts.push(`<div>Ticket #${opts.issueId}</div>`);
+    parts.push(`<div style="margin-bottom:8px;">Ticket #${opts.issueId}</div>`);
   }
-  parts.push(`<div><br/></div>`);
-  parts.push(preBlock(body));
+  parts.push(proseBlock(body));
   parts.push(
-    `<div><br/></div><div><i>Manuell aus Buddy · nur für internes Support-Personal sichtbar.</i></div>`
+    `<div style="margin-top:12px;color:#64748b;font-size:11px;font-style:italic;">Manuell aus Buddy · nur für internes Support-Personal sichtbar.</div>`
   );
+  parts.push(`</div>`);
   return parts.join("");
+}
+
+/** Für Timeline-Anzeige: Scripts/Handler aus MARI-HTML entfernen. */
+export function sanitizeMariNoteHtml(html: string): string {
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+    .replace(/javascript:/gi, "");
+}
+
+export function looksLikeMariHtml(raw: string): boolean {
+  const t = raw.trim();
+  if (!t) return false;
+  return (
+    /^<!DOCTYPE\s+HTML/i.test(t) ||
+    /<(div|p|pre|ul|ol|li|br|b|i|span|table)\b/i.test(t)
+  );
 }
 
 export type MariInternalNotePostResult = {

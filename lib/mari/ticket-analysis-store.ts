@@ -13,6 +13,8 @@ export type StoredMariTicketAnalysis = {
   model: string | null;
   analyzedAt: string;
   updatedAt: string;
+  /** ISO timestamp when this analysis was posted as Maringo internal note. */
+  internalNotePostedAt: string | null;
 };
 
 type Row = {
@@ -26,6 +28,7 @@ type Row = {
   model: string | null;
   analyzed_at: string;
   updated_at: string;
+  internal_note_posted_at?: string | null;
 };
 
 function mapRow(row: Row): StoredMariTicketAnalysis | null {
@@ -54,6 +57,7 @@ function mapRow(row: Row): StoredMariTicketAnalysis | null {
       usage = null;
     }
   }
+  const posted = row.internal_note_posted_at?.trim() || null;
   return {
     ownerKey: row.owner_key,
     issueId: row.issue_id,
@@ -65,6 +69,7 @@ function mapRow(row: Row): StoredMariTicketAnalysis | null {
     model: row.model,
     analyzedAt: row.analyzed_at,
     updatedAt: row.updated_at,
+    internalNotePostedAt: posted,
   };
 }
 
@@ -99,8 +104,8 @@ export function upsertMariTicketAnalysis(input: {
       `INSERT INTO mari_ticket_analyses (
         owner_key, issue_id, summary, analysis_json,
         images_analyzed, image_names_json, usage_json, model,
-        analyzed_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        analyzed_at, updated_at, internal_note_posted_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
       ON CONFLICT(owner_key, issue_id) DO UPDATE SET
         summary = excluded.summary,
         analysis_json = excluded.analysis_json,
@@ -109,7 +114,8 @@ export function upsertMariTicketAnalysis(input: {
         usage_json = excluded.usage_json,
         model = excluded.model,
         analyzed_at = excluded.analyzed_at,
-        updated_at = excluded.updated_at`
+        updated_at = excluded.updated_at,
+        internal_note_posted_at = NULL`
     )
     .run(
       input.ownerKey,
@@ -128,6 +134,25 @@ export function upsertMariTicketAnalysis(input: {
     throw new Error("Ticket-Analyse konnte nicht gespeichert werden.");
   }
   return stored;
+}
+
+/** Markiert die aktuelle gespeicherte Analyse als intern nach Maringo geschrieben. */
+export function markMariTicketAnalysisInternalNotePosted(
+  ownerKey: string,
+  issueId: number,
+  postedAt = new Date().toISOString()
+): StoredMariTicketAnalysis | null {
+  const existing = getMariTicketAnalysis(ownerKey, issueId);
+  if (!existing) return null;
+  const now = new Date().toISOString();
+  getDb()
+    .prepare(
+      `UPDATE mari_ticket_analyses
+       SET internal_note_posted_at = ?, updated_at = ?
+       WHERE owner_key = ? AND issue_id = ?`
+    )
+    .run(postedAt, now, ownerKey, issueId);
+  return getMariTicketAnalysis(ownerKey, issueId);
 }
 
 export function listMariTicketAnalysisIssueIds(

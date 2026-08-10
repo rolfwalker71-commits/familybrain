@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   MariTicketAnalysisSchema,
+  detectRelevantVendorsFromTicketText,
   isHollowMariTicketAnalysis,
   normalizeMariTicketAnalysisInput,
 } from "@/lib/mari/analyze-ticket";
@@ -131,4 +132,14 @@ test("detects hollow placeholder analysis", () => {
   assert.equal(r2.success, true);
   if (!r2.success) return;
   assert.equal(isHollowMariTicketAnalysis(r2.data), false);
+});
+
+test("detectRelevantVendorsFromTicketText finds coresuite boyum hana", () => {
+  const vendors = detectRelevantVendorsFromTicketText(
+    "Fehler in coresuite Customize auf HANA; Boyum B1UP Regel kollidiert mit OCRD UDF"
+  );
+  assert.ok(vendors.some((v) => /coresuite/i.test(v)));
+  assert.ok(vendors.some((v) => /Boyum/i.test(v)));
+  assert.ok(vendors.some((v) => /HANA/i.test(v)));
+  assert.ok(vendors.some((v) => /Business One/i.test(v)));
 });

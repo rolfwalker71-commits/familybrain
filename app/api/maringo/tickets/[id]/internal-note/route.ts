@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { ensureInitialized } from "@/lib/db/migrations";
 import { isAuthError, requireAuth } from "@/lib/auth/current-user";
+import { ownerKeyFromAuth } from "@/lib/auth/owner-key";
 import { MariApiError } from "@/lib/mari/client";
 import { hasMariConfig } from "@/lib/mari/config";
 import { MariTicketAnalysisSchema } from "@/lib/mari/analyze-ticket";
@@ -9,6 +10,7 @@ import {
   postAnalysisAsInternalNote,
   postPlainInternalNote,
 } from "@/lib/mari/internal-note";
+import { markMariTicketAnalysisInternalNotePosted } from "@/lib/mari/ticket-analysis-store";
 import { getTicketDetail } from "@/lib/mari/tickets";
 
 export const runtime = "nodejs";
@@ -64,14 +66,27 @@ export async function POST(request: Request, context: Ctx) {
   try {
     // Ticket muss existieren; verhindert Blind-Writes
     await getTicketDetail(id);
-    const posted = parsed.data.analysis
-      ? await postAnalysisAsInternalNote(id, parsed.data.analysis)
+    const isAnalysisNote = parsed.data.analysis != null;
+    const posted = isAnalysisNote
+      ? await postAnalysisAsInternalNote(id, parsed.data.analysis!)
       : await postPlainInternalNote(id, parsed.data.text || "");
+
+    let internalNotePostedAt: string | null = null;
+    if (isAnalysisNote) {
+      const marked = markMariTicketAnalysisInternalNotePosted(
+        ownerKeyFromAuth(auth),
+        id
+      );
+      internalNotePostedAt =
+        marked?.internalNotePostedAt ?? new Date().toISOString();
+    }
+
     const ticket = await getTicketDetail(id);
     return NextResponse.json({
       ok: true,
       attachmentId: posted.attachmentId,
       internal: posted.internal,
+      internalNotePostedAt,
       ticket,
     });
   } catch (err) {

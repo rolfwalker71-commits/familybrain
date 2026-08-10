@@ -16,6 +16,7 @@ import {
   type MariTimelineKind,
   type MariTimelineSide,
 } from "@/lib/mari/timeline-side";
+import { looksLikeMariHtml, sanitizeMariNoteHtml } from "@/lib/mari/internal-note";
 import {
   PRIORITY_LABELS,
   STATUS_LABELS,
@@ -48,7 +49,10 @@ function htmlToPlain(html: string): string {
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<\/p>/gi, "\n")
     .replace(/<\/div>/gi, "\n")
-    .replace(/<[^>]+>/g, " ")
+    .replace(/<\/pre>/gi, "\n")
+    .replace(/<\/li>/gi, "\n")
+    .replace(/<\/h[1-6]>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
     .replace(/&nbsp;/g, " ")
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
@@ -57,7 +61,6 @@ function htmlToPlain(html: string): string {
     .replace(/\r\n/g, "\n")
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
-    .replace(/[ \t]{2,}/g, " ")
     .trim();
 }
 
@@ -115,7 +118,13 @@ export type MariTimelineItem = {
   at: string;
   label: string;
   subject: string | null;
+  /** Plaintext (AI / Suche); bei HTML-Notizen aus dem Markup abgeleitet */
   text: string;
+  /**
+   * Original-HTML der Notiz (z.B. Buddy AI-Analyse), für saubere Darstellung.
+   * Null bei reinem Plaintext.
+   */
+  html?: string | null;
   actor: string | null;
   meta?: string | null;
   attachments?: MariTimelineAttachment[];
@@ -497,7 +506,9 @@ ORDER BY "ChangeDate", "ChangeLogID"`
   };
 
   for (const line of lines) {
-    const plain = htmlToPlain(line.RequestText || "");
+    const rawText = line.RequestText || "";
+    const asHtml = looksLikeMariHtml(rawText);
+    const plain = htmlToPlain(rawText);
     const subject = line.RequestPosSubject || null;
     const file = fileByPosId.get(Number(line.RequestPosID));
     const stub = isMailAttachmentStub(plain, subject);
@@ -550,6 +561,9 @@ ORDER BY "ChangeDate", "ChangeLogID"`
       actor,
       internalOnly: Boolean(internMeta),
     });
+    // HTML-Notizen (Buddy-Analyse) vollständig behalten — früher Slice 4000
+    // hat Codebeispiele und Lösungsansatz abgeschnitten.
+    const textLimit = asHtml || kind === "note" ? 100_000 : 4000;
     items.push({
       id: `line-${line.RequestPosID}`,
       kind,
@@ -557,7 +571,8 @@ ORDER BY "ChangeDate", "ChangeLogID"`
       at: line.CreateDate,
       label: lineLabel(Number(line.RequestPosType)),
       subject,
-      text: plain.slice(0, 4000),
+      text: plain.slice(0, textLimit),
+      html: asHtml ? sanitizeMariNoteHtml(rawText) : null,
       actor,
       meta: internMeta,
       attachments: file ? [toTimelineAttachment(file)] : undefined,

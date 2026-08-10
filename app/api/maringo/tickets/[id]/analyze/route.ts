@@ -51,6 +51,7 @@ export async function GET(_request: Request, context: Ctx) {
     imageNames: stored.imageNames,
     usage: stored.usage,
     model: stored.model,
+    internalNotePostedAt: stored.internalNotePostedAt,
   });
 }
 
@@ -135,6 +136,7 @@ export async function POST(_request: Request, context: Ctx) {
       includeImages,
       stored: true,
       analyzedAt: stored.analyzedAt,
+      internalNotePostedAt: stored.internalNotePostedAt,
     });
   } catch (err) {
     const message =

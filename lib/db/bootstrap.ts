@@ -315,11 +315,20 @@ function ensureMariTicketAnalysesTable(db: Database.Database): void {
       model TEXT,
       analyzed_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
+      internal_note_posted_at TEXT,
       PRIMARY KEY (owner_key, issue_id)
     );
     CREATE INDEX IF NOT EXISTS idx_mari_ticket_analyses_owner_analyzed
       ON mari_ticket_analyses(owner_key, analyzed_at DESC);
   `);
+  const cols = db
+    .prepare(`PRAGMA table_info(mari_ticket_analyses)`)
+    .all() as Array<{ name: string }>;
+  if (!cols.some((c) => c.name === "internal_note_posted_at")) {
+    db.exec(
+      `ALTER TABLE mari_ticket_analyses ADD COLUMN internal_note_posted_at TEXT`
+    );
+  }
 }
 
 function ensureMailAppliedLinksTable(db: Database.Database): void {

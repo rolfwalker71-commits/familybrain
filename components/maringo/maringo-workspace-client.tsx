@@ -474,7 +474,14 @@ function TimelineRow({ item }: { item: MariTimelineItem }) {
           )}
         >
           {showBody ? (
-            <div className="whitespace-pre-wrap">{item.text}</div>
+            item.html ? (
+              <div
+                className="mari-note-html max-w-none overflow-x-auto text-[13px] leading-relaxed [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_pre]:whitespace-pre-wrap [&_pre]:font-mono [&_pre]:text-[11px]"
+                dangerouslySetInnerHTML={{ __html: item.html }}
+              />
+            ) : (
+              <div className="whitespace-pre-wrap">{item.text}</div>
+            )
           ) : null}
           {isAttachmentOnly && hasAttachments ? (
             <p className="text-[11px] text-muted-foreground">
@@ -507,6 +514,8 @@ export function MaringoWorkspaceClient() {
   const [analysis, setAnalysis] = useState<MariTicketAnalysis | null>(null);
   const [analysisOpen, setAnalysisOpen] = useState(false);
   const [savedAnalyzedAt, setSavedAnalyzedAt] = useState<string | null>(null);
+  const [analysisInternalNotePostedAt, setAnalysisInternalNotePostedAt] =
+    useState<string | null>(null);
   const [imagesAnalyzed, setImagesAnalyzed] = useState(0);
   const [imageNames, setImageNames] = useState<string[]>([]);
   const [analysisUsage, setAnalysisUsage] = useState<AiTokenUsage | null>(null);
@@ -521,7 +530,6 @@ export function MaringoWorkspaceClient() {
   const [manualNoteHint, setManualNoteHint] = useState<string | null>(null);
   const [patching, setPatching] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [notePostedHint, setNotePostedHint] = useState<string | null>(null);
   const [configured, setConfigured] = useState(true);
   const [dueDraft, setDueDraft] = useState("");
   const [employees, setEmployees] = useState<MariEmployeeOption[]>([]);
@@ -638,6 +646,7 @@ export function MaringoWorkspaceClient() {
     setAnalysis(null);
     setAnalysisOpen(false);
     setSavedAnalyzedAt(null);
+    setAnalysisInternalNotePostedAt(null);
     setImagesAnalyzed(0);
     setImageNames([]);
     setAnalysisUsage(null);
@@ -646,7 +655,6 @@ export function MaringoWorkspaceClient() {
     setManualNoteDraft("");
     setManualNoteHint(null);
     setPostingManualNote(false);
-    setNotePostedHint(null);
     setError(null);
     try {
       const res = await fetch(`/api/maringo/tickets/${id}`);
@@ -674,6 +682,11 @@ export function MaringoWorkspaceClient() {
         setAnalysisUsage(
           storedData.usage && typeof storedData.usage === "object"
             ? (storedData.usage as AiTokenUsage)
+            : null
+        );
+        setAnalysisInternalNotePostedAt(
+          typeof storedData.internalNotePostedAt === "string"
+            ? storedData.internalNotePostedAt
             : null
         );
         setAnalysisOpen(false);
@@ -840,7 +853,6 @@ export function MaringoWorkspaceClient() {
     const includeImages = Boolean(options?.includeImages);
     setAnalyzing(true);
     setError(null);
-    setNotePostedHint(null);
     setAnalysisUsage(null);
     try {
       const res = await fetch(`/api/maringo/tickets/${selectedId}/analyze`, {
@@ -868,6 +880,7 @@ export function MaringoWorkspaceClient() {
           ? data.analyzedAt
           : new Date().toISOString()
       );
+      setAnalysisInternalNotePostedAt(null);
       setAnalysisOpen(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -943,7 +956,6 @@ export function MaringoWorkspaceClient() {
     if (!ok) return;
     setPostingInternalNote(true);
     setError(null);
-    setNotePostedHint(null);
     try {
       const res = await fetch(
         `/api/maringo/tickets/${selectedId}/internal-note`,
@@ -962,9 +974,11 @@ export function MaringoWorkspaceClient() {
       } else {
         await loadDetail(selectedId);
       }
-      setNotePostedHint(
-        "Als interner Kommentar geschrieben (nur intern sichtbar)."
-      );
+      const postedAt =
+        typeof data.internalNotePostedAt === "string"
+          ? data.internalNotePostedAt
+          : new Date().toISOString();
+      setAnalysisInternalNotePostedAt(postedAt);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -1618,6 +1632,14 @@ export function MaringoWorkspaceClient() {
                       Analyse vorhanden · {formatAnalyzedAt(savedAnalyzedAt)}
                     </Badge>
                   ) : null}
+                  {analysisInternalNotePostedAt ? (
+                    <Badge className="bg-emerald-100 text-emerald-900 hover:bg-emerald-100">
+                      Bereits als intern gespeichert
+                      {savedAnalyzedAt
+                        ? ` · ${formatAnalyzedAt(analysisInternalNotePostedAt)}`
+                        : ""}
+                    </Badge>
+                  ) : null}
                   {analysis && savedAnalyzedAt ? (
                     <Button
                       type="button"
@@ -1904,6 +1926,17 @@ export function MaringoWorkspaceClient() {
                         </div>
                       ) : null}
                       <div className="flex flex-col gap-2 border-t border-orange-200/50 pt-3">
+                        {analysisInternalNotePostedAt ? (
+                          <div className="rounded-lg border border-emerald-200/80 bg-emerald-50/70 px-3 py-2">
+                            <p className="text-[12px] font-semibold text-emerald-950">
+                              Bereits als intern gespeichert
+                            </p>
+                            <p className="mt-0.5 text-[11px] text-emerald-900/75">
+                              {formatAnalyzedAt(analysisInternalNotePostedAt)} ·
+                              nur Support, nicht für den Kunden
+                            </p>
+                          </div>
+                        ) : null}
                         <Button
                           type="button"
                           size="sm"
@@ -1915,15 +1948,14 @@ export function MaringoWorkspaceClient() {
                           <Lock className="size-3.5" />
                           {postingInternalNote
                             ? "Schreibe intern…"
-                            : "Als internen Kommentar schreiben"}
+                            : analysisInternalNotePostedAt
+                              ? "Erneut als intern speichern"
+                              : "Als internen Kommentar schreiben"}
                         </Button>
-                        <p className="text-[11px] text-orange-900/75">
-                          Wird mit Flag «Internal» nach Maringo geschrieben —
-                          nur für Support sichtbar, nicht für den Kunden.
-                        </p>
-                        {notePostedHint ? (
-                          <p className="text-[11px] font-medium text-emerald-800">
-                            {notePostedHint}
+                        {!analysisInternalNotePostedAt ? (
+                          <p className="text-[11px] text-orange-900/75">
+                            Wird mit Flag «Internal» nach Maringo geschrieben —
+                            nur für Support sichtbar, nicht für den Kunden.
                           </p>
                         ) : null}
                       </div>
