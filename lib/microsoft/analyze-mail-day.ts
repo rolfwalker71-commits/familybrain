@@ -892,7 +892,7 @@ export async function analyzeMicrosoftMailDay(input: {
   if (seeds.length === 0) {
     const extra =
       excludedCount > 0
-        ? ` (${excludedCount} SYSTEM INFOBOARD übersprungen)`
+        ? ` (${excludedCount} Noise-Mails übersprungen: INFOBOARD/Monitoring)`
         : "";
     return emptyMailDayAnalysis(
       `Keine Mails für ${rangeLabel} gefunden.${extra}`
@@ -950,7 +950,7 @@ AKTION vs INFO (wichtig):
 
 SUMMARY: 3–6 Sätze inhaltlicher Kern (wer will was, Stand, offene Punkte). NIEMALS Signaturen, Grussformeln, Adressen, Disclaimer, Trennlinien (***/---), «Sent from…».
 
-SYSTEM INFOBOARD ist bereits ausgefiltert — nicht erfinden.
+SYSTEM INFOBOARD und [Monitoring] sind bereits ausgefiltert — nicht erfinden.
 
 Seed-Liste:
 ${required}
@@ -1306,7 +1306,7 @@ async function writeDaySummaryOverview(input: {
   const replyCount = input.clusters.reduce((n, c) => n + c.replies.length, 0);
   const excludedNote =
     input.excludedCount && input.excludedCount > 0
-      ? ` (${input.excludedCount} SYSTEM-INFOBOARD-Mails ausgeklammert)`
+      ? ` (${input.excludedCount} Noise-Mails ausgeklammert: INFOBOARD/Monitoring)`
       : "";
   const lines = input.clusters
     .slice(0, 80)

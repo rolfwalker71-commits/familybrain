@@ -84,7 +84,8 @@ export function MailAnalysisThreadHint({
             pro Thread (bzw. Einzelmail) einen eigenen Cluster
           </strong>{" "}
           an — inkl. FYI/Newsletter und erledigter Themen. Mails mit
-          Betreff «[SYSTEM INFOBOARD]» werden aus der Analyse ausgeklammert.
+          Betreff «[SYSTEM INFOBOARD]» oder «[Monitoring]» werden aus der
+          Analyse ausgeklammert.
           Offene Handlungen stehen zuerst; der Rest hinter «Alle Threads zeigen».
           Frühere Analysen blenden nichts aus.
         </p>

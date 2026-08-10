@@ -139,3 +139,20 @@ test("isExcludedFromMailAnalysis matches SYSTEM INFOBOARD subjects", () => {
     false
   );
 });
+
+test("isExcludedFromMailAnalysis matches Monitoring subjects", () => {
+  assert.equal(
+    isExcludedFromMailAnalysis({
+      subject: "[Monitoring] Host unreachable: srv-db-01",
+    }),
+    true
+  );
+  assert.equal(
+    isExcludedFromMailAnalysis({ subject: "[monitoring] disk space low" }),
+    true
+  );
+  assert.equal(
+    isExcludedFromMailAnalysis({ subject: "Monitoring report weekly" }),
+    false
+  );
+});

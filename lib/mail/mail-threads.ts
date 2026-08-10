@@ -44,7 +44,10 @@ export function annotateMailInRange(
 export function isExcludedFromMailAnalysis(mail: {
   subject?: string | null;
 }): boolean {
-  return /\[SYSTEM\s+INFOBOARD\]/i.test(mail.subject || "");
+  const subject = mail.subject || "";
+  return (
+    /\[SYSTEM\s+INFOBOARD\]/i.test(subject) || /\[Monitoring\]/i.test(subject)
+  );
 }
 
 /** Always date + time (Europe/Zurich), e.g. «10.08.2026 · 12:19». */
