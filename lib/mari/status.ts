@@ -22,6 +22,13 @@ export const STATUS_LABELS: Record<number, string> = {
   16: "Abklärung Notwendig",
 };
 
+/** Alle bekannten Status-IDs (Filter-UI), Reihenfolge wie MPHOTLINESETTINGS. */
+export const ALL_STATUS_IDS = [
+  11, 1, 3, 13, 6, 9, 7, 10, 4, 2, 12, 8, 5, 14, 15, 16,
+] as const;
+
+export type StatusId = (typeof ALL_STATUS_IDS)[number];
+
 /** Kurze Chip-Labels wie im Mockup */
 export function statusChipLabel(statusId: number, fallback?: string): string {
   if (statusId === 6) return "Warte auf Kunden";
@@ -54,6 +61,9 @@ export function statusChipClass(statusId: number): string {
     case 5: // Geschlossen
     case 8:
       return "border-border bg-muted/40 text-muted-foreground";
+    case 15: // On Hold
+    case 16: // Abklärung Notwendig
+      return "border-slate-200/90 bg-slate-50 text-slate-900";
     default:
       return "border-border bg-muted/50 text-foreground";
   }

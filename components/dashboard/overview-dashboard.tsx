@@ -729,9 +729,6 @@ function MariTicketsAsideCard({
               <span className="text-[2.75rem] font-black tabular-nums tracking-tight text-foreground">
                 {data.total}
               </span>
-              <span className="mt-1 text-[11px] font-medium text-muted-foreground">
-                offen
-              </span>
             </div>
             {data.countsByStatus.length > 0 ? (
               <ul className="grid min-w-0 flex-1 grid-cols-2 gap-2 pt-0.5">

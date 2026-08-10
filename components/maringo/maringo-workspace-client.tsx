@@ -34,6 +34,7 @@ import { PageHeader } from "@/components/layout/page-primitives";
 import { pageVisuals } from "@/components/layout/icon-circle";
 import { APP_ICON_STROKE } from "@/lib/branding/app-icons";
 import {
+  ALL_STATUS_IDS,
   STATUS_LABELS,
   WORK_STATUS_IDS,
   statusChipClass,
@@ -607,6 +608,11 @@ export function MaringoWorkspaceClient() {
     setManualHandledBy("");
   }
 
+  function selectAllStatuses() {
+    setStatuses([...ALL_STATUS_IDS]);
+    setOverdueOnly(false);
+  }
+
   function onHandlerSelectChange(value: string) {
     if (value === "__manual__") {
       setHandlerMode("manual");
@@ -802,10 +808,10 @@ export function MaringoWorkspaceClient() {
                 >
                   Status ({statuses.length})
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-56">
+                <DropdownMenuContent align="start" className="max-h-80 w-60 overflow-y-auto">
                   <DropdownMenuGroup>
                     <DropdownMenuLabel>Status (Mehrfachauswahl)</DropdownMenuLabel>
-                    {WORK_STATUS_IDS.map((id) => (
+                    {ALL_STATUS_IDS.map((id) => (
                       <DropdownMenuCheckboxItem
                         key={id}
                         checked={statuses.includes(id)}
@@ -818,6 +824,9 @@ export function MaringoWorkspaceClient() {
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={selectAllWorkStatuses}>
                     Alle Arbeitsstatus
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={selectAllStatuses}>
+                    Alle Status
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
