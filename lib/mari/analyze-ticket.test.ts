@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   MariTicketAnalysisSchema,
+  isHollowMariTicketAnalysis,
   normalizeMariTicketAnalysisInput,
 } from "@/lib/mari/analyze-ticket";
 
@@ -106,4 +107,28 @@ test("accepts string solutionSketch", () => {
   assert.equal(r.success, true);
   if (!r.success) return;
   assert.equal(r.data.solutionSketch?.problemStillOpen, true);
+});
+
+test("detects hollow placeholder analysis", () => {
+  const hollow = normalizeMariTicketAnalysisInput({
+    summary: "",
+    completeness: { score: 0, missing: [] },
+    suggestedTasks: [],
+    suggestions: [],
+  });
+  const r = MariTicketAnalysisSchema.safeParse(hollow);
+  assert.equal(r.success, true);
+  if (!r.success) return;
+  assert.equal(isHollowMariTicketAnalysis(r.data), true);
+
+  const ok = normalizeMariTicketAnalysisInput({
+    summary: "Kunde meldet Fehler beim Login.",
+    completeness: { score: 40, missing: ["Logs"] },
+    suggestedTasks: [{ title: "Logs anfordern", reason: "fehlt" }],
+    suggestions: [],
+  });
+  const r2 = MariTicketAnalysisSchema.safeParse(ok);
+  assert.equal(r2.success, true);
+  if (!r2.success) return;
+  assert.equal(isHollowMariTicketAnalysis(r2.data), false);
 });

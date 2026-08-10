@@ -1,5 +1,11 @@
 import { z } from "zod";
-import { getAnalysisClient, hasChatKey, hasOpenAIKey } from "@/lib/ai/client";
+import type OpenAI from "openai";
+import {
+  getAnalysisClient,
+  getChatJsonRequestExtras,
+  hasChatKey,
+  hasOpenAIKey,
+} from "@/lib/ai/client";
 import {
   buildAiTokenUsage,
   type AiTokenUsage,
@@ -500,26 +506,44 @@ ${timelineText.slice(0, 14000) || "(keine Positionen)"}`;
           ),
         ];
 
-  const { client, model } = getAnalysisClient({
+  const { client, model, provider } = getAnalysisClient({
     needsVision: images.length > 0,
   });
   const completion = await client.chat.completions.create({
     model,
     temperature: 0.25,
-    max_tokens: 8000,
+    // DeepSeek-Thinking (falls doch an) + lange solutionSketch brauchen Luft.
+    max_tokens: 12_000,
     response_format: { type: "json_object" },
     messages: [
       { role: "system", content: SYSTEM },
       { role: "user", content: userContent },
     ],
-  });
+    // Structured JSON: Thinking aus — sonst frisst Reasoning max_tokens und
+    // content bleibt leer («Keine Zusammenfassung.»).
+    ...(provider === "chat" ? getChatJsonRequestExtras() : {}),
+  } as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming);
 
-  const raw = completion.choices[0]?.message?.content || "{}";
+  const finishReason = completion.choices[0]?.finish_reason;
+  const raw = completion.choices[0]?.message?.content?.trim() || "";
+  if (!raw) {
+    throw new Error(
+      finishReason === "length"
+        ? "AI-Antwort abgeschnitten (Token-Limit) — bitte erneut analysieren."
+        : "AI lieferte keinen Text. Bitte erneut analysieren."
+    );
+  }
   let parsed: unknown;
   try {
-    parsed = JSON.parse(raw);
+    parsed = JSON.parse(
+      raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "")
+    );
   } catch {
-    throw new Error("AI-Antwort war kein gültiges JSON.");
+    throw new Error(
+      finishReason === "length"
+        ? "AI-Antwort war unvollständiges JSON (abgeschnitten). Bitte erneut analysieren."
+        : "AI-Antwort war kein gültiges JSON."
+    );
   }
 
   const normalized = normalizeMariTicketAnalysisInput(parsed);
@@ -535,10 +559,34 @@ ${timelineText.slice(0, 14000) || "(keine Positionen)"}`;
         : "AI-Antwort entsprach nicht dem Schema."
     );
   }
+  if (isHollowMariTicketAnalysis(result.data)) {
+    throw new Error(
+      finishReason === "length"
+        ? "AI-Antwort war abgeschnitten (Token-Limit) — keine brauchbare Zusammenfassung. Bitte erneut analysieren."
+        : "AI-Antwort war leer (keine brauchbare Zusammenfassung). Bitte erneut analysieren."
+    );
+  }
   return {
     ...result.data,
     imagesAnalyzed: images.length,
     imageNames,
     usage: buildAiTokenUsage(model, completion.usage),
   };
+}
+
+/** Placeholder / truncated DeepSeek JSON that looks „fertig“, aber nichts enthält. */
+export function isHollowMariTicketAnalysis(
+  analysis: MariTicketAnalysis
+): boolean {
+  const summary = analysis.summary.trim();
+  const emptySummary =
+    !summary ||
+    summary === "Keine Zusammenfassung." ||
+    summary === "Keine Zusammenfassung";
+  const noSubstance =
+    analysis.suggestedTasks.length === 0 &&
+    analysis.suggestions.length === 0 &&
+    !analysis.nextReplyDraft?.trim() &&
+    !analysis.solutionSketch?.outline?.trim();
+  return emptySummary && analysis.completeness.score === 0 && noSubstance;
 }
