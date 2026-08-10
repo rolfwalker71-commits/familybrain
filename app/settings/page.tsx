@@ -87,6 +87,7 @@ function SettingsPageInner() {
   const [openaiKey, setOpenaiKey] = useState("");
   const [openaiKeyMasked, setOpenaiKeyMasked] = useState<string | null>(null);
   const [hasOpenAIKey, setHasOpenAIKey] = useState(false);
+  const [openaiBaseUrl, setOpenaiBaseUrl] = useState("");
   const [openaiModel, setOpenaiModel] = useState("gpt-4o-mini");
   const [customModel, setCustomModel] = useState("");
   const [message, setMessage] = useState<string | null>(null);
@@ -293,6 +294,9 @@ function SettingsPageInner() {
       );
       setOpenaiKeyMasked(data.openaiApiKeyMasked);
       setHasOpenAIKey(Boolean(data.hasOpenAIKey));
+      setOpenaiBaseUrl(
+        typeof data.openaiBaseUrl === "string" ? data.openaiBaseUrl : ""
+      );
       const model = data.openaiModel || "gpt-4o-mini";
       if (OPENAI_MODELS.includes(model)) {
         setOpenaiModel(model);
@@ -537,7 +541,11 @@ function SettingsPageInner() {
         openaiModel === "custom" ? customModel.trim() : openaiModel;
       if (!model) throw new Error("Bitte ein Modell wählen oder eingeben.");
       if (!openaiKey && !hasOpenAIKey) {
-        throw new Error("Bitte einen OpenAI API-Key eingeben.");
+        throw new Error("Bitte einen API-Key eingeben.");
+      }
+      const baseUrl = openaiBaseUrl.trim();
+      if (baseUrl && !URL.canParse(baseUrl)) {
+        throw new Error("API-Basis-URL ist ungültig.");
       }
 
       const res = await fetch("/api/settings", {
@@ -546,19 +554,29 @@ function SettingsPageInner() {
         body: JSON.stringify({
           openaiApiKey: openaiKey || undefined,
           openaiModel: model,
+          openaiBaseUrl: baseUrl,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Speichern fehlgeschlagen");
       setOpenaiKeyMasked(data.openaiApiKeyMasked);
       setHasOpenAIKey(data.hasOpenAIKey);
+      setOpenaiBaseUrl(
+        typeof data.openaiBaseUrl === "string" ? data.openaiBaseUrl : baseUrl
+      );
       setOpenaiKey("");
-      setMessage("OpenAI-Einstellungen gespeichert.");
+      setMessage("KI-API-Einstellungen gespeichert.");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setSaving(null);
     }
+  }
+
+  function applyDeepSeekPreset() {
+    setOpenaiBaseUrl("https://api.deepseek.com");
+    setOpenaiModel("custom");
+    setCustomModel("deepseek-v4-flash");
   }
 
   async function saveTrilium() {
@@ -1238,7 +1256,7 @@ function SettingsPageInner() {
   const activeTab = parseSettingsTab(searchParams.get("tab"));
   const tabItems: SettingsTabItem[] = [
     { id: "paperless", label: "Paperless", icon: Server },
-    { id: "openai", label: "OpenAI", icon: Sparkles },
+    { id: "openai", label: "KI-API", icon: Sparkles },
     { id: "calendars", label: "Cloud-OAuth", icon: CalendarDays },
     { id: "mail", label: "Mail", icon: Mail },
     { id: "travel", label: "Travel", icon: Luggage },
@@ -2825,7 +2843,7 @@ function SettingsPageInner() {
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="flex items-center gap-3">
             <IconCircle icon={KeyRound} tone="teal" size="sm" />
-            OpenAI
+            KI-API (OpenAI-kompatibel)
           </CardTitle>
           {hasOpenAIKey ? (
             <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">
@@ -2850,8 +2868,37 @@ function SettingsPageInner() {
               }
             />
             <p className="text-xs text-muted-foreground">
-              Wird lokal in SQLite gespeichert und nie vollständig im Browser
-              angezeigt.
+              OpenAI- oder DeepSeek-Key. Wird lokal in SQLite gespeichert und nie
+              vollständig im Browser angezeigt.
+            </p>
+          </div>
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <Label htmlFor="openaiBaseUrl">API-Basis-URL</Label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={saving !== null}
+                onClick={applyDeepSeekPreset}
+              >
+                DeepSeek vorausfüllen
+              </Button>
+            </div>
+            <Input
+              id="openaiBaseUrl"
+              value={openaiBaseUrl}
+              onChange={(e) => setOpenaiBaseUrl(e.target.value)}
+              placeholder="Leer = OpenAI (api.openai.com)"
+              className="max-w-md"
+            />
+            <p className="text-xs text-muted-foreground">
+              Für DeepSeek:{" "}
+              <code className="text-[11px]">https://api.deepseek.com</code> und
+              Modell{" "}
+              <code className="text-[11px]">deepseek-v4-flash</code> oder{" "}
+              <code className="text-[11px]">deepseek-v4-pro</code>. Embeddings
+              und Bildgenerierung brauchen weiterhin OpenAI.
             </p>
           </div>
           <div className="space-y-2">
@@ -2882,7 +2929,7 @@ function SettingsPageInner() {
                 id="customModel"
                 value={customModel}
                 onChange={(e) => setCustomModel(e.target.value)}
-                placeholder="z. B. gpt-4.1-nano"
+                placeholder="z. B. deepseek-v4-flash"
               />
             </div>
           ) : null}
@@ -2891,7 +2938,7 @@ function SettingsPageInner() {
             disabled={saving !== null}
             className={settingsPrimaryBtn}
           >
-            {saving === "openai" ? "Speichert…" : "OpenAI speichern"}
+            {saving === "openai" ? "Speichert…" : "KI-API speichern"}
           </Button>
         </CardContent>
       </Card>

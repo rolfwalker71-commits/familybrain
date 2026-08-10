@@ -140,6 +140,8 @@ export function getOpenAISettings() {
   return {
     apiKey: getSetting("openai_api_key"),
     model: getSetting("openai_model") || "gpt-4o-mini",
+    /** OpenAI-compatible API base URL; null = official OpenAI. */
+    baseUrl: getSetting("openai_base_url"),
   };
 }
 
@@ -183,12 +185,20 @@ export function savePaperlessSettings(
   }
 }
 
-export function saveOpenAISettings(apiKey: string | null, model: string | null) {
+export function saveOpenAISettings(
+  apiKey: string | null,
+  model: string | null,
+  baseUrl?: string | null
+) {
   if (apiKey !== null && apiKey.trim() !== "") {
     setSetting("openai_api_key", apiKey.trim());
   }
   if (model !== null && model.trim() !== "") {
     setSetting("openai_model", model.trim());
+  }
+  if (baseUrl !== undefined) {
+    const normalized = baseUrl.trim().replace(/\/$/, "") || null;
+    setSetting("openai_base_url", normalized);
   }
 }
 

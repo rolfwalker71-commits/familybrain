@@ -174,6 +174,7 @@ export async function GET(request: Request) {
     openaiApiKeyMasked: maskToken(openai.apiKey),
     hasOpenAIKey: hasOpenAIKey(),
     openaiModel: openai.model,
+    openaiBaseUrl: openai.baseUrl || "",
     triliumBaseUrl: trilium.baseUrl,
     triliumApiTokenMasked: maskToken(trilium.apiToken),
     hasTriliumToken: Boolean(trilium.apiToken),
@@ -244,6 +245,7 @@ const PutSchema = z.object({
   liveNotificationsDurationSec: z.number().int().min(3).max(60).optional(),
   openaiApiKey: z.string().optional(),
   openaiModel: z.string().min(1).optional(),
+  openaiBaseUrl: z.union([z.string().url(), z.literal("")]).optional(),
   triliumBaseUrl: z.string().url().optional(),
   triliumApiToken: z.string().optional(),
   chatInstructions: z.string().max(8000).optional(),
@@ -362,10 +364,15 @@ export async function PUT(request: Request) {
     setLiveNotificationsDurationSec(parsed.data.liveNotificationsDurationSec);
   }
 
-  if (parsed.data.openaiApiKey !== undefined || parsed.data.openaiModel) {
+  if (
+    parsed.data.openaiApiKey !== undefined ||
+    parsed.data.openaiModel ||
+    parsed.data.openaiBaseUrl !== undefined
+  ) {
     saveOpenAISettings(
       parsed.data.openaiApiKey ?? null,
-      parsed.data.openaiModel ?? null
+      parsed.data.openaiModel ?? null,
+      parsed.data.openaiBaseUrl
     );
   }
 
@@ -574,6 +581,7 @@ export async function PUT(request: Request) {
     openaiApiKeyMasked: maskToken(openai.apiKey),
     hasOpenAIKey: hasOpenAIKey(),
     openaiModel: openai.model,
+    openaiBaseUrl: openai.baseUrl || "",
     triliumBaseUrl: trilium.baseUrl,
     triliumApiTokenMasked: maskToken(trilium.apiToken),
     hasTriliumToken: Boolean(trilium.apiToken),
