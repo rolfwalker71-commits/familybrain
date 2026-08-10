@@ -90,6 +90,14 @@ export type MariTicketListItem = {
   stdFreigabe: string | null;
   /** AI-Kurzinfo (Topic/Category) */
   aiLabel: string | null;
+  /** Projektnummer (z.B. P200000) */
+  projectNumber: string | null;
+  phaseId: number | null;
+  phaseName: string | null;
+  contractId: number | null;
+  /** Sichtbare Vertragsnummer wenn bekannt */
+  contractNumber: string | null;
+  contractPositionId: number | null;
 };
 
 export type MariTimelineAttachment = {
@@ -263,6 +271,10 @@ export async function listMyTickets(
     StdFreigabe: string | null;
     AiTopic: string | null;
     AiCategory: string | null;
+    ProjectNumber: string | null;
+    PhaseID: number | null;
+    ContractID: number | null;
+    ContractPositionID: number | null;
   }>(
     `SELECT TOP ${limit}
   i."IssueID",
@@ -288,7 +300,11 @@ export async function listMyTickets(
   i."ContactPerson",
   i."USER_U_Std_Freigegeben_Kunde" AS "StdFreigabe",
   i."USER_ANG_AI_TOPIC" AS "AiTopic",
-  i."USER_ANG_AI_CATEGORY" AS "AiCategory"
+  i."USER_ANG_AI_CATEGORY" AS "AiCategory",
+  i."ProjectNumber",
+  i."PhaseID",
+  i."ContractID",
+  i."ContractPositionID"
 FROM "MARISupportIssue" i
 LEFT JOIN "MPHOTLINESETTINGS" s
   ON s."SETTING" = 1 AND s."ID" = i."Status"
@@ -352,6 +368,18 @@ ORDER BY
           ? null
           : String(r.StdFreigabe).trim(),
       aiLabel: ai,
+      projectNumber: (r.ProjectNumber || "").trim() || null,
+      phaseId: r.PhaseID == null || Number(r.PhaseID) === 0 ? null : Number(r.PhaseID),
+      phaseName: null,
+      contractId:
+        r.ContractID == null || Number(r.ContractID) === 0
+          ? null
+          : Number(r.ContractID),
+      contractNumber: null,
+      contractPositionId:
+        r.ContractPositionID == null || Number(r.ContractPositionID) === 0
+          ? null
+          : Number(r.ContractPositionID),
     };
   });
 }
@@ -605,6 +633,12 @@ export async function getTicketDetail(
   let cardCodeFromView: string | null = null;
   let handledByFromView: string | null = null;
   let dueDateFromView: string | null = null;
+  let projectNumber: string | null = null;
+  let phaseId: number | null = null;
+  let phaseName: string | null = null;
+  let contractId: number | null = null;
+  let contractNumber: string | null = null;
+  let contractPositionId: number | null = null;
 
   try {
     const names = await mariSql<{
@@ -628,6 +662,10 @@ export async function getTicketDetail(
       CardCode: string | null;
       HandledBy: string | null;
       DueDate: string | null;
+      ProjectNumber: string | null;
+      PhaseID: number | null;
+      ContractID: number | null;
+      ContractPositionID: number | null;
     }>(
       `SELECT
   s."BEZEICHNUNG" AS "StatusName",
@@ -649,7 +687,11 @@ export async function getTicketDetail(
   i."ProductID",
   i."CardCode",
   i."HandledBy",
-  i."DueDate"
+  i."DueDate",
+  i."ProjectNumber",
+  i."PhaseID",
+  i."ContractID",
+  i."ContractPositionID"
 FROM "MARISupportIssue" i
 LEFT JOIN "MPHOTLINESETTINGS" s ON s."SETTING"=1 AND s."ID"=i."Status"
 LEFT JOIN "MPHOTLINESETTINGS" p ON p."SETTING"=3 AND p."ID"=i."Priority"
@@ -684,8 +726,74 @@ WHERE i."IssueID"=${issueId}`
     cardCodeFromView = n?.CardCode || null;
     handledByFromView = n?.HandledBy || null;
     dueDateFromView = n?.DueDate || null;
+    projectNumber = (n?.ProjectNumber || "").trim() || null;
+    phaseId =
+      n?.PhaseID == null || Number(n.PhaseID) === 0
+        ? null
+        : Number(n.PhaseID);
+    contractId =
+      n?.ContractID == null || Number(n.ContractID) === 0
+        ? null
+        : Number(n.ContractID);
+    contractPositionId =
+      n?.ContractPositionID == null || Number(n.ContractPositionID) === 0
+        ? null
+        : Number(n.ContractPositionID);
   } catch {
     /* ignore */
+  }
+
+  // REST-Fallback falls SQL-Felder leer
+  if (!projectNumber && typeof issue.Project === "string") {
+    projectNumber = issue.Project.trim() || null;
+  }
+  if (
+    phaseId == null &&
+    issue.PhaseID != null &&
+    Number(issue.PhaseID) > 0
+  ) {
+    phaseId = Number(issue.PhaseID);
+  }
+  if (
+    contractId == null &&
+    issue.ContractID != null &&
+    Number(issue.ContractID) > 0
+  ) {
+    contractId = Number(issue.ContractID);
+  }
+  if (
+    contractPositionId == null &&
+    issue.ContractPosition != null &&
+    Number(issue.ContractPosition) > 0
+  ) {
+    contractPositionId = Number(issue.ContractPosition);
+  }
+
+  // Phase-/Vertrags-Bezeichnung nachladen (best effort)
+  if (projectNumber && phaseId != null) {
+    try {
+      const { listPhasesForTimeBooking } = await import(
+        "@/lib/mari/timekeeping"
+      );
+      const phases = await listPhasesForTimeBooking(projectNumber);
+      phaseName =
+        phases.find((p) => Number(p.keyInternal) === phaseId)?.matchcode ||
+        null;
+    } catch {
+      /* ignore */
+    }
+  }
+  if (projectNumber && contractId != null) {
+    try {
+      const { listContractsForProject } = await import(
+        "@/lib/mari/timekeeping"
+      );
+      const contracts = await listContractsForProject(projectNumber, false);
+      const hit = contracts.find((c) => Number(c.keyInternal) === contractId);
+      contractNumber = hit?.keyVisible || hit?.matchcode || null;
+    } catch {
+      /* ignore */
+    }
   }
 
   const productId =
@@ -728,6 +836,12 @@ WHERE i."IssueID"=${issueId}`
     contactPerson,
     stdFreigabe,
     aiLabel,
+    projectNumber,
+    phaseId,
+    phaseName,
+    contractId,
+    contractNumber,
+    contractPositionId,
     requestText,
     requestTextPlain: htmlToPlain(requestText),
     responsible:

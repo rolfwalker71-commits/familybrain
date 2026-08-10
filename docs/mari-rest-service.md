@@ -13,6 +13,21 @@ Credentials **nicht** in dieses File schreiben. Lokal in `.env.local` (siehe unt
 
 ---
 
+## TimeKeeping / Zeiterfassung
+
+| Methode | Pfad | Zweck |
+|---------|------|--------|
+| GET | `/api/ProjectListForTimeBooking/{employeeNumber}` | Buchbare Projekte |
+| GET | `/api/ProjectListPhasesForTimeBooking/{projectNumber}` | Phasen (Anzeige `sMatchcode`, ID `sKeyInternal`) |
+| GET | `/api/ProjectListContracts/{projectNumber}/{activeOnly}` | Verträge zum Projekt |
+| GET | `/api/ContractListPositionsForTimeKeeping/{contractId}` | Vertragspositionen |
+| POST | `/api/TimeKeepingLine` | Stundenzeile anlegen (`clsImportLine`) |
+| GET/DELETE | `/api/TimeKeepingLine/{id}` | Lesen / löschen (`TimeSheetEntryID`) |
+
+Buddy-Proxies unter `/api/maringo/timekeeping/*`. Ticket-Verknüpfung: `SourceReferenceType=2`, `SourceReferenceID=IssueID`.
+
+---
+
 ## Credentials
 
 Bevorzugt in der App: **Einstellungen → Maringo** (SQLite). Alternativ `.env.local`:

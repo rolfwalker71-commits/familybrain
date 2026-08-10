@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Calendar,
+  Clock3,
   Flag,
   Inbox,
   Lock,
@@ -57,6 +58,10 @@ import {
   isMariMailStubText,
   type MariTimelineSide,
 } from "@/lib/mari/timeline-side";
+import type { MariTimeLine } from "@/lib/mari/timekeeping";
+import { MaringoTimekeepingPanel } from "@/components/maringo/maringo-timekeeping-panel";
+import { MaringoTimeBookDialog } from "@/components/maringo/maringo-time-book-dialog";
+import { MaringoTimeLinesTable } from "@/components/maringo/maringo-time-lines-table";
 
 function sideChipClass(side: MariTimelineSide): string {
   switch (side) {
@@ -445,6 +450,9 @@ function TimelineRow({ item }: { item: MariTimelineItem }) {
 }
 
 export function MaringoWorkspaceClient() {
+  const [workspaceTab, setWorkspaceTab] = useState<"tickets" | "hours">(
+    "tickets"
+  );
   const [statuses, setStatuses] = useState<number[]>([...WORK_STATUS_IDS]);
   const [overdueOnly, setOverdueOnly] = useState(false);
   const [tickets, setTickets] = useState<MariTicketListItem[]>([]);
@@ -468,6 +476,9 @@ export function MaringoWorkspaceClient() {
   const [handledBy, setHandledBy] = useState("");
   const [manualHandledBy, setManualHandledBy] = useState("");
   const [handlerMode, setHandlerMode] = useState<"list" | "manual">("list");
+  const [bookDialogOpen, setBookDialogOpen] = useState(false);
+  const [ticketTimeLines, setTicketTimeLines] = useState<MariTimeLine[]>([]);
+  const [ticketTimeLoading, setTicketTimeLoading] = useState(false);
 
   const statusParam = useMemo(() => statuses.join(","), [statuses]);
   const analysisUsageLines = useMemo(
@@ -572,14 +583,35 @@ export function MaringoWorkspaceClient() {
     }
   }, []);
 
+  const loadTicketTimeLines = useCallback(async (id: number) => {
+    setTicketTimeLoading(true);
+    try {
+      const res = await fetch(
+        `/api/maringo/timekeeping/by-ticket?issueId=${id}`
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Ticket-Buchungen laden fehlgeschlagen");
+      setTicketTimeLines((data.lines || []) as MariTimeLine[]);
+    } catch {
+      setTicketTimeLines([]);
+    } finally {
+      setTicketTimeLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     void loadList();
   }, [loadList]);
 
   useEffect(() => {
-    if (selectedId != null) void loadDetail(selectedId);
-    else setDetail(null);
-  }, [selectedId, loadDetail]);
+    if (selectedId != null) {
+      void loadDetail(selectedId);
+      void loadTicketTimeLines(selectedId);
+    } else {
+      setDetail(null);
+      setTicketTimeLines([]);
+    }
+  }, [selectedId, loadDetail, loadTicketTimeLines]);
 
   useEffect(() => {
     if (tickets.length === 0) {
@@ -721,10 +753,38 @@ export function MaringoWorkspaceClient() {
     <div className="min-w-0 space-y-4 pb-10">
       <PageHeader
         title="Maringo Support"
-        description="Support-Tickets — Liste, Verlauf und AI-Analyse (auch fremde Bearbeiter)."
+        description="Support-Tickets, Verlauf, AI-Analyse und Stundenbuchung."
         icon={pageVisuals.maringo.icon}
         tone={pageVisuals.maringo.tone}
       />
+
+      <div className="flex flex-wrap gap-1.5">
+        <button
+          type="button"
+          onClick={() => setWorkspaceTab("tickets")}
+          className={cn(
+            "rounded-full border px-3 py-1.5 text-[12px] font-semibold transition-colors",
+            workspaceTab === "tickets"
+              ? "border-orange-300 bg-orange-50 text-orange-950"
+              : "border-border/70 bg-background text-muted-foreground hover:bg-muted/40"
+          )}
+        >
+          Tickets
+        </button>
+        <button
+          type="button"
+          onClick={() => setWorkspaceTab("hours")}
+          className={cn(
+            "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-semibold transition-colors",
+            workspaceTab === "hours"
+              ? "border-orange-300 bg-orange-50 text-orange-950"
+              : "border-border/70 bg-background text-muted-foreground hover:bg-muted/40"
+          )}
+        >
+          <Clock3 className="size-3.5" strokeWidth={APP_ICON_STROKE} />
+          Stunden
+        </button>
+      </div>
 
       {!configured ? (
         <Card className="border-amber-200/80 bg-amber-50/50">
@@ -749,6 +809,9 @@ export function MaringoWorkspaceClient() {
         </p>
       ) : null}
 
+      {workspaceTab === "hours" ? (
+        <MaringoTimekeepingPanel />
+      ) : (
       <div className="grid min-h-[70vh] gap-0 overflow-hidden rounded-2xl border border-border/60 bg-card shadow-[0_4px_18px_rgba(15,23,42,0.05)] lg:grid-cols-[minmax(16rem,22rem)_minmax(0,1fr)]">
         {/* List pane */}
         <section className="flex min-h-0 flex-col border-b border-border/60 lg:border-r lg:border-b-0">
@@ -923,6 +986,12 @@ export function MaringoWorkspaceClient() {
                 t.addressMatchcode,
                 t.cardCode,
               ]);
+              const projectLine = joinMeta([
+                t.projectNumber,
+                t.contractNumber ||
+                  (t.contractId != null ? `Vertrag ${t.contractId}` : null),
+                t.phaseName,
+              ]);
               const classLine = joinMeta([
                 t.issueTypeName,
                 t.productName,
@@ -995,6 +1064,11 @@ export function MaringoWorkspaceClient() {
                     {companyLine ? (
                       <p className="truncate text-[12px] font-medium text-foreground/85">
                         {companyLine}
+                      </p>
+                    ) : null}
+                    {projectLine ? (
+                      <p className="truncate text-[11px] text-muted-foreground">
+                        {projectLine}
                       </p>
                     ) : null}
                     {classLine ? (
@@ -1102,6 +1176,34 @@ export function MaringoWorkspaceClient() {
                     </p>
                     <p className="font-semibold">
                       {detail.addressMatchcode || "–"}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-border/50 bg-muted/20 px-2.5 py-2 text-[12px]">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Projekt
+                    </p>
+                    <p className="font-semibold">
+                      {detail.projectNumber || "–"}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-border/50 bg-muted/20 px-2.5 py-2 text-[12px]">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Vertrag
+                    </p>
+                    <p className="font-semibold">
+                      {detail.contractNumber ||
+                        (detail.contractId != null
+                          ? String(detail.contractId)
+                          : "–")}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-border/50 bg-muted/20 px-2.5 py-2 text-[12px]">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Phase
+                    </p>
+                    <p className="font-semibold">
+                      {detail.phaseName ||
+                        (detail.phaseId != null ? String(detail.phaseId) : "–")}
                     </p>
                   </div>
                   <div className="flex items-center gap-2 rounded-xl border border-border/50 bg-muted/20 px-2.5 py-2 text-[12px]">
@@ -1229,6 +1331,21 @@ export function MaringoWorkspaceClient() {
                   >
                     <Sparkles className="size-3.5" />
                     {analyzing ? "Analysiert…" : "AI analysieren"}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={!detail.projectNumber}
+                    title={
+                      detail.projectNumber
+                        ? "Stunden auf dieses Ticket buchen"
+                        : "Ticket hat kein Projekt hinterlegt"
+                    }
+                    onClick={() => setBookDialogOpen(true)}
+                  >
+                    <Clock3 className="size-3.5" />
+                    Zeit buchen
                   </Button>
                 </div>
               </div>
@@ -1430,6 +1547,21 @@ export function MaringoWorkspaceClient() {
                 ) : null}
 
                 <div>
+                  <h3 className="mb-3 flex items-center gap-2 text-[13px] font-black tracking-tight">
+                    <Clock3 className="size-3.5 text-muted-foreground" />
+                    Buchungen zu diesem Ticket
+                  </h3>
+                  <MaringoTimeLinesTable
+                    lines={ticketTimeLines}
+                    emptyText={
+                      ticketTimeLoading
+                        ? "Lade Buchungen…"
+                        : "Noch keine Stundenbuchungen auf dieses Ticket."
+                    }
+                  />
+                </div>
+
+                <div>
                   {detail.requestTextPlain ? (
                     <div className="mb-5">
                       <h3 className="mb-2 flex items-center gap-2 text-[13px] font-black tracking-tight">
@@ -1467,6 +1599,36 @@ export function MaringoWorkspaceClient() {
           ) : null}
         </section>
       </div>
+      )}
+
+      <MaringoTimeBookDialog
+        open={bookDialogOpen}
+        onOpenChange={setBookDialogOpen}
+        defaults={
+          detail
+            ? {
+                issueId: detail.issueId,
+                projectNumber: detail.projectNumber,
+                projectLabel: detail.projectNumber,
+                phaseId: detail.phaseId,
+                contractId: detail.contractId,
+                contractPositionId: detail.contractPositionId,
+                activity: detail.briefDescription.slice(0, 100),
+                hours: 0.25,
+                billable: true,
+              }
+            : null
+        }
+        title={
+          detail
+            ? `Zeit buchen · Ticket #${detail.issueId}`
+            : "Zeit buchen"
+        }
+        description="Buchung wird mit SourceReference auf dieses Ticket verknüpft."
+        onBooked={() => {
+          if (selectedId != null) void loadTicketTimeLines(selectedId);
+        }}
+      />
     </div>
   );
 }
