@@ -185,7 +185,7 @@ function normalizeSolutionSketch(raw: unknown): unknown {
   const artifacts = artifactsRaw
     .map(normalizeSolutionArtifact)
     .filter((x): x is NonNullable<typeof x> => x != null)
-    .slice(0, 8);
+    .slice(0, 12);
 
   return {
     problemStillOpen: asBoolean(
@@ -312,7 +312,7 @@ export const MariSolutionSketchSchema = z.object({
   /** Step-by-step in Apps / Administration */
   steps: z.array(MariSolutionStepSchema).max(16).default([]),
   /** SQL/HANA, TN, Customize, SP, Scripts usw. */
-  artifacts: z.array(MariSolutionArtifactSchema).max(8).default([]),
+  artifacts: z.array(MariSolutionArtifactSchema).max(12).default([]),
   caveats: z.string().max(1500).nullable().optional(),
 });
 
@@ -396,8 +396,9 @@ HANA SQL (kind sql_hana / language sql-hana) — SYNTAX HART:
 - Kommentare: -- und /* */.
 - Schema/Firmen-DB als Platzhalter kommentieren (z. B. /* Schema = aktuelle Firmen-DB */), keine erfundenen Schema-Namen als Fakt.
 - Diagnose-SELECTs kommentiert, Platzhalter klar ('C00001' / /* @CardCode */).
-- Wenn DB unklar: BEIDES sql_hana (korrekte HANA-Syntax) UND sql_sqlserver ([Klammern], ISNULL ok) als getrennte artifacts.
-- Transaction Notification: auf HANA als SQLSCRIPT-Skizze (IN/OUT-Parameter ohne @, LANGUAGE SQLSCRIPT, error/error_message); auf SQL Server klassisch mit @object_type/@transaction_type/… — in note die Ziel-DB nennen. Nie HANA-Artifact mit T-SQL-@Variablen als «HANA» ausgeben.
+- SQL IMMER doppelt: sql_hana UND sql_sqlserver als getrennte artifacts (nie nur eine Variante, auch wenn HANA im Ticket steht).
+- MS SQL (sql_sqlserver): [OCRD]/[CardCode], ISNULL ok, String-Verkettung oft +; keine HANA-only-Funktionen.
+- Transaction Notification: HANA = SQLSCRIPT (IN/OUT ohne @); SQL Server = @object_type/@transaction_type/… — wenn TN geliefert wird, idealerweise BEIDE Varianten. Nie HANA-Artifact mit T-SQL-@Variablen als «HANA» ausgeben.
 
 Nachschlagewerke (in caveats/outline):
 - https://help.sap.com → SAP Business One
@@ -451,12 +452,13 @@ solutionSketch — UMFANGREICH und PRAXISTAUGICH (Support-Qualität):
 - steps: 4–12 navigierbare Schritte wo sinnvoll (Diagnose → Fix → Verifikation), inkl. Addon-/Hersteller-UI wenn betroffen.
 - artifacts: LIEFERE substanzielle Skripte, sobald Daten/Regeln involviert sind:
   1) Diagnose-SELECTs (Joins, Filter mit Platzhaltern).
-  2) DB unklar → sql_hana UND sql_sqlserver getrennt; HANA strikt nach HANA-Regeln oben.
-  3) Transaction Notification passend zur DB (siehe HANA vs SQL Server).
-  4) Formatted Search: kind formatted_search — Query + Zuweisung im Formular.
+  2) SQL IMMER doppelt: je ein artifact kind sql_hana UND ein artifact kind sql_sqlserver mit gleichem Zweck (Titel z. B. «BP prüfen (HANA)» / «BP prüfen (SQL Server)»). Auch wenn nur HANA oder nur SQL Server im Ticket steht — Kundenumgebung oft unklar.
+  3) Transaction Notification: wenn relevant, möglichst HANA-SQLSCRIPT und SQL-Server-Variante als zwei artifacts; note = Ziel-DB.
+  4) Formatted Search: kind formatted_search — Query + Zuweisung im Formular (bei SQL-FS ebenfalls HANA + SQL Server wenn Query-basiert).
   5) coresuite_customize wenn Coresystems/coresuite relevant.
   6) config/script für Boyum/B1UP/Produmex wenn erkennbar.
   7) DI-API / Service Layer / PowerShell / Graph wenn passend.
+- VERBOTEN: nur sql_hana ohne sql_sqlserver (oder umgekehrt), sobald irgendein SQL-Diagnose-/Fix-Skript vorkommt.
 - Skripte: kommentiert, idempotent wo möglich, keine destruktiven UPDATEs ohne klaren WHERE und Warnung in note.
 - Keine erfundenen SAP-Note-/KB-Nummern; Themenpfade statt Fantasie-IDs.
 - Klar als Vorschlag; kein Blind-Deploy auf Produktiv.
@@ -562,12 +564,13 @@ Screenshots/Bilder: ${
       : "keine"
   }
 
-Relevante Hersteller/Produkte (Heuristik aus Ticket — in solutionSketch.vendors und outline/steps/artifacts berücksichtigen; HANA-Skripte nur in korrekter HANA-Syntax):
+Relevante Hersteller/Produkte (Heuristik aus Ticket — in solutionSketch.vendors und outline/steps/artifacts berücksichtigen):
 ${
   vendorHints.length
     ? vendorHints.map((v) => `- ${v}`).join("\n")
     : "- (keine klaren Treffer — aus Verlauf selbst ableiten; bei B1-Themen mind. SAP Business One)"
 }
+SQL-Artefakte: IMMER beide Varianten liefern (sql_hana + sql_sqlserver), auch wenn HANA erwähnt wird — Kunden-DB oft unklar. HANA nur in korrekter HANA-Syntax.
 
 Anrede-Muster für nextReplyDraft: ${
     addressForm === "du"
