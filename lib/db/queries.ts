@@ -197,7 +197,7 @@ export function saveOpenAISettings(
     setSetting("openai_model", model.trim());
   }
   if (baseUrl !== undefined) {
-    const normalized = baseUrl.trim().replace(/\/$/, "") || null;
+    const normalized = (baseUrl ?? "").trim().replace(/\/$/, "") || null;
     setSetting("openai_base_url", normalized);
   }
 }
