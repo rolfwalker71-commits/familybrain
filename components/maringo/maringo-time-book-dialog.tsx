@@ -19,6 +19,8 @@ export function MaringoTimeBookDialog({
   defaults,
   title = "Zeit buchen",
   description,
+  submitLabel = "Auf Ticket buchen",
+  editLineId,
   onBooked,
 }: {
   open: boolean;
@@ -26,16 +28,27 @@ export function MaringoTimeBookDialog({
   defaults?: TimeBookFormDefaults | null;
   title?: string;
   description?: string;
+  submitLabel?: string;
+  /** Wenn gesetzt: PUT statt POST (löschen + neu in MARI). */
+  editLineId?: number | null;
   onBooked?: () => void;
 }) {
   async function submit(values: TimeBookFormValues) {
-    const res = await fetch("/api/maringo/timekeeping/lines", {
-      method: "POST",
+    const url = editLineId
+      ? `/api/maringo/timekeeping/lines/${editLineId}`
+      : "/api/maringo/timekeeping/lines";
+    const res = await fetch(url, {
+      method: editLineId ? "PUT" : "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(values),
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || "Buchung fehlgeschlagen");
+    if (!res.ok) {
+      throw new Error(
+        data.error ||
+          (editLineId ? "Änderung fehlgeschlagen" : "Buchung fehlgeschlagen")
+      );
+    }
     onOpenChange(false);
     onBooked?.();
   }
@@ -50,9 +63,9 @@ export function MaringoTimeBookDialog({
           ) : null}
         </DialogHeader>
         <MaringoTimeBookForm
-          key={`${defaults?.issueId || "x"}-${defaults?.projectNumber || ""}-${open}`}
+          key={`${editLineId || "new"}-${defaults?.issueId || "x"}-${defaults?.projectNumber || ""}-${open}`}
           defaults={defaults}
-          submitLabel="Auf Ticket buchen"
+          submitLabel={submitLabel}
           onSubmit={submit}
         />
       </DialogContent>

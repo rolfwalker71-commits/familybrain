@@ -3,6 +3,7 @@ import { hasMariConfig, getMariConfig } from "@/lib/mari/config";
 import { listMyTickets, type MariTicketListItem } from "@/lib/mari/tickets";
 import { WORK_STATUS_IDS, statusChipLabel } from "@/lib/mari/status";
 import { notifyAppChange } from "@/lib/realtime/notify";
+import { toSwissDate } from "@/lib/utils/dates";
 
 export const MARI_TICKETS_LAST_POLL_KEY = "mari_tickets_last_poll_at";
 export const MARI_TICKETS_SNAPSHOT_KEY = "mari_tickets_snapshot_json";
@@ -128,7 +129,7 @@ function diffTickets(
         issueId: n.issueId,
         title: n.briefDescription,
         kind: "due",
-        detail: `Stichtag: ${p.dueDate || "–"} → ${n.dueDate || "–"}`,
+        detail: `Stichtag: ${toSwissDate(p.dueDate)} → ${toSwissDate(n.dueDate)}`,
       });
     } else if (
       p.changeAtDate !== n.changeAtDate &&

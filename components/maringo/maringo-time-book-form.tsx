@@ -12,7 +12,6 @@ export type TimeBookFormDefaults = {
   dayOfService?: string;
   projectNumber?: string | null;
   projectLabel?: string | null;
-  phaseId?: number | null;
   contractId?: number | null;
   contractPositionId?: number | null;
   activity?: string;
@@ -26,7 +25,6 @@ export type TimeBookFormDefaults = {
 export type TimeBookFormValues = {
   dayOfService: string;
   projectNumber: string;
-  phaseId: number;
   contractId: number;
   contractPositionId: number | null;
   activity: string;
@@ -75,10 +73,6 @@ export function MaringoTimeBookForm({
   );
   const [projectLabel, setProjectLabel] = useState(
     defaults?.projectLabel || defaults?.projectNumber || ""
-  );
-  const [phases, setPhases] = useState<MariKeyPair[]>([]);
-  const [phaseId, setPhaseId] = useState(
-    defaults?.phaseId != null ? String(defaults.phaseId) : ""
   );
   const [contracts, setContracts] = useState<MariKeyPair[]>([]);
   const [contractId, setContractId] = useState(
@@ -134,7 +128,6 @@ export function MaringoTimeBookForm({
 
   useEffect(() => {
     if (!projectNumber) {
-      setPhases([]);
       setContracts([]);
       setPositions([]);
       return;
@@ -142,36 +135,19 @@ export function MaringoTimeBookForm({
     let cancelled = false;
     (async () => {
       try {
-        const [phRes, coRes] = await Promise.all([
-          fetch(
-            `/api/maringo/timekeeping/projects/${encodeURIComponent(projectNumber)}/phases`
-          ),
-          fetch(
-            `/api/maringo/timekeeping/projects/${encodeURIComponent(projectNumber)}/contracts`
-          ),
-        ]);
-        const ph = await phRes.json().catch(() => ({}));
+        const coRes = await fetch(
+          `/api/maringo/timekeeping/projects/${encodeURIComponent(projectNumber)}/contracts`
+        );
         const co = await coRes.json().catch(() => ({}));
         if (cancelled) return;
-        if (!phRes.ok) throw new Error(ph.error || "Phasen laden fehlgeschlagen");
         if (!coRes.ok) throw new Error(co.error || "Verträge laden fehlgeschlagen");
-        const nextPhases = (ph.phases || []) as MariKeyPair[];
         const nextContracts = (co.contracts || []) as MariKeyPair[];
-        setPhases(nextPhases);
         setContracts(nextContracts);
-        if (
-          phaseId &&
-          !nextPhases.some((p) => p.keyInternal === phaseId)
-        ) {
-          // keep preset id even if not in list
-        } else if (!phaseId && nextPhases.length === 1) {
-          setPhaseId(nextPhases[0]!.keyInternal);
-        }
         if (
           contractId &&
           !nextContracts.some((c) => c.keyInternal === contractId)
         ) {
-          // keep
+          // keep preset
         } else if (!contractId && nextContracts.length === 1) {
           setContractId(nextContracts[0]!.keyInternal);
         }
@@ -230,7 +206,6 @@ export function MaringoTimeBookForm({
       [p.matchcode, p.keyVisible || p.keyInternal].filter(Boolean).join(" · ")
     );
     setProjectOpen(false);
-    setPhaseId("");
     setContractId("");
     setContractPositionId("");
   }
@@ -249,10 +224,6 @@ export function MaringoTimeBookForm({
     const hoursBillable = parseHours(hoursBillableRaw);
     if (!projectNumber) {
       setError("Bitte Projekt wählen.");
-      return;
-    }
-    if (phases.length > 0 && !phaseId) {
-      setError("Bitte Phase wählen.");
       return;
     }
     if (contracts.length > 0 && !contractId) {
@@ -280,7 +251,6 @@ export function MaringoTimeBookForm({
       await onSubmit({
         dayOfService,
         projectNumber,
-        phaseId: Number(phaseId),
         contractId: Number(contractId) || 0,
         contractPositionId: contractPositionId
           ? Number(contractPositionId)
@@ -418,28 +388,9 @@ export function MaringoTimeBookForm({
       <div
         className={cn(
           "grid gap-3",
-          wide ? "sm:grid-cols-2 lg:grid-cols-3" : "sm:grid-cols-2"
+          wide ? "sm:grid-cols-2" : "sm:grid-cols-2"
         )}
       >
-        <div className="space-y-1">
-          <Label htmlFor="tk-phase">Phase</Label>
-          <select
-            id="tk-phase"
-            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
-            value={phaseId}
-            onChange={(e) => setPhaseId(e.target.value)}
-            disabled={!projectNumber}
-          >
-            <option value="">
-              {phases.length === 0 ? "Keine Phase nötig" : "Phase wählen…"}
-            </option>
-            {phases.map((p) => (
-              <option key={p.keyInternal} value={p.keyInternal}>
-                {p.matchcode}
-              </option>
-            ))}
-          </select>
-        </div>
         <div className="space-y-1">
           <Label htmlFor="tk-contract">Vertrag</Label>
           <select
@@ -510,7 +461,7 @@ export function MaringoTimeBookForm({
 
       <div className="flex flex-wrap items-center gap-2 pt-1">
         <Button type="submit" size="sm" disabled={busy}>
-          {busy ? "Buche…" : submitLabel}
+          {busy ? "Speichere…" : submitLabel}
         </Button>
         {projectOpen ? (
           <Button

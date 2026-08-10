@@ -61,6 +61,7 @@ import {
 import type { MariTimeLine } from "@/lib/mari/timekeeping";
 import { MaringoTimekeepingPanel } from "@/components/maringo/maringo-timekeeping-panel";
 import { MaringoTimeBookDialog } from "@/components/maringo/maringo-time-book-dialog";
+import type { TimeBookFormDefaults } from "@/components/maringo/maringo-time-book-form";
 import { MaringoTimeLinesTable } from "@/components/maringo/maringo-time-lines-table";
 
 function sideChipClass(side: MariTimelineSide): string {
@@ -477,6 +478,10 @@ export function MaringoWorkspaceClient() {
   const [manualHandledBy, setManualHandledBy] = useState("");
   const [handlerMode, setHandlerMode] = useState<"list" | "manual">("list");
   const [bookDialogOpen, setBookDialogOpen] = useState(false);
+  const [editBookLineId, setEditBookLineId] = useState<number | null>(null);
+  const [editBookDefaults, setEditBookDefaults] =
+    useState<TimeBookFormDefaults | null>(null);
+  const [busyTicketLineId, setBusyTicketLineId] = useState<number | null>(null);
   const [ticketTimeLines, setTicketTimeLines] = useState<MariTimeLine[]>([]);
   const [ticketTimeLoading, setTicketTimeLoading] = useState(false);
 
@@ -598,6 +603,82 @@ export function MaringoWorkspaceClient() {
       setTicketTimeLoading(false);
     }
   }, []);
+
+  function openNewBookDialog() {
+    setEditBookLineId(null);
+    setEditBookDefaults(null);
+    setBookDialogOpen(true);
+  }
+
+  async function openEditTicketLine(line: MariTimeLine) {
+    if (line.approved) {
+      setError("Freigegebene Buchungen können nicht geändert werden.");
+      return;
+    }
+    setError(null);
+    try {
+      const res = await fetch(`/api/maringo/timekeeping/lines/${line.lineId}`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Buchung laden fehlgeschlagen");
+      const full = data.line as {
+        serviceDate: string;
+        projectNumber: string;
+        activity: string;
+        memo: string | null;
+        hours: number;
+        hoursBillable: number;
+        billable: boolean;
+        contractId: number;
+        contractPositionId: number;
+        issueId: number | null;
+      };
+      setEditBookLineId(line.lineId);
+      setEditBookDefaults({
+        dayOfService: full.serviceDate || line.serviceDate,
+        projectNumber: full.projectNumber || line.projectNumber,
+        projectLabel: full.projectNumber || line.projectNumber,
+        contractId: full.contractId || null,
+        contractPositionId: full.contractPositionId || null,
+        activity: full.activity || line.activity,
+        memoText: full.memo || line.memo || "",
+        hours: full.hours ?? line.hours,
+        hoursBillable: full.hoursBillable ?? line.hoursBillable,
+        billable: full.billable ?? line.billable,
+        issueId: full.issueId ?? detail?.issueId ?? null,
+      });
+      setBookDialogOpen(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function deleteTicketLine(line: MariTimeLine) {
+    if (line.approved) {
+      setError("Freigegebene Buchungen können nicht gelöscht werden.");
+      return;
+    }
+    if (
+      !window.confirm(
+        `Buchung #${line.lineId} (${line.hours} h, ${line.projectNumber}) wirklich löschen?`
+      )
+    ) {
+      return;
+    }
+    setBusyTicketLineId(line.lineId);
+    setError(null);
+    try {
+      const res = await fetch(`/api/maringo/timekeeping/lines/${line.lineId}`, {
+        method: "DELETE",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Löschen fehlgeschlagen");
+      if (selectedId != null) void loadTicketTimeLines(selectedId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusyTicketLineId(null);
+    }
+  }
 
   useEffect(() => {
     void loadList();
@@ -1342,7 +1423,7 @@ export function MaringoWorkspaceClient() {
                         ? "Stunden auf dieses Ticket buchen"
                         : "Ticket hat kein Projekt hinterlegt"
                     }
-                    onClick={() => setBookDialogOpen(true)}
+                    onClick={() => openNewBookDialog()}
                   >
                     <Clock3 className="size-3.5" />
                     Zeit buchen
@@ -1558,6 +1639,9 @@ export function MaringoWorkspaceClient() {
                         ? "Lade Buchungen…"
                         : "Noch keine Stundenbuchungen auf dieses Ticket."
                     }
+                    onEdit={(l) => void openEditTicketLine(l)}
+                    onDelete={deleteTicketLine}
+                    busyLineId={busyTicketLineId}
                   />
                 </div>
 
@@ -1603,28 +1687,42 @@ export function MaringoWorkspaceClient() {
 
       <MaringoTimeBookDialog
         open={bookDialogOpen}
-        onOpenChange={setBookDialogOpen}
+        onOpenChange={(open) => {
+          setBookDialogOpen(open);
+          if (!open) {
+            setEditBookLineId(null);
+            setEditBookDefaults(null);
+          }
+        }}
         defaults={
-          detail
+          editBookDefaults ||
+          (detail
             ? {
                 issueId: detail.issueId,
                 projectNumber: detail.projectNumber,
                 projectLabel: detail.projectNumber,
-                phaseId: detail.phaseId,
                 contractId: detail.contractId,
                 contractPositionId: detail.contractPositionId,
                 activity: detail.briefDescription.slice(0, 100),
                 hours: 0.25,
                 billable: true,
               }
-            : null
+            : null)
         }
         title={
-          detail
-            ? `Zeit buchen · Ticket #${detail.issueId}`
-            : "Zeit buchen"
+          editBookLineId
+            ? `Buchung ändern · #${editBookLineId}`
+            : detail
+              ? `Zeit buchen · Ticket #${detail.issueId}`
+              : "Zeit buchen"
         }
-        description="Buchung wird mit SourceReference auf dieses Ticket verknüpft."
+        description={
+          editBookLineId
+            ? "Speichern ersetzt die Zeile in MARI. Ticket-Verknüpfung bleibt erhalten."
+            : "Buchung wird mit SourceReference auf dieses Ticket verknüpft."
+        }
+        submitLabel={editBookLineId ? "Speichern" : "Auf Ticket buchen"}
+        editLineId={editBookLineId}
         onBooked={() => {
           if (selectedId != null) void loadTicketTimeLines(selectedId);
         }}

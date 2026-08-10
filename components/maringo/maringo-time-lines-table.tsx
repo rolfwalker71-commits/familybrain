@@ -1,10 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronRight } from "lucide-react";
-import type { MariTimeLine } from "@/lib/mari/timekeeping";
+import { ChevronRight, Pencil, Trash2 } from "lucide-react";
+import {
+  approvalStatusLabel,
+  type MariApprovalStatus,
+  type MariTimeLine,
+} from "@/lib/mari/timekeeping";
+import { APP_ICON_STROKE } from "@/lib/branding/app-icons";
 import { toSwissDate } from "@/lib/utils/dates";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 function formatHours(n: number): string {
   return n.toLocaleString("de-CH", {
@@ -40,6 +46,31 @@ function MemoBlock({ memo }: { memo: string }) {
   );
 }
 
+function ApprovalBadge({
+  status,
+  approved,
+}: {
+  status?: MariApprovalStatus;
+  approved?: boolean;
+}) {
+  const s = status || (approved ? "approved" : "recorded");
+  const label = approvalStatusLabel(s);
+  return (
+    <span
+      className={cn(
+        "inline-flex whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] font-semibold",
+        s === "approved" && "bg-emerald-100 text-emerald-900",
+        s === "recorded" && "bg-amber-100 text-amber-950",
+        s === "draft" && "bg-sky-100 text-sky-950",
+        s === "rejected" && "bg-rose-100 text-rose-950",
+        s === "unknown" && "bg-muted text-muted-foreground"
+      )}
+    >
+      {label}
+    </span>
+  );
+}
+
 export function MaringoTimeLinesTable({
   lines,
   totalHours,
@@ -47,6 +78,9 @@ export function MaringoTimeLinesTable({
   nonBillableHours,
   emptyText = "Keine Buchungen.",
   className,
+  onEdit,
+  onDelete,
+  busyLineId,
 }: {
   lines: MariTimeLine[];
   totalHours?: number;
@@ -54,6 +88,9 @@ export function MaringoTimeLinesTable({
   nonBillableHours?: number;
   emptyText?: string;
   className?: string;
+  onEdit?: (line: MariTimeLine) => void;
+  onDelete?: (line: MariTimeLine) => void | Promise<void>;
+  busyLineId?: number | null;
 }) {
   const total =
     totalHours ??
@@ -63,6 +100,8 @@ export function MaringoTimeLinesTable({
     Math.round(lines.reduce((s, l) => s + l.hoursBillable, 0) * 100) / 100;
   const nonBillable =
     nonBillableHours ?? Math.round((total - billable) * 100) / 100;
+
+  const showActions = Boolean(onEdit || onDelete);
 
   if (lines.length === 0) {
     return (
@@ -75,51 +114,121 @@ export function MaringoTimeLinesTable({
   return (
     <div className={cn("space-y-2", className)}>
       <div className="overflow-x-auto rounded-xl border border-border/60">
-        <table className="w-full min-w-[40rem] text-left text-[12px]">
+        <table className="w-full min-w-[44rem] text-left text-[12px]">
           <thead className="bg-muted/40 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
             <tr>
               <th className="px-2.5 py-2">Datum</th>
               <th className="px-2.5 py-2">Projekt</th>
               <th className="px-2.5 py-2">Aktivität / Memo</th>
               <th className="px-2.5 py-2">Bearbeiter</th>
+              <th className="px-2.5 py-2">Freigabe</th>
               <th className="px-2.5 py-2 text-right">Std.</th>
               <th className="px-2.5 py-2 text-right">Verr.</th>
+              {showActions ? (
+                <th className="px-2.5 py-2 text-right">Aktion</th>
+              ) : null}
             </tr>
           </thead>
           <tbody>
-            {lines.map((l) => (
-              <tr
-                key={l.lineId}
-                className="border-t border-border/50 align-top"
-              >
-                <td className="whitespace-nowrap px-2.5 py-2 tabular-nums">
-                  {toSwissDate(l.serviceDate)}
-                </td>
-                <td className="px-2.5 py-2 font-medium">{l.projectNumber}</td>
-                <td className="max-w-[20rem] px-2.5 py-2">
-                  <p className="font-medium">{l.activity || "–"}</p>
-                  {l.memo ? <MemoBlock memo={l.memo} /> : null}
-                </td>
-                <td className="px-2.5 py-2">
-                  {l.employeeName || l.employeeNumber || "–"}
-                </td>
-                <td className="px-2.5 py-2 text-right tabular-nums">
-                  {formatHours(l.hours)}
-                </td>
-                <td className="px-2.5 py-2 text-right tabular-nums">
-                  {formatHours(l.hoursBillable)}
-                  {l.billable ? (
-                    <span className="ml-1 text-[10px] text-emerald-700">
-                      ja
-                    </span>
-                  ) : (
-                    <span className="ml-1 text-[10px] text-muted-foreground">
-                      nein
-                    </span>
-                  )}
-                </td>
-              </tr>
-            ))}
+            {lines.map((l) => {
+              const busy = busyLineId === l.lineId;
+              const locked = Boolean(l.approved);
+              return (
+                <tr
+                  key={l.lineId}
+                  className="border-t border-border/50 align-top"
+                >
+                  <td className="whitespace-nowrap px-2.5 py-2 tabular-nums">
+                    {toSwissDate(l.serviceDate)}
+                  </td>
+                  <td className="px-2.5 py-2 font-medium">{l.projectNumber}</td>
+                  <td className="max-w-[20rem] px-2.5 py-2">
+                    <p className="font-medium">{l.activity || "–"}</p>
+                    {l.memo ? <MemoBlock memo={l.memo} /> : null}
+                  </td>
+                  <td className="px-2.5 py-2">
+                    {l.employeeName || l.employeeNumber || "–"}
+                  </td>
+                  <td className="px-2.5 py-2">
+                    <ApprovalBadge
+                      status={l.approvalStatus}
+                      approved={l.approved}
+                    />
+                  </td>
+                  <td className="px-2.5 py-2 text-right tabular-nums">
+                    {formatHours(l.hours)}
+                  </td>
+                  <td className="px-2.5 py-2 text-right tabular-nums">
+                    {formatHours(l.hoursBillable)}
+                    {l.billable ? (
+                      <span className="ml-1 text-[10px] text-emerald-700">
+                        ja
+                      </span>
+                    ) : (
+                      <span className="ml-1 text-[10px] text-muted-foreground">
+                        nein
+                      </span>
+                    )}
+                  </td>
+                  {showActions ? (
+                    <td className="px-2.5 py-2">
+                      <div className="flex justify-end gap-0.5">
+                        {onEdit ? (
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="size-7"
+                            disabled={busy || locked || l.lineId <= 0}
+                            onClick={() => onEdit(l)}
+                            aria-label={
+                              locked
+                                ? "Freigegeben — nicht änderbar"
+                                : "Buchung ändern"
+                            }
+                            title={
+                              locked
+                                ? "Freigegeben — nicht änderbar"
+                                : "Ändern"
+                            }
+                          >
+                            <Pencil
+                              className="size-3.5"
+                              strokeWidth={APP_ICON_STROKE}
+                            />
+                          </Button>
+                        ) : null}
+                        {onDelete ? (
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="size-7 text-rose-700 hover:text-rose-800"
+                            disabled={busy || locked || l.lineId <= 0}
+                            onClick={() => void onDelete(l)}
+                            aria-label={
+                              locked
+                                ? "Freigegeben — nicht löschbar"
+                                : "Buchung löschen"
+                            }
+                            title={
+                              locked
+                                ? "Freigegeben — nicht löschbar"
+                                : "Löschen"
+                            }
+                          >
+                            <Trash2
+                              className="size-3.5"
+                              strokeWidth={APP_ICON_STROKE}
+                            />
+                          </Button>
+                        ) : null}
+                      </div>
+                    </td>
+                  ) : null}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

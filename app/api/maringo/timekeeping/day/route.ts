@@ -3,10 +3,15 @@ import { ensureInitialized } from "@/lib/db/migrations";
 import { isAuthError, requireAuth } from "@/lib/auth/current-user";
 import { MariApiError } from "@/lib/mari/client";
 import { hasMariConfig } from "@/lib/mari/config";
-import { listTimeLinesForDay } from "@/lib/mari/timekeeping";
+import {
+  listTimeLinesForDay,
+  type MariTimePeriod,
+} from "@/lib/mari/timekeeping";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const PERIODS = new Set<MariTimePeriod>(["day", "week", "month", "quarter"]);
 
 export async function GET(request: Request) {
   ensureInitialized();
@@ -19,14 +24,25 @@ export async function GET(request: Request) {
     );
   }
   try {
-    const date = new URL(request.url).searchParams.get("date");
+    const params = new URL(request.url).searchParams;
+    const date = params.get("date");
+    const periodRaw = (params.get("period") || "day").toLowerCase();
     if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       return NextResponse.json(
         { error: "Parameter date=YYYY-MM-DD erforderlich." },
         { status: 400 }
       );
     }
-    const summary = await listTimeLinesForDay({ dateYmd: date });
+    if (!PERIODS.has(periodRaw as MariTimePeriod)) {
+      return NextResponse.json(
+        { error: "period muss day|week|month|quarter sein." },
+        { status: 400 }
+      );
+    }
+    const summary = await listTimeLinesForDay({
+      dateYmd: date,
+      period: periodRaw as MariTimePeriod,
+    });
     return NextResponse.json({ configured: true, ...summary });
   } catch (err) {
     const message =
