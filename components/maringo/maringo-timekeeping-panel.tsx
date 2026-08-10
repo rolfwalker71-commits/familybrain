@@ -95,7 +95,7 @@ export function MaringoTimekeepingPanel({
         </p>
       ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+      <div className="space-y-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-sm">
@@ -108,6 +108,7 @@ export function MaringoTimekeepingPanel({
               key={formKey}
               defaults={{ dayOfService: date, hours: 0.25, billable: true }}
               onSubmit={book}
+              layout="wide"
             />
           </CardContent>
         </Card>

@@ -56,11 +56,14 @@ export function MaringoTimeBookForm({
   submitLabel = "Buchen",
   onSubmit,
   className,
+  layout = "compact",
 }: {
   defaults?: TimeBookFormDefaults | null;
   submitLabel?: string;
   onSubmit: (values: TimeBookFormValues) => Promise<void>;
   className?: string;
+  /** wide = volle Breite untereinander (Stunden-Tab); compact = Dialog */
+  layout?: "wide" | "compact";
 }) {
   const [dayOfService, setDayOfService] = useState(
     defaults?.dayOfService || zurichTodayYmd()
@@ -295,6 +298,8 @@ export function MaringoTimeBookForm({
     }
   }
 
+  const wide = layout === "wide";
+
   return (
     <form
       onSubmit={(e) => void handleSubmit(e)}
@@ -306,7 +311,14 @@ export function MaringoTimeBookForm({
         </p>
       ) : null}
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div
+        className={cn(
+          "grid gap-3",
+          wide
+            ? "sm:grid-cols-2 lg:grid-cols-4"
+            : "sm:grid-cols-2"
+        )}
+      >
         <div className="space-y-1">
           <Label htmlFor="tk-date">Datum</Label>
           <Input
@@ -318,57 +330,97 @@ export function MaringoTimeBookForm({
           />
         </div>
         <div className="space-y-1">
-          <Label htmlFor="tk-project">Projekt</Label>
-          <div className="relative">
-            <Input
-              id="tk-project"
-              value={projectOpen ? projectQuery : projectLabel || projectQuery}
-              onChange={(e) => {
-                setProjectQuery(e.target.value);
-                setProjectOpen(true);
-              }}
-              onFocus={() => {
-                setProjectOpen(true);
-                setProjectQuery("");
-              }}
-              placeholder="Suche z.B. Werk oder P200000"
-              autoComplete="off"
+          <Label htmlFor="tk-hours">Stunden</Label>
+          <Input
+            id="tk-hours"
+            inputMode="decimal"
+            value={hoursRaw}
+            onChange={(e) => {
+              setHoursRaw(e.target.value);
+              if (billable) setHoursBillableRaw(e.target.value);
+            }}
+            placeholder="0.25"
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="tk-billable-h">Davon verrechenbar</Label>
+          <Input
+            id="tk-billable-h"
+            inputMode="decimal"
+            value={hoursBillableRaw}
+            onChange={(e) => setHoursBillableRaw(e.target.value)}
+            disabled={!billable}
+            placeholder="0.25"
+          />
+        </div>
+        <div className={cn("flex items-end pb-1", !wide && "sm:col-span-2")}>
+          <label className="flex h-9 items-center gap-2 text-[13px]">
+            <input
+              type="checkbox"
+              checked={billable}
+              onChange={(e) => onBillableToggle(e.target.checked)}
             />
-            {projectOpen ? (
-              <div className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-border bg-background shadow-lg">
-                {loadingProjects ? (
-                  <p className="px-2.5 py-2 text-[12px] text-muted-foreground">
-                    Lade…
-                  </p>
-                ) : projects.length === 0 ? (
-                  <p className="px-2.5 py-2 text-[12px] text-muted-foreground">
-                    Keine Treffer
-                  </p>
-                ) : (
-                  <ul>
-                    {projects.slice(0, 80).map((p) => (
-                      <li key={`${p.keyInternal}-${p.matchcode}`}>
-                        <button
-                          type="button"
-                          className="flex w-full flex-col px-2.5 py-1.5 text-left text-[12px] hover:bg-muted"
-                          onClick={() => selectProject(p)}
-                        >
-                          <span className="font-medium">{p.matchcode}</span>
-                          <span className="text-muted-foreground">
-                            {p.keyVisible || p.keyInternal}
-                          </span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            ) : null}
-          </div>
+            Verrechenbar
+          </label>
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="space-y-1">
+        <Label htmlFor="tk-project">Projekt</Label>
+        <div className="relative">
+          <Input
+            id="tk-project"
+            value={projectOpen ? projectQuery : projectLabel || projectQuery}
+            onChange={(e) => {
+              setProjectQuery(e.target.value);
+              setProjectOpen(true);
+            }}
+            onFocus={() => {
+              setProjectOpen(true);
+              setProjectQuery("");
+            }}
+            placeholder="Suche z.B. Werk oder P200000"
+            autoComplete="off"
+          />
+          {projectOpen ? (
+            <div className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-border bg-background shadow-lg">
+              {loadingProjects ? (
+                <p className="px-2.5 py-2 text-[12px] text-muted-foreground">
+                  Lade…
+                </p>
+              ) : projects.length === 0 ? (
+                <p className="px-2.5 py-2 text-[12px] text-muted-foreground">
+                  Keine Treffer
+                </p>
+              ) : (
+                <ul>
+                  {projects.slice(0, 80).map((p) => (
+                    <li key={`${p.keyInternal}-${p.matchcode}`}>
+                      <button
+                        type="button"
+                        className="flex w-full flex-col px-2.5 py-1.5 text-left text-[12px] hover:bg-muted"
+                        onClick={() => selectProject(p)}
+                      >
+                        <span className="font-medium">{p.matchcode}</span>
+                        <span className="text-muted-foreground">
+                          {p.keyVisible || p.keyInternal}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      <div
+        className={cn(
+          "grid gap-3",
+          wide ? "sm:grid-cols-2 lg:grid-cols-3" : "sm:grid-cols-2"
+        )}
+      >
         <div className="space-y-1">
           <Label htmlFor="tk-phase">Phase</Label>
           <select
@@ -399,7 +451,9 @@ export function MaringoTimeBookForm({
             disabled={!projectNumber}
           >
             <option value="">
-              {contracts.length === 0 ? "Kein Vertrag nötig" : "Vertrag wählen…"}
+              {contracts.length === 0
+                ? "Kein Vertrag nötig"
+                : "Vertrag wählen…"}
             </option>
             {contracts.map((c) => (
               <option key={c.keyInternal} value={c.keyInternal}>
@@ -408,84 +462,47 @@ export function MaringoTimeBookForm({
             ))}
           </select>
         </div>
+        {positions.length > 0 ? (
+          <div className="space-y-1">
+            <Label htmlFor="tk-pos">Vertragsposition</Label>
+            <select
+              id="tk-pos"
+              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+              value={contractPositionId}
+              onChange={(e) => setContractPositionId(e.target.value)}
+            >
+              <option value="">Position wählen…</option>
+              {positions.map((p) => (
+                <option key={p.keyInternal} value={p.keyInternal}>
+                  {[p.keyVisible, p.matchcode].filter(Boolean).join(" · ")}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
       </div>
 
-      {positions.length > 0 ? (
+      <div className={cn("grid gap-3", wide && "lg:grid-cols-2")}>
         <div className="space-y-1">
-          <Label htmlFor="tk-pos">Vertragsposition</Label>
-          <select
-            id="tk-pos"
-            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
-            value={contractPositionId}
-            onChange={(e) => setContractPositionId(e.target.value)}
-          >
-            <option value="">Position wählen…</option>
-            {positions.map((p) => (
-              <option key={p.keyInternal} value={p.keyInternal}>
-                {[p.keyVisible, p.matchcode].filter(Boolean).join(" · ")}
-              </option>
-            ))}
-          </select>
-        </div>
-      ) : null}
-
-      <div className="space-y-1">
-        <Label htmlFor="tk-activity">Aktivität</Label>
-        <Input
-          id="tk-activity"
-          value={activity}
-          onChange={(e) => setActivity(e.target.value)}
-          maxLength={100}
-          placeholder="z.B. Daily Call ANG CH"
-          required
-        />
-      </div>
-
-      <div className="space-y-1">
-        <Label htmlFor="tk-memo">Memo</Label>
-        <Textarea
-          id="tk-memo"
-          value={memoText}
-          onChange={(e) => setMemoText(e.target.value)}
-          rows={3}
-          placeholder="Optional"
-        />
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-3">
-        <div className="space-y-1">
-          <Label htmlFor="tk-hours">Stunden</Label>
+          <Label htmlFor="tk-activity">Aktivität</Label>
           <Input
-            id="tk-hours"
-            inputMode="decimal"
-            value={hoursRaw}
-            onChange={(e) => {
-              setHoursRaw(e.target.value);
-              if (billable) setHoursBillableRaw(e.target.value);
-            }}
-            placeholder="0.25"
+            id="tk-activity"
+            value={activity}
+            onChange={(e) => setActivity(e.target.value)}
+            maxLength={100}
+            placeholder="z.B. Daily Call ANG CH"
+            required
           />
         </div>
         <div className="space-y-1">
-          <Label htmlFor="tk-billable-h">Davon verrechenbar</Label>
-          <Input
-            id="tk-billable-h"
-            inputMode="decimal"
-            value={hoursBillableRaw}
-            onChange={(e) => setHoursBillableRaw(e.target.value)}
-            disabled={!billable}
-            placeholder="0.25"
+          <Label htmlFor="tk-memo">Memo</Label>
+          <Textarea
+            id="tk-memo"
+            value={memoText}
+            onChange={(e) => setMemoText(e.target.value)}
+            rows={wide ? 2 : 3}
+            placeholder="Optional"
           />
-        </div>
-        <div className="flex items-end pb-1">
-          <label className="flex items-center gap-2 text-[13px]">
-            <input
-              type="checkbox"
-              checked={billable}
-              onChange={(e) => onBillableToggle(e.target.checked)}
-            />
-            Verrechenbar
-          </label>
         </div>
       </div>
 

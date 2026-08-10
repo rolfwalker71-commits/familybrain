@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { ChevronRight } from "lucide-react";
 import type { MariTimeLine } from "@/lib/mari/timekeeping";
 import { toSwissDate } from "@/lib/utils/dates";
 import { cn } from "@/lib/utils";
@@ -9,6 +11,33 @@ function formatHours(n: number): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+}
+
+function MemoBlock({ memo }: { memo: string }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="mt-0.5">
+      <button
+        type="button"
+        className="inline-flex items-center gap-1 text-[11px] font-medium text-orange-800 underline-offset-2 hover:underline"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+      >
+        <ChevronRight
+          className={cn(
+            "size-3.5 shrink-0 transition-transform",
+            open && "rotate-90"
+          )}
+          aria-hidden
+        />
+        {open ? "Memo zuklappen" : "Memo aufklappen"}
+      </button>
+      {open ? (
+        <p className="mt-1 whitespace-pre-wrap text-muted-foreground">{memo}</p>
+      ) : null}
+    </div>
+  );
 }
 
 export function MaringoTimeLinesTable({
@@ -67,13 +96,9 @@ export function MaringoTimeLinesTable({
                   {toSwissDate(l.serviceDate)}
                 </td>
                 <td className="px-2.5 py-2 font-medium">{l.projectNumber}</td>
-                <td className="px-2.5 py-2">
+                <td className="max-w-[20rem] px-2.5 py-2">
                   <p className="font-medium">{l.activity || "–"}</p>
-                  {l.memo ? (
-                    <p className="mt-0.5 whitespace-pre-wrap text-muted-foreground">
-                      {l.memo}
-                    </p>
-                  ) : null}
+                  {l.memo ? <MemoBlock memo={l.memo} /> : null}
                 </td>
                 <td className="px-2.5 py-2">
                   {l.employeeName || l.employeeNumber || "–"}
