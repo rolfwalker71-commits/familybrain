@@ -7,8 +7,10 @@ import { emailDomain } from "@/lib/mail/mail-sender-prefs";
 import { isExcludedFromMailAnalysis } from "@/lib/mail/mail-threads";
 import type { MsMailItem } from "@/lib/microsoft/mail-day";
 import {
+  detectReplyAddressForm,
   detectReplyLanguage,
   normalizeReplySubject,
+  replyAddressFormInstruction,
   type ReplyLang,
 } from "@/lib/microsoft/reply-language-shared";
 import { addDaysYmd } from "@/lib/microsoft/time";
@@ -372,6 +374,7 @@ function formatMailBlock(
       ? senderDisplayName(m.from, m.fromEmail)
       : senderDisplayName(m.toPreview, m.toEmails?.[0]);
   const langHint = detectReplyLanguage(`${m.subject}\n${body}`);
+  const addressHint = detectReplyAddressForm(`${m.subject}\n${body}`);
   const rangeTag =
     m.inRange === false
       ? "Kontext (ausserhalb Selektion)"
@@ -384,6 +387,13 @@ An: ${m.toPreview || "—"}
 Betreff: ${m.subject}
 Zeit: ${m.receivedOrSentAt || "—"}
 Textsprache (Heuristik): ${langHint === "en" ? "EN" : "DE"}
+Anrede in dieser Mail (Heuristik): ${
+    addressHint === "du"
+      ? "per Du"
+      : addressHint === "formal"
+        ? "formell"
+        : "unklar"
+  }
 Text:
 ${body || "(leer)"}`;
 }
@@ -1143,6 +1153,20 @@ function packThreadSeedsForPrompt(
         (b.receivedOrSentAt || "").localeCompare(a.receivedOrSentAt || "")
       );
       const picked = ordered.slice(0, maxMails).reverse();
+      const ourTexts = picked
+        .filter((m) => m.folder === "sent")
+        .map((m) => `${m.subject}\n${stripMailBodyNoise(m.bodyText || m.preview || "")}`);
+      const allTexts = picked.map(
+        (m) =>
+          `${m.subject}\n${stripMailBodyNoise(m.bodyText || m.preview || "")}`
+      );
+      const addressForm = detectReplyAddressForm(allTexts, { ourTexts });
+      const addressLine =
+        addressForm === "du"
+          ? "per Du (Hallo + Vorname; du/dir) — strikt einhalten"
+          : addressForm === "formal"
+            ? "formell (Sie / Herr|Frau + Name) — strikt einhalten"
+            : "unklar — letzte eigene Sent-Mail spiegeln, sonst formell; nie mischen";
       const blocks = picked
         .map((m, j) => formatMailBlock(m, `#${i + 1}.${j + 1}`, bodyLimit))
         .join("\n\n");
@@ -1150,7 +1174,10 @@ function packThreadSeedsForPrompt(
         s.mails.length > picked.length
           ? ` · +${s.mails.length - picked.length} ältere Mails weggelassen`
           : "";
-      return `=== THREAD seedKey=${s.key} · ${picked.length}/${s.mails.length} Mails · ${s.company}${omitted} ===\n${blocks}`;
+      return `=== THREAD seedKey=${s.key} · ${picked.length}/${s.mails.length} Mails · ${s.company}${omitted} ===
+Anrede-Muster für REPLIES: ${addressLine}
+${replyAddressFormInstruction(addressForm, detectReplyLanguage(allTexts.join("\n")))}
+${blocks}`;
     })
     .join("\n\n---\n\n");
 }
@@ -1175,6 +1202,10 @@ SUMMARY:
 
 TASKS: dueDate Default ${defaultDue}, Titel ohne Absender-Suffix.
 REPLIES: to = E-Mail mit @; language de|en; subject und body als Strings (nie null); AW:/Re: passend.
+ANREDE (hart): Pro Thread steht «Anrede-Muster für REPLIES». Entweder konsequent per Du ODER konsequent formell — nie mischen.
+- per Du: Hallo/Hi + Vorname wie im Verlauf; du/dir/dein (DE) bzw. informal first-name (EN).
+- formell: Sehr geehrte/r bzw. Herr/Frau + Name (DE) bzw. Dear Mr/Ms (EN); Sie/Ihnen.
+- Eigene Sent-Mails im Thread haben Vorrang vor Kundenmails.
 EVENTS: nur bei klarem Termin und gültigem date YYYY-MM-DD.
 NUR JSON.`;
 }

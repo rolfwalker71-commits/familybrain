@@ -10,6 +10,8 @@ import {
 } from "@/lib/ai/client";
 import {
   normalizeReplySubject,
+  detectReplyAddressForm,
+  replyAddressFormInstruction,
   type ReplyLang,
 } from "@/lib/microsoft/reply-language-shared";
 import { applySwissOrthography } from "@/lib/microsoft/analyze-mail-day";
@@ -17,7 +19,9 @@ import { applySwissOrthography } from "@/lib/microsoft/analyze-mail-day";
 export type { ReplyLang };
 export {
   detectReplyLanguage,
+  detectReplyAddressForm,
   normalizeReplySubject,
+  replyAddressFormInstruction,
 } from "@/lib/microsoft/reply-language-shared";
 
 const TranslateSchema = z.object({
@@ -40,6 +44,10 @@ export async function translateMailReply(input: {
     throw new Error("Chat-/Analyse-API-Key fehlt (Einstellungen → KI-API).");
   }
   const target = input.targetLang;
+  const addressForm = detectReplyAddressForm(
+    `${input.subject}\n${input.body}`
+  );
+  const addressHint = replyAddressFormInstruction(addressForm, target);
   const client = getChatClient();
   const model = getChatModel();
   const completion = await client.chat.completions.create({
@@ -52,11 +60,13 @@ export async function translateMailReply(input: {
         content:
           target === "en"
             ? `You translate business e-mail reply drafts into clear, professional English.
-Keep facts, names, dates and numbers. Use an appropriate greeting and closing.
+Keep facts, names, dates and numbers. Keep the same address form (informal vs formal) as the source — never switch Du↔Sie / Hi↔Dear Mr.
+${addressHint}
 Subject must use "Re:" (not AW:). Return JSON only: {"subject","body","language":"en"}.`
             : `Du übersetzt geschäftliche Mail-Antwortentwürfe in klares, professionelles Schweizer Hochdeutsch.
-Kein scharfes s (ß) — immer ss (Gruss, heissen, Strasse). Schlussformel z. B. «Freundliche Grüsse».
-Fakten, Namen, Daten und Zahlen bleiben. Passende Anrede und Schlussformel.
+Kein scharfes s (ß) — immer ss (Gruss, heissen, Strasse).
+Fakten, Namen, Daten und Zahlen bleiben. Anrede-Form (Du vs. formell) exakt beibehalten — nie mischen oder wechseln.
+${addressHint}
 Betreff mit «AW:» (nicht Re:). Nur JSON: {"subject","body","language":"de"}.`,
       },
       {
@@ -65,6 +75,7 @@ Betreff mit «AW:» (nicht Re:). Nur JSON: {"subject","body","language":"de"}.`,
           subject: input.subject,
           body: input.body,
           targetLanguage: target,
+          addressForm,
         }),
       },
     ],

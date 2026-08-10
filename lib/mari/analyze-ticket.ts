@@ -1,17 +1,17 @@
-import { z } from "zod";
-import type OpenAI from "openai";
-import {
-  getAnalysisClient,
-  getChatJsonRequestExtras,
-  hasChatKey,
-  hasOpenAIKey,
-} from "@/lib/ai/client";
+import { getAnalysisClient, getChatJsonRequestExtras, hasChatKey, hasOpenAIKey } from "@/lib/ai/client";
 import {
   buildAiTokenUsage,
   type AiTokenUsage,
 } from "@/lib/ai/usage-cost";
 import type { MariTicketDetail } from "@/lib/mari/tickets";
 import { timelineSideLabel } from "@/lib/mari/timeline-side";
+import {
+  detectReplyAddressForm,
+  detectReplyLanguage,
+  replyAddressFormInstruction,
+} from "@/lib/microsoft/reply-language-shared";
+import type OpenAI from "openai";
+import { z } from "zod";
 
 function clip(s: string, max: number): string {
   const t = s.trim();
@@ -371,7 +371,7 @@ Liefere JSON genau in diesem Schema:
   "suggestedTasks": [{ "title": "…", "reason": "optional", "dueHint": "YYYY-MM-DD|null" }],
   "suggestions": ["…"],
   "recommendedStatus": { "statusId": 11|1|3|6|7|14|2|null, "label": "optional", "reason": "optional" } | null,
-  "nextReplyDraft": "Kundenantwort DE oder null",
+  "nextReplyDraft": "Kundenantwort in der Sprache/Anrede des Verlaufs oder null",
   "solutionSketch": {
     "problemStillOpen": true|false,
     "outline": "AUSFÜHRLICHE Analyse: Hypothesen, warum der Fehler auftritt, betroffene B1-Objekte/Tabellen (OCRD, OINV, …), Risiken, Alternativen",
@@ -415,6 +415,13 @@ solutionSketch — UMFANGREICH und PRAXISTAUGICH (Support-Qualität):
 
 Screenshots: Fehlermeldungen/UI in summary, missing, steps und artifacts einbeziehen.
 
+nextReplyDraft — ANREDE (hart):
+- Im User-Prompt steht «Anrede-Muster». Entweder konsequent per Du ODER konsequent formell — nie mischen.
+- per Du: Hallo/Hi + Vorname wie im Verlauf; du/dir/dein.
+- formell: Sehr geehrte/r bzw. Herr/Frau + Name; Sie/Ihnen/Ihr.
+- Eigene Support-Antworten im Verlauf haben Vorrang vor Kundenmails.
+- Schlussformel passend (z. B. Freundliche Grüsse) und Schweizer Hochdeutsch (kein ß).
+
 Status-IDs: 11 NEU, 1 Offen, 3 In Arbeit, 6 Warte auf Kunden, 7 Warte auf Hersteller, 14 Eskalation, 2 Gelöst.
 score als Zahl. Arrays nie weglassen (leer ok). NUR JSON-Objekt.`;
 
@@ -451,8 +458,23 @@ export async function analyzeMariTicket(
 
   const imageNames = images.map((i) => i.orgFilename).filter(Boolean);
 
-  const timelineText = ticket.timeline
-    .slice(-40)
+  const recentTimeline = ticket.timeline.slice(-40);
+  const supportTexts = recentTimeline
+    .filter((t) => t.side === "support")
+    .map((t) => `${t.subject || ""}\n${t.text || ""}`);
+  const otherTexts = recentTimeline
+    .filter((t) => t.side !== "system")
+    .map((t) => `${t.subject || ""}\n${t.text || ""}`);
+  const requestBlob = ticket.requestTextPlain || "";
+  const addressForm = detectReplyAddressForm(
+    [...otherTexts, requestBlob],
+    { ourTexts: supportTexts }
+  );
+  const replyLang = detectReplyLanguage(
+    [...supportTexts, ...otherTexts, requestBlob].join("\n")
+  );
+
+  const timelineText = recentTimeline
     .map((t) => {
       const side = timelineSideLabel(t.side || "unknown");
       const actor = t.actor ? ` · Actor: ${t.actor}` : "";
@@ -482,6 +504,15 @@ Screenshots/Bilder: ${
       ? `${imageNames.length} Datei(en): ${imageNames.join(", ")}`
       : "keine"
   }
+
+Anrede-Muster für nextReplyDraft: ${
+    addressForm === "du"
+      ? "per Du"
+      : addressForm === "formal"
+        ? "formell"
+        : "unklar"
+  } (Heuristik aus Verlauf; Support-Antworten stärker gewichtet)
+${replyAddressFormInstruction(addressForm, replyLang)}
 
 Anfragetext (ursprünglich, oft Kunde):
 ${ticket.requestTextPlain.slice(0, 6000)}
