@@ -144,6 +144,7 @@ export function bootstrapDatabase(db: Database.Database): void {
   ensureMailAnalysesTable(db);
   ensureMailSenderPrefsTable(db);
   ensureMariTimeBookFavoritesTable(db);
+  ensureMariTicketAnalysesTable(db);
   ensureMailAppliedLinksTable(db);
   ensureBuddySourceLinksTable(db);
   ensureReferenceNotesTable(db);
@@ -298,6 +299,26 @@ function ensureMariTimeBookFavoritesTable(db: Database.Database): void {
     );
     CREATE INDEX IF NOT EXISTS idx_mari_time_book_favorites_owner
       ON mari_time_book_favorites(owner_key, sort_key, id);
+  `);
+}
+
+function ensureMariTicketAnalysesTable(db: Database.Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS mari_ticket_analyses (
+      owner_key TEXT NOT NULL,
+      issue_id INTEGER NOT NULL,
+      summary TEXT,
+      analysis_json TEXT NOT NULL,
+      images_analyzed INTEGER NOT NULL DEFAULT 0,
+      image_names_json TEXT,
+      usage_json TEXT,
+      model TEXT,
+      analyzed_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (owner_key, issue_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_mari_ticket_analyses_owner_analyzed
+      ON mari_ticket_analyses(owner_key, analyzed_at DESC);
   `);
 }
 

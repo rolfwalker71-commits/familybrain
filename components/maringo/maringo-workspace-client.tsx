@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Calendar,
+  ChevronDown,
   Clock3,
   Flag,
   Inbox,
@@ -460,6 +461,8 @@ export function MaringoWorkspaceClient() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [detail, setDetail] = useState<MariTicketDetail | null>(null);
   const [analysis, setAnalysis] = useState<MariTicketAnalysis | null>(null);
+  const [analysisOpen, setAnalysisOpen] = useState(false);
+  const [savedAnalyzedAt, setSavedAnalyzedAt] = useState<string | null>(null);
   const [imagesAnalyzed, setImagesAnalyzed] = useState(0);
   const [imageNames, setImageNames] = useState<string[]>([]);
   const [analysisUsage, setAnalysisUsage] = useState<AiTokenUsage | null>(null);
@@ -490,6 +493,17 @@ export function MaringoWorkspaceClient() {
     () => formatTokenUsageBreakdownLines(analysisUsage),
     [analysisUsage]
   );
+
+  const detailImageAttachmentCount = useMemo(() => {
+    if (!detail?.timeline) return 0;
+    let n = 0;
+    for (const item of detail.timeline) {
+      for (const a of item.attachments || []) {
+        if (a.isImage) n += 1;
+      }
+    }
+    return n;
+  }, [detail]);
 
   const effectiveHandledBy = useMemo(() => {
     if (handlerMode === "manual") {
@@ -568,6 +582,8 @@ export function MaringoWorkspaceClient() {
   const loadDetail = useCallback(async (id: number) => {
     setDetailLoading(true);
     setAnalysis(null);
+    setAnalysisOpen(false);
+    setSavedAnalyzedAt(null);
     setImagesAnalyzed(0);
     setImageNames([]);
     setAnalysisUsage(null);
@@ -580,6 +596,29 @@ export function MaringoWorkspaceClient() {
       setDetail(data.ticket as MariTicketDetail);
       const due = (data.ticket as MariTicketDetail)?.dueDate;
       setDueDraft(due ? due.slice(0, 10) : "");
+
+      const storedRes = await fetch(`/api/maringo/tickets/${id}/analyze`);
+      const storedData = await storedRes.json().catch(() => ({}));
+      if (storedRes.ok && storedData.stored && storedData.analysis) {
+        setAnalysis(storedData.analysis as MariTicketAnalysis);
+        setSavedAnalyzedAt(
+          typeof storedData.analyzedAt === "string"
+            ? storedData.analyzedAt
+            : null
+        );
+        setImagesAnalyzed(Number(storedData.imagesAnalyzed) || 0);
+        setImageNames(
+          Array.isArray(storedData.imageNames)
+            ? storedData.imageNames.map((n: unknown) => String(n))
+            : []
+        );
+        setAnalysisUsage(
+          storedData.usage && typeof storedData.usage === "object"
+            ? (storedData.usage as AiTokenUsage)
+            : null
+        );
+        setAnalysisOpen(false);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setDetail(null);
@@ -737,8 +776,9 @@ export function MaringoWorkspaceClient() {
     setHandledBy(value);
   }
 
-  async function runAnalyze() {
+  async function runAnalyze(options?: { includeImages?: boolean }) {
     if (!selectedId) return;
+    const includeImages = Boolean(options?.includeImages);
     setAnalyzing(true);
     setError(null);
     setNotePostedHint(null);
@@ -746,6 +786,8 @@ export function MaringoWorkspaceClient() {
     try {
       const res = await fetch(`/api/maringo/tickets/${selectedId}/analyze`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ includeImages }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Analyse fehlgeschlagen");
@@ -761,11 +803,26 @@ export function MaringoWorkspaceClient() {
           ? (data.usage as AiTokenUsage)
           : null
       );
+      setSavedAnalyzedAt(
+        typeof data.analyzedAt === "string"
+          ? data.analyzedAt
+          : new Date().toISOString()
+      );
+      setAnalysisOpen(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setAnalyzing(false);
     }
+  }
+
+  function formatAnalyzedAt(iso: string): string {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso;
+    return d.toLocaleString("de-CH", {
+      dateStyle: "short",
+      timeStyle: "short",
+    });
   }
 
   async function postAnalysisAsInternalNote() {
@@ -1402,17 +1459,94 @@ export function MaringoWorkspaceClient() {
                   </div>
                 </div>
 
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    className="bg-orange-600 text-white hover:bg-orange-700"
-                    disabled={analyzing}
-                    onClick={() => void runAnalyze()}
-                  >
-                    <Sparkles className="size-3.5" />
-                    {analyzing ? "Analysiert…" : "AI analysieren"}
-                  </Button>
+                <div className="flex flex-wrap items-center gap-2">
+                  {savedAnalyzedAt ? (
+                    <Badge className="bg-orange-100 text-orange-900 hover:bg-orange-100">
+                      Analyse vorhanden · {formatAnalyzedAt(savedAnalyzedAt)}
+                    </Badge>
+                  ) : null}
+                  {analysis && savedAnalyzedAt ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="border-orange-300 text-orange-900 hover:bg-orange-50"
+                      onClick={() => setAnalysisOpen((open) => !open)}
+                    >
+                      <Sparkles className="size-3.5" />
+                      {analysisOpen ? "Analyse ausblenden" : "Analyse anzeigen"}
+                    </Button>
+                  ) : null}
+                  {detailImageAttachmentCount > 0 ? (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger
+                        disabled={analyzing}
+                        render={
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="bg-orange-600 text-white hover:bg-orange-700"
+                            disabled={analyzing}
+                          />
+                        }
+                      >
+                        <Sparkles className="size-3.5" />
+                        {analyzing
+                          ? "Analysiert…"
+                          : savedAnalyzedAt
+                            ? "Neu analysieren"
+                            : "AI analysieren"}
+                        <ChevronDown className="size-3.5 opacity-80" />
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="w-72">
+                        <DropdownMenuLabel>Analyse-Modus</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          disabled={analyzing}
+                          onClick={() =>
+                            void runAnalyze({ includeImages: false })
+                          }
+                        >
+                          <span className="flex flex-col gap-0.5">
+                            <span className="font-medium">Nur Text</span>
+                            <span className="text-[11px] text-muted-foreground">
+                              Chat-Provider (z. B. DeepSeek) — empfohlen
+                            </span>
+                          </span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          disabled={analyzing}
+                          onClick={() =>
+                            void runAnalyze({ includeImages: true })
+                          }
+                        >
+                          <span className="flex flex-col gap-0.5">
+                            <span className="font-medium">
+                              Mit Screenshots ({detailImageAttachmentCount})
+                            </span>
+                            <span className="text-[11px] text-muted-foreground">
+                              OpenAI Vision — wenn Bildinhalt wichtig ist
+                            </span>
+                          </span>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  ) : (
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="bg-orange-600 text-white hover:bg-orange-700"
+                      disabled={analyzing}
+                      onClick={() => void runAnalyze({ includeImages: false })}
+                    >
+                      <Sparkles className="size-3.5" />
+                      {analyzing
+                        ? "Analysiert…"
+                        : savedAnalyzedAt
+                          ? "Neu analysieren"
+                          : "AI analysieren"}
+                    </Button>
+                  )}
                   <Button
                     type="button"
                     size="sm"
@@ -1432,24 +1566,29 @@ export function MaringoWorkspaceClient() {
               </div>
 
               <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
-                {analysis ? (
+                {analysis && analysisOpen ? (
                   <Card className="border-orange-200/70 bg-orange-50/40">
                     <CardContent className="space-y-3 p-4 text-[13px]">
                       <p className="flex items-center gap-2 text-[12px] font-black uppercase tracking-wide text-orange-900">
                         <Sparkles className="size-3.5" />
                         AI-Zusammenfassung
                       </p>
+                      {savedAnalyzedAt ? (
+                        <p className="text-[11px] text-orange-900/70">
+                          Gespeichert {formatAnalyzedAt(savedAnalyzedAt)}
+                        </p>
+                      ) : null}
                       {imagesAnalyzed > 0 ? (
                         <p className="text-[11px] text-orange-900/80">
                           Inkl. {imagesAnalyzed} Screenshot
-                          {imagesAnalyzed === 1 ? "" : "s"}
+                          {imagesAnalyzed === 1 ? "" : "s"} (OpenAI Vision)
                           {imageNames.length
                             ? `: ${imageNames.slice(0, 4).join(", ")}`
                             : ""}
                         </p>
                       ) : (
                         <p className="text-[11px] text-muted-foreground">
-                          Keine Bild-Anhänge für die Analyse geladen (nur Text).
+                          Textanalyse ohne Screenshot-Vision (Chat-Provider).
                         </p>
                       )}
                       {analysisUsageLines.length > 0 ? (
