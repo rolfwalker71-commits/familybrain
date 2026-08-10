@@ -34,9 +34,11 @@ import type { AiTokenUsage } from "@/lib/ai/usage-cost";
 import { toSwissDate } from "@/lib/utils/dates";
 import {
   durationMinutesFromHm,
+  groupFreeSlotsByDate,
   isSlotDurationPreset,
   SLOT_DURATION_PRESETS,
 } from "@/lib/calendar/slot-duration";
+import { weekdayLabel } from "@/components/calendar/agenda-row";
 import { GoogleMailInboxPanel } from "@/components/google/google-mail-inbox-panel";
 import { GoogleTasksPanel } from "@/components/google/google-tasks-panel";
 import { MailWorkspaceSubnav, type MailWorkspaceView, mailWorkspacePrimaryBtnClass, mailWorkspaceTabClass } from "@/components/mail/mail-workspace-subnav";
@@ -1256,27 +1258,40 @@ export function GoogleWorkspaceClient() {
                             </div>
                           ) : null}
                           {slotsByEvent[e.id]?.length ? (
-                            <div className="space-y-1.5 rounded-lg border border-border/60 bg-muted/20 p-2">
+                            <div className="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-2">
                               <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                                Vorschläge à {slotDurationFor(e)} Min (nächste 7
-                                Tage, 08–18)
+                                Vorschläge à {slotDurationFor(e)} Min (7 Tage,
+                                08–18)
                               </p>
-                              <ul className="flex flex-wrap gap-1.5">
-                                {slotsByEvent[e.id]!.map((s) => (
-                                  <li key={`${s.date}-${s.startHm}`}>
-                                    <Button
-                                      type="button"
-                                      size="sm"
-                                      variant="outline"
-                                      disabled={busyId === e.id}
-                                      onClick={() => void reschedule(e, s)}
-                                    >
-                                      {toSwissDate(s.date)} {s.startHm}–
-                                      {s.endHm}
-                                    </Button>
-                                  </li>
-                                ))}
-                              </ul>
+                              <div className="max-h-64 space-y-2.5 overflow-y-auto">
+                                {groupFreeSlotsByDate(slotsByEvent[e.id]!).map(
+                                  ({ date, slots: daySlots }) => (
+                                    <div key={date} className="space-y-1">
+                                      <p className="text-[12px] font-semibold text-foreground">
+                                        {weekdayLabel(date)} ·{" "}
+                                        {toSwissDate(date)}
+                                      </p>
+                                      <ul className="flex flex-wrap gap-1.5">
+                                        {daySlots.map((s) => (
+                                          <li key={`${s.date}-${s.startHm}`}>
+                                            <Button
+                                              type="button"
+                                              size="sm"
+                                              variant="outline"
+                                              disabled={busyId === e.id}
+                                              onClick={() =>
+                                                void reschedule(e, s)
+                                              }
+                                            >
+                                              {s.startHm}–{s.endHm}
+                                            </Button>
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  )
+                                )}
+                              </div>
                             </div>
                           ) : null}
                         </CardContent>

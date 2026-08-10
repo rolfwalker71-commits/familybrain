@@ -24,7 +24,10 @@ import {
   AgendaTypeRail,
   weekdayLabel,
 } from "@/components/calendar/agenda-row";
-import { SLOT_DURATION_PRESETS } from "@/lib/calendar/slot-duration";
+import {
+  groupFreeSlotsByDate,
+  SLOT_DURATION_PRESETS,
+} from "@/lib/calendar/slot-duration";
 import { APP_ICON_STROKE } from "@/lib/branding/app-icons";
 import { ICS_TYPE_META } from "@/lib/calendar/ics-types";
 import type { AgendaItem } from "@/lib/dashboard/overview";
@@ -571,25 +574,37 @@ export function AgendaEventDialog({
                       </Button>
                     </div>
                     {slots.length > 0 ? (
-                      <div className="space-y-1.5 rounded-lg border border-border/60 bg-muted/20 p-2">
+                      <div className="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-2">
                         <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                          Verschieben nach ({slotDuration} Min)
+                          Verschieben nach ({slotDuration} Min · 7 Tage)
                         </p>
-                        <ul className="flex flex-wrap gap-1.5">
-                          {slots.map((s) => (
-                            <li key={`${s.date}-${s.startHm}`}>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="secondary"
-                                disabled={busy}
-                                onClick={() => void reschedule(s)}
-                              >
-                                {s.date.slice(5)} {s.startHm}–{s.endHm}
-                              </Button>
-                            </li>
-                          ))}
-                        </ul>
+                        <div className="max-h-56 space-y-2.5 overflow-y-auto">
+                          {groupFreeSlotsByDate(slots).map(
+                            ({ date, slots: daySlots }) => (
+                              <div key={date} className="space-y-1">
+                                <p className="text-[12px] font-semibold text-foreground">
+                                  {weekdayLabel(date)} · {date.slice(8)}.
+                                  {date.slice(5, 7)}.
+                                </p>
+                                <ul className="flex flex-wrap gap-1.5">
+                                  {daySlots.map((s) => (
+                                    <li key={`${s.date}-${s.startHm}`}>
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="secondary"
+                                        disabled={busy}
+                                        onClick={() => void reschedule(s)}
+                                      >
+                                        {s.startHm}–{s.endHm}
+                                      </Button>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )
+                          )}
+                        </div>
                       </div>
                     ) : null}
                     {actionMsg ? (

@@ -254,6 +254,8 @@ export function findFreeSlots(input: {
   lunchStartHm?: string;
   lunchEndHm?: string;
   maxSlots?: number;
+  /** Cap proposals per calendar day so a full week stays visible. */
+  maxSlotsPerDay?: number;
   stepMinutes?: number;
   /** Skip slot starts before this local wall time on `notBefore.date` (e.g. now). */
   notBefore?: { date: string; hm: string } | null;
@@ -273,6 +275,7 @@ export function findFreeSlots(input: {
   const need = Math.max(15, input.durationMinutes);
   const step = Math.max(15, input.stepMinutes ?? SLOT_STEP_MINUTES);
   const maxSlots = input.maxSlots ?? 12;
+  const maxPerDay = input.maxSlotsPerDay ?? maxSlots;
   const notBeforeMins =
     input.notBefore && input.notBefore.date
       ? hmToMinutes(input.notBefore.hm)
@@ -283,6 +286,7 @@ export function findFreeSlots(input: {
 
   let day = input.rangeStart;
   while (day <= input.rangeEnd && slots.length < maxSlots) {
+    let dayCount = 0;
     const dayBusy: Array<{ start: number; end: number }> = input.events
       .filter((e) => e.date === day && isOccupyingCalendarEvent(e))
       .map((e) => {
@@ -317,11 +321,13 @@ export function findFreeSlots(input: {
     }
 
     for (const gap of freeGaps) {
-      if (slots.length >= maxSlots) break;
+      if (slots.length >= maxSlots || dayCount >= maxPerDay) break;
       if (gap.end - gap.start < need) continue;
       for (
         let t = gap.start;
-        t + need <= gap.end && slots.length < maxSlots;
+        t + need <= gap.end &&
+        slots.length < maxSlots &&
+        dayCount < maxPerDay;
         t += step
       ) {
         if (
@@ -351,6 +357,7 @@ export function findFreeSlots(input: {
           endHm: minutesToHm(end),
           durationMinutes: need,
         });
+        dayCount += 1;
       }
     }
 
@@ -369,6 +376,7 @@ export type SuggestFreeSlotsOptions = {
   /** Include today and skip past starts (Zurich now). Default false → from tomorrow. */
   fromToday?: boolean;
   maxSlots?: number;
+  maxSlotsPerDay?: number;
 };
 
 function resolveSlotSearchWindow(options?: SuggestFreeSlotsOptions): {
@@ -425,7 +433,8 @@ export async function suggestFreeSlotsForEvent(
     workStartHm: options?.workStartHm || MS_WORK_START_HM,
     workEndHm: options?.workEndHm || MS_WORK_END_HM,
     notBefore,
-    maxSlots: options?.maxSlots ?? 12,
+    maxSlots: options?.maxSlots ?? 48,
+    maxSlotsPerDay: options?.maxSlotsPerDay ?? 6,
   });
 }
 
@@ -452,7 +461,8 @@ export async function suggestFreeSlotsForDuration(
     workStartHm: options.workStartHm || MS_WORK_START_HM,
     workEndHm: options.workEndHm || MS_WORK_END_HM,
     notBefore,
-    maxSlots: options.maxSlots ?? 12,
+    maxSlots: options.maxSlots ?? 48,
+    maxSlotsPerDay: options.maxSlotsPerDay ?? 6,
   });
 }
 

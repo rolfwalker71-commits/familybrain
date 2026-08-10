@@ -68,7 +68,8 @@ export async function POST(request: Request) {
         fromToday: true,
         rangeStart: today,
         rangeEnd: addDaysYmd(today, rangeDays),
-        maxSlots: 16,
+        maxSlots: 48,
+        maxSlotsPerDay: 6,
       });
       return NextResponse.json({
         ok: true,

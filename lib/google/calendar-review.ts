@@ -163,6 +163,7 @@ export async function suggestGoogleFreeSlotsForEvent(
     durationMinutes?: number;
     fromToday?: boolean;
     maxSlots?: number;
+    maxSlotsPerDay?: number;
   }
 ): Promise<FreeSlot[]> {
   const today = zurichYmd();
@@ -218,7 +219,8 @@ export async function suggestGoogleFreeSlotsForEvent(
     rangeStart,
     rangeEnd,
     durationMinutes: duration,
-    maxSlots: options?.maxSlots ?? 12,
+    maxSlots: options?.maxSlots ?? 48,
+    maxSlotsPerDay: options?.maxSlotsPerDay ?? 6,
     notBefore: fromToday
       ? { date: today, hm: zurichHm() }
       : null,

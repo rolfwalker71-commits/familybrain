@@ -187,6 +187,25 @@ test("findFreeSlots shorter duration finds tighter gaps", () => {
   assert.ok(short.every((s) => s.durationMinutes === 30));
 });
 
+test("findFreeSlots maxSlotsPerDay spreads across the week", () => {
+  const slots = findFreeSlots({
+    events: [],
+    rangeStart: "2026-08-10",
+    rangeEnd: "2026-08-16",
+    durationMinutes: 15,
+    maxSlots: 48,
+    maxSlotsPerDay: 3,
+  });
+  const byDay = new Map<string, number>();
+  for (const s of slots) {
+    byDay.set(s.date, (byDay.get(s.date) || 0) + 1);
+  }
+  assert.ok(byDay.size >= 5, `expected many days, got ${byDay.size}`);
+  for (const count of byDay.values()) {
+    assert.ok(count <= 3);
+  }
+});
+
 test("withReschedulePrefix adds arrow once", () => {
   assert.equal(withReschedulePrefix("MorgenCall"), "➡️ MorgenCall");
   assert.equal(withReschedulePrefix("➡️ MorgenCall"), "➡️ MorgenCall");

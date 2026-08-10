@@ -13,9 +13,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { APP_ICON_STROKE } from "@/lib/branding/app-icons";
+import {
+  groupFreeSlotsByDate,
+  SLOT_DURATION_PRESETS,
+} from "@/lib/calendar/slot-duration";
 import { cn } from "@/lib/utils";
 import { weekdayLabel } from "@/components/calendar/agenda-row";
-import { SLOT_DURATION_PRESETS } from "@/lib/calendar/slot-duration";
 
 type FreeSlot = {
   date: string;
@@ -208,31 +211,40 @@ export function AdhocEventDialog({
           </Button>
 
           {slots.length > 0 ? (
-            <div className="space-y-1.5 rounded-lg border border-border/60 bg-muted/20 p-2">
+            <div className="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-2">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Slot wählen → in Outlook speichern
+                Slot wählen → Outlook ({duration} Min · 7 Tage)
               </p>
-              <ul className="flex max-h-48 flex-col gap-1 overflow-y-auto">
-                {slots.map((s) => (
-                  <li key={`${s.date}-${s.startHm}`}>
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => void createInSlot(s)}
-                      className={cn(
-                        "flex w-full items-center justify-between gap-2 rounded-md border border-border/50 bg-card px-2.5 py-2 text-left text-[13px] transition-colors hover:bg-muted/40 disabled:opacity-60"
-                      )}
-                    >
-                      <span className="min-w-0 truncate font-medium">
-                        {weekdayLabel(s.date)} · {s.date.slice(5)}
-                      </span>
-                      <span className="shrink-0 tabular-nums text-muted-foreground">
-                        {s.startHm}–{s.endHm}
-                      </span>
-                    </button>
-                  </li>
+              <div className="max-h-56 space-y-2.5 overflow-y-auto">
+                {groupFreeSlotsByDate(slots).map(({ date, slots: daySlots }) => (
+                  <div key={date} className="space-y-1">
+                    <p className="text-[12px] font-semibold text-foreground">
+                      {weekdayLabel(date)} · {date.slice(8)}.{date.slice(5, 7)}.
+                    </p>
+                    <ul className="flex flex-col gap-1">
+                      {daySlots.map((s) => (
+                        <li key={`${s.date}-${s.startHm}`}>
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => void createInSlot(s)}
+                            className={cn(
+                              "flex w-full items-center justify-between gap-2 rounded-md border border-border/50 bg-card px-2.5 py-2 text-left text-[13px] transition-colors hover:bg-muted/40 disabled:opacity-60"
+                            )}
+                          >
+                            <span className="tabular-nums text-muted-foreground">
+                              {s.startHm}–{s.endHm}
+                            </span>
+                            <span className="text-[11px] font-medium text-foreground">
+                              Eintragen
+                            </span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 ))}
-              </ul>
+              </div>
             </div>
           ) : null}
 
