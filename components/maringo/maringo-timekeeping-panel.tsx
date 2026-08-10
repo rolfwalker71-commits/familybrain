@@ -65,6 +65,7 @@ export function MaringoTimekeepingPanel({
 
   async function book(values: TimeBookFormValues) {
     setStatus(null);
+    setError(null);
     const res = await fetch("/api/maringo/timekeeping/lines", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -72,25 +73,34 @@ export function MaringoTimekeepingPanel({
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || "Buchung fehlgeschlagen");
+    const line = data.line as MariTimeLine | undefined;
+    const warn =
+      (line?.warning || "").trim() ||
+      (typeof data.warning === "string" ? data.warning.trim() : "");
     setStatus(
-      `Gebucht: ${values.hours} h auf ${values.projectNumber}${
-        values.issueId ? ` (Ticket #${values.issueId})` : ""
-      }`
+      [
+        `Gebucht: ${values.hours} h auf ${values.projectNumber}` +
+          (values.issueId ? ` (Ticket #${values.issueId})` : "") +
+          (line?.lineId ? ` · #${line.lineId}` : ""),
+        warn ? `Hinweis: ${warn}` : null,
+      ]
+        .filter(Boolean)
+        .join(" — ")
     );
     setFormKey((k) => k + 1);
-    if (values.dayOfService !== date) setDate(values.dayOfService);
-    else await loadDay(date);
+    setDate(values.dayOfService);
+    await loadDay(values.dayOfService);
   }
 
   return (
     <div className={cn("space-y-4", className)}>
       {error ? (
-        <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-950">
+        <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm whitespace-pre-wrap break-words text-rose-950">
           {error}
         </p>
       ) : null}
       {status ? (
-        <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-950">
+        <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm whitespace-pre-wrap break-words text-emerald-950">
           {status}
         </p>
       ) : null}

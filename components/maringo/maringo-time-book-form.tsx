@@ -251,7 +251,7 @@ export function MaringoTimeBookForm({
       setError("Bitte Projekt wählen.");
       return;
     }
-    if (!phaseId) {
+    if (phases.length > 0 && !phaseId) {
       setError("Bitte Phase wählen.");
       return;
     }
@@ -306,7 +306,7 @@ export function MaringoTimeBookForm({
       className={cn("space-y-3", className)}
     >
       {error ? (
-        <p className="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-2 text-[12px] text-rose-950">
+        <p className="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-2 text-[12px] whitespace-pre-wrap break-words text-rose-950">
           {error}
         </p>
       ) : null}
@@ -430,7 +430,9 @@ export function MaringoTimeBookForm({
             onChange={(e) => setPhaseId(e.target.value)}
             disabled={!projectNumber}
           >
-            <option value="">Phase wählen…</option>
+            <option value="">
+              {phases.length === 0 ? "Keine Phase nötig" : "Phase wählen…"}
+            </option>
             {phases.map((p) => (
               <option key={p.keyInternal} value={p.keyInternal}>
                 {p.matchcode}

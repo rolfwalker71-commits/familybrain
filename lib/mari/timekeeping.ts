@@ -36,6 +36,8 @@ export type MariTimeLine = {
   timeStart: string | null;
   timeEnd: string | null;
   createDate: string | null;
+  /** Optional MARI-Hinweis (z.B. Warnings nach erfolgreichem Import). */
+  warning?: string | null;
 };
 
 export type MariDayTimeSummary = {
@@ -346,16 +348,31 @@ export async function createTimeKeepingLine(
     }
   );
 
+  const lineId = Number(result.LineID) || 0;
   const feedback = Number(result.IMPORT_Feedback) || 0;
-  if (feedback !== 0) {
+  const rawMsg = String(
+    result.IMPORT_ErrorMessage || result.EXPORT_INFO || ""
+  ).trim();
+  // MARI liefert oft Feedback≠0 inkl. «successfully imported … Warnings:» — Buchung ist trotzdem da.
+  const importedOk =
+    lineId > 0 || /successfully\s+imported/i.test(rawMsg);
+  if (!importedOk && feedback !== 0) {
     throw new MariApiError(
-      String(result.IMPORT_ErrorMessage || "Zeitbuchung fehlgeschlagen"),
+      rawMsg || "Zeitbuchung fehlgeschlagen",
       400,
       result
     );
   }
 
-  const lineId = Number(result.LineID) || 0;
+  const warningNote = (() => {
+    if (!rawMsg) return null;
+    const m = /warnings?\s*:\s*(.*)$/i.exec(rawMsg);
+    const rest = (m?.[1] || "").trim();
+    if (rest) return rest;
+    if (/warning/i.test(rawMsg) && importedOk) return rawMsg;
+    return null;
+  })();
+
   if (lineId > 0) {
     try {
       const one = await mariJson<Record<string, unknown>>(
@@ -384,6 +401,7 @@ export async function createTimeKeepingLine(
         timeStart: null,
         timeEnd: null,
         createDate: null,
+        warning: warningNote,
       };
     } catch {
       /* fall through */
@@ -408,5 +426,6 @@ export async function createTimeKeepingLine(
     timeStart: null,
     timeEnd: null,
     createDate: null,
+    warning: warningNote,
   };
 }
