@@ -252,10 +252,25 @@ type DayCluster = {
   theme: string;
   summary: string;
   status?: "open" | "waiting" | "done" | "fyi";
+  /** false = nur Info / Chip «keine Aktion». */
+  actionNeeded?: boolean;
   tasks: DayTask[];
   events: DayEventSug[];
   replies: DayReply[];
 };
+
+function clusterNeedsAction(cluster: DayCluster): boolean {
+  if (typeof cluster.actionNeeded === "boolean") return cluster.actionNeeded;
+  if (
+    cluster.tasks.length > 0 ||
+    cluster.events.length > 0 ||
+    cluster.replies.length > 0
+  ) {
+    return true;
+  }
+  if (cluster.status === "open" || cluster.status === "waiting") return true;
+  return false;
+}
 
 type DayAnalysis = {
   daySummary: string;
@@ -315,6 +330,7 @@ export function GoogleWorkspaceClient() {
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeNotice, setAnalyzeNotice] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<DayAnalysis | null>(null);
+  const [showAllThreads, setShowAllThreads] = useState(false);
   const [cachedDays, setCachedDays] = useState<string[]>([]);
   const [cachedEntries, setCachedEntries] = useState<MailDayCachedSummary[]>(
     []
@@ -538,6 +554,7 @@ export function GoogleWorkspaceClient() {
         replies: a.replies || [],
         usage: a.usage || null,
       });
+      setShowAllThreads(false);
       const next: PickState = { tasks: {}, events: {}, replies: {} };
       (a.tasks || []).forEach((t, i) => {
         next.tasks[i] = !t.existingTask?.id;
@@ -884,6 +901,24 @@ export function GoogleWorkspaceClient() {
       analysis.replies.filter((_, i) => picks.replies[i]).length
     );
   }, [analysis, picks]);
+
+  const clusterView = useMemo(() => {
+    if (!analysis) {
+      return {
+        actionable: [] as { cluster: DayCluster; ci: number }[],
+        rest: [] as { cluster: DayCluster; ci: number }[],
+        visible: [] as { cluster: DayCluster; ci: number }[],
+      };
+    }
+    const all = analysis.clusters.map((cluster, ci) => ({ cluster, ci }));
+    const actionable = all.filter(({ cluster }) => clusterNeedsAction(cluster));
+    const rest = all.filter(({ cluster }) => !clusterNeedsAction(cluster));
+    return {
+      actionable,
+      rest,
+      visible: showAllThreads ? all : actionable,
+    };
+  }, [analysis, showAllThreads]);
 
   function flatTaskIndex(clusterIdx: number, localIdx: number): number {
     if (!analysis) return -1;
@@ -1554,8 +1589,16 @@ export function GoogleWorkspaceClient() {
                         Keine Cluster / Handlungsvorschläge.
                       </p>
                     ) : (
-                      <ul className="space-y-3">
-                        {analysis.clusters.map((cluster, ci) => (
+                      <div className="space-y-3">
+                        {clusterView.visible.length === 0 &&
+                        !showAllThreads &&
+                        clusterView.rest.length > 0 ? (
+                          <p className="text-sm text-muted-foreground">
+                            Keine offenen Handlungen — nur Info-/FYI-Threads.
+                          </p>
+                        ) : null}
+                        <ul className="space-y-3">
+                        {clusterView.visible.map(({ cluster, ci }) => (
                           <li
                             key={`${cluster.company}-${cluster.theme}-${ci}`}
                             className="rounded-lg border border-border/60 bg-muted/20 p-3"
@@ -1575,11 +1618,25 @@ export function GoogleWorkspaceClient() {
                                   </p>
                                 ) : null}
                               </div>
-                              {cluster.status ? (
-                                <Badge variant="secondary" className="text-[10px]">
-                                  {STATUS_LABEL[cluster.status] || cluster.status}
-                                </Badge>
-                              ) : null}
+                              <div className="flex flex-wrap items-center justify-end gap-1.5">
+                                {!clusterNeedsAction(cluster) ? (
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[10px] font-normal"
+                                  >
+                                    Thread erfordert keine Aktion
+                                  </Badge>
+                                ) : null}
+                                {cluster.status ? (
+                                  <Badge
+                                    variant="secondary"
+                                    className="text-[10px]"
+                                  >
+                                    {STATUS_LABEL[cluster.status] ||
+                                      cluster.status}
+                                  </Badge>
+                                ) : null}
+                              </div>
                             </div>
                             <p className="mt-1.5 text-sm leading-snug text-foreground/90">
                               {cluster.summary}
@@ -1781,7 +1838,20 @@ export function GoogleWorkspaceClient() {
                             ) : null}
                           </li>
                         ))}
-                      </ul>
+                        </ul>
+                        {clusterView.rest.length > 0 ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setShowAllThreads((v) => !v)}
+                          >
+                            {showAllThreads
+                              ? `Nur offene Threads (${clusterView.actionable.length})`
+                              : `Alle Threads zeigen (${clusterView.rest.length} weitere)`}
+                          </Button>
+                        ) : null}
+                      </div>
                     )}
 
                     {selectedCount > 0 ||
