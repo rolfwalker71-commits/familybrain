@@ -51,6 +51,12 @@ const OPENAI_MODELS = [
   "o4-mini",
 ];
 
+const DEEPSEEK_MODELS = ["deepseek-v4-flash", "deepseek-v4-pro"];
+
+const DEEPSEEK_BASE_URL = "https://api.deepseek.com";
+
+type ChatProviderId = "openai" | "deepseek" | "custom";
+
 export default function SettingsPage() {
   return (
     <Suspense
@@ -87,9 +93,15 @@ function SettingsPageInner() {
   const [openaiKey, setOpenaiKey] = useState("");
   const [openaiKeyMasked, setOpenaiKeyMasked] = useState<string | null>(null);
   const [hasOpenAIKey, setHasOpenAIKey] = useState(false);
-  const [openaiBaseUrl, setOpenaiBaseUrl] = useState("");
   const [openaiModel, setOpenaiModel] = useState("gpt-4o-mini");
-  const [customModel, setCustomModel] = useState("");
+  const [openaiCustomModel, setOpenaiCustomModel] = useState("");
+  const [chatProvider, setChatProvider] = useState<ChatProviderId>("openai");
+  const [chatKey, setChatKey] = useState("");
+  const [chatKeyMasked, setChatKeyMasked] = useState<string | null>(null);
+  const [hasChatKey, setHasChatKey] = useState(false);
+  const [chatBaseUrl, setChatBaseUrl] = useState("");
+  const [chatModel, setChatModel] = useState("gpt-4o-mini");
+  const [chatCustomModel, setChatCustomModel] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState<
@@ -294,15 +306,36 @@ function SettingsPageInner() {
       );
       setOpenaiKeyMasked(data.openaiApiKeyMasked);
       setHasOpenAIKey(Boolean(data.hasOpenAIKey));
-      setOpenaiBaseUrl(
-        typeof data.openaiBaseUrl === "string" ? data.openaiBaseUrl : ""
-      );
-      const model = data.openaiModel || "gpt-4o-mini";
-      if (OPENAI_MODELS.includes(model)) {
-        setOpenaiModel(model);
+      const oaiModel = data.openaiModel || "gpt-4o-mini";
+      if (OPENAI_MODELS.includes(oaiModel)) {
+        setOpenaiModel(oaiModel);
+        setOpenaiCustomModel("");
       } else {
         setOpenaiModel("custom");
-        setCustomModel(model);
+        setOpenaiCustomModel(oaiModel);
+      }
+      const provider = (
+        data.chatProvider === "deepseek" ||
+        data.chatProvider === "custom" ||
+        data.chatProvider === "openai"
+          ? data.chatProvider
+          : "openai"
+      ) as ChatProviderId;
+      setChatProvider(provider);
+      setChatKeyMasked(data.chatApiKeyMasked || null);
+      setHasChatKey(Boolean(data.hasChatKey));
+      setChatBaseUrl(
+        typeof data.chatBaseUrl === "string" ? data.chatBaseUrl : ""
+      );
+      const cModel = data.chatModel || "gpt-4o-mini";
+      const chatPresets =
+        provider === "deepseek" ? DEEPSEEK_MODELS : OPENAI_MODELS;
+      if (chatPresets.includes(cModel)) {
+        setChatModel(cModel);
+        setChatCustomModel("");
+      } else {
+        setChatModel("custom");
+        setChatCustomModel(cModel);
       }
       setTriliumBaseUrl(data.triliumBaseUrl || "");
       setTriliumTokenMasked(data.triliumApiTokenMasked);
@@ -537,15 +570,33 @@ function SettingsPageInner() {
     setError(null);
     setMessage(null);
     try {
-      const model =
-        openaiModel === "custom" ? customModel.trim() : openaiModel;
-      if (!model) throw new Error("Bitte ein Modell wählen oder eingeben.");
-      if (!openaiKey && !hasOpenAIKey) {
-        throw new Error("Bitte einen API-Key eingeben.");
+      const visionModel =
+        openaiModel === "custom" ? openaiCustomModel.trim() : openaiModel;
+      if (!visionModel) {
+        throw new Error("Bitte ein OpenAI-Modell wählen oder eingeben.");
       }
-      const baseUrl = openaiBaseUrl.trim();
-      if (baseUrl && !URL.canParse(baseUrl)) {
-        throw new Error("API-Basis-URL ist ungültig.");
+      if (!openaiKey && !hasOpenAIKey) {
+        throw new Error(
+          "Bitte einen OpenAI API-Key eingeben (Bilder, Embeddings, Vision)."
+        );
+      }
+
+      const resolvedChatModel =
+        chatModel === "custom" ? chatCustomModel.trim() : chatModel;
+      if (!resolvedChatModel) {
+        throw new Error("Bitte ein Chat-/Analyse-Modell wählen oder eingeben.");
+      }
+      if (chatProvider !== "openai" && !chatKey && !hasChatKey) {
+        throw new Error(
+          "Bitte einen API-Key für Chat/Analyse eingeben (DeepSeek/Custom)."
+        );
+      }
+      const baseUrl = chatBaseUrl.trim();
+      if (chatProvider === "custom") {
+        if (!baseUrl) throw new Error("API-Basis-URL für Custom ist erforderlich.");
+        if (!URL.canParse(baseUrl)) {
+          throw new Error("API-Basis-URL ist ungültig.");
+        }
       }
 
       const res = await fetch("/api/settings", {
@@ -553,18 +604,36 @@ function SettingsPageInner() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           openaiApiKey: openaiKey || undefined,
-          openaiModel: model,
-          openaiBaseUrl: baseUrl,
+          openaiModel: visionModel,
+          chatProvider,
+          chatApiKey: chatKey || undefined,
+          chatBaseUrl:
+            chatProvider === "deepseek"
+              ? DEEPSEEK_BASE_URL
+              : chatProvider === "custom"
+                ? baseUrl
+                : "",
+          chatModel: resolvedChatModel,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Speichern fehlgeschlagen");
       setOpenaiKeyMasked(data.openaiApiKeyMasked);
       setHasOpenAIKey(data.hasOpenAIKey);
-      setOpenaiBaseUrl(
-        typeof data.openaiBaseUrl === "string" ? data.openaiBaseUrl : baseUrl
-      );
       setOpenaiKey("");
+      setChatKeyMasked(data.chatApiKeyMasked || null);
+      setHasChatKey(Boolean(data.hasChatKey));
+      setChatKey("");
+      setChatBaseUrl(
+        typeof data.chatBaseUrl === "string" ? data.chatBaseUrl : baseUrl
+      );
+      setChatProvider(
+        data.chatProvider === "deepseek" ||
+          data.chatProvider === "custom" ||
+          data.chatProvider === "openai"
+          ? data.chatProvider
+          : chatProvider
+      );
       setMessage("KI-API-Einstellungen gespeichert.");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -573,10 +642,11 @@ function SettingsPageInner() {
     }
   }
 
-  function applyDeepSeekPreset() {
-    setOpenaiBaseUrl("https://api.deepseek.com");
-    setOpenaiModel("custom");
-    setCustomModel("deepseek-v4-flash");
+  function applyDeepSeekChatPreset() {
+    setChatProvider("deepseek");
+    setChatBaseUrl(DEEPSEEK_BASE_URL);
+    setChatModel("deepseek-v4-flash");
+    setChatCustomModel("");
   }
 
   async function saveTrilium() {
@@ -2839,11 +2909,12 @@ function SettingsPageInner() {
       ) : null}
 
       {activeTab === "openai" ? (
+      <div className="space-y-6">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="flex items-center gap-3">
             <IconCircle icon={KeyRound} tone="teal" size="sm" />
-            KI-API (OpenAI-kompatibel)
+            OpenAI (Bilder, Embeddings, Vision)
           </CardTitle>
           {hasOpenAIKey ? (
             <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">
@@ -2854,8 +2925,12 @@ function SettingsPageInner() {
           )}
         </CardHeader>
         <CardContent className="space-y-4">
+          <p className="text-xs text-muted-foreground">
+            Wird für AI-Bilder, Vektorsuche/Embeddings und Ticket-Screenshots
+            genutzt — immer über die offizielle OpenAI-API.
+          </p>
           <div className="space-y-2">
-            <Label htmlFor="openaiKey">API-Key</Label>
+            <Label htmlFor="openaiKey">OpenAI API-Key</Label>
             <Input
               id="openaiKey"
               type="password"
@@ -2867,42 +2942,9 @@ function SettingsPageInner() {
                   : "sk-..."
               }
             />
-            <p className="text-xs text-muted-foreground">
-              OpenAI- oder DeepSeek-Key. Wird lokal in SQLite gespeichert und nie
-              vollständig im Browser angezeigt.
-            </p>
           </div>
           <div className="space-y-2">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <Label htmlFor="openaiBaseUrl">API-Basis-URL</Label>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                disabled={saving !== null}
-                onClick={applyDeepSeekPreset}
-              >
-                DeepSeek vorausfüllen
-              </Button>
-            </div>
-            <Input
-              id="openaiBaseUrl"
-              value={openaiBaseUrl}
-              onChange={(e) => setOpenaiBaseUrl(e.target.value)}
-              placeholder="Leer = OpenAI (api.openai.com)"
-              className="max-w-md"
-            />
-            <p className="text-xs text-muted-foreground">
-              Für DeepSeek:{" "}
-              <code className="text-[11px]">https://api.deepseek.com</code> und
-              Modell{" "}
-              <code className="text-[11px]">deepseek-v4-flash</code> oder{" "}
-              <code className="text-[11px]">deepseek-v4-pro</code>. Embeddings
-              und Bildgenerierung brauchen weiterhin OpenAI.
-            </p>
-          </div>
-          <div className="space-y-2">
-            <Label>Modell</Label>
+            <Label>OpenAI-Modell (Vision / Fallback)</Label>
             <Select
               value={openaiModel}
               onValueChange={(value) => {
@@ -2924,12 +2966,165 @@ function SettingsPageInner() {
           </div>
           {openaiModel === "custom" ? (
             <div className="space-y-2">
-              <Label htmlFor="customModel">Modellname</Label>
+              <Label htmlFor="openaiCustomModel">Modellname</Label>
               <Input
-                id="customModel"
-                value={customModel}
-                onChange={(e) => setCustomModel(e.target.value)}
-                placeholder="z. B. deepseek-v4-flash"
+                id="openaiCustomModel"
+                value={openaiCustomModel}
+                onChange={(e) => setOpenaiCustomModel(e.target.value)}
+                placeholder="z. B. gpt-4.1-nano"
+              />
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="flex items-center gap-3">
+            <IconCircle icon={Sparkles} tone="teal" size="sm" />
+            Chat & Analyse
+          </CardTitle>
+          {hasChatKey ? (
+            <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">
+              Konfiguriert
+            </Badge>
+          ) : (
+            <Badge variant="destructive">Fehlt</Badge>
+          )}
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-xs text-muted-foreground">
+            Chat, Mail-/Dokumentanalyse, Briefings. Kann OpenAI, DeepSeek oder
+            einen anderen OpenAI-kompatiblen Endpoint nutzen.
+          </p>
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <Label>Provider</Label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={saving !== null}
+                onClick={applyDeepSeekChatPreset}
+              >
+                DeepSeek vorausfüllen
+              </Button>
+            </div>
+            <Select
+              value={chatProvider}
+              onValueChange={(value) => {
+                if (value === "openai" || value === "deepseek" || value === "custom") {
+                  setChatProvider(value);
+                  if (value === "deepseek") {
+                    setChatBaseUrl(DEEPSEEK_BASE_URL);
+                    if (
+                      !DEEPSEEK_MODELS.includes(chatModel) &&
+                      chatModel !== "custom"
+                    ) {
+                      setChatModel("deepseek-v4-flash");
+                      setChatCustomModel("");
+                    }
+                  }
+                  if (value === "openai") {
+                    setChatBaseUrl("");
+                    if (
+                      !OPENAI_MODELS.includes(chatModel) &&
+                      chatModel !== "custom"
+                    ) {
+                      setChatModel("gpt-4o-mini");
+                      setChatCustomModel("");
+                    }
+                  }
+                }
+              }}
+            >
+              <SelectTrigger className="w-full max-w-md">
+                <SelectValue placeholder="Provider wählen" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="openai">
+                  OpenAI (gleicher Key wie oben)
+                </SelectItem>
+                <SelectItem value="deepseek">DeepSeek</SelectItem>
+                <SelectItem value="custom">Custom (OpenAI-kompatibel)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {chatProvider !== "openai" ? (
+            <div className="space-y-2">
+              <Label htmlFor="chatKey">
+                {chatProvider === "deepseek" ? "DeepSeek" : "Chat"} API-Key
+              </Label>
+              <Input
+                id="chatKey"
+                type="password"
+                value={chatKey}
+                onChange={(e) => setChatKey(e.target.value)}
+                placeholder={
+                  hasChatKey
+                    ? `Gespeichert: ${chatKeyMasked || "••••"}`
+                    : "sk-..."
+                }
+              />
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Nutzt den OpenAI-Key aus dem Abschnitt oben.
+            </p>
+          )}
+          {chatProvider === "custom" ? (
+            <div className="space-y-2">
+              <Label htmlFor="chatBaseUrl">API-Basis-URL</Label>
+              <Input
+                id="chatBaseUrl"
+                value={chatBaseUrl}
+                onChange={(e) => setChatBaseUrl(e.target.value)}
+                placeholder="https://…"
+                className="max-w-md"
+              />
+            </div>
+          ) : null}
+          {chatProvider === "deepseek" ? (
+            <p className="text-xs text-muted-foreground">
+              Endpoint: <code className="text-[11px]">{DEEPSEEK_BASE_URL}</code>
+            </p>
+          ) : null}
+          <div className="space-y-2">
+            <Label>Chat-/Analyse-Modell</Label>
+            <Select
+              value={chatModel}
+              onValueChange={(value) => {
+                if (value != null) setChatModel(value);
+              }}
+            >
+              <SelectTrigger className="w-full max-w-md">
+                <SelectValue placeholder="Modell wählen" />
+              </SelectTrigger>
+              <SelectContent>
+                {(chatProvider === "deepseek"
+                  ? DEEPSEEK_MODELS
+                  : OPENAI_MODELS
+                ).map((model) => (
+                  <SelectItem key={model} value={model}>
+                    {model}
+                  </SelectItem>
+                ))}
+                <SelectItem value="custom">Eigenes Modell…</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {chatModel === "custom" ? (
+            <div className="space-y-2">
+              <Label htmlFor="chatCustomModel">Modellname</Label>
+              <Input
+                id="chatCustomModel"
+                value={chatCustomModel}
+                onChange={(e) => setChatCustomModel(e.target.value)}
+                placeholder={
+                  chatProvider === "deepseek"
+                    ? "z. B. deepseek-v4-flash"
+                    : "z. B. gpt-4.1-nano"
+                }
               />
             </div>
           ) : null}
@@ -2942,6 +3137,7 @@ function SettingsPageInner() {
           </Button>
         </CardContent>
       </Card>
+      </div>
       ) : null}
 
       {message ? (

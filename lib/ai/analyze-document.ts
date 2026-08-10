@@ -1,4 +1,4 @@
-import { getOpenAIClient, getOpenAIModel } from "./client";
+import { getChatClient, getChatModel } from "./client";
 import {
   ANALYSIS_SYSTEM_PROMPT,
   buildAnalysisUserPrompt,
@@ -28,8 +28,8 @@ export async function analyzeDocument(
   }
 
   const { document, tags } = detail;
-  const model = getOpenAIModel();
-  const client = getOpenAIClient();
+  const model = getChatModel();
+  const client = getChatClient();
 
   let householdMembers: string[] = [];
   try {

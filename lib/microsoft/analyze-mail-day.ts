@@ -1,4 +1,4 @@
-import { getOpenAIClient, getOpenAIModel, hasOpenAIKey } from "@/lib/ai/client";
+import { getChatClient, getChatModel, hasChatKey } from "@/lib/ai/client";
 import {
   buildAiTokenUsage,
   type AiTokenUsage,
@@ -820,7 +820,7 @@ export async function analyzeMicrosoftMailDay(input: {
   inbox: MsMailItem[];
   sent: MsMailItem[];
 }): Promise<MsDayMailAnalysis> {
-  if (!hasOpenAIKey()) {
+  if (!hasChatKey()) {
     throw new Error("OpenAI API-Key fehlt (Einstellungen).");
   }
 
@@ -867,8 +867,8 @@ export async function analyzeMicrosoftMailDay(input: {
     batches.push(seeds.slice(i, i + BATCH));
   }
 
-  const client = getOpenAIClient();
-  const model = getOpenAIModel();
+  const client = getChatClient();
+  const model = getChatModel();
   const usages: AiTokenUsage[] = [];
   const aiByKey = new Map<string, z.infer<typeof MsDayClusterSchema>>();
 
@@ -1221,7 +1221,7 @@ function mergeUsages(
 }
 
 async function writeDaySummaryOverview(input: {
-  client: ReturnType<typeof getOpenAIClient>;
+  client: ReturnType<typeof getChatClient>;
   model: string;
   rangeLabel: string;
   clusters: MsDayCluster[];

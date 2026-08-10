@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { ensureInitialized } from "@/lib/db/migrations";
 import { isAuthError, requireAuth } from "@/lib/auth/current-user";
-import { hasOpenAIKey } from "@/lib/ai/client";
+import { hasChatKey } from "@/lib/ai/client";
 import { MariApiError } from "@/lib/mari/client";
 import { hasMariConfig } from "@/lib/mari/config";
 import { listMariImageAttachmentsForAi } from "@/lib/mari/attachments";
@@ -25,9 +25,9 @@ export async function POST(_request: Request, context: Ctx) {
       { status: 503 }
     );
   }
-  if (!hasOpenAIKey()) {
+  if (!hasChatKey()) {
     return NextResponse.json(
-      { error: "OpenAI API-Key fehlt (Einstellungen → OpenAI)." },
+      { error: "Chat-/Analyse-API-Key fehlt (Einstellungen → KI-API)." },
       { status: 400 }
     );
   }

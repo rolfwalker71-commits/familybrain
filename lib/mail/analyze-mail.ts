@@ -1,4 +1,4 @@
-import { getOpenAIClient, getOpenAIModel, hasOpenAIKey } from "@/lib/ai/client";
+import { getChatClient, getChatModel, hasChatKey } from "@/lib/ai/client";
 import {
   MailAnalysisSchema,
   type MailAnalysis,
@@ -88,8 +88,8 @@ export async function analyzeMailForActions(
   todayIso: string,
   context?: AnalyzeMailContext
 ): Promise<MailAnalysis> {
-  if (!hasOpenAIKey()) {
-    throw new Error("OpenAI API-Key fehlt (Einstellungen).");
+  if (!hasChatKey()) {
+    throw new Error("Chat-/Analyse-API-Key fehlt (Einstellungen → KI-API).");
   }
 
   const body = mailBodyForAi(message);
@@ -144,8 +144,8 @@ JSON-Schema:
   ]
 }`;
 
-  const client = getOpenAIClient();
-  const model = getOpenAIModel();
+  const client = getChatClient();
+  const model = getChatModel();
   const completion = await client.chat.completions.create({
     model,
     temperature: 0.2,

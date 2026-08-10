@@ -4,9 +4,9 @@ import {
   type AiTokenUsage,
 } from "@/lib/ai/usage-cost";
 import {
-  getOpenAIClient,
-  getOpenAIModel,
-  hasOpenAIKey,
+  getChatClient,
+  getChatModel,
+  hasChatKey,
 } from "@/lib/ai/client";
 import {
   normalizeReplySubject,
@@ -36,12 +36,12 @@ export async function translateMailReply(input: {
   language: ReplyLang;
   usage: AiTokenUsage | null;
 }> {
-  if (!hasOpenAIKey()) {
-    throw new Error("OpenAI API-Key fehlt (Einstellungen).");
+  if (!hasChatKey()) {
+    throw new Error("Chat-/Analyse-API-Key fehlt (Einstellungen → KI-API).");
   }
   const target = input.targetLang;
-  const client = getOpenAIClient();
-  const model = getOpenAIModel();
+  const client = getChatClient();
+  const model = getChatModel();
   const completion = await client.chat.completions.create({
     model,
     temperature: 0.2,

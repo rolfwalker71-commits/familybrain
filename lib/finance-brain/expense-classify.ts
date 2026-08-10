@@ -1,4 +1,4 @@
-import { getOpenAIClient, getOpenAIModel, hasOpenAIKey } from "@/lib/ai/client";
+import { getChatClient, getChatModel, hasChatKey } from "@/lib/ai/client";
 import {
   EXPENSE_CATEGORY_LABELS,
   expenseVisualFromLabel,
@@ -25,13 +25,13 @@ export async function classifyExpenseCategory(
 ): Promise<ExpenseVisual> {
   const fallback = expenseVisualFromText(input.description);
 
-  if (!hasOpenAIKey()) return fallback;
+  if (!hasChatKey()) return fallback;
   const description = (input.description || "").trim();
   if (!description) return fallback;
 
   try {
-    const client = getOpenAIClient();
-    const model = getOpenAIModel();
+    const client = getChatClient();
+    const model = getChatModel();
     const labels = EXPENSE_CATEGORY_LABELS.join(", ");
     const details = [
       `Description: ${description}`,

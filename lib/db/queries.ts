@@ -140,8 +140,17 @@ export function getOpenAISettings() {
   return {
     apiKey: getSetting("openai_api_key"),
     model: getSetting("openai_model") || "gpt-4o-mini",
-    /** OpenAI-compatible API base URL; null = official OpenAI. */
-    baseUrl: getSetting("openai_base_url"),
+  };
+}
+
+export function getChatAiSettings() {
+  return {
+    provider: getSetting("chat_provider"),
+    apiKey: getSetting("chat_api_key"),
+    baseUrl: getSetting("chat_base_url"),
+    model: getSetting("chat_model"),
+    /** Legacy single-base-url from earlier DeepSeek wiring. */
+    legacyBaseUrl: getSetting("openai_base_url"),
   };
 }
 
@@ -187,8 +196,7 @@ export function savePaperlessSettings(
 
 export function saveOpenAISettings(
   apiKey: string | null,
-  model: string | null,
-  baseUrl?: string | null
+  model: string | null
 ) {
   if (apiKey !== null && apiKey.trim() !== "") {
     setSetting("openai_api_key", apiKey.trim());
@@ -196,9 +204,32 @@ export function saveOpenAISettings(
   if (model !== null && model.trim() !== "") {
     setSetting("openai_model", model.trim());
   }
-  if (baseUrl !== undefined) {
-    const normalized = (baseUrl ?? "").trim().replace(/\/$/, "") || null;
-    setSetting("openai_base_url", normalized);
+}
+
+export function saveChatAiSettings(input: {
+  provider?: string | null;
+  apiKey?: string | null;
+  baseUrl?: string | null;
+  model?: string | null;
+}) {
+  if (input.provider !== undefined) {
+    const p = (input.provider || "openai").trim().toLowerCase();
+    setSetting(
+      "chat_provider",
+      p === "deepseek" || p === "custom" || p === "openai" ? p : "openai"
+    );
+  }
+  if (input.apiKey !== undefined && input.apiKey !== null && input.apiKey.trim() !== "") {
+    setSetting("chat_api_key", input.apiKey.trim());
+  }
+  if (input.baseUrl !== undefined) {
+    const normalized = (input.baseUrl ?? "").trim().replace(/\/$/, "") || null;
+    setSetting("chat_base_url", normalized);
+    // Clear legacy shared base so OpenAI client path stays clean
+    setSetting("openai_base_url", null);
+  }
+  if (input.model !== undefined && input.model !== null && input.model.trim() !== "") {
+    setSetting("chat_model", input.model.trim());
   }
 }
 

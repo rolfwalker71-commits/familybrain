@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { getOpenAIClient, getOpenAIModel, hasOpenAIKey } from "@/lib/ai/client";
+import { getAnalysisClient, hasChatKey, hasOpenAIKey } from "@/lib/ai/client";
 import {
   buildAiTokenUsage,
   type AiTokenUsage,
@@ -428,11 +428,21 @@ export async function analyzeMariTicket(
     }>;
   }
 ): Promise<AnalyzeMariTicketResult> {
-  if (!hasOpenAIKey()) {
-    throw new Error("OpenAI API-Key fehlt (Einstellungen → OpenAI).");
+  const images = (options?.images || []).slice(0, 6);
+  if (images.length > 0 && !hasOpenAIKey()) {
+    throw new Error(
+      "Screenshots brauchen den OpenAI-Key (Einstellungen → KI-API → OpenAI)."
+    );
+  }
+  if (!hasChatKey() && images.length === 0) {
+    throw new Error(
+      "Chat-/Analyse-API-Key fehlt (Einstellungen → KI-API)."
+    );
+  }
+  if (!hasChatKey() && !hasOpenAIKey()) {
+    throw new Error("KI-API-Key fehlt (Einstellungen → KI-API).");
   }
 
-  const images = (options?.images || []).slice(0, 6);
   const imageNames = images.map((i) => i.orgFilename).filter(Boolean);
 
   const timelineText = ticket.timeline
@@ -490,8 +500,9 @@ ${timelineText.slice(0, 14000) || "(keine Positionen)"}`;
           ),
         ];
 
-  const client = getOpenAIClient();
-  const model = getOpenAIModel();
+  const { client, model } = getAnalysisClient({
+    needsVision: images.length > 0,
+  });
   const completion = await client.chat.completions.create({
     model,
     temperature: 0.25,

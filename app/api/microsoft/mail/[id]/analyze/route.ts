@@ -8,7 +8,7 @@ import {
 } from "@/lib/microsoft/oauth";
 import { getMicrosoftMessage } from "@/lib/microsoft/mail-inbox";
 import { analyzeMailForActions } from "@/lib/mail/analyze-mail";
-import { hasOpenAIKey } from "@/lib/ai/client";
+import { hasChatKey } from "@/lib/ai/client";
 import { resolveStatusFromAnalysis } from "@/lib/mail/mail-heuristic";
 import {
   listMailAnalysesByThread,
@@ -53,9 +53,9 @@ export async function POST(request: Request, context: Ctx) {
       { status: 400 }
     );
   }
-  if (!hasOpenAIKey()) {
+  if (!hasChatKey()) {
     return NextResponse.json(
-      { error: "OpenAI API-Key fehlt (Einstellungen)." },
+      { error: "Chat-/Analyse-API-Key fehlt (Einstellungen → KI-API)." },
       { status: 400 }
     );
   }

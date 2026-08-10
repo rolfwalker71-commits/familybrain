@@ -1,18 +1,26 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import {
+  getChatAiSettings,
   getOpenAISettings,
   getPaperlessSettings,
   getTriliumSettings,
   countSyncedTriliumNotes,
   isTriliumConfigured,
+  saveChatAiSettings,
   saveOpenAISettings,
   savePaperlessSettings,
   saveTriliumSettings,
 } from "@/lib/db/queries";
 import { getTriliumInitialSyncComplete } from "@/lib/jobs/queries";
 import { maskToken } from "@/lib/utils/format";
-import { hasOpenAIKey } from "@/lib/ai/client";
+import {
+  getChatBaseUrl,
+  getChatModel,
+  getChatProvider,
+  hasChatKey,
+  hasOpenAIKey,
+} from "@/lib/ai/client";
 import {
   DEFAULT_CHAT_INSTRUCTIONS,
   getChatInstructions,
@@ -174,7 +182,11 @@ export async function GET(request: Request) {
     openaiApiKeyMasked: maskToken(openai.apiKey),
     hasOpenAIKey: hasOpenAIKey(),
     openaiModel: openai.model,
-    openaiBaseUrl: openai.baseUrl || "",
+    chatProvider: getChatProvider(),
+    chatApiKeyMasked: maskToken(getChatAiSettings().apiKey),
+    hasChatKey: hasChatKey(),
+    chatBaseUrl: getChatBaseUrl() || "",
+    chatModel: getChatModel(),
     triliumBaseUrl: trilium.baseUrl,
     triliumApiTokenMasked: maskToken(trilium.apiToken),
     hasTriliumToken: Boolean(trilium.apiToken),
@@ -245,7 +257,10 @@ const PutSchema = z.object({
   liveNotificationsDurationSec: z.number().int().min(3).max(60).optional(),
   openaiApiKey: z.string().optional(),
   openaiModel: z.string().min(1).optional(),
-  openaiBaseUrl: z.union([z.string().url(), z.literal("")]).optional(),
+  chatProvider: z.enum(["openai", "deepseek", "custom"]).optional(),
+  chatApiKey: z.string().optional(),
+  chatBaseUrl: z.union([z.string().url(), z.literal("")]).optional(),
+  chatModel: z.string().min(1).optional(),
   triliumBaseUrl: z.string().url().optional(),
   triliumApiToken: z.string().optional(),
   chatInstructions: z.string().max(8000).optional(),
@@ -364,16 +379,25 @@ export async function PUT(request: Request) {
     setLiveNotificationsDurationSec(parsed.data.liveNotificationsDurationSec);
   }
 
-  if (
-    parsed.data.openaiApiKey !== undefined ||
-    parsed.data.openaiModel ||
-    parsed.data.openaiBaseUrl !== undefined
-  ) {
+  if (parsed.data.openaiApiKey !== undefined || parsed.data.openaiModel) {
     saveOpenAISettings(
       parsed.data.openaiApiKey ?? null,
-      parsed.data.openaiModel ?? null,
-      parsed.data.openaiBaseUrl
+      parsed.data.openaiModel ?? null
     );
+  }
+
+  if (
+    parsed.data.chatProvider !== undefined ||
+    parsed.data.chatApiKey !== undefined ||
+    parsed.data.chatBaseUrl !== undefined ||
+    parsed.data.chatModel !== undefined
+  ) {
+    saveChatAiSettings({
+      provider: parsed.data.chatProvider,
+      apiKey: parsed.data.chatApiKey,
+      baseUrl: parsed.data.chatBaseUrl,
+      model: parsed.data.chatModel,
+    });
   }
 
   if (parsed.data.triliumBaseUrl) {
@@ -581,7 +605,11 @@ export async function PUT(request: Request) {
     openaiApiKeyMasked: maskToken(openai.apiKey),
     hasOpenAIKey: hasOpenAIKey(),
     openaiModel: openai.model,
-    openaiBaseUrl: openai.baseUrl || "",
+    chatProvider: getChatProvider(),
+    chatApiKeyMasked: maskToken(getChatAiSettings().apiKey),
+    hasChatKey: hasChatKey(),
+    chatBaseUrl: getChatBaseUrl() || "",
+    chatModel: getChatModel(),
     triliumBaseUrl: trilium.baseUrl,
     triliumApiTokenMasked: maskToken(trilium.apiToken),
     hasTriliumToken: Boolean(trilium.apiToken),

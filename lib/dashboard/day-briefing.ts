@@ -1,4 +1,4 @@
-import { getOpenAIClient, getOpenAIModel, hasOpenAIKey } from "@/lib/ai/client";
+import { getChatClient, getChatModel, hasChatKey } from "@/lib/ai/client";
 import { findTimedOverlaps } from "@/lib/calendar/event-overlap";
 import { formatCHF } from "@/lib/utils/format";
 
@@ -348,7 +348,7 @@ export async function polishBriefingWithAi(
   facts: DayBriefingFacts,
   pulse: { headline: string; detail: string | null; bullets: string[] }
 ): Promise<string | null> {
-  if (!hasOpenAIKey()) return null;
+  if (!hasChatKey()) return null;
 
   const isEvening = facts.mode === "evening";
   const digest = isEvening ? buildEveningDigest(facts) : null;
@@ -372,9 +372,9 @@ Maximal 3 kurze Sätze. Ton: ${isEvening ? "ruhiger Tagesabschluss" : "klarer Mo
   );
 
   try {
-    const client = getOpenAIClient();
+    const client = getChatClient();
     const completion = await client.chat.completions.create({
-      model: getOpenAIModel(),
+      model: getChatModel(),
       temperature: 0.3,
       max_tokens: 220,
       messages: [
@@ -398,7 +398,7 @@ export async function buildDayBriefingPayload(
 ): Promise<DayBriefingPayload> {
   const pulse = formatContextPulse(facts);
   let prose: string | null = null;
-  if (opts?.withAi !== false && hasOpenAIKey()) {
+  if (opts?.withAi !== false && hasChatKey()) {
     const timeoutMs = opts?.aiTimeoutMs ?? 2500;
     prose = await Promise.race([
       polishBriefingWithAi(facts, pulse),

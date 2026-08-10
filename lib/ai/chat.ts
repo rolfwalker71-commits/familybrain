@@ -23,7 +23,7 @@ import {
 } from "@/lib/chat/instructions";
 import { parseTripEventsMarker } from "@/lib/trips/parse-trip-events";
 import type { TripEventDraft } from "@/lib/trips/constants";
-import { getOpenAIClient, getOpenAIModel } from "./client";
+import { getChatClient, getChatModel } from "./client";
 import {
   retrieveForChat,
   type ChatRetrieval,
@@ -368,8 +368,8 @@ ${guide.excerpt}`;
           })
           .join("\n\n---\n\n");
 
-  const client = getOpenAIClient();
-  const model = getOpenAIModel();
+  const client = getChatClient();
+  const model = getChatModel();
 
   const completion = await client.chat.completions.create({
     model,

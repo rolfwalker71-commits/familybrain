@@ -1,5 +1,5 @@
 import { analyzeDocument } from "@/lib/ai/analyze-document";
-import { hasOpenAIKey } from "@/lib/ai/client";
+import { hasChatKey, hasOpenAIKey } from "@/lib/ai/client";
 import { syncPaperlessDocuments } from "@/lib/paperless/sync";
 import {
   INITIAL_ANALYSIS_BATCH_SIZE,
@@ -270,9 +270,9 @@ export async function runSyncAnalyzeJob(
       }
     }
 
-    if (!hasOpenAIKey()) {
+    if (!hasChatKey()) {
       throw new Error(
-        "OpenAI API-Key fehlt. Die Hintergrundanalyse startet nach dem Speichern des Keys automatisch erneut."
+        "Chat-/Analyse-API-Key fehlt. Die Hintergrundanalyse startet nach dem Speichern unter Einstellungen → KI-API automatisch erneut."
       );
     }
 
