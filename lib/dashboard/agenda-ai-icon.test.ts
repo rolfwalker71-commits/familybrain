@@ -5,9 +5,11 @@ import {
   buildAgendaAiIconPrompt,
   hasDriveAgendaContext,
   isBirthdayAgendaSubject,
+  isDayCloseRitualSubject,
   isOnlineAgendaMeeting,
   isValentynaWorkCalendar,
   shouldDepictManForWork,
+  shouldHaveAgendaAiIcon,
 } from "./agenda-ai-icon.ts";
 
 test("birthday prompt has no itinerary panels", () => {
@@ -113,4 +115,27 @@ test("Valentyna work calendar skips man depiction", () => {
     }),
     true
   );
+});
+
+test("Tagesabschluss ritual reuses one cache key and evening prompt", () => {
+  const open = {
+    id: "buddy-day-close",
+    title: "Tagesabschluss",
+    kind: "deadline",
+    calendarName: "Buddy",
+    time: "18:30",
+    endTime: "18:45",
+  };
+  const done = {
+    ...open,
+    title: "✅ Tagesabschluss",
+  };
+  assert.equal(isDayCloseRitualSubject(open), true);
+  assert.equal(shouldHaveAgendaAiIcon(open), true);
+  assert.equal(buildAgendaAiIconKey(open), buildAgendaAiIconKey(done));
+  const prompt = buildAgendaAiIconPrompt(open);
+  assert.match(prompt, /Tagesabschluss/);
+  assert.match(prompt, /end-of-day wrap-up/i);
+  assert.doesNotMatch(prompt, /Tiguan/i);
+  assert.match(prompt, /not a video call/i);
 });

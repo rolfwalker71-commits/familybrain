@@ -47,6 +47,7 @@ export async function POST(request: Request) {
   for (const item of capped) {
     if (!shouldHaveAgendaAiIcon(item)) continue;
     const subject: AgendaIconSubject = {
+      id: item.id,
       title: item.title,
       location: item.location,
       description: item.description,

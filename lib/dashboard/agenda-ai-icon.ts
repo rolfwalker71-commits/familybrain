@@ -8,6 +8,7 @@ import {
   ICS_TYPE_META,
   type IcsCalendarType,
 } from "@/lib/calendar/ics-types";
+import { isDayCloseRitualId } from "@/lib/dashboard/day-close-ritual";
 
 /** Bump when illustration style changes so cached JPGs are regenerated. */
 const AGENDA_AI_ICON_STYLE = "travel-poster-v5";
@@ -46,6 +47,8 @@ function normalizeLocationHint(location: string | null | undefined): string {
 }
 
 export type AgendaIconSubject = {
+  /** Agenda row id (e.g. buddy-day-close) — used for ritual detection. */
+  id?: string | null;
   title: string;
   location?: string | null;
   description?: string | null;
@@ -60,6 +63,20 @@ export type AgendaIconSubject = {
   distanceKm?: number | null;
   coords?: { lat: number; lon: number } | null;
 };
+
+/** Virtueller Buddy-Tagesabschluss — ein Bild für alle Wochentage. */
+export function isDayCloseRitualSubject(input: {
+  id?: string | null;
+  title?: string | null;
+  calendarName?: string | null;
+}): boolean {
+  if (isDayCloseRitualId(input.id)) return true;
+  const title = normalizeTitle(
+    (input.title || "").replace(/^[✅✓✔]\s*/u, "")
+  );
+  if (title !== "tagesabschluss") return false;
+  return (input.calendarName || "").trim() === "Buddy";
+}
 
 export function calendarTypeLabelDe(
   calendarType: string | null | undefined
@@ -118,8 +135,13 @@ function workPersonVariant(input: AgendaIconSubject): string {
 /**
  * Stable cache key for recurring events (e.g. «F2 Früh» / «AI Wochencall»).
  * Online meetings intentionally omit date/time so weekly repeats reuse one image.
+ * Tagesabschluss: one fixed key for every weekday (done/undone title variants).
  */
 export function buildAgendaAiIconKey(input: AgendaIconSubject): string {
+  if (isDayCloseRitualSubject(input)) {
+    const raw = `${AGENDA_AI_ICON_STYLE}|ritual|day-close|tagesabschluss`;
+    return createHash("sha256").update(raw).digest("hex").slice(0, 20);
+  }
   const title = normalizeTitle(input.title || "");
   if (!title) return "";
   const type = String(input.calendarType || input.kind || "calendar")
@@ -315,6 +337,19 @@ function buildOnlineMeetingPrompt(input: AgendaIconSubject): string {
     .join(" ");
 }
 
+/** Fixed visual for Buddy’s weekday evening wrap-up — reused every day. */
+function buildDayCloseRitualPrompt(): string {
+  return [
+    "Square editorial illustration (not photorealistic) for an evening end-of-day wrap-up ritual.",
+    "Calm dusk / early evening desk mood: soft warm lamp light, tidy notebook with a short checklist, laptop closing or closed, cup of tea.",
+    "Feeling: reflective, orderly closing of the workday — not a video call, not a car trip, not a birthday party.",
+    "Primary readable text on the poster (correct spelling, clear): «Tagesabschluss».",
+    "Optional tiny secondary time label «18:30» — do not dominate.",
+    "No Microsoft/Google logos, no UI chrome, no watermarks, no fake calendars full of appointments.",
+    TRAVEL_STYLE,
+  ].join(" ");
+}
+
 function buildDrivePrompt(input: AgendaIconSubject): string {
   const title = clip(input.title, 100) || "Termin";
   const typeLabel = calendarTypeLabelDe(input.calendarType);
@@ -385,6 +420,7 @@ function buildStandardPrompt(input: AgendaIconSubject): string {
 
 /** Exported for tests. */
 export function buildAgendaAiIconPrompt(input: AgendaIconSubject): string {
+  if (isDayCloseRitualSubject(input)) return buildDayCloseRitualPrompt();
   if (isBirthdayAgendaSubject(input)) return buildBirthdayPrompt(input);
   if (isOnlineAgendaMeeting(input)) return buildOnlineMeetingPrompt(input);
   if (hasDriveAgendaContext(input)) return buildDrivePrompt(input);
@@ -434,9 +470,12 @@ export async function ensureAgendaAiIcon(
 }
 
 export function shouldHaveAgendaAiIcon(input: {
+  id?: string | null;
   kind?: string | null;
   title?: string | null;
+  calendarName?: string | null;
 }): boolean {
+  if (isDayCloseRitualSubject(input)) return true;
   const kind = input.kind || "";
   if (
     kind === "invoice" ||

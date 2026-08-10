@@ -9,6 +9,10 @@ import {
   shouldHaveAgendaAiIcon,
   type AgendaIconSubject,
 } from "@/lib/dashboard/agenda-ai-icon";
+import {
+  buildDayCloseRitualItem,
+  isZurichWeekday,
+} from "@/lib/dashboard/day-close-ritual";
 
 export const AGENDA_AI_LAST_SYNC_KEY = "agenda_ai_icons_last_sync_at";
 export const AGENDA_AI_TOMORROW_PREP_KEY = "agenda_ai_icons_tomorrow_prep_ymd";
@@ -107,6 +111,7 @@ export async function syncAgendaAiIconsIfDue(options?: {
       if (!targetDates.has(item.date)) continue;
       if (!shouldHaveAgendaAiIcon(item)) continue;
       const subject: AgendaIconSubject = {
+        id: item.id,
         title: item.title,
         location: item.location,
         description: item.description,
@@ -126,6 +131,26 @@ export async function syncAgendaAiIconsIfDue(options?: {
       if (!key) continue;
       if (!subjects.has(key)) subjects.set(key, subject);
       if (item.date === tomorrow) tomorrowKeys.add(key);
+    }
+
+    // Virtueller Tagesabschluss steckt nicht im Cloud-Feed — einmalig vorbereiten.
+    for (const ymd of targetDates) {
+      if (!isZurichWeekday(ymd)) continue;
+      const ritual = buildDayCloseRitualItem(ymd);
+      if (!shouldHaveAgendaAiIcon(ritual)) continue;
+      const subject: AgendaIconSubject = {
+        id: ritual.id,
+        title: ritual.title,
+        description: ritual.description,
+        kind: ritual.kind,
+        calendarName: ritual.calendarName,
+        time: ritual.time,
+        endTime: ritual.endTime,
+      };
+      const key = buildAgendaAiIconKey(subject);
+      if (!key) continue;
+      if (!subjects.has(key)) subjects.set(key, subject);
+      if (ymd === tomorrow) tomorrowKeys.add(key);
     }
 
     let generated = 0;
