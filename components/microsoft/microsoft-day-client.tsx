@@ -33,6 +33,11 @@ import { APP_ICON_STROKE } from "@/lib/branding/app-icons";
 import { formatTokenUsageLine } from "@/lib/ai/usage-cost";
 import type { AiTokenUsage } from "@/lib/ai/usage-cost";
 import { toSwissDate } from "@/lib/utils/dates";
+import {
+  durationMinutesFromHm,
+  isSlotDurationPreset,
+  SLOT_DURATION_PRESETS,
+} from "@/lib/calendar/slot-duration";
 import { MicrosoftMailInboxPanel } from "@/components/microsoft/microsoft-mail-inbox-panel";
 import { MicrosoftPlannerPanel } from "@/components/microsoft/microsoft-planner-panel";
 import { MailWorkspaceSubnav, type MailWorkspaceView, mailWorkspacePrimaryBtnClass, mailWorkspaceTabClass } from "@/components/mail/mail-workspace-subnav";
@@ -292,6 +297,9 @@ export function MicrosoftDayClient() {
   const [slotsByEvent, setSlotsByEvent] = useState<Record<string, FreeSlot[]>>(
     {}
   );
+  const [slotDurationByEvent, setSlotDurationByEvent] = useState<
+    Record<string, number>
+  >({});
 
   const [inbox, setInbox] = useState<MsMail[]>([]);
   const [sent, setSent] = useState<MsMail[]>([]);
@@ -415,14 +423,32 @@ export function MicrosoftDayClient() {
     }
   }
 
-  async function suggestSlots(eventId: string) {
+  function slotDurationFor(e: MsEvent): number {
+    return (
+      slotDurationByEvent[e.id] ??
+      durationMinutesFromHm(e.startHm, e.endHm)
+    );
+  }
+
+  async function suggestSlots(eventId: string, durationMinutes?: number) {
+    const event = events.find((x) => x.id === eventId);
+    const duration =
+      durationMinutes ??
+      (event
+        ? slotDurationFor(event)
+        : 60);
+    setSlotDurationByEvent((prev) => ({ ...prev, [eventId]: duration }));
     setBusyId(eventId);
     setError(null);
     try {
       const res = await fetch("/api/microsoft/calendar/actions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "suggest_slots", eventId }),
+        body: JSON.stringify({
+          action: "suggest_slots",
+          eventId,
+          durationMinutes: duration,
+        }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Slots fehlgeschlagen");
@@ -431,7 +457,9 @@ export function MicrosoftDayClient() {
         [eventId]: (json.slots || []) as FreeSlot[],
       }));
       if (!(json.slots || []).length) {
-        setStatus("Keine freien Slots in den nächsten 7 Werktagen (08–18).");
+        setStatus(
+          `Keine freien Slots à ${duration} Min in den nächsten 7 Tagen (08–18).`
+        );
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -1132,46 +1160,94 @@ export function MicrosoftDayClient() {
                             ) : null}
                           </div>
                           {!e.done ? (
-                            <div className="flex flex-wrap gap-2">
-                              <Button
-                                type="button"
-                                size="sm"
-                                disabled={busyId === e.id}
-                                onClick={() => void markDone(e.id)}
-                              >
-                                <Check className="size-3.5" />
-                                Erledigt
-                              </Button>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                disabled={busyId === e.id}
-                                onClick={() => void suggestSlots(e.id)}
-                              >
-                                Freien Slot suchen
-                              </Button>
-                              {e.webLink ? (
-                                <a
-                                  href={e.webLink}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className={cn(
-                                    buttonVariants({
-                                      variant: "ghost",
-                                      size: "sm",
-                                    })
-                                  )}
+                            <div className="space-y-2">
+                              <div className="space-y-1">
+                                <p className="text-[11px] text-muted-foreground">
+                                  Dauer für Slot-Suche (kürzer = engere Lücken)
+                                </p>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {SLOT_DURATION_PRESETS.map((m) => (
+                                    <Button
+                                      key={m}
+                                      type="button"
+                                      size="sm"
+                                      variant={
+                                        slotDurationFor(e) === m
+                                          ? "default"
+                                          : "outline"
+                                      }
+                                      className="h-7 tabular-nums"
+                                      disabled={busyId === e.id}
+                                      onClick={() => {
+                                        setSlotDurationByEvent((prev) => ({
+                                          ...prev,
+                                          [e.id]: m,
+                                        }));
+                                        setSlotsByEvent((prev) => {
+                                          const next = { ...prev };
+                                          delete next[e.id];
+                                          return next;
+                                        });
+                                      }}
+                                    >
+                                      {m} Min
+                                    </Button>
+                                  ))}
+                                  {!isSlotDurationPreset(slotDurationFor(e)) ? (
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="default"
+                                      className="h-7 tabular-nums"
+                                      disabled={busyId === e.id}
+                                    >
+                                      {slotDurationFor(e)} Min
+                                    </Button>
+                                  ) : null}
+                                </div>
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  disabled={busyId === e.id}
+                                  onClick={() => void markDone(e.id)}
                                 >
-                                  In Outlook
-                                </a>
-                              ) : null}
+                                  <Check className="size-3.5" />
+                                  Erledigt
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={busyId === e.id}
+                                  onClick={() => void suggestSlots(e.id)}
+                                >
+                                  Freien Slot suchen
+                                </Button>
+                                {e.webLink ? (
+                                  <a
+                                    href={e.webLink}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className={cn(
+                                      buttonVariants({
+                                        variant: "ghost",
+                                        size: "sm",
+                                      })
+                                    )}
+                                  >
+                                    In Outlook
+                                  </a>
+                                ) : null}
+                              </div>
                             </div>
                           ) : null}
                           {slotsByEvent[e.id]?.length ? (
                             <div className="space-y-1.5 rounded-lg border border-border/60 bg-muted/20 p-2">
                               <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                                Vorschläge (nächste 7 Tage, 08–18)
+                                Vorschläge à {slotDurationFor(e)} Min (nächste 7
+                                Tage, 08–18)
                               </p>
                               <ul className="flex flex-wrap gap-1.5">
                                 {slotsByEvent[e.id]!.map((s) => (

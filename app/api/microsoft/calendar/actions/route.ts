@@ -28,6 +28,7 @@ const BodySchema = z.discriminatedUnion("action", [
     rangeEnd: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
     workStartHm: z.string().optional(),
     workEndHm: z.string().optional(),
+    durationMinutes: z.number().int().min(15).max(240).optional(),
   }),
   z.object({
     action: z.literal("reschedule"),
@@ -74,6 +75,7 @@ export async function POST(request: Request) {
         rangeEnd: body.rangeEnd,
         workStartHm: body.workStartHm,
         workEndHm: body.workEndHm,
+        durationMinutes: body.durationMinutes,
       });
       return NextResponse.json({ ok: true, event, slots });
     }

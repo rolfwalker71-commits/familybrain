@@ -28,6 +28,7 @@ const BodySchema = z.discriminatedUnion("action", [
     calendarId: z.string().min(1),
     rangeStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
     rangeEnd: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    durationMinutes: z.number().int().min(15).max(240).optional(),
   }),
   z.object({
     action: z.literal("reschedule"),
@@ -83,6 +84,7 @@ export async function POST(request: Request) {
       const slots = await suggestGoogleFreeSlotsForEvent(userId, event, {
         rangeStart: body.rangeStart,
         rangeEnd: body.rangeEnd,
+        durationMinutes: body.durationMinutes,
         request,
       });
       return NextResponse.json({ ok: true, event, slots });
