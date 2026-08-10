@@ -103,18 +103,27 @@ export async function mariJson<T>(
     }
   }
   if (!res.ok) {
-    throw new MariApiError(
+    const rawMsg =
       typeof json === "object" &&
-        json &&
-        "Message" in json &&
-        typeof (json as { Message: unknown }).Message === "string"
-        ? (json as { Message: string }).Message
-        : `MARI HTTP ${res.status}`,
+      json &&
+      "Message" in json &&
+      typeof (json as { Message: unknown }).Message === "string"
+        ? String((json as { Message: string }).Message).trim()
+        : typeof json === "string"
+          ? json.trim()
+          : "";
+    const generic =
+      !rawMsg ||
+      /^an error has occurred\.?$/i.test(rawMsg) ||
+      /^error$/i.test(rawMsg);
+    throw new MariApiError(
+      generic ? `MARI HTTP ${res.status}` : rawMsg,
       res.status,
       json
     );
   }
-  return json as T;
+  // Manche MARI-DELETEs liefern 200 ohne Body.
+  return (json ?? null) as T;
 }
 
 /** Nur SELECT — HANA quoted identifiers. */

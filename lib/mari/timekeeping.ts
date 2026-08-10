@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   MariApiError,
+  mariFetch,
   mariJson,
   mariSql,
   requireMariConfig,
@@ -460,9 +461,26 @@ export async function deleteTimeKeepingLine(lineId: number): Promise<void> {
     throw new MariApiError("Buchungs-ID ungültig.", 400);
   }
   await assertLineEditable(lineId);
-  await mariJson<unknown>(`/api/TimeKeepingLine/${lineId}`, {
+  // Erfolg: oft HTTP 200 mit leerem Body (kein JSON).
+  const res = await mariFetch(`/api/TimeKeepingLine/${lineId}`, {
     method: "DELETE",
   });
+  const text = (await res.text()).trim();
+  if (res.ok) return;
+  let detail = "";
+  if (text) {
+    try {
+      const parsed = JSON.parse(text) as { Message?: string };
+      detail = String(parsed.Message || "").trim();
+    } catch {
+      detail = text.slice(0, 300);
+    }
+  }
+  if (!detail || /^an error has occurred\.?$/i.test(detail)) {
+    detail =
+      "Löschen in MARI fehlgeschlagen. Mögliche Ursachen: Buchungsperiode gesperrt, freigegeben, interne Weiterbelastung oder bereits verrechnet.";
+  }
+  throw new MariApiError(detail, res.status || 502, text || null);
 }
 
 /**
