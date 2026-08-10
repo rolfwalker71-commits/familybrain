@@ -25,7 +25,7 @@ export const dynamic = "force-dynamic";
 
 const BodySchema = z.object({
   tasks: z.array(MsDayTaskApplySchema).max(12).optional().default([]),
-  events: z.array(MsDayEventSuggestionSchema).max(8).optional().default([]),
+  events: z.array(MsDayEventSuggestionSchema).max(20).optional().default([]),
   replies: z.array(MsDayReplyDraftSchema).max(8).optional().default([]),
 });
 

@@ -51,6 +51,10 @@ import {
 } from "@/components/mail/mail-chronik-list";
 import { MailAnalysisThreadHint } from "@/components/mail/mail-analysis-thread-hint";
 import { MailTagesanalysenList } from "@/components/mail/mail-tagesanalysen-list";
+import {
+  AnalysisEventDraftCard,
+  analysisEventsNeedSlot,
+} from "@/components/mail/analysis-event-draft-card";
 import { summarizeMailThreadCoverage } from "@/lib/mail/mail-threads";
 import type { MailDayCachedSummary } from "@/lib/mail/mail-day-cache-summary";
 import type { MsMailItem } from "@/lib/microsoft/mail-day";
@@ -189,6 +193,7 @@ type DayEventSug = {
   counterpartEmail?: string | null;
   theme?: string | null;
   reason?: string;
+  fromTaskTwin?: boolean;
 };
 
 type DayReply = {
@@ -834,6 +839,12 @@ export function MicrosoftDayClient() {
       draftTasks.length + draftEvents.length + draftReplies.length ===
       0
     ) {
+      return;
+    }
+    if (analysisEventsNeedSlot(draftEvents)) {
+      setError(
+        "Für Termine aus Aufgaben zuerst Dauer und freien Slot wählen."
+      );
       return;
     }
     setApplying(true);
@@ -1762,10 +1773,15 @@ export function MicrosoftDayClient() {
                                         </span>
                                         <span className="block text-[11px] text-muted-foreground">
                                           {[
+                                            ev.fromTaskTwin
+                                              ? "aus Aufgabe"
+                                              : null,
                                             toSwissDate(ev.date),
-                                            ev.allDay || !ev.startTime
-                                              ? "ganztags"
-                                              : `${ev.startTime}${ev.endTime ? `–${ev.endTime}` : ""}`,
+                                            ev.fromTaskTwin && !ev.startTime
+                                              ? "Zeit wählen beim Übernehmen"
+                                              : ev.allDay || !ev.startTime
+                                                ? "ganztags"
+                                                : `${ev.startTime}${ev.endTime ? `–${ev.endTime}` : ""}`,
                                             ev.location,
                                             ev.reason,
                                           ]
@@ -1947,74 +1963,18 @@ export function MicrosoftDayClient() {
               </div>
             ))}
             {draftEvents.map((ev, i) => (
-              <div key={`de-${i}`} className="space-y-2 rounded-lg border border-border/60 p-3">
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Termin · Outlook Kalender
-                </p>
-                <div className="space-y-1">
-                  <Label>Titel</Label>
-                  <Input
-                    value={ev.title}
-                    onChange={(e) =>
-                      setDraftEvents((prev) =>
-                        prev.map((x, j) =>
-                          j === i ? { ...x, title: e.target.value } : x
-                        )
-                      )
-                    }
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-1">
-                    <Label>Datum</Label>
-                    <Input
-                      type="date"
-                      value={ev.date}
-                      onChange={(e) =>
-                        setDraftEvents((prev) =>
-                          prev.map((x, j) =>
-                            j === i ? { ...x, date: e.target.value } : x
-                          )
-                        )
-                      }
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label>Start</Label>
-                    <Input
-                      type="time"
-                      value={ev.startTime || ""}
-                      onChange={(e) =>
-                        setDraftEvents((prev) =>
-                          prev.map((x, j) =>
-                            j === i
-                              ? {
-                                  ...x,
-                                  startTime: e.target.value || null,
-                                  allDay: !e.target.value,
-                                }
-                              : x
-                          )
-                        )
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <Label>Notizen</Label>
-                  <Textarea
-                    rows={2}
-                    value={ev.notes || ""}
-                    onChange={(e) =>
-                      setDraftEvents((prev) =>
-                        prev.map((x, j) =>
-                          j === i ? { ...x, notes: e.target.value } : x
-                        )
-                      )
-                    }
-                  />
-                </div>
-              </div>
+              <AnalysisEventDraftCard
+                key={`de-${i}`}
+                event={ev}
+                calendarLabel="Outlook Kalender"
+                slotProvider="microsoft"
+                disabled={applying}
+                onChange={(next) =>
+                  setDraftEvents((prev) =>
+                    prev.map((x, j) => (j === i ? { ...x, ...next } : x))
+                  )
+                }
+              />
             ))}
             {draftReplies.map((r, i) => {
               const lang = currentReplyLang(r);
@@ -2090,7 +2050,8 @@ export function MicrosoftDayClient() {
               disabled={
                 applying ||
                 draftTasks.length + draftEvents.length + draftReplies.length ===
-                  0
+                  0 ||
+                analysisEventsNeedSlot(draftEvents)
               }
               onClick={() => void applyConfirmed()}
             >

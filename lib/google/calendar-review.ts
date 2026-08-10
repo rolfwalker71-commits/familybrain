@@ -227,6 +227,64 @@ export async function suggestGoogleFreeSlotsForEvent(
   });
 }
 
+/** Freie Slots für neue Termine (ohne bestehendes Event) — Google. */
+export async function suggestGoogleFreeSlotsForDuration(
+  userId: number,
+  options: {
+    durationMinutes: number;
+    rangeStart?: string;
+    rangeEnd?: string;
+    request?: Request | null;
+    fromToday?: boolean;
+    maxSlots?: number;
+    maxSlotsPerDay?: number;
+  }
+): Promise<FreeSlot[]> {
+  const today = zurichYmd();
+  const fromToday = options.fromToday !== false;
+  const rangeStart = options.rangeStart || (fromToday ? today : addDaysYmd(today, 1));
+  const rangeEnd = options.rangeEnd || addDaysYmd(today, 7);
+  const duration = Math.max(15, Math.round(options.durationMinutes));
+
+  const events = await listGoogleCalendarEventsInRange(
+    userId,
+    rangeStart,
+    rangeEnd,
+    options.request
+  );
+
+  const mapped: MsCalendarEvent[] = events.map((e) => {
+    const subject = (e.summary || "").trim() || "(ohne Titel)";
+    const done = isDoneTitle(subject);
+    return {
+      id: e.id,
+      subject,
+      start: e.startAt || e.date,
+      end: e.endAt || e.date,
+      startHm: e.time,
+      endHm: e.endTime,
+      date: e.date,
+      location: e.location,
+      isAllDay: !e.time,
+      categories: [],
+      done,
+      showAs: done ? "free" : "busy",
+      webLink: null,
+      organizer: null,
+    };
+  });
+
+  return findFreeSlots({
+    events: mapped,
+    rangeStart,
+    rangeEnd,
+    durationMinutes: duration,
+    maxSlots: options.maxSlots ?? 48,
+    maxSlotsPerDay: options.maxSlotsPerDay ?? 6,
+    notBefore: fromToday ? { date: today, hm: zurichHm() } : null,
+  });
+}
+
 export async function rescheduleGoogleEvent(
   userId: number,
   calendarId: string,

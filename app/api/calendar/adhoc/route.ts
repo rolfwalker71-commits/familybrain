@@ -3,6 +3,11 @@ import { z } from "zod";
 import { isAuthError, requireAuth } from "@/lib/auth/current-user";
 import { ensureInitialized } from "@/lib/db/migrations";
 import { findRolfAppUserId } from "@/lib/calendar/ics-calendars";
+import { suggestGoogleFreeSlotsForDuration } from "@/lib/google/calendar-review";
+import {
+  hasGoogleCalendarEventsWriteScope,
+  hasGoogleCalendarScope,
+} from "@/lib/google/oauth";
 import {
   hasMicrosoftCalendarScope,
   isMicrosoftConnected,
@@ -19,6 +24,8 @@ const BodySchema = z.discriminatedUnion("action", [
     action: z.literal("suggest_slots"),
     durationMinutes: z.number().int().min(15).max(240),
     rangeDays: z.number().int().min(1).max(14).optional(),
+    /** Prefer microsoft | google; otherwise auto. */
+    provider: z.enum(["microsoft", "google", "auto"]).optional(),
   }),
   z.object({
     action: z.literal("create"),
@@ -40,12 +47,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Kein Kalender-User." }, { status: 400 });
   }
 
-  if (!isMicrosoftConnected(userId) || !hasMicrosoftCalendarScope(userId)) {
-    return NextResponse.json(
-      { error: "Microsoft-Kalender nicht verbunden." },
-      { status: 400 }
-    );
-  }
+  const msOk =
+    isMicrosoftConnected(userId) && hasMicrosoftCalendarScope(userId);
+  const googleOk =
+    hasGoogleCalendarScope(userId) || hasGoogleCalendarEventsWriteScope(userId);
 
   let body: z.infer<typeof BodySchema>;
   try {
@@ -61,22 +66,64 @@ export async function POST(request: Request) {
 
   try {
     if (body.action === "suggest_slots") {
+      const prefer = body.provider || "auto";
+      if (prefer === "microsoft" && !msOk) {
+        return NextResponse.json(
+          { error: "Microsoft-Kalender nicht verbunden." },
+          { status: 400 }
+        );
+      }
+      if (prefer === "google" && !googleOk) {
+        return NextResponse.json(
+          { error: "Google-Kalender nicht verbunden." },
+          { status: 400 }
+        );
+      }
+      if (prefer === "auto" && !msOk && !googleOk) {
+        return NextResponse.json(
+          { error: "Kein Kalender verbunden (Microsoft oder Google)." },
+          { status: 400 }
+        );
+      }
+      const useMs =
+        prefer === "google" ? false : prefer === "microsoft" ? true : msOk;
+
       const rangeDays = body.rangeDays ?? 7;
       const today = zurichYmd();
-      const slots = await suggestFreeSlotsForDuration(userId, {
-        durationMinutes: body.durationMinutes,
-        fromToday: true,
-        rangeStart: today,
-        rangeEnd: addDaysYmd(today, rangeDays),
-        maxSlots: 48,
-        maxSlotsPerDay: 6,
-      });
+      const slots = useMs
+        ? await suggestFreeSlotsForDuration(userId, {
+            durationMinutes: body.durationMinutes,
+            fromToday: true,
+            rangeStart: today,
+            rangeEnd: addDaysYmd(today, rangeDays),
+            maxSlots: 48,
+            maxSlotsPerDay: 6,
+          })
+        : await suggestGoogleFreeSlotsForDuration(userId, {
+            durationMinutes: body.durationMinutes,
+            fromToday: true,
+            rangeStart: today,
+            rangeEnd: addDaysYmd(today, rangeDays),
+            maxSlots: 48,
+            maxSlotsPerDay: 6,
+            request,
+          });
       return NextResponse.json({
         ok: true,
-        provider: "microsoft",
+        provider: useMs ? "microsoft" : "google",
         slots,
         durationMinutes: body.durationMinutes,
       });
+    }
+
+    if (!msOk) {
+      return NextResponse.json(
+        {
+          error:
+            "Ad-hoc Anlegen läuft über Outlook. Bitte Microsoft-Kalender verbinden — oder Termin über Tagesanalyse übernehmen.",
+        },
+        { status: 400 }
+      );
     }
 
     const created = await createOutlookCalendarEvent(userId, {

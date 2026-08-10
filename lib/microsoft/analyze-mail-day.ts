@@ -90,6 +90,8 @@ export const MsDayEventSuggestionSchema = z.object({
   counterpartEmail: aiNullableString(200).optional(),
   theme: aiNullableString(200).optional(),
   reason: aiString(400).optional(),
+  /** Automatisch aus Aufgaben-Vorschlag erzeugt — Slotwahl vor Anlegen. */
+  fromTaskTwin: z.boolean().optional(),
 });
 
 export const MsDayReplyDraftSchema = z.object({
@@ -132,7 +134,6 @@ export const MsDayClusterSchema = z.object({
   events: aiItemArray(MsDayEventSuggestionSchema, 4).default([]),
   replies: aiItemArray(MsDayReplyDraftSchema, 3).default([]),
 });
-
 export const MsDayMailAnalysisSchema = z.object({
   daySummary: z.string().max(3200),
   /** One cluster per conversation/thread. */
@@ -609,8 +610,42 @@ function enrichCluster(
         counterpartEmail:
           e.counterpartEmail?.trim() || counterpartEmail || c?.email || null,
         theme,
+        fromTaskTwin: false as boolean | undefined,
       };
     });
+
+  // Zu jeder Aufgabe denselben Vorschlag auch als Termin (ohne Uhrzeit → Slotwahl).
+  const eventKeys = new Set(
+    events.map(
+      (e) => `${e.title.trim().toLowerCase().replace(/\s+/g, " ")}|${e.date}`
+    )
+  );
+  const twinEvents: typeof events = [];
+  for (const t of tasks) {
+    const date = t.dueDate || defaultDue;
+    const key = `${t.title.trim().toLowerCase().replace(/\s+/g, " ")}|${date}`;
+    if (eventKeys.has(key)) continue;
+    eventKeys.add(key);
+    twinEvents.push({
+      title: t.title,
+      date,
+      startTime: null,
+      endTime: null,
+      allDay: true,
+      location: null,
+      notes: t.notes || null,
+      sourceMailId: t.sourceMailId || null,
+      sourceSubject: t.sourceSubject || null,
+      company: t.company || company,
+      counterpartEmail: t.counterpartEmail || counterpartEmail,
+      theme,
+      reason: t.reason?.trim()
+        ? `Aus Aufgabe: ${t.reason.trim()}`
+        : "Aus Aufgaben-Vorschlag",
+      fromTaskTwin: true,
+    });
+  }
+  const allEvents = [...events, ...twinEvents];
 
   const replies = cluster.replies
     .filter((r) => r.subject.trim() && r.body.trim())
@@ -664,11 +699,11 @@ function enrichCluster(
       cluster.actionNeeded,
       cluster.status,
       tasks.length,
-      events.length,
+      allEvents.length,
       replies.length
     ),
     tasks,
-    events,
+    events: allEvents,
     replies,
   };
 }
