@@ -4,6 +4,7 @@ import {
   applySwissOrthography,
   flattenAnalysis,
   guessCompanyLabel,
+  MsDayClusterSchema,
   packMailsForPrompt,
   resolveReplyToEmail,
   senderDisplayName,
@@ -247,4 +248,23 @@ test("flattenAnalysis collects tasks events replies", () => {
   assert.equal(flat.events.length, 1);
   assert.equal(flat.replies.length, 1);
   assert.equal(flat.daySummary, "Tag mit ELO-Thema");
+});
+
+test("cluster schema coerces null reply subject/body from AI", () => {
+  const parsed = MsDayClusterSchema.safeParse({
+    company: "Acme",
+    theme: "Info",
+    summary: "Newsletter",
+    replies: [
+      {
+        to: "a@b.com",
+        subject: null,
+        body: null,
+      },
+    ],
+  });
+  assert.equal(parsed.success, true);
+  if (!parsed.success) return;
+  assert.equal(parsed.data.replies[0]?.subject, "");
+  assert.equal(parsed.data.replies[0]?.body, "");
 });

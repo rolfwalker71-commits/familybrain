@@ -16,18 +16,48 @@ import { z } from "zod";
 const Ymd = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const Hm = z.string().regex(/^\d{2}:\d{2}$/);
 
+/** AI often sends null instead of omitting optional/required strings. */
+function aiString(max: number) {
+  return z.preprocess((v) => {
+    if (v == null) return "";
+    if (typeof v === "number" || typeof v === "boolean") return String(v);
+    if (typeof v !== "string") return "";
+    return v;
+  }, z.string().max(max));
+}
+
+function aiStringRequired(max: number, fallback: string) {
+  return z.preprocess((v) => {
+    if (v == null) return fallback;
+    if (typeof v === "number" || typeof v === "boolean") {
+      const s = String(v).trim();
+      return s || fallback;
+    }
+    if (typeof v !== "string") return fallback;
+    const t = v.trim();
+    return t || fallback;
+  }, z.string().min(1).max(max));
+}
+
+const aiNullableString = (max: number) =>
+  z.preprocess((v) => {
+    if (v == null || v === "") return null;
+    if (typeof v !== "string") return null;
+    return v;
+  }, z.string().max(max).nullable());
+
 export const MsDayTaskSuggestionSchema = z.object({
-  title: z.string().min(1).max(200),
-  notes: z.string().max(2000).nullable().optional(),
+  title: aiStringRequired(200, "Aufgabe"),
+  notes: aiNullableString(2000).optional(),
   dueDate: Ymd.nullable().optional(),
-  sourceMailId: z.string().max(200).nullable().optional(),
-  sourceSubject: z.string().max(300).nullable().optional(),
+  sourceMailId: aiNullableString(200).optional(),
+  sourceSubject: aiNullableString(300).optional(),
   folder: z.enum(["inbox", "sent"]).nullable().optional(),
-  company: z.string().max(120).nullable().optional(),
-  counterpartEmail: z.string().max(200).nullable().optional(),
-  senderInitials: z.string().max(80).nullable().optional(),
-  theme: z.string().max(200).nullable().optional(),
-  reason: z.string().max(400).optional(),
+  company: aiNullableString(120).optional(),
+  counterpartEmail: aiNullableString(200).optional(),
+  senderInitials: aiNullableString(80).optional(),
+  theme: aiNullableString(200).optional(),
+  reason: aiString(400).optional(),
 });
 
 export const ExistingDayTaskRefSchema = z.object({
@@ -46,40 +76,41 @@ export const MsDayTaskApplySchema = MsDayTaskSuggestionSchema.extend({
 });
 
 export const MsDayEventSuggestionSchema = z.object({
-  title: z.string().min(1).max(200),
+  title: aiStringRequired(200, "Termin"),
   date: Ymd,
   startTime: Hm.nullable().optional(),
   endTime: Hm.nullable().optional(),
   allDay: z.boolean().optional(),
-  location: z.string().max(300).nullable().optional(),
-  notes: z.string().max(2000).nullable().optional(),
-  sourceMailId: z.string().max(200).nullable().optional(),
-  sourceSubject: z.string().max(300).nullable().optional(),
-  company: z.string().max(120).nullable().optional(),
-  counterpartEmail: z.string().max(200).nullable().optional(),
-  theme: z.string().max(200).nullable().optional(),
-  reason: z.string().max(400).optional(),
+  location: aiNullableString(300).optional(),
+  notes: aiNullableString(2000).optional(),
+  sourceMailId: aiNullableString(200).optional(),
+  sourceSubject: aiNullableString(300).optional(),
+  company: aiNullableString(120).optional(),
+  counterpartEmail: aiNullableString(200).optional(),
+  theme: aiNullableString(200).optional(),
+  reason: aiString(400).optional(),
 });
 
 export const MsDayReplyDraftSchema = z.object({
-  to: z.string().min(3).max(200),
-  subject: z.string().min(1).max(300),
-  body: z.string().min(1).max(4000),
+  /** Empty after coerce → dropped in enrichCluster. */
+  to: aiString(200),
+  subject: aiString(300),
+  body: aiString(4000),
   /** Sprache des Antworttexts — muss zur Kunden-Anfrage passen. */
   language: z.enum(["de", "en"]).optional(),
-  sourceMailId: z.string().max(200).nullable().optional(),
-  company: z.string().max(120).nullable().optional(),
-  theme: z.string().max(200).nullable().optional(),
-  reason: z.string().max(400).optional(),
+  sourceMailId: aiNullableString(200).optional(),
+  company: aiNullableString(120).optional(),
+  theme: aiNullableString(200).optional(),
+  reason: aiString(400).optional(),
 });
 
 export const MsDayClusterSchema = z.object({
-  company: z.string().min(1).max(120),
-  counterpartEmail: z.string().max(200).nullable().optional(),
-  theme: z.string().min(1).max(200),
-  conversationId: z.string().max(200).nullable().optional(),
-  summary: z.string().max(2200),
-  mailIds: z.array(z.string().max(200)).max(40).default([]),
+  company: aiStringRequired(120, "Unbekannt"),
+  counterpartEmail: aiNullableString(200).optional(),
+  theme: aiStringRequired(200, "Thema"),
+  conversationId: aiNullableString(200).optional(),
+  summary: aiString(2200),
+  mailIds: z.array(aiString(200)).max(40).default([]),
   status: z.enum(["open", "waiting", "done", "fyi"]).optional(),
   /** false = nur Info / keine Task/Reply nötig (UI-Chip). */
   actionNeeded: z.boolean().optional(),
@@ -831,9 +862,13 @@ JSON:
     }
     const result = MsDayBatchClustersSchema.safeParse(parsed);
     if (!result.success) {
-      throw new Error(
-        `AI-Schema Batch ${bi + 1} ungültig: ${result.error.message}`
+      // Einzelne Bad-Batches → Seed-Fallback statt kompletter Tagesanalyse-Abbruch
+      // (Telegram/UI meldete sonst z. B. null statt string bei replies.subject).
+      console.warn(
+        `[mail-day-analyze] AI-Schema Batch ${bi + 1}/${batches.length} ungültig — Fallback:`,
+        result.error.message.slice(0, 500)
       );
+      continue;
     }
 
     for (const c of result.data.clusters) {
