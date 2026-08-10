@@ -78,7 +78,7 @@ export const MsDayClusterSchema = z.object({
   counterpartEmail: z.string().max(200).nullable().optional(),
   theme: z.string().min(1).max(200),
   conversationId: z.string().max(200).nullable().optional(),
-  summary: z.string().max(900),
+  summary: z.string().max(2200),
   mailIds: z.array(z.string().max(200)).max(20).default([]),
   status: z.enum(["open", "waiting", "done", "fyi"]).optional(),
   tasks: z.array(MsDayTaskSuggestionSchema).max(6).default([]),
@@ -87,7 +87,7 @@ export const MsDayClusterSchema = z.object({
 });
 
 export const MsDayMailAnalysisSchema = z.object({
-  daySummary: z.string().max(1600),
+  daySummary: z.string().max(3200),
   clusters: z.array(MsDayClusterSchema).max(16),
 });
 
@@ -297,7 +297,7 @@ export function originalSenderForCluster(mails: MsMailItem[]): {
 }
 
 function formatMailBlock(m: MsMailItem, indexLabel: string): string {
-  const body = (m.bodyText || m.preview || "").slice(0, 1400);
+  const body = (m.bodyText || m.preview || "").slice(0, 2200);
   const { email, company } = counterpartForMail(m);
   const absender =
     m.folder === "inbox"
@@ -657,11 +657,18 @@ Analysiere die Mails des gewählten Zeitraums (Posteingang + Gesendet).
 SCHREIBWEISE (hart, gesamtes JSON):
 - Schweizer Hochdeutsch: kein scharfes s (ß). Immer «ss» (Gruss, heissen, Strasse, grosse, Massnahme).
 - Schlussformel DE z. B. «Freundliche Grüsse» / «Mit freundlichen Grüssen» — nie «Grüße».
-- Schweiz-Kultur: klar, höflich, knapp; CHF/Datumsstil wo relevant.
+- Schweiz-Kultur: klar, höflich; CHF/Datumsstil wo relevant. Zusammenfassungen ausführlich und vollständig — nicht telegrammstilig.
+
+ZUSAMMENFASSUNGEN (hart — daySummary + cluster.summary):
+- daySummary: 5–10 Sätze Überblick über den gesamten Zeitraum. Nenne die wichtigsten Firmen/Personen und Themen. Was ist erledigt, was wartet, was brennt? Offene Fristen, Zusagen, Blocker und nächste Schritte nicht weglassen.
+- cluster.summary: 4–8 Sätze pro Thread/Thema. Chronologie des Austauschs (wer schrieb was / wann relevant), aktueller Stand, offene Fragen, zugesagte Termine/Lieferungen/Beträge/Referenzen (Ticket-, Auftrags-, Rechnungsnummern), und was du noch tun oder antworten musst.
+- Wesentliches nie weglassen: Zusagen, Ablehnungen, Deadlines, Geldbeträge, technische Fehlerbilder, Ansprechpartner, «bitte bis …», Eskalationen.
+- Keine Ausschmückung und keine erfundenen Fakten — aber auch keine knappen Einzeiler, wenn der Thread mehr hergibt.
+- Newsletter/Werbung nur erwähnen wenn sie Handlung brauchen; sonst weglassen.
 
 Ablauf:
 1) Gruppiere nach Kunde/Firma und Thema/Thread. Gleiche conv=… = derselbe Thread.
-2) Pro Cluster: kurze Zusammenfassung + status.
+2) Pro Cluster: ausführliche Zusammenfassung (s. oben) + status.
 3) Nächste Schritte — tasks / replies / events sind getrennte Kanäle:
 
 TASKS: interne Handlung für dich (prüfen, buchen, nachfassen, Ticket öffnen). Titel handlungsnah OHNE Absender-Suffix (wird serverseitig ergänzt). dueDate Default ${defaultDue}.
@@ -687,20 +694,22 @@ Newsletter/Werbung weglassen. Keine erfundenen Fakten. NUR JSON.`;
   }
 Default dueDate für Tasks ohne Frist: ${defaultDue}
 
-Vor dem JSON: gehe Cluster für Cluster die Inbox-Mails durch und entscheide bewusst, ob ein Reply fehlt. Lieber ein kurzer Zwischenstands-Reply als gar keiner, wenn der Absender auf Rückmeldung wartet.
+Vor dem JSON:
+1) Gehe Cluster für Cluster die Inbox-Mails durch und entscheide bewusst, ob ein Reply fehlt. Lieber ein kurzer Zwischenstands-Reply als gar keiner, wenn der Absender auf Rückmeldung wartet.
+2) Schreibe daySummary und jede cluster.summary so, dass jemand ohne die Mails den Stand versteht — inkl. aller wesentlichen Zusagen, Fristen und offenen Punkte.
 
 ${packed}
 
 JSON-Schema:
 {
-  "daySummary": "2–5 Sätze Überblick mit Firmennamen",
+  "daySummary": "5–10 Sätze: Überblick Zeitraum, Firmen/Themen, was erledigt/offen/dringend ist",
   "clusters": [
     {
       "company": "Firma",
       "counterpartEmail": "name@firma.ch"|null,
       "theme": "kurzes Thema",
       "conversationId": "conv-id oder null",
-      "summary": "Stand im Thread",
+      "summary": "4–8 Sätze: Chronologie, Stand, offene Punkte, Zusagen/Fristen/Referenzen — nichts Wesentliches weglassen",
       "mailIds": ["id"],
       "status": "open"|"waiting"|"done"|"fyi",
       "tasks": [
