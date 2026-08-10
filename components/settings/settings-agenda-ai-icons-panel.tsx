@@ -1,23 +1,117 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ImageIcon, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { IconCircle } from "@/components/layout/icon-circle";
 
+type RegenJob = {
+  status: "running" | "done" | "error";
+  message?: string | null;
+  error?: string | null;
+  generated?: number;
+  unique?: number;
+  errors?: number;
+  processed?: number;
+};
+
+async function readJsonSafe(res: Response): Promise<Record<string, unknown>> {
+  const text = await res.text();
+  if (!text) return {};
+  try {
+    return JSON.parse(text) as Record<string, unknown>;
+  } catch {
+    const snippet = text.replace(/\s+/g, " ").trim().slice(0, 120);
+    throw new Error(
+      res.ok
+        ? `Unerwartete Antwort (kein JSON): ${snippet || "(leer)"}`
+        : `Serverfehler ${res.status}: ${snippet || res.statusText || "keine Details"}`
+    );
+  }
+}
+
 /**
  * Admin action: force-regenerate Google + Microsoft agenda AI thumbnails
- * for the current week (new prompts / style).
+ * for the current week (new prompts / style). Runs as a background job.
  */
 export function SettingsAgendaAiIconsPanel() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const stopPoll = useCallback(() => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  }, []);
+
+  const applyJob = useCallback((job: RegenJob | null | undefined) => {
+    if (!job) return;
+    if (job.status === "running") {
+      setBusy(true);
+      setMessage(job.message || "Generiere…");
+      setError(null);
+      return;
+    }
+    setBusy(false);
+    if (job.status === "done") {
+      setMessage(job.message || "Fertig.");
+      setError(null);
+    } else if (job.status === "error") {
+      setError(job.error || job.message || "Neugenerierung fehlgeschlagen");
+      setMessage(null);
+    }
+  }, []);
+
+  const pollOnce = useCallback(async () => {
+    const res = await fetch("/api/calendar/ai-icons/regenerate", {
+      cache: "no-store",
+    });
+    const data = await readJsonSafe(res);
+    if (!res.ok) {
+      throw new Error(
+        typeof data.error === "string"
+          ? data.error
+          : "Status konnte nicht geladen werden"
+      );
+    }
+    const job = (data.job as RegenJob | null) || null;
+    applyJob(job);
+    return Boolean(data.busy) || job?.status === "running";
+  }, [applyJob]);
+
+  const startPolling = useCallback(() => {
+    stopPoll();
+    pollRef.current = setInterval(() => {
+      void pollOnce()
+        .then((stillBusy) => {
+          if (!stillBusy) stopPoll();
+        })
+        .catch((err) => {
+          stopPoll();
+          setBusy(false);
+          setError(err instanceof Error ? err.message : String(err));
+        });
+    }, 2500);
+  }, [pollOnce, stopPoll]);
+
+  useEffect(() => {
+    void pollOnce()
+      .then((stillBusy) => {
+        if (stillBusy) startPolling();
+      })
+      .catch(() => {
+        /* ignore initial status errors */
+      });
+    return () => stopPoll();
+  }, [pollOnce, startPolling, stopPoll]);
 
   async function regenerate() {
     setBusy(true);
-    setMessage(null);
+    setMessage("Neugenerierung wird gestartet…");
     setError(null);
     try {
       const res = await fetch("/api/calendar/ai-icons/regenerate", {
@@ -25,20 +119,28 @@ export function SettingsAgendaAiIconsPanel() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ maxGenerate: 24 }),
       });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Neugenerierung fehlgeschlagen");
+      const data = await readJsonSafe(res);
+      if (!res.ok && res.status !== 202) {
+        throw new Error(
+          typeof data.error === "string"
+            ? data.error
+            : "Neugenerierung fehlgeschlagen"
+        );
       }
-      setMessage(
-        `Fertig: ${data.generated ?? 0} neu erzeugt` +
-          (data.unique != null ? ` (${data.unique} Motive)` : "") +
-          (data.errors ? `, ${data.errors} Fehler` : "") +
-          "."
-      );
+      applyJob((data.job as RegenJob | null) || null);
+      if (typeof data.message === "string") {
+        setMessage(data.message);
+      }
+      startPolling();
+      // Immediate follow-up in case the job finishes quickly
+      void pollOnce().then((stillBusy) => {
+        if (!stillBusy) stopPoll();
+      });
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
       setBusy(false);
+      setError(err instanceof Error ? err.message : String(err));
+      setMessage(null);
+      stopPoll();
     }
   }
 
@@ -57,7 +159,8 @@ export function SettingsAgendaAiIconsPanel() {
             Google- und Microsoft-Kalender
           </strong>{" "}
           der aktuellen Woche neu (Online-Meetings, Arbeit/Sport/Ferien,
-          Fahrzeit). ICS-Abos und lokale Buddy-Einträge bleiben unberührt.
+          Fahrzeit). Läuft im Hintergrund — ICS-Abos und lokale Buddy-Einträge
+          bleiben unberührt.
         </p>
         <Button
           type="button"
