@@ -97,6 +97,7 @@ const ARTIFACT_KINDS = new Set([
   "di_api",
   "service_layer",
   "powershell",
+  "bash",
   "script",
   "config",
   "other",
@@ -123,6 +124,14 @@ function normalizeSolutionArtifact(raw: unknown): {
   if (kind === "fs" || kind === "formattedsearch") {
     kind = "formatted_search";
   }
+  if (
+    kind === "shell" ||
+    kind === "linux" ||
+    kind === "bash_script" ||
+    kind === "sh"
+  ) {
+    kind = "bash";
+  }
   if (!ARTIFACT_KINDS.has(kind)) kind = "other";
   const language =
     asString(o.language ?? o.lang, 40) ||
@@ -137,7 +146,9 @@ function normalizeSolutionArtifact(raw: unknown): {
         ? "csharp"
         : kind === "powershell"
           ? "powershell"
-          : "text");
+          : kind === "bash"
+            ? "bash"
+            : "text");
   return {
     kind,
     title: asString(o.title ?? o.name ?? o.label, 160) || "Artefakt",
@@ -293,6 +304,7 @@ export const MariSolutionArtifactSchema = z.object({
     "di_api",
     "service_layer",
     "powershell",
+    "bash",
     "script",
     "config",
     "other",
@@ -356,7 +368,8 @@ export function detectRelevantVendorsFromTicketText(text: string): string[] {
     if (re.test(t) && !found.includes(label)) found.push(label);
   };
   add("SAP Business One", /\b(sap\s*b1|business\s*one|sbo\b|ocrd|oinv|di-?api|service\s*layer|udf|udt|formatted\s*search|transaction\s*notification)\b/i);
-  add("SAP HANA", /\b(hana|sqlscript|hdbsql)\b/i);
+  add("SAP HANA", /\b(hana|sqlscript|hdbsql|hdbdaemon|hdbindexserver)\b/i);
+  add("Linux / OS", /\b(linux|suse|rhel|redhat|ubuntu|systemd|ssh|bash|shell|df\s+-h|journalctl)\b/i);
   add("Coresystems coresuite", /\b(coresystems|coresuite|core\s*suite|customize)\b/i);
   add("Boyum IT", /\b(boyum|b1up|b1\s*usability|produmex|print\s*&\s*delivery|boyum\s*insight)\b/i);
   add("Produmex", /\bprodumex\b/i);
@@ -400,6 +413,13 @@ HANA SQL (kind sql_hana / language sql-hana) — SYNTAX HART:
 - MS SQL (sql_sqlserver): [OCRD]/[CardCode], ISNULL ok, String-Verkettung oft +; keine HANA-only-Funktionen.
 - Transaction Notification: HANA = SQLSCRIPT (IN/OUT ohne @); SQL Server = @object_type/@transaction_type/… — wenn TN geliefert wird, idealerweise BEIDE Varianten. Nie HANA-Artifact mit T-SQL-@Variablen als «HANA» ausgeben.
 
+LINUX / HANA-BETRIEB (wenn Ticket Linux, SUSE, RHEL, HANA-Server, Speicher, Dienste, Backup, hdbsql, Indexserver, Netzwerk betrifft):
+- Zusätzlich praxisnahe Diagnose-/Fix-Hilfen liefern:
+  1) kind bash / language bash: Shell-Befehle (systemctl status/restart für HANA-Dienste wo üblich, df -h, free -h, journalctl, top/htop, ls -la auf Trace-/Log-Pfade, HDB info / sapcontrol wo passend). Kommentiert, Platzhalter für SID/Instanz/Host.
+  2) HANA-seitig: hdbsql-Beispiele, M_*-Monitoring-Views (z. B. M_SERVICES, M_DISK_USAGE, M_CONNECTIONS) als sql_hana — und parallel sql_sqlserver nur wenn B1-Datenbank-SQL gemeint ist; bei reinem HANA-OS/DB-Admin reichen bash + sql_hana.
+- Keine destruktiven rm -rf / DROP ohne klare Warnung in note; kein Blind-Restart auf Produktiv ohne Hinweis.
+- steps: wo relevant Linux-Pfad und HANA Studio/Database Explorer nennen.
+
 Nachschlagewerke (in caveats/outline):
 - https://help.sap.com → SAP Business One
 - Microsoft Learn für Graph/Outlook/M365
@@ -434,9 +454,9 @@ Liefere JSON genau in diesem Schema:
     ],
     "artifacts": [
       {
-        "kind": "sql_hana|sql_sqlserver|sql|transaction_notification|formatted_search|coresuite_customize|stored_procedure|di_api|service_layer|powershell|script|config|other",
+        "kind": "sql_hana|sql_sqlserver|sql|transaction_notification|formatted_search|coresuite_customize|stored_procedure|di_api|service_layer|powershell|bash|script|config|other",
         "title": "…",
-        "language": "sql-hana|sql|csharp|js|powershell|json|text|…",
+        "language": "sql-hana|sql|csharp|js|powershell|bash|json|text|…",
         "code": "AUSFÜHRLICHES, lauffähig skizziertes Skript (Kommentare, Platzhalter klar; HANA nur HANA-Syntax)",
         "note": "DB-Variante, Deploy-Hinweis, Test auf Testfirma, Doku-Themenpfad"
       }
@@ -458,7 +478,8 @@ solutionSketch — UMFANGREICH und PRAXISTAUGICH (Support-Qualität):
   5) coresuite_customize wenn Coresystems/coresuite relevant.
   6) config/script für Boyum/B1UP/Produmex wenn erkennbar.
   7) DI-API / Service Layer / PowerShell / Graph wenn passend.
-- VERBOTEN: nur sql_hana ohne sql_sqlserver (oder umgekehrt), sobald irgendein SQL-Diagnose-/Fix-Skript vorkommt.
+  8) Bei Linux/HANA-Betrieb: bash (Shell-Diagnose/Fix) und ggf. HANA-Monitoring-SQL (M_*-Views / hdbsql) — siehe LINUX / HANA-BETRIEB.
+- VERBOTEN: nur sql_hana ohne sql_sqlserver (oder umgekehrt), sobald irgendein B1-Firmen-DB SQL-Diagnose-/Fix-Skript vorkommt (reine HANA-OS-Admin-Skripte ausgenommen).
 - Skripte: kommentiert, idempotent wo möglich, keine destruktiven UPDATEs ohne klaren WHERE und Warnung in note.
 - Keine erfundenen SAP-Note-/KB-Nummern; Themenpfade statt Fantasie-IDs.
 - Klar als Vorschlag; kein Blind-Deploy auf Produktiv.
@@ -570,7 +591,8 @@ ${
     ? vendorHints.map((v) => `- ${v}`).join("\n")
     : "- (keine klaren Treffer — aus Verlauf selbst ableiten; bei B1-Themen mind. SAP Business One)"
 }
-SQL-Artefakte: IMMER beide Varianten liefern (sql_hana + sql_sqlserver), auch wenn HANA erwähnt wird — Kunden-DB oft unklar. HANA nur in korrekter HANA-Syntax.
+SQL-Artefakte: Bei B1-Firmen-DB-SQL IMMER beide Varianten (sql_hana + sql_sqlserver). HANA nur in korrekter HANA-Syntax.
+Bei Linux/HANA-Server-Problemen zusätzlich bash-Shell und ggf. HANA-Monitoring/hdbsql liefern.
 
 Anrede-Muster für nextReplyDraft: ${
     addressForm === "du"
