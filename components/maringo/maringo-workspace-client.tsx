@@ -59,11 +59,54 @@ import {
   isMariMailStubText,
   type MariTimelineSide,
 } from "@/lib/mari/timeline-side";
+import {
+  detectReplyLanguage,
+  type ReplyLang,
+} from "@/lib/microsoft/reply-language-shared";
 import type { MariTimeLine } from "@/lib/mari/timekeeping-shared";
 import { MaringoTimekeepingPanel } from "@/components/maringo/maringo-timekeeping-panel";
 import { MaringoTimeBookDialog } from "@/components/maringo/maringo-time-book-dialog";
 import type { TimeBookFormDefaults } from "@/components/maringo/maringo-time-book-form";
 import { MaringoTimeLinesTable } from "@/components/maringo/maringo-time-lines-table";
+
+function ReplyLangToggle({
+  lang,
+  busy,
+  onChange,
+}: {
+  lang: ReplyLang;
+  busy: boolean;
+  onChange: (lang: ReplyLang) => void;
+}) {
+  return (
+    <div
+      className="inline-flex items-center gap-0.5 rounded-md border border-border/60 p-0.5"
+      onClick={(e) => e.preventDefault()}
+      onKeyDown={(e) => e.stopPropagation()}
+    >
+      {(["de", "en"] as const).map((code) => (
+        <button
+          key={code}
+          type="button"
+          disabled={busy}
+          className={cn(
+            "rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase",
+            lang === code
+              ? "bg-muted text-foreground"
+              : "text-muted-foreground hover:text-foreground"
+          )}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onChange(code);
+          }}
+        >
+          {code}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 function sideChipClass(side: MariTimelineSide): string {
   switch (side) {
@@ -470,6 +513,8 @@ export function MaringoWorkspaceClient() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [postingInternalNote, setPostingInternalNote] = useState(false);
+  const [translatingReplyDraft, setTranslatingReplyDraft] = useState(false);
+  const [replyDraftLang, setReplyDraftLang] = useState<ReplyLang | null>(null);
   const [patching, setPatching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notePostedHint, setNotePostedHint] = useState<string | null>(null);
@@ -493,6 +538,11 @@ export function MaringoWorkspaceClient() {
     () => formatTokenUsageBreakdownLines(analysisUsage),
     [analysisUsage]
   );
+  const nextReplyDraftLang = useMemo((): ReplyLang => {
+    if (replyDraftLang) return replyDraftLang;
+    const draft = analysis?.nextReplyDraft?.trim() || "";
+    return detectReplyLanguage(draft);
+  }, [analysis?.nextReplyDraft, replyDraftLang]);
 
   const detailImageAttachmentCount = useMemo(() => {
     if (!detail?.timeline) return 0;
@@ -587,6 +637,8 @@ export function MaringoWorkspaceClient() {
     setImagesAnalyzed(0);
     setImageNames([]);
     setAnalysisUsage(null);
+    setReplyDraftLang(null);
+    setTranslatingReplyDraft(false);
     setNotePostedHint(null);
     setError(null);
     try {
@@ -803,6 +855,7 @@ export function MaringoWorkspaceClient() {
           ? (data.usage as AiTokenUsage)
           : null
       );
+      setReplyDraftLang(null);
       setSavedAnalyzedAt(
         typeof data.analyzedAt === "string"
           ? data.analyzedAt
@@ -823,6 +876,56 @@ export function MaringoWorkspaceClient() {
       dateStyle: "short",
       timeStyle: "short",
     });
+  }
+
+  async function changeNextReplyDraftLanguage(targetLang: ReplyLang) {
+    const draft = analysis?.nextReplyDraft?.trim();
+    if (!draft) return;
+    if (nextReplyDraftLang === targetLang) return;
+    setTranslatingReplyDraft(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/microsoft/mail/translate-reply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subject: "Antwort",
+          body: draft.slice(0, 4000),
+          targetLang,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          data.error || `Übersetzung fehlgeschlagen (${res.status})`
+        );
+      }
+      const body = String(data.body || "").trim();
+      if (!body) throw new Error("Übersetzung lieferte keinen Text.");
+      setAnalysis((prev) =>
+        prev ? { ...prev, nextReplyDraft: body.slice(0, 2000) } : prev
+      );
+      setReplyDraftLang(data.language === "en" ? "en" : "de");
+      if (data.usage && typeof data.usage === "object") {
+        setAnalysisUsage((prev) => {
+          const u = data.usage as AiTokenUsage;
+          if (!prev) return u;
+          return {
+            ...u,
+            promptTokens: (prev.promptTokens || 0) + (u.promptTokens || 0),
+            completionTokens:
+              (prev.completionTokens || 0) + (u.completionTokens || 0),
+            totalTokens: (prev.totalTokens || 0) + (u.totalTokens || 0),
+            estimatedCostUsd:
+              (prev.estimatedCostUsd || 0) + (u.estimatedCostUsd || 0),
+          };
+        });
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setTranslatingReplyDraft(false);
+    }
   }
 
   async function postAnalysisAsInternalNote() {
@@ -1732,7 +1835,19 @@ export function MaringoWorkspaceClient() {
                       ) : null}
                       {analysis.nextReplyDraft ? (
                         <div>
-                          <p className="font-semibold">Antwort-Entwurf</p>
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="font-semibold">
+                              Antwort-Entwurf
+                              {translatingReplyDraft ? " · übersetzt…" : ""}
+                            </p>
+                            <ReplyLangToggle
+                              lang={nextReplyDraftLang}
+                              busy={translatingReplyDraft || analyzing}
+                              onChange={(next) =>
+                                void changeNextReplyDraftLanguage(next)
+                              }
+                            />
+                          </div>
                           <pre className="mt-1 whitespace-pre-wrap rounded-xl border border-border/50 bg-white/70 p-2.5 font-sans text-[12px]">
                             {analysis.nextReplyDraft}
                           </pre>
