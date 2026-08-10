@@ -20,7 +20,7 @@ import {
   resolveTimePeriodRange,
   type MariTimeLine,
   type MariTimePeriod,
-} from "@/lib/mari/timekeeping";
+} from "@/lib/mari/timekeeping-shared";
 import {
   MaringoTimeBookForm,
   type TimeBookFormDefaults,

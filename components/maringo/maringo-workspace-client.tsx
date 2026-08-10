@@ -58,7 +58,7 @@ import {
   isMariMailStubText,
   type MariTimelineSide,
 } from "@/lib/mari/timeline-side";
-import type { MariTimeLine } from "@/lib/mari/timekeeping";
+import type { MariTimeLine } from "@/lib/mari/timekeeping-shared";
 import { MaringoTimekeepingPanel } from "@/components/maringo/maringo-timekeeping-panel";
 import { MaringoTimeBookDialog } from "@/components/maringo/maringo-time-book-dialog";
 import type { TimeBookFormDefaults } from "@/components/maringo/maringo-time-book-form";

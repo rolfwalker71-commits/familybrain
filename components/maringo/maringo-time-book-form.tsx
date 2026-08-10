@@ -1,12 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { Star, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { APP_ICON_STROKE } from "@/lib/branding/app-icons";
 import { cn } from "@/lib/utils";
-import type { MariKeyPair } from "@/lib/mari/timekeeping";
+import type { MariKeyPair } from "@/lib/mari/timekeeping-shared";
+import type { MariTimeBookFavorite } from "@/lib/mari/time-book-favorites";
 
 export type TimeBookFormDefaults = {
   dayOfService?: string;
@@ -55,6 +58,7 @@ export function MaringoTimeBookForm({
   onSubmit,
   className,
   layout = "compact",
+  enableFavorites = true,
 }: {
   defaults?: TimeBookFormDefaults | null;
   submitLabel?: string;
@@ -62,6 +66,7 @@ export function MaringoTimeBookForm({
   className?: string;
   /** wide = volle Breite untereinander (Stunden-Tab); compact = Dialog */
   layout?: "wide" | "compact";
+  enableFavorites?: boolean;
 }) {
   const [dayOfService, setDayOfService] = useState(
     defaults?.dayOfService || zurichTodayYmd()
@@ -100,8 +105,32 @@ export function MaringoTimeBookForm({
   );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hint, setHint] = useState<string | null>(null);
   const [projectOpen, setProjectOpen] = useState(false);
   const [loadingProjects, setLoadingProjects] = useState(false);
+  const [favorites, setFavorites] = useState<MariTimeBookFavorite[]>([]);
+  const [favoritesLoading, setFavoritesLoading] = useState(false);
+  const [saveAsFavorite, setSaveAsFavorite] = useState(false);
+  const [favoriteName, setFavoriteName] = useState("");
+
+  const loadFavorites = useCallback(async () => {
+    if (!enableFavorites) return;
+    setFavoritesLoading(true);
+    try {
+      const res = await fetch("/api/maringo/timekeeping/favorites");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Favoriten laden fehlgeschlagen");
+      setFavorites((data.favorites || []) as MariTimeBookFavorite[]);
+    } catch {
+      /* Favoriten optional — Maske bleibt nutzbar */
+    } finally {
+      setFavoritesLoading(false);
+    }
+  }, [enableFavorites]);
+
+  useEffect(() => {
+    void loadFavorites();
+  }, [loadFavorites]);
 
   const loadProjects = useCallback(async (q: string) => {
     setLoadingProjects(true);
@@ -217,9 +246,76 @@ export function MaringoTimeBookForm({
     else setHoursBillableRaw("0");
   }
 
+  function applyFavorite(fav: MariTimeBookFavorite) {
+    setError(null);
+    setHint(
+      `Favorit «${fav.name}» geladen — Datum und Stunden prüfen, dann buchen.`
+    );
+    setProjectNumber(fav.projectNumber);
+    setProjectLabel(fav.projectLabel || fav.projectNumber);
+    setContractId(fav.contractId != null ? String(fav.contractId) : "");
+    setContractPositionId(
+      fav.contractPositionId != null ? String(fav.contractPositionId) : ""
+    );
+    setActivity(fav.activity);
+    setMemoText(fav.memoText || "");
+    setBillable(fav.billable);
+    setHoursBillableRaw(
+      fav.billable ? String(fav.hoursBillable ?? fav.hours) : "0"
+    );
+    // Typische Stunden aus Favorit übernehmen — leicht anpassbar
+    setHoursRaw(String(fav.hours));
+    setProjectOpen(false);
+  }
+
+  function favoritePayloadFromForm(name: string) {
+    const hours = parseHours(hoursRaw) ?? 0.25;
+    const hoursBillable = parseHours(hoursBillableRaw) ?? (billable ? hours : 0);
+    return {
+      name: name.trim(),
+      projectNumber,
+      projectLabel: projectLabel || projectNumber,
+      contractId: contractId ? Number(contractId) : null,
+      contractPositionId: contractPositionId
+        ? Number(contractPositionId)
+        : null,
+      activity: activity.trim(),
+      memoText: memoText.trim() || null,
+      hours,
+      hoursBillable: billable ? Math.min(hoursBillable, hours) : 0,
+      billable,
+    };
+  }
+
+  async function persistFavorite(name: string) {
+    const res = await fetch("/api/maringo/timekeeping/favorites", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(favoritePayloadFromForm(name)),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || "Favorit speichern fehlgeschlagen");
+    await loadFavorites();
+    return data.favorite as MariTimeBookFavorite | undefined;
+  }
+
+  async function deleteFavorite(id: number) {
+    setError(null);
+    const res = await fetch(`/api/maringo/timekeeping/favorites/${id}`, {
+      method: "DELETE",
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setError(data.error || "Favorit löschen fehlgeschlagen");
+      return;
+    }
+    setFavorites((prev) => prev.filter((f) => f.id !== id));
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setHint(null);
     const hours = parseHours(hoursRaw);
     const hoursBillable = parseHours(hoursBillableRaw);
     if (!projectNumber) {
@@ -246,6 +342,13 @@ export function MaringoTimeBookForm({
       setError("Verrechenbare Stunden ungültig.");
       return;
     }
+    if (enableFavorites && saveAsFavorite) {
+      const name = (favoriteName.trim() || activity.trim()).slice(0, 80);
+      if (!name) {
+        setError("Name für Favorit fehlt.");
+        return;
+      }
+    }
     setBusy(true);
     try {
       await onSubmit({
@@ -261,6 +364,51 @@ export function MaringoTimeBookForm({
         hoursBillable: billable ? Math.min(hoursBillable, hours) : 0,
         issueId: defaults?.issueId ?? null,
       });
+      if (enableFavorites && saveAsFavorite) {
+        const name = (favoriteName.trim() || activity.trim()).slice(0, 80);
+        try {
+          await persistFavorite(name);
+          setHint(`Favorit «${name}» gespeichert.`);
+          setSaveAsFavorite(false);
+          setFavoriteName("");
+        } catch (favErr) {
+          setHint(
+            `Gebucht, aber Favorit nicht gespeichert: ${
+              favErr instanceof Error ? favErr.message : String(favErr)
+            }`
+          );
+        }
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveFavoriteOnly() {
+    setError(null);
+    setHint(null);
+    if (!projectNumber) {
+      setError("Bitte Projekt wählen.");
+      return;
+    }
+    if (!activity.trim()) {
+      setError("Aktivität fehlt.");
+      return;
+    }
+    const name = (
+      favoriteName.trim() ||
+      activity.trim() ||
+      projectLabel ||
+      projectNumber
+    ).slice(0, 80);
+    setBusy(true);
+    try {
+      await persistFavorite(name);
+      setHint(`Favorit «${name}» gespeichert.`);
+      setSaveAsFavorite(false);
+      setFavoriteName("");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -279,6 +427,54 @@ export function MaringoTimeBookForm({
         <p className="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-2 text-[12px] whitespace-pre-wrap break-words text-rose-950">
           {error}
         </p>
+      ) : null}
+      {hint ? (
+        <p className="rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-2 text-[12px] text-sky-950">
+          {hint}
+        </p>
+      ) : null}
+
+      {enableFavorites ? (
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <Star className="size-3.5" strokeWidth={APP_ICON_STROKE} />
+            Favoriten
+          </div>
+          {favoritesLoading && favorites.length === 0 ? (
+            <p className="text-[12px] text-muted-foreground">Lade Favoriten…</p>
+          ) : favorites.length === 0 ? (
+            <p className="text-[12px] text-muted-foreground">
+              Noch keine Favoriten — unten «Als Favorit speichern» wählen.
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-1.5">
+              {favorites.map((fav) => (
+                <div
+                  key={fav.id}
+                  className="inline-flex max-w-full items-center gap-0.5 rounded-lg border border-border/70 bg-muted/40 pl-1"
+                >
+                  <button
+                    type="button"
+                    className="max-w-[14rem] truncate px-2 py-1 text-left text-[12px] font-medium hover:underline"
+                    title={`${fav.projectNumber} · ${fav.activity}`}
+                    onClick={() => applyFavorite(fav)}
+                  >
+                    {fav.name}
+                  </button>
+                  <button
+                    type="button"
+                    className="mr-0.5 rounded p-1 text-muted-foreground hover:bg-background hover:text-rose-700"
+                    aria-label={`Favorit «${fav.name}» löschen`}
+                    title="Löschen"
+                    onClick={() => void deleteFavorite(fav.id)}
+                  >
+                    <X className="size-3.5" strokeWidth={APP_ICON_STROKE} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       ) : null}
 
       <div
@@ -385,12 +581,7 @@ export function MaringoTimeBookForm({
         </div>
       </div>
 
-      <div
-        className={cn(
-          "grid gap-3",
-          wide ? "sm:grid-cols-2" : "sm:grid-cols-2"
-        )}
-      >
+      <div className={cn("grid gap-3", "sm:grid-cols-2")}>
         <div className="space-y-1">
           <Label htmlFor="tk-contract">Vertrag</Label>
           <select
@@ -459,10 +650,55 @@ export function MaringoTimeBookForm({
         </div>
       </div>
 
+      {enableFavorites ? (
+        <div className="space-y-2 rounded-lg border border-border/60 bg-muted/20 px-3 py-2.5">
+          <label className="flex items-center gap-2 text-[13px]">
+            <input
+              type="checkbox"
+              checked={saveAsFavorite}
+              onChange={(e) => {
+                setSaveAsFavorite(e.target.checked);
+                if (e.target.checked && !favoriteName.trim()) {
+                  setFavoriteName(activity.trim().slice(0, 80));
+                }
+              }}
+            />
+            Als Favorit speichern
+          </label>
+          {saveAsFavorite ? (
+            <div className="space-y-1">
+              <Label htmlFor="tk-fav-name">Favoritenname</Label>
+              <Input
+                id="tk-fav-name"
+                value={favoriteName}
+                onChange={(e) => setFavoriteName(e.target.value)}
+                maxLength={80}
+                placeholder="z.B. Daily ANG"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Speichert Projekt, Vertrag, Aktivität, Memo und Verrechenbarkeit
+                (ohne Datum). Beim Buchen mit — oder nur Favorit speichern.
+              </p>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
       <div className="flex flex-wrap items-center gap-2 pt-1">
         <Button type="submit" size="sm" disabled={busy}>
           {busy ? "Speichere…" : submitLabel}
         </Button>
+        {enableFavorites && saveAsFavorite ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={busy}
+            onClick={() => void saveFavoriteOnly()}
+          >
+            Nur Favorit speichern
+          </Button>
+        ) : null}
         {projectOpen ? (
           <Button
             type="button"

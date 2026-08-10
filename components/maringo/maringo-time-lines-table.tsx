@@ -6,7 +6,7 @@ import {
   approvalStatusLabel,
   type MariApprovalStatus,
   type MariTimeLine,
-} from "@/lib/mari/timekeeping";
+} from "@/lib/mari/timekeeping-shared";
 import { APP_ICON_STROKE } from "@/lib/branding/app-icons";
 import { toSwissDate } from "@/lib/utils/dates";
 import { cn } from "@/lib/utils";

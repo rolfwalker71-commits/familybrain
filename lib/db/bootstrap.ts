@@ -143,6 +143,7 @@ export function bootstrapDatabase(db: Database.Database): void {
   ensureInboxTaskTables(db);
   ensureMailAnalysesTable(db);
   ensureMailSenderPrefsTable(db);
+  ensureMariTimeBookFavoritesTable(db);
   ensureMailAppliedLinksTable(db);
   ensureBuddySourceLinksTable(db);
   ensureReferenceNotesTable(db);
@@ -273,6 +274,30 @@ function ensureMailSenderPrefsTable(db: Database.Database): void {
       updated_at TEXT NOT NULL,
       PRIMARY KEY (user_id, from_domain)
     );
+  `);
+}
+
+function ensureMariTimeBookFavoritesTable(db: Database.Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS mari_time_book_favorites (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      owner_key TEXT NOT NULL,
+      name TEXT NOT NULL,
+      sort_key INTEGER NOT NULL DEFAULT 0,
+      project_number TEXT NOT NULL,
+      project_label TEXT,
+      contract_id INTEGER,
+      contract_position_id INTEGER,
+      activity TEXT NOT NULL,
+      memo_text TEXT,
+      hours REAL NOT NULL DEFAULT 0.25,
+      hours_billable REAL,
+      billable INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_mari_time_book_favorites_owner
+      ON mari_time_book_favorites(owner_key, sort_key, id);
   `);
 }
 
