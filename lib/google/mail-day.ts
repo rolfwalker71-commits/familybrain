@@ -12,6 +12,13 @@ import {
   mailAnalysisRangeExclusiveEnd,
   resolveMailAnalysisRange,
 } from "@/lib/mail/mail-analysis-range";
+import {
+  annotateMailInRange,
+  MAIL_THREAD_EXPAND_MAX_MESSAGES,
+  MAIL_THREAD_EXPAND_MAX_THREADS,
+  mergeMailItemsById,
+  splitMailsByFolder,
+} from "@/lib/mail/mail-threads";
 
 function gmailRangeBounds(
   fromYmd: string,
@@ -107,6 +114,36 @@ function isoFromInternalDate(internalDate: string | null | undefined): string | 
   return new Date(n).toISOString();
 }
 
+function mapGmailMessage(
+  msg: gmail_v1.Schema$Message,
+  folderHint: "inbox" | "sent"
+): MsMailItem | null {
+  if (!msg.id) return null;
+  const headers = msg.payload?.headers;
+  const from = parseFrom(headerValue(headers, "From"));
+  const to = parseAddressList(headerValue(headers, "To"));
+  const bodyText = extractBodies(msg.payload).slice(0, 8000);
+  const labelIds = msg.labelIds || [];
+  let folder: "inbox" | "sent" = folderHint;
+  if (labelIds.includes("SENT")) folder = "sent";
+  else if (labelIds.includes("INBOX")) folder = "inbox";
+  return {
+    id: msg.id,
+    folder,
+    subject: headerValue(headers, "Subject") || "(kein Betreff)",
+    from: from.name,
+    fromEmail: from.email,
+    toPreview: to.preview,
+    toEmails: to.emails,
+    receivedOrSentAt: isoFromInternalDate(msg.internalDate),
+    preview: (msg.snippet || "").trim().slice(0, 280),
+    bodyText,
+    conversationId: msg.threadId || null,
+    webLink: `https://mail.google.com/mail/u/0/#inbox/${msg.id}`,
+    isRead: !labelIds.includes("UNREAD"),
+  };
+}
+
 async function listFolderForRange(
   userId: number,
   folder: "inbox" | "sent",
@@ -139,29 +176,70 @@ async function listFolderForRange(
       id,
       format: "full",
     });
-    if (!msg.data.id) continue;
-    const headers = msg.data.payload?.headers;
-    const from = parseFrom(headerValue(headers, "From"));
-    const to = parseAddressList(headerValue(headers, "To"));
-    const bodyText = extractBodies(msg.data.payload).slice(0, 8000);
-    const labelIds = msg.data.labelIds || [];
-    out.push({
-      id: msg.data.id,
-      folder,
-      subject: headerValue(headers, "Subject") || "(kein Betreff)",
-      from: from.name,
-      fromEmail: from.email,
-      toPreview: to.preview,
-      toEmails: to.emails,
-      receivedOrSentAt: isoFromInternalDate(msg.data.internalDate),
-      preview: (msg.data.snippet || "").trim().slice(0, 280),
-      bodyText,
-      conversationId: msg.data.threadId || null,
-      webLink: `https://mail.google.com/mail/u/0/#inbox/${msg.data.id}`,
-      isRead: !labelIds.includes("UNREAD"),
-    });
+    const mapped = mapGmailMessage(msg.data, folder);
+    if (mapped) out.push(mapped);
   }
   return out;
+}
+
+async function expandGoogleThreads(
+  userId: number,
+  seeds: MsMailItem[],
+  fromYmd: string,
+  toYmd: string,
+  request?: Request | null
+): Promise<MsMailItem[]> {
+  const annotatedSeeds = seeds.map((m) =>
+    annotateMailInRange({ ...m, inRange: true }, fromYmd, toYmd)
+  );
+  const threadIds = [
+    ...new Set(
+      annotatedSeeds
+        .map((m) => m.conversationId?.trim())
+        .filter((id): id is string => Boolean(id))
+    ),
+  ].slice(0, MAIL_THREAD_EXPAND_MAX_THREADS);
+
+  if (threadIds.length === 0) {
+    return annotatedSeeds.map((m) => annotateMailInRange(m, fromYmd, toYmd));
+  }
+
+  const auth = await getAuthedGoogleClient(userId, request);
+  const gmail = google.gmail({ version: "v1", auth });
+  const extras: MsMailItem[] = [];
+  const concurrency = 4;
+  for (let i = 0; i < threadIds.length; i += concurrency) {
+    const batch = threadIds.slice(i, i + concurrency);
+    const parts = await Promise.all(
+      batch.map(async (threadId) => {
+        try {
+          const thr = await gmail.users.threads.get({
+            userId: "me",
+            id: threadId,
+            format: "full",
+          });
+          const msgs = (thr.data.messages || []).slice(
+            0,
+            MAIL_THREAD_EXPAND_MAX_MESSAGES
+          );
+          return msgs
+            .map((m) => mapGmailMessage(m, "inbox"))
+            .filter((m): m is MsMailItem => Boolean(m));
+        } catch (err) {
+          console.warn(
+            "[g-mail] thread expand failed:",
+            threadId.slice(0, 24),
+            err instanceof Error ? err.message : err
+          );
+          return [] as MsMailItem[];
+        }
+      })
+    );
+    for (const list of parts) extras.push(...list);
+  }
+
+  const merged = mergeMailItemsById(annotatedSeeds, extras);
+  return merged.map((m) => annotateMailInRange(m, fromYmd, toYmd));
 }
 
 export type GoogleMailListResult = {
@@ -188,7 +266,7 @@ export async function listGoogleMailForRange(
   const caps = mailAnalysisListLimits(resolved.dayCount);
   const inboxLimit = options?.inboxLimit ?? caps.inboxLimit;
   const sentLimit = options?.sentLimit ?? caps.sentLimit;
-  const [inbox, sent] = await Promise.all([
+  const [inboxSeed, sentSeed] = await Promise.all([
     listFolderForRange(
       userId,
       "inbox",
@@ -206,6 +284,14 @@ export async function listGoogleMailForRange(
       options?.request
     ),
   ]);
+  const expanded = await expandGoogleThreads(
+    userId,
+    [...inboxSeed, ...sentSeed],
+    resolved.fromYmd,
+    resolved.toYmd,
+    options?.request
+  );
+  const { inbox, sent } = splitMailsByFolder(expanded);
   return {
     inbox,
     sent,

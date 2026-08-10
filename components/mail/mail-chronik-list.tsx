@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { ExternalLink } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -14,35 +14,12 @@ import {
 import { cn } from "@/lib/utils";
 import type { MsMailItem } from "@/lib/microsoft/mail-day";
 import type { MailMessageDetail } from "@/lib/mail/gmail";
-import { toSwissDate } from "@/lib/utils/dates";
+import {
+  buildMailChronikThreads,
+  chronikDateTimeLabel,
+} from "@/lib/mail/mail-threads";
 
 export type MailChronikProvider = "microsoft" | "google";
-
-function chronikTimeLabel(iso: string | null): string {
-  if (!iso) return "–";
-  const d = new Date(iso);
-  if (!Number.isFinite(d.getTime())) return toSwissDate(iso);
-  const today = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Europe/Zurich",
-  }).format(new Date());
-  const ymd = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Europe/Zurich",
-  }).format(d);
-  const hm = new Intl.DateTimeFormat("de-CH", {
-    timeZone: "Europe/Zurich",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(d);
-  if (ymd === today) return hm;
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  const yYmd = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Europe/Zurich",
-  }).format(yesterday);
-  if (ymd === yYmd) return "Gestern";
-  return toSwissDate(ymd);
-}
 
 function formatDetailWhen(detail: MailMessageDetail): string {
   if (detail.internalDate) {
@@ -65,9 +42,17 @@ export function mergeMailChronik(
   inbox: MsMailItem[],
   sent: MsMailItem[]
 ): MsMailItem[] {
-  return [...inbox, ...sent].sort((a, b) =>
-    (b.receivedOrSentAt || "").localeCompare(a.receivedOrSentAt || "")
-  );
+  return [...inbox, ...sent];
+}
+
+export function countMailsInRange(
+  items: MsMailItem[],
+  folder?: "inbox" | "sent"
+): number {
+  return items.filter(
+    (m) =>
+      m.inRange !== false && (folder == null || m.folder === folder)
+  ).length;
 }
 
 export function MailChronikSummary({
@@ -90,6 +75,100 @@ export function MailChronikSummary({
   );
 }
 
+function MailChronikRow({
+  mail,
+  indented,
+  onOpen,
+}: {
+  mail: MsMailItem;
+  indented: boolean;
+  onOpen: (m: MsMailItem) => void;
+}) {
+  const isInbox = mail.folder === "inbox";
+  const isContext = mail.inRange === false;
+  const partyName = isInbox
+    ? mail.from || mail.fromEmail || "Unbekannt"
+    : mail.toPreview?.split("<")[0]?.trim() ||
+      mail.toEmails[0] ||
+      "Empfänger";
+  const partyEmail = isInbox ? mail.fromEmail : mail.toEmails[0] || null;
+  const headline = `${partyName} · ${mail.subject || "(kein Betreff)"}`;
+  const sub = isInbox
+    ? partyEmail || partyName
+    : partyEmail
+      ? `An ${partyName} (${partyEmail})`
+      : `An ${partyName}`;
+
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(mail)}
+      className={cn(
+        "flex w-full items-start gap-3 py-3 text-left transition-colors",
+        indented ? "border-l border-border/50 pl-3 pr-3.5 ml-6 sm:ml-8" : "px-3.5",
+        isContext
+          ? "bg-muted/25 text-muted-foreground hover:bg-muted/40"
+          : isInbox
+            ? "bg-teal-50/70 hover:bg-teal-100/70"
+            : "bg-amber-50/70 hover:bg-amber-100/70"
+      )}
+    >
+      <div className="flex shrink-0 flex-col items-start gap-1">
+        <Badge
+          variant="outline"
+          className={cn(
+            "mt-0.5 h-5 rounded-md px-1.5 text-[10px] font-semibold",
+            isContext
+              ? "border-border/70 bg-background/60 text-muted-foreground"
+              : isInbox
+                ? "border-teal-200/80 bg-teal-50 text-teal-950"
+                : "border-amber-200/80 bg-amber-50 text-amber-950"
+          )}
+        >
+          {isInbox ? "Eingang" : "Gesendet"}
+        </Badge>
+        {isContext ? (
+          <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/90">
+            Kontext
+          </span>
+        ) : null}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start justify-between gap-3">
+          <p
+            className={cn(
+              "min-w-0 truncate text-[14px] leading-snug",
+              isContext
+                ? "font-normal"
+                : isInbox && !mail.isRead
+                  ? "font-semibold"
+                  : "font-medium"
+            )}
+          >
+            {headline}
+          </p>
+          <span
+            className={cn(
+              "shrink-0 pt-0.5 text-[12px] tabular-nums",
+              isContext ? "text-muted-foreground/80" : "text-muted-foreground"
+            )}
+          >
+            {chronikDateTimeLabel(mail.receivedOrSentAt)}
+          </span>
+        </div>
+        <p
+          className={cn(
+            "mt-0.5 truncate text-[12px]",
+            isContext ? "text-muted-foreground/80" : "text-muted-foreground"
+          )}
+        >
+          {sub}
+        </p>
+      </div>
+    </button>
+  );
+}
+
 export function MailChronikList({
   items,
   loading,
@@ -104,6 +183,9 @@ export function MailChronikList({
   const [detail, setDetail] = useState<MailMessageDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
+
+  const threads = useMemo(() => buildMailChronikThreads(items), [items]);
+  const hasInRange = items.some((m) => m.inRange !== false);
 
   const openMail = useCallback(
     async (item: MsMailItem) => {
@@ -141,7 +223,7 @@ export function MailChronikList({
       </p>
     );
   }
-  if (items.length === 0) {
+  if (!hasInRange) {
     return (
       <div className="rounded-2xl border border-dashed border-border/70 bg-card px-4 py-8 text-center text-sm text-muted-foreground shadow-sm">
         Keine Mails im gewählten Zeitraum.
@@ -155,69 +237,30 @@ export function MailChronikList({
   return (
     <>
       <ul className="overflow-hidden rounded-2xl border border-border/60 bg-card shadow-[0_4px_18px_rgba(15,23,42,0.05)]">
-        {items.map((m) => {
-          const isInbox = m.folder === "inbox";
-          const partyName = isInbox
-            ? m.from || m.fromEmail || "Unbekannt"
-            : m.toPreview?.split("<")[0]?.trim() ||
-              m.toEmails[0] ||
-              "Empfänger";
-          const partyEmail = isInbox ? m.fromEmail : m.toEmails[0] || null;
-          const headline = `${partyName} · ${m.subject || "(kein Betreff)"}`;
-          const sub = isInbox
-            ? partyEmail || partyName
-            : partyEmail
-              ? `An ${partyName} (${partyEmail})`
-              : `An ${partyName}`;
-
-          return (
-            <li
-              key={`${m.folder}-${m.id}`}
-              className="border-b border-border/40 last:border-0"
-            >
-              <button
-                type="button"
-                onClick={() => void openMail(m)}
-                className={cn(
-                  "flex w-full items-start gap-3 px-3.5 py-3 text-left transition-colors",
-                  isInbox
-                    ? "bg-teal-50/70 hover:bg-teal-100/70"
-                    : "bg-amber-50/70 hover:bg-amber-100/70"
-                )}
-              >
-                <Badge
-                  variant="outline"
+        {threads.map((thread) => (
+          <li
+            key={thread.key}
+            className="border-b border-border/40 last:border-0"
+          >
+            <ul>
+              {thread.mails.map((m, idx) => (
+                <li
+                  key={`${m.folder}-${m.id}`}
                   className={cn(
-                    "mt-0.5 h-5 shrink-0 rounded-md px-1.5 text-[10px] font-semibold",
-                    isInbox
-                      ? "border-teal-200/80 bg-teal-50 text-teal-950"
-                      : "border-amber-200/80 bg-amber-50 text-amber-950"
+                    idx > 0 && "border-t border-border/30",
+                    m.inRange === false && "opacity-80"
                   )}
                 >
-                  {isInbox ? "Eingang" : "Gesendet"}
-                </Badge>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-start justify-between gap-3">
-                    <p
-                      className={cn(
-                        "min-w-0 truncate text-[14px] leading-snug",
-                        isInbox && !m.isRead ? "font-semibold" : "font-medium"
-                      )}
-                    >
-                      {headline}
-                    </p>
-                    <span className="shrink-0 pt-0.5 text-[12px] tabular-nums text-muted-foreground">
-                      {chronikTimeLabel(m.receivedOrSentAt)}
-                    </span>
-                  </div>
-                  <p className="mt-0.5 truncate text-[12px] text-muted-foreground">
-                    {sub}
-                  </p>
-                </div>
-              </button>
-            </li>
-          );
-        })}
+                  <MailChronikRow
+                    mail={m}
+                    indented={idx > 0}
+                    onOpen={(item) => void openMail(item)}
+                  />
+                </li>
+              ))}
+            </ul>
+          </li>
+        ))}
       </ul>
 
       <Dialog

@@ -10,6 +10,8 @@ import {
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+/** Thread expansion can take a while for busy mailboxes. */
+export const maxDuration = 120;
 
 export async function GET(request: Request) {
   ensureInitialized();

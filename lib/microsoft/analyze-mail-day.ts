@@ -304,7 +304,11 @@ function formatMailBlock(m: MsMailItem, indexLabel: string): string {
       ? senderDisplayName(m.from, m.fromEmail)
       : senderDisplayName(m.toPreview, m.toEmails?.[0]);
   const langHint = detectReplyLanguage(`${m.subject}\n${body}`);
-  return `[${indexLabel}|${m.folder}|id=${m.id}|conv=${m.conversationId || "—"}]
+  const rangeTag =
+    m.inRange === false
+      ? "Kontext (ausserhalb Selektion)"
+      : "im Selektionzeitraum";
+  return `[${indexLabel}|${m.folder}|id=${m.id}|conv=${m.conversationId || "—"}|${rangeTag}]
 Gegenstelle: ${company || "unbekannt"}${email ? ` <${email}>` : ""}
 Absender-Name für Aufgaben: ${absender || "—"}
 Von: ${m.from}${m.fromEmail ? ` <${m.fromEmail}>` : ""}
@@ -319,12 +323,43 @@ ${body || "(leer)"}`;
 export function packMailsForPrompt(
   inbox: MsMailItem[],
   sent: MsMailItem[],
-  caps?: { inbox?: number; sent?: number }
+  caps?: { inbox?: number; sent?: number; total?: number }
 ): string {
-  const inboxCap = caps?.inbox ?? 20;
-  const sentCap = caps?.sent ?? 12;
-  const inboxSlice = inbox.slice(0, inboxCap);
-  const sentSlice = sent.slice(0, sentCap);
+  const all = [...inbox, ...sent];
+  const inRange = all.filter((m) => m.inRange !== false);
+  const context = all.filter((m) => m.inRange === false);
+
+  // Prefer in-range seeds, then attach full thread context for those conversations.
+  const seedCap = caps?.total ?? Math.max(
+    (caps?.inbox ?? 28) + (caps?.sent ?? 16),
+    44
+  );
+  const seedIds = new Set<string>();
+  const seedConvs = new Set<string>();
+  const selected: MsMailItem[] = [];
+
+  for (const m of inRange) {
+    if (selected.length >= seedCap) break;
+    selected.push(m);
+    seedIds.add(m.id);
+    if (m.conversationId?.trim()) seedConvs.add(m.conversationId.trim());
+  }
+
+  for (const m of context) {
+    if (selected.length >= seedCap + 40) break;
+    const conv = m.conversationId?.trim();
+    if (!conv || !seedConvs.has(conv)) continue;
+    if (seedIds.has(m.id)) continue;
+    selected.push(m);
+    seedIds.add(m.id);
+  }
+
+  // Fallback: if nothing had inRange flags, keep legacy slice behaviour.
+  if (selected.length === 0 && all.length > 0) {
+    const inboxCap = caps?.inbox ?? 20;
+    const sentCap = caps?.sent ?? 12;
+    selected.push(...inbox.slice(0, inboxCap), ...sent.slice(0, sentCap));
+  }
 
   type Thread = { key: string; mails: MsMailItem[] };
   const threads = new Map<string, Thread>();
@@ -341,8 +376,7 @@ export function packMailsForPrompt(
     t.mails.push(m);
   }
 
-  for (const m of inboxSlice) add(m);
-  for (const m of sentSlice) add(m);
+  for (const m of selected) add(m);
 
   for (const t of threads.values()) {
     t.mails.sort((a, b) =>
@@ -364,9 +398,14 @@ export function packMailsForPrompt(
           .filter(Boolean)
       ),
     ].slice(0, 3);
+    const contextCount = t.mails.filter((m) => m.inRange === false).length;
     const header =
       t.mails.length > 1
-        ? `=== THREAD (${t.mails.length} Mails · ${counterparts.join(" · ") || "Gegenstelle unbekannt"} · conv=${t.mails[0]?.conversationId || "—"}) ===`
+        ? `=== THREAD (${t.mails.length} Mails` +
+          (contextCount
+            ? `, davon ${contextCount} Kontext ausserhalb Selektion`
+            : "") +
+          ` · ${counterparts.join(" · ") || "Gegenstelle unbekannt"} · conv=${t.mails[0]?.conversationId || "—"}) ===`
         : `=== MAIL ===`;
     const body = t.mails
       .map((m) => {
@@ -377,9 +416,15 @@ export function packMailsForPrompt(
     blocks.push(`${header}\n${body}`);
   }
 
+  const inRangeCount = all.filter((m) => m.inRange !== false).length;
+  const contextCount = all.filter((m) => m.inRange === false).length;
+
   return [
-    `Posteingang geladen: ${inbox.length} (im Prompt: ${inboxSlice.length})`,
-    `Gesendet geladen: ${sent.length} (im Prompt: ${sentSlice.length})`,
+    `Posteingang geladen: ${inbox.length}`,
+    `Gesendet geladen: ${sent.length}`,
+    `Im Selektionzeitraum: ${inRangeCount} · Thread-Kontext ausserhalb: ${contextCount}`,
+    `Im Prompt: ${selected.length} Mails / ${order.length} Threads`,
+    "Hinweis: Kontext-Mails gehören zu Threads mit Aktivität im Selektionzeitraum — vollständig berücksichtigen.",
     "",
     blocks.join("\n\n---\n\n") || "(keine Mails)",
   ].join("\n");
@@ -667,8 +712,8 @@ ZUSAMMENFASSUNGEN (hart — daySummary + cluster.summary):
 - Newsletter/Werbung nur erwähnen wenn sie Handlung brauchen; sonst weglassen.
 
 Ablauf:
-1) Gruppiere nach Kunde/Firma und Thema/Thread. Gleiche conv=… = derselbe Thread.
-2) Pro Cluster: ausführliche Zusammenfassung (s. oben) + status.
+1) Gruppiere nach Kunde/Firma und Thema/Thread. Gleiche conv=… = derselbe Thread — inkl. Mails mit Markierung «Kontext (ausserhalb Selektion)».
+2) Pro Cluster: ausführliche Zusammenfassung (s. oben) + status. Kontext-Mails sind Teil der Chronologie und dürfen nicht ignoriert werden.
 3) Nächste Schritte — tasks / replies / events sind getrennte Kanäle:
 
 TASKS: interne Handlung für dich (prüfen, buchen, nachfassen, Ticket öffnen). Titel handlungsnah OHNE Absender-Suffix (wird serverseitig ergänzt). dueDate Default ${defaultDue}.

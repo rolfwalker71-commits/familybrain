@@ -45,6 +45,7 @@ import { MailWorkspaceSubnav, type MailWorkspaceView, mailWorkspacePrimaryBtnCla
 import {
   MailChronikList,
   MailChronikSummary,
+  countMailsInRange,
   mergeMailChronik,
 } from "@/components/mail/mail-chronik-list";
 import { MailTagesanalysenList } from "@/components/mail/mail-tagesanalysen-list";
@@ -1384,8 +1385,8 @@ export function GoogleWorkspaceClient() {
               </div>
               <MailChronikSummary
                 rangeLabel={formatMailRangeLabel(mailFrom, mailTo)}
-                inboxCount={inbox.length}
-                sentCount={sent.length}
+                inboxCount={countMailsInRange(inbox, "inbox")}
+                sentCount={countMailsInRange(sent, "sent")}
               />
               <MailChronikList
                 items={mergeMailChronik(inbox, sent)}

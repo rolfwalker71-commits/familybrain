@@ -6,6 +6,13 @@ import {
   mailAnalysisRangeExclusiveEnd,
   resolveMailAnalysisRange,
 } from "@/lib/mail/mail-analysis-range";
+import {
+  annotateMailInRange,
+  MAIL_THREAD_EXPAND_MAX_MESSAGES,
+  MAIL_THREAD_EXPAND_MAX_THREADS,
+  mergeMailItemsById,
+  splitMailsByFolder,
+} from "@/lib/mail/mail-threads";
 
 export type MsMailFolder = "inbox" | "sent";
 
@@ -23,6 +30,11 @@ export type MsMailItem = {
   conversationId: string | null;
   webLink: string | null;
   isRead: boolean;
+  /**
+   * True when the mail falls in the requested from/to range.
+   * False = thread context loaded for Chronik/AI outside the filter window.
+   */
+  inRange?: boolean;
 };
 
 type GraphRecipient = {
@@ -41,6 +53,7 @@ type GraphMessage = {
   conversationId?: string | null;
   webLink?: string | null;
   isRead?: boolean;
+  parentFolderId?: string | null;
 };
 
 function stripHtml(html: string): string {
@@ -57,8 +70,17 @@ function stripHtml(html: string): string {
     .trim();
 }
 
-function mapMessage(m: GraphMessage, folder: MsMailFolder): MsMailItem | null {
+function mapMessage(
+  m: GraphMessage,
+  folder: MsMailFolder,
+  sentFolderId?: string | null
+): MsMailItem | null {
   if (!m.id) return null;
+  let resolvedFolder: MsMailFolder = folder;
+  if (sentFolderId && m.parentFolderId) {
+    resolvedFolder =
+      m.parentFolderId === sentFolderId ? "sent" : "inbox";
+  }
   const fromName = m.from?.emailAddress?.name?.trim();
   const fromEmail = m.from?.emailAddress?.address?.trim() || null;
   const toEmails = (m.toRecipients || [])
@@ -80,22 +102,109 @@ function mapMessage(m: GraphMessage, folder: MsMailFolder): MsMailItem | null {
     (m.body?.contentType || "").toLowerCase() === "html"
       ? stripHtml(rawBody)
       : rawBody.trim();
+  const at =
+    resolvedFolder === "sent"
+      ? m.sentDateTime || m.receivedDateTime || null
+      : m.receivedDateTime || m.sentDateTime || null;
   return {
     id: m.id,
-    folder,
+    folder: resolvedFolder,
     subject: (m.subject || "").trim() || "(kein Betreff)",
     from: fromName || fromEmail || "—",
     fromEmail,
     toPreview: to || null,
     toEmails,
-    receivedOrSentAt:
-      folder === "sent" ? m.sentDateTime || null : m.receivedDateTime || null,
+    receivedOrSentAt: at,
     preview: (m.bodyPreview || "").trim().slice(0, 280),
     bodyText: bodyText.slice(0, 8000),
     conversationId: m.conversationId || null,
     webLink: m.webLink || null,
     isRead: Boolean(m.isRead),
   };
+}
+
+const MESSAGE_SELECT =
+  "id,subject,bodyPreview,body,from,toRecipients,receivedDateTime,sentDateTime,conversationId,webLink,isRead,parentFolderId";
+
+function odataStringLiteral(value: string): string {
+  return `'${value.replace(/'/g, "''")}'`;
+}
+
+async function getSentFolderId(userId: number): Promise<string | null> {
+  try {
+    const data = await graphJson<{ id?: string }>(
+      userId,
+      "/me/mailFolders/sentitems?$select=id"
+    );
+    return data.id || null;
+  } catch {
+    return null;
+  }
+}
+
+async function listConversationMessages(
+  userId: number,
+  conversationId: string,
+  sentFolderId: string | null
+): Promise<MsMailItem[]> {
+  const qs = new URLSearchParams({
+    $filter: `conversationId eq ${odataStringLiteral(conversationId)}`,
+    $top: String(MAIL_THREAD_EXPAND_MAX_MESSAGES),
+    $select: MESSAGE_SELECT,
+  });
+  try {
+    const data = await graphJson<{ value?: GraphMessage[] }>(
+      userId,
+      `/me/messages?${qs}`,
+      { headers: { Prefer: 'outlook.body-content-type="text"' } }
+    );
+    return (data.value || [])
+      .map((m) => mapMessage(m, "inbox", sentFolderId))
+      .filter((m): m is MsMailItem => Boolean(m));
+  } catch (err) {
+    console.warn(
+      "[ms-mail] conversation expand failed:",
+      conversationId.slice(0, 24),
+      err instanceof Error ? err.message : err
+    );
+    return [];
+  }
+}
+
+async function expandMicrosoftThreads(
+  userId: number,
+  seeds: MsMailItem[],
+  fromYmd: string,
+  toYmd: string
+): Promise<MsMailItem[]> {
+  const annotatedSeeds = seeds.map((m) =>
+    annotateMailInRange({ ...m, inRange: true }, fromYmd, toYmd)
+  );
+  const convIds = [
+    ...new Set(
+      annotatedSeeds
+        .map((m) => m.conversationId?.trim())
+        .filter((id): id is string => Boolean(id))
+    ),
+  ].slice(0, MAIL_THREAD_EXPAND_MAX_THREADS);
+
+  if (convIds.length === 0) {
+    return annotatedSeeds.map((m) => annotateMailInRange(m, fromYmd, toYmd));
+  }
+
+  const sentFolderId = await getSentFolderId(userId);
+  const extras: MsMailItem[] = [];
+  const concurrency = 4;
+  for (let i = 0; i < convIds.length; i += concurrency) {
+    const batch = convIds.slice(i, i + concurrency);
+    const parts = await Promise.all(
+      batch.map((id) => listConversationMessages(userId, id, sentFolderId))
+    );
+    for (const list of parts) extras.push(...list);
+  }
+
+  const merged = mergeMailItemsById(annotatedSeeds, extras);
+  return merged.map((m) => annotateMailInRange(m, fromYmd, toYmd));
 }
 
 async function listFolderForRange(
@@ -114,8 +223,7 @@ async function listFolderForRange(
     $filter: `${filterField} ge ${start} and ${filterField} lt ${exclusiveEnd}T00:00:00`,
     $orderby: `${filterField} desc`,
     $top: String(limit),
-    $select:
-      "id,subject,bodyPreview,body,from,toRecipients,receivedDateTime,sentDateTime,conversationId,webLink,isRead",
+    $select: MESSAGE_SELECT,
   });
   try {
     const data = await graphJson<{ value?: GraphMessage[] }>(
@@ -134,8 +242,7 @@ async function listFolderForRange(
     const qs2 = new URLSearchParams({
       $orderby: `${filterField} desc`,
       $top: String(Math.min(limit * 3, 80)),
-      $select:
-        "id,subject,bodyPreview,body,from,toRecipients,receivedDateTime,sentDateTime,conversationId,webLink,isRead",
+      $select: MESSAGE_SELECT,
     });
     const data = await graphJson<{ value?: GraphMessage[] }>(
       userId,
@@ -175,7 +282,7 @@ export async function listMicrosoftMailForRange(
   const caps = mailAnalysisListLimits(resolved.dayCount);
   const inboxLimit = options?.inboxLimit ?? caps.inboxLimit;
   const sentLimit = options?.sentLimit ?? caps.sentLimit;
-  const [inbox, sent] = await Promise.all([
+  const [inboxSeed, sentSeed] = await Promise.all([
     listFolderForRange(
       userId,
       "inbox",
@@ -191,6 +298,13 @@ export async function listMicrosoftMailForRange(
       sentLimit
     ),
   ]);
+  const expanded = await expandMicrosoftThreads(
+    userId,
+    [...inboxSeed, ...sentSeed],
+    resolved.fromYmd,
+    resolved.toYmd
+  );
+  const { inbox, sent } = splitMailsByFolder(expanded);
   return {
     inbox,
     sent,
