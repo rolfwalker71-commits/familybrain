@@ -104,22 +104,24 @@ function MailChronikRow({
       type="button"
       onClick={() => onOpen(mail)}
       className={cn(
-        "flex w-full items-start gap-3 py-3 text-left transition-colors",
-        indented ? "border-l border-border/50 pl-3 pr-3.5 ml-6 sm:ml-8" : "px-3.5",
+        "flex w-full min-w-0 items-start gap-3 px-3.5 py-3 text-left transition-colors",
+        indented && "border-l-2 border-border/60 bg-muted/15 pl-5 sm:pl-6",
         isContext
-          ? "bg-muted/25 text-muted-foreground hover:bg-muted/40"
-          : isInbox
-            ? "bg-teal-50/70 hover:bg-teal-100/70"
-            : "bg-amber-50/70 hover:bg-amber-100/70"
+          ? "text-muted-foreground hover:bg-muted/35"
+          : indented
+            ? "hover:bg-muted/30"
+            : isInbox
+              ? "bg-teal-50/70 hover:bg-teal-100/70"
+              : "bg-amber-50/70 hover:bg-amber-100/70"
       )}
     >
-      <div className="flex shrink-0 flex-col items-start gap-1">
+      <div className="flex w-[4.25rem] shrink-0 flex-col items-start gap-1">
         <Badge
           variant="outline"
           className={cn(
             "mt-0.5 h-5 rounded-md px-1.5 text-[10px] font-semibold",
             isContext
-              ? "border-border/70 bg-background/60 text-muted-foreground"
+              ? "border-border/70 bg-background/70 text-muted-foreground"
               : isInbox
                 ? "border-teal-200/80 bg-teal-50 text-teal-950"
                 : "border-amber-200/80 bg-amber-50 text-amber-950"
@@ -137,7 +139,7 @@ function MailChronikRow({
         <div className="flex items-start justify-between gap-3">
           <p
             className={cn(
-              "min-w-0 truncate text-[14px] leading-snug",
+              "min-w-0 flex-1 truncate text-[14px] leading-snug",
               isContext
                 ? "font-normal"
                 : isInbox && !mail.isRead
@@ -149,7 +151,7 @@ function MailChronikRow({
           </p>
           <span
             className={cn(
-              "shrink-0 pt-0.5 text-[12px] tabular-nums",
+              "shrink-0 whitespace-nowrap pt-0.5 text-[12px] tabular-nums",
               isContext ? "text-muted-foreground/80" : "text-muted-foreground"
             )}
           >
@@ -236,31 +238,48 @@ export function MailChronikList({
 
   return (
     <>
-      <ul className="overflow-hidden rounded-2xl border border-border/60 bg-card shadow-[0_4px_18px_rgba(15,23,42,0.05)]">
-        {threads.map((thread) => (
-          <li
-            key={thread.key}
-            className="border-b border-border/40 last:border-0"
-          >
-            <ul>
-              {thread.mails.map((m, idx) => (
-                <li
-                  key={`${m.folder}-${m.id}`}
-                  className={cn(
-                    idx > 0 && "border-t border-border/30",
-                    m.inRange === false && "opacity-80"
-                  )}
-                >
-                  <MailChronikRow
-                    mail={m}
-                    indented={idx > 0}
-                    onOpen={(item) => void openMail(item)}
-                  />
-                </li>
-              ))}
-            </ul>
-          </li>
-        ))}
+      <ul className="space-y-3">
+        {threads.map((thread) => {
+          const contextCount = thread.mails.filter(
+            (m) => m.inRange === false
+          ).length;
+          const isThread = thread.mails.length > 1;
+          return (
+            <li key={thread.key}>
+              <article
+                className={cn(
+                  "overflow-hidden rounded-2xl border border-border/60 bg-card shadow-[0_4px_18px_rgba(15,23,42,0.05)]",
+                  isThread && "ring-1 ring-border/40"
+                )}
+              >
+                {isThread ? (
+                  <div className="flex items-center justify-between gap-2 border-b border-border/50 bg-muted/30 px-3.5 py-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Thread · {thread.mails.length} Mails
+                      {contextCount > 0
+                        ? ` · ${contextCount} Kontext`
+                        : ""}
+                    </p>
+                  </div>
+                ) : null}
+                <ul>
+                  {thread.mails.map((m, idx) => (
+                    <li
+                      key={`${m.folder}-${m.id}`}
+                      className={cn(idx > 0 && "border-t border-border/35")}
+                    >
+                      <MailChronikRow
+                        mail={m}
+                        indented={idx > 0}
+                        onOpen={(item) => void openMail(item)}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </article>
+            </li>
+          );
+        })}
       </ul>
 
       <Dialog
