@@ -12,6 +12,7 @@ import {
 } from "@/lib/mari/attachments";
 import {
   resolveTimelineSide,
+  isMariMailStubText,
   type MariTimelineKind,
   type MariTimelineSide,
 } from "@/lib/mari/timeline-side";
@@ -26,6 +27,7 @@ export type { MariTimelineKind, MariTimelineSide } from "@/lib/mari/timeline-sid
 export {
   resolveTimelineSide,
   timelineSideLabel,
+  isMariMailStubText,
 } from "@/lib/mari/timeline-side";
 
 function sqlQuote(value: string): string {
@@ -366,12 +368,8 @@ function toTimelineAttachment(
 }
 
 /** Mail-Platzhalter ohne echten Inhalt — oft nur Träger für Anhänge. */
-function isMailAttachmentStub(plain: string, subject: string | null): boolean {
-  if (subject?.trim()) return false;
-  const t = plain.trim();
-  if (!t) return true;
-  if (/^Aus E-Mail gesendet/i.test(t) && t.length < 220) return true;
-  return false;
+function isMailAttachmentStub(plain: string, _subject: string | null): boolean {
+  return isMariMailStubText(plain);
 }
 
 async function loadTimeline(issueId: number): Promise<MariTimelineItem[]> {
@@ -569,8 +567,22 @@ export async function getTicketDetail(
   const issue = await mariGetIssue(issueId);
   const status = Number(issue.Status);
   const priority = Number(issue.Priority);
-  const requestText =
+  let requestText =
     typeof issue.RequestText === "string" ? issue.RequestText : "";
+  // REST liefert RequestText manchmal leer/anders — SQL als Fallback.
+  if (!htmlToPlain(requestText)) {
+    try {
+      const rows = await mariSql<{ RequestText: string | null }>(
+        `SELECT "RequestText" FROM "MARISupportIssue" WHERE "IssueID" = ${issueId}`
+      );
+      const sqlText = rows[0]?.RequestText;
+      if (typeof sqlText === "string" && htmlToPlain(sqlText)) {
+        requestText = sqlText;
+      }
+    } catch {
+      /* ignore */
+    }
+  }
   const timeline = await loadTimeline(issueId);
 
   // Prefer labels from settings / master joins

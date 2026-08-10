@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   resolveTimelineSide,
   timelineSideLabel,
+  isMariMailStubText,
 } from "@/lib/mari/timeline-side";
 
 test("resolveTimelineSide maps reply/note to support", () => {
@@ -36,4 +37,17 @@ test("resolveTimelineSide maps change/system", () => {
   assert.equal(resolveTimelineSide({ kind: "system", posType: 4 }), "system");
   assert.equal(timelineSideLabel("support"), "Support (wir)");
   assert.equal(timelineSideLabel("customer"), "Kunde");
+});
+
+test("isMariMailStubText only flags short mail placeholders", () => {
+  assert.equal(isMariMailStubText(""), true);
+  assert.equal(isMariMailStubText("Aus E-Mail gesendet"), true);
+  assert.equal(isMariMailStubText("Aus E-Mail gesendet."), true);
+  assert.equal(
+    isMariMailStubText(
+      "Aus E-Mail gesendet\n\nHallo, bitte Etiketten prüfen und zurückmelden. Danke und Gruss."
+    ),
+    false
+  );
+  assert.equal(isMariMailStubText("Normale Kundenanfrage zum Thema X"), false);
 });

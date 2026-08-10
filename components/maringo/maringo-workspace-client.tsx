@@ -54,6 +54,7 @@ import type {
 } from "@/lib/mari/tickets";
 import {
   timelineSideLabel,
+  isMariMailStubText,
   type MariTimelineSide,
 } from "@/lib/mari/timeline-side";
 
@@ -361,7 +362,10 @@ function TimelineRow({ item }: { item: MariTimelineItem }) {
   const hasAttachments = attachments.length > 0;
   const isAttachmentOnly =
     item.kind === "attachment" ||
-    (hasAttachments && /^Aus E-Mail gesendet/i.test(item.text.trim()));
+    (hasAttachments && isMariMailStubText(item.text));
+  const showBody =
+    Boolean(item.text?.trim()) &&
+    !(isAttachmentOnly && isMariMailStubText(item.text));
   const fromSupport = side === "support";
   const bubble =
     side === "support"
@@ -418,10 +422,7 @@ function TimelineRow({ item }: { item: MariTimelineItem }) {
             fromSupport ? "rounded-br-md" : "rounded-bl-md"
           )}
         >
-          {!isAttachmentOnly && item.text ? (
-            <div className="whitespace-pre-wrap">{item.text}</div>
-          ) : null}
-          {isAttachmentOnly && item.text && !hasAttachments ? (
+          {showBody ? (
             <div className="whitespace-pre-wrap">{item.text}</div>
           ) : null}
           {isAttachmentOnly && hasAttachments ? (
@@ -434,7 +435,7 @@ function TimelineRow({ item }: { item: MariTimelineItem }) {
           {hasAttachments ? (
             <TimelineAttachments attachments={attachments} />
           ) : null}
-          {!item.text && !hasAttachments ? (
+          {!showBody && !hasAttachments ? (
             <span className="text-muted-foreground">(kein Text)</span>
           ) : null}
         </div>
@@ -1429,6 +1430,19 @@ export function MaringoWorkspaceClient() {
                 ) : null}
 
                 <div>
+                  {detail.requestTextPlain ? (
+                    <div className="mb-5">
+                      <h3 className="mb-2 flex items-center gap-2 text-[13px] font-black tracking-tight">
+                        <Inbox className="size-3.5 text-muted-foreground" />
+                        Anfragetext
+                      </h3>
+                      <div className="rounded-2xl border border-teal-200/70 bg-teal-50/40 px-3.5 py-2.5 text-[13px] leading-relaxed text-teal-950">
+                        <div className="whitespace-pre-wrap">
+                          {detail.requestTextPlain}
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
                   <h3 className="mb-3 flex items-center gap-2 text-[13px] font-black tracking-tight">
                     <MessageSquare className="size-3.5 text-muted-foreground" />
                     Verlauf
@@ -1436,12 +1450,9 @@ export function MaringoWorkspaceClient() {
                   {detail.timeline.length === 0 ? (
                     <div className="rounded-xl border border-dashed border-border/60 px-3 py-6 text-center text-sm text-muted-foreground">
                       <Inbox className="mx-auto mb-2 size-5 opacity-50" />
-                      Kein Verlauf vorhanden.
-                      {detail.requestTextPlain ? (
-                        <p className="mt-3 whitespace-pre-wrap text-left text-[13px] text-foreground">
-                          {detail.requestTextPlain}
-                        </p>
-                      ) : null}
+                      {detail.requestTextPlain
+                        ? "Noch keine weiteren Verlaufseinträge."
+                        : "Kein Verlauf und kein Anfragetext vorhanden."}
                     </div>
                   ) : (
                     <ol className="relative space-y-4 before:absolute before:top-2 before:bottom-2 before:left-[0.7rem] before:w-px before:bg-border">

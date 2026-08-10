@@ -50,3 +50,20 @@ export function timelineSideLabel(side: MariTimelineSide): string {
       return "Unklar";
   }
 }
+
+/**
+ * Mail-Platzhalter ohne echten Inhalt — oft nur Träger für Anhänge.
+ * Texte mit «Aus E-Mail gesendet» + echtem Body danach sind KEINE Stubs.
+ */
+export function isMariMailStubText(text: string): boolean {
+  const t = text.trim();
+  if (!t) return true;
+  const withoutPrefix = t
+    .replace(/^Aus E-Mail gesendet\.?\s*/i, "")
+    .trim();
+  if (!withoutPrefix) return true;
+  if (/^Aus E-Mail gesendet/i.test(t) && withoutPrefix.length < 40) {
+    return true;
+  }
+  return false;
+}
