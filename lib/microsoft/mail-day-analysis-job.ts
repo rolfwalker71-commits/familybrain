@@ -300,8 +300,8 @@ export function finishMsMailDayJobOk(
     rangeKey: range.rangeKey,
     finishedAt,
     analysis,
-    inboxCount: mail.inbox.length,
-    sentCount: mail.sent.length,
+    inboxCount: mail.inbox.filter((m) => m.inRange !== false).length,
+    sentCount: mail.sent.filter((m) => m.inRange !== false).length,
   });
   return job;
 }

@@ -79,7 +79,7 @@ export const MsDayClusterSchema = z.object({
   theme: z.string().min(1).max(200),
   conversationId: z.string().max(200).nullable().optional(),
   summary: z.string().max(2200),
-  mailIds: z.array(z.string().max(200)).max(20).default([]),
+  mailIds: z.array(z.string().max(200)).max(40).default([]),
   status: z.enum(["open", "waiting", "done", "fyi"]).optional(),
   tasks: z.array(MsDayTaskSuggestionSchema).max(6).default([]),
   events: z.array(MsDayEventSuggestionSchema).max(4).default([]),
@@ -88,7 +88,8 @@ export const MsDayClusterSchema = z.object({
 
 export const MsDayMailAnalysisSchema = z.object({
   daySummary: z.string().max(3200),
-  clusters: z.array(MsDayClusterSchema).max(16),
+  /** One cluster per conversation/thread (week ranges need headroom). */
+  clusters: z.array(MsDayClusterSchema).max(40),
 });
 
 export type ExistingDayTaskRef = z.infer<typeof ExistingDayTaskRefSchema>;
@@ -331,8 +332,8 @@ export function packMailsForPrompt(
 
   // Prefer in-range seeds, then attach full thread context for those conversations.
   const seedCap = caps?.total ?? Math.max(
-    (caps?.inbox ?? 28) + (caps?.sent ?? 16),
-    44
+    (caps?.inbox ?? 40) + (caps?.sent ?? 30),
+    80
   );
   const seedIds = new Set<string>();
   const seedConvs = new Set<string>();
@@ -706,14 +707,21 @@ SCHREIBWEISE (hart, gesamtes JSON):
 
 ZUSAMMENFASSUNGEN (hart — daySummary + cluster.summary):
 - daySummary: 5–10 Sätze Überblick über den gesamten Zeitraum. Nenne die wichtigsten Firmen/Personen und Themen. Was ist erledigt, was wartet, was brennt? Offene Fristen, Zusagen, Blocker und nächste Schritte nicht weglassen.
-- cluster.summary: 4–8 Sätze pro Thread/Thema. Chronologie des Austauschs (wer schrieb was / wann relevant), aktueller Stand, offene Fragen, zugesagte Termine/Lieferungen/Beträge/Referenzen (Ticket-, Auftrags-, Rechnungsnummern), und was du noch tun oder antworten musst.
-- Wesentliches nie weglassen: Zusagen, Ablehnungen, Deadlines, Geldbeträge, technische Fehlerbilder, Ansprechpartner, «bitte bis …», Eskalationen.
-- Keine Ausschmückung und keine erfundenen Fakten — aber auch keine knappen Einzeiler, wenn der Thread mehr hergibt.
-- Newsletter/Werbung nur erwähnen wenn sie Handlung brauchen; sonst weglassen.
+- cluster.summary: 4–8 Sätze pro Thread. Chronologie, Stand, offene Fragen, Zusagen/Fristen/Referenzen — nichts Wesentliches weglassen.
+- Keine Ausschmückung und keine erfundenen Fakten.
+
+CLUSTER-GRANULARITÄT (hart — sonst zu wenig Karten):
+- GENAU EIN Cluster pro Gesprächs-Thread (gleiche conv=… / gleicher THREAD-Block im Prompt).
+- Einzelmail ohne Thread = eigener Cluster.
+- Jeder THREAD-Block mit mindestens einer Mail «im Selektionzeitraum» MUSS als Cluster erscheinen — auch wenn status=done oder fyi (dann tasks/replies leer lassen).
+- NICHT mehrere Threads zu einem Firmen-Sammelcluster zusammenlegen.
+- Nur weglassen: reine Newsletter/Werbung/Marketing ohne Handlung und ohne persönliche Ansprache.
+- conversationId im Cluster setzen, wenn im Prompt vorhanden.
+- Frühere Buddy-Analysen gibt es nicht — nichts weglassen weil «schon bekannt».
 
 Ablauf:
-1) Gruppiere nach Kunde/Firma und Thema/Thread. Gleiche conv=… = derselbe Thread — inkl. Mails mit Markierung «Kontext (ausserhalb Selektion)».
-2) Pro Cluster: ausführliche Zusammenfassung (s. oben) + status. Kontext-Mails sind Teil der Chronologie und dürfen nicht ignoriert werden.
+1) Liste alle THREAD-/MAIL-Blöcke mit Aktivität im Selektionzeitraum; erzeuge je einen Cluster.
+2) Pro Cluster: ausführliche summary + status (open|waiting|done|fyi). Kontext-Mails ausserhalb der Selektion gehören zur Chronologie.
 3) Nächste Schritte — tasks / replies / events sind getrennte Kanäle:
 
 TASKS: interne Handlung für dich (prüfen, buchen, nachfassen, Ticket öffnen). Titel handlungsnah OHNE Absender-Suffix (wird serverseitig ergänzt). dueDate Default ${defaultDue}.
@@ -732,16 +740,29 @@ REPLIES (sehr wichtig — oft vergessen):
 
 EVENTS: nur bei klarem Datum/Zeit.
 
-Newsletter/Werbung weglassen. Keine erfundenen Fakten. NUR JSON.`;
+Keine erfundenen Fakten. NUR JSON.`;
+
+  const coverage = (() => {
+    const all = [...input.inbox, ...input.sent];
+    const inRange = all.filter((m) => m.inRange !== false);
+    const keys = new Set(
+      inRange.map(
+        (m) => m.conversationId?.trim() || `solo:${m.folder}:${m.id}`
+      )
+    );
+    return { inRangeMails: inRange.length, expectedClusters: keys.size };
+  })();
 
   const user = `Analysezeitraum: ${rangeLabel}${
     fromYmd === toYmd ? "" : ` (von ${fromYmd} bis ${toYmd})`
   }
 Default dueDate für Tasks ohne Frist: ${defaultDue}
+Erwartete Cluster-Anzahl: ca. ${coverage.expectedClusters} (ein Cluster pro Thread/Einzelmail mit Aktivität im Zeitraum; ${coverage.inRangeMails} Mails im Selektionzeitraum). Weniger nur bei klaren Newsletter/Werbung-Ausscheidern.
 
 Vor dem JSON:
-1) Gehe Cluster für Cluster die Inbox-Mails durch und entscheide bewusst, ob ein Reply fehlt. Lieber ein kurzer Zwischenstands-Reply als gar keiner, wenn der Absender auf Rückmeldung wartet.
-2) Schreibe daySummary und jede cluster.summary so, dass jemand ohne die Mails den Stand versteht — inkl. aller wesentlichen Zusagen, Fristen und offenen Punkte.
+1) Lege für JEDEN THREAD-/MAIL-Block mit Selektion-Mails einen Cluster an — keine Verdichtung auf «die 3 wichtigsten».
+2) Gehe Cluster für Cluster die Inbox-Mails durch und entscheide bewusst, ob ein Reply fehlt. Lieber ein kurzer Zwischenstands-Reply als gar keiner, wenn der Absender auf Rückmeldung wartet.
+3) Schreibe daySummary und jede cluster.summary so, dass jemand ohne die Mails den Stand versteht — inkl. aller wesentlichen Zusagen, Fristen und offenen Punkte.
 
 ${packed}
 
@@ -752,8 +773,8 @@ JSON-Schema:
     {
       "company": "Firma",
       "counterpartEmail": "name@firma.ch"|null,
-      "theme": "kurzes Thema",
-      "conversationId": "conv-id oder null",
+      "theme": "kurzes Thema dieses einen Threads",
+      "conversationId": "conv-id aus Prompt oder null",
       "summary": "4–8 Sätze: Chronologie, Stand, offene Punkte, Zusagen/Fristen/Referenzen — nichts Wesentliches weglassen",
       "mailIds": ["id"],
       "status": "open"|"waiting"|"done"|"fyi",

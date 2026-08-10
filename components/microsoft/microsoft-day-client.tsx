@@ -49,7 +49,9 @@ import {
   countMailsInRange,
   mergeMailChronik,
 } from "@/components/mail/mail-chronik-list";
+import { MailAnalysisThreadHint } from "@/components/mail/mail-analysis-thread-hint";
 import { MailTagesanalysenList } from "@/components/mail/mail-tagesanalysen-list";
+import { summarizeMailThreadCoverage } from "@/lib/mail/mail-threads";
 import type { MailDayCachedSummary } from "@/lib/mail/mail-day-cache-summary";
 import type { MsMailItem } from "@/lib/microsoft/mail-day";
 import {
@@ -406,6 +408,11 @@ export function MicrosoftDayClient() {
     [events]
   );
 
+  const mailThreadCoverage = useMemo(
+    () => summarizeMailThreadCoverage(inbox, sent),
+    [inbox, sent]
+  );
+
   async function markDone(eventId: string) {
     setBusyId(eventId);
     setError(null);
@@ -586,7 +593,7 @@ export function MicrosoftDayClient() {
       if (job.status === "running") {
         setAnalyzing(true);
         setAnalysisFromCache(false);
-        setAnalyzeNotice(`Analyse für ${label} läuft im Hintergrund…`);
+        setAnalyzeNotice(`Analyse für ${label} läuft im Hintergrund (inkl. vollständiger Threads)…`);
         if (syncDay && fromYmd && toYmd) {
           setMailFrom(fromYmd);
           setMailTo(toYmd);
@@ -762,7 +769,7 @@ export function MicrosoftDayClient() {
     setStatus(null);
     setAnalyzing(true);
     setAnalyzeNotice(
-      `Analyse für ${formatMailRangeLabel(clamped.from, clamped.to)} läuft im Hintergrund…`
+      `Analyse für ${formatMailRangeLabel(clamped.from, clamped.to)} läuft im Hintergrund (inkl. vollständiger Threads)…`
     );
     void (async () => {
       try {
@@ -1079,9 +1086,10 @@ export function MicrosoftDayClient() {
                   <p>{analyzeNotice}</p>
                   {analyzing ? (
                     <p className="mt-0.5 text-[11px] opacity-80">
-                      Läuft serverseitig — du kannst die Seite verlassen. Bei
-                      Rückkehr erscheinen die Resultate automatisch; zusätzlich
-                      Toast und Push-Benachrichtigung wenn fertig.
+                      Läuft serverseitig inkl. vollständiger Mail-Threads — du
+                      kannst die Seite verlassen. Bei Rückkehr erscheinen die
+                      Resultate automatisch; zusätzlich Toast und
+                      Push-Benachrichtigung wenn fertig.
                     </p>
                   ) : null}
                 </div>
@@ -1492,6 +1500,10 @@ export function MicrosoftDayClient() {
                   </Button>
                 </div>
               </div>
+              <MailAnalysisThreadHint
+                coverage={mailThreadCoverage}
+                clusterCount={analysis?.clusters.length ?? null}
+              />
               <MailTagesanalysenList
                 entries={cachedEntries}
                 selectedKey={mailRangeKey(mailFrom, mailTo)}
@@ -1519,6 +1531,12 @@ export function MicrosoftDayClient() {
                         </Badge>
                       ) : null}
                     </CardTitle>
+                    <MailAnalysisThreadHint
+                      coverage={mailThreadCoverage}
+                      clusterCount={analysis.clusters.length}
+                      compact
+                      className="mt-1"
+                    />
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <p className="text-sm leading-relaxed">{analysis.daySummary}</p>

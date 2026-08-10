@@ -5,6 +5,7 @@ import {
   chronikDateTimeLabel,
   isMailInSelectedRange,
   mergeMailItemsById,
+  summarizeMailThreadCoverage,
 } from "@/lib/mail/mail-threads";
 import type { MsMailItem } from "@/lib/microsoft/mail-day";
 
@@ -88,4 +89,34 @@ test("chronikDateTimeLabel includes date and time", () => {
   const label = chronikDateTimeLabel("2026-08-10T10:19:00+02:00");
   assert.match(label, /10\.08\.2026/);
   assert.match(label, /10:19/);
+});
+
+test("summarizeMailThreadCoverage counts context vs in-range", () => {
+  const inbox = [
+    mail({
+      id: "1",
+      folder: "inbox",
+      conversationId: "t1",
+      inRange: true,
+    }),
+    mail({
+      id: "2",
+      folder: "inbox",
+      conversationId: "t1",
+      inRange: false,
+    }),
+  ];
+  const sent = [
+    mail({
+      id: "3",
+      folder: "sent",
+      conversationId: "t2",
+      inRange: true,
+    }),
+  ];
+  const cov = summarizeMailThreadCoverage(inbox, sent);
+  assert.equal(cov.inRange, 2);
+  assert.equal(cov.context, 1);
+  assert.equal(cov.threads, 2);
+  assert.equal(cov.threadsWithContext, 1);
 });

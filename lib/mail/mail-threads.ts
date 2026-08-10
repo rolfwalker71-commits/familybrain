@@ -141,5 +141,42 @@ export function splitMailsByFolder(items: MsMailItem[]): {
   return { inbox, sent };
 }
 
+export type MailThreadCoverage = {
+  total: number;
+  inRange: number;
+  context: number;
+  threads: number;
+  threadsWithContext: number;
+  inboxInRange: number;
+  sentInRange: number;
+};
+
+/** Stats for Chronik / Tagesanalyse UI + prompts. */
+export function summarizeMailThreadCoverage(
+  inbox: MsMailItem[],
+  sent: MsMailItem[]
+): MailThreadCoverage {
+  const all = [...inbox, ...sent];
+  const inRange = all.filter((m) => m.inRange !== false);
+  const context = all.filter((m) => m.inRange === false);
+  const threadKeys = new Set(
+    all.map((m) => m.conversationId?.trim() || `solo:${m.folder}:${m.id}`)
+  );
+  const threadsWithContext = new Set(
+    context
+      .map((m) => m.conversationId?.trim())
+      .filter((id): id is string => Boolean(id))
+  );
+  return {
+    total: all.length,
+    inRange: inRange.length,
+    context: context.length,
+    threads: threadKeys.size,
+    threadsWithContext: threadsWithContext.size,
+    inboxInRange: inbox.filter((m) => m.inRange !== false).length,
+    sentInRange: sent.filter((m) => m.inRange !== false).length,
+  };
+}
+
 export const MAIL_THREAD_EXPAND_MAX_THREADS = 28;
 export const MAIL_THREAD_EXPAND_MAX_MESSAGES = 40;
