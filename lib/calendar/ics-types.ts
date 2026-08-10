@@ -12,6 +12,7 @@ export const ICS_CALENDAR_TYPES = [
   "work_rolf",
   "work_valentyna",
   "holiday",
+  "private",
   "other",
 ] as const;
 
@@ -75,6 +76,11 @@ export const ICS_TYPE_META: Record<
     label: "Ferien / Feiertage",
     defaultColor: "#8b5cf6",
     defaultName: "Ferien",
+  },
+  private: {
+    label: "Privat",
+    defaultColor: "#0369a1",
+    defaultName: "Privat",
   },
   other: {
     label: "Sonstiges",

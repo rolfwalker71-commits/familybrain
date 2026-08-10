@@ -122,6 +122,9 @@ function guessType(summary: string | null | undefined): IcsCalendarType {
   if (s.includes("familie") || s.includes("family")) {
     return "family";
   }
+  if (s.includes("privat") || s.includes("private") || s.includes("personal")) {
+    return "private";
+  }
   if (s.includes("schule") || s.includes("school") || s.includes("unterricht")) {
     return "school";
   }

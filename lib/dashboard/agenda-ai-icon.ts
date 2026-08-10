@@ -299,6 +299,9 @@ function sceneForAgenda(input: AgendaIconSubject): string {
   if (type === "family" || /\bfamilie|essen|mittag|eltern\b/i.test(title)) {
     return `${label}: cozy family gathering atmosphere`;
   }
+  if (type === "private") {
+    return `${label}: personal everyday life atmosphere — calm private plans, not work`;
+  }
   if (type === "sports") {
     return `${label}: active sports / outdoor activity atmosphere`;
   }

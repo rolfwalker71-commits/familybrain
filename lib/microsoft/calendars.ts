@@ -78,6 +78,7 @@ function guessType(name: string | null | undefined): IcsCalendarType {
   }
   if (/arbeit|work|job|geschäft|business|office/.test(s)) return "work";
   if (/familie|family/.test(s)) return "family";
+  if (/privat|private|personal/.test(s)) return "private";
   if (/ferien|feiertag|holiday/.test(s)) return "holiday";
   if (/schule|school/.test(s)) return "school";
   if (/sport|fitness/.test(s)) return "sports";
