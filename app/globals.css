@@ -114,6 +114,7 @@
     @apply font-sans;
     min-height: 100%;
     overscroll-behavior-y: none;
+    background-color: #ffffff;
   }
 }
 
