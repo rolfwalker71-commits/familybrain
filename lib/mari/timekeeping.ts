@@ -150,28 +150,27 @@ async function enrichTimeLinesProjectCustomer(
 ): Promise<MariTimeLine[]> {
   if (lines.length === 0) return lines;
   const byPn = new Map<string, string>();
-  for (const l of lines) {
-    const name = (l.projectCustomer || "").trim();
-    const pn = l.projectNumber.trim();
-    if (name && pn && !byPn.has(pn)) byPn.set(pn, name);
-  }
   try {
     const projects = await listProjectsForTimeBooking();
     for (const p of projects) {
       const label = p.matchcode.trim();
       if (!label) continue;
+      // Projekt-Matchcode hat Vorrang — nie Ticket-AddressMatchcode für die PN cachen.
       for (const key of [p.keyVisible, p.keyInternal]) {
         const k = String(key || "").trim();
-        if (k && !byPn.has(k)) byPn.set(k, label);
+        if (k) byPn.set(k, label);
       }
     }
   } catch {
     /* Projektliste optional */
   }
-  return lines.map((l) => ({
-    ...l,
-    projectCustomer: byPn.get(l.projectNumber.trim()) || l.projectCustomer,
-  }));
+  return lines.map((l) => {
+    const fromProject = byPn.get(l.projectNumber.trim());
+    return {
+      ...l,
+      projectCustomer: fromProject || l.projectCustomer,
+    };
+  });
 }
 
 function mapSqlLine(r: Record<string, unknown>): MariTimeLine {
@@ -187,6 +186,11 @@ function mapSqlLine(r: Record<string, unknown>): MariTimeLine {
     zeroHoursReason: String(r.ZeroHoursReason || "").trim() || null,
   };
   const fromMemo = parseTimekeepingUdfFromMemo(memoRaw);
+  const sourceType = Number(r.SourceType) || 0;
+  const addressFromTicket =
+    sourceType === TIMEKEEPING_SOURCE_SUPPORT_ISSUE
+      ? String(r.AddressMatchcode || "").trim() || null
+      : null;
   return {
     lineId: Number(r.TimeSheetEntryID) || 0,
     serviceDate,
@@ -195,7 +199,7 @@ function mapSqlLine(r: Record<string, unknown>): MariTimeLine {
       String(r.EmployeeName || r.EmployeeMatchcode || "").trim() || null,
     projectNumber: String(r.ProjectNumber || ""),
     projectCustomer:
-      String(r.ProjectCustomer || r.AddressMatchcode || "").trim() || null,
+      String(r.ProjectCustomer || "").trim() || addressFromTicket,
     phaseId: Number(r.PhaseID) || 0,
     activity: String(r.ActivityText || "").trim(),
     memo: stripTimekeepingUdfFromMemo(memoRaw) || null,
@@ -205,7 +209,7 @@ function mapSqlLine(r: Record<string, unknown>): MariTimeLine {
     hoursBillable,
     billable: hoursBillable > 0,
     contractId: Number(r.ContractID) || 0,
-    sourceType: Number(r.SourceType) || 0,
+    sourceType,
     sourceReference: Number(r.SourceReference) || 0,
     timeStart: r.TimeStart ? String(r.TimeStart) : null,
     timeEnd: r.TimeEnd ? String(r.TimeEnd) : null,
@@ -356,7 +360,7 @@ LEFT JOIN "MARIEmployeeMaster" e
   ON e."EmployeeNumber" = t."EmployeeNumber"
 LEFT JOIN "MARISupportIssue" i
   ON i."IssueID" = t."SourceReference"
-  AND t."SourceType" IN (2, 3)
+  AND t."SourceType" = ${TIMEKEEPING_SOURCE_SUPPORT_ISSUE}
 WHERE t."EmployeeNumber" = '${empQ}'
   AND t."ServiceDate" >= '${fromDate}'
   AND t."ServiceDate" < '${toExclusive}'
@@ -394,9 +398,9 @@ LEFT JOIN "MARIEmployeeMaster" e
   ON e."EmployeeNumber" = t."EmployeeNumber"
 LEFT JOIN "MARISupportIssue" i
   ON i."IssueID" = t."SourceReference"
-  AND t."SourceType" IN (2, 3)
+  AND t."SourceType" = ${TIMEKEEPING_SOURCE_SUPPORT_ISSUE}
 WHERE t."SourceReference" = ${issueId}
-  AND t."SourceType" IN (2, 3)
+  AND t."SourceType" = ${TIMEKEEPING_SOURCE_SUPPORT_ISSUE}
 ORDER BY t."ServiceDate" DESC, t."TimeSheetEntryID" DESC`
   );
   return enrichTimeLinesProjectCustomer(
@@ -590,7 +594,7 @@ LEFT JOIN "MARIEmployeeMaster" e
   ON e."EmployeeNumber" = t."EmployeeNumber"
 LEFT JOIN "MARISupportIssue" i
   ON i."IssueID" = t."SourceReference"
-  AND t."SourceType" IN (2, 3)
+  AND t."SourceType" = ${TIMEKEEPING_SOURCE_SUPPORT_ISSUE}
 WHERE t."TimeSheetEntryID" = ${lineId}`
   );
   const line = rows[0] ? mapSqlLine(rows[0]) : null;
