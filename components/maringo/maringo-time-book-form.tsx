@@ -482,7 +482,9 @@ export function MaringoTimeBookForm({
       <div
         className={cn(
           "grid gap-3",
-          wide ? "sm:grid-cols-2 lg:grid-cols-3" : "sm:grid-cols-2"
+          wide
+            ? "grid-cols-1 sm:grid-cols-[minmax(9.5rem,11rem)_5.5rem_minmax(0,1fr)]"
+            : "grid-cols-1 sm:grid-cols-[minmax(9.5rem,1fr)_5.5rem] sm:[&>*:last-child]:col-span-2"
         )}
       >
         <div className="space-y-1">
@@ -504,6 +506,7 @@ export function MaringoTimeBookForm({
           <Input
             id="tk-hours"
             inputMode="decimal"
+            className="tabular-nums"
             value={hoursRaw}
             onChange={(e) => {
               setHoursRaw(e.target.value);
@@ -512,7 +515,7 @@ export function MaringoTimeBookForm({
             placeholder="0.25"
           />
         </div>
-        <div className={cn("space-y-1", !wide && "sm:col-span-2")}>
+        <div className="space-y-1">
           <Label htmlFor="tk-billable-h" className="block truncate">
             Davon verrechenbar
           </Label>
@@ -520,7 +523,7 @@ export function MaringoTimeBookForm({
             <Input
               id="tk-billable-h"
               inputMode="decimal"
-              className="min-w-0 flex-1"
+              className="min-w-[5.5rem] flex-1 tabular-nums"
               value={hoursBillableRaw}
               onChange={(e) => setHoursBillableRaw(e.target.value)}
               disabled={!billable}

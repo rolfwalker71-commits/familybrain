@@ -47,9 +47,17 @@ const PERIOD_OPTIONS: { id: MariTimePeriod; label: string }[] = [
 
 export function MaringoTimekeepingPanel({
   className,
+  /** Ticket-Kontext: Formular + nur Buchungen dieses Tickets (keine Tagesübersicht). */
+  ticketIssueId = null,
+  bookDefaults = null,
+  onTicketLinesChange,
 }: {
   className?: string;
+  ticketIssueId?: number | null;
+  bookDefaults?: TimeBookFormDefaults | null;
+  onTicketLinesChange?: (lines: MariTimeLine[]) => void;
 }) {
+  const ticketMode = ticketIssueId != null && ticketIssueId > 0;
   const [date, setDate] = useState(zurichTodayYmd);
   const [period, setPeriod] = useState<MariTimePeriod>("day");
   const [fromDate, setFromDate] = useState(date);
@@ -78,6 +86,21 @@ export function MaringoTimekeepingPanel({
     }
   }, [date, period]);
 
+  const applyLines = useCallback(
+    (next: MariTimeLine[]) => {
+      setLines(next);
+      const total =
+        Math.round(next.reduce((s, l) => s + l.hours, 0) * 100) / 100;
+      const billable =
+        Math.round(next.reduce((s, l) => s + l.hoursBillable, 0) * 100) / 100;
+      setTotalHours(total);
+      setBillableHours(billable);
+      setNonBillableHours(Math.round((total - billable) * 100) / 100);
+      onTicketLinesChange?.(next);
+    },
+    [onTicketLinesChange]
+  );
+
   const loadPeriod = useCallback(async (ymd: string, p: MariTimePeriod) => {
     setLoading(true);
     setError(null);
@@ -102,17 +125,53 @@ export function MaringoTimekeepingPanel({
     }
   }, []);
 
+  const loadTicketLines = useCallback(async (issueId: number) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/maringo/timekeeping/by-ticket?issueId=${issueId}`
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || "Ticket-Buchungen laden fehlgeschlagen");
+      }
+      applyLines((data.lines || []) as MariTimeLine[]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      applyLines([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [applyLines]);
+
+  const reload = useCallback(async () => {
+    if (ticketMode && ticketIssueId != null) {
+      await loadTicketLines(ticketIssueId);
+      return;
+    }
+    await loadPeriod(date, period);
+  }, [ticketMode, ticketIssueId, loadTicketLines, loadPeriod, date, period]);
+
   useEffect(() => {
+    if (ticketMode && ticketIssueId != null) {
+      void loadTicketLines(ticketIssueId);
+      return;
+    }
     void loadPeriod(date, period);
-  }, [date, period, loadPeriod]);
+  }, [ticketMode, ticketIssueId, date, period, loadPeriod, loadTicketLines]);
 
   async function book(values: TimeBookFormValues) {
     setStatus(null);
     setError(null);
+    const payload = {
+      ...values,
+      issueId: ticketMode ? ticketIssueId : values.issueId,
+    };
     const res = await fetch("/api/maringo/timekeeping/lines", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(values),
+      body: JSON.stringify(payload),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || "Buchung fehlgeschlagen");
@@ -126,7 +185,7 @@ export function MaringoTimekeepingPanel({
           values.projectNumber,
           values.projectLabel
         )}` +
-          (values.issueId ? ` (Ticket #${values.issueId})` : "") +
+          (payload.issueId ? ` (Ticket #${payload.issueId})` : "") +
           (line?.lineId ? ` · #${line.lineId}` : ""),
         warn ? `Hinweis: ${warn}` : null,
       ]
@@ -134,8 +193,8 @@ export function MaringoTimekeepingPanel({
         .join(" — ")
     );
     setFormKey((k) => k + 1);
-    setDate(values.dayOfService);
-    await loadPeriod(values.dayOfService, period);
+    if (!ticketMode) setDate(values.dayOfService);
+    await reload();
   }
 
   async function openEdit(line: MariTimeLine) {
@@ -177,7 +236,7 @@ export function MaringoTimekeepingPanel({
         hours: full.hours ?? line.hours,
         hoursBillable: full.hoursBillable ?? line.hoursBillable,
         billable: full.billable ?? line.billable,
-        issueId: full.issueId,
+        issueId: full.issueId ?? (ticketMode ? ticketIssueId : null),
       });
     } catch (err) {
       setEditLine(null);
@@ -196,7 +255,10 @@ export function MaringoTimekeepingPanel({
       {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
+        body: JSON.stringify({
+          ...values,
+          issueId: ticketMode ? ticketIssueId : values.issueId,
+        }),
       }
     );
     const data = await res.json().catch(() => ({}));
@@ -206,13 +268,12 @@ export function MaringoTimekeepingPanel({
       `Geändert: ${values.hours} h auf ${formatMariProjectLabel(
         values.projectNumber,
         values.projectLabel
-      )}` +
-        (line?.lineId ? ` · #${line.lineId}` : "")
+      )}` + (line?.lineId ? ` · #${line.lineId}` : "")
     );
     setEditLine(null);
     setEditDefaults(null);
-    setDate(values.dayOfService);
-    await loadPeriod(values.dayOfService, period);
+    if (!ticketMode) setDate(values.dayOfService);
+    await reload();
   }
 
   async function removeLine(line: MariTimeLine) {
@@ -240,7 +301,7 @@ export function MaringoTimekeepingPanel({
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Löschen fehlgeschlagen");
       setStatus(`Gelöscht: Buchung #${line.lineId}`);
-      await loadPeriod(date, period);
+      await reload();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -248,14 +309,27 @@ export function MaringoTimekeepingPanel({
     }
   }
 
-  const overviewTitle =
-    period === "day"
+  const overviewTitle = ticketMode
+    ? "Buchungen zu diesem Ticket"
+    : period === "day"
       ? "Tagesübersicht"
       : period === "week"
         ? "Wochenübersicht"
         : period === "month"
           ? "Monatsübersicht"
           : "Quartalsübersicht";
+
+  const formDefaults: TimeBookFormDefaults = {
+    dayOfService: date,
+    hours: 0.25,
+    billable: true,
+    ...(bookDefaults || {}),
+    ...(ticketMode
+      ? {
+          issueId: ticketIssueId,
+        }
+      : {}),
+  };
 
   return (
     <div className={cn("space-y-4", className)}>
@@ -275,15 +349,18 @@ export function MaringoTimekeepingPanel({
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-sm">
               <Clock3 className="size-4" strokeWidth={APP_ICON_STROKE} />
-              Neue Stundenbuchung
+              {ticketMode
+                ? `Zeit auf Ticket #${ticketIssueId} buchen`
+                : "Neue Stundenbuchung"}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <MaringoTimeBookForm
-              key={formKey}
-              defaults={{ dayOfService: date, hours: 0.25, billable: true }}
+              key={`${formKey}-${ticketIssueId || "day"}`}
+              defaults={formDefaults}
               onSubmit={book}
-              layout="wide"
+              layout={ticketMode ? "compact" : "wide"}
+              submitLabel={ticketMode ? "Auf Ticket buchen" : "Buchen"}
             />
           </CardContent>
         </Card>
@@ -294,34 +371,42 @@ export function MaringoTimekeepingPanel({
               <div className="flex flex-wrap items-end justify-between gap-2">
                 <div>
                   <CardTitle className="text-sm">{overviewTitle}</CardTitle>
-                  {periodHint ? (
+                  {!ticketMode && periodHint ? (
                     <p className="mt-0.5 text-[11px] text-muted-foreground">
                       {periodHint}
                       {fromDate !== toDate
                         ? ` · ${lines.length} Buchungen`
                         : null}
                     </p>
+                  ) : ticketMode ? (
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">
+                      {loading
+                        ? "Lade…"
+                        : `${lines.length} Buchung${lines.length === 1 ? "" : "en"}`}
+                    </p>
                   ) : null}
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <div className="space-y-1">
-                    <Label htmlFor="tk-day" className="sr-only">
-                      Ankerdatum
-                    </Label>
-                    <Input
-                      id="tk-day"
-                      type="date"
-                      className="h-8 w-auto"
-                      value={date}
-                      onChange={(e) => setDate(e.target.value)}
-                    />
-                  </div>
+                  {!ticketMode ? (
+                    <div className="space-y-1">
+                      <Label htmlFor="tk-day" className="sr-only">
+                        Ankerdatum
+                      </Label>
+                      <Input
+                        id="tk-day"
+                        type="date"
+                        className="h-8 w-auto"
+                        value={date}
+                        onChange={(e) => setDate(e.target.value)}
+                      />
+                    </div>
+                  ) : null}
                   <Button
                     type="button"
                     size="icon"
                     variant="ghost"
                     className="size-8"
-                    onClick={() => void loadPeriod(date, period)}
+                    onClick={() => void reload()}
                     disabled={loading}
                     aria-label="Aktualisieren"
                   >
@@ -332,28 +417,30 @@ export function MaringoTimekeepingPanel({
                   </Button>
                 </div>
               </div>
-              <div
-                className="inline-flex flex-wrap gap-1 rounded-lg border border-border/60 bg-muted/30 p-1"
-                role="group"
-                aria-label="Zeitraum"
-              >
-                {PERIOD_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    className={cn(
-                      "rounded-md px-2.5 py-1 text-[12px] font-medium transition-colors",
-                      period === opt.id
-                        ? "bg-background text-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground"
-                    )}
-                    aria-pressed={period === opt.id}
-                    onClick={() => setPeriod(opt.id)}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
+              {!ticketMode ? (
+                <div
+                  className="inline-flex flex-wrap gap-1 rounded-lg border border-border/60 bg-muted/30 p-1"
+                  role="group"
+                  aria-label="Zeitraum"
+                >
+                  {PERIOD_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      className={cn(
+                        "rounded-md px-2.5 py-1 text-[12px] font-medium transition-colors",
+                        period === opt.id
+                          ? "bg-background text-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                      aria-pressed={period === opt.id}
+                      onClick={() => setPeriod(opt.id)}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
             </div>
           </CardHeader>
           <CardContent>
@@ -365,9 +452,11 @@ export function MaringoTimekeepingPanel({
               emptyText={
                 loading
                   ? "Lade Buchungen…"
-                  : period === "day"
-                    ? "Keine Buchungen an diesem Tag."
-                    : "Keine Buchungen in diesem Zeitraum."
+                  : ticketMode
+                    ? "Noch keine Stundenbuchungen auf dieses Ticket."
+                    : period === "day"
+                      ? "Keine Buchungen an diesem Tag."
+                      : "Keine Buchungen in diesem Zeitraum."
               }
               onEdit={(l) => void openEdit(l)}
               onDelete={removeLine}

@@ -77,7 +77,8 @@ import {
   DEFAULT_MARI_LIST_META_FIELDS,
   MARI_LIST_META_FIELD_OPTIONS,
 } from "@/lib/mari/ticket-filter-prefs-shared";
-import { buildMariTicketListMetaParts } from "@/lib/mari/ticket-list-meta";
+import { buildMariTicketListMetaItems } from "@/lib/mari/ticket-list-meta";
+import { MariCustomerChip } from "@/components/maringo/mari-customer-chip";
 import {
   MariMainFlyoutShell,
   MariSecondaryFlyoutShell,
@@ -99,7 +100,6 @@ import { formatMariProjectLabel } from "@/lib/mari/timekeeping-shared";
 import { MaringoTimekeepingPanel } from "@/components/maringo/maringo-timekeeping-panel";
 import { MaringoTimeBookDialog } from "@/components/maringo/maringo-time-book-dialog";
 import type { TimeBookFormDefaults } from "@/components/maringo/maringo-time-book-form";
-import { MaringoTimeLinesTable } from "@/components/maringo/maringo-time-lines-table";
 
 function ReplyLangToggle({
   lang,
@@ -883,88 +883,6 @@ export function MaringoWorkspaceClient() {
       setTicketTimeLoading(false);
     }
   }, []);
-
-  function openNewBookDialog() {
-    setEditBookLineId(null);
-    setEditBookDefaults(null);
-    setBookDialogOpen(true);
-  }
-
-  async function openEditTicketLine(line: MariTimeLine) {
-    if (line.approved) {
-      setError("Freigegebene Buchungen können nicht geändert werden.");
-      return;
-    }
-    setError(null);
-    try {
-      const res = await fetch(`/api/maringo/timekeeping/lines/${line.lineId}`);
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || "Buchung laden fehlgeschlagen");
-      const full = data.line as {
-        serviceDate: string;
-        projectNumber: string;
-        activity: string;
-        memo: string | null;
-        hours: number;
-        hoursBillable: number;
-        billable: boolean;
-        contractId: number;
-        contractPositionId: number;
-        issueId: number | null;
-      };
-      setEditBookLineId(line.lineId);
-      setEditBookDefaults({
-        dayOfService: full.serviceDate || line.serviceDate,
-        projectNumber: full.projectNumber || line.projectNumber,
-        projectLabel: formatMariProjectLabel(
-          full.projectNumber || line.projectNumber,
-          line.projectCustomer
-        ),
-        contractId: full.contractId || null,
-        contractPositionId: full.contractPositionId || null,
-        activity: full.activity || line.activity,
-        memoText: full.memo || line.memo || "",
-        hours: full.hours ?? line.hours,
-        hoursBillable: full.hoursBillable ?? line.hoursBillable,
-        billable: full.billable ?? line.billable,
-        issueId: full.issueId ?? detail?.issueId ?? null,
-      });
-      setBookDialogOpen(true);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    }
-  }
-
-  async function deleteTicketLine(line: MariTimeLine) {
-    if (line.approved) {
-      setError("Freigegebene Buchungen können nicht gelöscht werden.");
-      return;
-    }
-    if (
-      !window.confirm(
-        `Buchung #${line.lineId} (${line.hours} h, ${formatMariProjectLabel(
-          line.projectNumber,
-          line.projectCustomer
-        )}) wirklich löschen?`
-      )
-    ) {
-      return;
-    }
-    setBusyTicketLineId(line.lineId);
-    setError(null);
-    try {
-      const res = await fetch(`/api/maringo/timekeeping/lines/${line.lineId}`, {
-        method: "DELETE",
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || "Löschen fehlgeschlagen");
-      if (selectedId != null) void loadTicketTimeLines(selectedId);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setBusyTicketLineId(null);
-    }
-  }
 
   useEffect(() => {
     let cancelled = false;
@@ -1918,9 +1836,10 @@ export function MaringoWorkspaceClient() {
               const active = t.issueId === selectedId;
               const due = formatDayMonth(t.dueDate);
               const overdue = isOverdue(t.dueDate);
-              const metaParts = buildMariTicketListMetaParts(t, listMetaFields);
-              const metaLine =
-                metaParts.length > 0 ? metaParts.join(" · ") : null;
+              const metaItems = buildMariTicketListMetaItems(
+                t,
+                listMetaFields
+              );
               return (
                 <li key={t.issueId} className="border-b border-border/40 last:border-b-0">
                   <button
@@ -1942,10 +1861,28 @@ export function MaringoWorkspaceClient() {
                           {t.briefDescription}
                         </p>
                       </div>
-                      {metaLine ? (
-                        <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
-                          {metaLine}
-                        </p>
+                      {metaItems.length > 0 ? (
+                        <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] text-muted-foreground">
+                          {metaItems.map((item, idx) => (
+                            <span
+                              key={`${item.id}-${idx}`}
+                              className="inline-flex min-w-0 items-center gap-1.5"
+                            >
+                              {idx > 0 ? (
+                                <span className="text-border" aria-hidden>
+                                  ·
+                                </span>
+                              ) : null}
+                              {item.kind === "customer" ? (
+                                <MariCustomerChip className="max-w-[14rem]">
+                                  {item.value}
+                                </MariCustomerChip>
+                              ) : (
+                                <span className="truncate">{item.value}</span>
+                              )}
+                            </span>
+                          ))}
+                        </div>
                       ) : null}
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-1 pt-0.5">
@@ -2088,12 +2025,31 @@ export function MaringoWorkspaceClient() {
                               {detail.addressMatchcode || "–"}
                             </DetailField>
                             <DetailField label="Projekt">
-                              {detail.projectNumber
-                                ? formatMariProjectLabel(
-                                    detail.projectNumber,
+                              {detail.projectNumber ? (
+                                <span className="inline-flex flex-wrap items-center gap-1.5 text-[12px]">
+                                  {(
                                     detail.addressMatchcode || detail.cardCode
-                                  )
-                                : "–"}
+                                  )?.trim() ? (
+                                    <>
+                                      <MariCustomerChip>
+                                        {(
+                                          detail.addressMatchcode ||
+                                          detail.cardCode
+                                        )!.trim()}
+                                      </MariCustomerChip>
+                                      <span className="font-medium tabular-nums text-muted-foreground">
+                                        ({detail.projectNumber})
+                                      </span>
+                                    </>
+                                  ) : (
+                                    <span className="font-medium tabular-nums">
+                                      {detail.projectNumber}
+                                    </span>
+                                  )}
+                                </span>
+                              ) : (
+                                "–"
+                              )}
                             </DetailField>
                             <DetailField label="Vertrag">
                               {detail.contractNumber ||
@@ -2295,7 +2251,7 @@ export function MaringoWorkspaceClient() {
                                 ? "Stunden auf dieses Ticket buchen"
                                 : "Ticket hat kein Projekt hinterlegt"
                             }
-                            onClick={() => openNewBookDialog()}
+                            onClick={() => toggleSecondary("buchungen")}
                           >
                             <Clock3 className="size-3.5" />
                             Zeit buchen
@@ -2690,25 +2646,21 @@ export function MaringoWorkspaceClient() {
 
               {secondaryFlyouts.map((id, i) => {
                 const widthClass =
-                  id === "arbeitszeit"
+                  id === "buchungen"
                     ? "w-[min(100%,34rem)]"
                     : "w-[min(100%,30rem)]";
                 const title =
                   id === "verlauf"
                     ? "Verlauf"
                     : id === "buchungen"
-                      ? "Ticket-Buchungen"
-                      : id === "anzeige"
-                        ? "Listenfelder"
-                        : "Arbeitszeit";
+                      ? "Stunden"
+                      : "Listenfelder";
                 const description =
                   id === "verlauf"
                     ? "Timeline & interne Notizen"
                     : id === "buchungen"
-                      ? "Stunden auf dieses Ticket"
-                      : id === "anzeige"
-                        ? "Meta-Zeile in der Ticketliste"
-                        : "Zeiterfassung";
+                      ? "Auf Ticket buchen & bestehende Ticket-Buchungen"
+                      : "Meta-Zeile in der Ticketliste";
                 return (
                   <MariSecondaryFlyoutShell
                     key={id}
@@ -2772,34 +2724,26 @@ export function MaringoWorkspaceClient() {
                         )}
                       </div>
                     ) : null}
-                    {id === "buchungen" ? (
-                      <div className="space-y-3">
-                        {detail?.projectNumber ? (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={() => openNewBookDialog()}
-                          >
-                            <Clock3 className="size-3.5" />
-                            Zeit buchen
-                          </Button>
-                        ) : null}
-                        <MaringoTimeLinesTable
-                          lines={ticketTimeLines}
-                          emptyText={
-                            ticketTimeLoading
-                              ? "Lade Buchungen…"
-                              : "Noch keine Stundenbuchungen auf dieses Ticket."
-                          }
-                          onEdit={(l) => void openEditTicketLine(l)}
-                          onDelete={deleteTicketLine}
-                          busyLineId={busyTicketLineId}
-                        />
-                      </div>
-                    ) : null}
-                    {id === "arbeitszeit" ? (
-                      <MaringoTimekeepingPanel />
+                    {id === "buchungen" && detail ? (
+                      <MaringoTimekeepingPanel
+                        ticketIssueId={detail.issueId}
+                        bookDefaults={{
+                          issueId: detail.issueId,
+                          projectNumber: detail.projectNumber,
+                          projectLabel: formatMariProjectLabel(
+                            detail.projectNumber,
+                            detail.addressMatchcode || detail.cardCode
+                          ),
+                          contractId: detail.contractId,
+                          contractPositionId: detail.contractPositionId,
+                          activity: detail.briefDescription.slice(0, 100),
+                          hours: 0.25,
+                          billable: true,
+                        }}
+                        onTicketLinesChange={(lines) => {
+                          setTicketTimeLines(lines);
+                        }}
+                      />
                     ) : null}
                     {id === "anzeige" ? (
                       <div className="space-y-3">

@@ -2,7 +2,6 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import {
-  CalendarClock,
   Clock3,
   ListTree,
   MessageSquare,
@@ -15,7 +14,6 @@ import { cn } from "@/lib/utils";
 export type MariSecondaryFlyoutId =
   | "verlauf"
   | "buchungen"
-  | "arbeitszeit"
   | "anzeige";
 
 export const MARI_SECONDARY_FLYOUT_META: Record<
@@ -23,8 +21,7 @@ export const MARI_SECONDARY_FLYOUT_META: Record<
   { label: string; short: string }
 > = {
   verlauf: { label: "Verlauf", short: "Verlauf" },
-  buchungen: { label: "Ticket-Buchungen", short: "Buchungen" },
-  arbeitszeit: { label: "Arbeitszeit", short: "Zeit" },
+  buchungen: { label: "Stunden", short: "Stunden" },
   anzeige: { label: "Listenfelder", short: "Anzeige" },
 };
 
@@ -71,8 +68,7 @@ export function MariTicketFlyoutRail({
     label: string;
   }[] = [
     { id: "verlauf", icon: MessageSquare, label: "Verlauf" },
-    { id: "buchungen", icon: Clock3, label: "Buchungen" },
-    { id: "arbeitszeit", icon: CalendarClock, label: "Arbeitszeit" },
+    { id: "buchungen", icon: Clock3, label: "Stunden" },
     { id: "anzeige", icon: ListTree, label: "Listenfelder" },
   ];
 
@@ -89,7 +85,7 @@ export function MariTicketFlyoutRail({
             key={id}
             className={cn(
               "group relative flex w-full justify-center",
-              index === 3 && "mt-auto"
+              index === items.length - 1 && "mt-auto"
             )}
           >
             <button

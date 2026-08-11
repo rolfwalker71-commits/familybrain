@@ -1,5 +1,4 @@
 import type { MariListMetaField } from "@/lib/mari/ticket-filter-prefs-shared";
-import { formatMariProjectLabel } from "@/lib/mari/timekeeping-shared";
 
 /** Minimal ticket shape for list meta lines (list + detail). */
 export type MariTicketListMetaSource = {
@@ -11,6 +10,12 @@ export type MariTicketListMetaSource = {
   contractId?: number | null;
   requestDate?: string | null;
   changeAtDate?: string | null;
+};
+
+export type MariTicketListMetaItem = {
+  id: MariListMetaField;
+  value: string;
+  kind: "customer" | "text";
 };
 
 function formatDayMonth(iso: string | null | undefined): string | null {
@@ -35,28 +40,26 @@ function activityLabel(t: MariTicketListMetaSource): string | null {
   return raw.length > 48 ? `${raw.slice(0, 47)}…` : raw;
 }
 
-/** Build meta parts for the ticket list row according to user prefs. */
-export function buildMariTicketListMetaParts(
+/** Structured meta items for the ticket list row (Kunde as chip). */
+export function buildMariTicketListMetaItems(
   t: MariTicketListMetaSource,
   fields: readonly MariListMetaField[]
-): string[] {
-  const parts: string[] = [];
+): MariTicketListMetaItem[] {
+  const items: MariTicketListMetaItem[] = [];
+  const hasKunde = fields.includes("kunde");
   for (const id of fields) {
     let value: string | null = null;
+    let kind: MariTicketListMetaItem["kind"] = "text";
     switch (id) {
       case "kunde":
         value = (t.addressMatchcode || t.cardCode || "").trim() || null;
+        kind = "customer";
         break;
       case "projekt": {
         const pn = (t.projectNumber || "").trim();
-        if (!pn) {
-          value = null;
-          break;
-        }
-        value = formatMariProjectLabel(
-          pn,
-          t.addressMatchcode || t.cardCode
-        );
+        if (!pn) break;
+        // Kunde already as chip — show only project number here.
+        value = pn;
         break;
       }
       case "vertrag":
@@ -78,7 +81,31 @@ export function buildMariTicketListMetaParts(
       default:
         break;
     }
-    if (value) parts.push(value);
+    if (value) items.push({ id, value, kind });
   }
-  return parts;
+  // If projekt enabled but kunde not: still prefer customer chip + number when known
+  if (!hasKunde) {
+    const pn = (t.projectNumber || "").trim();
+    const customer = (t.addressMatchcode || t.cardCode || "").trim();
+    const projektIdx = items.findIndex((i) => i.id === "projekt");
+    if (projektIdx >= 0 && pn && customer && customer !== pn) {
+      items.splice(
+        projektIdx,
+        1,
+        { id: "kunde", value: customer, kind: "customer" },
+        { id: "projekt", value: pn, kind: "text" }
+      );
+    }
+  }
+  return items;
+}
+
+/** @deprecated Prefer buildMariTicketListMetaItems for UI. */
+export function buildMariTicketListMetaParts(
+  t: MariTicketListMetaSource,
+  fields: readonly MariListMetaField[]
+): string[] {
+  return buildMariTicketListMetaItems(t, fields).map((i) =>
+    i.kind === "customer" ? i.value : i.value
+  );
 }

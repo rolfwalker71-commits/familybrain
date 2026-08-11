@@ -4,7 +4,6 @@ import { useState } from "react";
 import { ChevronRight, Pencil, Trash2 } from "lucide-react";
 import {
   approvalStatusLabel,
-  formatMariProjectLabel,
   type MariApprovalStatus,
   type MariTimeLine,
 } from "@/lib/mari/timekeeping-shared";
@@ -12,6 +11,38 @@ import { APP_ICON_STROKE } from "@/lib/branding/app-icons";
 import { toSwissDate } from "@/lib/utils/dates";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { MariCustomerChip } from "@/components/maringo/mari-customer-chip";
+
+function ProjectWithCustomer({
+  projectNumber,
+  projectCustomer,
+}: {
+  projectNumber: string;
+  projectCustomer: string | null;
+}) {
+  const pn = projectNumber.trim();
+  const customer = (projectCustomer || "").trim();
+  if (!pn && !customer) return <span>–</span>;
+  if (!customer) {
+    return <span className="font-medium tabular-nums text-foreground">{pn}</span>;
+  }
+  if (
+    !pn ||
+    customer === pn ||
+    customer.includes(`(${pn})`) ||
+    customer.endsWith(` ${pn}`)
+  ) {
+    return <MariCustomerChip>{customer}</MariCustomerChip>;
+  }
+  return (
+    <span className="inline-flex min-w-0 max-w-full flex-wrap items-center gap-1.5">
+      <MariCustomerChip>{customer}</MariCustomerChip>
+      <span className="font-medium tabular-nums text-muted-foreground">
+        ({pn})
+      </span>
+    </span>
+  );
+}
 
 function formatHours(n: number): string {
   return n.toLocaleString("de-CH", {
@@ -200,16 +231,14 @@ export function MaringoTimeLinesTable({
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1 space-y-1">
-                    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                       <span className="font-semibold tabular-nums">
                         {toSwissDate(l.serviceDate)}
                       </span>
-                      <span className="font-medium text-foreground">
-                        {formatMariProjectLabel(
-                          l.projectNumber,
-                          l.projectCustomer
-                        )}
-                      </span>
+                      <ProjectWithCustomer
+                        projectNumber={l.projectNumber}
+                        projectCustomer={l.projectCustomer}
+                      />
                       <span className="ml-auto font-semibold tabular-nums text-foreground">
                         {formatHours(l.hours)} h
                       </span>
@@ -281,8 +310,11 @@ export function MaringoTimeLinesTable({
                   <td className="whitespace-nowrap px-2.5 py-2 tabular-nums">
                     {toSwissDate(l.serviceDate)}
                   </td>
-                  <td className="px-2.5 py-2 font-medium">
-                    {formatMariProjectLabel(l.projectNumber, l.projectCustomer)}
+                  <td className="px-2.5 py-2 align-middle">
+                    <ProjectWithCustomer
+                      projectNumber={l.projectNumber}
+                      projectCustomer={l.projectCustomer}
+                    />
                   </td>
                   <td className="max-w-[20rem] px-2.5 py-2">
                     <p className="font-medium">{l.activity || "–"}</p>
