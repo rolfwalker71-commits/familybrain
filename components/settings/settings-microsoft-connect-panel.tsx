@@ -2,10 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Link2, Unlink, Cloud, RefreshCw } from "lucide-react";
+import { Link2, Unlink, RefreshCw } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { IconCircle } from "@/components/layout/icon-circle";
+import { MicrosoftLogo } from "@/components/branding/provider-logos";
 import { cn } from "@/lib/utils";
 
 type Connection = {
@@ -111,7 +111,9 @@ export function SettingsMicrosoftConnectPanel() {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-3">
-          <IconCircle icon={Cloud} tone="blue" size="sm" />
+          <span className="flex size-8 items-center justify-center rounded-full bg-white shadow-[inset_0_0_0_1px_rgba(15,23,42,0.06)]">
+            <MicrosoftLogo className="size-4" />
+          </span>
           Mein Microsoft 365
         </CardTitle>
       </CardHeader>

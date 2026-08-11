@@ -90,14 +90,14 @@
   --brand-settings-soft: #e2e8f0;
   --brand-sync: #3f6b52;
   --brand-sync-soft: #d9e4d1;
-  /* Mid slate-teal sidebar — lifts away from logo charcoal so the stack mark reads clearly; pairs with orange accent */
-  --sidebar: #2b3d4a;
-  --sidebar-foreground: #e8eef2;
+  /* Lighter slate-teal — charcoal logo layers need clear separation from the rail */
+  --sidebar: #3f5568;
+  --sidebar-foreground: #eef3f6;
   --sidebar-primary: #e86a2b;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #374b5a;
+  --sidebar-accent: #4d6578;
   --sidebar-accent-foreground: #f8fafc;
-  --sidebar-border: #405868;
+  --sidebar-border: #5a7386;
   --sidebar-ring: #e86a2b;
 }
 

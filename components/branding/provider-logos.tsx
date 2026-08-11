@@ -174,28 +174,26 @@ export function GoogleTasksLogo({
   );
 }
 
-/** Gmail „M“-Markenzeichen. */
+/** Gmail 2020 Markenzeichen (mehrfarbiges „M“). */
 export function GmailLogo({ className, title = "Gmail" }: LogoProps) {
   return (
     <svg
-      viewBox="0 0 24 24"
+      viewBox="52 42 88 66"
       className={cn("size-4 shrink-0", className)}
       aria-hidden={title ? undefined : true}
       role={title ? "img" : undefined}
     >
       {title ? <title>{title}</title> : null}
+      <path fill="#4285F4" d="M58 108h14V74L52 59v43c0 3.32 2.69 6 6 6" />
+      <path fill="#34A853" d="M120 108h14c3.32 0 6-2.69 6-6V59l-20 15" />
       <path
-        fill="#EA4335"
-        d="M3.5 5.5A1.5 1.5 0 0 1 5 4h14a1.5 1.5 0 0 1 1.5 1.5v13A1.5 1.5 0 0 1 19 20H5a1.5 1.5 0 0 1-1.5-1.5v-13z"
+        fill="#FBBC04"
+        d="M120 48v26l20-15v-8c0-7.42-8.47-11.65-14.4-7.2"
       />
-      <path
-        fill="#fff"
-        d="M5.2 6.4 12 11.6l6.8-5.2V8.1L12 13.4 5.2 8.1V6.4z"
-      />
-      <path fill="#C5221F" d="M5.2 6.4v11.2H3.5V5.5A1.5 1.5 0 0 1 5 4h.2v2.4z" />
+      <path fill="#EA4335" d="M72 74V48l24 18 24-18v26L96 92" />
       <path
         fill="#C5221F"
-        d="M18.8 6.4V4H19a1.5 1.5 0 0 1 1.5 1.5v12.1h-1.7V6.4z"
+        d="M52 51v8l20 15V48l-5.6-4.2c-5.94-4.45-14.4-.22-14.4 7.2"
       />
     </svg>
   );

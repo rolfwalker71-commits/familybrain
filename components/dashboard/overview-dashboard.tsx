@@ -1101,7 +1101,9 @@ function FocusTile({
       <span
         className={cn(
           "flex size-9 shrink-0 items-center justify-center rounded-full",
-          iconWrap
+          logo
+            ? "bg-white shadow-[inset_0_0_0_1px_rgba(15,23,42,0.06)]"
+            : iconWrap
         )}
       >
         {logo ? (

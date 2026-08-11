@@ -7,8 +7,6 @@ import {
   Check,
   CalendarClock,
   ListChecks,
-  ListTodo,
-  Mail,
   RefreshCw,
   Sparkles,
 } from "lucide-react";
@@ -26,6 +24,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  GmailLogo,
+  GoogleLogo,
+  GoogleTasksLogo,
+} from "@/components/branding/provider-logos";
 import { PageHeader } from "@/components/layout/page-primitives";
 import { cn } from "@/lib/utils";
 import { APP_ICON_STROKE } from "@/lib/branding/app-icons";
@@ -1053,7 +1056,7 @@ export function GoogleWorkspaceClient() {
       <PageHeader
         title="Google Workspace"
         description="Gmail-Chronik, Triage, Kalender und Tagesanalysen — plus Slot-Suche."
-        icon={pageVisuals.google.icon}
+        logo={<GoogleLogo className="size-8" />}
         tone={pageVisuals.google.tone}
       />
 
@@ -1088,7 +1091,7 @@ export function GoogleWorkspaceClient() {
                 className={mailWorkspaceTabClass(tab === "mail", "google")}
                 onClick={() => setTab("mail")}
               >
-                <Mail className="size-3.5" strokeWidth={APP_ICON_STROKE} />
+                <GmailLogo className="size-3.5" />
                 Mails
               </button>
               <button
@@ -1117,7 +1120,7 @@ export function GoogleWorkspaceClient() {
                 className={mailWorkspaceTabClass(tab === "tasks", "google")}
                 onClick={() => setTab("tasks")}
               >
-                <ListTodo className="size-3.5" strokeWidth={APP_ICON_STROKE} />
+                <GoogleTasksLogo className="size-3.5" />
                 Tasks
               </button>
             </nav>

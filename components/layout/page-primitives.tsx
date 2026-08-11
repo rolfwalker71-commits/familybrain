@@ -34,6 +34,7 @@ export function PageHeader({
   description,
   actions,
   icon,
+  logo,
   tone = "teal",
   titleClassName,
   descriptionClassName,
@@ -42,6 +43,8 @@ export function PageHeader({
   description?: string;
   actions?: ReactNode;
   icon?: LucideIcon;
+  /** Brand mark (Google/Microsoft/…) — preferred over Lucide `icon` when set. */
+  logo?: ReactNode;
   tone?: IconTone;
   titleClassName?: string;
   descriptionClassName?: string;
@@ -49,7 +52,15 @@ export function PageHeader({
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
       <div className="flex min-w-0 items-start gap-3">
-        {icon ? (
+        {logo ? (
+          <div
+            className={cn(
+              "flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white shadow-[inset_0_0_0_1px_rgba(15,23,42,0.06)]"
+            )}
+          >
+            {logo}
+          </div>
+        ) : icon ? (
           <IconCircle icon={icon} tone={tone} size="lg" className="rounded-xl" />
         ) : null}
         <div className="min-w-0">

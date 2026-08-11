@@ -6,10 +6,7 @@ import { useSearchParams } from "next/navigation";
 import {
   Check,
   CalendarClock,
-  Cloud,
-  LayoutGrid,
   ListChecks,
-  Mail,
   RefreshCw,
   Sparkles,
 } from "lucide-react";
@@ -27,6 +24,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  MicrosoftLogo,
+  MicrosoftPlannerLogo,
+  OutlookLogo,
+} from "@/components/branding/provider-logos";
 import { PageHeader } from "@/components/layout/page-primitives";
 import { cn } from "@/lib/utils";
 import { APP_ICON_STROKE } from "@/lib/branding/app-icons";
@@ -1042,7 +1044,7 @@ export function MicrosoftDayClient() {
       <PageHeader
         title="Microsoft 365"
         description="Outlook-Chronik, Triage, Kalender und Tagesanalysen — plus Planner und Slot-Suche."
-        icon={Cloud}
+        logo={<MicrosoftLogo className="size-8" />}
         tone="blue"
       />
 
@@ -1081,7 +1083,7 @@ export function MicrosoftDayClient() {
                 className={mailWorkspaceTabClass(tab === "mail", "microsoft")}
                 onClick={() => setTab("mail")}
               >
-                <Mail className="size-3.5" strokeWidth={APP_ICON_STROKE} />
+                <OutlookLogo className="size-3.5" />
                 Mails
               </button>
               <button
@@ -1110,7 +1112,7 @@ export function MicrosoftDayClient() {
                 className={mailWorkspaceTabClass(tab === "planner", "microsoft")}
                 onClick={() => setTab("planner")}
               >
-                <LayoutGrid className="size-3.5" strokeWidth={APP_ICON_STROKE} />
+                <MicrosoftPlannerLogo className="size-3.5" />
                 Planner
               </button>
             </nav>

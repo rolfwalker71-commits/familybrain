@@ -1,10 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Link2, Unlink, UserRound } from "lucide-react";
+import { Link2, Unlink } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { IconCircle } from "@/components/layout/icon-circle";
+import { GoogleLogo } from "@/components/branding/provider-logos";
 import { cn } from "@/lib/utils";
 
 type Connection = {
@@ -67,7 +67,9 @@ export function SettingsGoogleConnectPanel() {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-3">
-          <IconCircle icon={UserRound} tone="teal" size="sm" />
+          <span className="flex size-8 items-center justify-center rounded-full bg-white shadow-[inset_0_0_0_1px_rgba(15,23,42,0.06)]">
+            <GoogleLogo className="size-4" />
+          </span>
           Mein Google-Konto
         </CardTitle>
       </CardHeader>

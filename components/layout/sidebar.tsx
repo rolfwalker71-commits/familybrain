@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useState, type ReactNode } from "react";
 import {
   ArrowLeft,
   ChevronsLeft,
@@ -13,6 +13,10 @@ import {
 import { cn } from "@/lib/utils";
 import { useAnalysis } from "@/components/analysis/analysis-provider";
 import { useAuth } from "@/components/auth/auth-provider";
+import {
+  GoogleLogo,
+  MicrosoftLogo,
+} from "@/components/branding/provider-logos";
 import { useAdminNav } from "@/components/layout/admin-nav-provider";
 import { UserAvatar } from "@/components/users/user-avatar";
 import { APP_VERSION } from "@/lib/app-version";
@@ -28,6 +32,8 @@ type NavItem = {
   href: string;
   label: string;
   icon: LucideIcon;
+  /** Brand mark when Lucide outline is too generic (Google / Microsoft). */
+  logo?: ReactNode;
   tone: IconTone;
   /** Sidebar section caption; shown before the first item of each group. */
   section?: string;
@@ -61,6 +67,7 @@ const myBrainNavItems: NavItem[] = [
     href: "/google",
     label: "Google Workspace",
     icon: pageVisuals.google.icon,
+    logo: <GoogleLogo className="size-4" />,
     tone: pageVisuals.google.tone,
     section: "Cloud",
     countKey: "mailTriageGoogleCount",
@@ -70,6 +77,7 @@ const myBrainNavItems: NavItem[] = [
     href: "/microsoft",
     label: "Microsoft 365",
     icon: pageVisuals.microsoft.icon,
+    logo: <MicrosoftLogo className="size-4" />,
     tone: pageVisuals.microsoft.tone,
     countKey: "mailTriageMicrosoftCount",
     pendingStyle: true,
@@ -189,6 +197,7 @@ const microsoftNavItem: NavItem = {
   href: "/microsoft",
   label: "Microsoft 365",
   icon: pageVisuals.microsoft.icon,
+  logo: <MicrosoftLogo className="size-4" />,
   tone: pageVisuals.microsoft.tone,
   countKey: "mailTriageMicrosoftCount",
   pendingStyle: true,
@@ -313,12 +322,18 @@ function NavLinkRow({
           : "text-sidebar-foreground/90 hover:bg-sidebar-accent hover:text-white"
       )}
     >
-      <Icon
-        className="size-4 shrink-0"
-        strokeWidth={APP_ICON_STROKE}
-        absoluteStrokeWidth
-        aria-hidden
-      />
+      {item.logo ? (
+        <span className="flex size-4 shrink-0 items-center justify-center">
+          {item.logo}
+        </span>
+      ) : (
+        <Icon
+          className="size-4 shrink-0"
+          strokeWidth={APP_ICON_STROKE}
+          absoluteStrokeWidth
+          aria-hidden
+        />
+      )}
       {!collapsed ? (
         <span className="flex-1 text-[14px] font-semibold tracking-tight">
           {item.label}
