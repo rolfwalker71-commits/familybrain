@@ -172,3 +172,57 @@ export function openStepCount(
     (s) => s.id !== "done" && !stepDone(s.id, provider, status)
   ).length;
 }
+
+/** Micro-checklist under the active step (visual wayfinding). */
+export function microChecksFor(stepId: CloseoutStepId): string[] {
+  switch (stepId) {
+    case "calendar":
+      return [
+        "Offene Termine ansehen",
+        "Erledigen / verschieben / bestätigen",
+        "Count auf 0",
+      ];
+    case "triage":
+      return [
+        "Offene Vorschläge prüfen",
+        "Anwenden oder überspringen",
+        "Triage leer",
+      ];
+    case "day-analysis":
+      return [
+        "Analyse laufen lassen",
+        "Vorschläge prüfen",
+        "Erledigt markieren",
+      ];
+    case "ticket-hours":
+      return [
+        "Vorschlagsliste öffnen",
+        "Stunden prüfen und buchen",
+        "Rest verwerfen oder erledigen",
+      ];
+    case "done":
+      return ["Alle Provider-Schritte grün", "Assistent schliessen"];
+    default:
+      return [];
+  }
+}
+
+/** True when the current route matches the step's hub deep link. */
+export function pathMatchesStep(
+  pathname: string,
+  search: string,
+  step: CloseoutStepDef
+): boolean {
+  try {
+    const url = new URL(step.href, "https://buddy.local");
+    if (pathname !== url.pathname) return false;
+    const want = url.searchParams;
+    const have = new URLSearchParams(search.startsWith("?") ? search : `?${search}`);
+    for (const [k, v] of want.entries()) {
+      if (have.get(k) !== v) return false;
+    }
+    return true;
+  } catch {
+    return pathname === step.href.split("?")[0];
+  }
+}

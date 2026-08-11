@@ -53,3 +53,19 @@ test("all clear marks done step complete", () => {
   assert.equal(firstOpenStepIndex("google", clear), 4);
   assert.equal(openStepCount("google", clear), 0);
 });
+
+test("microChecks and pathMatchesStep", async () => {
+  const { microChecksFor, pathMatchesStep, closeoutStepsFor } = await import(
+    "@/lib/closeout/steps"
+  );
+  assert.ok(microChecksFor("day-analysis").length >= 3);
+  const step = closeoutStepsFor("google")[1];
+  assert.equal(
+    pathMatchesStep("/google", "?tab=triage", step),
+    true
+  );
+  assert.equal(
+    pathMatchesStep("/microsoft", "?tab=triage", step),
+    false
+  );
+});
