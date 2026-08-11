@@ -46,7 +46,7 @@ export type MariTimeLineCreateInput = {
   contractPositionId?: number | null;
   issueId?: number | null;
   employeeNumber?: string | null;
-  /** Ignored — immer 0 (Phase wird bei ANG nicht genutzt). */
+  /** Optional; wenn leer, wird automatisch eine Projektphase gewählt (UI ohne Phase). */
   phaseId?: number | null;
 };
 
@@ -217,6 +217,34 @@ export async function listPhasesForTimeBooking(
     .filter((x): x is MariKeyPair => x != null && Boolean(x.keyInternal));
 }
 
+/**
+ * UI hat kein Phasenfeld — MARI verlangt trotzdem eine Phase.
+ * Weglassen / PhaseID 0 schlägt fehl; PhaseID oder PhaseIDByName funktionieren.
+ */
+async function resolvePhaseForBooking(
+  projectNumber: string
+): Promise<{ phaseId: number; phaseName: string }> {
+  const phases = await listPhasesForTimeBooking(projectNumber);
+  if (phases.length === 0) {
+    throw new MariApiError(
+      `Keine Phase für Projekt ${projectNumber} in MARI gefunden.`,
+      400
+    );
+  }
+  const preferred =
+    phases.find((p) => /meeting|besprechung|abstimmung/i.test(p.matchcode)) ||
+    phases[0];
+  const phaseId = Number(preferred.keyInternal) || 0;
+  const phaseName = preferred.matchcode.trim();
+  if (phaseId <= 0 && !phaseName) {
+    throw new MariApiError(
+      `Ungültige Phase für Projekt ${projectNumber}.`,
+      400
+    );
+  }
+  return { phaseId, phaseName };
+}
+
 export async function listContractsForProject(
   projectNumber: string,
   activeOnly = true
@@ -317,11 +345,14 @@ export async function createTimeKeepingLine(
   if (!emp) throw new MariApiError("Personalnummer ungültig.", 400);
 
   const hoursBillable = Math.min(parsed.hoursBillable, parsed.hours);
+  const resolved =
+    parsed.phaseId != null && parsed.phaseId > 0
+      ? { phaseId: parsed.phaseId, phaseName: "" }
+      : await resolvePhaseForBooking(parsed.projectNumber);
   const body: Record<string, unknown> = {
     EmployeeNumber: emp,
     DayOfService: toDayIso(parsed.dayOfService),
     ProjectNumber: parsed.projectNumber,
-    PhaseID: 0,
     Activity: parsed.activity,
     MemoText: parsed.memoText?.trim() || null,
     Hours: parsed.hours,
@@ -333,6 +364,19 @@ export async function createTimeKeepingLine(
       : 0,
     SourceReferenceID: parsed.issueId || 0,
   };
+  // Nie PhaseID 0 allein senden — MARI meldet dann «Phase fehlt».
+  if (resolved.phaseId > 0) {
+    body.PhaseID = resolved.phaseId;
+  }
+  if (resolved.phaseName) {
+    body.PhaseIDByName = resolved.phaseName;
+  }
+  if (!body.PhaseID && !body.PhaseIDByName) {
+    throw new MariApiError(
+      `Keine Phase für Projekt ${parsed.projectNumber} auflösbar.`,
+      400
+    );
+  }
 
   const result = await mariJson<Record<string, unknown>>(
     "/api/TimeKeepingLine",
@@ -384,7 +428,7 @@ export async function createTimeKeepingLine(
         employeeNumber: String(one.EmployeeNumber || emp),
         employeeName: null,
         projectNumber: String(one.ProjectNumber || parsed.projectNumber),
-        phaseId: Number(one.PhaseID) || 0,
+        phaseId: Number(one.PhaseID) || resolved.phaseId,
         activity: String(one.Activity || parsed.activity),
         memo: String(one.MemoText || "").trim() || null,
         hours,
@@ -412,7 +456,7 @@ export async function createTimeKeepingLine(
     employeeNumber: emp,
     employeeName: null,
     projectNumber: parsed.projectNumber,
-    phaseId: 0,
+    phaseId: resolved.phaseId,
     activity: parsed.activity,
     memo: parsed.memoText?.trim() || null,
     hours: parsed.hours,
