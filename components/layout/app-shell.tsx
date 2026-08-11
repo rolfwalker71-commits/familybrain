@@ -9,6 +9,7 @@ import { AuthProvider, useAuth } from "@/components/auth/auth-provider";
 import { AdminNavProvider } from "@/components/layout/admin-nav-provider";
 import { RealtimeToasts } from "@/components/realtime/realtime-toasts";
 import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register";
+import { CloseoutAssistant } from "@/components/closeout/closeout-assistant";
 import { BuddyScene } from "./buddy-scene";
 import { MobileHeader } from "./mobile-header";
 import { Sidebar } from "./sidebar";
@@ -80,6 +81,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
           {!isLimitedUser ? <AnalysisStatusBar /> : null}
           {me ? <RealtimeToasts /> : null}
           {me ? <ServiceWorkerRegister /> : null}
+          {me && !isLimitedUser ? <CloseoutAssistant /> : null}
           <div
             className={
               isChat

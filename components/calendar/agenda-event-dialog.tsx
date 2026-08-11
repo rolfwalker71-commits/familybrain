@@ -457,9 +457,47 @@ export function AgendaEventDialog({
               {item.id.startsWith("buddy-day-close") ? (
                 <DetailRow label="Tagesabschluss">
                   <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      className={cn(
+                        buttonVariants({ size: "sm" }),
+                        "gap-1.5"
+                      )}
+                      onClick={() => {
+                        try {
+                          const raw =
+                            window.localStorage.getItem(
+                              "buddy.closeout.assistant.v1"
+                            ) || "{}";
+                          const prev = JSON.parse(raw) as Record<
+                            string,
+                            unknown
+                          >;
+                          window.localStorage.setItem(
+                            "buddy.closeout.assistant.v1",
+                            JSON.stringify({
+                              ...prev,
+                              open: true,
+                              minimized: false,
+                              dismissedDate: null,
+                            })
+                          );
+                        } catch {
+                          /* ignore */
+                        }
+                        window.dispatchEvent(
+                          new Event("buddy:closeout-open")
+                        );
+                      }}
+                    >
+                      Assistent starten
+                    </button>
                     <Link
                       href="/google?tab=calendar"
-                      className={cn(buttonVariants({ size: "sm" }), "gap-1.5")}
+                      className={cn(
+                        buttonVariants({ size: "sm", variant: "outline" }),
+                        "gap-1.5"
+                      )}
                     >
                       Google · Kalender
                     </Link>
@@ -489,6 +527,15 @@ export function AgendaEventDialog({
                       )}
                     >
                       Outlook-Tagesanalyse
+                    </Link>
+                    <Link
+                      href="/maringo?tab=hours"
+                      className={cn(
+                        buttonVariants({ size: "sm", variant: "outline" }),
+                        "gap-1.5"
+                      )}
+                    >
+                      Ticket-Stunden
                     </Link>
                   </div>
                 </DetailRow>
