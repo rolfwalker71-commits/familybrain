@@ -24,6 +24,7 @@ const PutSchema = z.object({
     )
     .max(40)
     .optional(),
+  timelineSort: z.enum(["newest", "oldest"]).optional(),
 });
 
 export async function GET() {

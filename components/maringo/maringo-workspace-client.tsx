@@ -1,8 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
+  ArrowDownAZ,
+  ArrowUpAZ,
   Check,
   Calendar,
   ChevronDown,
@@ -59,7 +68,16 @@ import type {
   MariTimelineItem,
 } from "@/lib/mari/tickets";
 import type { MariCustomerOption } from "@/lib/mari/customers";
-import type { MariTicketFilterMode } from "@/lib/mari/ticket-filter-prefs";
+import type {
+  MariTicketFilterMode,
+  MariTimelineSort,
+} from "@/lib/mari/ticket-filter-prefs";
+import {
+  MariSecondaryFlyoutShell,
+  MariTicketFlyoutRail,
+  toggleMariSecondaryFlyout,
+  type MariSecondaryFlyoutId,
+} from "@/components/maringo/maringo-flyout-chrome";
 import {
   timelineSideLabel,
   isMariMailStubText,
@@ -276,7 +294,7 @@ function TimelineAttachments({
       ) : null}
       {lightbox ? (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          className="fixed inset-0 z-[1300] flex items-center justify-center bg-black/70 p-4"
           role="dialog"
           aria-modal="true"
           aria-label={lightbox.orgFilename}
@@ -560,8 +578,15 @@ export function MaringoWorkspaceClient() {
   const [statuses, setStatuses] = useState<number[]>([...WORK_STATUS_IDS]);
   const [overdueOnly, setOverdueOnly] = useState(false);
   const [filterReady, setFilterReady] = useState(false);
+  const [timelineSort, setTimelineSort] =
+    useState<MariTimelineSort>("oldest");
   const [tickets, setTickets] = useState<MariTicketListItem[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [ticketFlyoutOpen, setTicketFlyoutOpen] = useState(false);
+  const [secondaryFlyouts, setSecondaryFlyouts] = useState<
+    MariSecondaryFlyoutId[]
+  >([]);
+  const [flyoutPortalReady, setFlyoutPortalReady] = useState(false);
   const [detail, setDetail] = useState<MariTicketDetail | null>(null);
   const [analysis, setAnalysis] = useState<MariTicketAnalysis | null>(null);
   const [analysisOpen, setAnalysisOpen] = useState(false);
@@ -633,6 +658,30 @@ export function MaringoWorkspaceClient() {
     }
     return n;
   }, [detail]);
+
+  const sortedTimeline = useMemo(() => {
+    if (!detail?.timeline?.length) return [];
+    const items = [...detail.timeline];
+    items.sort((a, b) => {
+      const ta = Date.parse(a.at) || 0;
+      const tb = Date.parse(b.at) || 0;
+      if (ta !== tb) {
+        return timelineSort === "newest" ? tb - ta : ta - tb;
+      }
+      return timelineSort === "newest"
+        ? b.id.localeCompare(a.id)
+        : a.id.localeCompare(b.id);
+    });
+    return items;
+  }, [detail?.timeline, timelineSort]);
+
+  const ticketTimeHoursTotal = useMemo(() => {
+    return (
+      Math.round(
+        ticketTimeLines.reduce((s, l) => s + l.hours, 0) * 100
+      ) / 100
+    );
+  }, [ticketTimeLines]);
 
   const effectiveHandledBy = useMemo(() => {
     if (handlerMode === "manual") {
@@ -921,6 +970,9 @@ export function MaringoWorkspaceClient() {
         if (data.filterMode === "handler" || data.filterMode === "customer") {
           setFilterMode(data.filterMode);
         }
+        if (data.timelineSort === "newest" || data.timelineSort === "oldest") {
+          setTimelineSort(data.timelineSort);
+        }
         if (Array.isArray(data.customers)) {
           const next = data.customers
             .map((c: { cardCode?: unknown; name?: unknown }) => {
@@ -957,13 +1009,21 @@ export function MaringoWorkspaceClient() {
           overdueOnly,
           filterMode,
           customers: selectedCustomers,
+          timelineSort,
         }),
       }).catch(() => {
         /* optional */
       });
     }, 350);
     return () => window.clearTimeout(t);
-  }, [statuses, overdueOnly, filterMode, selectedCustomers, filterReady]);
+  }, [
+    statuses,
+    overdueOnly,
+    filterMode,
+    selectedCustomers,
+    timelineSort,
+    filterReady,
+  ]);
 
   useEffect(() => {
     if (filterMode === "customer") {
@@ -1029,12 +1089,68 @@ export function MaringoWorkspaceClient() {
   useEffect(() => {
     if (tickets.length === 0) {
       setSelectedId(null);
+      setTicketFlyoutOpen(false);
+      setSecondaryFlyouts([]);
       return;
     }
     if (selectedId == null || !tickets.some((t) => t.issueId === selectedId)) {
       setSelectedId(tickets[0].issueId);
     }
   }, [tickets, selectedId]);
+
+  useEffect(() => {
+    setFlyoutPortalReady(true);
+  }, []);
+
+  useEffect(() => {
+    setSecondaryFlyouts([]);
+  }, [selectedId]);
+
+  useEffect(() => {
+    if (!ticketFlyoutOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [ticketFlyoutOpen]);
+
+  useEffect(() => {
+    if (!ticketFlyoutOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (bookDialogOpen) return;
+      // Nested MARI dialogs (z.B. Arbeitszeit bearbeiten) zuerst
+      if (document.querySelector('[data-slot="dialog-overlay"]')) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (secondaryFlyouts.length > 0) {
+        setSecondaryFlyouts((s) => s.slice(0, -1));
+        return;
+      }
+      setTicketFlyoutOpen(false);
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [ticketFlyoutOpen, secondaryFlyouts, bookDialogOpen]);
+
+  function openTicket(issueId: number) {
+    setSelectedId(issueId);
+    setTicketFlyoutOpen(true);
+  }
+
+  function closeTicketFlyout() {
+    setSecondaryFlyouts([]);
+    setTicketFlyoutOpen(false);
+  }
+
+  function toggleSecondary(id: MariSecondaryFlyoutId) {
+    setSecondaryFlyouts((stack) => toggleMariSecondaryFlyout(stack, id));
+  }
+
+  function closeSecondary(id: MariSecondaryFlyoutId) {
+    setSecondaryFlyouts((stack) => stack.filter((x) => x !== id));
+  }
 
   function toggleStatus(id: number) {
     setStatuses((prev) => {
@@ -1319,7 +1435,11 @@ export function MaringoWorkspaceClient() {
       <div className="flex flex-wrap gap-1.5">
         <button
           type="button"
-          onClick={() => setWorkspaceTab("tickets")}
+          onClick={() => {
+            setTicketFlyoutOpen(false);
+            setSecondaryFlyouts([]);
+            setWorkspaceTab("tickets");
+          }}
           className={cn(
             "rounded-full border px-3 py-1.5 text-[12px] font-semibold transition-colors",
             workspaceTab === "tickets"
@@ -1331,7 +1451,11 @@ export function MaringoWorkspaceClient() {
         </button>
         <button
           type="button"
-          onClick={() => setWorkspaceTab("hours")}
+          onClick={() => {
+            setTicketFlyoutOpen(false);
+            setSecondaryFlyouts([]);
+            setWorkspaceTab("hours");
+          }}
           className={cn(
             "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-semibold transition-colors",
             workspaceTab === "hours"
@@ -1370,9 +1494,9 @@ export function MaringoWorkspaceClient() {
       {workspaceTab === "hours" ? (
         <MaringoTimekeepingPanel />
       ) : (
-      <div className="grid min-h-[70vh] gap-0 overflow-hidden rounded-2xl border border-border/60 bg-card shadow-[0_4px_18px_rgba(15,23,42,0.05)] lg:grid-cols-[minmax(20rem,28rem)_minmax(0,1fr)]">
+      <div className="min-h-[70vh] overflow-hidden rounded-2xl border border-border/60 bg-card shadow-[0_4px_18px_rgba(15,23,42,0.05)]">
         {/* List pane */}
-        <section className="flex min-h-0 flex-col border-b border-border/60 lg:border-r lg:border-b-0">
+        <section className="flex min-h-0 flex-col">
           <div className="flex items-center justify-between gap-2 border-b border-border/50 px-3 py-2">
             <div className="min-w-0">
               <p className="text-[13px] font-black tracking-tight">Tickets</p>
@@ -1745,7 +1869,7 @@ export function MaringoWorkspaceClient() {
                 <li key={t.issueId} className="border-b border-border/40 last:border-b-0">
                   <button
                     type="button"
-                    onClick={() => setSelectedId(t.issueId)}
+                    onClick={() => openTicket(t.issueId)}
                     className={cn(
                       "flex w-full items-start gap-2 border-l-2 px-2.5 py-2 text-left transition-colors",
                       active
@@ -1797,611 +1921,828 @@ export function MaringoWorkspaceClient() {
           </ul>
         </section>
 
-        {/* Detail pane */}
-        <section className="flex min-h-0 flex-col">
-          {!selectedId ? (
-            <div className="flex flex-1 items-center justify-center p-8 text-sm text-muted-foreground">
-              Ticket auswählen
-            </div>
-          ) : detailLoading && !detail ? (
-            <div className="flex flex-1 items-center justify-center p-8 text-sm text-muted-foreground">
-              Lade Ticket…
-            </div>
-          ) : detail ? (
-            <>
-              <div
-                className={cn(
-                  "flex items-start gap-2.5 px-4 py-2",
-                  statusDetailHeaderClass(detail.status)
-                )}
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="text-[11px] font-semibold tabular-nums text-current/70">
-                    #{detail.issueId}
-                  </p>
-                  <h2 className="text-[15px] font-bold leading-snug tracking-tight">
-                    {detail.briefDescription}
-                  </h2>
-                </div>
-                <StatusChip
-                  status={detail.status}
-                  statusName={detail.statusName}
-                  className="mt-0.5"
+      </div>
+      )}
+
+      {flyoutPortalReady && ticketFlyoutOpen && selectedId != null
+        ? createPortal(
+            <div className="fixed inset-0 z-[1000]">
+              <button
+                type="button"
+                className="absolute inset-0 bg-black/20"
+                aria-label="Flyout schliessen"
+                onClick={closeTicketFlyout}
+              />
+              <div className="absolute inset-y-0 right-0 z-[1001] flex h-full w-[min(100%,42rem)] max-w-full border-l border-border/70 bg-background shadow-[-12px_0_32px_rgba(15,23,42,0.12)]">
+                <MariTicketFlyoutRail
+                  openIds={secondaryFlyouts}
+                  onToggle={toggleSecondary}
                 />
-                <DropdownMenu>
-                  <DropdownMenuTrigger
-                    render={
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="ghost"
-                        className="size-7 shrink-0 text-current hover:bg-black/5"
-                        disabled={patching}
-                      />
-                    }
-                  >
-                    <MoreHorizontal className="size-4" />
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-52">
-                    <DropdownMenuGroup>
-                      <DropdownMenuLabel>Status setzen</DropdownMenuLabel>
-                      {[11, 1, 3, 6, 7, 13, 14, 2, 5].map((id) => (
-                        <DropdownMenuItem
-                          key={id}
-                          disabled={patching || detail.status === id}
-                          onClick={() => void patchTicket({ status: id })}
+                <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+                  {detailLoading && !detail ? (
+                    <>
+                      <div className="flex shrink-0 items-center justify-end border-b border-border/50 px-3 py-2">
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="size-8"
+                          onClick={closeTicketFlyout}
+                          aria-label="Schliessen"
                         >
-                          {STATUS_LABELS[id] || id}
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuGroup>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
+                          <X className="size-4" />
+                        </Button>
+                      </div>
+                      <div className="flex flex-1 items-center justify-center p-8 text-sm text-muted-foreground">
+                        Lade Ticket…
+                      </div>
+                    </>
+                  ) : detail ? (
+                    <>
+                      <div
+                        className={cn(
+                          "flex shrink-0 items-start gap-2.5 px-4 py-2",
+                          statusDetailHeaderClass(detail.status)
+                        )}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[11px] font-semibold tabular-nums text-current/70">
+                            #{detail.issueId}
+                          </p>
+                          <h2 className="text-[15px] font-bold leading-snug tracking-tight">
+                            {detail.briefDescription}
+                          </h2>
+                        </div>
+                        <StatusChip
+                          status={detail.status}
+                          statusName={detail.statusName}
+                          className="mt-0.5"
+                        />
+                        <DropdownMenu>
+                          <DropdownMenuTrigger
+                            render={
+                              <Button
+                                type="button"
+                                size="icon"
+                                variant="ghost"
+                                className="size-7 shrink-0 text-current hover:bg-black/5"
+                                disabled={patching}
+                              />
+                            }
+                          >
+                            <MoreHorizontal className="size-4" />
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-52">
+                            <DropdownMenuGroup>
+                              <DropdownMenuLabel>Status setzen</DropdownMenuLabel>
+                              {[11, 1, 3, 6, 7, 13, 14, 2, 5].map((id) => (
+                                <DropdownMenuItem
+                                  key={id}
+                                  disabled={patching || detail.status === id}
+                                  onClick={() => void patchTicket({ status: id })}
+                                >
+                                  {STATUS_LABELS[id] || id}
+                                </DropdownMenuItem>
+                              ))}
+                            </DropdownMenuGroup>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="size-7 shrink-0 text-current hover:bg-black/5"
+                          onClick={closeTicketFlyout}
+                          aria-label="Schliessen"
+                        >
+                          <X className="size-4" />
+                        </Button>
+                      </div>
 
-              <div className="space-y-2.5 border-b border-border/50 px-4 py-2.5">
-                <div className="rounded-xl border border-border/50 bg-muted/15 px-3 py-2">
-                  <div className="grid gap-x-3 gap-y-1.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                    <DetailField label="Typ">
-                      {detail.issueTypeName || "–"}
-                    </DetailField>
-                    <DetailField label="Produkt">
-                      {detail.productName || "–"}
-                    </DetailField>
-                    <DetailField label="Matchcode">
-                      {detail.addressMatchcode || "–"}
-                    </DetailField>
-                    <DetailField label="Projekt">
-                      {detail.projectNumber || "–"}
-                    </DetailField>
-                    <DetailField label="Vertrag">
-                      {detail.contractNumber ||
-                        (detail.contractId != null
-                          ? String(detail.contractId)
-                          : "–")}
-                    </DetailField>
-                    <DetailField label="Phase">
-                      {detail.phaseName ||
-                        (detail.phaseId != null ? String(detail.phaseId) : "–")}
-                    </DetailField>
-                    <DetailField label="Prio">
-                      <span className="inline-flex items-center gap-1">
-                        <Flag className="size-3 shrink-0 text-muted-foreground" />
-                        {detail.priorityName}
-                      </span>
-                    </DetailField>
-                    <DetailField label="Adresse">
-                      <span className="inline-flex min-w-0 items-center gap-1">
-                        <User className="size-3 shrink-0 text-muted-foreground" />
-                        <span className="truncate">{detail.cardCode || "–"}</span>
-                      </span>
-                    </DetailField>
-                    <DetailField label="Zuständig">
-                      {detail.handledByName || detail.handledBy || "–"}
-                    </DetailField>
-                    <DetailField label="Supportgruppe">
-                      {detail.supportGroupName || "–"}
-                    </DetailField>
-                    <DetailField label="Ansprechpartner">
-                      {primaryContact(detail.contactPerson) || "–"}
-                    </DetailField>
-                    <DetailField label="Datum">
-                      {formatDateTimeShort(detail.requestDate) || "–"}
-                    </DetailField>
-                    <DetailField label="Geändert am">
-                      {formatDateTimeShort(detail.changeAtDate) || "–"}
-                    </DetailField>
-                    <DetailField label="Referenz">
-                      {detail.referenceText || "–"}
-                    </DetailField>
-                    <DetailField label="Std. Freigabe">
-                      {detail.stdFreigabe || "–"}
-                    </DetailField>
-                    {detail.aiLabel ? (
-                      <DetailField label="AI">{detail.aiLabel}</DetailField>
-                    ) : null}
-                  </div>
-                  <div className="mt-2.5 flex flex-wrap items-center gap-2 border-t border-border/40 pt-2.5">
-                    <Calendar className="size-3.5 text-muted-foreground" />
-                    <Label htmlFor="dueDate" className="sr-only">
-                      Stichtag
-                    </Label>
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      Stichtag
-                    </p>
-                    <Input
-                      id="dueDate"
-                      type="date"
-                      className="h-7 w-auto border-border/60 bg-background px-2 shadow-none"
-                      value={dueDraft}
-                      onChange={(e) => setDueDraft(e.target.value)}
-                      disabled={patching}
-                    />
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className="h-7 text-[11px]"
-                      disabled={patching || !dueDraft}
-                      onClick={() =>
-                        void patchTicket({ dueDate: dueDraft || null })
-                      }
-                    >
-                      Setzen
-                    </Button>
-                  </div>
-                </div>
+                      <div className="shrink-0 space-y-2.5 border-b border-border/50 px-4 py-2.5">
+                        <div className="rounded-xl border border-border/50 bg-muted/15 px-3 py-2">
+                          <div className="grid gap-x-3 gap-y-1.5 sm:grid-cols-2 lg:grid-cols-3">
+                            <DetailField label="Typ">
+                              {detail.issueTypeName || "–"}
+                            </DetailField>
+                            <DetailField label="Produkt">
+                              {detail.productName || "–"}
+                            </DetailField>
+                            <DetailField label="Matchcode">
+                              {detail.addressMatchcode || "–"}
+                            </DetailField>
+                            <DetailField label="Projekt">
+                              {detail.projectNumber || "–"}
+                            </DetailField>
+                            <DetailField label="Vertrag">
+                              {detail.contractNumber ||
+                                (detail.contractId != null
+                                  ? String(detail.contractId)
+                                  : "–")}
+                            </DetailField>
+                            <DetailField label="Phase">
+                              {detail.phaseName ||
+                                (detail.phaseId != null
+                                  ? String(detail.phaseId)
+                                  : "–")}
+                            </DetailField>
+                            <DetailField label="Prio">
+                              <span className="inline-flex items-center gap-1">
+                                <Flag className="size-3 shrink-0 text-muted-foreground" />
+                                {detail.priorityName}
+                              </span>
+                            </DetailField>
+                            <DetailField label="Adresse">
+                              <span className="inline-flex min-w-0 items-center gap-1">
+                                <User className="size-3 shrink-0 text-muted-foreground" />
+                                <span className="truncate">
+                                  {detail.cardCode || "–"}
+                                </span>
+                              </span>
+                            </DetailField>
+                            <DetailField label="Zuständig">
+                              {detail.handledByName || detail.handledBy || "–"}
+                            </DetailField>
+                            <DetailField label="Supportgruppe">
+                              {detail.supportGroupName || "–"}
+                            </DetailField>
+                            <DetailField label="Ansprechpartner">
+                              {primaryContact(detail.contactPerson) || "–"}
+                            </DetailField>
+                            <DetailField label="Datum">
+                              {formatDateTimeShort(detail.requestDate) || "–"}
+                            </DetailField>
+                            <DetailField label="Geändert am">
+                              {formatDateTimeShort(detail.changeAtDate) || "–"}
+                            </DetailField>
+                            <DetailField label="Referenz">
+                              {detail.referenceText || "–"}
+                            </DetailField>
+                            <DetailField label="Std. Freigabe">
+                              {detail.stdFreigabe || "–"}
+                            </DetailField>
+                            {detail.aiLabel ? (
+                              <DetailField label="AI">{detail.aiLabel}</DetailField>
+                            ) : null}
+                          </div>
+                          <div className="mt-2.5 flex flex-wrap items-center gap-2 border-t border-border/40 pt-2.5">
+                            <Calendar className="size-3.5 text-muted-foreground" />
+                            <Label htmlFor="dueDate" className="sr-only">
+                              Stichtag
+                            </Label>
+                            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                              Stichtag
+                            </p>
+                            <Input
+                              id="dueDate"
+                              type="date"
+                              className="h-7 w-auto border-border/60 bg-background px-2 shadow-none"
+                              value={dueDraft}
+                              onChange={(e) => setDueDraft(e.target.value)}
+                              disabled={patching}
+                            />
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-[11px]"
+                              disabled={patching || !dueDraft}
+                              onClick={() =>
+                                void patchTicket({ dueDate: dueDraft || null })
+                              }
+                            >
+                              Setzen
+                            </Button>
+                          </div>
+                        </div>
 
-                <div className="flex flex-wrap items-center gap-2">
-                  {savedAnalyzedAt ? (
-                    <Badge className="bg-orange-100 text-orange-900 hover:bg-orange-100">
-                      Analyse vorhanden · {formatAnalyzedAt(savedAnalyzedAt)}
-                    </Badge>
-                  ) : null}
-                  {analysisInternalNotePostedAt ? (
-                    <Badge className="bg-emerald-100 text-emerald-900 hover:bg-emerald-100">
-                      Bereits als intern gespeichert
-                      {savedAnalyzedAt
-                        ? ` · ${formatAnalyzedAt(analysisInternalNotePostedAt)}`
-                        : ""}
-                    </Badge>
-                  ) : null}
-                  {analysis && savedAnalyzedAt ? (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className="border-orange-300 text-orange-900 hover:bg-orange-50"
-                      onClick={() => setAnalysisOpen((open) => !open)}
-                    >
-                      <Sparkles className="size-3.5" />
-                      {analysisOpen ? "Analyse ausblenden" : "Analyse anzeigen"}
-                    </Button>
-                  ) : null}
-                  {detailImageAttachmentCount > 0 ? (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger
-                        disabled={analyzing}
-                        render={
+                        <div className="flex flex-wrap items-center gap-2">
+                          {savedAnalyzedAt ? (
+                            <Badge className="bg-orange-100 text-orange-900 hover:bg-orange-100">
+                              Analyse vorhanden ·{" "}
+                              {formatAnalyzedAt(savedAnalyzedAt)}
+                            </Badge>
+                          ) : null}
+                          {analysisInternalNotePostedAt ? (
+                            <Badge className="bg-emerald-100 text-emerald-900 hover:bg-emerald-100">
+                              Bereits als intern gespeichert
+                              {savedAnalyzedAt
+                                ? ` · ${formatAnalyzedAt(analysisInternalNotePostedAt)}`
+                                : ""}
+                            </Badge>
+                          ) : null}
+                          {analysis && savedAnalyzedAt ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="border-orange-300 text-orange-900 hover:bg-orange-50"
+                              onClick={() => setAnalysisOpen((open) => !open)}
+                            >
+                              <Sparkles className="size-3.5" />
+                              {analysisOpen
+                                ? "Analyse ausblenden"
+                                : "Analyse anzeigen"}
+                            </Button>
+                          ) : null}
+                          {detailImageAttachmentCount > 0 ? (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger
+                                disabled={analyzing}
+                                render={
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    className="bg-orange-500 text-white hover:bg-orange-600"
+                                    disabled={analyzing}
+                                  />
+                                }
+                              >
+                                <Sparkles className="size-3.5" />
+                                {analyzing
+                                  ? "Analysiert…"
+                                  : savedAnalyzedAt
+                                    ? "Neu analysieren"
+                                    : "AI analysieren"}
+                                <ChevronDown className="size-3.5 opacity-80" />
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent
+                                align="start"
+                                className="w-72"
+                              >
+                                <DropdownMenuLabel>
+                                  Analyse-Modus
+                                </DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  disabled={analyzing}
+                                  onClick={() =>
+                                    void runAnalyze({ includeImages: false })
+                                  }
+                                >
+                                  <span className="flex flex-col gap-0.5">
+                                    <span className="font-medium">Nur Text</span>
+                                    <span className="text-[11px] text-muted-foreground">
+                                      Chat-Provider (z. B. DeepSeek) — empfohlen
+                                    </span>
+                                  </span>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  disabled={analyzing}
+                                  onClick={() =>
+                                    void runAnalyze({ includeImages: true })
+                                  }
+                                >
+                                  <span className="flex flex-col gap-0.5">
+                                    <span className="font-medium">
+                                      Mit Screenshots (
+                                      {detailImageAttachmentCount})
+                                    </span>
+                                    <span className="text-[11px] text-muted-foreground">
+                                      OpenAI Vision — wenn Bildinhalt wichtig
+                                      ist
+                                    </span>
+                                  </span>
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          ) : (
+                            <Button
+                              type="button"
+                              size="sm"
+                              className="bg-orange-500 text-white hover:bg-orange-600"
+                              disabled={analyzing}
+                              onClick={() =>
+                                void runAnalyze({ includeImages: false })
+                              }
+                            >
+                              <Sparkles className="size-3.5" />
+                              {analyzing
+                                ? "Analysiert…"
+                                : savedAnalyzedAt
+                                  ? "Neu analysieren"
+                                  : "AI analysieren"}
+                            </Button>
+                          )}
                           <Button
                             type="button"
                             size="sm"
-                            className="bg-orange-500 text-white hover:bg-orange-600"
-                            disabled={analyzing}
-                          />
-                        }
-                      >
-                        <Sparkles className="size-3.5" />
-                        {analyzing
-                          ? "Analysiert…"
-                          : savedAnalyzedAt
-                            ? "Neu analysieren"
-                            : "AI analysieren"}
-                        <ChevronDown className="size-3.5 opacity-80" />
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="start" className="w-72">
-                        <DropdownMenuLabel>Analyse-Modus</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          disabled={analyzing}
-                          onClick={() =>
-                            void runAnalyze({ includeImages: false })
-                          }
-                        >
-                          <span className="flex flex-col gap-0.5">
-                            <span className="font-medium">Nur Text</span>
-                            <span className="text-[11px] text-muted-foreground">
-                              Chat-Provider (z. B. DeepSeek) — empfohlen
-                            </span>
-                          </span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          disabled={analyzing}
-                          onClick={() =>
-                            void runAnalyze({ includeImages: true })
-                          }
-                        >
-                          <span className="flex flex-col gap-0.5">
-                            <span className="font-medium">
-                              Mit Screenshots ({detailImageAttachmentCount})
-                            </span>
-                            <span className="text-[11px] text-muted-foreground">
-                              OpenAI Vision — wenn Bildinhalt wichtig ist
-                            </span>
-                          </span>
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  ) : (
-                    <Button
-                      type="button"
-                      size="sm"
-                      className="bg-orange-500 text-white hover:bg-orange-600"
-                      disabled={analyzing}
-                      onClick={() => void runAnalyze({ includeImages: false })}
-                    >
-                      <Sparkles className="size-3.5" />
-                      {analyzing
-                        ? "Analysiert…"
-                        : savedAnalyzedAt
-                          ? "Neu analysieren"
-                          : "AI analysieren"}
-                    </Button>
-                  )}
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    disabled={!detail.projectNumber}
-                    title={
-                      detail.projectNumber
-                        ? "Stunden auf dieses Ticket buchen"
-                        : "Ticket hat kein Projekt hinterlegt"
-                    }
-                    onClick={() => openNewBookDialog()}
-                  >
-                    <Clock3 className="size-3.5" />
-                    Zeit buchen
-                  </Button>
-                </div>
-              </div>
-
-              <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
-                {analysis && analysisOpen ? (
-                  <Card className="border-orange-200/70 bg-orange-50/40">
-                    <CardContent className="space-y-3 p-4 text-[13px]">
-                      <p className="flex items-center gap-2 text-[12px] font-black uppercase tracking-wide text-orange-900">
-                        <Sparkles className="size-3.5" />
-                        AI-Zusammenfassung
-                      </p>
-                      {savedAnalyzedAt ? (
-                        <p className="text-[11px] text-orange-900/70">
-                          Gespeichert {formatAnalyzedAt(savedAnalyzedAt)}
-                        </p>
-                      ) : null}
-                      {imagesAnalyzed > 0 ? (
-                        <p className="text-[11px] text-orange-900/80">
-                          Inkl. {imagesAnalyzed} Screenshot
-                          {imagesAnalyzed === 1 ? "" : "s"} (OpenAI Vision)
-                          {imageNames.length
-                            ? `: ${imageNames.slice(0, 4).join(", ")}`
-                            : ""}
-                        </p>
-                      ) : (
-                        <p className="text-[11px] text-muted-foreground">
-                          Textanalyse ohne Screenshot-Vision (Chat-Provider).
-                        </p>
-                      )}
-                      {analysisUsageLines.length > 0 ? (
-                        <div className="rounded-lg border border-orange-200/50 bg-white/50 px-2.5 py-2 text-[11px] leading-relaxed text-orange-950/80">
-                          <p className="font-semibold text-orange-900/90">
-                            Token / Kosten (nur in Buddy)
-                          </p>
-                          <ul className="mt-1 space-y-0.5">
-                            {analysisUsageLines.map((line) => (
-                              <li key={line}>{line}</li>
-                            ))}
-                          </ul>
+                            variant="outline"
+                            disabled={!detail.projectNumber}
+                            title={
+                              detail.projectNumber
+                                ? "Stunden auf dieses Ticket buchen"
+                                : "Ticket hat kein Projekt hinterlegt"
+                            }
+                            onClick={() => openNewBookDialog()}
+                          >
+                            <Clock3 className="size-3.5" />
+                            Zeit buchen
+                          </Button>
                         </div>
-                      ) : null}
-                      <p className="leading-relaxed">{analysis.summary}</p>
-                      <div className="rounded-xl border border-orange-200/60 bg-white/70 px-3 py-2">
-                        <p className="font-semibold">
-                          Vollständigkeit: {analysis.completeness.score}/100
-                        </p>
-                        {analysis.completeness.missing.length > 0 ? (
-                          <ul className="mt-1 list-disc pl-4 text-muted-foreground">
-                            {analysis.completeness.missing.map((m) => (
-                              <li key={m}>{m}</li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <p className="text-muted-foreground">
-                            Keine kritischen Lücken erkannt.
-                          </p>
-                        )}
                       </div>
-                      {analysis.suggestedTasks.length > 0 ? (
-                        <div>
-                          <p className="font-semibold">Aufgaben</p>
-                          <ul className="mt-1 space-y-1">
-                            {analysis.suggestedTasks.map((t) => (
-                              <li
-                                key={t.title}
-                                className="rounded-lg border border-border/50 bg-white/60 px-2.5 py-1.5"
-                              >
-                                <span className="font-medium">{t.title}</span>
-                                {t.reason ? (
-                                  <span className="text-muted-foreground">
-                                    {" "}
-                                    — {t.reason}
-                                  </span>
-                                ) : null}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      ) : null}
-                      {analysis.suggestions.length > 0 ? (
-                        <div>
-                          <p className="font-semibold">Vorschläge</p>
-                          <ul className="mt-1 list-disc pl-4">
-                            {analysis.suggestions.map((s) => (
-                              <li key={s}>{s}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      ) : null}
-                      {analysis.solutionSketch &&
-                      analysis.solutionSketch.problemStillOpen ? (
-                        <div className="rounded-xl border border-sky-200/80 bg-sky-50/70 px-3 py-2.5">
-                          <p className="font-semibold text-sky-950">
-                            Lösungsansatz (ausführlich)
-                          </p>
-                          {analysis.solutionSketch.vendors.length > 0 ? (
-                            <p className="mt-1 text-[11px] text-sky-900/80">
-                              Hersteller:{" "}
-                              {analysis.solutionSketch.vendors.join(" · ")}
-                            </p>
-                          ) : null}
-                          <pre className="mt-2 whitespace-pre-wrap font-sans text-[12px] leading-relaxed text-sky-950/95">
-                            {analysis.solutionSketch.outline}
-                          </pre>
-                          {analysis.solutionSketch.steps.length > 0 ? (
-                            <ol className="mt-3 list-decimal space-y-2 pl-4 text-[12px] text-sky-950/95">
-                              {analysis.solutionSketch.steps.map((s, i) => (
-                                <li key={`${s.where}-${s.action}-${i}`}>
-                                  <span className="font-semibold">{s.where}</span>
-                                  <span className="text-sky-900/80"> — </span>
-                                  {s.action}
-                                  {s.detail ? (
-                                    <p className="mt-0.5 text-[11px] text-sky-900/75">
-                                      {s.detail}
-                                    </p>
-                                  ) : null}
-                                </li>
-                              ))}
-                            </ol>
-                          ) : null}
-                          {analysis.solutionSketch.artifacts.length > 0 ? (
-                            <div className="mt-3 space-y-2.5">
-                              <p className="text-[11px] font-semibold uppercase tracking-wide text-sky-900/80">
-                                Queries / Skripte / Code
+
+                      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
+                        {analysis && analysisOpen ? (
+                          <Card className="border-orange-200/70 bg-orange-50/40">
+                            <CardContent className="space-y-3 p-4 text-[13px]">
+                              <p className="flex items-center gap-2 text-[12px] font-black uppercase tracking-wide text-orange-900">
+                                <Sparkles className="size-3.5" />
+                                AI-Zusammenfassung
                               </p>
-                              {analysis.solutionSketch.artifacts.map((a, i) => (
-                                <div
-                                  key={`${a.kind}-${a.title}-${i}`}
-                                  className="overflow-hidden rounded-lg border border-sky-200/70 bg-white/80"
-                                >
-                                  <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 border-b border-sky-100 px-2.5 py-1.5 text-[11px]">
-                                    <span className="font-semibold text-sky-950">
-                                      {a.title}
-                                    </span>
-                                    <span className="rounded bg-sky-100/80 px-1.5 py-0.5 font-mono text-[10px] text-sky-900">
-                                      {a.kind}
-                                    </span>
-                                    {a.language ? (
-                                      <span className="text-sky-900/60">
-                                        {a.language}
-                                      </span>
-                                    ) : null}
-                                  </div>
-                                  {a.note ? (
-                                    <p className="border-b border-sky-100 px-2.5 py-1 text-[11px] text-sky-900/70">
-                                      {a.note}
+                              {savedAnalyzedAt ? (
+                                <p className="text-[11px] text-orange-900/70">
+                                  Gespeichert {formatAnalyzedAt(savedAnalyzedAt)}
+                                </p>
+                              ) : null}
+                              {imagesAnalyzed > 0 ? (
+                                <p className="text-[11px] text-orange-900/80">
+                                  Inkl. {imagesAnalyzed} Screenshot
+                                  {imagesAnalyzed === 1 ? "" : "s"} (OpenAI
+                                  Vision)
+                                  {imageNames.length
+                                    ? `: ${imageNames.slice(0, 4).join(", ")}`
+                                    : ""}
+                                </p>
+                              ) : (
+                                <p className="text-[11px] text-muted-foreground">
+                                  Textanalyse ohne Screenshot-Vision
+                                  (Chat-Provider).
+                                </p>
+                              )}
+                              {analysisUsageLines.length > 0 ? (
+                                <div className="rounded-lg border border-orange-200/50 bg-white/50 px-2.5 py-2 text-[11px] leading-relaxed text-orange-950/80">
+                                  <p className="font-semibold text-orange-900/90">
+                                    Token / Kosten (nur in Buddy)
+                                  </p>
+                                  <ul className="mt-1 space-y-0.5">
+                                    {analysisUsageLines.map((line) => (
+                                      <li key={line}>{line}</li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              ) : null}
+                              <p className="leading-relaxed">
+                                {analysis.summary}
+                              </p>
+                              <div className="rounded-xl border border-orange-200/60 bg-white/70 px-3 py-2">
+                                <p className="font-semibold">
+                                  Vollständigkeit:{" "}
+                                  {analysis.completeness.score}/100
+                                </p>
+                                {analysis.completeness.missing.length > 0 ? (
+                                  <ul className="mt-1 list-disc pl-4 text-muted-foreground">
+                                    {analysis.completeness.missing.map((m) => (
+                                      <li key={m}>{m}</li>
+                                    ))}
+                                  </ul>
+                                ) : (
+                                  <p className="text-muted-foreground">
+                                    Keine kritischen Lücken erkannt.
+                                  </p>
+                                )}
+                              </div>
+                              {analysis.suggestedTasks.length > 0 ? (
+                                <div>
+                                  <p className="font-semibold">Aufgaben</p>
+                                  <ul className="mt-1 space-y-1">
+                                    {analysis.suggestedTasks.map((t) => (
+                                      <li
+                                        key={t.title}
+                                        className="rounded-lg border border-border/50 bg-white/60 px-2.5 py-1.5"
+                                      >
+                                        <span className="font-medium">
+                                          {t.title}
+                                        </span>
+                                        {t.reason ? (
+                                          <span className="text-muted-foreground">
+                                            {" "}
+                                            — {t.reason}
+                                          </span>
+                                        ) : null}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              ) : null}
+                              {analysis.suggestions.length > 0 ? (
+                                <div>
+                                  <p className="font-semibold">Vorschläge</p>
+                                  <ul className="mt-1 list-disc pl-4">
+                                    {analysis.suggestions.map((s) => (
+                                      <li key={s}>{s}</li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              ) : null}
+                              {analysis.solutionSketch &&
+                              analysis.solutionSketch.problemStillOpen ? (
+                                <div className="rounded-xl border border-sky-200/80 bg-sky-50/70 px-3 py-2.5">
+                                  <p className="font-semibold text-sky-950">
+                                    Lösungsansatz (ausführlich)
+                                  </p>
+                                  {analysis.solutionSketch.vendors.length >
+                                  0 ? (
+                                    <p className="mt-1 text-[11px] text-sky-900/80">
+                                      Hersteller:{" "}
+                                      {analysis.solutionSketch.vendors.join(
+                                        " · "
+                                      )}
                                     </p>
                                   ) : null}
-                                  <pre className="max-h-[28rem] overflow-auto whitespace-pre-wrap p-2.5 font-mono text-[11px] leading-snug text-sky-950">
-                                    {a.code}
+                                  <pre className="mt-2 whitespace-pre-wrap font-sans text-[12px] leading-relaxed text-sky-950/95">
+                                    {analysis.solutionSketch.outline}
+                                  </pre>
+                                  {analysis.solutionSketch.steps.length > 0 ? (
+                                    <ol className="mt-3 list-decimal space-y-2 pl-4 text-[12px] text-sky-950/95">
+                                      {analysis.solutionSketch.steps.map(
+                                        (s, i) => (
+                                          <li
+                                            key={`${s.where}-${s.action}-${i}`}
+                                          >
+                                            <span className="font-semibold">
+                                              {s.where}
+                                            </span>
+                                            <span className="text-sky-900/80">
+                                              {" "}
+                                              —{" "}
+                                            </span>
+                                            {s.action}
+                                            {s.detail ? (
+                                              <p className="mt-0.5 text-[11px] text-sky-900/75">
+                                                {s.detail}
+                                              </p>
+                                            ) : null}
+                                          </li>
+                                        )
+                                      )}
+                                    </ol>
+                                  ) : null}
+                                  {analysis.solutionSketch.artifacts.length >
+                                  0 ? (
+                                    <div className="mt-3 space-y-2.5">
+                                      <p className="text-[11px] font-semibold uppercase tracking-wide text-sky-900/80">
+                                        Queries / Skripte / Code
+                                      </p>
+                                      {analysis.solutionSketch.artifacts.map(
+                                        (a, i) => (
+                                          <div
+                                            key={`${a.kind}-${a.title}-${i}`}
+                                            className="overflow-hidden rounded-lg border border-sky-200/70 bg-white/80"
+                                          >
+                                            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 border-b border-sky-100 px-2.5 py-1.5 text-[11px]">
+                                              <span className="font-semibold text-sky-950">
+                                                {a.title}
+                                              </span>
+                                              <span className="rounded bg-sky-100/80 px-1.5 py-0.5 font-mono text-[10px] text-sky-900">
+                                                {a.kind}
+                                              </span>
+                                              {a.language ? (
+                                                <span className="text-sky-900/60">
+                                                  {a.language}
+                                                </span>
+                                              ) : null}
+                                            </div>
+                                            {a.note ? (
+                                              <p className="border-b border-sky-100 px-2.5 py-1 text-[11px] text-sky-900/70">
+                                                {a.note}
+                                              </p>
+                                            ) : null}
+                                            <pre className="max-h-[28rem] overflow-auto whitespace-pre-wrap p-2.5 font-mono text-[11px] leading-snug text-sky-950">
+                                              {a.code}
+                                            </pre>
+                                          </div>
+                                        )
+                                      )}
+                                    </div>
+                                  ) : null}
+                                  {analysis.solutionSketch.caveats ? (
+                                    <p className="mt-2 text-[11px] text-sky-900/70">
+                                      {analysis.solutionSketch.caveats}
+                                    </p>
+                                  ) : (
+                                    <p className="mt-2 text-[11px] text-sky-900/70">
+                                      Vorschlag aus allgemein verfügbarem
+                                      Herstellerwissen (u.a. SAP Business One,
+                                      nicht S/4) — bitte mit offizieller Doku
+                                      abgleichen.
+                                    </p>
+                                  )}
+                                </div>
+                              ) : null}
+                              {analysis.nextReplyDraft ? (
+                                <div>
+                                  <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <p className="font-semibold">
+                                      Antwort-Entwurf
+                                      {translatingReplyDraft
+                                        ? " · übersetzt…"
+                                        : ""}
+                                    </p>
+                                    <ReplyLangToggle
+                                      lang={nextReplyDraftLang}
+                                      busy={
+                                        translatingReplyDraft || analyzing
+                                      }
+                                      onChange={(next) =>
+                                        void changeNextReplyDraftLanguage(next)
+                                      }
+                                    />
+                                  </div>
+                                  <pre className="mt-1 whitespace-pre-wrap rounded-xl border border-border/50 bg-white/70 p-2.5 font-sans text-[12px]">
+                                    {analysis.nextReplyDraft}
                                   </pre>
                                 </div>
-                              ))}
+                              ) : null}
+                              <div className="flex flex-col gap-2 border-t border-orange-200/50 pt-3">
+                                {analysisInternalNotePostedAt ? (
+                                  <div className="rounded-lg border border-emerald-200/80 bg-emerald-50/70 px-3 py-2">
+                                    <p className="text-[12px] font-semibold text-emerald-950">
+                                      Bereits als intern gespeichert
+                                    </p>
+                                    <p className="mt-0.5 text-[11px] text-emerald-900/75">
+                                      {formatAnalyzedAt(
+                                        analysisInternalNotePostedAt
+                                      )}{" "}
+                                      · nur Support, nicht für den Kunden
+                                    </p>
+                                  </div>
+                                ) : null}
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  className="border-orange-300/80 bg-white/80 text-orange-950 hover:bg-orange-100/80"
+                                  disabled={postingInternalNote}
+                                  onClick={() =>
+                                    void postAnalysisAsInternalNote()
+                                  }
+                                >
+                                  <Lock className="size-3.5" />
+                                  {postingInternalNote
+                                    ? "Schreibe intern…"
+                                    : analysisInternalNotePostedAt
+                                      ? "Erneut als intern speichern"
+                                      : "Als internen Kommentar schreiben"}
+                                </Button>
+                                {!analysisInternalNotePostedAt ? (
+                                  <p className="text-[11px] text-orange-900/75">
+                                    Wird mit Flag «Internal» nach Maringo
+                                    geschrieben — nur für Support sichtbar,
+                                    nicht für den Kunden.
+                                  </p>
+                                ) : null}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ) : null}
+
+                        <button
+                          type="button"
+                          onClick={() => toggleSecondary("buchungen")}
+                          className="w-full rounded-2xl border border-border/60 bg-muted/20 px-3.5 py-3 text-left transition-colors hover:bg-muted/40"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="flex items-center gap-2 text-[13px] font-black tracking-tight">
+                                <Clock3 className="size-3.5 text-muted-foreground" />
+                                Buchungen
+                              </p>
+                              <p className="mt-1 text-[12px] text-muted-foreground">
+                                {ticketTimeLoading
+                                  ? "Lade Buchungen…"
+                                  : ticketTimeLines.length === 0
+                                    ? "Noch keine Stundenbuchungen"
+                                    : `${ticketTimeHoursTotal} Std · ${ticketTimeLines.length} Buchung${ticketTimeLines.length === 1 ? "" : "en"}`}
+                              </p>
                             </div>
-                          ) : null}
-                          {analysis.solutionSketch.caveats ? (
-                            <p className="mt-2 text-[11px] text-sky-900/70">
-                              {analysis.solutionSketch.caveats}
-                            </p>
-                          ) : (
-                            <p className="mt-2 text-[11px] text-sky-900/70">
-                              Vorschlag aus allgemein verfügbarem
-                              Herstellerwissen (u.a. SAP Business One, nicht
-                              S/4) — bitte mit offizieller Doku abgleichen.
-                            </p>
-                          )}
-                        </div>
-                      ) : null}
-                      {analysis.nextReplyDraft ? (
+                            <span className="shrink-0 text-[11px] font-semibold text-orange-800">
+                              Öffnen
+                            </span>
+                          </div>
+                        </button>
+
                         <div>
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <p className="font-semibold">
-                              Antwort-Entwurf
-                              {translatingReplyDraft ? " · übersetzt…" : ""}
-                            </p>
-                            <ReplyLangToggle
-                              lang={nextReplyDraftLang}
-                              busy={translatingReplyDraft || analyzing}
-                              onChange={(next) =>
-                                void changeNextReplyDraftLanguage(next)
+                          <h3 className="mb-3 flex items-center gap-2 text-[13px] font-black tracking-tight">
+                            <Lock className="size-3.5 text-muted-foreground" />
+                            Interner Kommentar
+                          </h3>
+                          <div className="rounded-2xl border border-amber-200/70 bg-amber-50/40 px-3.5 py-3">
+                            <Label
+                              htmlFor="manual-internal-note"
+                              className="sr-only"
+                            >
+                              Interner Kommentar
+                            </Label>
+                            <Textarea
+                              id="manual-internal-note"
+                              rows={5}
+                              value={manualNoteDraft}
+                              onChange={(e) =>
+                                setManualNoteDraft(e.target.value)
                               }
+                              placeholder="Eigene Notiz fürs Support-Team (nicht für den Kunden)…"
+                              disabled={postingManualNote}
+                              className="resize-y border-amber-200/80 bg-white/80 text-[13px]"
                             />
+                            <div className="mt-2.5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                              <p className="text-[11px] text-amber-950/70">
+                                Wird mit Flag «Internal» nach Maringo
+                                geschrieben — nur intern sichtbar.
+                              </p>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="shrink-0 border-amber-300/80 bg-white/80 text-amber-950 hover:bg-amber-100/80"
+                                disabled={
+                                  postingManualNote || !manualNoteDraft.trim()
+                                }
+                                onClick={() => void postManualInternalNote()}
+                              >
+                                <Lock className="size-3.5" />
+                                {postingManualNote
+                                  ? "Speichere…"
+                                  : "Intern speichern"}
+                              </Button>
+                            </div>
+                            {manualNoteHint ? (
+                              <p className="mt-2 text-[11px] font-medium text-emerald-800">
+                                {manualNoteHint}
+                              </p>
+                            ) : null}
                           </div>
-                          <pre className="mt-1 whitespace-pre-wrap rounded-xl border border-border/50 bg-white/70 p-2.5 font-sans text-[12px]">
-                            {analysis.nextReplyDraft}
-                          </pre>
                         </div>
-                      ) : null}
-                      <div className="flex flex-col gap-2 border-t border-orange-200/50 pt-3">
-                        {analysisInternalNotePostedAt ? (
-                          <div className="rounded-lg border border-emerald-200/80 bg-emerald-50/70 px-3 py-2">
-                            <p className="text-[12px] font-semibold text-emerald-950">
-                              Bereits als intern gespeichert
-                            </p>
-                            <p className="mt-0.5 text-[11px] text-emerald-900/75">
-                              {formatAnalyzedAt(analysisInternalNotePostedAt)} ·
-                              nur Support, nicht für den Kunden
-                            </p>
+
+                        {detail.requestTextPlain ? (
+                          <div>
+                            <h3 className="mb-2 flex items-center gap-2 text-[13px] font-black tracking-tight">
+                              <Inbox className="size-3.5 text-muted-foreground" />
+                              Anfragetext
+                            </h3>
+                            <div className="rounded-2xl border border-teal-200/70 bg-teal-50/40 px-3.5 py-2.5 text-[13px] leading-relaxed text-teal-950">
+                              <div className="whitespace-pre-wrap">
+                                {detail.requestTextPlain}
+                              </div>
+                            </div>
                           </div>
                         ) : null}
-                        <Button
+
+                        <button
                           type="button"
-                          size="sm"
-                          variant="outline"
-                          className="border-orange-300/80 bg-white/80 text-orange-950 hover:bg-orange-100/80"
-                          disabled={postingInternalNote}
-                          onClick={() => void postAnalysisAsInternalNote()}
+                          onClick={() => toggleSecondary("verlauf")}
+                          className="w-full rounded-2xl border border-border/60 bg-muted/20 px-3.5 py-3 text-left transition-colors hover:bg-muted/40"
                         >
-                          <Lock className="size-3.5" />
-                          {postingInternalNote
-                            ? "Schreibe intern…"
-                            : analysisInternalNotePostedAt
-                              ? "Erneut als intern speichern"
-                              : "Als internen Kommentar schreiben"}
-                        </Button>
-                        {!analysisInternalNotePostedAt ? (
-                          <p className="text-[11px] text-orange-900/75">
-                            Wird mit Flag «Internal» nach Maringo geschrieben —
-                            nur für Support sichtbar, nicht für den Kunden.
-                          </p>
-                        ) : null}
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="flex items-center gap-2 text-[13px] font-black tracking-tight">
+                              <MessageSquare className="size-3.5 text-muted-foreground" />
+                              Verlauf öffnen ({detail.timeline.length})
+                            </p>
+                            <span className="shrink-0 text-[11px] font-semibold text-orange-800">
+                              Öffnen
+                            </span>
+                          </div>
+                        </button>
                       </div>
-                    </CardContent>
-                  </Card>
-                ) : null}
-
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="mb-3 flex items-center gap-2 text-[13px] font-black tracking-tight">
-                      <Clock3 className="size-3.5 text-muted-foreground" />
-                      Buchungen zu diesem Ticket
-                    </h3>
-                    <MaringoTimeLinesTable
-                      lines={ticketTimeLines}
-                      emptyText={
-                        ticketTimeLoading
-                          ? "Lade Buchungen…"
-                          : "Noch keine Stundenbuchungen auf dieses Ticket."
-                      }
-                      onEdit={(l) => void openEditTicketLine(l)}
-                      onDelete={deleteTicketLine}
-                      busyLineId={busyTicketLineId}
-                    />
-                  </div>
-
-                  <div>
-                    <h3 className="mb-3 flex items-center gap-2 text-[13px] font-black tracking-tight">
-                      <Lock className="size-3.5 text-muted-foreground" />
-                      Interner Kommentar
-                    </h3>
-                    <div className="rounded-2xl border border-amber-200/70 bg-amber-50/40 px-3.5 py-3">
-                      <Label htmlFor="manual-internal-note" className="sr-only">
-                        Interner Kommentar
-                      </Label>
-                      <Textarea
-                        id="manual-internal-note"
-                        rows={5}
-                        value={manualNoteDraft}
-                        onChange={(e) => setManualNoteDraft(e.target.value)}
-                        placeholder="Eigene Notiz fürs Support-Team (nicht für den Kunden)…"
-                        disabled={postingManualNote}
-                        className="resize-y border-amber-200/80 bg-white/80 text-[13px]"
-                      />
-                      <div className="mt-2.5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                        <p className="text-[11px] text-amber-950/70">
-                          Wird mit Flag «Internal» nach Maringo geschrieben — nur
-                          intern sichtbar.
-                        </p>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          className="shrink-0 border-amber-300/80 bg-white/80 text-amber-950 hover:bg-amber-100/80"
-                          disabled={
-                            postingManualNote || !manualNoteDraft.trim()
-                          }
-                          onClick={() => void postManualInternalNote()}
-                        >
-                          <Lock className="size-3.5" />
-                          {postingManualNote
-                            ? "Speichere…"
-                            : "Intern speichern"}
-                        </Button>
-                      </div>
-                      {manualNoteHint ? (
-                        <p className="mt-2 text-[11px] font-medium text-emerald-800">
-                          {manualNoteHint}
-                        </p>
-                      ) : null}
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  {detail.requestTextPlain ? (
-                    <div className="mb-5">
-                      <h3 className="mb-2 flex items-center gap-2 text-[13px] font-black tracking-tight">
-                        <Inbox className="size-3.5 text-muted-foreground" />
-                        Anfragetext
-                      </h3>
-                      <div className="rounded-2xl border border-teal-200/70 bg-teal-50/40 px-3.5 py-2.5 text-[13px] leading-relaxed text-teal-950">
-                        <div className="whitespace-pre-wrap">
-                          {detail.requestTextPlain}
-                        </div>
-                      </div>
-                    </div>
-                  ) : null}
-                  <h3 className="mb-3 flex items-center gap-2 text-[13px] font-black tracking-tight">
-                    <MessageSquare className="size-3.5 text-muted-foreground" />
-                    Verlauf
-                  </h3>
-                  {detail.timeline.length === 0 ? (
-                    <div className="rounded-xl border border-dashed border-border/60 px-3 py-6 text-center text-sm text-muted-foreground">
-                      <Inbox className="mx-auto mb-2 size-5 opacity-50" />
-                      {detail.requestTextPlain
-                        ? "Noch keine weiteren Verlaufseinträge."
-                        : "Kein Verlauf und kein Anfragetext vorhanden."}
-                    </div>
+                    </>
                   ) : (
-                    <ol className="relative space-y-4 before:absolute before:top-2 before:bottom-2 before:left-[0.7rem] before:w-px before:bg-border">
-                      {detail.timeline.map((item) => (
-                        <TimelineRow
-                          key={item.id}
-                          item={item}
-                          deletingAttachmentId={deletingAttachmentId}
-                          onDeleteInternalNote={(attachmentId) =>
-                            void deleteInternalNote(attachmentId)
-                          }
-                        />
-                      ))}
-                    </ol>
+                    <>
+                      <div className="flex shrink-0 items-center justify-end border-b border-border/50 px-3 py-2">
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="size-8"
+                          onClick={closeTicketFlyout}
+                          aria-label="Schliessen"
+                        >
+                          <X className="size-4" />
+                        </Button>
+                      </div>
+                      <div className="flex flex-1 items-center justify-center p-8 text-sm text-muted-foreground">
+                        Ticket nicht geladen
+                      </div>
+                    </>
                   )}
                 </div>
               </div>
-            </>
-          ) : null}
-        </section>
-      </div>
-      )}
+
+              {secondaryFlyouts.map((id, i) => {
+                const widthClass =
+                  id === "arbeitszeit"
+                    ? "w-[min(100%,34rem)]"
+                    : "w-[min(100%,30rem)]";
+                const title =
+                  id === "verlauf"
+                    ? "Verlauf"
+                    : id === "buchungen"
+                      ? "Ticket-Buchungen"
+                      : "Arbeitszeit";
+                const description =
+                  id === "verlauf"
+                    ? "Timeline & interne Notizen"
+                    : id === "buchungen"
+                      ? "Stunden auf dieses Ticket"
+                      : "Zeiterfassung";
+                return (
+                  <MariSecondaryFlyoutShell
+                    key={id}
+                    title={title}
+                    description={description}
+                    onClose={() => closeSecondary(id)}
+                    widthClass={widthClass}
+                    zIndex={1010 + i}
+                    offsetPx={(secondaryFlyouts.length - 1 - i) * 12}
+                  >
+                    {id === "verlauf" ? (
+                      <div className="space-y-3">
+                        <div className="inline-flex items-center gap-0.5 rounded-lg border border-border/60 p-0.5">
+                          <button
+                            type="button"
+                            onClick={() => setTimelineSort("newest")}
+                            className={cn(
+                              "inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold transition-colors",
+                              timelineSort === "newest"
+                                ? "bg-muted text-foreground"
+                                : "text-muted-foreground hover:text-foreground"
+                            )}
+                          >
+                            <ArrowDownAZ className="size-3.5" />
+                            Aktuellste oben
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setTimelineSort("oldest")}
+                            className={cn(
+                              "inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold transition-colors",
+                              timelineSort === "oldest"
+                                ? "bg-muted text-foreground"
+                                : "text-muted-foreground hover:text-foreground"
+                            )}
+                          >
+                            <ArrowUpAZ className="size-3.5" />
+                            Älteste oben
+                          </button>
+                        </div>
+                        {sortedTimeline.length === 0 ? (
+                          <div className="rounded-xl border border-dashed border-border/60 px-3 py-6 text-center text-sm text-muted-foreground">
+                            <Inbox className="mx-auto mb-2 size-5 opacity-50" />
+                            {detail?.requestTextPlain
+                              ? "Noch keine weiteren Verlaufseinträge."
+                              : "Kein Verlauf und kein Anfragetext vorhanden."}
+                          </div>
+                        ) : (
+                          <ol className="relative space-y-4 before:absolute before:top-2 before:bottom-2 before:left-[0.7rem] before:w-px before:bg-border">
+                            {sortedTimeline.map((item) => (
+                              <TimelineRow
+                                key={item.id}
+                                item={item}
+                                deletingAttachmentId={deletingAttachmentId}
+                                onDeleteInternalNote={(attachmentId) =>
+                                  void deleteInternalNote(attachmentId)
+                                }
+                              />
+                            ))}
+                          </ol>
+                        )}
+                      </div>
+                    ) : null}
+                    {id === "buchungen" ? (
+                      <div className="space-y-3">
+                        {detail?.projectNumber ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => openNewBookDialog()}
+                          >
+                            <Clock3 className="size-3.5" />
+                            Zeit buchen
+                          </Button>
+                        ) : null}
+                        <MaringoTimeLinesTable
+                          lines={ticketTimeLines}
+                          emptyText={
+                            ticketTimeLoading
+                              ? "Lade Buchungen…"
+                              : "Noch keine Stundenbuchungen auf dieses Ticket."
+                          }
+                          onEdit={(l) => void openEditTicketLine(l)}
+                          onDelete={deleteTicketLine}
+                          busyLineId={busyTicketLineId}
+                        />
+                      </div>
+                    ) : null}
+                    {id === "arbeitszeit" ? (
+                      <MaringoTimekeepingPanel />
+                    ) : null}
+                  </MariSecondaryFlyoutShell>
+                );
+              })}
+            </div>,
+            document.body
+          )
+        : null}
 
       <MaringoTimeBookDialog
         open={bookDialogOpen}

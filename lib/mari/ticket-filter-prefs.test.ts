@@ -30,5 +30,6 @@ test("ticket filter prefs default to handler mode", () => {
   assert.equal(d.filterMode, "handler");
   assert.deepEqual(d.customers, []);
   assert.equal(d.overdueOnly, false);
+  assert.equal(d.timelineSort, "oldest");
   assert.ok(d.statuses.length > 0);
 });

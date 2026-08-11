@@ -4,6 +4,9 @@ import { normalizeMariCardCode } from "@/lib/mari/customers";
 
 export type MariTicketFilterMode = "handler" | "customer";
 
+/** Verlauf: newest = aktuellste Nachricht oben */
+export type MariTimelineSort = "newest" | "oldest";
+
 export type MariTicketFilterCustomer = {
   cardCode: string;
   name: string;
@@ -14,6 +17,7 @@ export type MariTicketFilterPrefs = {
   overdueOnly: boolean;
   filterMode: MariTicketFilterMode;
   customers: MariTicketFilterCustomer[];
+  timelineSort: MariTimelineSort;
 };
 
 const KEY_PREFIX = "mari_ticket_filter_prefs:";
@@ -37,6 +41,11 @@ function sanitizeStatuses(raw: unknown): number[] | null {
 
 function sanitizeFilterMode(raw: unknown): MariTicketFilterMode | null {
   if (raw === "handler" || raw === "customer") return raw;
+  return null;
+}
+
+function sanitizeTimelineSort(raw: unknown): MariTimelineSort | null {
+  if (raw === "newest" || raw === "oldest") return raw;
   return null;
 }
 
@@ -68,6 +77,8 @@ export function defaultMariTicketFilterPrefs(): MariTicketFilterPrefs {
     overdueOnly: false,
     filterMode: "handler",
     customers: [],
+    /** Matches previous Maringo order (CreateDate ascending). */
+    timelineSort: "oldest",
   };
 }
 
@@ -84,6 +95,7 @@ export function getMariTicketFilterPrefs(
       filterMode?: unknown;
       customers?: unknown;
       cardCodes?: unknown;
+      timelineSort?: unknown;
     };
     const statuses = sanitizeStatuses(parsed.statuses) || defaults.statuses;
     let customers = sanitizeCustomers(parsed.customers);
@@ -99,6 +111,8 @@ export function getMariTicketFilterPrefs(
       overdueOnly: Boolean(parsed.overdueOnly),
       filterMode: sanitizeFilterMode(parsed.filterMode) || defaults.filterMode,
       customers: customers ?? defaults.customers,
+      timelineSort:
+        sanitizeTimelineSort(parsed.timelineSort) || defaults.timelineSort,
     };
   } catch {
     return defaults;
@@ -112,6 +126,7 @@ export function saveMariTicketFilterPrefs(
     overdueOnly?: unknown;
     filterMode?: unknown;
     customers?: unknown;
+    timelineSort?: unknown;
   }
 ): MariTicketFilterPrefs {
   const current = getMariTicketFilterPrefs(ownerKey);
@@ -131,11 +146,16 @@ export function saveMariTicketFilterPrefs(
     input.customers !== undefined
       ? sanitizeCustomers(input.customers) ?? current.customers
       : current.customers;
+  const timelineSort =
+    input.timelineSort !== undefined
+      ? sanitizeTimelineSort(input.timelineSort) || current.timelineSort
+      : current.timelineSort;
   const next: MariTicketFilterPrefs = {
     statuses,
     overdueOnly,
     filterMode,
     customers,
+    timelineSort,
   };
   setSetting(settingKey(ownerKey), JSON.stringify(next));
   return next;
