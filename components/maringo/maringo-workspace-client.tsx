@@ -406,7 +406,7 @@ function DetailField({
 }) {
   return (
     <div className={cn("min-w-0", className)}>
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+      <p className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
         {label}
       </p>
       <div className="truncate text-[12px] font-semibold leading-snug">
@@ -1279,7 +1279,7 @@ export function MaringoWorkspaceClient() {
                 className={cn(
                   "rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors",
                   statuses.length === WORK_STATUS_IDS.length && !overdueOnly
-                    ? "border-orange-300 bg-orange-50 text-orange-950"
+                    ? "border-orange-200/90 bg-orange-50/80 text-orange-900"
                     : "border-border/70 bg-background text-muted-foreground hover:bg-muted/40"
                 )}
               >
@@ -1334,19 +1334,16 @@ export function MaringoWorkspaceClient() {
               </DropdownMenu>
             </div>
             {statuses.length > 0 ? (
-              <div className="-mx-0.5 flex gap-1 overflow-x-auto px-0.5 pb-0.5 [scrollbar-width:thin]">
-                {statuses.map((id) => (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => toggleStatus(id)}
-                    title="Klicken zum Abwählen"
-                    className="shrink-0"
-                  >
-                    <StatusChip status={id} className="cursor-pointer" />
-                  </button>
-                ))}
-              </div>
+              <p
+                className="truncate text-[11px] leading-snug text-muted-foreground"
+                title={statuses
+                  .map((id) => STATUS_LABELS[id] || `Status ${id}`)
+                  .join(", ")}
+              >
+                {statuses
+                  .map((id) => STATUS_LABELS[id] || `Status ${id}`)
+                  .join(" · ")}
+              </p>
             ) : null}
             <div className="pt-0.5">
               <Label
@@ -1440,7 +1437,7 @@ export function MaringoWorkspaceClient() {
                     className={cn(
                       "flex w-full items-start gap-2 border-l-2 px-2.5 py-2 text-left transition-colors",
                       active
-                        ? "border-l-orange-500 bg-orange-50"
+                        ? "border-l-orange-400 bg-orange-50/70"
                         : "border-l-transparent hover:bg-muted/40"
                     )}
                   >
@@ -1502,22 +1499,22 @@ export function MaringoWorkspaceClient() {
             <>
               <div
                 className={cn(
-                  "flex items-start gap-3 px-4 py-3",
+                  "flex items-start gap-2.5 px-4 py-2",
                   statusDetailHeaderClass(detail.status)
                 )}
               >
                 <div className="min-w-0 flex-1">
-                  <p className="text-[12px] font-bold tabular-nums opacity-80">
+                  <p className="text-[11px] font-semibold tabular-nums text-current/70">
                     #{detail.issueId}
                   </p>
-                  <h2 className="text-[17px] font-black tracking-tight">
+                  <h2 className="text-[15px] font-bold leading-snug tracking-tight">
                     {detail.briefDescription}
                   </h2>
                 </div>
                 <StatusChip
                   status={detail.status}
                   statusName={detail.statusName}
-                  className="border-white/40 bg-white/95 shadow-sm"
+                  className="mt-0.5"
                 />
                 <DropdownMenu>
                   <DropdownMenuTrigger
@@ -1526,7 +1523,7 @@ export function MaringoWorkspaceClient() {
                         type="button"
                         size="icon"
                         variant="ghost"
-                        className="size-8 shrink-0 text-white hover:bg-white/15 hover:text-white"
+                        className="size-7 shrink-0 text-current hover:bg-black/5"
                         disabled={patching}
                       />
                     }
@@ -1550,9 +1547,9 @@ export function MaringoWorkspaceClient() {
                 </DropdownMenu>
               </div>
 
-              <div className="space-y-3 border-b border-border/50 px-4 py-3">
-                <div className="rounded-xl border border-border/50 bg-muted/15 px-3 py-2.5">
-                  <div className="grid gap-x-3 gap-y-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              <div className="space-y-2.5 border-b border-border/50 px-4 py-2.5">
+                <div className="rounded-xl border border-border/50 bg-muted/15 px-3 py-2">
+                  <div className="grid gap-x-3 gap-y-1.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                     <DetailField label="Typ">
                       {detail.issueTypeName || "–"}
                     </DetailField>
@@ -1677,7 +1674,7 @@ export function MaringoWorkspaceClient() {
                           <Button
                             type="button"
                             size="sm"
-                            className="bg-orange-600 text-white hover:bg-orange-700"
+                            className="bg-orange-500 text-white hover:bg-orange-600"
                             disabled={analyzing}
                           />
                         }
@@ -1727,7 +1724,7 @@ export function MaringoWorkspaceClient() {
                     <Button
                       type="button"
                       size="sm"
-                      className="bg-orange-600 text-white hover:bg-orange-700"
+                      className="bg-orange-500 text-white hover:bg-orange-600"
                       disabled={analyzing}
                       onClick={() => void runAnalyze({ includeImages: false })}
                     >

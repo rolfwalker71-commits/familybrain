@@ -69,38 +69,38 @@ export function statusChipClass(statusId: number): string {
   }
 }
 
-/** Volle Detail-Header-Leiste (Ticket-Titel), statusfarben. */
+/** Volle Detail-Header-Leiste (Ticket-Titel), dezente Statusfarbe. */
 export function statusDetailHeaderClass(statusId: number): string {
   switch (statusId) {
     case 11: // NEU
-      return "bg-rose-700 text-white";
+      return "border-b border-rose-200/80 bg-rose-50 text-rose-950";
     case 1: // Offen
-      return "bg-sky-700 text-white";
+      return "border-b border-sky-200/80 bg-sky-50 text-sky-950";
     case 3: // In Arbeit
-      return "bg-teal-700 text-white";
+      return "border-b border-teal-200/80 bg-teal-50 text-teal-950";
     case 13: // Aktualisiert
-      return "bg-cyan-700 text-white";
+      return "border-b border-cyan-200/80 bg-cyan-50 text-cyan-950";
     case 6: // Warte auf Kunden
     case 9:
-      return "bg-orange-600 text-white";
+      return "border-b border-orange-200/80 bg-orange-50 text-orange-950";
     case 7: // Warte auf Hersteller
     case 10:
-      return "bg-violet-700 text-white";
+      return "border-b border-violet-200/80 bg-violet-50 text-violet-950";
     case 4: // Wieder geöffnet
-      return "bg-amber-600 text-white";
+      return "border-b border-amber-200/80 bg-amber-50 text-amber-950";
     case 14: // Eskalation
-      return "bg-red-700 text-white";
+      return "border-b border-red-200/80 bg-red-50 text-red-950";
     case 2: // Gelöst
     case 12:
-      return "bg-slate-600 text-white";
+      return "border-b border-border/70 bg-muted/50 text-foreground";
     case 5: // Geschlossen
     case 8:
-      return "bg-slate-500 text-white";
+      return "border-b border-border/60 bg-muted/40 text-muted-foreground";
     case 15: // On Hold
     case 16: // Abklärung Notwendig
-      return "bg-slate-700 text-white";
+      return "border-b border-slate-200/80 bg-slate-50 text-slate-900";
     default:
-      return "bg-slate-800 text-white";
+      return "border-b border-border/70 bg-muted/40 text-foreground";
   }
 }
 
