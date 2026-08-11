@@ -16,3 +16,8 @@ test("getMariTicketsWatchState returns shape without throwing", () => {
   assert.ok(Array.isArray(st.recentChanges));
   assert.equal(typeof st.total, "number");
 });
+
+test("getMariTicketsWatchState accepts ownerKey", () => {
+  const st = getMariTicketsWatchState("admin");
+  assert.equal(typeof st.total, "number");
+});

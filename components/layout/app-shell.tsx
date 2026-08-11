@@ -30,6 +30,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
   const { me, loading } = useAuth();
   const isLogin = pathname === "/login";
   const isChat = pathname === "/chat";
+  const isWideContent = pathname.startsWith("/maringo");
   const isBareChrome =
     isLogin ||
     (pathname.startsWith("/trips/") && pathname.endsWith("/print")) ||
@@ -83,7 +84,9 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
             className={
               isChat
                 ? "mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col px-4 py-3 sm:px-6 lg:px-8 lg:py-4"
-                : "mx-auto w-full max-w-7xl min-w-0 px-4 py-5 pb-[max(2rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-7 lg:px-8 lg:py-8"
+                : `mx-auto w-full min-w-0 px-4 py-5 pb-[max(2rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-7 lg:px-8 lg:py-8 ${
+                    isWideContent ? "max-w-[96rem]" : "max-w-7xl"
+                  }`
             }
           >
             {children}

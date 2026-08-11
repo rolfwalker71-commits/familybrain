@@ -132,16 +132,69 @@ export async function GET(request: Request) {
   const anchor = searchParams.get("anchor");
   const fresh = searchParams.get("fresh") === "1";
 
+  const { ownerKeyFromAuth } = await import("@/lib/auth/owner-key");
+  const ownerKey = ownerKeyFromAuth(auth);
+
+  // Refresh ticket snapshot when due; await only if status universe expanded.
+  try {
+    const {
+      syncMariTicketsIfDue,
+      mariTicketsSyncNeedsForce,
+    } = await import("@/lib/mari/sync-tickets-if-due");
+    if (mariTicketsSyncNeedsForce()) {
+      await syncMariTicketsIfDue();
+    } else {
+      void syncMariTicketsIfDue().catch((error) => {
+        console.warn(
+          "[mari] overview ticket sync:",
+          error instanceof Error ? error.message : error
+        );
+      });
+    }
+  } catch (error) {
+    console.warn(
+      "[mari] overview ticket sync:",
+      error instanceof Error ? error.message : error
+    );
+  }
+
   if (!fresh) {
     const cached = getCachedOverview(calendarUserId, period, anchor);
     if (cached) {
+      // Ticket widget follows live filter prefs / snapshot (cheap, no MARI).
+      try {
+        const { getMariTicketsWatchState } = await import(
+          "@/lib/mari/sync-tickets-if-due"
+        );
+        const st = getMariTicketsWatchState(ownerKey);
+        cached.mariTickets = {
+          configured: st.configured,
+          employeeNumber: st.employeeNumber,
+          lastPollAt: st.lastPollAt,
+          countsByStatus: st.countsByStatus,
+          total: st.total,
+          recentChanges: st.recentChanges.map((c) => ({
+            at: c.at,
+            issueId: c.issueId,
+            title: c.title,
+            detail: c.detail,
+          })),
+        };
+      } catch {
+        /* keep cached mariTickets */
+      }
       return NextResponse.json(cached, {
         headers: { "X-Overview-Cache": "hit" },
       });
     }
   }
 
-  const payload = await getDashboardOverview(period, anchor, calendarUserId);
+  const payload = await getDashboardOverview(
+    period,
+    anchor,
+    calendarUserId,
+    ownerKey
+  );
   setCachedOverview(calendarUserId, period, anchor, payload);
   return NextResponse.json(payload, {
     headers: { "X-Overview-Cache": fresh ? "bypass" : "miss" },

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
   Calendar,
@@ -391,6 +391,27 @@ function StatusChip({
     >
       {statusChipLabel(status, statusName)}
     </Badge>
+  );
+}
+
+function DetailField({
+  label,
+  children,
+  className,
+}: {
+  label: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn("min-w-0", className)}>
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+        {label}
+      </p>
+      <div className="truncate text-[12px] font-semibold leading-snug">
+        {children}
+      </div>
+    </div>
   );
 }
 
@@ -1223,11 +1244,16 @@ export function MaringoWorkspaceClient() {
       {workspaceTab === "hours" ? (
         <MaringoTimekeepingPanel />
       ) : (
-      <div className="grid min-h-[70vh] gap-0 overflow-hidden rounded-2xl border border-border/60 bg-card shadow-[0_4px_18px_rgba(15,23,42,0.05)] lg:grid-cols-[minmax(16rem,22rem)_minmax(0,1fr)]">
+      <div className="grid min-h-[70vh] gap-0 overflow-hidden rounded-2xl border border-border/60 bg-card shadow-[0_4px_18px_rgba(15,23,42,0.05)] lg:grid-cols-[minmax(20rem,28rem)_minmax(0,1fr)]">
         {/* List pane */}
         <section className="flex min-h-0 flex-col border-b border-border/60 lg:border-r lg:border-b-0">
-          <div className="flex items-center justify-between gap-2 border-b border-border/50 px-3 py-2.5">
-            <p className="text-[13px] font-black tracking-tight">Tickets</p>
+          <div className="flex items-center justify-between gap-2 border-b border-border/50 px-3 py-2">
+            <div className="min-w-0">
+              <p className="text-[13px] font-black tracking-tight">Tickets</p>
+              <p className="text-[11px] text-muted-foreground">
+                {tickets.length} Ticket{tickets.length === 1 ? "" : "s"}
+              </p>
+            </div>
             <Button
               type="button"
               size="icon"
@@ -1244,8 +1270,8 @@ export function MaringoWorkspaceClient() {
             </Button>
           </div>
 
-          <div className="space-y-2 border-b border-border/50 px-3 py-2.5">
-            <div className="flex flex-wrap gap-1.5">
+          <div className="space-y-1.5 border-b border-border/50 px-3 py-2">
+            <div className="flex flex-wrap items-center gap-1.5">
               <button
                 type="button"
                 onClick={selectAllWorkStatuses}
@@ -1281,7 +1307,7 @@ export function MaringoWorkspaceClient() {
                     />
                   }
                 >
-                  Status ({statuses.length})
+                  Status · {statuses.length}
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className="max-h-80 w-60 overflow-y-auto">
                   <DropdownMenuGroup>
@@ -1306,22 +1332,25 @@ export function MaringoWorkspaceClient() {
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
-            <div className="flex flex-wrap gap-1">
-              {statuses.map((id) => (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => toggleStatus(id)}
-                  title="Klicken zum Abwählen"
-                >
-                  <StatusChip status={id} className="cursor-pointer" />
-                </button>
-              ))}
-            </div>
-            <div className="space-y-1.5 pt-1">
+            {statuses.length > 0 ? (
+              <div className="-mx-0.5 flex gap-1 overflow-x-auto px-0.5 pb-0.5 [scrollbar-width:thin]">
+                {statuses.map((id) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => toggleStatus(id)}
+                    title="Klicken zum Abwählen"
+                    className="shrink-0"
+                  >
+                    <StatusChip status={id} className="cursor-pointer" />
+                  </button>
+                ))}
+              </div>
+            ) : null}
+            <div className="pt-0.5">
               <Label
                 htmlFor="mari-handler"
-                className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
+                className="sr-only"
               >
                 Bearbeiter
               </Label>
@@ -1361,7 +1390,7 @@ export function MaringoWorkspaceClient() {
                     setManualHandledBy(e.target.value.toUpperCase())
                   }
                   placeholder="z.B. M2055"
-                  className="h-8 text-[12px]"
+                  className="mt-1.5 h-8 text-[12px]"
                   spellCheck={false}
                   autoComplete="off"
                 />
@@ -1369,7 +1398,7 @@ export function MaringoWorkspaceClient() {
               {effectiveHandledBy &&
               defaultHandledBy &&
               effectiveHandledBy !== defaultHandledBy ? (
-                <p className="text-[10px] text-muted-foreground">
+                <p className="mt-1 text-[10px] text-muted-foreground">
                   Ansicht: {effectiveHandledBy} (nicht deine Nummer{" "}
                   {defaultHandledBy})
                 </p>
@@ -1377,14 +1406,14 @@ export function MaringoWorkspaceClient() {
             </div>
           </div>
 
-          <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto bg-muted/20 p-2.5">
+          <ul className="min-h-0 flex-1 overflow-y-auto">
             {listLoading && tickets.length === 0 ? (
-              <li className="rounded-xl border border-dashed border-border/60 bg-background/80 px-3 py-6 text-sm text-muted-foreground">
+              <li className="px-3 py-8 text-sm text-muted-foreground">
                 Lade Tickets…
               </li>
             ) : null}
             {!listLoading && tickets.length === 0 ? (
-              <li className="rounded-xl border border-dashed border-border/60 bg-background/80 px-3 py-6 text-center text-sm text-muted-foreground">
+              <li className="px-3 py-8 text-center text-sm text-muted-foreground">
                 Keine Tickets für die gewählten Status.
               </li>
             ) : null}
@@ -1392,71 +1421,53 @@ export function MaringoWorkspaceClient() {
               const active = t.issueId === selectedId;
               const due = formatDayMonth(t.dueDate);
               const overdue = isOverdue(t.dueDate);
-              const contact = primaryContact(t.contactPerson);
-              const companyLine = joinMeta([
-                t.addressMatchcode,
-                t.cardCode,
-              ]);
-              const projectLine = joinMeta([
+              const metaLine = joinMeta([
+                t.addressMatchcode || t.cardCode,
                 t.projectNumber,
-                t.contractNumber ||
-                  (t.contractId != null ? `Vertrag ${t.contractId}` : null),
-                t.phaseName,
-              ]);
-              const classLine = joinMeta([
-                t.issueTypeName,
-                t.productName,
-                t.priorityName && t.priorityName !== "Normal"
-                  ? t.priorityName
-                  : null,
-                t.supportGroupName,
-              ]);
-              const peopleLine = joinMeta([
-                t.handledByName || t.handledBy,
-                contact,
-              ]);
-              const whenLine = joinMeta([
                 formatDayMonth(t.requestDate)
                   ? `seit ${formatDayMonth(t.requestDate)}`
                   : null,
                 formatDayMonth(t.changeAtDate)
                   ? `änd. ${formatDayMonth(t.changeAtDate)}`
                   : null,
-                t.referenceText,
-                t.stdFreigabe ? `Freigabe ${t.stdFreigabe}` : null,
-                t.aiLabel,
               ]);
               return (
-                <li key={t.issueId}>
+                <li key={t.issueId} className="border-b border-border/40 last:border-b-0">
                   <button
                     type="button"
                     onClick={() => setSelectedId(t.issueId)}
                     className={cn(
-                      "flex w-full flex-col gap-1 rounded-xl border px-3 py-2.5 text-left shadow-sm transition-[background-color,border-color,box-shadow]",
+                      "flex w-full items-start gap-2 border-l-2 px-2.5 py-2 text-left transition-colors",
                       active
-                        ? "border-orange-300 bg-orange-50 shadow-[0_1px_0_rgba(251,146,60,0.25)] ring-1 ring-orange-200/80"
-                        : "border-border/70 bg-background hover:border-orange-200/80 hover:bg-orange-50/40"
+                        ? "border-l-orange-500 bg-orange-50"
+                        : "border-l-transparent hover:bg-muted/40"
                     )}
                   >
-                    <div className="flex items-start gap-2">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="text-[12px] font-bold text-foreground">
-                            #{t.issueId}
-                          </span>
-                          <StatusChip
-                            status={t.status}
-                            statusName={t.statusName}
-                          />
-                        </div>
-                        <p className="mt-1 line-clamp-2 text-[13px] font-semibold leading-snug tracking-tight">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex min-w-0 items-baseline gap-1.5">
+                        <span className="shrink-0 text-[12px] font-bold tabular-nums text-foreground">
+                          #{t.issueId}
+                        </span>
+                        <p className="min-w-0 truncate text-[13px] font-semibold leading-snug tracking-tight">
                           {t.briefDescription}
                         </p>
                       </div>
+                      {metaLine ? (
+                        <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                          {metaLine}
+                        </p>
+                      ) : null}
+                    </div>
+                    <div className="flex shrink-0 flex-col items-end gap-1 pt-0.5">
+                      <StatusChip
+                        status={t.status}
+                        statusName={t.statusName}
+                        className="h-4 px-1.5 text-[9px]"
+                      />
                       {due ? (
                         <span
                           className={cn(
-                            "shrink-0 pt-0.5 text-right text-[11px] font-semibold leading-tight",
+                            "text-[11px] font-semibold tabular-nums",
                             overdue ? "text-rose-700" : "text-muted-foreground"
                           )}
                           title={
@@ -1465,46 +1476,15 @@ export function MaringoWorkspaceClient() {
                               : undefined
                           }
                         >
-                          <span className="block text-[9px] font-bold uppercase tracking-wide opacity-70">
-                            Stichtag
-                          </span>
                           {due}
                         </span>
                       ) : null}
                     </div>
-                    {companyLine ? (
-                      <p className="truncate text-[12px] font-medium text-foreground/85">
-                        {companyLine}
-                      </p>
-                    ) : null}
-                    {projectLine ? (
-                      <p className="truncate text-[11px] text-muted-foreground">
-                        {projectLine}
-                      </p>
-                    ) : null}
-                    {classLine ? (
-                      <p className="truncate text-[11px] text-muted-foreground">
-                        {classLine}
-                      </p>
-                    ) : null}
-                    {peopleLine ? (
-                      <p className="truncate text-[11px] text-muted-foreground">
-                        {peopleLine}
-                      </p>
-                    ) : null}
-                    {whenLine ? (
-                      <p className="truncate text-[10px] text-muted-foreground/90">
-                        {whenLine}
-                      </p>
-                    ) : null}
                   </button>
                 </li>
               );
             })}
           </ul>
-          <p className="border-t border-border/50 px-3 py-2 text-[11px] text-muted-foreground">
-            {tickets.length} Ticket{tickets.length === 1 ? "" : "s"}
-          </p>
         </section>
 
         {/* Detail pane */}
@@ -1566,169 +1546,95 @@ export function MaringoWorkspaceClient() {
                   </DropdownMenu>
                 </div>
 
-                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                  <div className="rounded-xl border border-border/50 bg-muted/20 px-2.5 py-2 text-[12px]">
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      Typ
-                    </p>
-                    <p className="font-semibold">
+                <div className="rounded-xl border border-border/50 bg-muted/15 px-3 py-2.5">
+                  <div className="grid gap-x-3 gap-y-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    <DetailField label="Typ">
                       {detail.issueTypeName || "–"}
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-border/50 bg-muted/20 px-2.5 py-2 text-[12px]">
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      Produkt
-                    </p>
-                    <p className="font-semibold">{detail.productName || "–"}</p>
-                  </div>
-                  <div className="rounded-xl border border-border/50 bg-muted/20 px-2.5 py-2 text-[12px]">
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      Matchcode
-                    </p>
-                    <p className="font-semibold">
+                    </DetailField>
+                    <DetailField label="Produkt">
+                      {detail.productName || "–"}
+                    </DetailField>
+                    <DetailField label="Matchcode">
                       {detail.addressMatchcode || "–"}
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-border/50 bg-muted/20 px-2.5 py-2 text-[12px]">
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      Projekt
-                    </p>
-                    <p className="font-semibold">
+                    </DetailField>
+                    <DetailField label="Projekt">
                       {detail.projectNumber || "–"}
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-border/50 bg-muted/20 px-2.5 py-2 text-[12px]">
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      Vertrag
-                    </p>
-                    <p className="font-semibold">
+                    </DetailField>
+                    <DetailField label="Vertrag">
                       {detail.contractNumber ||
                         (detail.contractId != null
                           ? String(detail.contractId)
                           : "–")}
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-border/50 bg-muted/20 px-2.5 py-2 text-[12px]">
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      Phase
-                    </p>
-                    <p className="font-semibold">
+                    </DetailField>
+                    <DetailField label="Phase">
                       {detail.phaseName ||
                         (detail.phaseId != null ? String(detail.phaseId) : "–")}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 rounded-xl border border-border/50 bg-muted/20 px-2.5 py-2 text-[12px]">
-                    <Flag className="size-3.5 shrink-0 text-muted-foreground" />
-                    <div>
-                      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                        Prio
-                      </p>
-                      <p className="font-semibold">{detail.priorityName}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 rounded-xl border border-border/50 bg-muted/20 px-2.5 py-2 text-[12px]">
-                    <User className="size-3.5 shrink-0 text-muted-foreground" />
-                    <div className="min-w-0">
-                      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                        Adresse
-                      </p>
-                      <p className="truncate font-semibold">
-                        {detail.cardCode || "–"}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="rounded-xl border border-border/50 bg-muted/20 px-2.5 py-2 text-[12px]">
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      Zuständig
-                    </p>
-                    <p className="font-semibold">
+                    </DetailField>
+                    <DetailField label="Prio">
+                      <span className="inline-flex items-center gap-1">
+                        <Flag className="size-3 shrink-0 text-muted-foreground" />
+                        {detail.priorityName}
+                      </span>
+                    </DetailField>
+                    <DetailField label="Adresse">
+                      <span className="inline-flex min-w-0 items-center gap-1">
+                        <User className="size-3 shrink-0 text-muted-foreground" />
+                        <span className="truncate">{detail.cardCode || "–"}</span>
+                      </span>
+                    </DetailField>
+                    <DetailField label="Zuständig">
                       {detail.handledByName || detail.handledBy || "–"}
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-border/50 bg-muted/20 px-2.5 py-2 text-[12px]">
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      Supportgruppe
-                    </p>
-                    <p className="font-semibold">
+                    </DetailField>
+                    <DetailField label="Supportgruppe">
                       {detail.supportGroupName || "–"}
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-border/50 bg-muted/20 px-2.5 py-2 text-[12px]">
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      Ansprechpartner
-                    </p>
-                    <p className="font-semibold">
+                    </DetailField>
+                    <DetailField label="Ansprechpartner">
                       {primaryContact(detail.contactPerson) || "–"}
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-border/50 bg-muted/20 px-2.5 py-2 text-[12px]">
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      Datum
-                    </p>
-                    <p className="font-semibold">
+                    </DetailField>
+                    <DetailField label="Datum">
                       {formatDateTimeShort(detail.requestDate) || "–"}
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-border/50 bg-muted/20 px-2.5 py-2 text-[12px]">
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      Geändert am
-                    </p>
-                    <p className="font-semibold">
+                    </DetailField>
+                    <DetailField label="Geändert am">
                       {formatDateTimeShort(detail.changeAtDate) || "–"}
-                    </p>
+                    </DetailField>
+                    <DetailField label="Referenz">
+                      {detail.referenceText || "–"}
+                    </DetailField>
+                    <DetailField label="Std. Freigabe">
+                      {detail.stdFreigabe || "–"}
+                    </DetailField>
+                    {detail.aiLabel ? (
+                      <DetailField label="AI">{detail.aiLabel}</DetailField>
+                    ) : null}
                   </div>
-                  <div className="rounded-xl border border-border/50 bg-muted/20 px-2.5 py-2 text-[12px]">
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      Referenz
-                    </p>
-                    <p className="font-semibold">{detail.referenceText || "–"}</p>
-                  </div>
-                  <div className="rounded-xl border border-border/50 bg-muted/20 px-2.5 py-2 text-[12px]">
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      Std. Freigabe
-                    </p>
-                    <p className="font-semibold">{detail.stdFreigabe || "–"}</p>
-                  </div>
-                  {detail.aiLabel ? (
-                    <div className="rounded-xl border border-border/50 bg-muted/20 px-2.5 py-2 text-[12px]">
-                      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                        AI
-                      </p>
-                      <p className="font-semibold">{detail.aiLabel}</p>
-                    </div>
-                  ) : null}
-                  <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border/50 bg-muted/20 px-2.5 py-2 text-[12px] sm:col-span-2 xl:col-span-1">
+                  <div className="mt-2.5 flex flex-wrap items-center gap-2 border-t border-border/40 pt-2.5">
                     <Calendar className="size-3.5 text-muted-foreground" />
                     <Label htmlFor="dueDate" className="sr-only">
                       Stichtag
                     </Label>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                        Stichtag
-                      </p>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Input
-                          id="dueDate"
-                          type="date"
-                          className="h-7 w-auto border-0 bg-transparent px-0 shadow-none"
-                          value={dueDraft}
-                          onChange={(e) => setDueDraft(e.target.value)}
-                          disabled={patching}
-                        />
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          className="h-7 text-[11px]"
-                          disabled={patching || !dueDraft}
-                          onClick={() =>
-                            void patchTicket({ dueDate: dueDraft || null })
-                          }
-                        >
-                          Setzen
-                        </Button>
-                      </div>
-                    </div>
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Stichtag
+                    </p>
+                    <Input
+                      id="dueDate"
+                      type="date"
+                      className="h-7 w-auto border-border/60 bg-background px-2 shadow-none"
+                      value={dueDraft}
+                      onChange={(e) => setDueDraft(e.target.value)}
+                      disabled={patching}
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-[11px]"
+                      disabled={patching || !dueDraft}
+                      onClick={() =>
+                        void patchTicket({ dueDate: dueDraft || null })
+                      }
+                    >
+                      Setzen
+                    </Button>
                   </div>
                 </div>
 
@@ -2069,68 +1975,70 @@ export function MaringoWorkspaceClient() {
                   </Card>
                 ) : null}
 
-                <div>
-                  <h3 className="mb-3 flex items-center gap-2 text-[13px] font-black tracking-tight">
-                    <Clock3 className="size-3.5 text-muted-foreground" />
-                    Buchungen zu diesem Ticket
-                  </h3>
-                  <MaringoTimeLinesTable
-                    lines={ticketTimeLines}
-                    emptyText={
-                      ticketTimeLoading
-                        ? "Lade Buchungen…"
-                        : "Noch keine Stundenbuchungen auf dieses Ticket."
-                    }
-                    onEdit={(l) => void openEditTicketLine(l)}
-                    onDelete={deleteTicketLine}
-                    busyLineId={busyTicketLineId}
-                  />
-                </div>
-
-                <div>
-                  <h3 className="mb-3 flex items-center gap-2 text-[13px] font-black tracking-tight">
-                    <Lock className="size-3.5 text-muted-foreground" />
-                    Interner Kommentar
-                  </h3>
-                  <div className="rounded-2xl border border-amber-200/70 bg-amber-50/40 px-3.5 py-3">
-                    <Label htmlFor="manual-internal-note" className="sr-only">
-                      Interner Kommentar
-                    </Label>
-                    <Textarea
-                      id="manual-internal-note"
-                      rows={5}
-                      value={manualNoteDraft}
-                      onChange={(e) => setManualNoteDraft(e.target.value)}
-                      placeholder="Eigene Notiz fürs Support-Team (nicht für den Kunden)…"
-                      disabled={postingManualNote}
-                      className="resize-y border-amber-200/80 bg-white/80 text-[13px]"
+                <div className="grid gap-4 xl:grid-cols-2">
+                  <div>
+                    <h3 className="mb-3 flex items-center gap-2 text-[13px] font-black tracking-tight">
+                      <Clock3 className="size-3.5 text-muted-foreground" />
+                      Buchungen zu diesem Ticket
+                    </h3>
+                    <MaringoTimeLinesTable
+                      lines={ticketTimeLines}
+                      emptyText={
+                        ticketTimeLoading
+                          ? "Lade Buchungen…"
+                          : "Noch keine Stundenbuchungen auf dieses Ticket."
+                      }
+                      onEdit={(l) => void openEditTicketLine(l)}
+                      onDelete={deleteTicketLine}
+                      busyLineId={busyTicketLineId}
                     />
-                    <div className="mt-2.5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                      <p className="text-[11px] text-amber-950/70">
-                        Wird mit Flag «Internal» nach Maringo geschrieben — nur
-                        intern sichtbar.
-                      </p>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="shrink-0 border-amber-300/80 bg-white/80 text-amber-950 hover:bg-amber-100/80"
-                        disabled={
-                          postingManualNote || !manualNoteDraft.trim()
-                        }
-                        onClick={() => void postManualInternalNote()}
-                      >
-                        <Lock className="size-3.5" />
-                        {postingManualNote
-                          ? "Speichere…"
-                          : "Intern speichern"}
-                      </Button>
+                  </div>
+
+                  <div>
+                    <h3 className="mb-3 flex items-center gap-2 text-[13px] font-black tracking-tight">
+                      <Lock className="size-3.5 text-muted-foreground" />
+                      Interner Kommentar
+                    </h3>
+                    <div className="rounded-2xl border border-amber-200/70 bg-amber-50/40 px-3.5 py-3">
+                      <Label htmlFor="manual-internal-note" className="sr-only">
+                        Interner Kommentar
+                      </Label>
+                      <Textarea
+                        id="manual-internal-note"
+                        rows={5}
+                        value={manualNoteDraft}
+                        onChange={(e) => setManualNoteDraft(e.target.value)}
+                        placeholder="Eigene Notiz fürs Support-Team (nicht für den Kunden)…"
+                        disabled={postingManualNote}
+                        className="resize-y border-amber-200/80 bg-white/80 text-[13px]"
+                      />
+                      <div className="mt-2.5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <p className="text-[11px] text-amber-950/70">
+                          Wird mit Flag «Internal» nach Maringo geschrieben — nur
+                          intern sichtbar.
+                        </p>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="shrink-0 border-amber-300/80 bg-white/80 text-amber-950 hover:bg-amber-100/80"
+                          disabled={
+                            postingManualNote || !manualNoteDraft.trim()
+                          }
+                          onClick={() => void postManualInternalNote()}
+                        >
+                          <Lock className="size-3.5" />
+                          {postingManualNote
+                            ? "Speichere…"
+                            : "Intern speichern"}
+                        </Button>
+                      </div>
+                      {manualNoteHint ? (
+                        <p className="mt-2 text-[11px] font-medium text-emerald-800">
+                          {manualNoteHint}
+                        </p>
+                      ) : null}
                     </div>
-                    {manualNoteHint ? (
-                      <p className="mt-2 text-[11px] font-medium text-emerald-800">
-                        {manualNoteHint}
-                      </p>
-                    ) : null}
                   </div>
                 </div>
 

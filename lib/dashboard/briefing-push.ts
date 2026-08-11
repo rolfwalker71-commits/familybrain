@@ -39,7 +39,12 @@ function inEveningWindow(
 }
 
 async function briefingForUser(userId: number) {
-  const overview = await getDashboardOverview("month", undefined, userId);
+  const overview = await getDashboardOverview(
+    "month",
+    undefined,
+    userId,
+    `user:${userId}`
+  );
   const { todayIso, hour, hm } = zurichNowParts();
   const facts = buildDayBriefingFacts({
     todayIso,

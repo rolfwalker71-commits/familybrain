@@ -33,5 +33,16 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: "Ungültige Eingabe" }, { status: 400 });
   }
   const prefs = saveMariTicketFilterPrefs(ownerKeyFromAuth(auth), parsed.data);
+  try {
+    const { invalidateOverviewCache } = await import(
+      "@/lib/dashboard/overview-cache"
+    );
+    const { resolveCalendarUserId } = await import(
+      "@/lib/calendar/ics-calendars"
+    );
+    invalidateOverviewCache(resolveCalendarUserId(auth));
+  } catch {
+    /* optional */
+  }
   return NextResponse.json(prefs);
 }

@@ -397,7 +397,8 @@ function inRange(date: string | null | undefined, start: string, end: string) {
 export async function getDashboardOverview(
   period: OverviewPeriod,
   anchorIso?: string | null,
-  calendarUserId: number | null = null
+  calendarUserId: number | null = null,
+  ownerKey?: string | null
 ): Promise<OverviewPayload> {
   const anchor = anchorIso ? new Date(anchorIso) : new Date();
   const { start, end, label } = resolvePeriodRange(period, anchor);
@@ -991,7 +992,7 @@ export async function getDashboardOverview(
     })(),
     mariTickets: (() => {
       try {
-        const st = getMariTicketsWatchState();
+        const st = getMariTicketsWatchState(ownerKey);
         return {
           configured: st.configured,
           employeeNumber: st.employeeNumber,
