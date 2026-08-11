@@ -17,6 +17,7 @@ import { APP_ICON_STROKE } from "@/lib/branding/app-icons";
 import { cn } from "@/lib/utils";
 import {
   formatPeriodLabel,
+  formatMariProjectLabel,
   resolveTimePeriodRange,
   type MariTimeLine,
   type MariTimePeriod,
@@ -121,7 +122,10 @@ export function MaringoTimekeepingPanel({
       (typeof data.warning === "string" ? data.warning.trim() : "");
     setStatus(
       [
-        `Gebucht: ${values.hours} h auf ${values.projectNumber}` +
+        `Gebucht: ${values.hours} h auf ${formatMariProjectLabel(
+          values.projectNumber,
+          values.projectLabel
+        )}` +
           (values.issueId ? ` (Ticket #${values.issueId})` : "") +
           (line?.lineId ? ` · #${line.lineId}` : ""),
         warn ? `Hinweis: ${warn}` : null,
@@ -162,7 +166,10 @@ export function MaringoTimekeepingPanel({
       setEditDefaults({
         dayOfService: full.serviceDate || line.serviceDate,
         projectNumber: full.projectNumber || line.projectNumber,
-        projectLabel: full.projectNumber || line.projectNumber,
+        projectLabel: formatMariProjectLabel(
+          full.projectNumber || line.projectNumber,
+          line.projectCustomer
+        ),
         contractId: full.contractId || null,
         contractPositionId: full.contractPositionId || null,
         activity: full.activity || line.activity,
@@ -196,7 +203,10 @@ export function MaringoTimekeepingPanel({
     if (!res.ok) throw new Error(data.error || "Änderung fehlgeschlagen");
     const line = data.line as MariTimeLine | undefined;
     setStatus(
-      `Geändert: ${values.hours} h auf ${values.projectNumber}` +
+      `Geändert: ${values.hours} h auf ${formatMariProjectLabel(
+        values.projectNumber,
+        values.projectLabel
+      )}` +
         (line?.lineId ? ` · #${line.lineId}` : "")
     );
     setEditLine(null);
@@ -212,7 +222,10 @@ export function MaringoTimekeepingPanel({
     }
     if (
       !window.confirm(
-        `Buchung #${line.lineId} (${line.hours} h, ${line.projectNumber}) wirklich löschen?`
+        `Buchung #${line.lineId} (${line.hours} h, ${formatMariProjectLabel(
+          line.projectNumber,
+          line.projectCustomer
+        )}) wirklich löschen?`
       )
     ) {
       return;

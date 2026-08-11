@@ -72,11 +72,11 @@ import type {
   MariListMetaField,
   MariTicketFilterMode,
   MariTimelineSort,
-} from "@/lib/mari/ticket-filter-prefs";
+} from "@/lib/mari/ticket-filter-prefs-shared";
 import {
   DEFAULT_MARI_LIST_META_FIELDS,
   MARI_LIST_META_FIELD_OPTIONS,
-} from "@/lib/mari/ticket-filter-prefs";
+} from "@/lib/mari/ticket-filter-prefs-shared";
 import { buildMariTicketListMetaParts } from "@/lib/mari/ticket-list-meta";
 import {
   MariMainFlyoutShell,
@@ -95,6 +95,7 @@ import {
   type ReplyLang,
 } from "@/lib/microsoft/reply-language-shared";
 import type { MariTimeLine } from "@/lib/mari/timekeeping-shared";
+import { formatMariProjectLabel } from "@/lib/mari/timekeeping-shared";
 import { MaringoTimekeepingPanel } from "@/components/maringo/maringo-timekeeping-panel";
 import { MaringoTimeBookDialog } from "@/components/maringo/maringo-time-book-dialog";
 import type { TimeBookFormDefaults } from "@/components/maringo/maringo-time-book-form";
@@ -915,7 +916,10 @@ export function MaringoWorkspaceClient() {
       setEditBookDefaults({
         dayOfService: full.serviceDate || line.serviceDate,
         projectNumber: full.projectNumber || line.projectNumber,
-        projectLabel: full.projectNumber || line.projectNumber,
+        projectLabel: formatMariProjectLabel(
+          full.projectNumber || line.projectNumber,
+          line.projectCustomer
+        ),
         contractId: full.contractId || null,
         contractPositionId: full.contractPositionId || null,
         activity: full.activity || line.activity,
@@ -938,7 +942,10 @@ export function MaringoWorkspaceClient() {
     }
     if (
       !window.confirm(
-        `Buchung #${line.lineId} (${line.hours} h, ${line.projectNumber}) wirklich löschen?`
+        `Buchung #${line.lineId} (${line.hours} h, ${formatMariProjectLabel(
+          line.projectNumber,
+          line.projectCustomer
+        )}) wirklich löschen?`
       )
     ) {
       return;
@@ -2081,7 +2088,12 @@ export function MaringoWorkspaceClient() {
                               {detail.addressMatchcode || "–"}
                             </DetailField>
                             <DetailField label="Projekt">
-                              {detail.projectNumber || "–"}
+                              {detail.projectNumber
+                                ? formatMariProjectLabel(
+                                    detail.projectNumber,
+                                    detail.addressMatchcode || detail.cardCode
+                                  )
+                                : "–"}
                             </DetailField>
                             <DetailField label="Vertrag">
                               {detail.contractNumber ||
@@ -2865,17 +2877,10 @@ export function MaringoWorkspaceClient() {
             ? {
                 issueId: detail.issueId,
                 projectNumber: detail.projectNumber,
-                projectLabel:
-                  [
-                    detail.projectNumber,
-                    detail.addressMatchcode || detail.cardCode,
-                    detail.contractNumber ||
-                      (detail.contractId != null
-                        ? `V-${detail.contractId}`
-                        : null),
-                  ]
-                    .filter(Boolean)
-                    .join(" · ") || detail.projectNumber,
+                projectLabel: formatMariProjectLabel(
+                  detail.projectNumber,
+                  detail.addressMatchcode || detail.cardCode
+                ),
                 contractId: detail.contractId,
                 contractPositionId: detail.contractPositionId,
                 activity: detail.briefDescription.slice(0, 100),

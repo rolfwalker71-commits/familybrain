@@ -1,77 +1,28 @@
 import { getSetting, setSetting } from "@/lib/db/migrations";
 import { ALL_STATUS_IDS, WORK_STATUS_IDS } from "@/lib/mari/status";
 import { normalizeMariCardCode } from "@/lib/mari/customers";
+import {
+  DEFAULT_MARI_LIST_META_FIELDS,
+  MARI_LIST_META_FIELD_OPTIONS,
+  type MariListMetaField,
+  type MariTicketFilterCustomer,
+  type MariTicketFilterMode,
+  type MariTicketFilterPrefs,
+  type MariTimelineSort,
+} from "@/lib/mari/ticket-filter-prefs-shared";
 
-export type MariTicketFilterMode = "handler" | "customer";
+export type {
+  MariListMetaField,
+  MariTicketFilterCustomer,
+  MariTicketFilterMode,
+  MariTicketFilterPrefs,
+  MariTimelineSort,
+} from "@/lib/mari/ticket-filter-prefs-shared";
 
-export type MariTimelineSort = "newest" | "oldest";
-
-/** Meta-Zeile in der Ticketliste (Stundenbuchung-relevant). */
-export type MariListMetaField =
-  | "kunde"
-  | "projekt"
-  | "vertrag"
-  | "aktivitaet"
-  | "seit"
-  | "geaendert";
-
-export const MARI_LIST_META_FIELD_OPTIONS: {
-  id: MariListMetaField;
-  label: string;
-  hint: string;
-}[] = [
-  {
-    id: "kunde",
-    label: "Kunde",
-    hint: "Matchcode / CardCode",
-  },
-  {
-    id: "projekt",
-    label: "Projekt",
-    hint: "Projektnummer für Zeitbuchung",
-  },
-  {
-    id: "vertrag",
-    label: "Vertrag",
-    hint: "Vertragsnummer oder -ID",
-  },
-  {
-    id: "aktivitaet",
-    label: "Aktivität",
-    hint: "Ticket-Betreff → Vorbelegung Aktivität",
-  },
-  {
-    id: "seit",
-    label: "Seit",
-    hint: "Anfragedatum",
-  },
-  {
-    id: "geaendert",
-    label: "Geändert",
-    hint: "Letzte Änderung",
-  },
-];
-
-export const DEFAULT_MARI_LIST_META_FIELDS: MariListMetaField[] = [
-  "kunde",
-  "projekt",
-  "vertrag",
-  "aktivitaet",
-];
-
-export type MariTicketFilterCustomer = {
-  cardCode: string;
-  name: string;
-};
-
-export type MariTicketFilterPrefs = {
-  statuses: number[];
-  overdueOnly: boolean;
-  filterMode: MariTicketFilterMode;
-  customers: MariTicketFilterCustomer[];
-  timelineSort: MariTimelineSort;
-  listMetaFields: MariListMetaField[];
-};
+export {
+  DEFAULT_MARI_LIST_META_FIELDS,
+  MARI_LIST_META_FIELD_OPTIONS,
+} from "@/lib/mari/ticket-filter-prefs-shared";
 
 const KEY_PREFIX = "mari_ticket_filter_prefs:";
 

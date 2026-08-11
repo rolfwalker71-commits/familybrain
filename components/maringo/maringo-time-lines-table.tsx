@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ChevronRight, Pencil, Trash2 } from "lucide-react";
 import {
   approvalStatusLabel,
+  formatMariProjectLabel,
   type MariApprovalStatus,
   type MariTimeLine,
 } from "@/lib/mari/timekeeping-shared";
@@ -204,7 +205,10 @@ export function MaringoTimeLinesTable({
                         {toSwissDate(l.serviceDate)}
                       </span>
                       <span className="font-medium text-foreground">
-                        {l.projectNumber}
+                        {formatMariProjectLabel(
+                          l.projectNumber,
+                          l.projectCustomer
+                        )}
                       </span>
                       <span className="ml-auto font-semibold tabular-nums text-foreground">
                         {formatHours(l.hours)} h
@@ -277,7 +281,9 @@ export function MaringoTimeLinesTable({
                   <td className="whitespace-nowrap px-2.5 py-2 tabular-nums">
                     {toSwissDate(l.serviceDate)}
                   </td>
-                  <td className="px-2.5 py-2 font-medium">{l.projectNumber}</td>
+                  <td className="px-2.5 py-2 font-medium">
+                    {formatMariProjectLabel(l.projectNumber, l.projectCustomer)}
+                  </td>
                   <td className="max-w-[20rem] px-2.5 py-2">
                     <p className="font-medium">{l.activity || "–"}</p>
                     {l.memo ? <MemoBlock memo={l.memo} /> : null}

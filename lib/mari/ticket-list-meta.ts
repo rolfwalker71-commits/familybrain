@@ -1,4 +1,5 @@
-import type { MariListMetaField } from "@/lib/mari/ticket-filter-prefs";
+import type { MariListMetaField } from "@/lib/mari/ticket-filter-prefs-shared";
+import { formatMariProjectLabel } from "@/lib/mari/timekeeping-shared";
 
 /** Minimal ticket shape for list meta lines (list + detail). */
 export type MariTicketListMetaSource = {
@@ -46,9 +47,18 @@ export function buildMariTicketListMetaParts(
       case "kunde":
         value = (t.addressMatchcode || t.cardCode || "").trim() || null;
         break;
-      case "projekt":
-        value = (t.projectNumber || "").trim() || null;
+      case "projekt": {
+        const pn = (t.projectNumber || "").trim();
+        if (!pn) {
+          value = null;
+          break;
+        }
+        value = formatMariProjectLabel(
+          pn,
+          t.addressMatchcode || t.cardCode
+        );
         break;
+      }
       case "vertrag":
         value = contractLabel(t);
         break;

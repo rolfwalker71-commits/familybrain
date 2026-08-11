@@ -26,6 +26,8 @@ export type MariTimeLine = {
   employeeNumber: string;
   employeeName: string | null;
   projectNumber: string;
+  /** Kunden-/Projektname (Matchcode), wenn bekannt — UI: «Kunde (P…)». */
+  projectCustomer: string | null;
   phaseId: number;
   activity: string;
   memo: string | null;
@@ -45,6 +47,27 @@ export type MariTimeLine = {
   /** Optional MARI-Hinweis (z.B. Warnings nach erfolgreichem Import). */
   warning?: string | null;
 };
+
+/** Anzeige «Kunde (Projektnummer)» — ohne Doppelung, wenn Name die Nummer schon enthält. */
+export function formatMariProjectLabel(
+  projectNumber: string | null | undefined,
+  customerOrName?: string | null
+): string {
+  const pn = (projectNumber || "").trim();
+  const name = (customerOrName || "").trim();
+  if (!pn && !name) return "–";
+  if (!name) return pn;
+  if (!pn) return name;
+  if (
+    name === pn ||
+    name.includes(`(${pn})`) ||
+    name.endsWith(` ${pn}`) ||
+    name.startsWith(`${pn} `)
+  ) {
+    return name;
+  }
+  return `${name} (${pn})`;
+}
 
 export type MariDayTimeSummary = {
   date: string;

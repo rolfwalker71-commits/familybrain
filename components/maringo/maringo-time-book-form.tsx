@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { APP_ICON_STROKE } from "@/lib/branding/app-icons";
 import { cn } from "@/lib/utils";
 import type { MariKeyPair } from "@/lib/mari/timekeeping-shared";
+import { formatMariProjectLabel } from "@/lib/mari/timekeeping-shared";
 import type { MariTimeBookFavorite } from "@/lib/mari/time-book-favorites";
 
 export type TimeBookFormDefaults = {
@@ -28,6 +29,7 @@ export type TimeBookFormDefaults = {
 export type TimeBookFormValues = {
   dayOfService: string;
   projectNumber: string;
+  projectLabel: string;
   contractId: number;
   contractPositionId: number | null;
   activity: string;
@@ -230,10 +232,9 @@ export function MaringoTimeBookForm({
   }, [contractId]);
 
   function selectProject(p: MariKeyPair) {
+    const pn = p.keyVisible || p.keyInternal;
     setProjectNumber(p.keyInternal || p.keyVisible);
-    setProjectLabel(
-      [p.matchcode, p.keyVisible || p.keyInternal].filter(Boolean).join(" · ")
-    );
+    setProjectLabel(formatMariProjectLabel(pn, p.matchcode));
     setProjectOpen(false);
     setContractId("");
     setContractPositionId("");
@@ -354,6 +355,7 @@ export function MaringoTimeBookForm({
       await onSubmit({
         dayOfService,
         projectNumber,
+        projectLabel: projectLabel || projectNumber,
         contractId: Number(contractId) || 0,
         contractPositionId: contractPositionId
           ? Number(contractPositionId)
@@ -456,7 +458,7 @@ export function MaringoTimeBookForm({
                   <button
                     type="button"
                     className="max-w-[14rem] truncate px-2 py-1 text-left text-[12px] font-medium hover:underline"
-                    title={`${fav.projectNumber} · ${fav.activity}`}
+                    title={`${formatMariProjectLabel(fav.projectNumber, fav.projectLabel)} · ${fav.activity}`}
                     onClick={() => applyFavorite(fav)}
                   >
                     {fav.name}

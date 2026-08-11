@@ -126,8 +126,38 @@ const TIME_LINE_SQL_SELECT = `
   t."TimeStart",
   t."TimeEnd",
   t."CreateDate",
-  t."ApprovalMode"
+  t."ApprovalMode",
+  i."AddressMatchcode" AS "AddressMatchcode"
 `;
+
+async function enrichTimeLinesProjectCustomer(
+  lines: MariTimeLine[]
+): Promise<MariTimeLine[]> {
+  if (lines.length === 0) return lines;
+  const byPn = new Map<string, string>();
+  for (const l of lines) {
+    const name = (l.projectCustomer || "").trim();
+    const pn = l.projectNumber.trim();
+    if (name && pn && !byPn.has(pn)) byPn.set(pn, name);
+  }
+  try {
+    const projects = await listProjectsForTimeBooking();
+    for (const p of projects) {
+      const label = p.matchcode.trim();
+      if (!label) continue;
+      for (const key of [p.keyVisible, p.keyInternal]) {
+        const k = String(key || "").trim();
+        if (k && !byPn.has(k)) byPn.set(k, label);
+      }
+    }
+  } catch {
+    /* Projektliste optional */
+  }
+  return lines.map((l) => ({
+    ...l,
+    projectCustomer: byPn.get(l.projectNumber.trim()) || l.projectCustomer,
+  }));
+}
 
 function mapSqlLine(r: Record<string, unknown>): MariTimeLine {
   const hours = Number(r.Quantity) || 0;
@@ -142,6 +172,8 @@ function mapSqlLine(r: Record<string, unknown>): MariTimeLine {
     employeeName:
       String(r.EmployeeName || r.EmployeeMatchcode || "").trim() || null,
     projectNumber: String(r.ProjectNumber || ""),
+    projectCustomer:
+      String(r.ProjectCustomer || r.AddressMatchcode || "").trim() || null,
     phaseId: Number(r.PhaseID) || 0,
     activity: String(r.ActivityText || "").trim(),
     memo: String(r.Memo || "").trim() || null,
@@ -298,6 +330,9 @@ ${TIME_LINE_SQL_SELECT}
 FROM "MARIProjectTimeKeepingLines" t
 LEFT JOIN "MARIEmployeeMaster" e
   ON e."EmployeeNumber" = t."EmployeeNumber"
+LEFT JOIN "MARISupportIssue" i
+  ON i."IssueID" = t."SourceReference"
+  AND t."SourceType" IN (2, 3)
 WHERE t."EmployeeNumber" = '${empQ}'
   AND t."ServiceDate" >= '${fromDate}'
   AND t."ServiceDate" < '${toExclusive}'
@@ -311,7 +346,13 @@ ORDER BY t."ServiceDate", t."TimeSheetEntryID"`
         l.serviceDate >= fromDate &&
         l.serviceDate <= toDate
     );
-  return summarizeLines(ymd, period, fromDate, toDate, lines);
+  return summarizeLines(
+    ymd,
+    period,
+    fromDate,
+    toDate,
+    await enrichTimeLinesProjectCustomer(lines)
+  );
 }
 
 export async function listTimeLinesForTicket(
@@ -327,11 +368,16 @@ ${TIME_LINE_SQL_SELECT}
 FROM "MARIProjectTimeKeepingLines" t
 LEFT JOIN "MARIEmployeeMaster" e
   ON e."EmployeeNumber" = t."EmployeeNumber"
+LEFT JOIN "MARISupportIssue" i
+  ON i."IssueID" = t."SourceReference"
+  AND t."SourceType" IN (2, 3)
 WHERE t."SourceReference" = ${issueId}
   AND t."SourceType" IN (2, 3)
 ORDER BY t."ServiceDate" DESC, t."TimeSheetEntryID" DESC`
   );
-  return rows.map(mapSqlLine).filter((l) => l.lineId > 0);
+  return enrichTimeLinesProjectCustomer(
+    rows.map(mapSqlLine).filter((l) => l.lineId > 0)
+  );
 }
 
 export async function createTimeKeepingLine(
@@ -428,6 +474,7 @@ export async function createTimeKeepingLine(
         employeeNumber: String(one.EmployeeNumber || emp),
         employeeName: null,
         projectNumber: String(one.ProjectNumber || parsed.projectNumber),
+        projectCustomer: null,
         phaseId: Number(one.PhaseID) || resolved.phaseId,
         activity: String(one.Activity || parsed.activity),
         memo: String(one.MemoText || "").trim() || null,
@@ -456,6 +503,7 @@ export async function createTimeKeepingLine(
     employeeNumber: emp,
     employeeName: null,
     projectNumber: parsed.projectNumber,
+    projectCustomer: null,
     phaseId: resolved.phaseId,
     activity: parsed.activity,
     memo: parsed.memoText?.trim() || null,
