@@ -921,6 +921,14 @@ export async function patchTicketFields(
     status?: number;
     dueDate?: string | null;
     priority?: number;
+    /** API: Project */
+    projectNumber?: string | null;
+    contractId?: number | null;
+    contractPositionId?: number | null;
+    /** API: BriefDescription (Betreff / Aktivitäts-Vorlage) */
+    activity?: string | null;
+    /** USER_U_Std_Freigegeben_Kunde (INTEGER Stunden) */
+    stdFreigabe?: number | null;
   }
 ): Promise<MariTicketDetail> {
   const current = await mariGetIssue(issueId);
@@ -946,6 +954,52 @@ export async function patchTicketFields(
         : `${patch.dueDate}T00:00:00`;
       body.DueDate = d;
     }
+  }
+  if (patch.projectNumber !== undefined) {
+    const pn = (patch.projectNumber || "").trim();
+    body.Project = pn || null;
+    if (pn) {
+      try {
+        const { listPhasesForTimeBooking } = await import(
+          "@/lib/mari/timekeeping"
+        );
+        const phases = await listPhasesForTimeBooking(pn);
+        const preferred =
+          phases.find((p) =>
+            /meeting|besprechung|abstimmung|support/i.test(p.matchcode)
+          ) || phases[0];
+        const phaseId = preferred ? Number(preferred.keyInternal) || 0 : 0;
+        if (phaseId > 0) body.PhaseID = phaseId;
+      } catch {
+        // Phase optional — Projekt trotzdem speichern
+      }
+    }
+  }
+  if (patch.contractId !== undefined) {
+    body.ContractID =
+      patch.contractId == null || patch.contractId <= 0 ? 0 : patch.contractId;
+  }
+  if (patch.contractPositionId !== undefined) {
+    body.ContractPosition =
+      patch.contractPositionId == null || patch.contractPositionId <= 0
+        ? 0
+        : patch.contractPositionId;
+  }
+  if (patch.activity !== undefined) {
+    const act = (patch.activity || "").trim();
+    if (act) body.BriefDescription = act.slice(0, 250);
+  }
+  if (patch.stdFreigabe !== undefined) {
+    const udfRaw = current.UserDefinedFieldValues;
+    const udf =
+      udfRaw && typeof udfRaw === "object" && !Array.isArray(udfRaw)
+        ? { ...(udfRaw as Record<string, unknown>) }
+        : {};
+    udf.USER_U_Std_Freigegeben_Kunde =
+      patch.stdFreigabe == null || !Number.isFinite(patch.stdFreigabe)
+        ? null
+        : Math.round(patch.stdFreigabe);
+    body.UserDefinedFieldValues = udf;
   }
 
   if (Object.keys(body).length === 0) {

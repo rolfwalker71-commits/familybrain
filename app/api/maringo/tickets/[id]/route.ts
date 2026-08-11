@@ -59,6 +59,12 @@ const PatchSchema = z.object({
       z.literal(""),
     ])
     .optional(),
+  projectNumber: z.string().trim().max(40).nullable().optional(),
+  contractId: z.number().int().nonnegative().nullable().optional(),
+  contractPositionId: z.number().int().nonnegative().nullable().optional(),
+  activity: z.string().trim().max(250).nullable().optional(),
+  /** USER_U_Std_Freigegeben_Kunde — ganze Stunden */
+  stdFreigabe: z.number().int().min(0).max(9999).nullable().optional(),
 });
 
 export async function PATCH(request: Request, context: Ctx) {
@@ -93,6 +99,11 @@ export async function PATCH(request: Request, context: Ctx) {
       priority: parsed.data.priority,
       dueDate:
         parsed.data.dueDate === "" ? null : parsed.data.dueDate,
+      projectNumber: parsed.data.projectNumber,
+      contractId: parsed.data.contractId,
+      contractPositionId: parsed.data.contractPositionId,
+      activity: parsed.data.activity,
+      stdFreigabe: parsed.data.stdFreigabe,
     });
     return NextResponse.json({ ok: true, ticket });
   } catch (err) {

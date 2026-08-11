@@ -43,7 +43,7 @@ function describeDonutSlice(
 function Donut({
   billable,
   nonBillable,
-  size = 72,
+  size = 64,
 }: {
   billable: number;
   nonBillable: number;
@@ -183,26 +183,26 @@ export function MariHoursSplitSummary({
   return (
     <div
       className={cn(
-        "flex flex-wrap items-center gap-3 rounded-xl border border-border/60 bg-muted/20 px-3 py-2.5",
+        "flex flex-wrap items-center gap-2.5 rounded-lg border border-border/60 bg-muted/20 px-2.5 py-2",
         className
       )}
     >
       <div className="relative shrink-0">
         <Donut billable={billableHours} nonBillable={nonBillableHours} />
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-[11px] font-black tabular-nums leading-none tracking-tight">
+          <span className="text-[10px] font-black tabular-nums leading-none tracking-tight">
             {formatHours(totalHours)}
           </span>
-          <span className="mt-0.5 text-[9px] font-medium text-muted-foreground">
+          <span className="mt-px text-[8px] font-medium text-muted-foreground">
             h
           </span>
         </div>
       </div>
 
-      <div className="min-w-0 flex-1 space-y-1.5">
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          <div className="rounded-lg border border-emerald-200/70 bg-emerald-50/60 px-2 py-1.5">
-            <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-900/80">
+      <div className="min-w-0 flex-1 space-y-1">
+        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+          <div className="rounded-md border border-emerald-200/70 bg-emerald-50/60 px-1.5 py-1">
+            <p className="flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wide text-emerald-900/80">
               <span
                 className="size-1.5 shrink-0 rounded-full"
                 style={{ backgroundColor: BILLABLE_COLOR }}
@@ -210,18 +210,18 @@ export function MariHoursSplitSummary({
               />
               Verrechenbar
             </p>
-            <p className="mt-0.5 text-[15px] font-black tabular-nums leading-none text-emerald-950">
+            <p className="mt-0.5 text-[13px] font-black tabular-nums leading-none text-emerald-950">
               {formatHours(billableHours)}
-              <span className="ml-0.5 text-[11px] font-semibold text-emerald-800/80">
+              <span className="ml-0.5 text-[10px] font-semibold text-emerald-800/80">
                 h
               </span>
             </p>
-            <p className="mt-0.5 text-[10px] tabular-nums text-emerald-900/65">
+            <p className="mt-px text-[9px] tabular-nums text-emerald-900/65">
               {billablePct}%
             </p>
           </div>
-          <div className="rounded-lg border border-border/60 bg-background/80 px-2 py-1.5">
-            <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <div className="rounded-md border border-border/60 bg-background/80 px-1.5 py-1">
+            <p className="flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
               <span
                 className="size-1.5 shrink-0 rounded-full"
                 style={{ backgroundColor: NON_BILLABLE_COLOR }}
@@ -229,35 +229,33 @@ export function MariHoursSplitSummary({
               />
               Nicht verr.
             </p>
-            <p className="mt-0.5 text-[15px] font-black tabular-nums leading-none text-foreground">
+            <p className="mt-0.5 text-[13px] font-black tabular-nums leading-none text-foreground">
               {formatHours(nonBillableHours)}
-              <span className="ml-0.5 text-[11px] font-semibold text-muted-foreground">
+              <span className="ml-0.5 text-[10px] font-semibold text-muted-foreground">
                 h
               </span>
             </p>
-            <p className="mt-0.5 text-[10px] tabular-nums text-muted-foreground">
+            <p className="mt-px text-[9px] tabular-nums text-muted-foreground">
               {nonBillablePct}%
             </p>
           </div>
-          <div className="col-span-2 rounded-lg border border-border/60 bg-background/80 px-2 py-1.5 sm:col-span-1">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <div className="col-span-2 rounded-md border border-border/60 bg-background/80 px-1.5 py-1 sm:col-span-1">
+            <p className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
               Gesamt erfasst
             </p>
-            <p className="mt-0.5 text-[15px] font-black tabular-nums leading-none text-foreground">
+            <p className="mt-0.5 text-[13px] font-black tabular-nums leading-none text-foreground">
               {formatHours(totalHours)}
-              <span className="ml-0.5 text-[11px] font-semibold text-muted-foreground">
+              <span className="ml-0.5 text-[10px] font-semibold text-muted-foreground">
                 h
               </span>
             </p>
             {totalHint ? (
-              <p className="mt-0.5 text-[10px] text-muted-foreground">
-                {totalHint}
-              </p>
+              <p className="mt-px text-[9px] text-muted-foreground">{totalHint}</p>
             ) : null}
           </div>
         </div>
         {hint ? (
-          <p className="text-[11px] text-muted-foreground">{hint}</p>
+          <p className="text-[10px] text-muted-foreground">{hint}</p>
         ) : null}
       </div>
     </div>

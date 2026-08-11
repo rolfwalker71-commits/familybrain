@@ -100,6 +100,7 @@ import type { MariTimeLine } from "@/lib/mari/timekeeping-shared";
 import { formatMariProjectLabel } from "@/lib/mari/timekeeping-shared";
 import { MaringoTimekeepingPanel } from "@/components/maringo/maringo-timekeeping-panel";
 import { MaringoTimeBookDialog } from "@/components/maringo/maringo-time-book-dialog";
+import { MaringoTicketKopfForm } from "@/components/maringo/maringo-ticket-kopf-form";
 import type { TimeBookFormDefaults } from "@/components/maringo/maringo-time-book-form";
 
 function ReplyLangToggle({
@@ -1384,6 +1385,11 @@ export function MaringoWorkspaceClient() {
     status?: number;
     dueDate?: string | null;
     priority?: number;
+    projectNumber?: string | null;
+    contractId?: number | null;
+    contractPositionId?: number | null;
+    activity?: string | null;
+    stdFreigabe?: number | null;
   }) {
     if (!selectedId) return;
     setPatching(true);
@@ -1400,6 +1406,31 @@ export function MaringoWorkspaceClient() {
       await loadList();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setPatching(false);
+    }
+  }
+
+  async function saveTicketKopf(values: {
+    projectNumber: string;
+    contractId: number | null;
+    contractPositionId: number | null;
+    activity: string;
+    stdFreigabe: number | null;
+  }) {
+    if (!selectedId) throw new Error("Kein Ticket gewählt.");
+    setPatching(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/maringo/tickets/${selectedId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(values),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Änderung fehlgeschlagen");
+      setDetail(data.ticket as MariTicketDetail);
+      await loadList();
     } finally {
       setPatching(false);
     }
@@ -2097,7 +2128,16 @@ export function MaringoWorkspaceClient() {
                               {detail.referenceText || "–"}
                             </DetailField>
                             <DetailField label="Std. Freigabe">
-                              {detail.stdFreigabe || "–"}
+                              <button
+                                type="button"
+                                className="text-left font-medium text-orange-900 underline-offset-2 hover:underline"
+                                onClick={() => toggleSecondary("kopf")}
+                                title="Ticket-Kopf bearbeiten"
+                              >
+                                {detail.stdFreigabe
+                                  ? `${detail.stdFreigabe} h`
+                                  : "–"}
+                              </button>
                             </DetailField>
                             {detail.aiLabel ? (
                               <DetailField label="AI">{detail.aiLabel}</DetailField>
@@ -2648,7 +2688,7 @@ export function MaringoWorkspaceClient() {
               {secondaryFlyouts.map((id, i) => {
                 const meta = MARI_SECONDARY_FLYOUT_META[id];
                 const widthClass =
-                  id === "buchen" || id === "buchungen"
+                  id === "buchen" || id === "buchungen" || id === "kopf"
                     ? "w-[min(100%,34rem)]"
                     : "w-[min(100%,30rem)]";
                 return (
@@ -2713,6 +2753,23 @@ export function MaringoWorkspaceClient() {
                           </ol>
                         )}
                       </div>
+                    ) : null}
+                    {id === "kopf" && detail ? (
+                      <MaringoTicketKopfForm
+                        key={`kopf-${detail.issueId}-${detail.changeAtDate || ""}`}
+                        defaults={{
+                          projectNumber: detail.projectNumber,
+                          projectLabel: formatMariProjectLabel(
+                            detail.projectNumber,
+                            detail.addressMatchcode || detail.cardCode
+                          ),
+                          contractId: detail.contractId,
+                          contractPositionId: detail.contractPositionId,
+                          activity: detail.briefDescription,
+                          stdFreigabe: detail.stdFreigabe,
+                        }}
+                        onSubmit={saveTicketKopf}
+                      />
                     ) : null}
                     {(id === "buchen" || id === "buchungen") && detail ? (
                       <MaringoTimekeepingPanel

@@ -262,6 +262,8 @@ export function MaringoTimekeepingPanel({
         contractId: number;
         contractPositionId: number;
         issueId: number | null;
+        internalRemarkVerr?: string | null;
+        zeroHoursReason?: string | null;
       };
       setEditDefaults({
         dayOfService: full.serviceDate || line.serviceDate,
@@ -278,6 +280,8 @@ export function MaringoTimekeepingPanel({
         hoursBillable: full.hoursBillable ?? line.hoursBillable,
         billable: full.billable ?? line.billable,
         issueId: full.issueId ?? (ticketMode ? ticketIssueId : null),
+        internalRemarkVerr: full.internalRemarkVerr ?? line.internalRemarkVerr,
+        zeroHoursReason: full.zeroHoursReason ?? line.zeroHoursReason,
       });
     } catch (err) {
       setEditLine(null);
@@ -409,14 +413,14 @@ export function MaringoTimekeepingPanel({
         {showLinesOverview ? (
           dayOverview ? (
             <div className="overflow-hidden rounded-2xl border border-border/60 bg-card shadow-[0_4px_18px_rgba(15,23,42,0.05)]">
-              <div className="space-y-3 border-b border-border/50 px-4 py-3">
-                <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="space-y-2.5 border-b border-border/50 px-3 py-2.5">
+                <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <h2 className="text-[15px] font-black tracking-tight">
+                    <h2 className="text-[14px] font-black tracking-tight">
                       {overviewTitle}
                     </h2>
                     {periodHint ? (
-                      <p className="mt-0.5 text-[12px] text-muted-foreground">
+                      <p className="mt-0.5 text-[11px] text-muted-foreground">
                         {periodHint}
                         {fromDate !== toDate
                           ? ` · ${lines.length} Buchungen`
@@ -503,7 +507,7 @@ export function MaringoTimekeepingPanel({
                 />
               </div>
 
-              <div className="px-4 py-3">
+              <div className="px-3 py-2.5">
                 <MaringoTimeLinesTable
                   lines={lines}
                   totalHours={totalHours}

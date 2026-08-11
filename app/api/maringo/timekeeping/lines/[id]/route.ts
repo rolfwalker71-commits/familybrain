@@ -6,6 +6,7 @@ import { hasMariConfig } from "@/lib/mari/config";
 import {
   deleteTimeKeepingLine,
   getTimeKeepingLine,
+  getTimeKeepingLineDetail,
   MariTimeLineCreateSchema,
   replaceTimeKeepingLine,
   TIMEKEEPING_SOURCE_SUPPORT_ISSUE,
@@ -38,25 +39,38 @@ export async function GET(
     return NextResponse.json({ error: "Buchungs-ID ungültig." }, { status: 400 });
   }
   try {
-    const raw = await getTimeKeepingLine(lineId);
-    const hours = Number(raw.Hours) || 0;
-    const hoursBillable = Number(raw.HoursBillable) || 0;
-    const srcType = Number(raw.SourceReferenceType) || 0;
-    const srcId = Number(raw.SourceReferenceID) || 0;
+    const detail = await getTimeKeepingLineDetail(lineId);
+    const raw = await getTimeKeepingLine(lineId).catch(() => null);
+    const hours = detail?.hours ?? (Number(raw?.Hours) || 0);
+    const hoursBillable =
+      detail?.hoursBillable ?? (Number(raw?.HoursBillable) || 0);
+    const srcType =
+      detail?.sourceType ?? (Number(raw?.SourceReferenceType) || 0);
+    const srcId =
+      detail?.sourceReference ?? (Number(raw?.SourceReferenceID) || 0);
     return NextResponse.json({
       ok: true,
       line: {
-        lineId: Number(raw.LineID) || lineId,
-        serviceDate: String(raw.DayOfService || "").slice(0, 10),
-        employeeNumber: String(raw.EmployeeNumber || ""),
-        projectNumber: String(raw.ProjectNumber || ""),
-        activity: String(raw.Activity || ""),
-        memo: String(raw.MemoText || "").trim() || null,
+        lineId: detail?.lineId || Number(raw?.LineID) || lineId,
+        serviceDate:
+          detail?.serviceDate ||
+          String(raw?.DayOfService || "").slice(0, 10),
+        employeeNumber:
+          detail?.employeeNumber || String(raw?.EmployeeNumber || ""),
+        projectNumber:
+          detail?.projectNumber || String(raw?.ProjectNumber || ""),
+        projectCustomer: detail?.projectCustomer || null,
+        activity: detail?.activity || String(raw?.Activity || ""),
+        memo:
+          detail?.memo ??
+          (String(raw?.MemoText || "").trim() || null),
+        internalRemarkVerr: detail?.internalRemarkVerr || null,
+        zeroHoursReason: detail?.zeroHoursReason || null,
         hours,
         hoursBillable,
         billable: hoursBillable > 0,
-        contractId: Number(raw.ContractID) || 0,
-        contractPositionId: Number(raw.ContractPositionID) || 0,
+        contractId: detail?.contractId ?? (Number(raw?.ContractID) || 0),
+        contractPositionId: Number(raw?.ContractPositionID) || 0,
         issueId:
           srcType === TIMEKEEPING_SOURCE_SUPPORT_ISSUE && srcId > 0
             ? srcId

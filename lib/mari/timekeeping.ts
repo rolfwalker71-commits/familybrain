@@ -20,6 +20,13 @@ import {
   type MariTimeLine,
   type MariTimePeriod,
 } from "@/lib/mari/timekeeping-shared";
+import {
+  buildTimekeepingUserDefinedFieldValues,
+  mergeTimekeepingUdfIntoMemo,
+  parseTimekeepingUdfFromMemo,
+  stripTimekeepingUdfFromMemo,
+  type TimekeepingUdfFields,
+} from "@/lib/mari/timekeeping-udfs";
 
 export {
   addDaysYmd,
@@ -48,6 +55,10 @@ export type MariTimeLineCreateInput = {
   employeeNumber?: string | null;
   /** Optional; wenn leer, wird automatisch eine Projektphase gewählt (UI ohne Phase). */
   phaseId?: number | null;
+  /** USER_ND_Int_Bemerkung_Verr */
+  internalRemarkVerr?: string | null;
+  /** USER_Begruendung */
+  zeroHoursReason?: string | null;
 };
 
 const Ymd = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -64,6 +75,8 @@ export const MariTimeLineCreateSchema = z.object({
   issueId: z.number().int().positive().nullable().optional(),
   employeeNumber: z.string().trim().max(20).nullable().optional(),
   phaseId: z.number().int().nonnegative().optional(),
+  internalRemarkVerr: z.string().trim().max(40).nullable().optional(),
+  zeroHoursReason: z.string().trim().max(500).nullable().optional(),
 });
 
 type RawKeyPair = {
@@ -127,6 +140,8 @@ const TIME_LINE_SQL_SELECT = `
   t."TimeEnd",
   t."CreateDate",
   t."ApprovalMode",
+  t."USER_ND_Int_Bemerkung_Verr" AS "InternalRemarkVerr",
+  t."USER_Begruendung" AS "ZeroHoursReason",
   i."AddressMatchcode" AS "AddressMatchcode"
 `;
 
@@ -165,6 +180,13 @@ function mapSqlLine(r: Record<string, unknown>): MariTimeLine {
   const serviceDateRaw = String(r.ServiceDate || "");
   const serviceDate = serviceDateRaw.slice(0, 10);
   const approval = mapApprovalMode(r.ApprovalMode);
+  const memoRaw = String(r.Memo || "").trim() || null;
+  const fromSql: TimekeepingUdfFields = {
+    internalRemarkVerr:
+      String(r.InternalRemarkVerr || "").trim() || null,
+    zeroHoursReason: String(r.ZeroHoursReason || "").trim() || null,
+  };
+  const fromMemo = parseTimekeepingUdfFromMemo(memoRaw);
   return {
     lineId: Number(r.TimeSheetEntryID) || 0,
     serviceDate,
@@ -176,7 +198,9 @@ function mapSqlLine(r: Record<string, unknown>): MariTimeLine {
       String(r.ProjectCustomer || r.AddressMatchcode || "").trim() || null,
     phaseId: Number(r.PhaseID) || 0,
     activity: String(r.ActivityText || "").trim(),
-    memo: String(r.Memo || "").trim() || null,
+    memo: stripTimekeepingUdfFromMemo(memoRaw) || null,
+    internalRemarkVerr: fromSql.internalRemarkVerr || fromMemo.internalRemarkVerr,
+    zeroHoursReason: fromSql.zeroHoursReason || fromMemo.zeroHoursReason,
     hours,
     hoursBillable,
     billable: hoursBillable > 0,
@@ -395,12 +419,20 @@ export async function createTimeKeepingLine(
     parsed.phaseId != null && parsed.phaseId > 0
       ? { phaseId: parsed.phaseId, phaseName: "" }
       : await resolvePhaseForBooking(parsed.projectNumber);
+  const udf: TimekeepingUdfFields = {
+    internalRemarkVerr: parsed.internalRemarkVerr?.trim() || null,
+    zeroHoursReason: parsed.zeroHoursReason?.trim() || null,
+  };
+  const memoForMari = mergeTimekeepingUdfIntoMemo(
+    parsed.memoText?.trim() || null,
+    udf
+  );
   const body: Record<string, unknown> = {
     EmployeeNumber: emp,
     DayOfService: toDayIso(parsed.dayOfService),
     ProjectNumber: parsed.projectNumber,
     Activity: parsed.activity,
-    MemoText: parsed.memoText?.trim() || null,
+    MemoText: memoForMari,
     Hours: parsed.hours,
     HoursBillable: hoursBillable,
     ContractID: parsed.contractId,
@@ -410,6 +442,10 @@ export async function createTimeKeepingLine(
       : 0,
     SourceReferenceID: parsed.issueId || 0,
   };
+  const udfPayload = buildTimekeepingUserDefinedFieldValues(udf);
+  if (udfPayload) {
+    body.UserDefinedFieldValues = udfPayload;
+  }
   // Nie PhaseID 0 allein senden — MARI meldet dann «Phase fehlt».
   if (resolved.phaseId > 0) {
     body.PhaseID = resolved.phaseId;
@@ -465,6 +501,8 @@ export async function createTimeKeepingLine(
       );
       const hours = Number(one.Hours) || parsed.hours;
       const hb = Number(one.HoursBillable) || hoursBillable;
+      const memoRaw = String(one.MemoText || memoForMari || "").trim() || null;
+      const fromMemo = parseTimekeepingUdfFromMemo(memoRaw);
       return {
         lineId,
         serviceDate: String(one.DayOfService || parsed.dayOfService).slice(
@@ -477,7 +515,10 @@ export async function createTimeKeepingLine(
         projectCustomer: null,
         phaseId: Number(one.PhaseID) || resolved.phaseId,
         activity: String(one.Activity || parsed.activity),
-        memo: String(one.MemoText || "").trim() || null,
+        memo: stripTimekeepingUdfFromMemo(memoRaw) || null,
+        internalRemarkVerr:
+          udf.internalRemarkVerr || fromMemo.internalRemarkVerr,
+        zeroHoursReason: udf.zeroHoursReason || fromMemo.zeroHoursReason,
         hours,
         hoursBillable: hb,
         billable: hb > 0,
@@ -506,7 +547,9 @@ export async function createTimeKeepingLine(
     projectCustomer: null,
     phaseId: resolved.phaseId,
     activity: parsed.activity,
-    memo: parsed.memoText?.trim() || null,
+    memo: stripTimekeepingUdfFromMemo(memoForMari) || null,
+    internalRemarkVerr: udf.internalRemarkVerr,
+    zeroHoursReason: udf.zeroHoursReason,
     hours: parsed.hours,
     hoursBillable,
     billable: hoursBillable > 0,
@@ -529,6 +572,31 @@ export async function getTimeKeepingLine(
     throw new MariApiError("Buchungs-ID ungültig.", 400);
   }
   return mariJson<Record<string, unknown>>(`/api/TimeKeepingLine/${lineId}`);
+}
+
+/** Zeile inkl. USER-Feldern aus der MARI-View (REST liefert UDFs oft nicht). */
+export async function getTimeKeepingLineDetail(
+  lineId: number
+): Promise<MariTimeLine | null> {
+  requireMariConfig();
+  if (!Number.isInteger(lineId) || lineId <= 0) {
+    throw new MariApiError("Buchungs-ID ungültig.", 400);
+  }
+  const rows = await mariSql<Record<string, unknown>>(
+    `SELECT TOP 1
+${TIME_LINE_SQL_SELECT}
+FROM "MARIProjectTimeKeepingLines" t
+LEFT JOIN "MARIEmployeeMaster" e
+  ON e."EmployeeNumber" = t."EmployeeNumber"
+LEFT JOIN "MARISupportIssue" i
+  ON i."IssueID" = t."SourceReference"
+  AND t."SourceType" IN (2, 3)
+WHERE t."TimeSheetEntryID" = ${lineId}`
+  );
+  const line = rows[0] ? mapSqlLine(rows[0]) : null;
+  if (!line || line.lineId <= 0) return null;
+  const [enriched] = await enrichTimeLinesProjectCustomer([line]);
+  return enriched || line;
 }
 
 async function assertLineEditable(lineId: number): Promise<void> {

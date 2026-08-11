@@ -10,6 +10,7 @@ import { APP_ICON_STROKE } from "@/lib/branding/app-icons";
 import { cn } from "@/lib/utils";
 import type { MariKeyPair } from "@/lib/mari/timekeeping-shared";
 import { formatMariProjectLabel } from "@/lib/mari/timekeeping-shared";
+import { TIMEKEEPING_INT_BEMERKUNG_OPTIONS } from "@/lib/mari/timekeeping-udfs";
 import type { MariTimeBookFavorite } from "@/lib/mari/time-book-favorites";
 
 export type TimeBookFormDefaults = {
@@ -24,6 +25,8 @@ export type TimeBookFormDefaults = {
   hoursBillable?: number;
   billable?: boolean;
   issueId?: number | null;
+  internalRemarkVerr?: string | null;
+  zeroHoursReason?: string | null;
 };
 
 export type TimeBookFormValues = {
@@ -37,6 +40,8 @@ export type TimeBookFormValues = {
   hours: number;
   hoursBillable: number;
   issueId?: number | null;
+  internalRemarkVerr: string | null;
+  zeroHoursReason: string | null;
 };
 
 function zurichTodayYmd(): string {
@@ -93,6 +98,12 @@ export function MaringoTimeBookForm({
   );
   const [activity, setActivity] = useState(defaults?.activity || "");
   const [memoText, setMemoText] = useState(defaults?.memoText || "");
+  const [internalRemarkVerr, setInternalRemarkVerr] = useState(
+    defaults?.internalRemarkVerr || ""
+  );
+  const [zeroHoursReason, setZeroHoursReason] = useState(
+    defaults?.zeroHoursReason || ""
+  );
   const [hoursRaw, setHoursRaw] = useState(
     String(defaults?.hours ?? 0.25)
   );
@@ -365,6 +376,8 @@ export function MaringoTimeBookForm({
         hours,
         hoursBillable: billable ? Math.min(hoursBillable, hours) : 0,
         issueId: defaults?.issueId ?? null,
+        internalRemarkVerr: internalRemarkVerr.trim() || null,
+        zeroHoursReason: zeroHoursReason.trim() || null,
       });
       if (enableFavorites && saveAsFavorite) {
         const name = (favoriteName.trim() || activity.trim()).slice(0, 80);
@@ -655,6 +668,37 @@ export function MaringoTimeBookForm({
             value={memoText}
             onChange={(e) => setMemoText(e.target.value)}
             rows={wide ? 2 : 3}
+            placeholder="Optional"
+          />
+        </div>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="space-y-1">
+          <Label htmlFor="tk-int-bemerkung">
+            Interne Bemerkung zur Verrechnung
+          </Label>
+          <select
+            id="tk-int-bemerkung"
+            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+            value={internalRemarkVerr}
+            onChange={(e) => setInternalRemarkVerr(e.target.value)}
+          >
+            <option value="">—</option>
+            {TIMEKEEPING_INT_BEMERKUNG_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="tk-nuller">Grund für Nullerstunden</Label>
+          <Input
+            id="tk-nuller"
+            value={zeroHoursReason}
+            onChange={(e) => setZeroHoursReason(e.target.value)}
+            maxLength={500}
             placeholder="Optional"
           />
         </div>

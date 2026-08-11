@@ -31,6 +31,10 @@ export type MariTimeLine = {
   phaseId: number;
   activity: string;
   memo: string | null;
+  /** USER_ND_Int_Bemerkung_Verr — Interne Bemerkung zur Verrechnung */
+  internalRemarkVerr: string | null;
+  /** USER_Begruendung — Grund für Nullerstunden */
+  zeroHoursReason: string | null;
   hours: number;
   hoursBillable: number;
   billable: boolean;

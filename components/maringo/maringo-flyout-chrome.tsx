@@ -6,6 +6,7 @@ import {
   Clock3,
   ListTree,
   MessageSquare,
+  SquarePen,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,7 @@ import { cn } from "@/lib/utils";
 
 export type MariSecondaryFlyoutId =
   | "verlauf"
+  | "kopf"
   | "buchen"
   | "buchungen"
   | "anzeige";
@@ -26,6 +28,11 @@ export const MARI_SECONDARY_FLYOUT_META: Record<
     label: "Verlauf",
     short: "Verlauf",
     description: "Timeline & interne Notizen",
+  },
+  kopf: {
+    label: "Ticket-Kopf",
+    short: "Kopf",
+    description: "Projekt, Vertrag, Aktivität, Freigabe-Std.",
   },
   buchen: {
     label: "Buchungsmaske",
@@ -87,6 +94,7 @@ export function MariTicketFlyoutRail({
     label: string;
   }[] = [
     { id: "verlauf", icon: MessageSquare, label: "Verlauf" },
+    { id: "kopf", icon: SquarePen, label: "Ticket-Kopf" },
     { id: "buchen", icon: Clock3, label: "Buchungsmaske" },
     { id: "buchungen", icon: ClipboardList, label: "Stundenübersicht" },
     { id: "anzeige", icon: ListTree, label: "Listenfelder" },
