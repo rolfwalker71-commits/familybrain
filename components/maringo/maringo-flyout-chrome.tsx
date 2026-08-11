@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import {
+  ClipboardList,
   Clock3,
   ListTree,
   MessageSquare,
@@ -13,16 +14,34 @@ import { cn } from "@/lib/utils";
 
 export type MariSecondaryFlyoutId =
   | "verlauf"
+  | "buchen"
   | "buchungen"
   | "anzeige";
 
 export const MARI_SECONDARY_FLYOUT_META: Record<
   MariSecondaryFlyoutId,
-  { label: string; short: string }
+  { label: string; short: string; description?: string }
 > = {
-  verlauf: { label: "Verlauf", short: "Verlauf" },
-  buchungen: { label: "Stunden", short: "Stunden" },
-  anzeige: { label: "Listenfelder", short: "Anzeige" },
+  verlauf: {
+    label: "Verlauf",
+    short: "Verlauf",
+    description: "Timeline & interne Notizen",
+  },
+  buchen: {
+    label: "Buchungsmaske",
+    short: "Buchen",
+    description: "Zeit auf dieses Ticket buchen",
+  },
+  buchungen: {
+    label: "Stundenübersicht",
+    short: "Stunden",
+    description: "Buchungen zu diesem Ticket",
+  },
+  anzeige: {
+    label: "Listenfelder",
+    short: "Anzeige",
+    description: "Meta-Zeile in der Ticketliste",
+  },
 };
 
 /** Slide-in duration for main + secondary flyouts (ms). */
@@ -68,7 +87,8 @@ export function MariTicketFlyoutRail({
     label: string;
   }[] = [
     { id: "verlauf", icon: MessageSquare, label: "Verlauf" },
-    { id: "buchungen", icon: Clock3, label: "Stunden" },
+    { id: "buchen", icon: Clock3, label: "Buchungsmaske" },
+    { id: "buchungen", icon: ClipboardList, label: "Stundenübersicht" },
     { id: "anzeige", icon: ListTree, label: "Listenfelder" },
   ];
 

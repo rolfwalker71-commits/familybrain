@@ -83,6 +83,7 @@ import {
   MariMainFlyoutShell,
   MariSecondaryFlyoutShell,
   MariTicketFlyoutRail,
+  MARI_SECONDARY_FLYOUT_META,
   toggleMariSecondaryFlyout,
   type MariSecondaryFlyoutId,
 } from "@/components/maringo/maringo-flyout-chrome";
@@ -2251,7 +2252,7 @@ export function MaringoWorkspaceClient() {
                                 ? "Stunden auf dieses Ticket buchen"
                                 : "Ticket hat kein Projekt hinterlegt"
                             }
-                            onClick={() => toggleSecondary("buchungen")}
+                            onClick={() => toggleSecondary("buchen")}
                           >
                             <Clock3 className="size-3.5" />
                             Zeit buchen
@@ -2645,27 +2646,16 @@ export function MaringoWorkspaceClient() {
               </MariMainFlyoutShell>
 
               {secondaryFlyouts.map((id, i) => {
+                const meta = MARI_SECONDARY_FLYOUT_META[id];
                 const widthClass =
-                  id === "buchungen"
+                  id === "buchen" || id === "buchungen"
                     ? "w-[min(100%,34rem)]"
                     : "w-[min(100%,30rem)]";
-                const title =
-                  id === "verlauf"
-                    ? "Verlauf"
-                    : id === "buchungen"
-                      ? "Stunden"
-                      : "Listenfelder";
-                const description =
-                  id === "verlauf"
-                    ? "Timeline & interne Notizen"
-                    : id === "buchungen"
-                      ? "Auf Ticket buchen & bestehende Ticket-Buchungen"
-                      : "Meta-Zeile in der Ticketliste";
                 return (
                   <MariSecondaryFlyoutShell
                     key={id}
-                    title={title}
-                    description={description}
+                    title={meta.label}
+                    description={meta.description}
                     onClose={() => closeSecondary(id)}
                     widthClass={widthClass}
                     zIndex={1010 + i}
@@ -2724,22 +2714,27 @@ export function MaringoWorkspaceClient() {
                         )}
                       </div>
                     ) : null}
-                    {id === "buchungen" && detail ? (
+                    {(id === "buchen" || id === "buchungen") && detail ? (
                       <MaringoTimekeepingPanel
                         ticketIssueId={detail.issueId}
-                        bookDefaults={{
-                          issueId: detail.issueId,
-                          projectNumber: detail.projectNumber,
-                          projectLabel: formatMariProjectLabel(
-                            detail.projectNumber,
-                            detail.addressMatchcode || detail.cardCode
-                          ),
-                          contractId: detail.contractId,
-                          contractPositionId: detail.contractPositionId,
-                          activity: detail.briefDescription.slice(0, 100),
-                          hours: 0.25,
-                          billable: true,
-                        }}
+                        ticketPanel={id === "buchen" ? "book" : "lines"}
+                        bookDefaults={
+                          id === "buchen"
+                            ? {
+                                issueId: detail.issueId,
+                                projectNumber: detail.projectNumber,
+                                projectLabel: formatMariProjectLabel(
+                                  detail.projectNumber,
+                                  detail.addressMatchcode || detail.cardCode
+                                ),
+                                contractId: detail.contractId,
+                                contractPositionId: detail.contractPositionId,
+                                activity: detail.briefDescription.slice(0, 100),
+                                hours: 0.25,
+                                billable: true,
+                              }
+                            : null
+                        }
                         onTicketLinesChange={(lines) => {
                           setTicketTimeLines(lines);
                         }}

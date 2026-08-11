@@ -12,6 +12,7 @@ import { toSwissDate } from "@/lib/utils/dates";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { MariCustomerChip } from "@/components/maringo/mari-customer-chip";
+import { MariHoursSplitSummary } from "@/components/maringo/mari-hours-split-summary";
 
 function ProjectWithCustomer({
   projectNumber,
@@ -167,6 +168,8 @@ export function MaringoTimeLinesTable({
   busyLineId,
   /** stack = mehrzeilige Karten ohne Horizontal-Scroll (Flyout). */
   variant = "stack",
+  /** chart = Donut + KPIs; text = Summenzeile; none = kein Footer (KPIs sitzen im Header). */
+  summaryVariant = "text",
 }: {
   lines: MariTimeLine[];
   totalHours?: number;
@@ -178,6 +181,7 @@ export function MaringoTimeLinesTable({
   onDelete?: (line: MariTimeLine) => void | Promise<void>;
   busyLineId?: number | null;
   variant?: "stack" | "table";
+  summaryVariant?: "text" | "chart" | "none";
 }) {
   const total =
     totalHours ??
@@ -198,28 +202,38 @@ export function MaringoTimeLinesTable({
     );
   }
 
-  const totals = (
-    <p className="text-[12px] text-muted-foreground">
-      Summe{" "}
-      <span className="font-semibold tabular-nums text-foreground">
-        {formatHours(total)} h
-      </span>
-      {" · "}
-      verrechenbar{" "}
-      <span className="font-semibold tabular-nums text-emerald-800">
-        {formatHours(billable)} h
-      </span>
-      {" · "}
-      nicht verrechenbar{" "}
-      <span className="font-semibold tabular-nums">
-        {formatHours(nonBillable)} h
-      </span>
-    </p>
-  );
+  const totals =
+    summaryVariant === "chart" ? (
+      <MariHoursSplitSummary
+        totalHours={total}
+        billableHours={billable}
+        nonBillableHours={nonBillable}
+        lineCount={lines.length}
+        totalHint="Ticket"
+      />
+    ) : summaryVariant === "text" ? (
+      <p className="text-[12px] text-muted-foreground">
+        Summe{" "}
+        <span className="font-semibold tabular-nums text-foreground">
+          {formatHours(total)} h
+        </span>
+        {" · "}
+        verrechenbar{" "}
+        <span className="font-semibold tabular-nums text-emerald-800">
+          {formatHours(billable)} h
+        </span>
+        {" · "}
+        nicht verrechenbar{" "}
+        <span className="font-semibold tabular-nums">
+          {formatHours(nonBillable)} h
+        </span>
+      </p>
+    ) : null;
 
   if (variant === "stack") {
     return (
       <div className={cn("space-y-2", className)}>
+        {summaryVariant === "chart" ? totals : null}
         <ul className="space-y-2">
           {lines.map((l) => {
             const busy = busyLineId === l.lineId;
@@ -275,7 +289,7 @@ export function MaringoTimeLinesTable({
             );
           })}
         </ul>
-        {totals}
+        {summaryVariant === "text" ? totals : null}
       </div>
     );
   }

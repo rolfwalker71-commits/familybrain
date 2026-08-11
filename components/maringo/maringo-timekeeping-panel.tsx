@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Clock3, RefreshCw } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { Clock3, Plus, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -28,6 +29,8 @@ import {
   type TimeBookFormValues,
 } from "@/components/maringo/maringo-time-book-form";
 import { MaringoTimeLinesTable } from "@/components/maringo/maringo-time-lines-table";
+import { MariHoursSplitSummary } from "@/components/maringo/mari-hours-split-summary";
+import { MariSecondaryFlyoutShell } from "@/components/maringo/maringo-flyout-chrome";
 
 function zurichTodayYmd(): string {
   return new Intl.DateTimeFormat("en-CA", {
@@ -45,19 +48,27 @@ const PERIOD_OPTIONS: { id: MariTimePeriod; label: string }[] = [
   { id: "quarter", label: "Quartal" },
 ];
 
+export type MariTicketTimePanel = "book" | "lines" | "both";
+
 export function MaringoTimekeepingPanel({
   className,
-  /** Ticket-Kontext: Formular + nur Buchungen dieses Tickets (keine Tagesübersicht). */
+  /** Ticket-Kontext: Formular und/oder nur Buchungen dieses Tickets (keine Tagesübersicht). */
   ticketIssueId = null,
+  /** Bei Ticket: nur Maske, nur Übersicht, oder beides. */
+  ticketPanel = "both",
   bookDefaults = null,
   onTicketLinesChange,
 }: {
   className?: string;
   ticketIssueId?: number | null;
+  ticketPanel?: MariTicketTimePanel;
   bookDefaults?: TimeBookFormDefaults | null;
   onTicketLinesChange?: (lines: MariTimeLine[]) => void;
 }) {
   const ticketMode = ticketIssueId != null && ticketIssueId > 0;
+  const showBookForm = ticketMode && ticketPanel !== "lines";
+  const showLinesOverview = !ticketMode || ticketPanel !== "book";
+  const dayOverview = !ticketMode;
   const [date, setDate] = useState(zurichTodayYmd);
   const [period, setPeriod] = useState<MariTimePeriod>("day");
   const [fromDate, setFromDate] = useState(date);
@@ -76,6 +87,30 @@ export function MaringoTimekeepingPanel({
     null
   );
   const [editLoading, setEditLoading] = useState(false);
+  const [bookFlyoutOpen, setBookFlyoutOpen] = useState(false);
+  const [flyoutPortalReady, setFlyoutPortalReady] = useState(false);
+
+  const onTicketLinesChangeRef = useRef(onTicketLinesChange);
+  useEffect(() => {
+    onTicketLinesChangeRef.current = onTicketLinesChange;
+  }, [onTicketLinesChange]);
+
+  useEffect(() => {
+    setFlyoutPortalReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!bookFlyoutOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (document.querySelector('[data-slot="dialog-overlay"]')) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setBookFlyoutOpen(false);
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [bookFlyoutOpen]);
 
   const periodHint = useMemo(() => {
     try {
@@ -86,20 +121,17 @@ export function MaringoTimekeepingPanel({
     }
   }, [date, period]);
 
-  const applyLines = useCallback(
-    (next: MariTimeLine[]) => {
-      setLines(next);
-      const total =
-        Math.round(next.reduce((s, l) => s + l.hours, 0) * 100) / 100;
-      const billable =
-        Math.round(next.reduce((s, l) => s + l.hoursBillable, 0) * 100) / 100;
-      setTotalHours(total);
-      setBillableHours(billable);
-      setNonBillableHours(Math.round((total - billable) * 100) / 100);
-      onTicketLinesChange?.(next);
-    },
-    [onTicketLinesChange]
-  );
+  const applyLines = useCallback((next: MariTimeLine[]) => {
+    setLines(next);
+    const total =
+      Math.round(next.reduce((s, l) => s + l.hours, 0) * 100) / 100;
+    const billable =
+      Math.round(next.reduce((s, l) => s + l.hoursBillable, 0) * 100) / 100;
+    setTotalHours(total);
+    setBillableHours(billable);
+    setNonBillableHours(Math.round((total - billable) * 100) / 100);
+    onTicketLinesChangeRef.current?.(next);
+  }, []);
 
   const loadPeriod = useCallback(async (ymd: string, p: MariTimePeriod) => {
     setLoading(true);
@@ -125,25 +157,30 @@ export function MaringoTimekeepingPanel({
     }
   }, []);
 
-  const loadTicketLines = useCallback(async (issueId: number) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(
-        `/api/maringo/timekeeping/by-ticket?issueId=${issueId}`
-      );
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(data.error || "Ticket-Buchungen laden fehlgeschlagen");
+  const loadTicketLines = useCallback(
+    async (issueId: number) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetch(
+          `/api/maringo/timekeeping/by-ticket?issueId=${issueId}`
+        );
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(
+            data.error || "Ticket-Buchungen laden fehlgeschlagen"
+          );
+        }
+        applyLines((data.lines || []) as MariTimeLine[]);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+        applyLines([]);
+      } finally {
+        setLoading(false);
       }
-      applyLines((data.lines || []) as MariTimeLine[]);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-      applyLines([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [applyLines]);
+    },
+    [applyLines]
+  );
 
   const reload = useCallback(async () => {
     if (ticketMode && ticketIssueId != null) {
@@ -155,11 +192,15 @@ export function MaringoTimekeepingPanel({
 
   useEffect(() => {
     if (ticketMode && ticketIssueId != null) {
+      // Book-only flyout: lines load after submit via reload(); overview flyout loads here.
+      if (ticketPanel === "book") return;
       void loadTicketLines(ticketIssueId);
       return;
     }
     void loadPeriod(date, period);
-  }, [ticketMode, ticketIssueId, date, period, loadPeriod, loadTicketLines]);
+    // loadTicketLines/loadPeriod are stable; avoid re-fetch loops from parent callbacks
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ticketMode, ticketIssueId, ticketPanel, date, period]);
 
   async function book(values: TimeBookFormValues) {
     setStatus(null);
@@ -338,56 +379,54 @@ export function MaringoTimekeepingPanel({
           {error}
         </p>
       ) : null}
-      {status ? (
+      {status && !dayOverview ? (
         <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm whitespace-pre-wrap break-words text-emerald-950">
           {status}
         </p>
       ) : null}
 
       <div className="space-y-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-sm">
-              <Clock3 className="size-4" strokeWidth={APP_ICON_STROKE} />
-              {ticketMode
-                ? `Zeit auf Ticket #${ticketIssueId} buchen`
-                : "Neue Stundenbuchung"}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <MaringoTimeBookForm
-              key={`${formKey}-${ticketIssueId || "day"}`}
-              defaults={formDefaults}
-              onSubmit={book}
-              layout={ticketMode ? "compact" : "wide"}
-              submitLabel={ticketMode ? "Auf Ticket buchen" : "Buchen"}
-            />
-          </CardContent>
-        </Card>
+        {showBookForm ? (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-sm">
+                <Clock3 className="size-4" strokeWidth={APP_ICON_STROKE} />
+                {`Zeit auf Ticket #${ticketIssueId} buchen`}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <MaringoTimeBookForm
+                key={`${formKey}-${ticketIssueId || "day"}`}
+                defaults={formDefaults}
+                onSubmit={book}
+                layout="compact"
+                submitLabel="Auf Ticket buchen"
+              />
+            </CardContent>
+          </Card>
+        ) : null}
 
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex flex-col gap-3">
-              <div className="flex flex-wrap items-end justify-between gap-2">
-                <div>
-                  <CardTitle className="text-sm">{overviewTitle}</CardTitle>
-                  {!ticketMode && periodHint ? (
-                    <p className="mt-0.5 text-[11px] text-muted-foreground">
-                      {periodHint}
-                      {fromDate !== toDate
-                        ? ` · ${lines.length} Buchungen`
-                        : null}
-                    </p>
-                  ) : ticketMode ? (
-                    <p className="mt-0.5 text-[11px] text-muted-foreground">
-                      {loading
-                        ? "Lade…"
-                        : `${lines.length} Buchung${lines.length === 1 ? "" : "en"}`}
-                    </p>
-                  ) : null}
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  {!ticketMode ? (
+        {showLinesOverview ? (
+          dayOverview ? (
+            <div className="overflow-hidden rounded-2xl border border-border/60 bg-card shadow-[0_4px_18px_rgba(15,23,42,0.05)]">
+              <div className="space-y-3 border-b border-border/50 px-4 py-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h2 className="text-[15px] font-black tracking-tight">
+                      {overviewTitle}
+                    </h2>
+                    {periodHint ? (
+                      <p className="mt-0.5 text-[12px] text-muted-foreground">
+                        {periodHint}
+                        {fromDate !== toDate
+                          ? ` · ${lines.length} Buchungen`
+                          : loading
+                            ? " · Lade…"
+                            : ` · ${lines.length} Buchung${lines.length === 1 ? "" : "en"}`}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
                     <div className="space-y-1">
                       <Label htmlFor="tk-day" className="sr-only">
                         Ankerdatum
@@ -400,24 +439,32 @@ export function MaringoTimekeepingPanel({
                         onChange={(e) => setDate(e.target.value)}
                       />
                     </div>
-                  ) : null}
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="ghost"
-                    className="size-8"
-                    onClick={() => void reload()}
-                    disabled={loading}
-                    aria-label="Aktualisieren"
-                  >
-                    <RefreshCw
-                      className={cn("size-4", loading && "animate-spin")}
-                      strokeWidth={APP_ICON_STROKE}
-                    />
-                  </Button>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="size-8"
+                      onClick={() => void reload()}
+                      disabled={loading}
+                      aria-label="Aktualisieren"
+                    >
+                      <RefreshCw
+                        className={cn("size-4", loading && "animate-spin")}
+                        strokeWidth={APP_ICON_STROKE}
+                      />
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="bg-orange-500 text-white hover:bg-orange-600"
+                      onClick={() => setBookFlyoutOpen(true)}
+                    >
+                      <Plus className="size-3.5" strokeWidth={APP_ICON_STROKE} />
+                      Stunden buchen
+                    </Button>
+                  </div>
                 </div>
-              </div>
-              {!ticketMode ? (
+
                 <div
                   className="inline-flex flex-wrap gap-1 rounded-lg border border-border/60 bg-muted/30 p-1"
                   role="group"
@@ -440,31 +487,134 @@ export function MaringoTimekeepingPanel({
                     </button>
                   ))}
                 </div>
-              ) : null}
+
+                <MariHoursSplitSummary
+                  totalHours={totalHours}
+                  billableHours={billableHours}
+                  nonBillableHours={nonBillableHours}
+                  footnote={
+                    loading
+                      ? "Lade Buchungen…"
+                      : periodHint
+                        ? `${lines.length} Buchung${lines.length === 1 ? "" : "en"} · ${periodHint}`
+                        : `${lines.length} Buchung${lines.length === 1 ? "" : "en"}`
+                  }
+                  totalHint="Zeitraum"
+                />
+              </div>
+
+              <div className="px-4 py-3">
+                <MaringoTimeLinesTable
+                  lines={lines}
+                  totalHours={totalHours}
+                  billableHours={billableHours}
+                  nonBillableHours={nonBillableHours}
+                  summaryVariant="none"
+                  variant="table"
+                  emptyText={
+                    loading
+                      ? "Lade Buchungen…"
+                      : period === "day"
+                        ? "Keine Buchungen an diesem Tag."
+                        : "Keine Buchungen in diesem Zeitraum."
+                  }
+                  onEdit={(l) => void openEdit(l)}
+                  onDelete={removeLine}
+                  busyLineId={busyLineId}
+                />
+              </div>
             </div>
-          </CardHeader>
-          <CardContent>
-            <MaringoTimeLinesTable
-              lines={lines}
-              totalHours={totalHours}
-              billableHours={billableHours}
-              nonBillableHours={nonBillableHours}
-              emptyText={
-                loading
-                  ? "Lade Buchungen…"
-                  : ticketMode
-                    ? "Noch keine Stundenbuchungen auf dieses Ticket."
-                    : period === "day"
-                      ? "Keine Buchungen an diesem Tag."
-                      : "Keine Buchungen in diesem Zeitraum."
-              }
-              onEdit={(l) => void openEdit(l)}
-              onDelete={removeLine}
-              busyLineId={busyLineId}
-            />
-          </CardContent>
-        </Card>
+          ) : (
+            <Card>
+              <CardHeader className="pb-2">
+                <div className="flex flex-col gap-3">
+                  <div className="flex flex-wrap items-end justify-between gap-2">
+                    <div>
+                      <CardTitle className="text-sm">{overviewTitle}</CardTitle>
+                      <p className="mt-0.5 text-[11px] text-muted-foreground">
+                        {loading
+                          ? "Lade…"
+                          : `${lines.length} Buchung${lines.length === 1 ? "" : "en"}`}
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="size-8"
+                      onClick={() => void reload()}
+                      disabled={loading}
+                      aria-label="Aktualisieren"
+                    >
+                      <RefreshCw
+                        className={cn("size-4", loading && "animate-spin")}
+                        strokeWidth={APP_ICON_STROKE}
+                      />
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <MaringoTimeLinesTable
+                  lines={lines}
+                  totalHours={totalHours}
+                  billableHours={billableHours}
+                  nonBillableHours={nonBillableHours}
+                  summaryVariant="chart"
+                  emptyText={
+                    loading
+                      ? "Lade Buchungen…"
+                      : "Noch keine Stundenbuchungen auf dieses Ticket."
+                  }
+                  onEdit={(l) => void openEdit(l)}
+                  onDelete={removeLine}
+                  busyLineId={busyLineId}
+                />
+              </CardContent>
+            </Card>
+          )
+        ) : null}
       </div>
+
+      {flyoutPortalReady && bookFlyoutOpen
+        ? createPortal(
+            <div className="fixed inset-0 z-[1000]">
+              <button
+                type="button"
+                className="absolute inset-0 bg-black/20"
+                aria-label="Flyout schliessen"
+                onClick={() => setBookFlyoutOpen(false)}
+              />
+              <MariSecondaryFlyoutShell
+                title="Stundenbuchung"
+                description="Neue Zeit erfassen"
+                onClose={() => setBookFlyoutOpen(false)}
+                widthClass="w-[min(100%,34rem)]"
+                zIndex={1010}
+                offsetPx={0}
+              >
+                {status ? (
+                  <p className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm whitespace-pre-wrap break-words text-emerald-950">
+                    {status}
+                  </p>
+                ) : null}
+                {error ? (
+                  <p className="mb-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm whitespace-pre-wrap break-words text-rose-950">
+                    {error}
+                  </p>
+                ) : null}
+                <MaringoTimeBookForm
+                  key={`${formKey}-day-flyout`}
+                  defaults={formDefaults}
+                  onSubmit={book}
+                  layout="compact"
+                  submitLabel="Buchen"
+                />
+              </MariSecondaryFlyoutShell>
+            </div>,
+            document.body
+          )
+        : null}
 
       <Dialog
         open={editLine != null}
