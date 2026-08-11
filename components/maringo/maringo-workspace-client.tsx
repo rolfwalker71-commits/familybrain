@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
+  Check,
   Calendar,
   ChevronDown,
   Clock3,
@@ -596,9 +597,13 @@ export function MaringoWorkspaceClient() {
   const [selectedCustomers, setSelectedCustomers] = useState<
     MariCustomerOption[]
   >([]);
+  const [customerDraft, setCustomerDraft] = useState<MariCustomerOption[]>(
+    []
+  );
   const [customerQuery, setCustomerQuery] = useState("");
   const [customerHits, setCustomerHits] = useState<MariCustomerOption[]>([]);
   const [customerSearchBusy, setCustomerSearchBusy] = useState(false);
+  const [customerPickerOpen, setCustomerPickerOpen] = useState(false);
   const [bookDialogOpen, setBookDialogOpen] = useState(false);
   const [editBookLineId, setEditBookLineId] = useState<number | null>(null);
   const [editBookDefaults, setEditBookDefaults] =
@@ -928,6 +933,7 @@ export function MaringoWorkspaceClient() {
             })
             .filter(Boolean) as MariCustomerOption[];
           setSelectedCustomers(next);
+          setCustomerDraft(next);
         }
       } catch {
         /* defaults bleiben */
@@ -960,10 +966,18 @@ export function MaringoWorkspaceClient() {
   }, [statuses, overdueOnly, filterMode, selectedCustomers, filterReady]);
 
   useEffect(() => {
-    if (filterMode !== "customer") {
+    if (filterMode === "customer") {
+      setCustomerDraft(selectedCustomers);
+    } else {
       setCustomerHits([]);
-      return;
+      setCustomerPickerOpen(false);
     }
+    // Only when switching mode — not when applied selection changes mid-pick
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterMode]);
+
+  useEffect(() => {
+    if (filterMode !== "customer") return;
     const q = customerQuery.trim();
     if (q.length < 2) {
       setCustomerHits([]);
@@ -979,11 +993,11 @@ export function MaringoWorkspaceClient() {
           );
           const data = await res.json().catch(() => ({}));
           if (cancelled) return;
-          setCustomerHits(
-            Array.isArray(data.customers)
-              ? (data.customers as MariCustomerOption[])
-              : []
-          );
+          const hits = Array.isArray(data.customers)
+            ? (data.customers as MariCustomerOption[])
+            : [];
+          setCustomerHits(hits);
+          if (hits.length > 0) setCustomerPickerOpen(true);
         } catch {
           if (!cancelled) setCustomerHits([]);
         } finally {
@@ -1548,11 +1562,14 @@ export function MaringoWorkspaceClient() {
                           key={c.cardCode}
                           type="button"
                           title="Abwählen"
-                          onClick={() =>
+                          onClick={() => {
                             setSelectedCustomers((prev) =>
                               prev.filter((x) => x.cardCode !== c.cardCode)
-                            )
-                          }
+                            );
+                            setCustomerDraft((prev) =>
+                              prev.filter((x) => x.cardCode !== c.cardCode)
+                            );
+                          }}
                           className="inline-flex max-w-full items-center gap-1 rounded-full border border-sky-200/80 bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-sky-950"
                         >
                           <span className="truncate">
@@ -1574,7 +1591,7 @@ export function MaringoWorkspaceClient() {
                       id="mari-customer-search"
                       value={customerQuery}
                       onChange={(e) => setCustomerQuery(e.target.value)}
-                      placeholder="Kunde suchen (mind. 2 Zeichen)…"
+                      placeholder="z.B. Bübchen oder CardCode…"
                       className="h-8 text-[12px]"
                       spellCheck={false}
                       autoComplete="off"
@@ -1585,43 +1602,92 @@ export function MaringoWorkspaceClient() {
                         Suche…
                       </p>
                     ) : null}
-                    {customerQuery.trim().length >= 2 &&
-                    customerHits.length > 0 ? (
-                      <ul className="absolute z-20 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-border/70 bg-background py-1 shadow-md">
-                        {customerHits.map((hit) => {
-                          const selected = selectedCustomers.some(
-                            (c) => c.cardCode === hit.cardCode
-                          );
-                          return (
-                            <li key={hit.cardCode}>
-                              <button
-                                type="button"
-                                disabled={selected}
-                                className={cn(
-                                  "flex w-full flex-col px-2.5 py-1.5 text-left text-[12px] hover:bg-muted/50",
-                                  selected && "opacity-50"
-                                )}
-                                onClick={() => {
-                                  setSelectedCustomers((prev) =>
-                                    prev.some((c) => c.cardCode === hit.cardCode)
-                                      ? prev
-                                      : [...prev, hit]
-                                  );
-                                  setCustomerQuery("");
-                                  setCustomerHits([]);
-                                }}
-                              >
-                                <span className="truncate font-semibold">
-                                  {hit.name}
-                                </span>
-                                <span className="truncate text-[10px] text-muted-foreground">
-                                  {hit.cardCode}
-                                </span>
-                              </button>
-                            </li>
-                          );
-                        })}
-                      </ul>
+                    {customerPickerOpen && customerHits.length > 0 ? (
+                      <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-lg border border-border/70 bg-background shadow-md">
+                        <ul className="max-h-48 overflow-y-auto py-1">
+                          {customerHits.map((hit) => {
+                            const checked = customerDraft.some(
+                              (c) => c.cardCode === hit.cardCode
+                            );
+                            return (
+                              <li key={hit.cardCode}>
+                                <button
+                                  type="button"
+                                  className={cn(
+                                    "flex w-full items-start gap-2 px-2.5 py-1.5 text-left text-[12px] hover:bg-muted/50",
+                                    checked && "bg-sky-50/80"
+                                  )}
+                                  onClick={() => {
+                                    setCustomerDraft((prev) =>
+                                      checked
+                                        ? prev.filter(
+                                            (c) => c.cardCode !== hit.cardCode
+                                          )
+                                        : [...prev, hit]
+                                    );
+                                  }}
+                                >
+                                  <span
+                                    className={cn(
+                                      "mt-0.5 flex size-4 shrink-0 items-center justify-center rounded border",
+                                      checked
+                                        ? "border-sky-600 bg-sky-600 text-white"
+                                        : "border-border/80 bg-background"
+                                    )}
+                                    aria-hidden
+                                  >
+                                    {checked ? (
+                                      <Check className="size-3" strokeWidth={3} />
+                                    ) : null}
+                                  </span>
+                                  <span className="min-w-0 flex-1">
+                                    <span className="block truncate font-semibold">
+                                      {hit.name}
+                                    </span>
+                                    <span className="block truncate text-[10px] text-muted-foreground">
+                                      {hit.cardCode}
+                                    </span>
+                                  </span>
+                                </button>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                        <div className="flex items-center justify-between gap-2 border-t border-border/50 bg-muted/20 px-2 py-1.5">
+                          <p className="text-[10px] text-muted-foreground">
+                            {customerDraft.length} gewählt
+                          </p>
+                          <div className="flex gap-1.5">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 px-2 text-[11px]"
+                              onClick={() => {
+                                setCustomerDraft(selectedCustomers);
+                                setCustomerQuery("");
+                                setCustomerHits([]);
+                                setCustomerPickerOpen(false);
+                              }}
+                            >
+                              Abbrechen
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              className="h-7 bg-sky-600 px-2.5 text-[11px] text-white hover:bg-sky-700"
+                              onClick={() => {
+                                setSelectedCustomers(customerDraft);
+                                setCustomerQuery("");
+                                setCustomerHits([]);
+                                setCustomerPickerOpen(false);
+                              }}
+                            >
+                              Übernehmen
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
                     ) : null}
                     {customerQuery.trim().length >= 2 &&
                     !customerSearchBusy &&
@@ -1633,9 +1699,16 @@ export function MaringoWorkspaceClient() {
                   </div>
                   {selectedCustomers.length === 0 ? (
                     <p className="text-[10px] text-muted-foreground">
-                      Mindestens einen Kunden wählen (Multi-Select).
+                      Mehrere Kunden anhaken, dann «Übernehmen» — Tickets aller
+                      Bearbeiter.
                     </p>
-                  ) : null}
+                  ) : (
+                    <p className="text-[10px] text-muted-foreground">
+                      {selectedCustomers.length} Kunde
+                      {selectedCustomers.length === 1 ? "" : "n"} aktiv · Tickets
+                      aller Kollegen
+                    </p>
+                  )}
                 </div>
               )}
             </div>

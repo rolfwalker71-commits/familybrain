@@ -249,7 +249,6 @@ export async function listMyTickets(
       ? options.statuses.filter((n) => Number.isInteger(n) && n > 0)
       : [...WORK_STATUS_IDS];
   if (statuses.length === 0) return [];
-  const limit = Math.min(Math.max(options.limit ?? 100, 1), 200);
 
   const cardCodes = [
     ...new Set(
@@ -259,6 +258,10 @@ export async function listMyTickets(
     ),
   ].slice(0, 40);
   const byCustomer = cardCodes.length > 0;
+  const limit = Math.min(
+    Math.max(options.limit ?? (byCustomer ? 200 : 100), 1),
+    200
+  );
 
   let ownerClause: string;
   if (byCustomer) {
