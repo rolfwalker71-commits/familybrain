@@ -25,14 +25,23 @@ const PatchSchema = z.object({
   id: z.string().min(1).max(200),
   listId: z.string().max(200).nullable().optional(),
   etag: z.string().max(500).nullable().optional(),
-  /** complete / reopen / reschedule / moveBucket (Planner) */
-  action: z.enum(["complete", "reopen", "reschedule", "moveBucket"]),
+  /** complete / reopen / reschedule / moveBucket (Planner) / rename / moveList (To Do) */
+  action: z.enum([
+    "complete",
+    "reopen",
+    "reschedule",
+    "moveBucket",
+    "rename",
+    "moveList",
+  ]),
   dueDate: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .nullable()
     .optional(),
   bucketId: z.string().min(1).max(80).optional(),
+  title: z.string().min(1).max(500).optional(),
+  moveToListId: z.string().min(1).max(200).optional(),
 });
 
 export async function GET() {
@@ -117,6 +126,9 @@ export async function PATCH(request: Request) {
               : undefined,
         dueDate:
           body.action === "reschedule" ? body.dueDate ?? null : undefined,
+        title: body.action === "rename" ? body.title : undefined,
+        moveToListId:
+          body.action === "moveList" ? body.moveToListId : undefined,
       });
       invalidateOverviewCache(userId);
       return NextResponse.json({ ok: true, task });

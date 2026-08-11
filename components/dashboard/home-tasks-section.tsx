@@ -8,6 +8,7 @@ import { weekdayLabel } from "@/components/calendar/agenda-row";
 import {
   GoogleTasksLogo,
   MicrosoftPlannerLogo,
+  MicrosoftToDoLogo,
 } from "@/components/branding/provider-logos";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -326,7 +327,14 @@ function SourceBlock({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-[13px] font-bold tracking-tight">
+        <h3 className="flex items-center gap-1.5 text-[13px] font-bold tracking-tight">
+          {source === "planner" ? (
+            <MicrosoftPlannerLogo className="size-3.5" />
+          ) : source === "todo" ? (
+            <MicrosoftToDoLogo className="size-3.5" />
+          ) : (
+            <GoogleTasksLogo className="size-3.5" />
+          )}
           {SOURCE_LABEL[source]}
           {source === "google" ? (
             <span className="ml-1.5 text-[11px] font-medium text-sky-800">
@@ -596,13 +604,22 @@ export function HomeTasksSection({
           </CardTitle>
           <div className="flex flex-wrap gap-2 text-[12px] text-muted-foreground">
             {hasMicrosoftScope ? (
-              <Link
-                href="/microsoft?tab=planner"
-                className="inline-flex items-center gap-1.5 font-medium underline-offset-2 hover:underline"
-              >
-                <MicrosoftPlannerLogo className="size-3.5" />
-                Planner
-              </Link>
+              <>
+                <Link
+                  href="/microsoft?tab=planner"
+                  className="inline-flex items-center gap-1.5 font-medium underline-offset-2 hover:underline"
+                >
+                  <MicrosoftPlannerLogo className="size-3.5" />
+                  Planner
+                </Link>
+                <Link
+                  href="/microsoft?tab=planner"
+                  className="inline-flex items-center gap-1.5 font-medium underline-offset-2 hover:underline"
+                >
+                  <MicrosoftToDoLogo className="size-3.5" />
+                  To Do
+                </Link>
+              </>
             ) : null}
             {hasGoogleScope ? (
               <Link

@@ -27,6 +27,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   MicrosoftLogo,
   MicrosoftPlannerLogo,
+  MicrosoftToDoLogo,
   OutlookLogo,
 } from "@/components/branding/provider-logos";
 import { PageHeader } from "@/components/layout/page-primitives";
@@ -1112,8 +1113,11 @@ export function MicrosoftDayClient() {
                 className={mailWorkspaceTabClass(tab === "planner", "microsoft")}
                 onClick={() => setTab("planner")}
               >
-                <MicrosoftPlannerLogo className="size-3.5" />
-                Planner
+                <span className="inline-flex items-center gap-0.5">
+                  <MicrosoftPlannerLogo className="size-3.5" />
+                  <MicrosoftToDoLogo className="size-3.5" />
+                </span>
+                Aufgaben
               </button>
             </nav>
           </div>
@@ -1366,10 +1370,13 @@ export function MicrosoftDayClient() {
             />
           ) : tab === "planner" ? (
             <section className="space-y-3">
-              <h2 className="text-[15px] font-semibold">Microsoft Planner</h2>
+              <h2 className="text-[15px] font-semibold">
+                Planner &amp; Microsoft To Do
+              </h2>
               <p className="text-sm text-muted-foreground">
-                Aufgaben, die dir zugewiesen sind — erledigen oder in einen
-                anderen Bucket im gleichen Plan verschieben.
+                Zugewiesene Planner-Aufgaben und To Do (inkl. gekennzeichneter
+                Mails) — erledigen, umbenennen, Termin setzen oder Liste/Bucket
+                wechseln.
               </p>
               <MicrosoftPlannerPanel />
             </section>

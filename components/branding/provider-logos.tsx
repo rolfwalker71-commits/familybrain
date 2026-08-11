@@ -156,6 +156,28 @@ export function MicrosoftPlannerLogo({
   );
 }
 
+/** Microsoft To Do checkmark mark. */
+export function MicrosoftToDoLogo({
+  className,
+  title = "Microsoft To Do",
+}: LogoProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={cn("size-4 shrink-0", className)}
+      aria-hidden={title ? undefined : true}
+      role={title ? "img" : undefined}
+    >
+      {title ? <title>{title}</title> : null}
+      <rect x="2" y="2" width="20" height="20" rx="4" fill="#2564CF" />
+      <path
+        fill="#fff"
+        d="M10.2 16.2 6.6 12.6l1.4-1.4 2.2 2.2 5.4-5.4 1.4 1.4-6.8 6.8z"
+      />
+    </svg>
+  );
+}
+
 export function GoogleTasksLogo({
   className,
   title = "Google Tasks",
