@@ -57,6 +57,8 @@ import type {
   MariTimelineAttachment,
   MariTimelineItem,
 } from "@/lib/mari/tickets";
+import type { MariCustomerOption } from "@/lib/mari/customers";
+import type { MariTicketFilterMode } from "@/lib/mari/ticket-filter-prefs";
 import {
   timelineSideLabel,
   isMariMailStubText,
@@ -589,6 +591,14 @@ export function MaringoWorkspaceClient() {
   const [handledBy, setHandledBy] = useState("");
   const [manualHandledBy, setManualHandledBy] = useState("");
   const [handlerMode, setHandlerMode] = useState<"list" | "manual">("list");
+  const [filterMode, setFilterMode] =
+    useState<MariTicketFilterMode>("handler");
+  const [selectedCustomers, setSelectedCustomers] = useState<
+    MariCustomerOption[]
+  >([]);
+  const [customerQuery, setCustomerQuery] = useState("");
+  const [customerHits, setCustomerHits] = useState<MariCustomerOption[]>([]);
+  const [customerSearchBusy, setCustomerSearchBusy] = useState(false);
   const [bookDialogOpen, setBookDialogOpen] = useState(false);
   const [editBookLineId, setEditBookLineId] = useState<number | null>(null);
   const [editBookDefaults, setEditBookDefaults] =
@@ -659,10 +669,46 @@ export function MaringoWorkspaceClient() {
     }
   }, []);
 
+  const selectedCardCodesKey = useMemo(
+    () =>
+      selectedCustomers
+        .map((c) => c.cardCode)
+        .sort()
+        .join(","),
+    [selectedCustomers]
+  );
+
   const loadList = useCallback(async () => {
     setListLoading(true);
     setError(null);
     try {
+      if (filterMode === "customer") {
+        if (!selectedCardCodesKey) {
+          setConfigured(true);
+          setTickets([]);
+          return;
+        }
+        const q = new URLSearchParams();
+        if (statusParam) q.set("status", statusParam);
+        if (overdueOnly) q.set("overdue", "1");
+        q.set("cardCodes", selectedCardCodesKey);
+        const res = await fetch(`/api/maringo/tickets?${q}`);
+        const data = await res.json().catch(() => ({}));
+        if (res.status === 503) {
+          setConfigured(false);
+          setTickets([]);
+          setError(data.error || "MARI nicht konfiguriert.");
+          return;
+        }
+        setConfigured(true);
+        if (!res.ok) throw new Error(data.error || "Liste fehlgeschlagen");
+        setTickets(Array.isArray(data.tickets) ? data.tickets : []);
+        if (typeof data.defaultHandledBy === "string" && data.defaultHandledBy) {
+          setDefaultHandledBy(String(data.defaultHandledBy).toUpperCase());
+        }
+        return;
+      }
+
       const q = new URLSearchParams();
       if (statusParam) q.set("status", statusParam);
       if (overdueOnly) q.set("overdue", "1");
@@ -687,7 +733,13 @@ export function MaringoWorkspaceClient() {
     } finally {
       setListLoading(false);
     }
-  }, [statusParam, overdueOnly, listHandledBy]);
+  }, [
+    statusParam,
+    overdueOnly,
+    listHandledBy,
+    filterMode,
+    selectedCardCodesKey,
+  ]);
 
   useEffect(() => {
     void loadEmployees();
@@ -861,6 +913,22 @@ export function MaringoWorkspaceClient() {
         if (typeof data.overdueOnly === "boolean") {
           setOverdueOnly(data.overdueOnly);
         }
+        if (data.filterMode === "handler" || data.filterMode === "customer") {
+          setFilterMode(data.filterMode);
+        }
+        if (Array.isArray(data.customers)) {
+          const next = data.customers
+            .map((c: { cardCode?: unknown; name?: unknown }) => {
+              const cardCode = String(c?.cardCode || "").trim();
+              if (!cardCode) return null;
+              return {
+                cardCode,
+                name: String(c?.name || cardCode).trim() || cardCode,
+              };
+            })
+            .filter(Boolean) as MariCustomerOption[];
+          setSelectedCustomers(next);
+        }
       } catch {
         /* defaults bleiben */
       } finally {
@@ -878,13 +946,56 @@ export function MaringoWorkspaceClient() {
       void fetch("/api/maringo/ticket-filter-prefs", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ statuses, overdueOnly }),
+        body: JSON.stringify({
+          statuses,
+          overdueOnly,
+          filterMode,
+          customers: selectedCustomers,
+        }),
       }).catch(() => {
         /* optional */
       });
     }, 350);
     return () => window.clearTimeout(t);
-  }, [statuses, overdueOnly, filterReady]);
+  }, [statuses, overdueOnly, filterMode, selectedCustomers, filterReady]);
+
+  useEffect(() => {
+    if (filterMode !== "customer") {
+      setCustomerHits([]);
+      return;
+    }
+    const q = customerQuery.trim();
+    if (q.length < 2) {
+      setCustomerHits([]);
+      return;
+    }
+    let cancelled = false;
+    const t = window.setTimeout(() => {
+      setCustomerSearchBusy(true);
+      void (async () => {
+        try {
+          const res = await fetch(
+            `/api/maringo/customers?q=${encodeURIComponent(q)}`
+          );
+          const data = await res.json().catch(() => ({}));
+          if (cancelled) return;
+          setCustomerHits(
+            Array.isArray(data.customers)
+              ? (data.customers as MariCustomerOption[])
+              : []
+          );
+        } catch {
+          if (!cancelled) setCustomerHits([]);
+        } finally {
+          if (!cancelled) setCustomerSearchBusy(false);
+        }
+      })();
+    }, 280);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(t);
+    };
+  }, [customerQuery, filterMode]);
 
   useEffect(() => {
     if (!filterReady) return;
@@ -1345,62 +1456,188 @@ export function MaringoWorkspaceClient() {
                   .join(" · ")}
               </p>
             ) : null}
-            <div className="pt-0.5">
-              <Label
-                htmlFor="mari-handler"
-                className="sr-only"
-              >
-                Bearbeiter
-              </Label>
-              <select
-                id="mari-handler"
-                className="h-8 w-full rounded-lg border border-border/70 bg-background px-2 text-[12px] outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
-                value={
-                  handlerMode === "manual"
-                    ? "__manual__"
-                    : handledBy || defaultHandledBy || ""
-                }
-                onChange={(e) => onHandlerSelectChange(e.target.value)}
-                disabled={!configured}
-              >
-                {!handledBy && !defaultHandledBy ? (
-                  <option value="">Laden…</option>
-                ) : null}
-                {employees.map((e) => (
-                  <option key={e.employeeNumber} value={e.employeeNumber}>
-                    {e.matchcode} ({e.employeeNumber})
-                    {defaultHandledBy &&
-                    e.employeeNumber === defaultHandledBy
-                      ? " · ich"
-                      : ""}
-                  </option>
-                ))}
-                {handledBy &&
-                !employees.some((e) => e.employeeNumber === handledBy) ? (
-                  <option value={handledBy}>{handledBy}</option>
-                ) : null}
-                <option value="__manual__">Andere Nummer…</option>
-              </select>
-              {handlerMode === "manual" ? (
-                <Input
-                  value={manualHandledBy}
-                  onChange={(e) =>
-                    setManualHandledBy(e.target.value.toUpperCase())
-                  }
-                  placeholder="z.B. M2055"
-                  className="mt-1.5 h-8 text-[12px]"
-                  spellCheck={false}
-                  autoComplete="off"
-                />
-              ) : null}
-              {effectiveHandledBy &&
-              defaultHandledBy &&
-              effectiveHandledBy !== defaultHandledBy ? (
-                <p className="mt-1 text-[10px] text-muted-foreground">
-                  Ansicht: {effectiveHandledBy} (nicht deine Nummer{" "}
-                  {defaultHandledBy})
-                </p>
-              ) : null}
+            <div className="space-y-1.5 pt-0.5">
+              <div className="flex gap-1 rounded-lg border border-border/60 bg-muted/20 p-0.5">
+                <button
+                  type="button"
+                  onClick={() => setFilterMode("handler")}
+                  className={cn(
+                    "flex-1 rounded-md px-2 py-1 text-[11px] font-semibold transition-colors",
+                    filterMode === "handler"
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  Bearbeiter
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilterMode("customer")}
+                  className={cn(
+                    "flex-1 rounded-md px-2 py-1 text-[11px] font-semibold transition-colors",
+                    filterMode === "customer"
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  Kunde
+                </button>
+              </div>
+
+              {filterMode === "handler" ? (
+                <div>
+                  <Label htmlFor="mari-handler" className="sr-only">
+                    Bearbeiter
+                  </Label>
+                  <select
+                    id="mari-handler"
+                    className="h-8 w-full rounded-lg border border-border/70 bg-background px-2 text-[12px] outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
+                    value={
+                      handlerMode === "manual"
+                        ? "__manual__"
+                        : handledBy || defaultHandledBy || ""
+                    }
+                    onChange={(e) => onHandlerSelectChange(e.target.value)}
+                    disabled={!configured}
+                  >
+                    {!handledBy && !defaultHandledBy ? (
+                      <option value="">Laden…</option>
+                    ) : null}
+                    {employees.map((e) => (
+                      <option key={e.employeeNumber} value={e.employeeNumber}>
+                        {e.matchcode} ({e.employeeNumber})
+                        {defaultHandledBy &&
+                        e.employeeNumber === defaultHandledBy
+                          ? " · ich"
+                          : ""}
+                      </option>
+                    ))}
+                    {handledBy &&
+                    !employees.some((e) => e.employeeNumber === handledBy) ? (
+                      <option value={handledBy}>{handledBy}</option>
+                    ) : null}
+                    <option value="__manual__">Andere Nummer…</option>
+                  </select>
+                  {handlerMode === "manual" ? (
+                    <Input
+                      value={manualHandledBy}
+                      onChange={(e) =>
+                        setManualHandledBy(e.target.value.toUpperCase())
+                      }
+                      placeholder="z.B. M2055"
+                      className="mt-1.5 h-8 text-[12px]"
+                      spellCheck={false}
+                      autoComplete="off"
+                    />
+                  ) : null}
+                  {effectiveHandledBy &&
+                  defaultHandledBy &&
+                  effectiveHandledBy !== defaultHandledBy ? (
+                    <p className="mt-1 text-[10px] text-muted-foreground">
+                      Ansicht: {effectiveHandledBy} (nicht deine Nummer{" "}
+                      {defaultHandledBy})
+                    </p>
+                  ) : null}
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  {selectedCustomers.length > 0 ? (
+                    <div className="flex flex-wrap gap-1">
+                      {selectedCustomers.map((c) => (
+                        <button
+                          key={c.cardCode}
+                          type="button"
+                          title="Abwählen"
+                          onClick={() =>
+                            setSelectedCustomers((prev) =>
+                              prev.filter((x) => x.cardCode !== c.cardCode)
+                            )
+                          }
+                          className="inline-flex max-w-full items-center gap-1 rounded-full border border-sky-200/80 bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-sky-950"
+                        >
+                          <span className="truncate">
+                            {c.name}
+                            <span className="ml-1 font-normal opacity-70">
+                              {c.cardCode}
+                            </span>
+                          </span>
+                          <X className="size-3 shrink-0 opacity-60" aria-hidden />
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                  <div className="relative">
+                    <Label htmlFor="mari-customer-search" className="sr-only">
+                      Kunde suchen
+                    </Label>
+                    <Input
+                      id="mari-customer-search"
+                      value={customerQuery}
+                      onChange={(e) => setCustomerQuery(e.target.value)}
+                      placeholder="Kunde suchen (mind. 2 Zeichen)…"
+                      className="h-8 text-[12px]"
+                      spellCheck={false}
+                      autoComplete="off"
+                      disabled={!configured}
+                    />
+                    {customerSearchBusy ? (
+                      <p className="mt-1 text-[10px] text-muted-foreground">
+                        Suche…
+                      </p>
+                    ) : null}
+                    {customerQuery.trim().length >= 2 &&
+                    customerHits.length > 0 ? (
+                      <ul className="absolute z-20 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-border/70 bg-background py-1 shadow-md">
+                        {customerHits.map((hit) => {
+                          const selected = selectedCustomers.some(
+                            (c) => c.cardCode === hit.cardCode
+                          );
+                          return (
+                            <li key={hit.cardCode}>
+                              <button
+                                type="button"
+                                disabled={selected}
+                                className={cn(
+                                  "flex w-full flex-col px-2.5 py-1.5 text-left text-[12px] hover:bg-muted/50",
+                                  selected && "opacity-50"
+                                )}
+                                onClick={() => {
+                                  setSelectedCustomers((prev) =>
+                                    prev.some((c) => c.cardCode === hit.cardCode)
+                                      ? prev
+                                      : [...prev, hit]
+                                  );
+                                  setCustomerQuery("");
+                                  setCustomerHits([]);
+                                }}
+                              >
+                                <span className="truncate font-semibold">
+                                  {hit.name}
+                                </span>
+                                <span className="truncate text-[10px] text-muted-foreground">
+                                  {hit.cardCode}
+                                </span>
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    ) : null}
+                    {customerQuery.trim().length >= 2 &&
+                    !customerSearchBusy &&
+                    customerHits.length === 0 ? (
+                      <p className="mt-1 text-[10px] text-muted-foreground">
+                        Keine Treffer
+                      </p>
+                    ) : null}
+                  </div>
+                  {selectedCustomers.length === 0 ? (
+                    <p className="text-[10px] text-muted-foreground">
+                      Mindestens einen Kunden wählen (Multi-Select).
+                    </p>
+                  ) : null}
+                </div>
+              )}
             </div>
           </div>
 
@@ -1412,7 +1649,9 @@ export function MaringoWorkspaceClient() {
             ) : null}
             {!listLoading && tickets.length === 0 ? (
               <li className="px-3 py-8 text-center text-sm text-muted-foreground">
-                Keine Tickets für die gewählten Status.
+                {filterMode === "customer" && selectedCustomers.length === 0
+                  ? "Kunde wählen, um Tickets zu laden."
+                  : "Keine Tickets für die gewählten Filter."}
               </li>
             ) : null}
             {tickets.map((t) => {

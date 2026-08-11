@@ -14,6 +14,16 @@ export const dynamic = "force-dynamic";
 const PutSchema = z.object({
   statuses: z.array(z.number().int().positive()).optional(),
   overdueOnly: z.boolean().optional(),
+  filterMode: z.enum(["handler", "customer"]).optional(),
+  customers: z
+    .array(
+      z.object({
+        cardCode: z.string().min(1).max(50),
+        name: z.string().max(120).optional(),
+      })
+    )
+    .max(40)
+    .optional(),
 });
 
 export async function GET() {

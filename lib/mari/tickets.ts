@@ -150,6 +150,11 @@ export type ListTicketsOptions = {
   limit?: number;
   /** Override HandledBy (EmployeeNumber, z.B. M2055). Default: konfigurierte Personalnummer. */
   employeeNumber?: string | null;
+  /**
+   * Wenn gesetzt (nicht leer): Filter nach CardCode, ohne HandledBy-Einschränkung.
+   * Mutually exclusive with employee filter in the API layer.
+   */
+  cardCodes?: string[];
 };
 
 export type MariEmployeeOption = {
@@ -238,23 +243,40 @@ function lineLabel(posType: number): string {
 export async function listMyTickets(
   options: ListTicketsOptions = {}
 ): Promise<MariTicketListItem[]> {
-  const cfg = requireMariConfig();
+  requireMariConfig();
   const statuses =
     options.statuses && options.statuses.length > 0
       ? options.statuses.filter((n) => Number.isInteger(n) && n > 0)
       : [...WORK_STATUS_IDS];
   if (statuses.length === 0) return [];
   const limit = Math.min(Math.max(options.limit ?? 100, 1), 200);
-  const empRaw =
-    normalizeMariEmployeeNumber(options.employeeNumber) ||
-    normalizeMariEmployeeNumber(cfg.employeeNumber);
-  if (!empRaw) {
-    throw new MariApiError(
-      "Personalnummer fehlt oder ungültig (z.B. M1010).",
-      400
-    );
+
+  const cardCodes = [
+    ...new Set(
+      (options.cardCodes || [])
+        .map((c) => (c || "").trim())
+        .filter((c) => c.length > 0 && c.length <= 50)
+    ),
+  ].slice(0, 40);
+  const byCustomer = cardCodes.length > 0;
+
+  let ownerClause: string;
+  if (byCustomer) {
+    ownerClause = `i."CardCode" IN (${cardCodes.map(sqlQuote).join(",")})`;
+  } else {
+    const cfg = requireMariConfig();
+    const empRaw =
+      normalizeMariEmployeeNumber(options.employeeNumber) ||
+      normalizeMariEmployeeNumber(cfg.employeeNumber);
+    if (!empRaw) {
+      throw new MariApiError(
+        "Personalnummer fehlt oder ungültig (z.B. M1010).",
+        400
+      );
+    }
+    ownerClause = `i."HandledBy" = ${sqlQuote(empRaw)}`;
   }
-  const emp = sqlQuote(empRaw);
+
   const statusList = statuses.join(",");
   const overdueClause = options.overdueOnly
     ? ` AND i."DueDate" IS NOT NULL AND i."DueDate" < CURRENT_DATE `
@@ -332,7 +354,7 @@ LEFT JOIN "MARIEmployeeMaster" e
   ON e."EmployeeNumber" = i."HandledBy"
 LEFT JOIN "MARISupportGroup" g
   ON g."GroupId" = i."SupportGroupID"
-WHERE i."HandledBy" = ${emp}
+WHERE ${ownerClause}
   AND i."EditorType" = 3
   AND i."HotlineClassType" = ${SUPPORT_HOTLINE_CLASS_TYPE}
   AND i."Status" IN (${statusList})

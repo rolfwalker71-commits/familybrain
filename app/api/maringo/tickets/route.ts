@@ -3,6 +3,7 @@ import { ensureInitialized } from "@/lib/db/migrations";
 import { isAuthError, requireModule } from "@/lib/auth/current-user";
 import { MariApiError, requireMariConfig } from "@/lib/mari/client";
 import { hasMariConfig } from "@/lib/mari/config";
+import { parseCardCodesParam } from "@/lib/mari/customers";
 import { parseStatusIdsParam, WORK_STATUS_IDS } from "@/lib/mari/status";
 import {
   listMyTickets,
@@ -38,6 +39,30 @@ export async function GET(request: Request) {
       WORK_STATUS_IDS
     );
     const overdueOnly = url.searchParams.get("overdue") === "1";
+    const cardCodes = parseCardCodesParam(url.searchParams.get("cardCodes"));
+
+    if (cardCodes.length > 0) {
+      const tickets = await listMyTickets({
+        statuses,
+        overdueOnly,
+        cardCodes,
+      });
+      return NextResponse.json({
+        configured: true,
+        tickets,
+        statuses,
+        overdueOnly,
+        cardCodes,
+        filterMode: "customer" as const,
+        defaultHandledBy:
+          normalizeMariEmployeeNumber(
+            auth.userId != null
+              ? getAppUserById(auth.userId)?.mari_employee_number
+              : null
+          ) || cfg.employeeNumber.trim().toUpperCase(),
+      });
+    }
+
     const handledByParam =
       url.searchParams.get("handledBy") ||
       url.searchParams.get("employee") ||
@@ -67,6 +92,7 @@ export async function GET(request: Request) {
       statuses,
       overdueOnly,
       handledBy,
+      filterMode: "handler" as const,
       defaultHandledBy:
         normalizeMariEmployeeNumber(userEmp) ||
         cfg.employeeNumber.trim().toUpperCase(),
