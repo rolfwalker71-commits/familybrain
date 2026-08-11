@@ -73,6 +73,7 @@ import type {
 import type { MariCustomerOption } from "@/lib/mari/customers";
 import type {
   MariListMetaField,
+  MariListSort,
   MariTicketFilterMode,
   MariTimelineSort,
 } from "@/lib/mari/ticket-filter-prefs-shared";
@@ -606,6 +607,7 @@ export function MaringoWorkspaceClient() {
   const [filterReady, setFilterReady] = useState(false);
   const [timelineSort, setTimelineSort] =
     useState<MariTimelineSort>("oldest");
+  const [listSort, setListSort] = useState<MariListSort>("newest");
   const [listMetaFields, setListMetaFields] = useState<MariListMetaField[]>([
     ...DEFAULT_MARI_LIST_META_FIELDS,
   ]);
@@ -710,6 +712,26 @@ export function MaringoWorkspaceClient() {
     });
     return items;
   }, [detail?.timeline, timelineSort]);
+
+  const sortedTickets = useMemo(() => {
+    if (tickets.length === 0) return tickets;
+    const items = [...tickets];
+    const stamp = (t: MariTicketListItem) =>
+      Date.parse(t.requestDate || "") ||
+      Date.parse(t.changeAtDate || "") ||
+      0;
+    items.sort((a, b) => {
+      const ta = stamp(a);
+      const tb = stamp(b);
+      if (ta !== tb) {
+        return listSort === "newest" ? tb - ta : ta - tb;
+      }
+      return listSort === "newest"
+        ? b.issueId - a.issueId
+        : a.issueId - b.issueId;
+    });
+    return items;
+  }, [tickets, listSort]);
 
   const ticketTimeHoursTotal = useMemo(() => {
     return (
@@ -933,6 +955,9 @@ export function MaringoWorkspaceClient() {
         if (data.timelineSort === "newest" || data.timelineSort === "oldest") {
           setTimelineSort(data.timelineSort);
         }
+        if (data.listSort === "newest" || data.listSort === "oldest") {
+          setListSort(data.listSort);
+        }
         if (Array.isArray(data.listMetaFields)) {
           const allowed = new Set(
             MARI_LIST_META_FIELD_OPTIONS.map((o) => o.id)
@@ -982,6 +1007,7 @@ export function MaringoWorkspaceClient() {
           filterMode,
           customers: selectedCustomers,
           timelineSort,
+          listSort,
           listMetaFields,
         }),
       }).catch(() => {
@@ -995,6 +1021,7 @@ export function MaringoWorkspaceClient() {
     filterMode,
     selectedCustomers,
     timelineSort,
+    listSort,
     listMetaFields,
     filterReady,
   ]);
@@ -1672,6 +1699,36 @@ export function MaringoWorkspaceClient() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              <div className="ml-auto inline-flex items-center gap-0.5 rounded-full border border-border/70 p-0.5">
+                <button
+                  type="button"
+                  onClick={() => setListSort("newest")}
+                  title="Neueste zuerst"
+                  className={cn(
+                    "inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-semibold transition-colors",
+                    listSort === "newest"
+                      ? "bg-muted text-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <ArrowDownAZ className="size-3.5" strokeWidth={APP_ICON_STROKE} />
+                  Neu→Alt
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setListSort("oldest")}
+                  title="Älteste zuerst"
+                  className={cn(
+                    "inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-semibold transition-colors",
+                    listSort === "oldest"
+                      ? "bg-muted text-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <ArrowUpAZ className="size-3.5" strokeWidth={APP_ICON_STROKE} />
+                  Alt→Neu
+                </button>
+              </div>
             </div>
             {statuses.length > 0 ? (
               <p
@@ -1942,7 +1999,7 @@ export function MaringoWorkspaceClient() {
                   : "Keine Tickets für die gewählten Filter."}
               </li>
             ) : null}
-            {tickets.map((t) => {
+            {sortedTickets.map((t) => {
               const active = t.issueId === selectedId;
               const due = formatDayMonth(t.dueDate);
               const overdue = isOverdue(t.dueDate);

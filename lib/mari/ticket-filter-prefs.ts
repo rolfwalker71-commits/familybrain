@@ -5,6 +5,7 @@ import {
   DEFAULT_MARI_LIST_META_FIELDS,
   MARI_LIST_META_FIELD_OPTIONS,
   type MariListMetaField,
+  type MariListSort,
   type MariTicketFilterCustomer,
   type MariTicketFilterMode,
   type MariTicketFilterPrefs,
@@ -13,6 +14,7 @@ import {
 
 export type {
   MariListMetaField,
+  MariListSort,
   MariTicketFilterCustomer,
   MariTicketFilterMode,
   MariTicketFilterPrefs,
@@ -49,6 +51,11 @@ function sanitizeFilterMode(raw: unknown): MariTicketFilterMode | null {
 }
 
 function sanitizeTimelineSort(raw: unknown): MariTimelineSort | null {
+  if (raw === "newest" || raw === "oldest") return raw;
+  return null;
+}
+
+function sanitizeListSort(raw: unknown): MariListSort | null {
   if (raw === "newest" || raw === "oldest") return raw;
   return null;
 }
@@ -101,6 +108,8 @@ export function defaultMariTicketFilterPrefs(): MariTicketFilterPrefs {
     customers: [],
     /** Matches previous Maringo order (CreateDate ascending). */
     timelineSort: "oldest",
+    /** Neueste Tickets oben — typisch für Support-Inbox. */
+    listSort: "newest",
     listMetaFields: [...DEFAULT_MARI_LIST_META_FIELDS],
   };
 }
@@ -119,6 +128,7 @@ export function getMariTicketFilterPrefs(
       customers?: unknown;
       cardCodes?: unknown;
       timelineSort?: unknown;
+      listSort?: unknown;
       listMetaFields?: unknown;
     };
     const statuses = sanitizeStatuses(parsed.statuses) || defaults.statuses;
@@ -137,6 +147,7 @@ export function getMariTicketFilterPrefs(
       customers: customers ?? defaults.customers,
       timelineSort:
         sanitizeTimelineSort(parsed.timelineSort) || defaults.timelineSort,
+      listSort: sanitizeListSort(parsed.listSort) || defaults.listSort,
       listMetaFields:
         sanitizeListMetaFields(parsed.listMetaFields) ??
         defaults.listMetaFields,
@@ -154,6 +165,7 @@ export function saveMariTicketFilterPrefs(
     filterMode?: unknown;
     customers?: unknown;
     timelineSort?: unknown;
+    listSort?: unknown;
     listMetaFields?: unknown;
   }
 ): MariTicketFilterPrefs {
@@ -178,6 +190,10 @@ export function saveMariTicketFilterPrefs(
     input.timelineSort !== undefined
       ? sanitizeTimelineSort(input.timelineSort) || current.timelineSort
       : current.timelineSort;
+  const listSort =
+    input.listSort !== undefined
+      ? sanitizeListSort(input.listSort) || current.listSort
+      : current.listSort;
   const listMetaFields =
     input.listMetaFields !== undefined
       ? sanitizeListMetaFields(input.listMetaFields) ?? current.listMetaFields
@@ -188,6 +204,7 @@ export function saveMariTicketFilterPrefs(
     filterMode,
     customers,
     timelineSort,
+    listSort,
     listMetaFields,
   };
   setSetting(settingKey(ownerKey), JSON.stringify(next));

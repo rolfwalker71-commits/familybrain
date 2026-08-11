@@ -31,6 +31,7 @@ test("ticket filter prefs default to handler mode", () => {
   assert.deepEqual(d.customers, []);
   assert.equal(d.overdueOnly, false);
   assert.equal(d.timelineSort, "oldest");
+  assert.equal(d.listSort, "newest");
   assert.deepEqual(d.listMetaFields, [
     "kunde",
     "projekt",

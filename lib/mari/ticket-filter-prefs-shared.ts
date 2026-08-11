@@ -5,6 +5,9 @@ export type MariTicketFilterMode = "handler" | "customer";
 /** Verlauf: newest = aktuellste Nachricht oben */
 export type MariTimelineSort = "newest" | "oldest";
 
+/** Ticketliste: newest = neueste Anfrage oben */
+export type MariListSort = "newest" | "oldest";
+
 /** Meta-Zeile in der Ticketliste (Stundenbuchung-relevant). */
 export type MariListMetaField =
   | "kunde"
@@ -69,5 +72,7 @@ export type MariTicketFilterPrefs = {
   filterMode: MariTicketFilterMode;
   customers: MariTicketFilterCustomer[];
   timelineSort: MariTimelineSort;
+  /** Ticketliste alt→neu / neu→alt (Anfragedatum). */
+  listSort: MariListSort;
   listMetaFields: MariListMetaField[];
 };
