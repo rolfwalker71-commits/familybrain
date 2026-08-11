@@ -1675,6 +1675,12 @@ export function MaringoWorkspaceClient() {
     contractPositionId: number | null;
     activity: string;
     stdFreigabe: number | null;
+    contactPerson: string | null;
+    contactEmail: string | null;
+    supportGroupId: number | null;
+    handledBy: string | null;
+    priority: number | null;
+    medium: number | null;
   }) {
     if (!selectedId) throw new Error("Kein Ticket gewählt.");
     setPatching(true);
@@ -1683,7 +1689,18 @@ export function MaringoWorkspaceClient() {
       const res = await fetch(`/api/maringo/tickets/${selectedId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
+        body: JSON.stringify({
+          projectNumber: values.projectNumber,
+          contractId: values.contractId,
+          contractPositionId: values.contractPositionId,
+          activity: values.activity,
+          stdFreigabe: values.stdFreigabe,
+          contactPerson: values.contactPerson,
+          supportGroupId: values.supportGroupId,
+          handledBy: values.handledBy,
+          priority: values.priority ?? undefined,
+          medium: values.medium,
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Änderung fehlgeschlagen");
@@ -3175,6 +3192,11 @@ export function MaringoWorkspaceClient() {
                           contractPositionId: detail.contractPositionId,
                           activity: detail.briefDescription,
                           stdFreigabe: detail.stdFreigabe,
+                          contactPerson: detail.contactPerson,
+                          supportGroupId: detail.supportGroupId,
+                          handledBy: detail.handledBy,
+                          priority: detail.priority,
+                          medium: detail.medium,
                         }}
                         onSubmit={saveTicketKopf}
                       />

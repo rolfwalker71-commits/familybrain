@@ -150,7 +150,9 @@ export async function DELETE(request: Request, context: Ctx) {
 
     const subject = (deleted.subject || "").toLowerCase();
     const wasAnalysisNote =
-      subject.includes("buddy ai") || subject.includes("ai-analyse");
+      subject.includes("buddy ai") ||
+      subject.includes("ai-analyse") ||
+      subject === "interner kommentar";
     let internalNotePostedAt: string | null | undefined;
     if (wasAnalysisNote) {
       const cleared = clearMariTicketAnalysisInternalNotePosted(

@@ -89,6 +89,9 @@ export type MariTicketListItem = {
   supportGroupName: string | null;
   requestDate: string | null;
   contactPerson: string | null;
+  /** Kommunikationskanal / Medium (MPHOTLINESETTINGS SETTING=5) */
+  medium: number | null;
+  mediumName: string | null;
   /** USER_U_Std_Freigegeben_Kunde */
   stdFreigabe: string | null;
   /** AI-Kurzinfo (Topic/Category) */
@@ -402,6 +405,8 @@ ORDER BY
       supportGroupName: r.SupportGroupName || null,
       requestDate: r.RequestDate || null,
       contactPerson: (r.ContactPerson || "").trim() || null,
+      medium: null,
+      mediumName: null,
       stdFreigabe:
         r.StdFreigabe == null || String(r.StdFreigabe).trim() === ""
           ? null
@@ -682,6 +687,8 @@ export async function getTicketDetail(
   let requestDate: string | null = null;
   let changeAtDate: string | null = null;
   let contactPerson: string | null = null;
+  let medium: number | null = null;
+  let mediumName: string | null = null;
   let stdFreigabe: string | null = null;
   let aiLabel: string | null = null;
   let issueType: number | null = null;
@@ -710,6 +717,8 @@ export async function getTicketDetail(
       RequestDate: string | null;
       ChangeAtDate: string | null;
       ContactPerson: string | null;
+      Medium: number | null;
+      MediumName: string | null;
       StdFreigabe: string | null;
       AiTopic: string | null;
       AiCategory: string | null;
@@ -725,6 +734,114 @@ export async function getTicketDetail(
       ContractPositionID: number | null;
     }>(
       `SELECT
+  s."BEZEICHNUNG" AS "StatusName",
+  p."BEZEICHNUNG" AS "PriorityName",
+  t."BEZEICHNUNG" AS "IssueTypeName",
+  pr."ProductName" AS "ProductName",
+  i."AddressMatchcode",
+  i."ReferenceText",
+  e."Matchcode" AS "HandledByName",
+  g."Description" AS "SupportGroupName",
+  i."RequestDate",
+  i."ChangeAtDate",
+  i."ContactPerson",
+  i."Medium",
+  m."BEZEICHNUNG" AS "MediumName",
+  i."USER_U_Std_Freigegeben_Kunde" AS "StdFreigabe",
+  i."USER_ANG_AI_TOPIC" AS "AiTopic",
+  i."USER_ANG_AI_CATEGORY" AS "AiCategory",
+  i."IssueType",
+  i."SupportGroupID",
+  i."ProductID",
+  i."CardCode",
+  i."HandledBy",
+  i."DueDate",
+  i."ProjectNumber",
+  i."PhaseID",
+  i."ContractID",
+  i."ContractPositionID"
+FROM "MARISupportIssue" i
+LEFT JOIN "MPHOTLINESETTINGS" s ON s."SETTING"=1 AND s."ID"=i."Status"
+LEFT JOIN "MPHOTLINESETTINGS" p ON p."SETTING"=3 AND p."ID"=i."Priority"
+LEFT JOIN "MPHOTLINESETTINGS" t ON t."SETTING"=2 AND t."ID"=i."IssueType"
+LEFT JOIN "MPHOTLINESETTINGS" m ON m."SETTING"=5 AND m."ID"=i."Medium"
+LEFT JOIN "MARISupportProduct" pr ON pr."ProductID"=i."ProductID"
+LEFT JOIN "MARIEmployeeMaster" e ON e."EmployeeNumber"=i."HandledBy"
+LEFT JOIN "MARISupportGroup" g ON g."GroupId"=i."SupportGroupID"
+WHERE i."IssueID"=${issueId}`
+    );
+    const n = names[0];
+    if (n?.StatusName) statusName = statusChipLabel(status, n.StatusName);
+    if (n?.PriorityName) priorityName = n.PriorityName;
+    issueTypeName = n?.IssueTypeName || null;
+    productName = n?.ProductName || null;
+    addressMatchcode = n?.AddressMatchcode || null;
+    referenceText = (n?.ReferenceText || "").trim() || null;
+    handledByName = n?.HandledByName || null;
+    supportGroupName = n?.SupportGroupName || null;
+    requestDate = n?.RequestDate || null;
+    changeAtDate = n?.ChangeAtDate || null;
+    contactPerson = (n?.ContactPerson || "").trim() || null;
+    if (n?.Medium != null && Number.isFinite(Number(n.Medium))) {
+      medium = Number(n.Medium);
+      mediumName = (n.MediumName || "").trim() || null;
+    }
+    stdFreigabe =
+      n?.StdFreigabe == null || String(n.StdFreigabe).trim() === ""
+        ? null
+        : String(n.StdFreigabe).trim();
+    aiLabel =
+      (n?.AiTopic || "").trim() || (n?.AiCategory || "").trim() || null;
+    issueType = n?.IssueType != null ? Number(n.IssueType) : null;
+    supportGroupId =
+      n?.SupportGroupID != null ? Number(n.SupportGroupID) : null;
+    productIdFromView = n?.ProductID != null ? Number(n.ProductID) : null;
+    cardCodeFromView = n?.CardCode || null;
+    handledByFromView = n?.HandledBy || null;
+    dueDateFromView = n?.DueDate || null;
+    projectNumber = (n?.ProjectNumber || "").trim() || null;
+    phaseId =
+      n?.PhaseID == null || Number(n.PhaseID) === 0
+        ? null
+        : Number(n.PhaseID);
+    contractId =
+      n?.ContractID == null || Number(n.ContractID) === 0
+        ? null
+        : Number(n.ContractID);
+    contractPositionId =
+      n?.ContractPositionID == null || Number(n.ContractPositionID) === 0
+        ? null
+        : Number(n.ContractPositionID);
+  } catch {
+    /* ignore enrichment — Medium-Spalte ggf. nicht vorhanden */
+    try {
+      const names = await mariSql<{
+        StatusName: string | null;
+        PriorityName: string | null;
+        IssueTypeName: string | null;
+        ProductName: string | null;
+        AddressMatchcode: string | null;
+        ReferenceText: string | null;
+        HandledByName: string | null;
+        SupportGroupName: string | null;
+        RequestDate: string | null;
+        ChangeAtDate: string | null;
+        ContactPerson: string | null;
+        StdFreigabe: string | null;
+        AiTopic: string | null;
+        AiCategory: string | null;
+        IssueType: number | null;
+        SupportGroupID: number | null;
+        ProductID: number | null;
+        CardCode: string | null;
+        HandledBy: string | null;
+        DueDate: string | null;
+        ProjectNumber: string | null;
+        PhaseID: number | null;
+        ContractID: number | null;
+        ContractPositionID: number | null;
+      }>(
+        `SELECT
   s."BEZEICHNUNG" AS "StatusName",
   p."BEZEICHNUNG" AS "PriorityName",
   t."BEZEICHNUNG" AS "IssueTypeName",
@@ -757,47 +874,54 @@ LEFT JOIN "MARISupportProduct" pr ON pr."ProductID"=i."ProductID"
 LEFT JOIN "MARIEmployeeMaster" e ON e."EmployeeNumber"=i."HandledBy"
 LEFT JOIN "MARISupportGroup" g ON g."GroupId"=i."SupportGroupID"
 WHERE i."IssueID"=${issueId}`
-    );
-    const n = names[0];
-    if (n?.StatusName) statusName = statusChipLabel(status, n.StatusName);
-    if (n?.PriorityName) priorityName = n.PriorityName;
-    issueTypeName = n?.IssueTypeName || null;
-    productName = n?.ProductName || null;
-    addressMatchcode = n?.AddressMatchcode || null;
-    referenceText = (n?.ReferenceText || "").trim() || null;
-    handledByName = n?.HandledByName || null;
-    supportGroupName = n?.SupportGroupName || null;
-    requestDate = n?.RequestDate || null;
-    changeAtDate = n?.ChangeAtDate || null;
-    contactPerson = (n?.ContactPerson || "").trim() || null;
-    stdFreigabe =
-      n?.StdFreigabe == null || String(n.StdFreigabe).trim() === ""
-        ? null
-        : String(n.StdFreigabe).trim();
-    aiLabel =
-      (n?.AiTopic || "").trim() || (n?.AiCategory || "").trim() || null;
-    issueType = n?.IssueType != null ? Number(n.IssueType) : null;
-    supportGroupId =
-      n?.SupportGroupID != null ? Number(n.SupportGroupID) : null;
-    productIdFromView = n?.ProductID != null ? Number(n.ProductID) : null;
-    cardCodeFromView = n?.CardCode || null;
-    handledByFromView = n?.HandledBy || null;
-    dueDateFromView = n?.DueDate || null;
-    projectNumber = (n?.ProjectNumber || "").trim() || null;
-    phaseId =
-      n?.PhaseID == null || Number(n.PhaseID) === 0
-        ? null
-        : Number(n.PhaseID);
-    contractId =
-      n?.ContractID == null || Number(n.ContractID) === 0
-        ? null
-        : Number(n.ContractID);
-    contractPositionId =
-      n?.ContractPositionID == null || Number(n.ContractPositionID) === 0
-        ? null
-        : Number(n.ContractPositionID);
-  } catch {
-    /* ignore */
+      );
+      const n = names[0];
+      if (n?.StatusName) statusName = statusChipLabel(status, n.StatusName);
+      if (n?.PriorityName) priorityName = n.PriorityName;
+      issueTypeName = n?.IssueTypeName || null;
+      productName = n?.ProductName || null;
+      addressMatchcode = n?.AddressMatchcode || null;
+      referenceText = (n?.ReferenceText || "").trim() || null;
+      handledByName = n?.HandledByName || null;
+      supportGroupName = n?.SupportGroupName || null;
+      requestDate = n?.RequestDate || null;
+      changeAtDate = n?.ChangeAtDate || null;
+      contactPerson = (n?.ContactPerson || "").trim() || null;
+      stdFreigabe =
+        n?.StdFreigabe == null || String(n.StdFreigabe).trim() === ""
+          ? null
+          : String(n.StdFreigabe).trim();
+      aiLabel =
+        (n?.AiTopic || "").trim() || (n?.AiCategory || "").trim() || null;
+      issueType = n?.IssueType != null ? Number(n.IssueType) : null;
+      supportGroupId =
+        n?.SupportGroupID != null ? Number(n.SupportGroupID) : null;
+      productIdFromView = n?.ProductID != null ? Number(n.ProductID) : null;
+      cardCodeFromView = n?.CardCode || null;
+      handledByFromView = n?.HandledBy || null;
+      dueDateFromView = n?.DueDate || null;
+      projectNumber = (n?.ProjectNumber || "").trim() || null;
+      phaseId =
+        n?.PhaseID == null || Number(n.PhaseID) === 0
+          ? null
+          : Number(n.PhaseID);
+      contractId =
+        n?.ContractID == null || Number(n.ContractID) === 0
+          ? null
+          : Number(n.ContractID);
+      contractPositionId =
+        n?.ContractPositionID == null || Number(n.ContractPositionID) === 0
+          ? null
+          : Number(n.ContractPositionID);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  if (medium == null) {
+    const rawMedium = issue.Medium ?? issue.medium;
+    const mid = Number(rawMedium);
+    if (Number.isInteger(mid) && mid > 0) medium = mid;
   }
 
   // REST-Fallback falls SQL-Felder leer
@@ -891,6 +1015,8 @@ WHERE i."IssueID"=${issueId}`
     supportGroupName,
     requestDate,
     contactPerson,
+    medium,
+    mediumName,
     stdFreigabe,
     aiLabel,
     projectNumber,
@@ -929,6 +1055,13 @@ export async function patchTicketFields(
     activity?: string | null;
     /** USER_U_Std_Freigegeben_Kunde (INTEGER Stunden) */
     stdFreigabe?: number | null;
+    /** Ansprechpartner (Name; optional «Name; email») */
+    contactPerson?: string | null;
+    supportGroupId?: number | null;
+    /** EmployeeNumber z.B. M1010 → Responsible + ResponsibleType 3 */
+    handledBy?: string | null;
+    /** Kommunikationskanal / Medium ID */
+    medium?: number | null;
   }
 ): Promise<MariTicketDetail> {
   const current = await mariGetIssue(issueId);
@@ -1001,6 +1134,30 @@ export async function patchTicketFields(
         : Math.round(patch.stdFreigabe);
     body.UserDefinedFieldValues = udf;
   }
+  if (patch.contactPerson !== undefined) {
+    const cp = (patch.contactPerson || "").trim();
+    body.ContactPerson = cp || null;
+  }
+  if (patch.supportGroupId !== undefined) {
+    body.SupportGroupID =
+      patch.supportGroupId == null || patch.supportGroupId <= 0
+        ? 0
+        : patch.supportGroupId;
+  }
+  if (patch.handledBy !== undefined) {
+    const emp = normalizeMariEmployeeNumber(patch.handledBy);
+    if (emp) {
+      body.Responsible = emp;
+      body.ResponsibleType = 3;
+    } else if (patch.handledBy === null || patch.handledBy === "") {
+      body.Responsible = null;
+      body.ResponsibleType = 3;
+    }
+  }
+  if (patch.medium !== undefined) {
+    body.Medium =
+      patch.medium == null || patch.medium <= 0 ? 0 : patch.medium;
+  }
 
   if (Object.keys(body).length === 0) {
     throw new MariApiError("Keine Änderungen angegeben.", 400);
@@ -1018,6 +1175,21 @@ export async function patchTicketFields(
 
   const result = await mariPatchIssue(issueId, body);
   if (result.IMPORT_Feedback && result.IMPORT_Feedback !== 0) {
+    // Medium ggf. unbekannt — ohne Medium erneut versuchen
+    if (patch.medium !== undefined && "Medium" in body) {
+      const { Medium: _drop, ...withoutMedium } = body;
+      const retry = await mariPatchIssue(issueId, withoutMedium);
+      if (retry.IMPORT_Feedback && retry.IMPORT_Feedback !== 0) {
+        throw new MariApiError(
+          retry.IMPORT_ErrorMessage ||
+            result.IMPORT_ErrorMessage ||
+            "MARI PATCH fehlgeschlagen",
+          400,
+          retry
+        );
+      }
+      return getTicketDetail(issueId);
+    }
     throw new MariApiError(
       result.IMPORT_ErrorMessage || "MARI PATCH fehlgeschlagen",
       400,

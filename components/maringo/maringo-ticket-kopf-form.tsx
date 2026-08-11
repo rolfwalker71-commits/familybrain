@@ -8,6 +8,11 @@ import { cn } from "@/lib/utils";
 import type { MariKeyPair } from "@/lib/mari/timekeeping-shared";
 import { formatMariProjectLabel } from "@/lib/mari/timekeeping-shared";
 import { MariKeyPairPicker } from "@/components/maringo/mari-key-pair-picker";
+import type { MariEmployeeOption } from "@/lib/mari/tickets";
+import type {
+  MariSettingOption,
+  MariSupportGroupOption,
+} from "@/lib/mari/ticket-meta";
 
 export type TicketKopfDefaults = {
   projectNumber?: string | null;
@@ -17,6 +22,11 @@ export type TicketKopfDefaults = {
   activity?: string | null;
   /** USER_U_Std_Freigegeben_Kunde — ganze Stunden */
   stdFreigabe?: string | number | null;
+  contactPerson?: string | null;
+  supportGroupId?: number | null;
+  handledBy?: string | null;
+  priority?: number | null;
+  medium?: number | null;
 };
 
 export type TicketKopfValues = {
@@ -25,6 +35,12 @@ export type TicketKopfValues = {
   contractPositionId: number | null;
   activity: string;
   stdFreigabe: number | null;
+  contactPerson: string | null;
+  contactEmail: string | null;
+  supportGroupId: number | null;
+  handledBy: string | null;
+  priority: number | null;
+  medium: number | null;
 };
 
 function parseStdFreigabe(raw: string): number | null {
@@ -33,6 +49,32 @@ function parseStdFreigabe(raw: string): number | null {
   const n = Number(t.replace(",", "."));
   if (!Number.isFinite(n) || n < 0) return null;
   return Math.round(n);
+}
+
+function splitContactPerson(raw: string | null | undefined): {
+  name: string;
+  email: string;
+} {
+  const t = (raw || "").trim();
+  if (!t) return { name: "", email: "" };
+  const parts = t.split(";").map((p) => p.trim()).filter(Boolean);
+  if (parts.length >= 2) {
+    const maybeEmail = parts.find((p) => p.includes("@"));
+    const name =
+      parts.find((p) => p !== maybeEmail)?.trim() || parts[0] || "";
+    return { name, email: maybeEmail || "" };
+  }
+  if (t.includes("@")) return { name: "", email: t };
+  return { name: t, email: "" };
+}
+
+function joinContactPerson(name: string, email: string): string | null {
+  const n = name.trim();
+  const e = email.trim();
+  if (n && e) return `${n}; ${e}`;
+  if (n) return n;
+  if (e) return e;
+  return null;
 }
 
 export function MaringoTicketKopfForm({
@@ -44,6 +86,7 @@ export function MaringoTicketKopfForm({
   onSubmit: (values: TicketKopfValues) => Promise<void>;
   className?: string;
 }) {
+  const initialContact = splitContactPerson(defaults.contactPerson);
   const [projectQuery, setProjectQuery] = useState("");
   const [projects, setProjects] = useState<MariKeyPair[]>([]);
   const [projectNumber, setProjectNumber] = useState(
@@ -71,11 +114,71 @@ export function MaringoTicketKopfForm({
     const n = Number(v);
     return Number.isFinite(n) ? String(Math.round(n)) : String(v);
   });
+  const [contactName, setContactName] = useState(initialContact.name);
+  const [contactEmail, setContactEmail] = useState(initialContact.email);
+  const [supportGroupId, setSupportGroupId] = useState(
+    defaults.supportGroupId != null && defaults.supportGroupId > 0
+      ? String(defaults.supportGroupId)
+      : ""
+  );
+  const [handledBy, setHandledBy] = useState(
+    (defaults.handledBy || "").trim().toUpperCase()
+  );
+  const [priority, setPriority] = useState(
+    defaults.priority != null && defaults.priority > 0
+      ? String(defaults.priority)
+      : ""
+  );
+  const [medium, setMedium] = useState(
+    defaults.medium != null && defaults.medium > 0
+      ? String(defaults.medium)
+      : ""
+  );
+  const [employees, setEmployees] = useState<MariEmployeeOption[]>([]);
+  const [groups, setGroups] = useState<MariSupportGroupOption[]>([]);
+  const [priorities, setPriorities] = useState<MariSettingOption[]>([]);
+  const [media, setMedia] = useState<MariSettingOption[]>([]);
   const [projectOpen, setProjectOpen] = useState(false);
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hint, setHint] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const [empRes, grpRes, metaRes] = await Promise.all([
+          fetch("/api/maringo/employees"),
+          fetch("/api/maringo/support-groups"),
+          fetch("/api/maringo/ticket-meta"),
+        ]);
+        const empData = await empRes.json().catch(() => ({}));
+        const grpData = await grpRes.json().catch(() => ({}));
+        const metaData = await metaRes.json().catch(() => ({}));
+        if (cancelled) return;
+        if (empRes.ok && Array.isArray(empData.employees)) {
+          setEmployees(empData.employees as MariEmployeeOption[]);
+        }
+        if (grpRes.ok && Array.isArray(grpData.groups)) {
+          setGroups(grpData.groups as MariSupportGroupOption[]);
+        }
+        if (metaRes.ok) {
+          if (Array.isArray(metaData.priorities)) {
+            setPriorities(metaData.priorities as MariSettingOption[]);
+          }
+          if (Array.isArray(metaData.media)) {
+            setMedia(metaData.media as MariSettingOption[]);
+          }
+        }
+      } catch {
+        /* optional — Selects bleiben leer */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!projectOpen) return;
@@ -213,6 +316,14 @@ export function MaringoTicketKopfForm({
           : null,
         activity: act,
         stdFreigabe: parseStdFreigabe(stdFreigabeRaw),
+        contactPerson: joinContactPerson(contactName, contactEmail),
+        contactEmail: contactEmail.trim() || null,
+        supportGroupId: supportGroupId
+          ? Number(supportGroupId) || null
+          : null,
+        handledBy: handledBy.trim() || null,
+        priority: priority ? Number(priority) || null : null,
+        medium: medium ? Number(medium) || null : null,
       });
       setHint("Ticket-Kopf gespeichert.");
     } catch (err) {
@@ -239,9 +350,107 @@ export function MaringoTicketKopfForm({
       ) : null}
 
       <p className="text-[11px] leading-relaxed text-muted-foreground">
-        Überschreibt die Ticket-Vorgaben in MARI (Projekt, Vertrag, Betreff /
-        Aktivität, freigegebene Kundenstunden).
+        Ansprechpartner, Supportgruppe, Zuständig, Priorität und Kanal sowie
+        Projekt / Vertrag / Betreff in MARI.
       </p>
+
+      <div className="space-y-2 rounded-xl border border-border/60 bg-muted/15 p-3">
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+          Organisation
+        </p>
+        <div className="space-y-1">
+          <Label htmlFor="tk-kopf-contact">Ansprechpartner</Label>
+          <Input
+            id="tk-kopf-contact"
+            value={contactName}
+            onChange={(e) => setContactName(e.target.value)}
+            placeholder="z.B. Herr Lucas Castro"
+            maxLength={200}
+            autoComplete="off"
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="tk-kopf-contact-email">E-Mail</Label>
+          <Input
+            id="tk-kopf-contact-email"
+            type="email"
+            value={contactEmail}
+            onChange={(e) => setContactEmail(e.target.value)}
+            placeholder="name@firma.ch"
+            maxLength={120}
+            autoComplete="off"
+          />
+          <p className="text-[10px] text-muted-foreground">
+            Wird mit dem Namen als «Name; E-Mail» in ContactPerson gespeichert.
+          </p>
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="tk-kopf-group">Supportgruppe</Label>
+          <select
+            id="tk-kopf-group"
+            className="flex h-9 w-full rounded-md border border-input bg-background px-2.5 text-[13px]"
+            value={supportGroupId}
+            onChange={(e) => setSupportGroupId(e.target.value)}
+          >
+            <option value="">— keine —</option>
+            {groups.map((g) => (
+              <option key={g.groupId} value={g.groupId}>
+                {g.description}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="tk-kopf-handled">Zuständig</Label>
+          <select
+            id="tk-kopf-handled"
+            className="flex h-9 w-full rounded-md border border-input bg-background px-2.5 text-[13px]"
+            value={handledBy}
+            onChange={(e) => setHandledBy(e.target.value)}
+          >
+            <option value="">— wählen —</option>
+            {employees.map((e) => (
+              <option key={e.employeeNumber} value={e.employeeNumber}>
+                {e.matchcode} ({e.employeeNumber})
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <div className="space-y-1">
+            <Label htmlFor="tk-kopf-prio">Priorität</Label>
+            <select
+              id="tk-kopf-prio"
+              className="flex h-9 w-full rounded-md border border-input bg-background px-2.5 text-[13px]"
+              value={priority}
+              onChange={(e) => setPriority(e.target.value)}
+            >
+              <option value="">— wählen —</option>
+              {priorities.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="tk-kopf-medium">Kommunikationskanal</Label>
+            <select
+              id="tk-kopf-medium"
+              className="flex h-9 w-full rounded-md border border-input bg-background px-2.5 text-[13px]"
+              value={medium}
+              onChange={(e) => setMedium(e.target.value)}
+            >
+              <option value="">— wählen —</option>
+              {media.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
 
       <div className="space-y-1">
         <Label htmlFor="tk-kopf-project">Projekt</Label>

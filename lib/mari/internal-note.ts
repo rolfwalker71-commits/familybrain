@@ -10,7 +10,10 @@ function escapeHtml(raw: string): string {
 }
 
 function nl2brEscaped(text: string): string {
-  return escapeHtml(text).replace(/\n/g, "<br/>");
+  return escapeHtml(text.replace(/\r\n/g, "\n").replace(/\r/g, "\n")).replace(
+    /\n/g,
+    "<br/>"
+  );
 }
 
 function listHtml(items: string[]): string {
@@ -26,8 +29,9 @@ function codeBlock(code: string): string {
   return `<div style="margin:6px 0 12px;padding:10px;border:1px solid #cbd5e1;background:#f8fafc;font-family:Consolas,'Courier New',monospace;font-size:12px;line-height:1.45;white-space:pre-wrap;word-break:break-word;">${escapeHtml(code)}</div>`;
 }
 
+/** Maringo-HTML: Zeilenumbrüche als &lt;br/&gt; — CSS white-space wird dort oft ignoriert. */
 function proseBlock(text: string): string {
-  return `<div style="margin:4px 0 8px;white-space:pre-wrap;line-height:1.5;">${escapeHtml(text)}</div>`;
+  return `<div style="margin:4px 0 8px;line-height:1.5;">${nl2brEscaped(text)}</div>`;
 }
 
 /**
@@ -166,7 +170,7 @@ export function formatPlainTextAsInternalCommentHtml(
   const parts: string[] = [
     `<!DOCTYPE HTML>`,
     `<div style="font-family:Segoe UI,Arial,sans-serif;font-size:13px;color:#0f172a;">`,
-    `<div style="font-weight:800;margin-bottom:4px;">Buddy Notiz</div>`,
+    `<div style="font-weight:800;margin-bottom:4px;">Interner Kommentar</div>`,
     `<div style="color:#9a3412;font-size:12px;margin-bottom:10px;">Nur intern — nicht für den Kunden</div>`,
   ];
   if (opts?.issueId) {
@@ -251,7 +255,7 @@ export async function postMariInternalNote(params: {
     Comment: comment,
     Internal: true,
     AttachmentTyp: 1,
-    AttachmentSubject: params.subject?.trim() || "Buddy AI (intern)",
+    AttachmentSubject: params.subject?.trim() || "Interner Kommentar",
     DisableNotificationSettings: true,
   };
 
@@ -300,7 +304,7 @@ export async function postAnalysisAsInternalNote(
 ): Promise<MariInternalNotePostResult> {
   return postMariInternalNote({
     issueId,
-    subject: "Buddy AI-Analyse (intern)",
+    subject: "Interner Kommentar",
     commentHtml: formatAnalysisAsInternalCommentHtml(analysis, { issueId }),
   });
 }
@@ -315,7 +319,7 @@ export async function postPlainInternalNote(
   }
   return postMariInternalNote({
     issueId,
-    subject: "Buddy Notiz (intern)",
+    subject: "Interner Kommentar",
     commentHtml: formatPlainTextAsInternalCommentHtml(trimmed, { issueId }),
   });
 }
@@ -343,7 +347,7 @@ export async function postMariExternalNote(params: {
     Comment: comment,
     Internal: false,
     AttachmentTyp: 1,
-    AttachmentSubject: params.subject?.trim() || "Buddy Kommentar",
+    AttachmentSubject: params.subject?.trim() || "Info an Kunde",
   };
 
   const res = await mariJson<MariAttachmentPostResponse>(
@@ -395,7 +399,7 @@ export async function postPlainExternalNote(
   }
   return postMariExternalNote({
     issueId,
-    subject: "Buddy Kommentar",
+    subject: "Info an Kunde",
     commentHtml: formatPlainTextAsExternalCommentHtml(trimmed),
   });
 }

@@ -14,7 +14,19 @@ test("formats plain external note without internal banner", () => {
   );
   assert.match(html, /Hallo &lt;b&gt;Kunde&lt;\/b&gt; &amp; &quot;Team&quot;/);
   assert.doesNotMatch(html, /Nur intern/);
-  assert.doesNotMatch(html, /Buddy Notiz/);
+  assert.doesNotMatch(html, /Buddy Kommentar/);
+});
+
+test("plain internal/external notes keep line breaks as br", () => {
+  const internal = formatPlainTextAsInternalCommentHtml(
+    "Dear Lisa\n\nPlease send details.\nRolf"
+  );
+  assert.match(internal, /Dear Lisa<br\/>\s*<br\/>Please send details\.<br\/>Rolf/);
+
+  const external = formatPlainTextAsExternalCommentHtml(
+    "Hallo\nWelt\r\nEnde"
+  );
+  assert.match(external, /Hallo<br\/>Welt<br\/>Ende/);
 });
 
 test("formats plain internal note as escaped HTML", () => {
@@ -22,7 +34,7 @@ test("formats plain internal note as escaped HTML", () => {
     'Check <script> & "quotes"',
     { issueId: 42 }
   );
-  assert.match(html, /Buddy Notiz/);
+  assert.match(html, /Interner Kommentar/);
   assert.match(html, /Ticket #42/);
   assert.match(html, /Check &lt;script&gt; &amp; &quot;quotes&quot;/);
   assert.doesNotMatch(html, /<script>/);
