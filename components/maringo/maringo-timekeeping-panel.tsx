@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Clock3, Plus, RefreshCw } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock3, Plus, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,7 @@ import {
   formatPeriodLabel,
   formatMariProjectLabel,
   resolveTimePeriodRange,
+  shiftTimePeriodAnchor,
   type MariTimeLine,
   type MariTimePeriod,
 } from "@/lib/mari/timekeeping-shared";
@@ -431,17 +432,65 @@ export function MaringoTimekeepingPanel({
                     ) : null}
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <div className="space-y-1">
-                      <Label htmlFor="tk-day" className="sr-only">
-                        Ankerdatum
-                      </Label>
-                      <Input
-                        id="tk-day"
-                        type="date"
-                        className="h-8 w-auto"
-                        value={date}
-                        onChange={(e) => setDate(e.target.value)}
-                      />
+                    <div className="flex items-center gap-0.5">
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="size-8 shrink-0"
+                        onClick={() =>
+                          setDate(shiftTimePeriodAnchor(date, period, -1))
+                        }
+                        aria-label={
+                          period === "day"
+                            ? "Vorheriger Tag"
+                            : period === "week"
+                              ? "Vorherige Woche"
+                              : period === "month"
+                                ? "Vorheriger Monat"
+                                : "Vorheriges Quartal"
+                        }
+                      >
+                        <ChevronLeft
+                          className="size-4"
+                          strokeWidth={APP_ICON_STROKE}
+                        />
+                      </Button>
+                      <div className="space-y-1">
+                        <Label htmlFor="tk-day" className="sr-only">
+                          Ankerdatum
+                        </Label>
+                        <Input
+                          id="tk-day"
+                          type="date"
+                          className="h-8 w-auto"
+                          value={date}
+                          onChange={(e) => setDate(e.target.value)}
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="size-8 shrink-0"
+                        onClick={() =>
+                          setDate(shiftTimePeriodAnchor(date, period, 1))
+                        }
+                        aria-label={
+                          period === "day"
+                            ? "Nächster Tag"
+                            : period === "week"
+                              ? "Nächste Woche"
+                              : period === "month"
+                                ? "Nächster Monat"
+                                : "Nächstes Quartal"
+                        }
+                      >
+                        <ChevronRight
+                          className="size-4"
+                          strokeWidth={APP_ICON_STROKE}
+                        />
+                      </Button>
                     </div>
                     <Button
                       type="button"

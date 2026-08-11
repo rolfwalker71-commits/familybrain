@@ -195,3 +195,20 @@ export function formatPeriodLabel(
   if (fromDate === toDate) return toSwissDateLocal(fromDate);
   return `${toSwissDateLocal(fromDate)} – ${toSwissDateLocal(toDate)}`;
 }
+
+/** Ankerdatum um einen Zeitraum verschieben (Tag/Woche/Monat/Quartal). */
+export function shiftTimePeriodAnchor(
+  anchorYmd: string,
+  period: MariTimePeriod,
+  steps: number
+): string {
+  assertYmd(anchorYmd);
+  if (period === "day") return addDaysYmd(anchorYmd, steps);
+  if (period === "week") return addDaysYmd(anchorYmd, steps * 7);
+
+  const range = resolveTimePeriodRange(anchorYmd, period);
+  const { y, m } = parseYmdParts(range.fromDate);
+  const monthDelta = period === "month" ? steps : steps * 3;
+  const dt = new Date(Date.UTC(y, m - 1 + monthDelta, 1));
+  return formatYmd(dt.getUTCFullYear(), dt.getUTCMonth() + 1, 1);
+}

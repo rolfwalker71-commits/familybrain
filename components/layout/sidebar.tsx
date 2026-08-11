@@ -2,8 +2,14 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Fragment } from "react";
-import { LogOut, ArrowLeft, type LucideIcon } from "lucide-react";
+import { Fragment, useEffect, useState } from "react";
+import {
+  ArrowLeft,
+  ChevronsLeft,
+  ChevronsRight,
+  LogOut,
+  type LucideIcon,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAnalysis } from "@/components/analysis/analysis-provider";
 import { useAuth } from "@/components/auth/auth-provider";
@@ -15,6 +21,8 @@ import { BuddyLogo } from "@/components/brand/buddy-logo";
 import { pageVisuals, type IconTone } from "@/components/layout/icon-circle";
 import { APP_ICON_STROKE } from "@/lib/branding/app-icons";
 import type { AdminNavMode } from "@/lib/navigation/admin-nav";
+
+const SIDEBAR_COLLAPSED_KEY = "buddy.sidebar.collapsed";
 
 type NavItem = {
   href: string;
@@ -263,12 +271,14 @@ function NavLinkRow({
   showBadges,
   isRunning,
   onNavigate,
+  collapsed,
 }: {
   item: NavItem;
   pathname: string;
   showBadges: boolean;
   isRunning: boolean;
   onNavigate?: () => void;
+  collapsed?: boolean;
 }) {
   const itemPath = item.href.split("?")[0] || item.href;
   const active =
@@ -291,8 +301,13 @@ function NavLinkRow({
     <Link
       href={linkHref}
       onClick={onNavigate}
+      title={collapsed ? item.label : undefined}
+      aria-label={item.label}
       className={cn(
-        "flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm font-medium transition-colors",
+        "relative flex items-center rounded-lg text-sm font-medium transition-colors",
+        collapsed
+          ? "justify-center px-2 py-2"
+          : "gap-2.5 px-2.5 py-1.5",
         active
           ? "bg-white/15 text-white"
           : "text-sidebar-foreground/90 hover:bg-sidebar-accent hover:text-white"
@@ -304,22 +319,29 @@ function NavLinkRow({
         absoluteStrokeWidth
         aria-hidden
       />
-      <span className="flex-1 text-[14px] font-semibold tracking-tight">
-        {item.label}
-      </span>
+      {!collapsed ? (
+        <span className="flex-1 text-[14px] font-semibold tracking-tight">
+          {item.label}
+        </span>
+      ) : null}
       {showCount ? (
         <span
           className={cn(
-            "min-w-[1.5rem] rounded-full px-1.5 py-0.5 text-center text-[10px] font-semibold tabular-nums",
-            active
-              ? "bg-red-500 text-white"
-              : item.countKey === "triagePendingCount" ||
-                  item.countKey === "mailTriageGoogleCount" ||
-                  item.countKey === "mailTriageMicrosoftCount"
-                ? "bg-red-500 text-white"
-                : item.pendingStyle && isRunning
-                  ? "bg-amber-500 text-white"
-                  : "bg-white/15 text-white"
+            "font-semibold tabular-nums",
+            collapsed
+              ? "absolute -top-0.5 -right-0.5 flex size-4 items-center justify-center rounded-full bg-red-500 text-[9px] text-white"
+              : cn(
+                  "min-w-[1.5rem] rounded-full px-1.5 py-0.5 text-center text-[10px]",
+                  active
+                    ? "bg-red-500 text-white"
+                    : item.countKey === "triagePendingCount" ||
+                        item.countKey === "mailTriageGoogleCount" ||
+                        item.countKey === "mailTriageMicrosoftCount"
+                      ? "bg-red-500 text-white"
+                      : item.pendingStyle && isRunning
+                        ? "bg-amber-500 text-white"
+                        : "bg-white/15 text-white"
+                )
           )}
           title={
             item.countKey === "pendingCount"
@@ -339,7 +361,11 @@ function NavLinkRow({
                           : undefined
           }
         >
-          {formatCount(count)}
+          {collapsed
+            ? count! > 9
+              ? "9+"
+              : formatCount(count!)
+            : formatCount(count!)}
         </span>
       ) : null}
     </Link>
@@ -360,6 +386,31 @@ export function Sidebar({
   const { mode, setMode, goHome, isAdminNav } = useAdminNav();
   const { isRunning } = analysis;
   const isLimitedUser = me != null && !me.isAdmin;
+  /** Mobile drawer stays expanded; desktop can collapse to icon rail. */
+  const [collapsedPref, setCollapsedPref] = useState(false);
+  const collapsed = Boolean(collapsedPref && !onNavigate);
+
+  useEffect(() => {
+    try {
+      setCollapsedPref(
+        window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1"
+      );
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  function toggleCollapsed() {
+    setCollapsedPref((prev) => {
+      const next = !prev;
+      try {
+        window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? "1" : "0");
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }
 
   const brandTitle = BRAND.app;
   const brandHref = isLimitedUser
@@ -402,14 +453,20 @@ export function Sidebar({
   return (
     <aside
       className={cn(
-        "flex h-full w-60 shrink-0 flex-col bg-sidebar text-sidebar-foreground",
+        "flex h-full shrink-0 flex-col bg-sidebar text-sidebar-foreground transition-[width] duration-200 ease-out",
+        collapsed ? "w-[4.25rem]" : "w-60",
         className
       )}
+      data-collapsed={collapsed ? "true" : "false"}
     >
-      <div className="px-5 py-6">
+      <div className={cn(collapsed ? "px-2 py-4" : "px-5 py-6")}>
         <button
           type="button"
-          className="flex w-full items-center gap-3 text-left"
+          className={cn(
+            "flex w-full items-center text-left",
+            collapsed ? "justify-center" : "gap-3"
+          )}
+          title={brandTitle}
           onClick={() => {
             if (isAdminNav) {
               handleGoHome();
@@ -419,47 +476,84 @@ export function Sidebar({
             onNavigate?.();
           }}
         >
-          <span className="flex h-14 w-14 shrink-0 items-center justify-center">
-            <BuddyLogo size={56} className="h-14 w-14 drop-shadow-md" priority />
+          <span
+            className={cn(
+              "flex shrink-0 items-center justify-center",
+              collapsed ? "h-10 w-10" : "h-14 w-14"
+            )}
+          >
+            <BuddyLogo
+              size={collapsed ? 40 : 56}
+              className={cn(
+                "drop-shadow-md",
+                collapsed ? "h-10 w-10" : "h-14 w-14"
+              )}
+              priority
+            />
           </span>
-          <span className="text-3xl font-extrabold leading-none tracking-tight text-white">
-            {brandTitle}
-          </span>
+          {!collapsed ? (
+            <span className="text-3xl font-extrabold leading-none tracking-tight text-white">
+              {brandTitle}
+            </span>
+          ) : null}
         </button>
         {me ? (
-          <div className="mt-4 flex items-center gap-2.5 rounded-xl bg-white/10 px-3 py-2.5 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1)]">
+          <div
+            className={cn(
+              "mt-4 flex items-center rounded-xl bg-white/10 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1)]",
+              collapsed
+                ? "justify-center px-1.5 py-2"
+                : "gap-2.5 px-3 py-2.5"
+            )}
+            title={collapsed ? `Angemeldet als ${me.displayName}` : undefined}
+          >
             <UserAvatar
               name={me.displayName}
               src={me.avatarUrl}
-              size="md"
+              size={collapsed ? "sm" : "md"}
               className="ring-white/30"
             />
-            <div className="min-w-0 flex-1">
-              <p className="text-[11px] font-medium leading-none text-sidebar-foreground/65">
-                Angemeldet als:
-              </p>
-              <p
-                className="mt-1.5 truncate text-sm font-semibold tracking-tight text-white"
-                title={me.displayName}
-              >
-                {me.displayName}
-              </p>
-            </div>
+            {!collapsed ? (
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium leading-none text-sidebar-foreground/65">
+                  Angemeldet als:
+                </p>
+                <p
+                  className="mt-1.5 truncate text-sm font-semibold tracking-tight text-white"
+                  title={me.displayName}
+                >
+                  {me.displayName}
+                </p>
+              </div>
+            ) : null}
           </div>
         ) : null}
       </div>
 
       {showAreaSwitcher ? (
-        <div className="space-y-2 px-3 pb-3">
+        <div
+          className={cn("space-y-2 pb-3", collapsed ? "px-1.5" : "px-3")}
+        >
           <button
             type="button"
             onClick={handleGoHome}
-            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-white"
+            title={`Zurück zu ${BRAND.app}`}
+            className={cn(
+              "flex w-full items-center rounded-lg text-xs font-semibold text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-white",
+              collapsed
+                ? "justify-center px-2 py-2"
+                : "gap-2 px-3 py-2"
+            )}
           >
             <ArrowLeft className="size-3.5 shrink-0" />
-            Zurück zu {BRAND.app}
+            {!collapsed ? <>Zurück zu {BRAND.app}</> : null}
           </button>
-          <div className="grid grid-cols-3 gap-1 rounded-xl bg-white/10 p-1">
+          <div
+            className={cn(
+              "rounded-xl bg-white/10 p-1",
+              collapsed ? "flex flex-col gap-1" : "grid grid-cols-3 gap-1"
+            )}
+          >
             {areaEntries.map((entry) => {
               const active = mode === entry.mode;
               return (
@@ -469,7 +563,10 @@ export function Sidebar({
                   title={entry.label}
                   onClick={() => selectArea(entry)}
                   className={cn(
-                    "flex flex-col items-center gap-1 rounded-lg px-1 py-2 text-[10px] font-semibold leading-tight transition-colors",
+                    "flex items-center justify-center rounded-lg transition-colors",
+                    collapsed
+                      ? "px-2 py-2"
+                      : "flex-col gap-1 px-1 py-2 text-[10px] font-semibold leading-tight",
                     active
                       ? "bg-white/20 text-white shadow-sm"
                       : "text-sidebar-foreground/70 hover:bg-white/10 hover:text-white"
@@ -481,7 +578,9 @@ export function Sidebar({
                     absoluteStrokeWidth
                     aria-hidden
                   />
-                  <span className="truncate">{entry.shortLabel}</span>
+                  {!collapsed ? (
+                    <span className="truncate">{entry.shortLabel}</span>
+                  ) : null}
                 </button>
               );
             })}
@@ -489,33 +588,51 @@ export function Sidebar({
         </div>
       ) : null}
 
-      <nav className="min-h-0 flex-1 space-y-0.5 overflow-y-auto px-3 pb-3">
+      <nav
+        className={cn(
+          "min-h-0 flex-1 space-y-0.5 overflow-y-auto pb-3",
+          collapsed ? "px-1.5" : "px-3"
+        )}
+      >
         {isAdminNav && mode === "home" ? (
           <div className="space-y-1.5 pt-0.5">
-            <p className="px-2 pb-0.5 text-[10px] font-semibold uppercase tracking-wide text-sidebar-foreground/55">
-              Bereiche
-            </p>
+            {!collapsed ? (
+              <p className="px-2 pb-0.5 text-[10px] font-semibold uppercase tracking-wide text-sidebar-foreground/55">
+                Bereiche
+              </p>
+            ) : null}
             {areaEntries.map((entry) => (
               <button
                 key={entry.mode}
                 type="button"
+                title={entry.label}
                 onClick={() => selectArea(entry)}
-                className="flex w-full items-start gap-3 rounded-xl bg-white/5 px-3 py-3 text-left transition-colors hover:bg-white/10"
+                className={cn(
+                  "flex w-full rounded-xl bg-white/5 text-left transition-colors hover:bg-white/10",
+                  collapsed
+                    ? "items-center justify-center px-2 py-2.5"
+                    : "items-start gap-3 px-3 py-3"
+                )}
               >
                 <entry.icon
-                  className="mt-0.5 size-5 shrink-0 text-white"
+                  className={cn(
+                    "shrink-0 text-white",
+                    collapsed ? "size-5" : "mt-0.5 size-5"
+                  )}
                   strokeWidth={APP_ICON_STROKE}
                   absoluteStrokeWidth
                   aria-hidden
                 />
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[15px] font-semibold tracking-tight text-white">
-                    {entry.label}
+                {!collapsed ? (
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[15px] font-semibold tracking-tight text-white">
+                      {entry.label}
+                    </span>
+                    <span className="mt-0.5 block text-xs text-sidebar-foreground/65">
+                      {entry.description}
+                    </span>
                   </span>
-                  <span className="mt-0.5 block text-xs text-sidebar-foreground/65">
-                    {entry.description}
-                  </span>
-                </span>
+                ) : null}
               </button>
             ))}
           </div>
@@ -523,7 +640,9 @@ export function Sidebar({
           listItems.map((item, index) => {
             const prev = listItems[index - 1];
             const showSection =
-              Boolean(item.section) && item.section !== prev?.section;
+              !collapsed &&
+              Boolean(item.section) &&
+              item.section !== prev?.section;
             return (
               <Fragment key={item.href}>
                 {showSection ? (
@@ -542,6 +661,7 @@ export function Sidebar({
                   showBadges={!isLimitedUser}
                   isRunning={isRunning}
                   onNavigate={onNavigate}
+                  collapsed={collapsed}
                 />
               </Fragment>
             );
@@ -549,10 +669,43 @@ export function Sidebar({
         )}
       </nav>
 
-      <div className="mt-auto space-y-3 border-t border-sidebar-border/60 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4">
+      <div
+        className={cn(
+          "mt-auto space-y-2 border-t border-sidebar-border/60 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3",
+          collapsed ? "px-1.5" : "px-4"
+        )}
+      >
+        {!onNavigate ? (
+          <button
+            type="button"
+            onClick={toggleCollapsed}
+            title={collapsed ? "Navigation ausklappen" : "Navigation einklappen"}
+            aria-expanded={!collapsed}
+            aria-label={
+              collapsed ? "Navigation ausklappen" : "Navigation einklappen"
+            }
+            className={cn(
+              "flex min-h-10 w-full items-center rounded-xl text-sm font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+              collapsed ? "justify-center px-2 py-2" : "gap-3 px-3 py-2"
+            )}
+          >
+            {collapsed ? (
+              <ChevronsRight className="size-4" />
+            ) : (
+              <>
+                <ChevronsLeft className="size-4" />
+                Einklappen
+              </>
+            )}
+          </button>
+        ) : null}
         <button
           type="button"
-          className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          title="Abmelden"
+          className={cn(
+            "flex min-h-11 w-full items-center rounded-xl text-sm font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+            collapsed ? "justify-center px-2 py-2" : "gap-3 px-3 py-2"
+          )}
           onClick={async () => {
             await fetch("/api/auth/logout", { method: "POST" }).catch(
               () => undefined
@@ -561,14 +714,23 @@ export function Sidebar({
           }}
         >
           <LogOut className="size-4" />
-          Abmelden
+          {!collapsed ? "Abmelden" : null}
         </button>
-        <p
-          className="font-mono text-[10px] tabular-nums tracking-wide text-sidebar-foreground/50"
-          title="App-Version (Datum-Uhrzeit des letzten Commits)"
-        >
-          {APP_VERSION}
-        </p>
+        {!collapsed ? (
+          <p
+            className="font-mono text-[10px] tabular-nums tracking-wide text-sidebar-foreground/50"
+            title="App-Version (Datum-Uhrzeit des letzten Commits)"
+          >
+            {APP_VERSION}
+          </p>
+        ) : (
+          <p
+            className="truncate px-0.5 text-center font-mono text-[8px] tabular-nums text-sidebar-foreground/40"
+            title={APP_VERSION}
+          >
+            {APP_VERSION.slice(-4)}
+          </p>
+        )}
       </div>
     </aside>
   );
