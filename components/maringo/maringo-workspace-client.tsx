@@ -534,6 +534,7 @@ export function MaringoWorkspaceClient() {
   );
   const [statuses, setStatuses] = useState<number[]>([...WORK_STATUS_IDS]);
   const [overdueOnly, setOverdueOnly] = useState(false);
+  const [filterReady, setFilterReady] = useState(false);
   const [tickets, setTickets] = useState<MariTicketListItem[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [detail, setDetail] = useState<MariTicketDetail | null>(null);
@@ -821,8 +822,52 @@ export function MaringoWorkspaceClient() {
   }
 
   useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/maringo/ticket-filter-prefs");
+        const data = await res.json().catch(() => ({}));
+        if (cancelled || !res.ok) return;
+        if (Array.isArray(data.statuses) && data.statuses.length > 0) {
+          const next = data.statuses
+            .map((n: unknown) => Number(n))
+            .filter((n: number) => Number.isInteger(n) && n > 0);
+          if (next.length > 0) {
+            setStatuses([...new Set(next as number[])].sort((a, b) => a - b));
+          }
+        }
+        if (typeof data.overdueOnly === "boolean") {
+          setOverdueOnly(data.overdueOnly);
+        }
+      } catch {
+        /* defaults bleiben */
+      } finally {
+        if (!cancelled) setFilterReady(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!filterReady) return;
+    const t = window.setTimeout(() => {
+      void fetch("/api/maringo/ticket-filter-prefs", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ statuses, overdueOnly }),
+      }).catch(() => {
+        /* optional */
+      });
+    }, 350);
+    return () => window.clearTimeout(t);
+  }, [statuses, overdueOnly, filterReady]);
+
+  useEffect(() => {
+    if (!filterReady) return;
     void loadList();
-  }, [loadList]);
+  }, [loadList, filterReady]);
 
   useEffect(() => {
     if (selectedId != null) {
