@@ -22,7 +22,6 @@ import {
   closeoutStepsFor,
   firstOpenStepIndex,
   microChecksFor,
-  openStepCount,
   pathMatchesStep,
   stepDetail,
   stepDone,
