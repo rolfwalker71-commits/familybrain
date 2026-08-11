@@ -90,6 +90,8 @@ export function MaringoTimekeepingPanel({
   const [editLoading, setEditLoading] = useState(false);
   const [bookFlyoutOpen, setBookFlyoutOpen] = useState(false);
   const [flyoutPortalReady, setFlyoutPortalReady] = useState(false);
+  const [duplicateDefaults, setDuplicateDefaults] =
+    useState<TimeBookFormDefaults | null>(null);
 
   const onTicketLinesChangeRef = useRef(onTicketLinesChange);
   useEffect(() => {
@@ -108,6 +110,7 @@ export function MaringoTimekeepingPanel({
       e.preventDefault();
       e.stopPropagation();
       setBookFlyoutOpen(false);
+      setDuplicateDefaults(null);
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
@@ -221,9 +224,10 @@ export function MaringoTimekeepingPanel({
     const warn =
       (line?.warning || "").trim() ||
       (typeof data.warning === "string" ? data.warning.trim() : "");
+    const wasDuplicate = duplicateDefaults != null;
     setStatus(
       [
-        `Gebucht: ${values.hours} h auf ${formatMariProjectLabel(
+        `${wasDuplicate ? "Dupliziert" : "Gebucht"}: ${values.hours} h auf ${formatMariProjectLabel(
           values.projectNumber,
           values.projectLabel
         )}` +
@@ -234,9 +238,51 @@ export function MaringoTimekeepingPanel({
         .filter(Boolean)
         .join(" — ")
     );
+    setDuplicateDefaults(null);
+    setBookFlyoutOpen(false);
     setFormKey((k) => k + 1);
     if (!ticketMode) setDate(values.dayOfService);
     await reload();
+  }
+
+  async function fetchLineFormDefaults(
+    line: MariTimeLine
+  ): Promise<TimeBookFormDefaults> {
+    const res = await fetch(`/api/maringo/timekeeping/lines/${line.lineId}`);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || "Buchung laden fehlgeschlagen");
+    const full = data.line as {
+      serviceDate: string;
+      projectNumber: string;
+      activity: string;
+      memo: string | null;
+      hours: number;
+      hoursBillable: number;
+      billable: boolean;
+      contractId: number;
+      contractPositionId: number;
+      issueId: number | null;
+      internalRemarkVerr?: string | null;
+      zeroHoursReason?: string | null;
+    };
+    return {
+      dayOfService: full.serviceDate || line.serviceDate,
+      projectNumber: full.projectNumber || line.projectNumber,
+      projectLabel: formatMariProjectLabel(
+        full.projectNumber || line.projectNumber,
+        line.projectCustomer
+      ),
+      contractId: full.contractId || null,
+      contractPositionId: full.contractPositionId || null,
+      activity: full.activity || line.activity,
+      memoText: full.memo || line.memo || "",
+      hours: full.hours ?? line.hours,
+      hoursBillable: full.hoursBillable ?? line.hoursBillable,
+      billable: full.billable ?? line.billable,
+      issueId: full.issueId ?? (ticketMode ? ticketIssueId : null),
+      internalRemarkVerr: full.internalRemarkVerr ?? line.internalRemarkVerr,
+      zeroHoursReason: full.zeroHoursReason ?? line.zeroHoursReason,
+    };
   }
 
   async function openEdit(line: MariTimeLine) {
@@ -249,47 +295,36 @@ export function MaringoTimekeepingPanel({
     setEditDefaults(null);
     setEditLoading(true);
     try {
-      const res = await fetch(`/api/maringo/timekeeping/lines/${line.lineId}`);
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || "Buchung laden fehlgeschlagen");
-      const full = data.line as {
-        serviceDate: string;
-        projectNumber: string;
-        activity: string;
-        memo: string | null;
-        hours: number;
-        hoursBillable: number;
-        billable: boolean;
-        contractId: number;
-        contractPositionId: number;
-        issueId: number | null;
-        internalRemarkVerr?: string | null;
-        zeroHoursReason?: string | null;
-      };
-      setEditDefaults({
-        dayOfService: full.serviceDate || line.serviceDate,
-        projectNumber: full.projectNumber || line.projectNumber,
-        projectLabel: formatMariProjectLabel(
-          full.projectNumber || line.projectNumber,
-          line.projectCustomer
-        ),
-        contractId: full.contractId || null,
-        contractPositionId: full.contractPositionId || null,
-        activity: full.activity || line.activity,
-        memoText: full.memo || line.memo || "",
-        hours: full.hours ?? line.hours,
-        hoursBillable: full.hoursBillable ?? line.hoursBillable,
-        billable: full.billable ?? line.billable,
-        issueId: full.issueId ?? (ticketMode ? ticketIssueId : null),
-        internalRemarkVerr: full.internalRemarkVerr ?? line.internalRemarkVerr,
-        zeroHoursReason: full.zeroHoursReason ?? line.zeroHoursReason,
-      });
+      setEditDefaults(await fetchLineFormDefaults(line));
     } catch (err) {
       setEditLine(null);
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setEditLoading(false);
     }
+  }
+
+  async function openDuplicate(line: MariTimeLine) {
+    if (line.lineId <= 0) return;
+    setError(null);
+    setBusyLineId(line.lineId);
+    try {
+      const defaults = await fetchLineFormDefaults(line);
+      setDuplicateDefaults(defaults);
+      setFormKey((k) => k + 1);
+      if (dayOverview || !showBookForm) {
+        setBookFlyoutOpen(true);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusyLineId(null);
+    }
+  }
+
+  function closeBookFlyout() {
+    setBookFlyoutOpen(false);
+    setDuplicateDefaults(null);
   }
 
   async function saveEdit(values: TimeBookFormValues) {
@@ -370,12 +405,19 @@ export function MaringoTimekeepingPanel({
     hours: 0.25,
     billable: true,
     ...(bookDefaults || {}),
+    ...(duplicateDefaults || {}),
     ...(ticketMode
       ? {
           issueId: ticketIssueId,
         }
       : {}),
   };
+  const isDuplicateMode = duplicateDefaults != null;
+  const bookSubmitLabel = isDuplicateMode
+    ? "Duplikat buchen"
+    : ticketMode
+      ? "Auf Ticket buchen"
+      : "Buchen";
 
   return (
     <div className={cn("space-y-4", className)}>
@@ -405,7 +447,7 @@ export function MaringoTimekeepingPanel({
                 defaults={formDefaults}
                 onSubmit={book}
                 layout="compact"
-                submitLabel="Auf Ticket buchen"
+                submitLabel={bookSubmitLabel}
               />
             </CardContent>
           </Card>
@@ -510,7 +552,10 @@ export function MaringoTimekeepingPanel({
                       type="button"
                       size="sm"
                       className="bg-orange-500 text-white hover:bg-orange-600"
-                      onClick={() => setBookFlyoutOpen(true)}
+                      onClick={() => {
+                        setDuplicateDefaults(null);
+                        setBookFlyoutOpen(true);
+                      }}
                     >
                       <Plus className="size-3.5" strokeWidth={APP_ICON_STROKE} />
                       Stunden buchen
@@ -572,6 +617,7 @@ export function MaringoTimekeepingPanel({
                         : "Keine Buchungen in diesem Zeitraum."
                   }
                   onEdit={(l) => void openEdit(l)}
+                  onDuplicate={(l) => void openDuplicate(l)}
                   onDelete={removeLine}
                   busyLineId={busyLineId}
                 />
@@ -620,6 +666,7 @@ export function MaringoTimekeepingPanel({
                       : "Noch keine Stundenbuchungen auf dieses Ticket."
                   }
                   onEdit={(l) => void openEdit(l)}
+                  onDuplicate={(l) => void openDuplicate(l)}
                   onDelete={removeLine}
                   busyLineId={busyLineId}
                 />
@@ -636,12 +683,18 @@ export function MaringoTimekeepingPanel({
                 type="button"
                 className="absolute inset-0 bg-black/20"
                 aria-label="Flyout schliessen"
-                onClick={() => setBookFlyoutOpen(false)}
+                onClick={closeBookFlyout}
               />
               <MariSecondaryFlyoutShell
-                title="Stundenbuchung"
-                description="Neue Zeit erfassen"
-                onClose={() => setBookFlyoutOpen(false)}
+                title={
+                  isDuplicateMode ? "Buchung duplizieren" : "Stundenbuchung"
+                }
+                description={
+                  isDuplicateMode
+                    ? "Datum und Stunden anpassen, dann speichern"
+                    : "Neue Zeit erfassen"
+                }
+                onClose={closeBookFlyout}
                 widthClass="w-[min(100%,34rem)]"
                 zIndex={1010}
                 offsetPx={0}
@@ -661,7 +714,7 @@ export function MaringoTimekeepingPanel({
                   defaults={formDefaults}
                   onSubmit={book}
                   layout="compact"
-                  submitLabel="Buchen"
+                  submitLabel={bookSubmitLabel}
                 />
               </MariSecondaryFlyoutShell>
             </div>,

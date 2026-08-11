@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronRight, Pencil, Trash2 } from "lucide-react";
+import { ChevronRight, Copy, Pencil, Trash2 } from "lucide-react";
 import {
   approvalStatusLabel,
   type MariApprovalStatus,
@@ -111,15 +111,17 @@ function LineActions({
   busy,
   locked,
   onEdit,
+  onDuplicate,
   onDelete,
 }: {
   line: MariTimeLine;
   busy: boolean;
   locked: boolean;
   onEdit?: (line: MariTimeLine) => void;
+  onDuplicate?: (line: MariTimeLine) => void;
   onDelete?: (line: MariTimeLine) => void | Promise<void>;
 }) {
-  if (!onEdit && !onDelete) return null;
+  if (!onEdit && !onDuplicate && !onDelete) return null;
   return (
     <div className="flex shrink-0 gap-0">
       {onEdit ? (
@@ -136,6 +138,20 @@ function LineActions({
           title={locked ? "Freigegeben — nicht änderbar" : "Ändern"}
         >
           <Pencil className="size-3" strokeWidth={APP_ICON_STROKE} />
+        </Button>
+      ) : null}
+      {onDuplicate ? (
+        <Button
+          type="button"
+          size="icon"
+          variant="ghost"
+          className="size-6"
+          disabled={busy || line.lineId <= 0}
+          onClick={() => onDuplicate(line)}
+          aria-label="Buchung duplizieren"
+          title="Duplizieren"
+        >
+          <Copy className="size-3" strokeWidth={APP_ICON_STROKE} />
         </Button>
       ) : null}
       {onDelete ? (
@@ -166,6 +182,7 @@ export function MaringoTimeLinesTable({
   emptyText = "Keine Buchungen.",
   className,
   onEdit,
+  onDuplicate,
   onDelete,
   busyLineId,
   /** stack = mehrzeilige Karten ohne Horizontal-Scroll (Flyout). */
@@ -180,6 +197,7 @@ export function MaringoTimeLinesTable({
   emptyText?: string;
   className?: string;
   onEdit?: (line: MariTimeLine) => void;
+  onDuplicate?: (line: MariTimeLine) => void;
   onDelete?: (line: MariTimeLine) => void | Promise<void>;
   busyLineId?: number | null;
   variant?: "stack" | "table";
@@ -194,7 +212,7 @@ export function MaringoTimeLinesTable({
   const nonBillable =
     nonBillableHours ?? Math.round((total - billable) * 100) / 100;
 
-  const showActions = Boolean(onEdit || onDelete);
+  const showActions = Boolean(onEdit || onDuplicate || onDelete);
 
   if (lines.length === 0) {
     return (
@@ -303,6 +321,7 @@ export function MaringoTimeLinesTable({
                       busy={busy}
                       locked={locked}
                       onEdit={onEdit}
+                      onDuplicate={onDuplicate}
                       onDelete={onDelete}
                     />
                   ) : null}
@@ -388,6 +407,7 @@ export function MaringoTimeLinesTable({
                           busy={busy}
                           locked={locked}
                           onEdit={onEdit}
+                          onDuplicate={onDuplicate}
                           onDelete={onDelete}
                         />
                       </div>

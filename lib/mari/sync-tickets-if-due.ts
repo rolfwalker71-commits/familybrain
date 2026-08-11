@@ -96,6 +96,25 @@ function buildCounts(
     }));
 }
 
+/** One row per selected status (incl. 0), order preserved. */
+function buildCountsForStatuses(
+  tickets: Array<{ status: number }>,
+  statusIds: number[]
+): MariTicketCountsByStatus[] {
+  const map = new Map<number, number>();
+  for (const id of statusIds) map.set(id, 0);
+  for (const t of tickets) {
+    const status = Number(t.status);
+    if (!map.has(status)) continue;
+    map.set(status, (map.get(status) || 0) + 1);
+  }
+  return statusIds.map((statusId) => ({
+    statusId,
+    label: statusChipLabel(statusId),
+    count: map.get(statusId) || 0,
+  }));
+}
+
 function sameDay(a: string | null, b: string | null): boolean {
   if (!a && !b) return true;
   if (!a || !b) return false;
@@ -200,26 +219,25 @@ export function getMariTicketsWatchState(
     issueId: Number(row.issueId),
   }));
 
-  const storedCounts = readJsonSetting<MariTicketCountsByStatus[]>(
-    MARI_TICKETS_COUNTS_KEY,
-    []
-  )
-    .map((c) => ({
-      ...c,
-      statusId: Number(c.statusId),
-      count: Number(c.count) || 0,
-    }))
-    .filter((c) => statusIds.includes(c.statusId) && c.count > 0);
+  const storedCountMap = new Map(
+    readJsonSetting<MariTicketCountsByStatus[]>(MARI_TICKETS_COUNTS_KEY, [])
+      .map((c) => [Number(c.statusId), Number(c.count) || 0] as const)
+      .filter(([id]) => Number.isInteger(id) && id > 0)
+  );
 
   let counts: MariTicketCountsByStatus[];
   let total: number;
 
   if (snapshot.length > 0) {
     const filtered = filterSnapshotForHome(snapshot, statusIds);
-    counts = buildCounts(filtered);
+    counts = buildCountsForStatuses(filtered, statusIds);
     total = filtered.length;
   } else {
-    counts = storedCounts;
+    counts = statusIds.map((statusId) => ({
+      statusId,
+      label: statusChipLabel(statusId),
+      count: storedCountMap.get(statusId) || 0,
+    }));
     total = counts.reduce((s, c) => s + c.count, 0);
   }
 
@@ -291,9 +309,13 @@ export async function syncMariTicketsIfDue(options?: {
     MARI_TICKETS_SNAPSHOT_KEY,
     []
   );
-  // Guard: don't wipe a good snapshot with an empty poll (transient MARI glitch).
-  if (nextSnap.length === 0 && prevSnap.length > 0 && !statusSetChanged) {
+  // Guard: never wipe a good snapshot with an empty poll (incl. forced
+  // status-set upgrades — transient MARI glitches must not clear the home KPIs).
+  if (nextSnap.length === 0 && prevSnap.length > 0) {
     setSetting(MARI_TICKETS_LAST_POLL_KEY, at);
+    if (statusSetChanged) {
+      setSetting(MARI_TICKETS_SYNC_STATUSES_KEY, desiredStatuses);
+    }
     return {
       attempted: true,
       employeeNumber,

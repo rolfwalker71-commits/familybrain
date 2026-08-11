@@ -719,8 +719,11 @@ function MariTicketsAsideCard({
 }) {
   if (!data.configured) return null;
   const pollLabel = formatPollAt(data.lastPollAt);
-  const statusCounts = data.countsByStatus.filter((c) => c.count > 0);
+  /** Selected statuses from prefs (backend always returns one row each). */
+  const statusCounts = data.countsByStatus;
+  const positiveCounts = statusCounts.filter((c) => c.count > 0);
   const recentChanges = data.recentChanges.slice(0, 2);
+  const showKpis = Boolean(data.lastPollAt) || data.total > 0 || statusCounts.length > 0;
 
   return (
     <Card className={ASIDE_WIDGET_CLASS}>
@@ -741,7 +744,7 @@ function MariTicketsAsideCard({
         ) : null}
       </CardHeader>
       <CardContent className="space-y-3">
-        {statusCounts.length > 0 || data.total > 0 ? (
+        {showKpis ? (
           <div className="flex items-start gap-2.5">
             <div className="flex min-w-[3.25rem] shrink-0 flex-col items-start leading-none">
               <span className="text-[2.25rem] font-black tabular-nums tracking-tight text-foreground">
@@ -751,9 +754,9 @@ function MariTicketsAsideCard({
                 gesamt
               </span>
             </div>
-            {statusCounts.length > 0 ? (
+            {positiveCounts.length > 0 ? (
               <ul className="grid min-w-0 flex-1 grid-cols-2 gap-1.5 pt-0.5">
-                {statusCounts.map((c) => (
+                {positiveCounts.map((c) => (
                   <li
                     key={c.statusId}
                     className={cn(
@@ -772,13 +775,19 @@ function MariTicketsAsideCard({
                   </li>
                 ))}
               </ul>
-            ) : null}
+            ) : data.lastPollAt ? (
+              <p className="min-w-0 flex-1 pt-1 text-[12px] text-muted-foreground">
+                Keine Tickets in den gewählten Status.
+              </p>
+            ) : (
+              <p className="min-w-0 flex-1 pt-1 text-[12px] text-muted-foreground">
+                Noch kein Poll — Scheduler lädt gleich.
+              </p>
+            )}
           </div>
         ) : (
           <p className="text-[12px] text-muted-foreground">
-            {data.lastPollAt
-              ? "Keine offenen Support-Tickets."
-              : "Noch kein Poll — Scheduler lädt gleich."}
+            Noch kein Poll — Scheduler lädt gleich.
           </p>
         )}
 
