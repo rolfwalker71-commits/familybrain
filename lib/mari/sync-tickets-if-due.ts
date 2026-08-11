@@ -195,7 +195,7 @@ export function mariTicketsSyncNeedsForce(): boolean {
 
 /**
  * Read persisted watch state for overview widget (no MARI call).
- * Counts follow the user's Maringo *status* filter (not overdue-only / not customer mode).
+ * Fallback when live MARI is unavailable. Prefer getMariTicketsWatchStateLive.
  */
 export function getMariTicketsWatchState(
   ownerKey?: string | null
@@ -204,7 +204,6 @@ export function getMariTicketsWatchState(
   const prefs = ownerKey
     ? getMariTicketFilterPrefs(ownerKey)
     : defaultMariTicketFilterPrefs();
-  // Home «Tickets von mir»: Status-Auswahl übernehmen, Überfällig/Kundenmodus ignorieren.
   const statusIds =
     prefs.statuses.length > 0
       ? prefs.statuses
@@ -261,6 +260,97 @@ export function getMariTicketsWatchState(
     total,
     recentChanges: filteredChanges.slice(0, 12),
   };
+}
+
+function recentChangesForStatuses(statusIds: number[]): MariTicketChangeEvent[] {
+  const snapshot = readJsonSetting<MariTicketSnapshotRow[]>(
+    MARI_TICKETS_SNAPSHOT_KEY,
+    []
+  ).map((row) => ({
+    ...row,
+    status: Number(row.status),
+    issueId: Number(row.issueId),
+  }));
+  const recentChanges = readJsonSetting<MariTicketChangeEvent[]>(
+    MARI_TICKETS_RECENT_CHANGES_KEY,
+    []
+  );
+  const statusByIssue = new Map(snapshot.map((r) => [r.issueId, r.status]));
+  const allowed = new Set(statusIds.map((n) => Number(n)));
+  return recentChanges
+    .filter((ch) => {
+      const status = statusByIssue.get(Number(ch.issueId));
+      if (status == null) return false;
+      return allowed.has(status);
+    })
+    .slice(0, 12);
+}
+
+/**
+ * Live counts for home «Tickets von mir» — same filter as Maringo ticket list
+ * (statuses, overdue, handler vs. customer cardCodes).
+ */
+export async function getMariTicketsWatchStateLive(
+  ownerKey?: string | null
+): Promise<MariTicketsWatchState> {
+  const cfg = getMariConfig();
+  const prefs = ownerKey
+    ? getMariTicketFilterPrefs(ownerKey)
+    : defaultMariTicketFilterPrefs();
+  const statusIds =
+    prefs.statuses.length > 0
+      ? prefs.statuses
+      : [...defaultMariTicketFilterPrefs().statuses];
+
+  if (!cfg) {
+    return {
+      configured: false,
+      employeeNumber: null,
+      lastPollAt: null,
+      countsByStatus: buildCountsForStatuses([], statusIds),
+      total: 0,
+      recentChanges: [],
+    };
+  }
+
+  try {
+    const cardCodes =
+      prefs.filterMode === "customer"
+        ? prefs.customers.map((c) => c.cardCode).filter(Boolean)
+        : [];
+
+    let tickets: MariTicketListItem[];
+    if (prefs.filterMode === "customer") {
+      if (cardCodes.length === 0) {
+        tickets = [];
+      } else {
+        tickets = await listMyTickets({
+          statuses: statusIds,
+          overdueOnly: prefs.overdueOnly,
+          cardCodes,
+          limit: 200,
+        });
+      }
+    } else {
+      tickets = await listMyTickets({
+        statuses: statusIds,
+        overdueOnly: prefs.overdueOnly,
+        employeeNumber: cfg.employeeNumber,
+        limit: 200,
+      });
+    }
+
+    return {
+      configured: true,
+      employeeNumber: cfg.employeeNumber ?? null,
+      lastPollAt: new Date().toISOString(),
+      countsByStatus: buildCountsForStatuses(tickets, statusIds),
+      total: tickets.length,
+      recentChanges: recentChangesForStatuses(statusIds),
+    };
+  } catch {
+    return getMariTicketsWatchState(ownerKey);
+  }
 }
 
 /**

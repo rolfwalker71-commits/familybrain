@@ -163,10 +163,10 @@ export async function GET(request: Request) {
     if (cached) {
       // Ticket widget follows live filter prefs / snapshot (cheap, no MARI).
       try {
-        const { getMariTicketsWatchState } = await import(
+        const { getMariTicketsWatchStateLive } = await import(
           "@/lib/mari/sync-tickets-if-due"
         );
-        const st = getMariTicketsWatchState(ownerKey);
+        const st = await getMariTicketsWatchStateLive(ownerKey);
         cached.mariTickets = {
           configured: st.configured,
           employeeNumber: st.employeeNumber,

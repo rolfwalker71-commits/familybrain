@@ -25,7 +25,7 @@ import { getDriveMirrorStatus } from "@/lib/buddy/drive-mirror";
 import type { DayBriefingPayload } from "@/lib/dashboard/day-briefing";
 import { getSchedulerSettings } from "@/lib/jobs/queries";
 import { getSchedulerRuntimeStatus } from "@/lib/jobs/scheduler";
-import { getMariTicketsWatchState } from "@/lib/mari/sync-tickets-if-due";
+import { getMariTicketsWatchStateLive } from "@/lib/mari/sync-tickets-if-due";
 
 function attachAgendaAiIconMeta<T extends AgendaItem>(items: T[]): T[] {
   return items.map((item) => {
@@ -897,6 +897,26 @@ export async function getDashboardOverview(
       }
     : null;
 
+  let mariTickets: OverviewPayload["mariTickets"] = null;
+  try {
+    const st = await getMariTicketsWatchStateLive(ownerKey);
+    mariTickets = {
+      configured: st.configured,
+      employeeNumber: st.employeeNumber,
+      lastPollAt: st.lastPollAt,
+      countsByStatus: st.countsByStatus,
+      total: st.total,
+      recentChanges: st.recentChanges.map((c) => ({
+        at: c.at,
+        issueId: c.issueId,
+        title: c.title,
+        detail: c.detail,
+      })),
+    };
+  } catch {
+    mariTickets = null;
+  }
+
   const resultShell: OverviewPayload = {
     period,
     rangeStart: start,
@@ -990,26 +1010,7 @@ export async function getDashboardOverview(
         return null;
       }
     })(),
-    mariTickets: (() => {
-      try {
-        const st = getMariTicketsWatchState(ownerKey);
-        return {
-          configured: st.configured,
-          employeeNumber: st.employeeNumber,
-          lastPollAt: st.lastPollAt,
-          countsByStatus: st.countsByStatus,
-          total: st.total,
-          recentChanges: st.recentChanges.map((c) => ({
-            at: c.at,
-            issueId: c.issueId,
-            title: c.title,
-            detail: c.detail,
-          })),
-        };
-      } catch {
-        return null;
-      }
-    })(),
+    mariTickets,
     briefing: null,
   };
 
