@@ -170,16 +170,48 @@ const finanzBuddyItem: NavItem = {
   tone: pageVisuals.financeBrain.tone,
 };
 
-const limitedUserNavItems: NavItem[] = [
-  travelBuddyItem,
-  finanzBuddyItem,
-  {
-    href: "/account",
-    label: "Konto",
-    icon: pageVisuals.account.icon,
-    tone: pageVisuals.account.tone,
-  },
-];
+const accountNavItem: NavItem = {
+  href: "/account",
+  label: "Konto",
+  icon: pageVisuals.account.icon,
+  tone: pageVisuals.account.tone,
+};
+
+const microsoftNavItem: NavItem = {
+  href: "/microsoft",
+  label: "Microsoft 365",
+  icon: pageVisuals.microsoft.icon,
+  tone: pageVisuals.microsoft.tone,
+  countKey: "mailTriageMicrosoftCount",
+  pendingStyle: true,
+};
+
+const maringoNavItem: NavItem = {
+  href: "/maringo",
+  label: "Maringo Support",
+  icon: pageVisuals.maringo.icon,
+  tone: pageVisuals.maringo.tone,
+};
+
+function limitedNavForModules(modules: string[] | undefined): NavItem[] {
+  const set = new Set(modules || []);
+  const items: NavItem[] = [];
+  if (set.has("microsoft")) items.push(microsoftNavItem);
+  if (set.has("maringo")) items.push(maringoNavItem);
+  if (set.has("travel")) items.push(travelBuddyItem);
+  if (set.has("finance")) items.push(finanzBuddyItem);
+  items.push(accountNavItem);
+  return items;
+}
+
+function homeHrefForModules(modules: string[] | undefined): string {
+  const set = new Set(modules || []);
+  if (set.has("microsoft")) return "/microsoft";
+  if (set.has("maringo")) return "/maringo";
+  if (set.has("travel")) return "/trips";
+  if (set.has("finance")) return "/finance-brain";
+  return "/account";
+}
 
 type AreaEntry = {
   mode: Exclude<AdminNavMode, "home">;
@@ -331,7 +363,7 @@ export function Sidebar({
 
   const brandTitle = BRAND.app;
   const brandHref = isLimitedUser
-    ? "/trips"
+    ? homeHrefForModules(me?.modules)
     : isAdminNav
       ? mode === "travelbuddy"
         ? "/trips"
@@ -357,7 +389,7 @@ export function Sidebar({
 
   let listItems: NavItem[] = [];
   if (isLimitedUser) {
-    listItems = limitedUserNavItems;
+    listItems = limitedNavForModules(me?.modules);
   } else if (isAdminNav) {
     if (mode === "mybrain") listItems = myBrainNavItems;
     else if (mode === "travelbuddy") listItems = [travelBuddyItem];

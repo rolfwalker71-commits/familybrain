@@ -437,6 +437,8 @@ export function notifyTelegramMessage(input: {
 export function notifyTelegramFromAppNotify(
   notification: AppNotifyPayload
 ): void {
+  // Limited module users set skipTelegram on the payload (see notifyAppChange).
+  if (notification.skipTelegram) return;
   void dispatchTelegramNotify(notification).catch(() => {
     /* optional */
   });

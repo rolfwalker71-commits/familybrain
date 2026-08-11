@@ -5,8 +5,10 @@ import {
   requireAdmin,
 } from "@/lib/auth/current-user";
 import { hashPassword } from "@/lib/auth/password";
+import { clearMariTokenCache } from "@/lib/mari/client";
 import {
   deleteAppUser,
+  getAppUserById,
   getAppUserPublic,
   updateAppUser,
 } from "@/lib/users/queries";
@@ -25,6 +27,10 @@ const PatchSchema = z.object({
   gender: z.enum(["male", "female"]).nullable().optional(),
   showTodayHub: z.boolean().optional(),
   isAdmin: z.boolean().optional(),
+  mariEmployeeNumber: z.string().max(40).nullable().optional(),
+  mariRestUsername: z.string().max(120).nullable().optional(),
+  mariRestPassword: z.string().max(200).nullable().optional(),
+  clearMariRestPassword: z.boolean().optional(),
 });
 
 export async function GET(_request: Request, context: Ctx) {
@@ -51,6 +57,7 @@ export async function PATCH(request: Request, context: Ctx) {
     if (!Number.isInteger(id) || id <= 0) {
       return NextResponse.json({ error: "Ungültige ID" }, { status: 400 });
     }
+    const before = getAppUserById(id);
     const parsed = PatchSchema.safeParse(await request.json());
     if (!parsed.success) {
       return NextResponse.json({ error: "Ungültige Eingabe" }, { status: 400 });
@@ -67,7 +74,14 @@ export async function PATCH(request: Request, context: Ctx) {
       gender: parsed.data.gender,
       showTodayHub: parsed.data.showTodayHub,
       isAdmin: parsed.data.isAdmin,
+      mariEmployeeNumber: parsed.data.mariEmployeeNumber,
+      mariRestUsername: parsed.data.mariRestUsername,
+      mariRestPassword: parsed.data.mariRestPassword,
+      clearMariRestPassword: parsed.data.clearMariRestPassword,
     });
+    const after = getAppUserById(id);
+    clearMariTokenCache(before?.mari_rest_username);
+    clearMariTokenCache(after?.mari_rest_username);
     return NextResponse.json({ ok: true, user: getAppUserPublic(id) });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -75,7 +89,9 @@ export async function PATCH(request: Request, context: Ctx) {
       ? 404
       : message.includes("bereits")
         ? 409
-        : 500;
+        : message.includes("MARI")
+          ? 400
+          : 500;
     return NextResponse.json({ error: message }, { status });
   }
 }

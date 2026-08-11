@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { ensureInitialized } from "@/lib/db/migrations";
-import { isAuthError, requireAdmin } from "@/lib/auth/current-user";
+import { isAuthError, requireModule } from "@/lib/auth/current-user";
 import { MariApiError, mariSql, requireMariConfig } from "@/lib/mari/client";
 import { hasMariConfig } from "@/lib/mari/config";
 
@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 export async function POST() {
   ensureInitialized();
-  const auth = await requireAdmin();
+  const auth = await requireModule("maringo");
   if (isAuthError(auth)) return auth;
 
   if (!hasMariConfig()) {

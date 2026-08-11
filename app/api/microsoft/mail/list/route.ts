@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isAuthError, requireAuth } from "@/lib/auth/current-user";
+import { isAuthError, requireModule } from "@/lib/auth/current-user";
 import { ensureInitialized } from "@/lib/db/migrations";
 import {
   getConnectedMicrosoftEmail,
@@ -27,7 +27,7 @@ function parseFilter(raw: string | null): MailListFilter {
 
 export async function GET(request: Request) {
   ensureInitialized();
-  const auth = await requireAuth();
+  const auth = await requireModule("microsoft");
   if (isAuthError(auth)) return auth;
   const userId = resolveMicrosoftUserId(auth);
   const { searchParams } = new URL(request.url);

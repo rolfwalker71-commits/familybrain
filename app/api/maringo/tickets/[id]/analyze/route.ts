@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { ensureInitialized } from "@/lib/db/migrations";
-import { isAuthError, requireAuth } from "@/lib/auth/current-user";
+import { isAuthError, requireModule } from "@/lib/auth/current-user";
 import { ownerKeyFromAuth } from "@/lib/auth/owner-key";
 import { hasChatKey, hasOpenAIKey } from "@/lib/ai/client";
 import { MariApiError } from "@/lib/mari/client";
@@ -28,7 +28,7 @@ function parseIssueId(raw: string): number | null {
 
 export async function GET(_request: Request, context: Ctx) {
   ensureInitialized();
-  const auth = await requireAuth();
+  const auth = await requireModule("maringo");
   if (isAuthError(auth)) return auth;
 
   const { id: raw } = await context.params;
@@ -57,7 +57,7 @@ export async function GET(_request: Request, context: Ctx) {
 
 export async function POST(_request: Request, context: Ctx) {
   ensureInitialized();
-  const auth = await requireAuth();
+  const auth = await requireModule("maringo");
   if (isAuthError(auth)) return auth;
   if (!hasMariConfig()) {
     return NextResponse.json(

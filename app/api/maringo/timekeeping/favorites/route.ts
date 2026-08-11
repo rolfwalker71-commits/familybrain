@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { ensureInitialized } from "@/lib/db/migrations";
-import { isAuthError, requireAuth } from "@/lib/auth/current-user";
+import { isAuthError, requireModule } from "@/lib/auth/current-user";
 import { ownerKeyFromAuth } from "@/lib/auth/owner-key";
 import {
   createMariTimeBookFavorite,
@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   ensureInitialized();
-  const auth = await requireAuth();
+  const auth = await requireModule("maringo");
   if (isAuthError(auth)) return auth;
   const ownerKey = ownerKeyFromAuth(auth);
   const favorites = listMariTimeBookFavorites(ownerKey);
@@ -22,7 +22,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   ensureInitialized();
-  const auth = await requireAuth();
+  const auth = await requireModule("maringo");
   if (isAuthError(auth)) return auth;
   try {
     const json = await request.json();

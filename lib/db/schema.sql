@@ -432,7 +432,7 @@ CREATE TABLE IF NOT EXISTS trip_share_links (
 CREATE INDEX IF NOT EXISTS idx_trip_share_links_trip ON trip_share_links(trip_id);
 CREATE INDEX IF NOT EXISTS idx_trip_share_links_token ON trip_share_links(token);
 
--- App users (limited access to assigned trips + finance ledgers)
+-- App users (limited access via modules + trip/ledger ACLs)
 CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   username TEXT NOT NULL UNIQUE,
@@ -445,6 +445,9 @@ CREATE TABLE IF NOT EXISTS users (
   active INTEGER NOT NULL DEFAULT 1,
   show_today_hub INTEGER NOT NULL DEFAULT 0,
   is_admin INTEGER NOT NULL DEFAULT 0,
+  mari_employee_number TEXT,
+  mari_rest_username TEXT,
+  mari_rest_password TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
@@ -596,6 +599,14 @@ CREATE TABLE IF NOT EXISTS user_ledger_access (
   FOREIGN KEY(ledger_id) REFERENCES finance_ledgers(id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_user_ledger_access_ledger ON user_ledger_access(ledger_id);
+
+CREATE TABLE IF NOT EXISTS user_module_access (
+  user_id INTEGER NOT NULL,
+  module TEXT NOT NULL,
+  PRIMARY KEY (user_id, module),
+  FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_user_module_access_module ON user_module_access(module);
 
 CREATE TABLE IF NOT EXISTS paperless_field_sync_log (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

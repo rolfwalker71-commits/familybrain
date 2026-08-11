@@ -1,6 +1,6 @@
 import { after, NextResponse } from "next/server";
 import { z } from "zod";
-import { isAuthError, requireAuth } from "@/lib/auth/current-user";
+import { isAuthError, requireModule } from "@/lib/auth/current-user";
 import { ensureInitialized } from "@/lib/db/migrations";
 import {
   analyzeMicrosoftMailDay,
@@ -51,7 +51,11 @@ const BodySchema = z.object({
   to: Ymd,
 });
 
-function notifyDone(rangeLabel: string, analysis: MsDayMailAnalysis) {
+function notifyDone(
+  rangeLabel: string,
+  analysis: MsDayMailAnalysis,
+  skipTelegram: boolean
+) {
   const usageLine = formatTokenUsageLine(analysis.usage);
   const detail = [
     `${analysis.clusters.length} Cluster`,
@@ -74,10 +78,16 @@ function notifyDone(rangeLabel: string, analysis: MsDayMailAnalysis) {
     category: null,
     meta: null,
     source: "buddy",
+    skipTelegram,
+    skipWebPush: skipTelegram,
   });
 }
 
-function notifyError(rangeLabel: string, message: string) {
+function notifyError(
+  rangeLabel: string,
+  message: string,
+  skipTelegram: boolean
+) {
   const detail = `${rangeLabel}: ${message.slice(0, 180)}`;
   notifyAppChange({
     domain: "documents",
@@ -90,10 +100,16 @@ function notifyError(rangeLabel: string, message: string) {
     category: null,
     meta: null,
     source: "buddy",
+    skipTelegram,
+    skipWebPush: skipTelegram,
   });
 }
 
-async function runAnalysisJob(userId: number, range: MailAnalysisRange) {
+async function runAnalysisJob(
+  userId: number,
+  range: MailAnalysisRange,
+  skipTelegram: boolean
+) {
   const label = formatMailAnalysisRangeLabel(range);
   try {
     const mail = await listMicrosoftMailForRange(
@@ -114,7 +130,7 @@ async function runAnalysisJob(userId: number, range: MailAnalysisRange) {
         `Keine Outlook-Mails für ${label} gefunden.`
       );
       finishMsMailDayJobOk(userId, range, mailPayload, analysis);
-      notifyDone(label, analysis);
+      notifyDone(label, analysis, skipTelegram);
       return;
     }
     const catalogPromise = Promise.all([
@@ -133,11 +149,11 @@ async function runAnalysisJob(userId: number, range: MailAnalysisRange) {
       await catalogPromise
     );
     finishMsMailDayJobOk(userId, range, mailPayload, enriched);
-    notifyDone(label, enriched);
+    notifyDone(label, enriched, skipTelegram);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     finishMsMailDayJobError(userId, range, message);
-    notifyError(label, message);
+    notifyError(label, message, skipTelegram);
   }
 }
 
@@ -152,7 +168,7 @@ function resolveRangeFromRequest(url: URL, body?: z.infer<typeof BodySchema>) {
 /** Status / Cache für Zeitraum (überlebt Seitenwechsel, max. 7 Einträge). */
 export async function GET(request: Request) {
   ensureInitialized();
-  const auth = await requireAuth();
+  const auth = await requireModule("microsoft");
   if (isAuthError(auth)) return auth;
   const userId = resolveMicrosoftUserId(auth);
   if (userId == null || !isMicrosoftConnected(userId)) {
@@ -311,7 +327,7 @@ export async function GET(request: Request) {
 /** Startet Analyse im Hintergrund (after) und antwortet sofort. */
 export async function POST(request: Request) {
   ensureInitialized();
-  const auth = await requireAuth();
+  const auth = await requireModule("microsoft");
   if (isAuthError(auth)) return auth;
   const userId = resolveMicrosoftUserId(auth);
   if (userId == null || !isMicrosoftConnected(userId)) {
@@ -359,8 +375,9 @@ export async function POST(request: Request) {
   }
 
   const job = startMsMailDayJob(userId, range);
+  const skipTelegram = !auth.isAdmin;
   after(() => {
-    void runAnalysisJob(userId, range);
+    void runAnalysisJob(userId, range, skipTelegram);
   });
 
   const label = formatMailAnalysisRangeLabel(range);

@@ -4,7 +4,14 @@ import {
   SESSION_COOKIE_NAME,
 } from "@/lib/auth/config";
 import { verifySessionToken } from "@/lib/auth/session";
-import { getAppUserById } from "@/lib/users/queries";
+import {
+  effectiveUserModules,
+  getAppUserById,
+} from "@/lib/users/queries";
+import {
+  homePathForModules,
+  type AppModule,
+} from "@/lib/users/modules";
 
 const PUBLIC_PATHS = new Set([
   "/login",
@@ -36,46 +43,103 @@ function isPublicPath(pathname: string): boolean {
   return false;
 }
 
-function isLimitedUserAllowedPath(pathname: string): boolean {
+function isAlwaysAllowedForLimitedUser(pathname: string): boolean {
   if (pathname === "/api/auth/me" || pathname === "/api/auth/logout") {
     return true;
   }
   if (pathname.startsWith("/api/push/")) return true;
   if (pathname === "/api/me/notification-prefs") return true;
-  if (pathname === "/trips" || pathname.startsWith("/trips/")) return true;
-  if (pathname === "/finance-brain" || pathname.startsWith("/finance-brain/")) {
-    return true;
-  }
-  if (pathname === "/api/trips" || pathname.startsWith("/api/trips/")) {
-    return true;
-  }
-  if (pathname === "/api/home/agenda") {
-    return true;
-  }
-  // Trip/finance overlays (ActivityLogPanel) — route still enforces entity ACL.
-  if (pathname === "/api/activity-log") {
-    return true;
-  }
-  if (pathname.startsWith("/api/users/media/avatar/")) {
-    return true;
-  }
-  if (pathname.startsWith("/api/family/media/avatar/")) {
+  if (pathname === "/account" || pathname.startsWith("/account/")) return true;
+  if (pathname.startsWith("/api/users/media/avatar/")) return true;
+  if (pathname.startsWith("/api/family/media/avatar/")) return true;
+  // Konto: Google / Microsoft connect + ICS calendars
+  if (pathname === "/api/calendars" || pathname.startsWith("/api/calendars/")) {
     return true;
   }
   if (
-    pathname === "/api/finance-ledgers" ||
-    pathname.startsWith("/api/finance-ledgers/")
+    pathname === "/api/google/connection" ||
+    pathname.startsWith("/api/google/oauth/") ||
+    pathname === "/api/google/calendars"
   ) {
     return true;
   }
-  // Trip/finance PDF thumbs + viewers (route still checks trip/ledger access).
   if (
-    pathname.startsWith("/api/paperless/documents/") &&
-    pathname.endsWith("/file")
+    pathname === "/api/microsoft/connection" ||
+    pathname.startsWith("/api/microsoft/oauth/") ||
+    pathname === "/api/microsoft/probe" ||
+    pathname === "/api/microsoft/calendars"
   ) {
     return true;
   }
   return false;
+}
+
+function isModulePathAllowed(
+  pathname: string,
+  modules: readonly AppModule[]
+): boolean {
+  if (modules.includes("travel")) {
+    if (pathname === "/trips" || pathname.startsWith("/trips/")) return true;
+    if (pathname === "/api/trips" || pathname.startsWith("/api/trips/")) {
+      return true;
+    }
+    if (pathname === "/api/home/agenda") return true;
+    if (pathname === "/api/activity-log") return true;
+    if (
+      pathname.startsWith("/api/paperless/documents/") &&
+      pathname.endsWith("/file")
+    ) {
+      return true;
+    }
+  }
+  if (modules.includes("finance")) {
+    if (
+      pathname === "/finance-brain" ||
+      pathname.startsWith("/finance-brain/")
+    ) {
+      return true;
+    }
+    if (
+      pathname === "/api/finance-ledgers" ||
+      pathname.startsWith("/api/finance-ledgers/")
+    ) {
+      return true;
+    }
+    if (pathname === "/api/activity-log") return true;
+    if (
+      pathname.startsWith("/api/paperless/documents/") &&
+      pathname.endsWith("/file")
+    ) {
+      return true;
+    }
+  }
+  if (modules.includes("microsoft")) {
+    if (pathname === "/microsoft" || pathname.startsWith("/microsoft/")) {
+      return true;
+    }
+    if (
+      pathname.startsWith("/api/microsoft/") &&
+      pathname !== "/api/microsoft/settings" &&
+      !pathname.startsWith("/api/microsoft/settings/")
+    ) {
+      return true;
+    }
+  }
+  if (modules.includes("maringo")) {
+    if (pathname === "/maringo" || pathname.startsWith("/maringo/")) {
+      return true;
+    }
+    if (pathname.startsWith("/api/maringo/")) return true;
+  }
+  return false;
+}
+
+function isLimitedUserAllowedPath(
+  pathname: string,
+  modules: readonly AppModule[]
+): boolean {
+  if (isAlwaysAllowedForLimitedUser(pathname)) return true;
+  return isModulePathAllowed(pathname, modules);
 }
 
 function normalizeHost(host: string): string {
@@ -153,6 +217,20 @@ function isLimitedAppUser(session: {
   return !user?.active || !user.is_admin;
 }
 
+function limitedUserHome(session: {
+  kind: string;
+  userId?: number;
+}): string {
+  if (session.kind === "user" && session.userId) {
+    const user = getAppUserById(session.userId);
+    if (user?.is_admin) return "/dashboard";
+    if (user) {
+      return homePathForModules(effectiveUserModules(user.id, false));
+    }
+  }
+  return "/account";
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
   const origin = requestOrigin(request);
@@ -206,19 +284,26 @@ export async function proxy(request: NextRequest) {
     if (pathname === "/login") {
       let home = "/dashboard";
       if (session.kind === "user" && session.userId) {
-        const user = getAppUserById(session.userId);
-        home = user?.is_admin ? "/dashboard" : "/trips";
+        home = limitedUserHome(session);
       }
       return NextResponse.redirect(new URL(home, origin));
     }
-    if (isLimitedAppUser(session) && !isLimitedUserAllowedPath(pathname)) {
-      if (pathname.startsWith("/api/")) {
-        return NextResponse.json(
-          { error: "Keine Berechtigung." },
-          { status: 403 }
+    if (isLimitedAppUser(session)) {
+      const modules =
+        session.userId != null
+          ? effectiveUserModules(session.userId, false)
+          : [];
+      if (!isLimitedUserAllowedPath(pathname, modules)) {
+        if (pathname.startsWith("/api/")) {
+          return NextResponse.json(
+            { error: "Keine Berechtigung." },
+            { status: 403 }
+          );
+        }
+        return NextResponse.redirect(
+          new URL(homePathForModules(modules), origin)
         );
       }
-      return NextResponse.redirect(new URL("/trips", origin));
     }
     return NextResponse.next();
   }

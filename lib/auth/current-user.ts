@@ -8,9 +8,12 @@ import {
   verifySessionToken,
   type SessionPayload,
 } from "@/lib/auth/session";
+import type { AppModule } from "@/lib/users/modules";
 import {
+  effectiveUserModules,
   getAppUserById,
   userHasLedgerAccess,
+  userHasModule,
   userHasTripAccess,
 } from "@/lib/users/queries";
 
@@ -19,6 +22,7 @@ export type AuthContext = {
   username: string;
   userId: number | null;
   isAdmin: boolean;
+  modules: AppModule[];
 };
 
 export async function getSessionFromCookies(): Promise<SessionPayload | null> {
@@ -42,6 +46,7 @@ export async function getAuthContext(): Promise<AuthContext | null> {
       username: session.username,
       userId: null,
       isAdmin: true,
+      modules: effectiveUserModules(0, true),
     };
   }
   if (!session.userId) return null;
@@ -50,11 +55,13 @@ export async function getAuthContext(): Promise<AuthContext | null> {
   if (user.username.toLowerCase() !== session.username.toLowerCase()) {
     return null;
   }
+  const isAdmin = Boolean(user.is_admin);
   return {
     kind: "user",
     username: user.username,
     userId: user.id,
-    isAdmin: Boolean(user.is_admin),
+    isAdmin,
+    modules: effectiveUserModules(user.id, isAdmin),
   };
 }
 
@@ -74,6 +81,33 @@ export async function requireAdmin(): Promise<AuthContext | NextResponse> {
   if (ctx instanceof NextResponse) return ctx;
   if (!ctx.isAdmin) {
     return NextResponse.json({ error: "Keine Berechtigung." }, { status: 403 });
+  }
+  return ctx;
+}
+
+export async function requireModule(
+  module: AppModule
+): Promise<AuthContext | NextResponse> {
+  const ctx = await requireAuth();
+  if (ctx instanceof NextResponse) return ctx;
+  if (ctx.isAdmin) {
+    if (module === "maringo") {
+      // Admin uses global MARI credentials from Einstellungen.
+      const { enterMariRequestUser } = await import(
+        "@/lib/mari/request-context"
+      );
+      enterMariRequestUser(null);
+    }
+    return ctx;
+  }
+  if (!ctx.userId || !userHasModule(ctx.userId, module, false)) {
+    return NextResponse.json({ error: "Keine Berechtigung." }, { status: 403 });
+  }
+  if (module === "maringo") {
+    const { enterMariRequestUser } = await import(
+      "@/lib/mari/request-context"
+    );
+    enterMariRequestUser(ctx.userId);
   }
   return ctx;
 }

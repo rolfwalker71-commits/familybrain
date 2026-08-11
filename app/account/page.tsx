@@ -7,6 +7,7 @@ import { DriveMirrorStatusPanel } from "@/components/settings/drive-mirror-statu
 import { O365PdfBackfillPanel } from "@/components/settings/o365-pdf-backfill-panel";
 import { PageHeader } from "@/components/layout/page-primitives";
 import { pageVisuals } from "@/components/layout/icon-circle";
+import { getAuthContext } from "@/lib/auth/current-user";
 import { Suspense, type ReactNode } from "react";
 
 export const dynamic = "force-dynamic";
@@ -35,7 +36,10 @@ function AccountSection({
   );
 }
 
-export default function AccountPage() {
+export default async function AccountPage() {
+  const ctx = await getAuthContext();
+  const isAdmin = Boolean(ctx?.isAdmin);
+
   return (
     <div className="space-y-8 pb-28 md:pb-0">
       <PageHeader
@@ -66,13 +70,15 @@ export default function AccountPage() {
         <SettingsCalendarsPanel />
       </AccountSection>
 
-      <AccountSection
-        title="Spiegel & Import"
-        description="Drive-Spiegel und historische O365-PDFs nach Paperless."
-      >
-        <DriveMirrorStatusPanel />
-        <O365PdfBackfillPanel />
-      </AccountSection>
+      {isAdmin ? (
+        <AccountSection
+          title="Spiegel & Import"
+          description="Drive-Spiegel und historische O365-PDFs nach Paperless."
+        >
+          <DriveMirrorStatusPanel />
+          <O365PdfBackfillPanel />
+        </AccountSection>
+      ) : null}
     </div>
   );
 }

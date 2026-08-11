@@ -61,17 +61,21 @@ export function notifyAppChange(
 
   publishRealtime({ topic: "notify", at, notification });
 
-  void import("@/lib/push/dispatch")
-    .then((m) => m.dispatchWebPush(notification))
-    .catch(() => {
-      /* optional */
-    });
+  if (!notification.skipWebPush) {
+    void import("@/lib/push/dispatch")
+      .then((m) => m.dispatchWebPush(notification))
+      .catch(() => {
+        /* optional */
+      });
+  }
 
-  void import("@/lib/telegram/notify")
-    .then((m) => m.notifyTelegramFromAppNotify(notification))
-    .catch(() => {
-      /* optional */
-    });
+  if (!notification.skipTelegram) {
+    void import("@/lib/telegram/notify")
+      .then((m) => m.notifyTelegramFromAppNotify(notification))
+      .catch(() => {
+        /* optional */
+      });
+  }
 }
 
 export function getDocumentRealtimeSnapshot(localId: number): {

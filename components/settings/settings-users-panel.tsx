@@ -29,6 +29,10 @@ type AppUser = {
   avatar_url: string | null;
   trip_ids: number[];
   ledger_ids: number[];
+  modules: string[];
+  mari_employee_number: string | null;
+  mari_rest_username: string | null;
+  has_mari_password: boolean;
 };
 
 type TripOption = { id: number; title: string };
@@ -58,6 +62,11 @@ export function SettingsUsersPanel() {
   const [editIsAdmin, setEditIsAdmin] = useState(false);
   const [editTripIds, setEditTripIds] = useState<number[]>([]);
   const [editLedgerIds, setEditLedgerIds] = useState<number[]>([]);
+  const [editModules, setEditModules] = useState<string[]>([]);
+  const [editMariEmployee, setEditMariEmployee] = useState("");
+  const [editMariRestUser, setEditMariRestUser] = useState("");
+  const [editMariRestPassword, setEditMariRestPassword] = useState("");
+  const [editClearMariPassword, setEditClearMariPassword] = useState(false);
   const [avatarBusy, setAvatarBusy] = useState(false);
   const avatarFileRef = useRef<HTMLInputElement>(null);
 
@@ -136,6 +145,11 @@ export function SettingsUsersPanel() {
         setEditIsAdmin(Boolean(data.user.is_admin));
         setEditTripIds(data.user.trip_ids || []);
         setEditLedgerIds(data.user.ledger_ids || []);
+        setEditModules(data.user.modules || []);
+        setEditMariEmployee(data.user.mari_employee_number || "");
+        setEditMariRestUser(data.user.mari_rest_username || "");
+        setEditMariRestPassword("");
+        setEditClearMariPassword(false);
         setEditPassword("");
       }
     } catch (err) {
@@ -149,6 +163,11 @@ export function SettingsUsersPanel() {
     setEditId(user.id);
     setEditTripIds(user.trip_ids || []);
     setEditLedgerIds(user.ledger_ids || []);
+    setEditModules(user.modules || []);
+    setEditMariEmployee(user.mari_employee_number || "");
+    setEditMariRestUser(user.mari_rest_username || "");
+    setEditMariRestPassword("");
+    setEditClearMariPassword(false);
     setEditPassword("");
     setEditDisplayName(user.display_name);
     setEditEmail(user.email);
@@ -172,12 +191,20 @@ export function SettingsUsersPanel() {
           active: Boolean(user.active),
           showTodayHub: editShowTodayHub,
           isAdmin: editIsAdmin,
+          mariEmployeeNumber: editMariEmployee.trim() || null,
+          mariRestUsername: editMariRestUser.trim() || null,
+          ...(editMariRestPassword.trim()
+            ? { mariRestPassword: editMariRestPassword.trim() }
+            : {}),
+          ...(editClearMariPassword ? { clearMariRestPassword: true } : {}),
           ...(editPassword ? { password: editPassword } : {}),
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Speichern fehlgeschlagen");
       setEditPassword("");
+      setEditMariRestPassword("");
+      setEditClearMariPassword(false);
       setStatus("Benutzer gespeichert.");
       await load();
     } catch (err) {
@@ -240,6 +267,7 @@ export function SettingsUsersPanel() {
         body: JSON.stringify({
           tripIds: editTripIds,
           ledgerIds: editLedgerIds,
+          modules: editModules,
         }),
       });
       const data = await res.json();
@@ -285,9 +313,10 @@ export function SettingsUsersPanel() {
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            App-User standardmässig nur für zugewiesene TravelBuddy-Reisen und
-            FinanzBuddy-Abrechnungen. Mit Flag «Admin» voller Zugriff. Der
-            Env-Admin (Login aus .env) bleibt zusätzlich bestehen.
+            App-User erhalten nur zugewiesene Module (z. B. Microsoft 365,
+            Maringo, TravelBuddy, FinanzBuddy) plus Konto. Mit Flag «Admin»
+            voller Zugriff. Der Env-Admin (Login aus .env) bleibt zusätzlich
+            bestehen.
           </p>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
@@ -420,6 +449,19 @@ export function SettingsUsersPanel() {
                         <Badge variant="outline">
                           {user.ledger_ids.length} Abrechnungen
                         </Badge>
+                        {(user.modules || []).map((mod) => (
+                          <Badge key={mod} variant="secondary">
+                            {mod === "microsoft"
+                              ? "M365"
+                              : mod === "maringo"
+                                ? "Maringo"
+                                : mod === "travel"
+                                  ? "Travel"
+                                  : mod === "finance"
+                                    ? "Finanz"
+                                    : mod}
+                          </Badge>
+                        ))}
                       </div>
                       </div>
                     </div>
@@ -584,6 +626,78 @@ export function SettingsUsersPanel() {
                             </span>
                           </label>
                         </div>
+                        <div className="sm:col-span-2 space-y-3 rounded-lg border border-border/70 p-3">
+                          <div>
+                            <Label className="text-sm font-medium">
+                              MARI-Zugangsdaten (persönlich)
+                            </Label>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              Eigenes MARI-Login für diesen User. Leer = globale
+                              Credentials aus Einstellungen → Maringo. Base-URL
+                              bleibt global.
+                            </p>
+                          </div>
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <div className="space-y-1.5">
+                              <Label>MARI Benutzer</Label>
+                              <Input
+                                value={editMariRestUser}
+                                onChange={(e) =>
+                                  setEditMariRestUser(e.target.value)
+                                }
+                                placeholder="MARI Login"
+                                autoCapitalize="none"
+                                spellCheck={false}
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label>Personalnummer</Label>
+                              <Input
+                                value={editMariEmployee}
+                                onChange={(e) =>
+                                  setEditMariEmployee(e.target.value)
+                                }
+                                placeholder="z.B. M1010"
+                                autoCapitalize="characters"
+                                spellCheck={false}
+                              />
+                            </div>
+                            <div className="space-y-1.5 sm:col-span-2">
+                              <Label>
+                                MARI Passwort
+                                {user.has_mari_password
+                                  ? " (gesetzt — leer lassen zum Behalten)"
+                                  : ""}
+                              </Label>
+                              <Input
+                                type="password"
+                                value={editMariRestPassword}
+                                onChange={(e) => {
+                                  setEditMariRestPassword(e.target.value);
+                                  if (e.target.value)
+                                    setEditClearMariPassword(false);
+                                }}
+                                autoComplete="new-password"
+                                disabled={editClearMariPassword}
+                              />
+                            </div>
+                            {user.has_mari_password || editMariRestUser ? (
+                              <label className="flex cursor-pointer items-center gap-2 text-sm sm:col-span-2">
+                                <input
+                                  type="checkbox"
+                                  className="size-4 rounded border-border"
+                                  checked={editClearMariPassword}
+                                  onChange={(e) => {
+                                    setEditClearMariPassword(e.target.checked);
+                                    if (e.target.checked)
+                                      setEditMariRestPassword("");
+                                  }}
+                                />
+                                MARI-Passwort löschen
+                              </label>
+                            ) : null}
+                          </div>
+                        </div>
                         <div className="flex items-end sm:col-span-2">
                           <Button
                             variant="outline"
@@ -597,6 +711,39 @@ export function SettingsUsersPanel() {
                           >
                             Stammdaten speichern
                           </Button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Module</Label>
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          {(
+                            [
+                              ["microsoft", "Microsoft 365"],
+                              ["maringo", "Maringo Support"],
+                              ["travel", "TravelBuddy"],
+                              ["finance", "FinanzBuddy"],
+                            ] as const
+                          ).map(([id, label]) => (
+                            <label
+                              key={id}
+                              className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-border/70 px-3 py-2.5 text-sm"
+                            >
+                              <input
+                                type="checkbox"
+                                className="mt-1 size-4 shrink-0 rounded border-border"
+                                checked={editModules.includes(id)}
+                                onChange={() => {
+                                  setEditModules((prev) =>
+                                    prev.includes(id)
+                                      ? prev.filter((m) => m !== id)
+                                      : [...prev, id]
+                                  );
+                                }}
+                              />
+                              <span className="font-medium">{label}</span>
+                            </label>
+                          ))}
                         </div>
                       </div>
 

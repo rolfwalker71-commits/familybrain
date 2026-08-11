@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { ensureInitialized } from "@/lib/db/migrations";
-import { isAuthError, requireAuth } from "@/lib/auth/current-user";
+import { isAuthError, requireModule } from "@/lib/auth/current-user";
 import { MariApiError } from "@/lib/mari/client";
 import { hasMariConfig } from "@/lib/mari/config";
 import { listContractsForProject } from "@/lib/mari/timekeeping";
@@ -12,7 +12,7 @@ type Ctx = { params: Promise<{ projectNumber: string }> };
 
 export async function GET(request: Request, ctx: Ctx) {
   ensureInitialized();
-  const auth = await requireAuth();
+  const auth = await requireModule("maringo");
   if (isAuthError(auth)) return auth;
   if (!hasMariConfig()) {
     return NextResponse.json(

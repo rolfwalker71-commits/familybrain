@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { ensureInitialized } from "@/lib/db/migrations";
-import { isAuthError, requireAuth } from "@/lib/auth/current-user";
+import { isAuthError, requireModule } from "@/lib/auth/current-user";
 import { ownerKeyFromAuth } from "@/lib/auth/owner-key";
 import { deleteMariTimeBookFavorite } from "@/lib/mari/time-book-favorites";
 
@@ -12,7 +12,7 @@ export async function DELETE(
   ctx: { params: Promise<{ id: string }> }
 ) {
   ensureInitialized();
-  const auth = await requireAuth();
+  const auth = await requireModule("maringo");
   if (isAuthError(auth)) return auth;
   const id = Number((await ctx.params).id);
   if (!Number.isInteger(id) || id <= 0) {

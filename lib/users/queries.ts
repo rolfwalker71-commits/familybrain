@@ -1,6 +1,11 @@
 import { getDb } from "@/lib/db/client";
 import { nowIso } from "@/lib/utils/dates";
 import path from "path";
+import {
+  ALL_APP_MODULES,
+  normalizeAppModules,
+  type AppModule,
+} from "@/lib/users/modules";
 
 export type UserGender = "male" | "female" | null;
 
@@ -16,17 +21,22 @@ export type AppUserRow = {
   active: number;
   show_today_hub: number;
   is_admin: number;
+  mari_employee_number: string | null;
+  mari_rest_username: string | null;
+  mari_rest_password: string | null;
   created_at: string;
   updated_at: string;
 };
 
 export type AppUserPublic = Omit<
   AppUserRow,
-  "password_hash" | "avatar_path" | "avatar_prompt"
+  "password_hash" | "avatar_path" | "avatar_prompt" | "mari_rest_password"
 > & {
   trip_ids: number[];
   ledger_ids: number[];
+  modules: AppModule[];
   avatar_url: string | null;
+  has_mari_password: boolean;
 };
 
 function normalizeGender(raw: string | null | undefined): UserGender {
@@ -44,16 +54,26 @@ function avatarUrlFromPath(avatarPath: string | null | undefined): string | null
 function mapPublic(
   row: AppUserRow,
   tripIds: number[],
-  ledgerIds: number[]
+  ledgerIds: number[],
+  modules: AppModule[]
 ): AppUserPublic {
-  const { password_hash: _hash, avatar_path, avatar_prompt: _prompt, ...rest } =
-    row;
+  const {
+    password_hash: _hash,
+    avatar_path,
+    avatar_prompt: _prompt,
+    mari_rest_password,
+    ...rest
+  } = row;
   return {
     ...rest,
     gender: normalizeGender(row.gender),
+    mari_employee_number: row.mari_employee_number?.trim() || null,
+    mari_rest_username: row.mari_rest_username?.trim() || null,
+    has_mari_password: Boolean(mari_rest_password?.trim()),
     avatar_url: avatarUrlFromPath(avatar_path),
     trip_ids: tripIds,
     ledger_ids: ledgerIds,
+    modules,
   };
 }
 
@@ -65,6 +85,9 @@ function coerceUserRow(row: AppUserRow): AppUserRow {
     avatar_prompt: row.avatar_prompt ?? null,
     show_today_hub: row.show_today_hub ? 1 : 0,
     is_admin: row.is_admin ? 1 : 0,
+    mari_employee_number: row.mari_employee_number?.trim() || null,
+    mari_rest_username: row.mari_rest_username?.trim() || null,
+    mari_rest_password: row.mari_rest_password ?? null,
   };
 }
 
@@ -79,7 +102,8 @@ export function listAppUsers(): AppUserPublic[] {
     mapPublic(
       coerceUserRow(row),
       listUserTripIds(row.id),
-      listUserLedgerIds(row.id)
+      listUserLedgerIds(row.id),
+      listUserModules(row.id)
     )
   );
 }
@@ -103,7 +127,12 @@ export function getAppUserByUsername(username: string): AppUserRow | null {
 export function getAppUserPublic(id: number): AppUserPublic | null {
   const row = getAppUserById(id);
   if (!row) return null;
-  return mapPublic(row, listUserTripIds(id), listUserLedgerIds(id));
+  return mapPublic(
+    row,
+    listUserTripIds(id),
+    listUserLedgerIds(id),
+    listUserModules(id)
+  );
 }
 
 export function createAppUser(input: {
@@ -164,11 +193,44 @@ export function updateAppUser(
     gender?: UserGender;
     showTodayHub?: boolean;
     isAdmin?: boolean;
+    mariEmployeeNumber?: string | null;
+    mariRestUsername?: string | null;
+    mariRestPassword?: string | null;
+    clearMariRestPassword?: boolean;
   }
 ): AppUserRow {
   const existing = getAppUserById(id);
   if (!existing) throw new Error("Benutzer nicht gefunden");
   const db = getDb();
+  let mariEmployeeNumber = existing.mari_employee_number;
+  if (input.mariEmployeeNumber !== undefined) {
+    const emp = input.mariEmployeeNumber?.trim() || null;
+    if (emp && !/^[A-Za-z0-9]+$/.test(emp)) {
+      throw new Error(
+        "Personalnummer darf nur Buchstaben und Ziffern enthalten (z.B. M1010)."
+      );
+    }
+    mariEmployeeNumber = emp;
+  }
+  let mariRestUsername = existing.mari_rest_username;
+  if (input.mariRestUsername !== undefined) {
+    mariRestUsername = input.mariRestUsername?.trim() || null;
+  }
+  let mariRestPassword = existing.mari_rest_password;
+  if (input.clearMariRestPassword) {
+    mariRestPassword = null;
+  } else if (input.mariRestPassword != null && input.mariRestPassword.trim()) {
+    mariRestPassword = input.mariRestPassword.trim();
+  }
+  // Personal login requires username + password + employee together.
+  if (mariRestUsername && (!mariRestPassword || !mariEmployeeNumber)) {
+    throw new Error(
+      "Für persönliche MARI-Zugangsdaten bitte Benutzer, Passwort und Personalnummer setzen."
+    );
+  }
+  if (!mariRestUsername) {
+    mariRestPassword = null;
+  }
   try {
     db.prepare(
       `UPDATE users SET
@@ -180,6 +242,9 @@ export function updateAppUser(
          active = ?,
          show_today_hub = ?,
          is_admin = ?,
+         mari_employee_number = ?,
+         mari_rest_username = ?,
+         mari_rest_password = ?,
          updated_at = ?
        WHERE id = ?`
     ).run(
@@ -207,6 +272,9 @@ export function updateAppUser(
           ? 1
           : 0
         : existing.is_admin,
+      mariEmployeeNumber,
+      mariRestUsername,
+      mariRestPassword,
       nowIso(),
       id
     );
@@ -368,9 +436,59 @@ export function userHasLedgerAccess(userId: number, ledgerId: number): boolean {
   return Boolean(row);
 }
 
+export function listUserModules(userId: number): AppModule[] {
+  const db = getDb();
+  const rows = db
+    .prepare(`SELECT module FROM user_module_access WHERE user_id = ?`)
+    .all(userId) as Array<{ module: string }>;
+  return normalizeAppModules(rows.map((r) => r.module));
+}
+
+/** Effective modules: admins get all; others from ACL (+ travel/finance if resources). */
+export function effectiveUserModules(
+  userId: number,
+  isAdmin: boolean
+): AppModule[] {
+  if (isAdmin) return [...ALL_APP_MODULES];
+  const modules = new Set(listUserModules(userId));
+  if (listUserTripIds(userId).length > 0) modules.add("travel");
+  if (listUserLedgerIds(userId).length > 0) modules.add("finance");
+  return normalizeAppModules([...modules]);
+}
+
+export function userHasModule(
+  userId: number,
+  module: AppModule,
+  isAdmin = false
+): boolean {
+  if (isAdmin) return true;
+  return effectiveUserModules(userId, false).includes(module);
+}
+
+export function setUserModules(userId: number, modules: AppModule[]): void {
+  const existing = getAppUserById(userId);
+  if (!existing) throw new Error("Benutzer nicht gefunden");
+  const normalized = normalizeAppModules(modules);
+  const db = getDb();
+  const tx = db.transaction(() => {
+    db.prepare(`DELETE FROM user_module_access WHERE user_id = ?`).run(userId);
+    const insert = db.prepare(
+      `INSERT INTO user_module_access (user_id, module) VALUES (?, ?)`
+    );
+    for (const module of normalized) {
+      insert.run(userId, module);
+    }
+  });
+  tx();
+}
+
 export function setUserAccess(
   userId: number,
-  input: { tripIds: number[]; ledgerIds: number[] }
+  input: {
+    tripIds: number[];
+    ledgerIds: number[];
+    modules?: AppModule[];
+  }
 ): AppUserPublic {
   const existing = getAppUserById(userId);
   if (!existing) throw new Error("Benutzer nicht gefunden");
@@ -385,14 +503,22 @@ export function setUserAccess(
       input.ledgerIds.filter((id) => Number.isInteger(id) && id > 0)
     ),
   ];
+  const modules = new Set(normalizeAppModules(input.modules ?? []));
+  if (tripIds.length > 0) modules.add("travel");
+  if (ledgerIds.length > 0) modules.add("finance");
+
   const tx = db.transaction(() => {
     db.prepare(`DELETE FROM user_trip_access WHERE user_id = ?`).run(userId);
     db.prepare(`DELETE FROM user_ledger_access WHERE user_id = ?`).run(userId);
+    db.prepare(`DELETE FROM user_module_access WHERE user_id = ?`).run(userId);
     const insertTrip = db.prepare(
       `INSERT INTO user_trip_access (user_id, trip_id) VALUES (?, ?)`
     );
     const insertLedger = db.prepare(
       `INSERT INTO user_ledger_access (user_id, ledger_id) VALUES (?, ?)`
+    );
+    const insertModule = db.prepare(
+      `INSERT INTO user_module_access (user_id, module) VALUES (?, ?)`
     );
     for (const tripId of tripIds) {
       const trip = db
@@ -408,6 +534,9 @@ export function setUserAccess(
       if (!ledger) throw new Error(`Abrechnung ${ledgerId} nicht gefunden`);
       insertLedger.run(userId, ledgerId);
     }
+    for (const module of modules) {
+      insertModule.run(userId, module);
+    }
   });
   tx();
   return getAppUserPublic(userId)!;
@@ -419,6 +548,9 @@ export function grantLedgerAccess(userId: number, ledgerId: number): void {
   db.prepare(
     `INSERT OR IGNORE INTO user_ledger_access (user_id, ledger_id) VALUES (?, ?)`
   ).run(userId, ledgerId);
+  db.prepare(
+    `INSERT OR IGNORE INTO user_module_access (user_id, module) VALUES (?, 'finance')`
+  ).run(userId);
 }
 
 export function grantTripAccess(userId: number, tripId: number): void {
@@ -427,4 +559,7 @@ export function grantTripAccess(userId: number, tripId: number): void {
   db.prepare(
     `INSERT OR IGNORE INTO user_trip_access (user_id, trip_id) VALUES (?, ?)`
   ).run(userId, tripId);
+  db.prepare(
+    `INSERT OR IGNORE INTO user_module_access (user_id, module) VALUES (?, 'travel')`
+  ).run(userId);
 }

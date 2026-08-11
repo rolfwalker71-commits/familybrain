@@ -7,7 +7,7 @@ export type MariConfig = {
   employeeNumber: string;
 };
 
-/** Prefer Einstellungen (SQLite), then .env. */
+/** Prefer per-request user credentials, else Einstellungen / .env. */
 export function getMariConfig(): MariConfig | null {
   return resolveMariConfig();
 }

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { ensureInitialized } from "@/lib/db/migrations";
-import { isAuthError, requireAuth } from "@/lib/auth/current-user";
+import { isAuthError, requireModule } from "@/lib/auth/current-user";
 import { MariApiError, requireMariConfig } from "@/lib/mari/client";
 import { hasMariConfig } from "@/lib/mari/config";
 import { parseStatusIdsParam, WORK_STATUS_IDS } from "@/lib/mari/status";
@@ -8,13 +8,14 @@ import {
   listMyTickets,
   normalizeMariEmployeeNumber,
 } from "@/lib/mari/tickets";
+import { getAppUserById } from "@/lib/users/queries";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   ensureInitialized();
-  const auth = await requireAuth();
+  const auth = await requireModule("maringo");
   if (isAuthError(auth)) return auth;
 
   if (!hasMariConfig()) {
@@ -41,8 +42,13 @@ export async function GET(request: Request) {
       url.searchParams.get("handledBy") ||
       url.searchParams.get("employee") ||
       null;
+    const userEmp =
+      auth.userId != null
+        ? getAppUserById(auth.userId)?.mari_employee_number
+        : null;
     const handledBy =
       normalizeMariEmployeeNumber(handledByParam) ||
+      normalizeMariEmployeeNumber(userEmp) ||
       normalizeMariEmployeeNumber(cfg.employeeNumber);
     if (!handledBy) {
       return NextResponse.json(
@@ -61,7 +67,9 @@ export async function GET(request: Request) {
       statuses,
       overdueOnly,
       handledBy,
-      defaultHandledBy: cfg.employeeNumber.trim().toUpperCase(),
+      defaultHandledBy:
+        normalizeMariEmployeeNumber(userEmp) ||
+        cfg.employeeNumber.trim().toUpperCase(),
     });
   } catch (err) {
     const message =

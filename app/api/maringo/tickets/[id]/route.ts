@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { ensureInitialized } from "@/lib/db/migrations";
-import { isAuthError, requireAuth } from "@/lib/auth/current-user";
+import { isAuthError, requireModule } from "@/lib/auth/current-user";
 import { MariApiError } from "@/lib/mari/client";
 import { hasMariConfig } from "@/lib/mari/config";
 import { getTicketDetail, patchTicketFields } from "@/lib/mari/tickets";
@@ -19,7 +19,7 @@ function parseId(raw: string): number | null {
 
 export async function GET(_request: Request, context: Ctx) {
   ensureInitialized();
-  const auth = await requireAuth();
+  const auth = await requireModule("maringo");
   if (isAuthError(auth)) return auth;
   if (!hasMariConfig()) {
     return NextResponse.json(
@@ -63,7 +63,7 @@ const PatchSchema = z.object({
 
 export async function PATCH(request: Request, context: Ctx) {
   ensureInitialized();
-  const auth = await requireAuth();
+  const auth = await requireModule("maringo");
   if (isAuthError(auth)) return auth;
   if (!hasMariConfig()) {
     return NextResponse.json(

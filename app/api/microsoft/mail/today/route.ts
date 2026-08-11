@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isAuthError, requireAuth } from "@/lib/auth/current-user";
+import { isAuthError, requireModule } from "@/lib/auth/current-user";
 import { ensureInitialized } from "@/lib/db/migrations";
 import { listMicrosoftMailForRange } from "@/lib/microsoft/mail-day";
 import { resolveMailAnalysisRange } from "@/lib/mail/mail-analysis-range";
@@ -15,7 +15,7 @@ export const maxDuration = 120;
 
 export async function GET(request: Request) {
   ensureInitialized();
-  const auth = await requireAuth();
+  const auth = await requireModule("microsoft");
   if (isAuthError(auth)) return auth;
   const userId = resolveMicrosoftUserId(auth);
   if (userId == null || !isMicrosoftConnected(userId)) {

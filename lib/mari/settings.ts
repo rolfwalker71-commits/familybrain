@@ -1,6 +1,8 @@
 import { getSetting, setSetting } from "@/lib/db/migrations";
 import { maskToken } from "@/lib/utils/format";
 import type { MariConfig } from "@/lib/mari/config";
+import { getMariRequestUserId } from "@/lib/mari/request-context";
+import { getAppUserById } from "@/lib/users/queries";
 
 const KEY_BASE = "mari_rest_base_url";
 const KEY_USER = "mari_rest_username";
@@ -14,13 +16,17 @@ function envOrNull(key: string): string | null {
   return v || null;
 }
 
-/** Stored settings + env fallback (settings win when set). */
-export function resolveMariConfig(): MariConfig | null {
-  const baseUrl = (
+export function getMariBaseUrl(): string {
+  return (
     getSetting(KEY_BASE) ||
     envOrNull("MARI_REST_BASE_URL") ||
     DEFAULT_BASE
   ).replace(/\/$/, "");
+}
+
+/** Global admin credentials (Einstellungen / env). */
+export function resolveGlobalMariConfig(): MariConfig | null {
+  const baseUrl = getMariBaseUrl();
   const username =
     getSetting(KEY_USER) || envOrNull("MARI_REST_USERNAME") || "";
   const password =
@@ -31,12 +37,48 @@ export function resolveMariConfig(): MariConfig | null {
   return { baseUrl, username, password, employeeNumber };
 }
 
+/**
+ * Resolve MARI config for a Buddy user.
+ * If the user has a personal MARI login (`mari_rest_username`), that login +
+ * password + Personalnummer are used (base URL stays global).
+ * Otherwise falls back to global admin credentials.
+ */
+export function resolveMariConfigForUser(
+  userId: number | null | undefined
+): MariConfig | null {
+  const baseUrl = getMariBaseUrl();
+  if (!baseUrl) return null;
+
+  if (userId != null && userId > 0) {
+    const user = getAppUserById(userId);
+    const personalUser = user?.mari_rest_username?.trim() || "";
+    if (personalUser) {
+      const password = user?.mari_rest_password?.trim() || "";
+      const employeeNumber = user?.mari_employee_number?.trim() || "";
+      if (!password || !employeeNumber) return null;
+      return {
+        baseUrl,
+        username: personalUser,
+        password,
+        employeeNumber,
+      };
+    }
+  }
+
+  return resolveGlobalMariConfig();
+}
+
+/** Request-scoped (ALS) or global MARI config. */
+export function resolveMariConfig(): MariConfig | null {
+  return resolveMariConfigForUser(getMariRequestUserId());
+}
+
 export function getMariSettingsPublic() {
   const storedUser = getSetting(KEY_USER);
   const storedPass = getSetting(KEY_PASS);
   const storedBase = getSetting(KEY_BASE);
   const storedEmp = getSetting(KEY_EMP);
-  const resolved = resolveMariConfig();
+  const resolved = resolveGlobalMariConfig();
   return {
     mariBaseUrl: storedBase || envOrNull("MARI_REST_BASE_URL") || DEFAULT_BASE,
     mariUsername: storedUser || envOrNull("MARI_REST_USERNAME") || "",

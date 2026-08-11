@@ -46,6 +46,10 @@ export type AppNotifyPayload = {
   /** Legacy document fields (optional) */
   localId?: number | null;
   paperlessId?: number | null;
+  /** When true, skip household Telegram (limited module users). */
+  skipTelegram?: boolean;
+  /** When true, skip web-push / external mail-style alerts. */
+  skipWebPush?: boolean;
 };
 
 /** @deprecated use AppNotifyPayload */

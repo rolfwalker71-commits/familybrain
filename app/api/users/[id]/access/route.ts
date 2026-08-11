@@ -4,6 +4,7 @@ import {
   isAuthError,
   requireAdmin,
 } from "@/lib/auth/current-user";
+import { normalizeAppModules } from "@/lib/users/modules";
 import { setUserAccess } from "@/lib/users/queries";
 
 export const runtime = "nodejs";
@@ -14,6 +15,7 @@ type Ctx = { params: Promise<{ id: string }> };
 const AccessSchema = z.object({
   tripIds: z.array(z.number().int().positive()),
   ledgerIds: z.array(z.number().int().positive()),
+  modules: z.array(z.string()).optional(),
 });
 
 export async function PUT(request: Request, context: Ctx) {
@@ -29,7 +31,11 @@ export async function PUT(request: Request, context: Ctx) {
     if (!parsed.success) {
       return NextResponse.json({ error: "Ungültige Eingabe" }, { status: 400 });
     }
-    const user = setUserAccess(id, parsed.data);
+    const user = setUserAccess(id, {
+      tripIds: parsed.data.tripIds,
+      ledgerIds: parsed.data.ledgerIds,
+      modules: normalizeAppModules(parsed.data.modules ?? []),
+    });
     return NextResponse.json({ ok: true, user });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

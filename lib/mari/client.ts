@@ -5,7 +5,8 @@ type TokenCache = {
   expiresAt: number;
 };
 
-let tokenCache: TokenCache | null = null;
+/** Per MARI username — colleagues must not share the admin token. */
+const tokenCaches = new Map<string, TokenCache>();
 
 export class MariApiError extends Error {
   status: number;
@@ -51,24 +52,40 @@ async function fetchToken(cfg: MariConfig): Promise<TokenCache> {
   };
 }
 
-async function getAccessToken(cfg: MariConfig): Promise<string> {
-  if (tokenCache && tokenCache.expiresAt > Date.now()) {
-    return tokenCache.accessToken;
-  }
-  tokenCache = await fetchToken(cfg);
-  return tokenCache.accessToken;
+function cacheKey(cfg: MariConfig): string {
+  return `${cfg.baseUrl}::${cfg.username}`;
 }
 
-/** Call after credentials change in Einstellungen. */
-export function clearMariTokenCache(): void {
-  tokenCache = null;
+async function getAccessToken(cfg: MariConfig): Promise<string> {
+  const key = cacheKey(cfg);
+  const cached = tokenCaches.get(key);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.accessToken;
+  }
+  const next = await fetchToken(cfg);
+  tokenCaches.set(key, next);
+  return next.accessToken;
+}
+
+/** Call after credentials change in Einstellungen / User-Admin. */
+export function clearMariTokenCache(username?: string | null): void {
+  if (!username?.trim()) {
+    tokenCaches.clear();
+    return;
+  }
+  const needle = username.trim().toLowerCase();
+  for (const key of tokenCaches.keys()) {
+    if (key.toLowerCase().endsWith(`::${needle}`)) {
+      tokenCaches.delete(key);
+    }
+  }
 }
 
 export function requireMariConfig(): MariConfig {
   const cfg = getMariConfig();
   if (!cfg) {
     throw new MariApiError(
-      "MARI nicht konfiguriert. Unter Einstellungen → Maringo Benutzer, Passwort und Personalnummer hinterlegen.",
+      "MARI nicht konfiguriert. Unter Einstellungen → Maringo oder beim User Benutzer, Passwort und Personalnummer hinterlegen.",
       503
     );
   }

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { isAuthError, requireAuth } from "@/lib/auth/current-user";
+import { isAuthError, requireModule } from "@/lib/auth/current-user";
 import { ensureInitialized } from "@/lib/db/migrations";
 import {
   getMicrosoftEvent,
@@ -41,7 +41,7 @@ const BodySchema = z.discriminatedUnion("action", [
 
 export async function POST(request: Request) {
   ensureInitialized();
-  const auth = await requireAuth();
+  const auth = await requireModule("microsoft");
   if (isAuthError(auth)) return auth;
   const userId = resolveMicrosoftUserId(auth);
   if (userId == null || !isMicrosoftConnected(userId)) {

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { isAuthError, requireAuth } from "@/lib/auth/current-user";
+import { isAuthError, requireModule } from "@/lib/auth/current-user";
 import { ensureInitialized } from "@/lib/db/migrations";
 import {
   isMicrosoftConnected,
@@ -30,7 +30,7 @@ const PatchSchema = z.object({
 /** Mir zugewiesene Planner-Tasks (+ optional Buckets eines Plans). */
 export async function GET(request: Request) {
   ensureInitialized();
-  const auth = await requireAuth();
+  const auth = await requireModule("microsoft");
   if (isAuthError(auth)) return auth;
   const userId = resolveMicrosoftUserId(auth);
   if (userId == null || !isMicrosoftConnected(userId)) {
@@ -67,7 +67,7 @@ export async function GET(request: Request) {
 /** Erledigen (percentComplete=100) oder in anderen Bucket verschieben. */
 export async function PATCH(request: Request) {
   ensureInitialized();
-  const auth = await requireAuth();
+  const auth = await requireModule("microsoft");
   if (isAuthError(auth)) return auth;
   const userId = resolveMicrosoftUserId(auth);
   if (userId == null || !isMicrosoftConnected(userId)) {

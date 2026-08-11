@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { isAuthError, requireAuth } from "@/lib/auth/current-user";
+import { isAuthError, requireModule } from "@/lib/auth/current-user";
 import { ensureInitialized } from "@/lib/db/migrations";
 import { translateMailReply } from "@/lib/microsoft/reply-language";
 
@@ -16,7 +16,7 @@ const BodySchema = z.object({
 /** Übersetzt einen Antwort-Entwurf DE↔EN für die Tagesanalyse. */
 export async function POST(request: Request) {
   ensureInitialized();
-  const auth = await requireAuth();
+  const auth = await requireModule("microsoft");
   if (isAuthError(auth)) return auth;
 
   let body: z.infer<typeof BodySchema>;

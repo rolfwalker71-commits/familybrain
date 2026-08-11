@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { ensureInitialized } from "@/lib/db/migrations";
-import { isAuthError, requireAuth } from "@/lib/auth/current-user";
+import { isAuthError, requireModule } from "@/lib/auth/current-user";
 import { ownerKeyFromAuth } from "@/lib/auth/owner-key";
 import { MariApiError } from "@/lib/mari/client";
 import { hasMariConfig } from "@/lib/mari/config";
@@ -44,7 +44,7 @@ const DeleteBodySchema = z.object({
 
 export async function POST(request: Request, context: Ctx) {
   ensureInitialized();
-  const auth = await requireAuth();
+  const auth = await requireModule("maringo");
   if (isAuthError(auth)) return auth;
   if (!hasMariConfig()) {
     return NextResponse.json(
@@ -112,7 +112,7 @@ export async function POST(request: Request, context: Ctx) {
 /** Löscht einen internen Kommentar (SupportIssueAttachment / Notiz) am Ticket. */
 export async function DELETE(request: Request, context: Ctx) {
   ensureInitialized();
-  const auth = await requireAuth();
+  const auth = await requireModule("maringo");
   if (isAuthError(auth)) return auth;
   if (!hasMariConfig()) {
     return NextResponse.json(

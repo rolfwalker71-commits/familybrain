@@ -1132,6 +1132,15 @@ function ensureUsersTable(db: Database.Database): void {
   if (!names.has("notification_prefs")) {
     db.exec(`ALTER TABLE users ADD COLUMN notification_prefs TEXT`);
   }
+  if (!names.has("mari_employee_number")) {
+    db.exec(`ALTER TABLE users ADD COLUMN mari_employee_number TEXT`);
+  }
+  if (!names.has("mari_rest_username")) {
+    db.exec(`ALTER TABLE users ADD COLUMN mari_rest_username TEXT`);
+  }
+  if (!names.has("mari_rest_password")) {
+    db.exec(`ALTER TABLE users ADD COLUMN mari_rest_password TEXT`);
+  }
 }
 
 function ensureFamilyMembersTable(db: Database.Database): void {
@@ -1218,6 +1227,26 @@ function ensureUserAccessTables(db: Database.Database): void {
       FOREIGN KEY(ledger_id) REFERENCES finance_ledgers(id) ON DELETE CASCADE
     );
     CREATE INDEX IF NOT EXISTS idx_user_ledger_access_ledger ON user_ledger_access(ledger_id);
+
+    CREATE TABLE IF NOT EXISTS user_module_access (
+      user_id INTEGER NOT NULL,
+      module TEXT NOT NULL,
+      PRIMARY KEY (user_id, module),
+      FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_user_module_access_module
+      ON user_module_access(module);
+  `);
+
+  // One-time backfill: existing trip/ledger ACLs → travel/finance modules.
+  db.exec(`
+    INSERT OR IGNORE INTO user_module_access (user_id, module)
+    SELECT DISTINCT user_id, 'travel' FROM user_trip_access;
+    INSERT OR IGNORE INTO user_module_access (user_id, module)
+    SELECT DISTINCT user_id, 'travel' FROM trip_travelers
+    WHERE user_id IS NOT NULL;
+    INSERT OR IGNORE INTO user_module_access (user_id, module)
+    SELECT DISTINCT user_id, 'finance' FROM user_ledger_access;
   `);
 }
 

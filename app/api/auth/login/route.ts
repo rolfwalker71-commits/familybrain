@@ -15,7 +15,11 @@ import {
   createSessionToken,
   sessionCookieOptions,
 } from "@/lib/auth/session";
-import { getAppUserByUsername } from "@/lib/users/queries";
+import { homePathForModules } from "@/lib/users/modules";
+import {
+  effectiveUserModules,
+  getAppUserByUsername,
+} from "@/lib/users/queries";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -100,7 +104,9 @@ export async function POST(request: Request) {
         },
         config.sessionSecret
       );
-      home = user.is_admin ? "/dashboard" : "/trips";
+      home = user.is_admin
+        ? "/dashboard"
+        : homePathForModules(effectiveUserModules(user.id, false));
     }
   }
 
