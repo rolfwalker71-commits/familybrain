@@ -2,10 +2,20 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   formatAnalysisAsInternalCommentHtml,
+  formatPlainTextAsExternalCommentHtml,
   formatPlainTextAsInternalCommentHtml,
   looksLikeMariHtml,
 } from "@/lib/mari/internal-note";
 import type { MariTicketAnalysis } from "@/lib/mari/analyze-ticket";
+
+test("formats plain external note without internal banner", () => {
+  const html = formatPlainTextAsExternalCommentHtml(
+    'Hallo <b>Kunde</b> & "Team"'
+  );
+  assert.match(html, /Hallo &lt;b&gt;Kunde&lt;\/b&gt; &amp; &quot;Team&quot;/);
+  assert.doesNotMatch(html, /Nur intern/);
+  assert.doesNotMatch(html, /Buddy Notiz/);
+});
 
 test("formats plain internal note as escaped HTML", () => {
   const html = formatPlainTextAsInternalCommentHtml(

@@ -21,6 +21,7 @@ import {
   Flag,
   Inbox,
   Lock,
+  Mail,
   MessageSquare,
   MoreHorizontal,
   Paperclip,
@@ -661,6 +662,12 @@ export function MaringoWorkspaceClient() {
   const [manualNoteDraft, setManualNoteDraft] = useState("");
   const [postingManualNote, setPostingManualNote] = useState(false);
   const [manualNoteHint, setManualNoteHint] = useState<string | null>(null);
+  const [externalNoteDraft, setExternalNoteDraft] = useState("");
+  const [postingExternalNote, setPostingExternalNote] = useState(false);
+  const [draftingExternalNote, setDraftingExternalNote] = useState(false);
+  const [externalNoteHint, setExternalNoteHint] = useState<string | null>(
+    null
+  );
   const [deletingAttachmentId, setDeletingAttachmentId] = useState<
     number | null
   >(null);
@@ -895,6 +902,10 @@ export function MaringoWorkspaceClient() {
     setManualNoteDraft("");
     setManualNoteHint(null);
     setPostingManualNote(false);
+    setExternalNoteDraft("");
+    setExternalNoteHint(null);
+    setPostingExternalNote(false);
+    setDraftingExternalNote(false);
     setTicketCalendarStamp(null);
     setError(null);
     try {
@@ -1496,6 +1507,80 @@ export function MaringoWorkspaceClient() {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setPostingManualNote(false);
+    }
+  }
+
+  async function postManualExternalNote() {
+    if (!selectedId) return;
+    const text = externalNoteDraft.trim();
+    if (!text) {
+      setError("Kommentar ist leer.");
+      return;
+    }
+    const ok = window.confirm(
+      "Externen Kommentar nach Maringo schreiben?\n\nSichtbar für den Kunden — Maringo kann daraus eine Mail auslösen."
+    );
+    if (!ok) return;
+    setPostingExternalNote(true);
+    setError(null);
+    setExternalNoteHint(null);
+    try {
+      const res = await fetch(
+        `/api/maringo/tickets/${selectedId}/external-note`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text }),
+        }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || "Externer Kommentar fehlgeschlagen");
+      }
+      if (data.ticket) {
+        setDetail(data.ticket as MariTicketDetail);
+      } else {
+        await loadDetail(selectedId);
+      }
+      setExternalNoteDraft("");
+      setExternalNoteHint("Externer Kommentar an Maringo geschrieben.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setPostingExternalNote(false);
+    }
+  }
+
+  async function draftExternalNoteWithAi() {
+    if (!selectedId) return;
+    if (externalNoteDraft.trim()) {
+      const ok = window.confirm(
+        "AI-Entwurf ins Feld übernehmen?\n\nDer aktuelle Text im externen Kommentar wird ersetzt."
+      );
+      if (!ok) return;
+    }
+    setDraftingExternalNote(true);
+    setError(null);
+    setExternalNoteHint(null);
+    try {
+      const res = await fetch(
+        `/api/maringo/tickets/${selectedId}/external-note/draft`,
+        { method: "POST" }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || "AI-Entwurf fehlgeschlagen");
+      }
+      const text = String(data.text || "").trim();
+      if (!text) throw new Error("AI-Entwurf lieferte keinen Text.");
+      setExternalNoteDraft(text);
+      setExternalNoteHint(
+        "AI-Entwurf eingefügt — bitte prüfen, dann «Extern speichern»."
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDraftingExternalNote(false);
     }
   }
 
@@ -2837,6 +2922,80 @@ export function MaringoWorkspaceClient() {
                             {manualNoteHint ? (
                               <p className="mt-2 text-[11px] font-medium text-emerald-800">
                                 {manualNoteHint}
+                              </p>
+                            ) : null}
+                          </div>
+                        </div>
+
+                        <div>
+                          <h3 className="mb-3 flex items-center gap-2 text-[13px] font-black tracking-tight">
+                            <Mail className="size-3.5 text-muted-foreground" />
+                            Externer Kommentar
+                          </h3>
+                          <div className="rounded-2xl border border-sky-200/70 bg-sky-50/40 px-3.5 py-3">
+                            <Label
+                              htmlFor="manual-external-note"
+                              className="sr-only"
+                            >
+                              Externer Kommentar
+                            </Label>
+                            <Textarea
+                              id="manual-external-note"
+                              rows={5}
+                              value={externalNoteDraft}
+                              onChange={(e) =>
+                                setExternalNoteDraft(e.target.value)
+                              }
+                              placeholder="Antwort an den Kunden (sichtbar / Mail über Maringo)…"
+                              disabled={
+                                postingExternalNote || draftingExternalNote
+                              }
+                              className="resize-y border-sky-200/80 bg-white/80 text-[13px]"
+                            />
+                            <div className="mt-2.5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                              <p className="text-[11px] text-sky-950/70">
+                                Wird ohne «Internal» nach Maringo geschrieben —
+                                Mailversand übernimmt Maringo.
+                              </p>
+                              <div className="flex shrink-0 flex-wrap gap-1.5">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  className="border-sky-300/80 bg-white/80 text-sky-950 hover:bg-sky-100/80"
+                                  disabled={
+                                    draftingExternalNote || postingExternalNote
+                                  }
+                                  title="Kurzer Kundenkommentar: Eingang, ggf. fehlende Details, baldige Bearbeitung"
+                                  onClick={() => void draftExternalNoteWithAi()}
+                                >
+                                  <Sparkles className="size-3.5" />
+                                  {draftingExternalNote
+                                    ? "Entwurf…"
+                                    : "AI-Entwurf"}
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  className="border-sky-300/80 bg-white/80 text-sky-950 hover:bg-sky-100/80"
+                                  disabled={
+                                    postingExternalNote ||
+                                    draftingExternalNote ||
+                                    !externalNoteDraft.trim()
+                                  }
+                                  onClick={() => void postManualExternalNote()}
+                                >
+                                  <Mail className="size-3.5" />
+                                  {postingExternalNote
+                                    ? "Sende…"
+                                    : "Extern speichern"}
+                                </Button>
+                              </div>
+                            </div>
+                            {externalNoteHint ? (
+                              <p className="mt-2 text-[11px] font-medium text-emerald-800">
+                                {externalNoteHint}
                               </p>
                             ) : null}
                           </div>

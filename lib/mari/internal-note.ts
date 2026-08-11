@@ -167,7 +167,7 @@ export function formatPlainTextAsInternalCommentHtml(
     `<!DOCTYPE HTML>`,
     `<div style="font-family:Segoe UI,Arial,sans-serif;font-size:13px;color:#0f172a;">`,
     `<div style="font-weight:800;margin-bottom:4px;">Buddy Notiz</div>`,
-    `<div style="color:#9a3412;font-size:12px;margin-bottom:10px;">Nur intern — nicht für Kunden</div>`,
+    `<div style="color:#9a3412;font-size:12px;margin-bottom:10px;">Nur intern — nicht für den Kunden</div>`,
   ];
   if (opts?.issueId) {
     parts.push(`<div style="margin-bottom:8px;">Ticket #${opts.issueId}</div>`);
@@ -178,6 +178,20 @@ export function formatPlainTextAsInternalCommentHtml(
   );
   parts.push(`</div>`);
   return parts.join("");
+}
+
+/**
+ * Kunden-sichtbarer Kommentar-HTML (ohne internes Banner).
+ * Mailversand übernimmt Maringo selbst.
+ */
+export function formatPlainTextAsExternalCommentHtml(text: string): string {
+  const body = text.trim();
+  return [
+    `<!DOCTYPE HTML>`,
+    `<div style="font-family:Segoe UI,Arial,sans-serif;font-size:13px;color:#0f172a;line-height:1.5;">`,
+    proseBlock(body),
+    `</div>`,
+  ].join("");
 }
 
 /** Für Timeline-Anzeige: Scripts/Handler aus MARI-HTML entfernen. */
@@ -303,5 +317,85 @@ export async function postPlainInternalNote(
     issueId,
     subject: "Buddy Notiz (intern)",
     commentHtml: formatPlainTextAsInternalCommentHtml(trimmed, { issueId }),
+  });
+}
+
+/**
+ * Schreibt einen kunden-sichtbaren Kommentar (Internal=false).
+ * Maringo übernimmt ggf. Mailversand — Buddy macht nur den Write.
+ */
+export async function postMariExternalNote(params: {
+  issueId: number;
+  commentHtml: string;
+  subject?: string;
+}): Promise<MariInternalNotePostResult> {
+  const issueId = params.issueId;
+  if (!Number.isInteger(issueId) || issueId <= 0) {
+    throw new MariApiError("Ungültige Issue-ID", 400);
+  }
+  const comment = params.commentHtml.trim();
+  if (!comment) {
+    throw new MariApiError("Kommentar leer", 400);
+  }
+
+  const body = {
+    IssueID: issueId,
+    Comment: comment,
+    Internal: false,
+    AttachmentTyp: 1,
+    AttachmentSubject: params.subject?.trim() || "Buddy Kommentar",
+  };
+
+  const res = await mariJson<MariAttachmentPostResponse>(
+    "/api/SupportIssueAttachment",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }
+  );
+
+  const attachmentId = Number(res.AttachmentID);
+  if (!Number.isInteger(attachmentId) || attachmentId <= 0) {
+    throw new MariApiError(
+      res.IMPORT_ErrorMessage || "MARI lieferte keine AttachmentID",
+      502,
+      res
+    );
+  }
+  if (res.Internal === true) {
+    throw new MariApiError(
+      "MARI hat Internal=true zurückgegeben — Kommentar nicht als extern bestätigt.",
+      502,
+      res
+    );
+  }
+  const errMsg = (res.IMPORT_ErrorMessage || "").trim();
+  if (errMsg) {
+    throw new MariApiError(errMsg, 502, res);
+  }
+
+  return {
+    attachmentId,
+    issueId: Number(res.IssueID) || issueId,
+    internal: false,
+    importFeedback:
+      res.IMPORT_Feedback == null ? null : Number(res.IMPORT_Feedback),
+    importErrorMessage: errMsg || null,
+  };
+}
+
+export async function postPlainExternalNote(
+  issueId: number,
+  text: string
+): Promise<MariInternalNotePostResult> {
+  const trimmed = text.trim();
+  if (!trimmed) {
+    throw new MariApiError("Kommentar leer", 400);
+  }
+  return postMariExternalNote({
+    issueId,
+    subject: "Buddy Kommentar",
+    commentHtml: formatPlainTextAsExternalCommentHtml(trimmed),
   });
 }
