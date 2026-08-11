@@ -43,6 +43,8 @@ const BodySchema = z.discriminatedUnion("action", [
     notes: z.string().trim().max(4000).optional().nullable(),
     /** Stamp event as originating from this Maringo ticket. */
     mariIssueId: z.number().int().positive().optional().nullable(),
+    /** Outlook only: create Teams online meeting. */
+    teamsMeeting: z.boolean().optional(),
     provider: z.enum(["microsoft", "google", "auto"]).optional(),
   }),
 ]);
@@ -162,6 +164,7 @@ export async function POST(request: Request) {
         endTime: body.endHm,
         notes,
         categories: mariIssueId ? mariOutlookCategories(mariIssueId) : null,
+        teamsMeeting: Boolean(body.teamsMeeting),
       });
       if (mariIssueId) {
         upsertMariCalendarStamp({
@@ -179,6 +182,7 @@ export async function POST(request: Request) {
         ok: true,
         provider: "microsoft",
         event: created,
+        teamsMeeting: Boolean(body.teamsMeeting),
         mariIssueId,
       });
     }

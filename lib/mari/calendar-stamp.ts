@@ -247,6 +247,57 @@ export function getPrimaryMariCalendarStampForIssue(
   return upcoming[0] || stamps[0] || null;
 }
 
+function pickPrimaryStamp(
+  stamps: MariCalendarStamp[],
+  todayYmd: string
+): MariCalendarStamp | null {
+  if (stamps.length === 0) return null;
+  const upcoming = stamps
+    .filter((s) => s.eventDate >= todayYmd)
+    .sort((a, b) => {
+      const d = a.eventDate.localeCompare(b.eventDate);
+      if (d !== 0) return d;
+      return (a.startHm || "").localeCompare(b.startHm || "");
+    });
+  return upcoming[0] || stamps[0] || null;
+}
+
+/** Primary active stamp per issue (for ticket list chips). */
+export function mapPrimaryMariCalendarStampsByIssueIds(
+  issueIds: number[],
+  todayYmd: string
+): Record<number, MariCalendarStamp> {
+  const ids = [
+    ...new Set(
+      issueIds.filter((id) => Number.isInteger(id) && id > 0)
+    ),
+  ];
+  if (ids.length === 0) return {};
+  ensureMariCalendarStampsTable();
+  const placeholders = ids.map(() => "?").join(",");
+  const rows = getDb()
+    .prepare(
+      `SELECT * FROM mari_calendar_stamps
+       WHERE issue_id IN (${placeholders})
+         AND status IN ('pending', 'booked')
+       ORDER BY event_date DESC, start_hm DESC, created_at DESC`
+    )
+    .all(...ids) as Array<Record<string, unknown>>;
+  const byIssue = new Map<number, MariCalendarStamp[]>();
+  for (const row of rows) {
+    const stamp = mapStampRow(row);
+    const list = byIssue.get(stamp.issueId) || [];
+    list.push(stamp);
+    byIssue.set(stamp.issueId, list);
+  }
+  const out: Record<number, MariCalendarStamp> = {};
+  for (const id of ids) {
+    const primary = pickPrimaryStamp(byIssue.get(id) || [], todayYmd);
+    if (primary) out[id] = primary;
+  }
+  return out;
+}
+
 export function updateMariCalendarStampStatus(input: {
   eventProvider: "microsoft" | "google";
   eventId: string;

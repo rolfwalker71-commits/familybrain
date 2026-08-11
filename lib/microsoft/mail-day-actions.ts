@@ -10,12 +10,15 @@ export type CreateOutlookEventInput = {
   notes?: string | null;
   /** Outlook categories (e.g. Buddy/Maringo). */
   categories?: string[] | null;
+  /** Graph: Teams online meeting (Outlook only). */
+  teamsMeeting?: boolean;
 };
 
 export type CreatedOutlookEvent = {
   id: string;
   subject: string;
   webLink: string | null;
+  joinUrl: string | null;
 };
 
 export async function createOutlookCalendarEvent(
@@ -25,6 +28,7 @@ export async function createOutlookCalendarEvent(
   const allDay = input.allDay || !input.startTime;
   const categories =
     input.categories?.map((c) => c.trim()).filter(Boolean) || undefined;
+  const teamsMeeting = Boolean(input.teamsMeeting) && !allDay;
   let body: Record<string, unknown>;
   if (allDay) {
     const endDate = (() => {
@@ -68,6 +72,12 @@ export async function createOutlookCalendarEvent(
         ? { contentType: "Text", content: input.notes }
         : undefined,
       categories,
+      ...(teamsMeeting
+        ? {
+            isOnlineMeeting: true,
+            onlineMeetingProvider: "teamsForBusiness",
+          }
+        : {}),
     };
   }
 
@@ -75,6 +85,8 @@ export async function createOutlookCalendarEvent(
     id?: string;
     subject?: string;
     webLink?: string | null;
+    onlineMeeting?: { joinUrl?: string | null } | null;
+    onlineMeetingUrl?: string | null;
   }>(userId, "/me/events", {
     method: "POST",
     body: JSON.stringify(body),
@@ -85,6 +97,10 @@ export async function createOutlookCalendarEvent(
     id: created.id,
     subject: created.subject || input.title,
     webLink: created.webLink || null,
+    joinUrl:
+      created.onlineMeeting?.joinUrl ||
+      created.onlineMeetingUrl ||
+      null,
   };
 }
 

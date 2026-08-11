@@ -1,18 +1,28 @@
 import { NextResponse } from "next/server";
 import { ensureInitialized } from "@/lib/db/migrations";
 import { isAuthError, requireModule } from "@/lib/auth/current-user";
+import { zurichNowParts } from "@/lib/dashboard/day-briefing";
 import { MariApiError, requireMariConfig } from "@/lib/mari/client";
 import { hasMariConfig } from "@/lib/mari/config";
+import { mapPrimaryMariCalendarStampsByIssueIds } from "@/lib/mari/calendar-stamp";
 import { parseCardCodesParam } from "@/lib/mari/customers";
 import { parseStatusIdsParam, WORK_STATUS_IDS } from "@/lib/mari/status";
 import {
   listMyTickets,
   normalizeMariEmployeeNumber,
+  type MariTicketListItem,
 } from "@/lib/mari/tickets";
 import { getAppUserById } from "@/lib/users/queries";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+function stampsForTickets(tickets: MariTicketListItem[]) {
+  return mapPrimaryMariCalendarStampsByIssueIds(
+    tickets.map((t) => t.issueId),
+    zurichNowParts().todayIso
+  );
+}
 
 export async function GET(request: Request) {
   ensureInitialized();
@@ -26,6 +36,7 @@ export async function GET(request: Request) {
           "MARI nicht konfiguriert. Unter Einstellungen → Maringo Credentials hinterlegen.",
         configured: false,
         tickets: [],
+        calendarStamps: {},
       },
       { status: 503 }
     );
@@ -50,6 +61,7 @@ export async function GET(request: Request) {
       return NextResponse.json({
         configured: true,
         tickets,
+        calendarStamps: stampsForTickets(tickets),
         statuses,
         overdueOnly,
         cardCodes,
@@ -77,7 +89,11 @@ export async function GET(request: Request) {
       normalizeMariEmployeeNumber(cfg.employeeNumber);
     if (!handledBy) {
       return NextResponse.json(
-        { error: "Personalnummer ungültig (z.B. M1010).", tickets: [] },
+        {
+          error: "Personalnummer ungültig (z.B. M1010).",
+          tickets: [],
+          calendarStamps: {},
+        },
         { status: 400 }
       );
     }
@@ -89,6 +105,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       configured: true,
       tickets,
+      calendarStamps: stampsForTickets(tickets),
       statuses,
       overdueOnly,
       handledBy,
@@ -105,6 +122,9 @@ export async function GET(request: Request) {
           ? err.message
           : String(err);
     const status = err instanceof MariApiError ? err.status || 502 : 502;
-    return NextResponse.json({ error: message, tickets: [] }, { status });
+    return NextResponse.json(
+      { error: message, tickets: [], calendarStamps: {} },
+      { status }
+    );
   }
 }

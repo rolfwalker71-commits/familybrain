@@ -699,6 +699,9 @@ export function MaringoWorkspaceClient() {
   const [ticketCalendarOpen, setTicketCalendarOpen] = useState(false);
   const [ticketCalendarStamp, setTicketCalendarStamp] =
     useState<MariCalendarStamp | null>(null);
+  const [listCalendarStamps, setListCalendarStamps] = useState<
+    Record<number, MariCalendarStamp>
+  >({});
   const [pendingStampBook, setPendingStampBook] =
     useState<MariTimeSuggestion | null>(null);
   const [suggestionsRefresh, setSuggestionsRefresh] = useState(0);
@@ -824,11 +827,26 @@ export function MaringoWorkspaceClient() {
   const loadList = useCallback(async () => {
     setListLoading(true);
     setError(null);
+    const applyStamps = (raw: unknown) => {
+      if (!raw || typeof raw !== "object") {
+        setListCalendarStamps({});
+        return;
+      }
+      const next: Record<number, MariCalendarStamp> = {};
+      for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+        const id = Number(k);
+        if (Number.isInteger(id) && v && typeof v === "object") {
+          next[id] = v as MariCalendarStamp;
+        }
+      }
+      setListCalendarStamps(next);
+    };
     try {
       if (filterMode === "customer") {
         if (!selectedCardCodesKey) {
           setConfigured(true);
           setTickets([]);
+          setListCalendarStamps({});
           return;
         }
         const q = new URLSearchParams();
@@ -840,12 +858,14 @@ export function MaringoWorkspaceClient() {
         if (res.status === 503) {
           setConfigured(false);
           setTickets([]);
+          setListCalendarStamps({});
           setError(data.error || "MARI nicht konfiguriert.");
           return;
         }
         setConfigured(true);
         if (!res.ok) throw new Error(data.error || "Liste fehlgeschlagen");
         setTickets(Array.isArray(data.tickets) ? data.tickets : []);
+        applyStamps(data.calendarStamps);
         if (typeof data.defaultHandledBy === "string" && data.defaultHandledBy) {
           setDefaultHandledBy(String(data.defaultHandledBy).toUpperCase());
         }
@@ -861,18 +881,21 @@ export function MaringoWorkspaceClient() {
       if (res.status === 503) {
         setConfigured(false);
         setTickets([]);
+        setListCalendarStamps({});
         setError(data.error || "MARI nicht konfiguriert.");
         return;
       }
       setConfigured(true);
       if (!res.ok) throw new Error(data.error || "Liste fehlgeschlagen");
       setTickets(Array.isArray(data.tickets) ? data.tickets : []);
+      applyStamps(data.calendarStamps);
       if (typeof data.defaultHandledBy === "string" && data.defaultHandledBy) {
         setDefaultHandledBy(String(data.defaultHandledBy).toUpperCase());
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setTickets([]);
+      setListCalendarStamps({});
     } finally {
       setListLoading(false);
     }
@@ -2143,19 +2166,20 @@ export function MaringoWorkspaceClient() {
                 t,
                 listMetaFields
               );
+              const stamp = listCalendarStamps[t.issueId] || null;
               return (
                 <li key={t.issueId} className="border-b border-border/40 last:border-b-0">
                   <button
                     type="button"
                     onClick={() => openTicket(t.issueId)}
                     className={cn(
-                      "flex w-full items-start gap-2 border-l-2 px-2.5 py-2 text-left transition-colors",
+                      "relative flex w-full items-start gap-2 border-l-2 px-2.5 py-2 text-left transition-colors",
                       active
                         ? "border-l-orange-400 bg-orange-50/70"
                         : "border-l-transparent hover:bg-muted/40"
                     )}
                   >
-                    <div className="min-w-0 flex-1">
+                    <div className="min-w-0 flex-1 pr-2">
                       <div className="flex min-w-0 items-baseline gap-1.5">
                         <span className="shrink-0 text-[12px] font-bold tabular-nums text-foreground">
                           #{t.issueId}
@@ -2188,7 +2212,15 @@ export function MaringoWorkspaceClient() {
                         </div>
                       ) : null}
                     </div>
-                    <div className="flex shrink-0 flex-col items-end gap-1 pt-0.5">
+                    {stamp ? (
+                      <span
+                        className="pointer-events-none absolute left-1/2 top-1/2 z-[1] -translate-x-1/2 -translate-y-1/2 rounded-full border border-emerald-300/90 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold tabular-nums text-emerald-950 shadow-sm"
+                        title={`Termin eingeplant · ${formatStampWhen(stamp)}`}
+                      >
+                        Termin ({formatStampWhen(stamp)})
+                      </span>
+                    ) : null}
+                    <div className="relative z-[2] flex shrink-0 flex-col items-end gap-1 pt-0.5">
                       <StatusChip
                         status={t.status}
                         statusName={t.statusName}
@@ -3305,6 +3337,7 @@ export function MaringoWorkspaceClient() {
         mariIssueId={detail?.issueId ?? null}
         onCreated={() => {
           const id = detail?.issueId;
+          void loadList();
           if (id == null) return;
           void (async () => {
             try {

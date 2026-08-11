@@ -58,6 +58,8 @@ export function AdhocEventDialog({
   const [error, setError] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [providerLabel, setProviderLabel] = useState<string | null>(null);
+  /** Outlook/Teams only — ignored for Google. */
+  const [teamsMeeting, setTeamsMeeting] = useState(false);
 
   const isMari = mariIssueId != null && mariIssueId > 0;
 
@@ -70,6 +72,7 @@ export function AdhocEventDialog({
     setMsg(null);
     setBusy(false);
     setProviderLabel(null);
+    setTeamsMeeting(false);
   }
 
   useEffect(() => {
@@ -82,7 +85,8 @@ export function AdhocEventDialog({
     setMsg(null);
     setBusy(false);
     setProviderLabel(null);
-  }, [open, initialTitle, initialNotes, defaultDurationMinutes, mariIssueId]);
+    setTeamsMeeting(Boolean(isMari));
+  }, [open, initialTitle, initialNotes, defaultDurationMinutes, mariIssueId, isMari]);
 
   async function suggestSlots() {
     setBusy(true);
@@ -145,6 +149,7 @@ export function AdhocEventDialog({
           endHm: slot.endHm,
           notes: notes.trim() || null,
           mariIssueId: isMari ? mariIssueId : null,
+          teamsMeeting,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -157,8 +162,12 @@ export function AdhocEventDialog({
           : data.provider === "microsoft"
             ? "Outlook"
             : "Kalender";
+      const teamsHint =
+        data.provider === "microsoft" && data.teamsMeeting
+          ? " · Teams-Meeting"
+          : "";
       setMsg(
-        `Eingetragen (${prov}): ${trimmed} · ${slot.date} ${slot.startHm}–${slot.endHm}`
+        `Eingetragen (${prov}${teamsHint}): ${trimmed} · ${slot.date} ${slot.startHm}–${slot.endHm}`
       );
       onCreated?.();
       onOpenChange(false);
@@ -262,6 +271,24 @@ export function AdhocEventDialog({
               ))}
             </div>
           </div>
+
+          <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-border/60 bg-muted/20 px-3 py-2.5">
+            <input
+              type="checkbox"
+              className="mt-0.5 size-4 accent-teal-700"
+              checked={teamsMeeting}
+              disabled={busy}
+              onChange={(e) => setTeamsMeeting(e.target.checked)}
+            />
+            <span className="min-w-0">
+              <span className="block text-[13px] font-semibold">
+                Teams-Meeting
+              </span>
+              <span className="block text-[11px] text-muted-foreground">
+                Bei Outlook: Online-Meeting anlegen. Bei Google ohne Wirkung.
+              </span>
+            </span>
+          </label>
 
           <Button
             type="button"
