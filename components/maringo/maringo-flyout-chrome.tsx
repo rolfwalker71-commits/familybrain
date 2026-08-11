@@ -1,6 +1,11 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import {
   ClipboardList,
   Clock3,
@@ -51,8 +56,11 @@ export const MARI_SECONDARY_FLYOUT_META: Record<
   },
 };
 
-/** Slide-in duration for main + secondary flyouts (ms). */
-export const MARI_FLYOUT_ENTER_MS = 1000;
+/** Slide-in / slide-out duration for main + secondary flyouts (ms). */
+export const MARI_FLYOUT_MS = 750;
+
+/** @deprecated use MARI_FLYOUT_MS */
+export const MARI_FLYOUT_ENTER_MS = MARI_FLYOUT_MS;
 
 /** Toggle / bring-to-front / close-if-top for the secondary stack. */
 export function toggleMariSecondaryFlyout(
@@ -65,20 +73,63 @@ export function toggleMariSecondaryFlyout(
   return [...stack.filter((x) => x !== id), id];
 }
 
-function useFlyoutEnter(open = true) {
+/**
+ * Keep the portal mounted while the exit slide finishes.
+ * `entered` drives translate/opacity; `mounted` controls render.
+ */
+export function useFlyoutPresence(open: boolean): {
+  mounted: boolean;
+  entered: boolean;
+} {
+  const [mounted, setMounted] = useState(open);
   const [entered, setEntered] = useState(false);
+
   useEffect(() => {
-    if (!open) {
+    if (open) {
+      setMounted(true);
       setEntered(false);
-      return;
+      const id = window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => setEntered(true));
+      });
+      return () => window.cancelAnimationFrame(id);
     }
     setEntered(false);
-    const id = window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => setEntered(true));
-    });
-    return () => window.cancelAnimationFrame(id);
+    const t = window.setTimeout(() => setMounted(false), MARI_FLYOUT_MS);
+    return () => window.clearTimeout(t);
   }, [open]);
-  return entered;
+
+  return { mounted, entered };
+}
+
+/**
+ * Secondary stack: add/reorder immediately; keep closed panels mounted until
+ * the exit animation completes.
+ */
+export function useFlyoutStackPresence<T extends string>(
+  openStack: readonly T[]
+): { rendered: T[]; isEntered: (id: T) => boolean } {
+  const [rendered, setRendered] = useState<T[]>(() => [...openStack]);
+  const openKey = openStack.join("\0");
+
+  useEffect(() => {
+    const open = openKey ? (openKey.split("\0") as T[]) : [];
+    setRendered((prev) => {
+      const closing = prev.filter((id) => !open.includes(id));
+      if (closing.length === 0) return open;
+      return [...open, ...closing];
+    });
+    const t = window.setTimeout(() => {
+      setRendered(open);
+    }, MARI_FLYOUT_MS);
+    return () => window.clearTimeout(t);
+  }, [openKey]);
+
+  const openSet = useMemo(() => new Set(openStack), [openKey, openStack]);
+
+  return {
+    rendered,
+    isEntered: (id: T) => openSet.has(id),
+  };
 }
 
 export function MariTicketFlyoutRail({
@@ -148,19 +199,21 @@ export function MariTicketFlyoutRail({
 export function MariMainFlyoutShell({
   children,
   className,
+  open = true,
 }: {
   children: ReactNode;
   className?: string;
+  /** When false, slides out (parent should keep mounted until MARI_FLYOUT_MS). */
+  open?: boolean;
 }) {
-  const entered = useFlyoutEnter(true);
   return (
     <div
       className={cn(
-        "absolute inset-y-0 right-0 z-[1001] flex h-full w-[min(100%,42rem)] max-w-full overflow-hidden rounded-l-2xl border-l border-border/70 bg-background shadow-[-12px_0_32px_rgba(15,23,42,0.12)] transition-transform ease-out will-change-transform",
-        entered ? "translate-x-0" : "translate-x-full",
+        "absolute inset-y-0 right-0 z-[1001] flex h-full w-[min(100%,42rem)] max-w-full overflow-hidden rounded-l-2xl border-l border-border/70 bg-background shadow-[-12px_0_32px_rgba(15,23,42,0.12)] transition-transform ease-in-out will-change-transform",
+        open ? "translate-x-0" : "translate-x-full",
         className
       )}
-      style={{ transitionDuration: `${MARI_FLYOUT_ENTER_MS}ms` }}
+      style={{ transitionDuration: `${MARI_FLYOUT_MS}ms` }}
     >
       {children}
     </div>
@@ -175,6 +228,7 @@ export function MariSecondaryFlyoutShell({
   zIndex,
   offsetPx,
   children,
+  open = true,
 }: {
   title: string;
   description?: string;
@@ -183,23 +237,24 @@ export function MariSecondaryFlyoutShell({
   zIndex: number;
   offsetPx: number;
   children: ReactNode;
+  open?: boolean;
 }) {
-  const entered = useFlyoutEnter(true);
   return (
     <aside
       className={cn(
-        "pointer-events-auto absolute inset-y-0 flex flex-col overflow-hidden rounded-l-2xl border-l border-border/70 bg-background shadow-[-8px_0_24px_rgba(15,23,42,0.08)] transition-transform ease-out will-change-transform",
-        entered ? "translate-x-0" : "translate-x-full",
+        "pointer-events-auto absolute inset-y-0 flex flex-col overflow-hidden rounded-l-2xl border-l border-border/70 bg-background shadow-[-8px_0_24px_rgba(15,23,42,0.08)] transition-transform ease-in-out will-change-transform",
+        open ? "translate-x-0" : "translate-x-full",
         widthClass
       )}
       style={{
         right: offsetPx,
         zIndex,
-        transitionDuration: `${MARI_FLYOUT_ENTER_MS}ms`,
+        transitionDuration: `${MARI_FLYOUT_MS}ms`,
       }}
       role="dialog"
       aria-modal="false"
       aria-label={title}
+      aria-hidden={!open}
     >
       <div className="flex shrink-0 items-start gap-2 border-b border-border/60 px-3 py-2.5 pr-2">
         <div className="min-w-0 flex-1">

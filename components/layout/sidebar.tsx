@@ -453,13 +453,39 @@ export function Sidebar({
   return (
     <aside
       className={cn(
-        "flex h-full shrink-0 flex-col bg-sidebar text-sidebar-foreground transition-[width] duration-200 ease-out",
+        "relative flex h-full shrink-0 flex-col bg-sidebar text-sidebar-foreground transition-[width] duration-200 ease-out",
         collapsed ? "w-[4.25rem]" : "w-60",
         className
       )}
       data-collapsed={collapsed ? "true" : "false"}
     >
-      <div className={cn(collapsed ? "px-2 py-4" : "px-5 py-6")}>
+      {!onNavigate ? (
+        <button
+          type="button"
+          onClick={toggleCollapsed}
+          title={collapsed ? "Navigation ausklappen" : "Navigation einklappen"}
+          aria-expanded={!collapsed}
+          aria-label={
+            collapsed ? "Navigation ausklappen" : "Navigation einklappen"
+          }
+          className={cn(
+            "absolute z-10 flex size-8 items-center justify-center rounded-lg text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-white",
+            collapsed ? "top-3 right-2.5" : "top-3.5 right-3.5"
+          )}
+        >
+          {collapsed ? (
+            <ChevronsRight className="size-4" strokeWidth={2} aria-hidden />
+          ) : (
+            <ChevronsLeft className="size-4" strokeWidth={2} aria-hidden />
+          )}
+        </button>
+      ) : null}
+      <div
+        className={cn(
+          collapsed ? "px-2 py-4" : "px-5 py-6",
+          !onNavigate && (collapsed ? "pt-11" : "pr-12")
+        )}
+      >
         <button
           type="button"
           className={cn(
@@ -675,30 +701,6 @@ export function Sidebar({
           collapsed ? "px-1.5" : "px-4"
         )}
       >
-        {!onNavigate ? (
-          <button
-            type="button"
-            onClick={toggleCollapsed}
-            title={collapsed ? "Navigation ausklappen" : "Navigation einklappen"}
-            aria-expanded={!collapsed}
-            aria-label={
-              collapsed ? "Navigation ausklappen" : "Navigation einklappen"
-            }
-            className={cn(
-              "flex min-h-10 w-full items-center rounded-xl text-sm font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-              collapsed ? "justify-center px-2 py-2" : "gap-3 px-3 py-2"
-            )}
-          >
-            {collapsed ? (
-              <ChevronsRight className="size-4" />
-            ) : (
-              <>
-                <ChevronsLeft className="size-4" />
-                Einklappen
-              </>
-            )}
-          </button>
-        ) : null}
         <button
           type="button"
           title="Abmelden"

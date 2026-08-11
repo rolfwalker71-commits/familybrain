@@ -83,8 +83,11 @@ import {
   MariMainFlyoutShell,
   MariSecondaryFlyoutShell,
   MariTicketFlyoutRail,
+  MARI_FLYOUT_MS,
   MARI_SECONDARY_FLYOUT_META,
   toggleMariSecondaryFlyout,
+  useFlyoutPresence,
+  useFlyoutStackPresence,
   type MariSecondaryFlyoutId,
 } from "@/components/maringo/maringo-flyout-chrome";
 import {
@@ -603,6 +606,9 @@ export function MaringoWorkspaceClient() {
     MariSecondaryFlyoutId[]
   >([]);
   const [flyoutPortalReady, setFlyoutPortalReady] = useState(false);
+  const ticketFlyoutWanted = ticketFlyoutOpen && selectedId != null;
+  const ticketFlyoutPresence = useFlyoutPresence(ticketFlyoutWanted);
+  const secondaryPresence = useFlyoutStackPresence(secondaryFlyouts);
   const [detail, setDetail] = useState<MariTicketDetail | null>(null);
   const [analysis, setAnalysis] = useState<MariTicketAnalysis | null>(null);
   const [analysisOpen, setAnalysisOpen] = useState(false);
@@ -1952,16 +1958,20 @@ export function MaringoWorkspaceClient() {
       </div>
       )}
 
-      {flyoutPortalReady && ticketFlyoutOpen && selectedId != null
+      {flyoutPortalReady && ticketFlyoutPresence.mounted
         ? createPortal(
             <div className="fixed inset-0 z-[1000]">
               <button
                 type="button"
-                className="absolute inset-0 bg-black/20"
+                className={cn(
+                  "absolute inset-0 bg-black/20 transition-opacity ease-in-out",
+                  ticketFlyoutPresence.entered ? "opacity-100" : "opacity-0"
+                )}
+                style={{ transitionDuration: `${MARI_FLYOUT_MS}ms` }}
                 aria-label="Flyout schliessen"
                 onClick={closeTicketFlyout}
               />
-              <MariMainFlyoutShell>
+              <MariMainFlyoutShell open={ticketFlyoutPresence.entered}>
                 <MariTicketFlyoutRail
                   openIds={secondaryFlyouts}
                   onToggle={toggleSecondary}
@@ -2688,12 +2698,18 @@ export function MaringoWorkspaceClient() {
                 </div>
               </MariMainFlyoutShell>
 
-              {secondaryFlyouts.map((id, i) => {
+              {secondaryPresence.rendered.map((id, i) => {
                 const meta = MARI_SECONDARY_FLYOUT_META[id];
                 const widthClass =
                   id === "buchen" || id === "buchungen" || id === "kopf"
                     ? "w-[min(100%,34rem)]"
                     : "w-[min(100%,30rem)]";
+                const entered = secondaryPresence.isEntered(id);
+                const openIndex = secondaryFlyouts.indexOf(id);
+                const offsetBase =
+                  openIndex >= 0
+                    ? secondaryFlyouts.length - 1 - openIndex
+                    : secondaryPresence.rendered.length - 1 - i;
                 return (
                   <MariSecondaryFlyoutShell
                     key={id}
@@ -2702,7 +2718,8 @@ export function MaringoWorkspaceClient() {
                     onClose={() => closeSecondary(id)}
                     widthClass={widthClass}
                     zIndex={1010 + i}
-                    offsetPx={(secondaryFlyouts.length - 1 - i) * 12}
+                    offsetPx={offsetBase * 12}
+                    open={entered && ticketFlyoutPresence.entered}
                   >
                     {id === "verlauf" ? (
                       <div className="space-y-3">

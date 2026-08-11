@@ -31,7 +31,11 @@ import {
 } from "@/components/maringo/maringo-time-book-form";
 import { MaringoTimeLinesTable } from "@/components/maringo/maringo-time-lines-table";
 import { MariHoursSplitSummary } from "@/components/maringo/mari-hours-split-summary";
-import { MariSecondaryFlyoutShell } from "@/components/maringo/maringo-flyout-chrome";
+import {
+  MariSecondaryFlyoutShell,
+  MARI_FLYOUT_MS,
+  useFlyoutPresence,
+} from "@/components/maringo/maringo-flyout-chrome";
 
 function zurichTodayYmd(): string {
   return new Intl.DateTimeFormat("en-CA", {
@@ -92,6 +96,7 @@ export function MaringoTimekeepingPanel({
   const [flyoutPortalReady, setFlyoutPortalReady] = useState(false);
   const [duplicateDefaults, setDuplicateDefaults] =
     useState<TimeBookFormDefaults | null>(null);
+  const bookFlyoutPresence = useFlyoutPresence(bookFlyoutOpen);
 
   const onTicketLinesChangeRef = useRef(onTicketLinesChange);
   useEffect(() => {
@@ -676,12 +681,16 @@ export function MaringoTimekeepingPanel({
         ) : null}
       </div>
 
-      {flyoutPortalReady && bookFlyoutOpen
+      {flyoutPortalReady && bookFlyoutPresence.mounted
         ? createPortal(
             <div className="fixed inset-0 z-[1000]">
               <button
                 type="button"
-                className="absolute inset-0 bg-black/20"
+                className={cn(
+                  "absolute inset-0 bg-black/20 transition-opacity ease-in-out",
+                  bookFlyoutPresence.entered ? "opacity-100" : "opacity-0"
+                )}
+                style={{ transitionDuration: `${MARI_FLYOUT_MS}ms` }}
                 aria-label="Flyout schliessen"
                 onClick={closeBookFlyout}
               />
@@ -698,6 +707,7 @@ export function MaringoTimekeepingPanel({
                 widthClass="w-[min(100%,34rem)]"
                 zIndex={1010}
                 offsetPx={0}
+                open={bookFlyoutPresence.entered}
               >
                 {status ? (
                   <p className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm whitespace-pre-wrap break-words text-emerald-950">
