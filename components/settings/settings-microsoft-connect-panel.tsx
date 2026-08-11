@@ -5,6 +5,8 @@ import { useSearchParams } from "next/navigation";
 import { Link2, Unlink, RefreshCw } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { MicrosoftLogo } from "@/components/branding/provider-logos";
 import { cn } from "@/lib/utils";
 
@@ -41,6 +43,10 @@ export function SettingsMicrosoftConnectPanel() {
   const [probe, setProbe] = useState<Probe | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const [sigText, setSigText] = useState("");
+  const [sigAppend, setSigAppend] = useState(true);
+  const [sigSaving, setSigSaving] = useState(false);
+  const [sigStatus, setSigStatus] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -50,12 +56,47 @@ export function SettingsMicrosoftConnectPanel() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Status laden fehlgeschlagen");
       setData(json as Connection);
+      if (json.connected) {
+        try {
+          const sigRes = await fetch("/api/microsoft/mail/signature");
+          const sigJson = await sigRes.json().catch(() => ({}));
+          if (sigRes.ok && sigJson.signature) {
+            setSigText(String(sigJson.signature.text || ""));
+            setSigAppend(sigJson.signature.appendOnSend !== false);
+          }
+        } catch {
+          /* optional */
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
     }
   }, []);
+
+  async function saveSignature() {
+    setSigSaving(true);
+    setSigStatus(null);
+    setError(null);
+    try {
+      const res = await fetch("/api/microsoft/mail/signature", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: sigText,
+          appendOnSend: sigAppend,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Signatur speichern fehlgeschlagen");
+      setSigStatus("Signatur gespeichert.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSigSaving(false);
+    }
+  }
 
   useEffect(() => {
     void load();
@@ -242,6 +283,49 @@ export function SettingsMicrosoftConnectPanel() {
                 Mein Microsoft 365 verbinden
               </a>
             )}
+            {data?.connected ? (
+              <div className="space-y-3 rounded-xl border border-border/60 bg-muted/15 p-3">
+                <div className="space-y-1">
+                  <Label htmlFor="ms-sig">Mail-Signatur für Buddy-Versand</Label>
+                  <p className="text-[12px] text-muted-foreground">
+                    Outlook-Client-Signaturen sind über die Microsoft-API{" "}
+                    <span className="font-medium text-foreground">nicht lesbar</span>
+                    . Einmal aus Outlook kopieren und hier einfügen — Buddy hängt
+                    sie beim Senden an.
+                  </p>
+                  <Textarea
+                    id="ms-sig"
+                    rows={5}
+                    value={sigText}
+                    onChange={(e) => setSigText(e.target.value)}
+                    placeholder={"Mit freundlichen Grüssen\nRolf Walker\n…"}
+                    disabled={sigSaving}
+                  />
+                </div>
+                <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    checked={sigAppend}
+                    onChange={(e) => setSigAppend(e.target.checked)}
+                    disabled={sigSaving}
+                  />
+                  Beim Senden aus Buddy automatisch anhängen
+                </label>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={sigSaving}
+                    onClick={() => void saveSignature()}
+                  >
+                    {sigSaving ? "Speichert…" : "Signatur speichern"}
+                  </Button>
+                  {sigStatus ? (
+                    <span className="text-xs text-emerald-700">{sigStatus}</span>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
             {data?.connected ? (
               <p className="pt-1 text-xs text-muted-foreground">
                 Abend-Review &amp; Mail-Tag:{" "}

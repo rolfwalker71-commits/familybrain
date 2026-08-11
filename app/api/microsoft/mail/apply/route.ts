@@ -9,10 +9,14 @@ import {
 } from "@/lib/microsoft/analyze-mail-day";
 import {
   createOutlookCalendarEvent,
-  createOutlookMailDraft,
   createOutlookTodoTask,
 } from "@/lib/microsoft/mail-day-actions";
 import {
+  createOutlookMailDraftWithSignature,
+  sendOutlookMail,
+} from "@/lib/microsoft/mail-message-actions";
+import {
+  hasMicrosoftMailSendScope,
   hasMicrosoftTasksScope,
   isMicrosoftConnected,
   resolveMicrosoftUserId,
@@ -25,6 +29,9 @@ const BodySchema = z.object({
   tasks: z.array(MsDayTaskApplySchema).max(12).optional().default([]),
   events: z.array(MsDayEventSuggestionSchema).max(20).optional().default([]),
   replies: z.array(MsDayReplyDraftSchema).max(8).optional().default([]),
+  /** When true, send reply mails instead of leaving Outlook drafts. */
+  sendReplies: z.boolean().optional().default(false),
+  includeSignature: z.boolean().optional(),
 });
 
 export async function POST(request: Request) {
@@ -167,25 +174,54 @@ export async function POST(request: Request) {
 
   for (const reply of body.replies) {
     try {
-      const draft = await createOutlookMailDraft(msUserId, {
-        to: reply.to,
-        subject: reply.subject,
-        body: reply.body,
-        sourceMailId: reply.sourceMailId,
-      });
-      created.push({
-        title: draft.subject,
-        ok: true,
-        kind: "reply",
-        target: "outlook_draft",
-        link: draft.webLink,
-      });
+      if (body.sendReplies) {
+        if (!hasMicrosoftMailSendScope(msUserId)) {
+          created.push({
+            title: reply.subject,
+            ok: false,
+            kind: "reply",
+            target: "outlook_send",
+            error:
+              "Mail.Send fehlt. Bitte Microsoft 365 unter Konto neu verbinden.",
+          });
+          continue;
+        }
+        const sent = await sendOutlookMail(msUserId, {
+          to: reply.to,
+          subject: reply.subject,
+          body: reply.body,
+          sourceMailId: reply.sourceMailId,
+          includeSignature: body.includeSignature,
+        });
+        created.push({
+          title: sent.subject,
+          ok: true,
+          kind: "reply",
+          target: "outlook_send",
+          link: null,
+        });
+      } else {
+        const draft = await createOutlookMailDraftWithSignature(msUserId, {
+          to: reply.to,
+          subject: reply.subject,
+          body: reply.body,
+          sourceMailId: reply.sourceMailId,
+          includeSignature: body.includeSignature,
+        });
+        created.push({
+          title: draft.subject,
+          ok: true,
+          kind: "reply",
+          target: "outlook_draft",
+          link: draft.webLink,
+        });
+      }
     } catch (error) {
       created.push({
         title: reply.subject,
         ok: false,
         kind: "reply",
-        target: "outlook_draft",
+        target: body.sendReplies ? "outlook_send" : "outlook_draft",
         error: error instanceof Error ? error.message : String(error),
       });
     }

@@ -8,6 +8,7 @@ import {
   CalendarClock,
   ListChecks,
   RefreshCw,
+  Send,
   Sparkles,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -44,6 +45,7 @@ import {
 } from "@/lib/calendar/slot-duration";
 import { weekdayLabel } from "@/components/calendar/agenda-row";
 import { MicrosoftMailInboxPanel } from "@/components/microsoft/microsoft-mail-inbox-panel";
+import { MicrosoftMailComposeDialog } from "@/components/microsoft/microsoft-mail-compose-dialog";
 import { MicrosoftPlannerPanel } from "@/components/microsoft/microsoft-planner-panel";
 import { MailWorkspaceSubnav, type MailWorkspaceView, mailWorkspacePrimaryBtnClass, mailWorkspaceTabClass } from "@/components/mail/mail-workspace-subnav";
 import {
@@ -353,6 +355,8 @@ export function MicrosoftDayClient() {
   const [draftTasks, setDraftTasks] = useState<DayTask[]>([]);
   const [draftEvents, setDraftEvents] = useState<DayEventSug[]>([]);
   const [draftReplies, setDraftReplies] = useState<DayReply[]>([]);
+  const [sendReplies, setSendReplies] = useState(false);
+  const [composeNewOpen, setComposeNewOpen] = useState(false);
   const [translatingReply, setTranslatingReply] = useState<string | null>(
     null
   );
@@ -872,6 +876,7 @@ export function MicrosoftDayClient() {
           tasks: draftTasks,
           events: draftEvents,
           replies: draftReplies,
+          sendReplies,
         }),
       });
       const json = await res.json();
@@ -881,10 +886,13 @@ export function MicrosoftDayClient() {
           (json.errors || []).join(" · ") || "Übernehmen fehlgeschlagen"
         );
       }
+      const replyLabel = sendReplies
+        ? `${json.replyOk} Antwort(en) gesendet`
+        : `${json.replyOk} Entwurf(e) → Outlook`;
       const parts = [
         json.taskOk ? `${json.taskOk} Aufgabe(n) → Outlook To Do` : null,
         json.eventOk ? `${json.eventOk} Termin(e) → Outlook` : null,
-        json.replyOk ? `${json.replyOk} Entwurf(e) → Outlook` : null,
+        json.replyOk ? replyLabel : null,
       ].filter(Boolean);
       setStatus(
         [
@@ -1452,15 +1460,34 @@ export function MicrosoftDayClient() {
                   Aktualisieren
                 </Button>
               </div>
-              <MailChronikSummary
-                rangeLabel={formatMailRangeLabel(mailFrom, mailTo)}
-                inboxCount={countMailsInRange(inbox, "inbox")}
-                sentCount={countMailsInRange(sent, "sent")}
-              />
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <MailChronikSummary
+                  rangeLabel={formatMailRangeLabel(mailFrom, mailTo)}
+                  inboxCount={countMailsInRange(inbox, "inbox")}
+                  sentCount={countMailsInRange(sent, "sent")}
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5"
+                  onClick={() => setComposeNewOpen(true)}
+                >
+                  <Send className="size-3.5" strokeWidth={APP_ICON_STROKE} />
+                  Neue Mail
+                </Button>
+              </div>
               <MailChronikList
                 items={mergeMailChronik(inbox, sent)}
                 loading={mailLoading}
                 provider="microsoft"
+                onItemsChanged={() => void loadMail()}
+              />
+              <MicrosoftMailComposeDialog
+                open={composeNewOpen}
+                onOpenChange={setComposeNewOpen}
+                mode="new"
+                onSent={() => void loadMail()}
               />
               <p className="text-[12px] text-muted-foreground">
                 Gleiche Struktur auch unter Google Workspace
@@ -2004,7 +2031,7 @@ export function MicrosoftDayClient() {
               <div key={`dr-${i}`} className="space-y-2 rounded-lg border border-border/60 p-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                    Antwort · Outlook Entwurf
+                    Antwort · {sendReplies ? "direkt senden" : "Outlook Entwurf"}
                     {busy ? " · übersetzt…" : ""}
                   </p>
                   <ReplyLangToggle
@@ -2057,7 +2084,23 @@ export function MicrosoftDayClient() {
               );
             })}
           </div>
-          <DialogFooter className="border-t border-border/60 px-4 py-3">
+          <DialogFooter className="flex-col gap-3 border-t border-border/60 px-4 py-3 sm:flex-col sm:space-x-0">
+            {draftReplies.length > 0 ? (
+              <label className="flex w-full items-start gap-2 text-left text-xs text-muted-foreground">
+                <input
+                  type="checkbox"
+                  className="mt-0.5"
+                  checked={sendReplies}
+                  onChange={(e) => setSendReplies(e.target.checked)}
+                  disabled={applying}
+                />
+                <span>
+                  Antworten <span className="font-medium text-foreground">direkt senden</span>
+                  {" "}(sonst nur Entwurf). Signatur aus Konto wird angehängt, falls hinterlegt.
+                </span>
+              </label>
+            ) : null}
+            <div className="flex w-full flex-wrap justify-end gap-2">
             <Button
               type="button"
               variant="outline"
@@ -2076,8 +2119,13 @@ export function MicrosoftDayClient() {
               }
               onClick={() => void applyConfirmed()}
             >
-              {applying ? "Lege an…" : "In Outlook anlegen"}
+              {applying
+                ? "…"
+                : sendReplies && draftReplies.length > 0
+                  ? "Anlegen & senden"
+                  : "In Outlook anlegen"}
             </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>

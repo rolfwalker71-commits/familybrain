@@ -11,6 +11,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { MicrosoftMailComposeDialog } from "@/components/microsoft/microsoft-mail-compose-dialog";
+import { MicrosoftMailQuickActions } from "@/components/microsoft/microsoft-mail-quick-actions";
 import { cn } from "@/lib/utils";
 import type { MsMailItem } from "@/lib/microsoft/mail-day";
 import type { MailMessageDetail } from "@/lib/mail/gmail";
@@ -175,16 +177,22 @@ export function MailChronikList({
   items,
   loading,
   provider,
+  onItemsChanged,
 }: {
   items: MsMailItem[];
   loading?: boolean;
   provider: MailChronikProvider;
+  onItemsChanged?: () => void;
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
   const [webLink, setWebLink] = useState<string | null>(null);
+  const [openFolder, setOpenFolder] = useState<"inbox" | "sent" | null>(null);
+  const [openFromEmail, setOpenFromEmail] = useState<string | null>(null);
+  const [openSubject, setOpenSubject] = useState<string | null>(null);
   const [detail, setDetail] = useState<MailMessageDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
+  const [composeOpen, setComposeOpen] = useState(false);
 
   const threads = useMemo(() => buildMailChronikThreads(items), [items]);
   const hasInRange = items.some((m) => m.inRange !== false);
@@ -193,6 +201,9 @@ export function MailChronikList({
     async (item: MsMailItem) => {
       setOpenId(item.id);
       setWebLink(item.webLink);
+      setOpenFolder(item.folder);
+      setOpenFromEmail(item.fromEmail || null);
+      setOpenSubject(item.subject || null);
       setDetail(null);
       setDetailError(null);
       setDetailLoading(true);
@@ -290,6 +301,9 @@ export function MailChronikList({
             setDetail(null);
             setDetailError(null);
             setWebLink(null);
+            setOpenFolder(null);
+            setOpenFromEmail(null);
+            setOpenSubject(null);
           }
         }}
       >
@@ -312,8 +326,8 @@ export function MailChronikList({
             </DialogDescription>
           </DialogHeader>
           <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overflow-x-hidden px-4 py-3">
-            {webLink ? (
-              <div>
+            <div className="flex flex-wrap items-center gap-2">
+              {webLink ? (
                 <a
                   href={webLink}
                   target="_blank"
@@ -326,8 +340,28 @@ export function MailChronikList({
                   <ExternalLink className="size-3.5" />
                   {externalLabel}
                 </a>
-              </div>
-            ) : null}
+              ) : null}
+              {provider === "microsoft" && openId ? (
+                <MicrosoftMailQuickActions
+                  messageId={openId}
+                  unread={detail?.unread}
+                  folder={openFolder}
+                  onReply={() => setComposeOpen(true)}
+                  onChanged={(action) => {
+                    if (
+                      action === "archive" ||
+                      action === "delete" ||
+                      action === "markRead"
+                    ) {
+                      if (action === "archive" || action === "delete") {
+                        setOpenId(null);
+                      }
+                      onItemsChanged?.();
+                    }
+                  }}
+                />
+              ) : null}
+            </div>
             {detailLoading ? (
               <p className="text-sm text-muted-foreground">Lade Inhalt…</p>
             ) : detailError ? (
@@ -354,6 +388,25 @@ export function MailChronikList({
           </div>
         </DialogContent>
       </Dialog>
+
+      {provider === "microsoft" ? (
+        <MicrosoftMailComposeDialog
+          open={composeOpen}
+          onOpenChange={setComposeOpen}
+          mode="reply"
+          sourceMailId={openId}
+          defaultTo={openFromEmail || detail?.from || ""}
+          defaultSubject={
+            openSubject
+              ? openSubject.toLowerCase().startsWith("re:")
+                ? openSubject
+                : `Re: ${openSubject}`
+              : ""
+          }
+          defaultBody=""
+          onSent={() => onItemsChanged?.()}
+        />
+      ) : null}
     </>
   );
 }

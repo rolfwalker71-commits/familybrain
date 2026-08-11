@@ -23,6 +23,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { MicrosoftMailComposeDialog } from "@/components/microsoft/microsoft-mail-compose-dialog";
+import { MicrosoftMailQuickActions } from "@/components/microsoft/microsoft-mail-quick-actions";
 import { cn } from "@/lib/utils";
 import { APP_ICON_STROKE } from "@/lib/branding/app-icons";
 import type { MailListFilter, MailListItem, MailMessageDetail } from "@/lib/mail/gmail";
@@ -118,6 +120,7 @@ export function MicrosoftMailInboxPanel({
   const [analyzing, setAnalyzing] = useState(false);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [applying, setApplying] = useState(false);
+  const [composeOpen, setComposeOpen] = useState(false);
   const [applyMsg, setApplyMsg] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [pdfAttachments, setPdfAttachments] = useState<
@@ -602,6 +605,21 @@ export function MicrosoftMailInboxPanel({
                     </Button>
                   ) : null}
                 </div>
+                {openId ? (
+                  <MicrosoftMailQuickActions
+                    messageId={openId}
+                    unread={detail.unread}
+                    folder="inbox"
+                    onReply={() => setComposeOpen(true)}
+                    onChanged={(action) => {
+                      if (action === "archive" || action === "delete") {
+                        setOpenId(null);
+                      }
+                      if (mode === "inbox") void loadInbox();
+                      else void loadTriage();
+                    }}
+                  />
+                ) : null}
                 {pdfAttachments.length > 0 ? (
                   <ul className="space-y-1.5 rounded-lg border border-border/60 bg-muted/20 px-2.5 py-2 text-xs">
                     {pdfAttachments.map((a) => (
@@ -692,6 +710,24 @@ export function MicrosoftMailInboxPanel({
                     )}
                   </div>
                 ) : null}
+                {analysis?.replyDraft?.body ? (
+                  <div className="space-y-2 rounded-xl border border-border/70 bg-muted/20 p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Antwortvorschlag
+                    </p>
+                    <pre className="whitespace-pre-wrap break-words text-sm">
+                      {analysis.replyDraft.body}
+                    </pre>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => setComposeOpen(true)}
+                    >
+                      Antworten / senden…
+                    </Button>
+                  </div>
+                ) : null}
                 {applyMsg ? (
                   <p className="text-sm text-muted-foreground">{applyMsg}</p>
                 ) : null}
@@ -700,6 +736,26 @@ export function MicrosoftMailInboxPanel({
           </div>
         </DialogContent>
       </Dialog>
+
+      <MicrosoftMailComposeDialog
+        open={composeOpen}
+        onOpenChange={setComposeOpen}
+        mode="reply"
+        sourceMailId={openId}
+        defaultTo={detail?.from || ""}
+        defaultSubject={
+          detail?.subject
+            ? detail.subject.toLowerCase().startsWith("re:")
+              ? detail.subject
+              : `Re: ${detail.subject}`
+            : ""
+        }
+        defaultBody={analysis?.replyDraft?.body || ""}
+        onSent={() => {
+          if (mode === "inbox") void loadInbox();
+          else void loadTriage();
+        }}
+      />
     </div>
   );
 }
