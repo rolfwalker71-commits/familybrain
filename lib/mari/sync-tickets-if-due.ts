@@ -70,15 +70,6 @@ function readJsonSetting<T>(key: string, fallback: T): T {
   }
 }
 
-function zurichTodayIso(): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Europe/Zurich",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
-}
-
 function ticketToSnapshot(t: MariTicketListItem): MariTicketSnapshotRow {
   return {
     issueId: t.issueId,
@@ -166,20 +157,12 @@ function diffTickets(
   return changes;
 }
 
-function filterSnapshotForPrefs(
+function filterSnapshotForHome(
   snapshot: MariTicketSnapshotRow[],
-  prefs: { statuses: number[]; overdueOnly: boolean }
+  statusIds: number[]
 ): MariTicketSnapshotRow[] {
-  const allowed = new Set(prefs.statuses);
-  const today = zurichTodayIso();
-  return snapshot.filter((row) => {
-    if (!allowed.has(row.status)) return false;
-    if (prefs.overdueOnly) {
-      if (!row.dueDate) return false;
-      return row.dueDate < today;
-    }
-    return true;
-  });
+  const allowed = new Set(statusIds.map((n) => Number(n)));
+  return snapshot.filter((row) => allowed.has(Number(row.status)));
 }
 
 function syncStatusFingerprint(): string {
@@ -193,7 +176,7 @@ export function mariTicketsSyncNeedsForce(): boolean {
 
 /**
  * Read persisted watch state for overview widget (no MARI call).
- * When `ownerKey` is set, counts/total follow that user's Maringo status filter.
+ * Counts follow the user's Maringo *status* filter (not overdue-only / not customer mode).
  */
 export function getMariTicketsWatchState(
   ownerKey?: string | null
@@ -202,37 +185,56 @@ export function getMariTicketsWatchState(
   const prefs = ownerKey
     ? getMariTicketFilterPrefs(ownerKey)
     : defaultMariTicketFilterPrefs();
+  // Home «Tickets von mir»: Status-Auswahl übernehmen, Überfällig/Kundenmodus ignorieren.
+  const statusIds =
+    prefs.statuses.length > 0
+      ? prefs.statuses
+      : [...defaultMariTicketFilterPrefs().statuses];
+
   const snapshot = readJsonSetting<MariTicketSnapshotRow[]>(
     MARI_TICKETS_SNAPSHOT_KEY,
     []
-  );
-  const filtered =
-    snapshot.length > 0 ? filterSnapshotForPrefs(snapshot, prefs) : null;
-  const counts =
-    filtered != null
-      ? buildCounts(filtered)
-      : readJsonSetting<MariTicketCountsByStatus[]>(
-          MARI_TICKETS_COUNTS_KEY,
-          []
-        ).filter((c) => prefs.statuses.includes(c.statusId));
+  ).map((row) => ({
+    ...row,
+    status: Number(row.status),
+    issueId: Number(row.issueId),
+  }));
+
+  const storedCounts = readJsonSetting<MariTicketCountsByStatus[]>(
+    MARI_TICKETS_COUNTS_KEY,
+    []
+  )
+    .map((c) => ({
+      ...c,
+      statusId: Number(c.statusId),
+      count: Number(c.count) || 0,
+    }))
+    .filter((c) => statusIds.includes(c.statusId) && c.count > 0);
+
+  let counts: MariTicketCountsByStatus[];
+  let total: number;
+
+  if (snapshot.length > 0) {
+    const filtered = filterSnapshotForHome(snapshot, statusIds);
+    counts = buildCounts(filtered);
+    total = filtered.length;
+  } else {
+    counts = storedCounts;
+    total = counts.reduce((s, c) => s + c.count, 0);
+  }
+
   const recentChanges = readJsonSetting<MariTicketChangeEvent[]>(
     MARI_TICKETS_RECENT_CHANGES_KEY,
     []
   );
-  const statusByIssue = new Map(
-    (filtered ?? snapshot).map((r) => [r.issueId, r.status])
-  );
-  const allowed = new Set(prefs.statuses);
+  const statusByIssue = new Map(snapshot.map((r) => [r.issueId, r.status]));
+  const allowed = new Set(statusIds);
   const filteredChanges = recentChanges.filter((ch) => {
-    const status = statusByIssue.get(ch.issueId);
-    if (status == null) return true;
+    const status = statusByIssue.get(Number(ch.issueId));
+    if (status == null) return false;
     return allowed.has(status);
   });
   const lastPollAt = getSetting(MARI_TICKETS_LAST_POLL_KEY);
-  const total =
-    filtered != null
-      ? filtered.length
-      : counts.reduce((s, c) => s + c.count, 0);
   return {
     configured: Boolean(cfg),
     employeeNumber: cfg?.employeeNumber ?? null,
@@ -289,6 +291,18 @@ export async function syncMariTicketsIfDue(options?: {
     MARI_TICKETS_SNAPSHOT_KEY,
     []
   );
+  // Guard: don't wipe a good snapshot with an empty poll (transient MARI glitch).
+  if (nextSnap.length === 0 && prevSnap.length > 0 && !statusSetChanged) {
+    setSetting(MARI_TICKETS_LAST_POLL_KEY, at);
+    return {
+      attempted: true,
+      employeeNumber,
+      ticketCount: 0,
+      changeCount: 0,
+      notified: false,
+    };
+  }
+
   const isBaseline =
     !getSetting(MARI_TICKETS_LAST_POLL_KEY) || statusSetChanged;
 
