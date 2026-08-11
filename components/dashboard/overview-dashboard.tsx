@@ -53,12 +53,12 @@ import type { MailListItem } from "@/lib/mail/gmail";
 import { statusAsideKpiClass } from "@/lib/mari/status";
 import type { LucideIcon } from "lucide-react";
 
-/** Aside widgets: thicker/darker border + soft 3D. */
+/** Aside widgets: light border + subtle raised edge. */
 const ASIDE_WIDGET_CLASS =
-  "border-2 border-slate-400/90 bg-card shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_3px_0_0_rgb(148_163_184),0_8px_18px_rgba(15,23,42,0.12)]";
+  "border border-slate-300/80 bg-card shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_0_0_rgb(203_213_225),0_3px_10px_rgba(15,23,42,0.06)]";
 
 const ASIDE_KPI_3D =
-  "border-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_2px_0_0_rgba(15,23,42,0.14),0_4px_8px_rgba(15,23,42,0.12)]";
+  "border shadow-[inset_0_1px_0_rgba(255,255,255,0.75),0_1px_0_0_rgba(15,23,42,0.08),0_2px_4px_rgba(15,23,42,0.06)]";
 
 function zurichTodayIso(): string {
   return new Intl.DateTimeFormat("en-CA", {
