@@ -69,6 +69,41 @@ export function statusChipClass(statusId: number): string {
   }
 }
 
+/** Volle Detail-Header-Leiste (Ticket-Titel), statusfarben. */
+export function statusDetailHeaderClass(statusId: number): string {
+  switch (statusId) {
+    case 11: // NEU
+      return "bg-rose-700 text-white";
+    case 1: // Offen
+      return "bg-sky-700 text-white";
+    case 3: // In Arbeit
+      return "bg-teal-700 text-white";
+    case 13: // Aktualisiert
+      return "bg-cyan-700 text-white";
+    case 6: // Warte auf Kunden
+    case 9:
+      return "bg-orange-600 text-white";
+    case 7: // Warte auf Hersteller
+    case 10:
+      return "bg-violet-700 text-white";
+    case 4: // Wieder geöffnet
+      return "bg-amber-600 text-white";
+    case 14: // Eskalation
+      return "bg-red-700 text-white";
+    case 2: // Gelöst
+    case 12:
+      return "bg-slate-600 text-white";
+    case 5: // Geschlossen
+    case 8:
+      return "bg-slate-500 text-white";
+    case 15: // On Hold
+    case 16: // Abklärung Notwendig
+      return "bg-slate-700 text-white";
+    default:
+      return "bg-slate-800 text-white";
+  }
+}
+
 /** Sanfte Statusfarben für kompakte KPI-Chips in Aside-Widgets. */
 export function statusAsideKpiClass(statusId: number): string {
   switch (statusId) {

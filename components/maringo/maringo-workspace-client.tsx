@@ -43,6 +43,7 @@ import {
   WORK_STATUS_IDS,
   statusChipClass,
   statusChipLabel,
+  statusDetailHeaderClass,
 } from "@/lib/mari/status";
 import { cn } from "@/lib/utils";
 import { toSwissDate } from "@/lib/utils/dates";
@@ -1499,53 +1500,57 @@ export function MaringoWorkspaceClient() {
             </div>
           ) : detail ? (
             <>
-              <div className="space-y-3 border-b border-border/50 px-4 py-3">
-                <div className="flex items-start gap-3">
-                  <div className="min-w-0 flex-1 space-y-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-[12px] font-bold text-muted-foreground">
-                        #{detail.issueId}
-                      </span>
-                      <StatusChip
-                        status={detail.status}
-                        statusName={detail.statusName}
-                      />
-                    </div>
-                    <h2 className="text-[17px] font-black tracking-tight">
-                      {detail.briefDescription}
-                    </h2>
-                  </div>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger
-                      render={
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="ghost"
-                          className="size-8 shrink-0"
-                          disabled={patching}
-                        />
-                      }
-                    >
-                      <MoreHorizontal className="size-4" />
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-52">
-                      <DropdownMenuGroup>
-                        <DropdownMenuLabel>Status setzen</DropdownMenuLabel>
-                        {[11, 1, 3, 6, 7, 13, 14, 2, 5].map((id) => (
-                          <DropdownMenuItem
-                            key={id}
-                            disabled={patching || detail.status === id}
-                            onClick={() => void patchTicket({ status: id })}
-                          >
-                            {STATUS_LABELS[id] || id}
-                          </DropdownMenuItem>
-                        ))}
-                      </DropdownMenuGroup>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+              <div
+                className={cn(
+                  "flex items-start gap-3 px-4 py-3",
+                  statusDetailHeaderClass(detail.status)
+                )}
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-[12px] font-bold tabular-nums opacity-80">
+                    #{detail.issueId}
+                  </p>
+                  <h2 className="text-[17px] font-black tracking-tight">
+                    {detail.briefDescription}
+                  </h2>
                 </div>
+                <StatusChip
+                  status={detail.status}
+                  statusName={detail.statusName}
+                  className="border-white/40 bg-white/95 shadow-sm"
+                />
+                <DropdownMenu>
+                  <DropdownMenuTrigger
+                    render={
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="size-8 shrink-0 text-white hover:bg-white/15 hover:text-white"
+                        disabled={patching}
+                      />
+                    }
+                  >
+                    <MoreHorizontal className="size-4" />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-52">
+                    <DropdownMenuGroup>
+                      <DropdownMenuLabel>Status setzen</DropdownMenuLabel>
+                      {[11, 1, 3, 6, 7, 13, 14, 2, 5].map((id) => (
+                        <DropdownMenuItem
+                          key={id}
+                          disabled={patching || detail.status === id}
+                          onClick={() => void patchTicket({ status: id })}
+                        >
+                          {STATUS_LABELS[id] || id}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuGroup>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
 
+              <div className="space-y-3 border-b border-border/50 px-4 py-3">
                 <div className="rounded-xl border border-border/50 bg-muted/15 px-3 py-2.5">
                   <div className="grid gap-x-3 gap-y-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                     <DetailField label="Typ">
@@ -1975,7 +1980,7 @@ export function MaringoWorkspaceClient() {
                   </Card>
                 ) : null}
 
-                <div className="grid gap-4 xl:grid-cols-2">
+                <div className="space-y-4">
                   <div>
                     <h3 className="mb-3 flex items-center gap-2 text-[13px] font-black tracking-tight">
                       <Clock3 className="size-3.5 text-muted-foreground" />
