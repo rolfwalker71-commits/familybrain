@@ -95,6 +95,42 @@ export function toSwissDate(isoDate: string | null | undefined): string {
   return raw;
 }
 
+/** German weekday for an ISO `YYYY-MM-DD` (or Swiss `TT.MM.JJJJ`) calendar day. */
+export function toSwissWeekday(isoDate: string | null | undefined): string {
+  if (!isoDate) return "";
+  const raw = isoDate.trim();
+  let y: number;
+  let m: number;
+  let d: number;
+  const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(raw);
+  if (iso) {
+    y = Number(iso[1]);
+    m = Number(iso[2]);
+    d = Number(iso[3]);
+  } else {
+    const swiss = /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(raw);
+    if (!swiss) return "";
+    d = Number(swiss[1]);
+    m = Number(swiss[2]);
+    y = Number(swiss[3]);
+  }
+  if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) {
+    return "";
+  }
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  if (
+    dt.getUTCFullYear() !== y ||
+    dt.getUTCMonth() !== m - 1 ||
+    dt.getUTCDate() !== d
+  ) {
+    return "";
+  }
+  return new Intl.DateTimeFormat("de-CH", {
+    weekday: "long",
+    timeZone: "UTC",
+  }).format(dt);
+}
+
 function hour12To24(hour: number, minute: number, ampm: string): string | null {
   if (
     !Number.isFinite(hour) ||

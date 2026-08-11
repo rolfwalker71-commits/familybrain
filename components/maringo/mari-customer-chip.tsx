@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
-/** Kundename als farbiger Chip — etwas grösser als umgebender Text. */
+/** Kundename fett, ohne Chip-Hintergrund. */
 export function MariCustomerChip({
   children,
   className,
@@ -12,7 +12,7 @@ export function MariCustomerChip({
   return (
     <span
       className={cn(
-        "inline-flex max-w-full items-center truncate rounded-full bg-sky-100 px-2 py-0.5 text-[length:calc(1em+2px)] font-bold leading-none text-sky-950",
+        "inline-block max-w-full truncate font-bold text-foreground",
         className
       )}
     >

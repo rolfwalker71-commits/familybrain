@@ -12,6 +12,7 @@ import type { MariKeyPair } from "@/lib/mari/timekeeping-shared";
 import { formatMariProjectLabel } from "@/lib/mari/timekeeping-shared";
 import { TIMEKEEPING_INT_BEMERKUNG_OPTIONS } from "@/lib/mari/timekeeping-udfs";
 import type { MariTimeBookFavorite } from "@/lib/mari/time-book-favorites";
+import { MariKeyPairPicker } from "@/components/maringo/mari-key-pair-picker";
 
 export type TimeBookFormDefaults = {
   dayOfService?: string;
@@ -604,48 +605,29 @@ export function MaringoTimeBookForm({
         </div>
       </div>
 
-      <div className={cn("grid gap-3", "sm:grid-cols-2")}>
-        <div className="space-y-1">
-          <Label htmlFor="tk-contract">Vertrag</Label>
-          <select
-            id="tk-contract"
-            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
-            value={contractId}
-            onChange={(e) => {
-              setContractId(e.target.value);
-              setContractPositionId("");
-            }}
-            disabled={!projectNumber}
-          >
-            <option value="">
-              {contracts.length === 0
-                ? "Kein Vertrag nötig"
-                : "Vertrag wählen…"}
-            </option>
-            {contracts.map((c) => (
-              <option key={c.keyInternal} value={c.keyInternal}>
-                {[c.keyVisible, c.matchcode].filter(Boolean).join(" · ")}
-              </option>
-            ))}
-          </select>
-        </div>
+      <div className="space-y-3">
+        <MariKeyPairPicker
+          id="tk-contract"
+          label="Vertrag"
+          value={contractId}
+          options={contracts}
+          placeholder="Vertrag wählen…"
+          emptyLabel="Kein Vertrag nötig"
+          disabled={!projectNumber}
+          onChange={(next) => {
+            setContractId(next);
+            setContractPositionId("");
+          }}
+        />
         {positions.length > 0 ? (
-          <div className="space-y-1">
-            <Label htmlFor="tk-pos">Vertragsposition</Label>
-            <select
-              id="tk-pos"
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
-              value={contractPositionId}
-              onChange={(e) => setContractPositionId(e.target.value)}
-            >
-              <option value="">Position wählen…</option>
-              {positions.map((p) => (
-                <option key={p.keyInternal} value={p.keyInternal}>
-                  {[p.keyVisible, p.matchcode].filter(Boolean).join(" · ")}
-                </option>
-              ))}
-            </select>
-          </div>
+          <MariKeyPairPicker
+            id="tk-pos"
+            label="Vertragsposition"
+            value={contractPositionId}
+            options={positions}
+            placeholder="Position wählen…"
+            onChange={setContractPositionId}
+          />
         ) : null}
       </div>
 

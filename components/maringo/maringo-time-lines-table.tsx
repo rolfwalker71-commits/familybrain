@@ -9,10 +9,30 @@ import {
 } from "@/lib/mari/timekeeping-shared";
 import { labelForInternalRemarkVerr } from "@/lib/mari/timekeeping-udfs";
 import { APP_ICON_STROKE } from "@/lib/branding/app-icons";
-import { toSwissDate } from "@/lib/utils/dates";
+import { toSwissDate, toSwissWeekday } from "@/lib/utils/dates";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { MariHoursSplitSummary } from "@/components/maringo/mari-hours-split-summary";
+
+function ServiceDateLabel({
+  serviceDate,
+  className,
+}: {
+  serviceDate: string;
+  className?: string;
+}) {
+  const weekday = toSwissWeekday(serviceDate);
+  return (
+    <span className={cn("inline-flex flex-col leading-tight", className)}>
+      <span className="tabular-nums">{toSwissDate(serviceDate)}</span>
+      {weekday ? (
+        <span className="text-[10px] font-normal text-muted-foreground">
+          {weekday}
+        </span>
+      ) : null}
+    </span>
+  );
+}
 
 function ProjectWithCustomer({
   projectNumber,
@@ -266,8 +286,8 @@ export function MaringoTimeLinesTable({
                 <div className="flex items-start justify-between gap-1.5">
                   <div className="min-w-0 flex-1 space-y-0.5">
                     <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
-                      <span className="font-semibold tabular-nums">
-                        {toSwissDate(l.serviceDate)}
+                      <span className="font-semibold">
+                        <ServiceDateLabel serviceDate={l.serviceDate} />
                       </span>
                       <ProjectWithCustomer
                         projectNumber={l.projectNumber}
@@ -362,8 +382,11 @@ export function MaringoTimeLinesTable({
                   key={l.lineId}
                   className="border-t border-border/50 align-top"
                 >
-                  <td className="whitespace-nowrap px-2 py-1.5 tabular-nums">
-                    {toSwissDate(l.serviceDate)}
+                  <td className="whitespace-nowrap px-2 py-1.5">
+                    <ServiceDateLabel
+                      serviceDate={l.serviceDate}
+                      className="font-medium"
+                    />
                   </td>
                   <td className="px-2 py-1.5 align-middle">
                     <ProjectWithCustomer
