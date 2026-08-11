@@ -480,13 +480,13 @@ export function MaringoTimeBookForm({
       <div
         className={cn(
           "grid gap-3",
-          wide
-            ? "sm:grid-cols-2 lg:grid-cols-4"
-            : "sm:grid-cols-2"
+          wide ? "sm:grid-cols-2 lg:grid-cols-3" : "sm:grid-cols-2"
         )}
       >
         <div className="space-y-1">
-          <Label htmlFor="tk-date">Datum</Label>
+          <Label htmlFor="tk-date" className="block truncate">
+            Datum
+          </Label>
           <Input
             id="tk-date"
             type="date"
@@ -496,7 +496,9 @@ export function MaringoTimeBookForm({
           />
         </div>
         <div className="space-y-1">
-          <Label htmlFor="tk-hours">Stunden</Label>
+          <Label htmlFor="tk-hours" className="block truncate">
+            Stunden
+          </Label>
           <Input
             id="tk-hours"
             inputMode="decimal"
@@ -508,26 +510,29 @@ export function MaringoTimeBookForm({
             placeholder="0.25"
           />
         </div>
-        <div className="space-y-1">
-          <Label htmlFor="tk-billable-h">Davon verrechenbar</Label>
-          <Input
-            id="tk-billable-h"
-            inputMode="decimal"
-            value={hoursBillableRaw}
-            onChange={(e) => setHoursBillableRaw(e.target.value)}
-            disabled={!billable}
-            placeholder="0.25"
-          />
-        </div>
-        <div className={cn("flex items-end pb-1", !wide && "sm:col-span-2")}>
-          <label className="flex h-9 items-center gap-2 text-[13px]">
-            <input
-              type="checkbox"
-              checked={billable}
-              onChange={(e) => onBillableToggle(e.target.checked)}
+        <div className={cn("space-y-1", !wide && "sm:col-span-2")}>
+          <Label htmlFor="tk-billable-h" className="block truncate">
+            Davon verrechenbar
+          </Label>
+          <div className="flex items-center gap-2">
+            <Input
+              id="tk-billable-h"
+              inputMode="decimal"
+              className="min-w-0 flex-1"
+              value={hoursBillableRaw}
+              onChange={(e) => setHoursBillableRaw(e.target.value)}
+              disabled={!billable}
+              placeholder="0.25"
             />
-            Verrechenbar
-          </label>
+            <label className="flex h-9 shrink-0 items-center gap-2 whitespace-nowrap text-[13px]">
+              <input
+                type="checkbox"
+                checked={billable}
+                onChange={(e) => onBillableToggle(e.target.checked)}
+              />
+              Verrechenbar
+            </label>
+          </div>
         </div>
       </div>
 

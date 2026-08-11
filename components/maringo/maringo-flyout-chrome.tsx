@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import {
   CalendarClock,
   Clock3,
+  ListTree,
   MessageSquare,
   X,
 } from "lucide-react";
@@ -14,7 +15,8 @@ import { cn } from "@/lib/utils";
 export type MariSecondaryFlyoutId =
   | "verlauf"
   | "buchungen"
-  | "arbeitszeit";
+  | "arbeitszeit"
+  | "anzeige";
 
 export const MARI_SECONDARY_FLYOUT_META: Record<
   MariSecondaryFlyoutId,
@@ -23,10 +25,11 @@ export const MARI_SECONDARY_FLYOUT_META: Record<
   verlauf: { label: "Verlauf", short: "Verlauf" },
   buchungen: { label: "Ticket-Buchungen", short: "Buchungen" },
   arbeitszeit: { label: "Arbeitszeit", short: "Zeit" },
+  anzeige: { label: "Listenfelder", short: "Anzeige" },
 };
 
 /** Slide-in duration for main + secondary flyouts (ms). */
-export const MARI_FLYOUT_ENTER_MS = 1500;
+export const MARI_FLYOUT_ENTER_MS = 1000;
 
 /** Toggle / bring-to-front / close-if-top for the secondary stack. */
 export function toggleMariSecondaryFlyout(
@@ -70,36 +73,48 @@ export function MariTicketFlyoutRail({
     { id: "verlauf", icon: MessageSquare, label: "Verlauf" },
     { id: "buchungen", icon: Clock3, label: "Buchungen" },
     { id: "arbeitszeit", icon: CalendarClock, label: "Arbeitszeit" },
+    { id: "anzeige", icon: ListTree, label: "Listenfelder" },
   ];
 
   return (
     <nav
-      className="flex w-11 shrink-0 flex-col gap-1 border-r border-border/60 bg-muted/25 px-1 py-2"
+      className="flex h-full w-12 shrink-0 flex-col items-center gap-1.5 border-r border-border/60 bg-muted/25 px-1.5 py-2.5"
       aria-label="Ticket-Nebenbereiche"
     >
-      {items.map(({ id, icon: Icon, label }) => {
+      {items.map(({ id, icon: Icon, label }, index) => {
         const active = openIds.includes(id);
         const top = openIds[openIds.length - 1] === id;
         return (
-          <button
+          <div
             key={id}
-            type="button"
-            title={label}
-            aria-label={label}
-            aria-pressed={active}
-            onClick={() => onToggle(id)}
             className={cn(
-              "flex flex-col items-center gap-0.5 rounded-lg px-0.5 py-1.5 text-[9px] font-semibold leading-tight transition-colors",
-              top
-                ? "bg-orange-100 text-orange-950"
-                : active
-                  ? "bg-orange-50 text-orange-900"
-                  : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+              "group relative flex w-full justify-center",
+              index === 3 && "mt-auto"
             )}
           >
-            <Icon className="size-4" strokeWidth={APP_ICON_STROKE} />
-            <span className="max-w-full truncate px-0.5">{label}</span>
-          </button>
+            <button
+              type="button"
+              aria-label={label}
+              aria-pressed={active}
+              onClick={() => onToggle(id)}
+              className={cn(
+                "flex size-10 items-center justify-center rounded-xl transition-colors",
+                top
+                  ? "bg-orange-100 text-orange-950"
+                  : active
+                    ? "bg-orange-50 text-orange-900"
+                    : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+              )}
+            >
+              <Icon className="size-5" strokeWidth={APP_ICON_STROKE} />
+            </button>
+            <span
+              role="tooltip"
+              className="pointer-events-none absolute top-1/2 left-full z-20 ml-2 -translate-y-1/2 whitespace-nowrap rounded-md bg-foreground px-2 py-1 text-[11px] font-medium text-background opacity-0 shadow-md transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
+            >
+              {label}
+            </span>
+          </div>
         );
       })}
     </nav>

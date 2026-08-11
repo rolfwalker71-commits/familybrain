@@ -69,9 +69,15 @@ import type {
 } from "@/lib/mari/tickets";
 import type { MariCustomerOption } from "@/lib/mari/customers";
 import type {
+  MariListMetaField,
   MariTicketFilterMode,
   MariTimelineSort,
 } from "@/lib/mari/ticket-filter-prefs";
+import {
+  DEFAULT_MARI_LIST_META_FIELDS,
+  MARI_LIST_META_FIELD_OPTIONS,
+} from "@/lib/mari/ticket-filter-prefs";
+import { buildMariTicketListMetaParts } from "@/lib/mari/ticket-list-meta";
 import {
   MariMainFlyoutShell,
   MariSecondaryFlyoutShell,
@@ -581,6 +587,9 @@ export function MaringoWorkspaceClient() {
   const [filterReady, setFilterReady] = useState(false);
   const [timelineSort, setTimelineSort] =
     useState<MariTimelineSort>("oldest");
+  const [listMetaFields, setListMetaFields] = useState<MariListMetaField[]>([
+    ...DEFAULT_MARI_LIST_META_FIELDS,
+  ]);
   const [tickets, setTickets] = useState<MariTicketListItem[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [ticketFlyoutOpen, setTicketFlyoutOpen] = useState(false);
@@ -974,6 +983,18 @@ export function MaringoWorkspaceClient() {
         if (data.timelineSort === "newest" || data.timelineSort === "oldest") {
           setTimelineSort(data.timelineSort);
         }
+        if (Array.isArray(data.listMetaFields)) {
+          const allowed = new Set(
+            MARI_LIST_META_FIELD_OPTIONS.map((o) => o.id)
+          );
+          const next = data.listMetaFields.filter(
+            (f: unknown): f is MariListMetaField =>
+              typeof f === "string" && allowed.has(f as MariListMetaField)
+          );
+          setListMetaFields(
+            next.length > 0 ? next : [...DEFAULT_MARI_LIST_META_FIELDS]
+          );
+        }
         if (Array.isArray(data.customers)) {
           const next = data.customers
             .map((c: { cardCode?: unknown; name?: unknown }) => {
@@ -1011,6 +1032,7 @@ export function MaringoWorkspaceClient() {
           filterMode,
           customers: selectedCustomers,
           timelineSort,
+          listMetaFields,
         }),
       }).catch(() => {
         /* optional */
@@ -1023,6 +1045,7 @@ export function MaringoWorkspaceClient() {
     filterMode,
     selectedCustomers,
     timelineSort,
+    listMetaFields,
     filterReady,
   ]);
 
@@ -1888,16 +1911,9 @@ export function MaringoWorkspaceClient() {
               const active = t.issueId === selectedId;
               const due = formatDayMonth(t.dueDate);
               const overdue = isOverdue(t.dueDate);
-              const metaLine = joinMeta([
-                t.addressMatchcode || t.cardCode,
-                t.projectNumber,
-                formatDayMonth(t.requestDate)
-                  ? `seit ${formatDayMonth(t.requestDate)}`
-                  : null,
-                formatDayMonth(t.changeAtDate)
-                  ? `änd. ${formatDayMonth(t.changeAtDate)}`
-                  : null,
-              ]);
+              const metaParts = buildMariTicketListMetaParts(t, listMetaFields);
+              const metaLine =
+                metaParts.length > 0 ? metaParts.join(" · ") : null;
               return (
                 <li key={t.issueId} className="border-b border-border/40 last:border-b-0">
                   <button
@@ -2670,13 +2686,17 @@ export function MaringoWorkspaceClient() {
                     ? "Verlauf"
                     : id === "buchungen"
                       ? "Ticket-Buchungen"
-                      : "Arbeitszeit";
+                      : id === "anzeige"
+                        ? "Listenfelder"
+                        : "Arbeitszeit";
                 const description =
                   id === "verlauf"
                     ? "Timeline & interne Notizen"
                     : id === "buchungen"
                       ? "Stunden auf dieses Ticket"
-                      : "Zeiterfassung";
+                      : id === "anzeige"
+                        ? "Meta-Zeile in der Ticketliste"
+                        : "Zeiterfassung";
                 return (
                   <MariSecondaryFlyoutShell
                     key={id}
@@ -2769,6 +2789,59 @@ export function MaringoWorkspaceClient() {
                     {id === "arbeitszeit" ? (
                       <MaringoTimekeepingPanel />
                     ) : null}
+                    {id === "anzeige" ? (
+                      <div className="space-y-3">
+                        <p className="text-[12px] leading-relaxed text-muted-foreground">
+                          Felder in der Ticketliste (Meta-Zeile). Vorhandene
+                          Werte werden bei «Zeit buchen» vorbelegt und können
+                          dort überschrieben werden.
+                        </p>
+                        <ul className="space-y-1.5">
+                          {MARI_LIST_META_FIELD_OPTIONS.map((opt) => {
+                            const checked = listMetaFields.includes(opt.id);
+                            return (
+                              <li key={opt.id}>
+                                <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-border/60 bg-muted/15 px-3 py-2.5 hover:bg-muted/30">
+                                  <input
+                                    type="checkbox"
+                                    className="mt-0.5"
+                                    checked={checked}
+                                    onChange={() => {
+                                      setListMetaFields((prev) => {
+                                        if (prev.includes(opt.id)) {
+                                          const next = prev.filter(
+                                            (x) => x !== opt.id
+                                          );
+                                          return next.length > 0
+                                            ? next
+                                            : [...DEFAULT_MARI_LIST_META_FIELDS];
+                                        }
+                                        const order =
+                                          MARI_LIST_META_FIELD_OPTIONS.map(
+                                            (o) => o.id
+                                          );
+                                        return [...prev, opt.id].sort(
+                                          (a, b) =>
+                                            order.indexOf(a) - order.indexOf(b)
+                                        );
+                                      });
+                                    }}
+                                  />
+                                  <span className="min-w-0">
+                                    <span className="block text-[13px] font-semibold">
+                                      {opt.label}
+                                    </span>
+                                    <span className="block text-[11px] text-muted-foreground">
+                                      {opt.hint}
+                                    </span>
+                                  </span>
+                                </label>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    ) : null}
                   </MariSecondaryFlyoutShell>
                 );
               })}
@@ -2792,7 +2865,17 @@ export function MaringoWorkspaceClient() {
             ? {
                 issueId: detail.issueId,
                 projectNumber: detail.projectNumber,
-                projectLabel: detail.projectNumber,
+                projectLabel:
+                  [
+                    detail.projectNumber,
+                    detail.addressMatchcode || detail.cardCode,
+                    detail.contractNumber ||
+                      (detail.contractId != null
+                        ? `V-${detail.contractId}`
+                        : null),
+                  ]
+                    .filter(Boolean)
+                    .join(" · ") || detail.projectNumber,
                 contractId: detail.contractId,
                 contractPositionId: detail.contractPositionId,
                 activity: detail.briefDescription.slice(0, 100),

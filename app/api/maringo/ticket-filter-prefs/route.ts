@@ -25,6 +25,18 @@ const PutSchema = z.object({
     .max(40)
     .optional(),
   timelineSort: z.enum(["newest", "oldest"]).optional(),
+  listMetaFields: z
+    .array(
+      z.enum([
+        "kunde",
+        "projekt",
+        "vertrag",
+        "aktivitaet",
+        "seit",
+        "geaendert",
+      ])
+    )
+    .optional(),
 });
 
 export async function GET() {

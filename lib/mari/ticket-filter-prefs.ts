@@ -4,8 +4,60 @@ import { normalizeMariCardCode } from "@/lib/mari/customers";
 
 export type MariTicketFilterMode = "handler" | "customer";
 
-/** Verlauf: newest = aktuellste Nachricht oben */
 export type MariTimelineSort = "newest" | "oldest";
+
+/** Meta-Zeile in der Ticketliste (Stundenbuchung-relevant). */
+export type MariListMetaField =
+  | "kunde"
+  | "projekt"
+  | "vertrag"
+  | "aktivitaet"
+  | "seit"
+  | "geaendert";
+
+export const MARI_LIST_META_FIELD_OPTIONS: {
+  id: MariListMetaField;
+  label: string;
+  hint: string;
+}[] = [
+  {
+    id: "kunde",
+    label: "Kunde",
+    hint: "Matchcode / CardCode",
+  },
+  {
+    id: "projekt",
+    label: "Projekt",
+    hint: "Projektnummer für Zeitbuchung",
+  },
+  {
+    id: "vertrag",
+    label: "Vertrag",
+    hint: "Vertragsnummer oder -ID",
+  },
+  {
+    id: "aktivitaet",
+    label: "Aktivität",
+    hint: "Ticket-Betreff → Vorbelegung Aktivität",
+  },
+  {
+    id: "seit",
+    label: "Seit",
+    hint: "Anfragedatum",
+  },
+  {
+    id: "geaendert",
+    label: "Geändert",
+    hint: "Letzte Änderung",
+  },
+];
+
+export const DEFAULT_MARI_LIST_META_FIELDS: MariListMetaField[] = [
+  "kunde",
+  "projekt",
+  "vertrag",
+  "aktivitaet",
+];
 
 export type MariTicketFilterCustomer = {
   cardCode: string;
@@ -18,6 +70,7 @@ export type MariTicketFilterPrefs = {
   filterMode: MariTicketFilterMode;
   customers: MariTicketFilterCustomer[];
   timelineSort: MariTimelineSort;
+  listMetaFields: MariListMetaField[];
 };
 
 const KEY_PREFIX = "mari_ticket_filter_prefs:";
@@ -47,6 +100,24 @@ function sanitizeFilterMode(raw: unknown): MariTicketFilterMode | null {
 function sanitizeTimelineSort(raw: unknown): MariTimelineSort | null {
   if (raw === "newest" || raw === "oldest") return raw;
   return null;
+}
+
+const LIST_META_ALLOWED = new Set<MariListMetaField>(
+  MARI_LIST_META_FIELD_OPTIONS.map((o) => o.id)
+);
+
+function sanitizeListMetaFields(raw: unknown): MariListMetaField[] | null {
+  if (!Array.isArray(raw)) return null;
+  const out: MariListMetaField[] = [];
+  const seen = new Set<MariListMetaField>();
+  for (const v of raw) {
+    if (typeof v !== "string") continue;
+    const id = v as MariListMetaField;
+    if (!LIST_META_ALLOWED.has(id) || seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+  }
+  return out;
 }
 
 function sanitizeCustomers(raw: unknown): MariTicketFilterCustomer[] | null {
@@ -79,6 +150,7 @@ export function defaultMariTicketFilterPrefs(): MariTicketFilterPrefs {
     customers: [],
     /** Matches previous Maringo order (CreateDate ascending). */
     timelineSort: "oldest",
+    listMetaFields: [...DEFAULT_MARI_LIST_META_FIELDS],
   };
 }
 
@@ -96,6 +168,7 @@ export function getMariTicketFilterPrefs(
       customers?: unknown;
       cardCodes?: unknown;
       timelineSort?: unknown;
+      listMetaFields?: unknown;
     };
     const statuses = sanitizeStatuses(parsed.statuses) || defaults.statuses;
     let customers = sanitizeCustomers(parsed.customers);
@@ -113,6 +186,9 @@ export function getMariTicketFilterPrefs(
       customers: customers ?? defaults.customers,
       timelineSort:
         sanitizeTimelineSort(parsed.timelineSort) || defaults.timelineSort,
+      listMetaFields:
+        sanitizeListMetaFields(parsed.listMetaFields) ??
+        defaults.listMetaFields,
     };
   } catch {
     return defaults;
@@ -127,6 +203,7 @@ export function saveMariTicketFilterPrefs(
     filterMode?: unknown;
     customers?: unknown;
     timelineSort?: unknown;
+    listMetaFields?: unknown;
   }
 ): MariTicketFilterPrefs {
   const current = getMariTicketFilterPrefs(ownerKey);
@@ -150,12 +227,17 @@ export function saveMariTicketFilterPrefs(
     input.timelineSort !== undefined
       ? sanitizeTimelineSort(input.timelineSort) || current.timelineSort
       : current.timelineSort;
+  const listMetaFields =
+    input.listMetaFields !== undefined
+      ? sanitizeListMetaFields(input.listMetaFields) ?? current.listMetaFields
+      : current.listMetaFields;
   const next: MariTicketFilterPrefs = {
     statuses,
     overdueOnly,
     filterMode,
     customers,
     timelineSort,
+    listMetaFields,
   };
   setSetting(settingKey(ownerKey), JSON.stringify(next));
   return next;
