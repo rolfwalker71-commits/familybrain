@@ -50,8 +50,15 @@ import type {
   OverviewPeriod,
 } from "@/lib/dashboard/overview";
 import type { MailListItem } from "@/lib/mail/gmail";
-import { statusChipClass } from "@/lib/mari/status";
+import { statusAsideKpiClass } from "@/lib/mari/status";
 import type { LucideIcon } from "lucide-react";
+
+/** Aside widgets: thicker/darker border + soft 3D. */
+const ASIDE_WIDGET_CLASS =
+  "border-2 border-slate-400/90 bg-card shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_3px_0_0_rgb(148_163_184),0_8px_18px_rgba(15,23,42,0.12)]";
+
+const ASIDE_KPI_3D =
+  "border-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_2px_0_0_rgba(15,23,42,0.14),0_4px_8px_rgba(15,23,42,0.12)]";
 
 function zurichTodayIso(): string {
   return new Intl.DateTimeFormat("en-CA", {
@@ -299,7 +306,12 @@ function HomeWeatherWidget({ weather }: { weather: HomeWeatherCard }) {
   const week = weather.week ?? [];
 
   return (
-    <div className="w-full min-w-0 rounded-2xl border border-white/70 bg-white/95 px-3.5 py-3 shadow-[0_8px_30px_rgba(15,23,42,0.08)] backdrop-blur-sm sm:max-w-md sm:px-4 sm:py-3.5">
+    <div
+      className={cn(
+        "w-full min-w-0 rounded-2xl px-3.5 py-3 sm:max-w-md sm:px-4 sm:py-3.5",
+        ASIDE_WIDGET_CLASS
+      )}
+    >
       <div className="flex items-start gap-3">
         <div className="flex shrink-0 flex-col items-center pt-0.5">
           <span className="text-[2.25rem] leading-none" aria-hidden>
@@ -400,7 +412,10 @@ function DriveAsideCard({ data }: { data: OverviewPayload }) {
   return (
     <Link
       href="/account"
-      className="flex items-center gap-3 rounded-2xl border border-border/60 bg-card px-3.5 py-3 shadow-[0_4px_18px_rgba(15,23,42,0.05)] transition-colors hover:bg-muted/30"
+      className={cn(
+        "flex items-center gap-3 rounded-2xl px-3.5 py-3 transition-colors hover:bg-muted/30",
+        ASIDE_WIDGET_CLASS
+      )}
     >
       <GoogleDriveLogo className="size-5" />
       <div className="min-w-0 flex-1">
@@ -610,7 +625,7 @@ function BirthdaysAsideCard({
   if (items.length === 0) return null;
 
   return (
-    <Card className="border-border/60 shadow-[0_4px_18px_rgba(15,23,42,0.05)]">
+    <Card className={ASIDE_WIDGET_CLASS}>
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2 text-[16px] font-black">
           <Cake
@@ -704,9 +719,11 @@ function MariTicketsAsideCard({
 }) {
   if (!data.configured) return null;
   const pollLabel = formatPollAt(data.lastPollAt);
+  const statusCounts = data.countsByStatus.filter((c) => c.count > 0);
+  const recentChanges = data.recentChanges.slice(0, 2);
 
   return (
-    <Card className="border-border/60 shadow-[0_4px_18px_rgba(15,23,42,0.05)]">
+    <Card className={ASIDE_WIDGET_CLASS}>
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2 text-[16px] font-black">
           <Ticket
@@ -724,28 +741,32 @@ function MariTicketsAsideCard({
         ) : null}
       </CardHeader>
       <CardContent className="space-y-3">
-        {data.countsByStatus.length > 0 || data.total > 0 ? (
-          <div className="flex items-start gap-3">
-            <div className="flex min-w-[4.5rem] shrink-0 flex-col items-start leading-none">
-              <span className="text-[2.75rem] font-black tabular-nums tracking-tight text-foreground">
+        {statusCounts.length > 0 || data.total > 0 ? (
+          <div className="flex items-start gap-2.5">
+            <div className="flex min-w-[3.25rem] shrink-0 flex-col items-start leading-none">
+              <span className="text-[2.25rem] font-black tabular-nums tracking-tight text-foreground">
                 {data.total}
               </span>
+              <span className="mt-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                gesamt
+              </span>
             </div>
-            {data.countsByStatus.length > 0 ? (
-              <ul className="grid min-w-0 flex-1 grid-cols-2 gap-2 pt-0.5">
-                {data.countsByStatus.map((c) => (
+            {statusCounts.length > 0 ? (
+              <ul className="grid min-w-0 flex-1 grid-cols-2 gap-1.5 pt-0.5">
+                {statusCounts.map((c) => (
                   <li
                     key={c.statusId}
                     className={cn(
-                      "min-w-0 rounded-lg border px-2 py-1.5",
-                      statusChipClass(c.statusId)
+                      "flex min-w-0 items-center justify-between gap-1.5 rounded-md px-1.5 py-1",
+                      statusAsideKpiClass(c.statusId),
+                      ASIDE_KPI_3D
                     )}
                     title={`${c.label}: ${c.count}`}
                   >
-                    <p className="truncate text-[11px] leading-tight opacity-90">
+                    <p className="min-w-0 truncate text-[10px] font-medium leading-tight opacity-90">
                       {c.label}
                     </p>
-                    <p className="mt-1 text-[20px] font-bold tabular-nums leading-none">
+                    <p className="shrink-0 text-[15px] font-bold tabular-nums leading-none">
                       {c.count}
                     </p>
                   </li>
@@ -761,13 +782,13 @@ function MariTicketsAsideCard({
           </p>
         )}
 
-        {data.recentChanges.length > 0 ? (
+        {recentChanges.length > 0 ? (
           <div>
             <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               Letzte Änderungen
             </p>
             <ul className="space-y-1.5">
-              {data.recentChanges.slice(0, 6).map((ch, i) => (
+              {recentChanges.map((ch, i) => (
                 <li
                   key={`${ch.issueId}-${ch.at}-${i}`}
                   className="min-w-0 text-[12px] leading-snug"
@@ -1717,7 +1738,7 @@ export function OverviewDashboard({
               ) : null}
 
               {data.referenceNotes && data.referenceNotes.length > 0 ? (
-                <Card className="border-border/60 shadow-[0_4px_18px_rgba(15,23,42,0.05)]">
+                <Card className={ASIDE_WIDGET_CLASS}>
                   <CardHeader className="pb-2">
                     <CardTitle className="flex items-center gap-2 text-[16px] font-black">
                       <StickyNote

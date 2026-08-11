@@ -69,6 +69,41 @@ export function statusChipClass(statusId: number): string {
   }
 }
 
+/** Dunklere Ränder für kompakte KPI-Chips in Aside-Widgets. */
+export function statusAsideKpiClass(statusId: number): string {
+  switch (statusId) {
+    case 11:
+      return "border-rose-400 bg-rose-50 text-rose-950";
+    case 1:
+      return "border-sky-400 bg-sky-50 text-sky-950";
+    case 3:
+      return "border-teal-500 bg-teal-50 text-teal-950";
+    case 13:
+      return "border-cyan-400 bg-cyan-50 text-cyan-950";
+    case 6:
+    case 9:
+      return "border-orange-400 bg-orange-50 text-orange-950";
+    case 7:
+    case 10:
+      return "border-violet-400 bg-violet-50 text-violet-950";
+    case 4:
+      return "border-amber-400 bg-amber-50 text-amber-950";
+    case 14:
+      return "border-red-400 bg-red-50 text-red-950";
+    case 2:
+    case 12:
+      return "border-slate-400 bg-muted/60 text-muted-foreground";
+    case 5:
+    case 8:
+      return "border-slate-400 bg-muted/40 text-muted-foreground";
+    case 15:
+    case 16:
+      return "border-slate-400 bg-slate-50 text-slate-900";
+    default:
+      return "border-slate-400 bg-muted/50 text-foreground";
+  }
+}
+
 export function isWorkStatusId(id: number): id is WorkStatusId {
   return (WORK_STATUS_IDS as readonly number[]).includes(id);
 }
