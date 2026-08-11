@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/dialog";
 import { MicrosoftMailComposeDialog } from "@/components/microsoft/microsoft-mail-compose-dialog";
 import { MicrosoftMailQuickActions } from "@/components/microsoft/microsoft-mail-quick-actions";
+import { MailHtmlBody } from "@/components/mail/mail-html-body";
 import { cn } from "@/lib/utils";
 import { APP_ICON_STROKE } from "@/lib/branding/app-icons";
 import type { MailListFilter, MailListItem, MailMessageDetail } from "@/lib/mail/gmail";
@@ -649,9 +650,10 @@ export function MicrosoftMailInboxPanel({
                     </li>
                   </ul>
                 ) : null}
-                <pre className="max-h-52 overflow-y-auto overflow-x-hidden whitespace-pre-wrap break-words rounded-lg bg-muted/50 p-3 font-sans text-xs leading-relaxed">
-                  {detail.bodyText || detail.snippet || "(kein Text)"}
-                </pre>
+                <MailHtmlBody
+                  html={detail.bodyHtml}
+                  plainFallback={detail.bodyText || detail.snippet}
+                />
                 {analysis ? (
                   <div className="space-y-3 rounded-xl border border-border/70 bg-muted/20 p-3">
                     <p className="text-sm text-muted-foreground">

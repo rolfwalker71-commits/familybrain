@@ -27,6 +27,7 @@ import type { MailListFilter, MailListItem, MailMessageDetail } from "@/lib/mail
 import type { MailAnalysis, MailSuggestion } from "@/lib/mail/mail-action-schema";
 import type { MailAnalysisChip } from "@/lib/mail/mail-heuristic";
 import { formatMailSuggestionDetail } from "@/lib/mail/format-suggestion";
+import { MailHtmlBody } from "@/components/mail/mail-html-body";
 import { MailTriagePanel } from "@/components/mail/mail-triage-panel";
 
 const FILTERS: { id: MailListFilter; label: string }[] = [
@@ -803,16 +804,10 @@ export function GoogleMailInboxPanel({
                   </div>
                 ) : null}
 
-                {detail.bodyHtml ? (
-                  <div
-                    className="prose prose-sm max-w-none break-words dark:prose-invert"
-                    dangerouslySetInnerHTML={{ __html: detail.bodyHtml }}
-                  />
-                ) : (
-                  <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
-                    {detail.bodyText || detail.snippet || "Kein Text."}
-                  </pre>
-                )}
+                <MailHtmlBody
+                  html={detail.bodyHtml}
+                  plainFallback={detail.bodyText || detail.snippet || "Kein Text."}
+                />
               </div>
             ) : null}
           </div>

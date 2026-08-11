@@ -71,7 +71,7 @@ function mapToDetail(m: GraphMessage): MailMessageDetail | null {
     ...base,
     to: to || null,
     bodyText: bodyText.slice(0, 12_000) || null,
-    bodyHtml: isHtml ? rawBody.slice(0, 50_000) : null,
+    bodyHtml: isHtml ? rawBody.slice(0, 80_000) : null,
   };
 }
 
@@ -169,12 +169,24 @@ export async function getMicrosoftMessage(
   userId: number,
   messageId: string
 ): Promise<MailMessageDetail> {
+  // Prefer HTML for display; fall back to text-only if tenant ignores Prefer.
   const m = await graphJson<GraphMessage>(
     userId,
     `/me/messages/${encodeURIComponent(messageId)}?$select=id,subject,bodyPreview,body,from,toRecipients,receivedDateTime,conversationId,isRead`,
-    { headers: { Prefer: 'outlook.body-content-type="text"' } }
+    { headers: { Prefer: 'outlook.body-content-type="html"' } }
   );
-  const detail = mapToDetail(m);
+  let detail = mapToDetail(m);
   if (!detail) throw new Error("Outlook-Nachricht nicht gefunden.");
+
+  // Some responses still come as text — keep usable bodyText via stripHtml when HTML.
+  if (!detail.bodyHtml && detail.bodyText) {
+    return detail;
+  }
+  if (detail.bodyHtml && !detail.bodyText) {
+    detail = {
+      ...detail,
+      bodyText: stripHtml(detail.bodyHtml).slice(0, 12_000) || null,
+    };
+  }
   return detail;
 }

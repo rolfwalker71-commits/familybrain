@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { MicrosoftMailComposeDialog } from "@/components/microsoft/microsoft-mail-compose-dialog";
 import { MicrosoftMailQuickActions } from "@/components/microsoft/microsoft-mail-quick-actions";
+import { MailHtmlBody } from "@/components/mail/mail-html-body";
 import { cn } from "@/lib/utils";
 import type { MsMailItem } from "@/lib/microsoft/mail-day";
 import type { MailMessageDetail } from "@/lib/mail/gmail";
@@ -373,16 +374,10 @@ export function MailChronikList({
                     An: {detail.to}
                   </p>
                 ) : null}
-                {detail.bodyHtml ? (
-                  <div
-                    className="prose prose-sm max-w-none break-words text-sm leading-relaxed [&_a]:underline [&_img]:max-w-full"
-                    dangerouslySetInnerHTML={{ __html: detail.bodyHtml }}
-                  />
-                ) : (
-                  <pre className="whitespace-pre-wrap break-words rounded-lg bg-muted/50 p-3 font-sans text-sm leading-relaxed">
-                    {detail.bodyText || detail.snippet || "(kein Text)"}
-                  </pre>
-                )}
+                <MailHtmlBody
+                  html={detail.bodyHtml}
+                  plainFallback={detail.bodyText || detail.snippet}
+                />
               </div>
             ) : null}
           </div>
