@@ -4,7 +4,9 @@ import { ensureInitialized } from "@/lib/db/migrations";
 import { isAuthError, requireModule } from "@/lib/auth/current-user";
 import { MariApiError } from "@/lib/mari/client";
 import { hasMariConfig } from "@/lib/mari/config";
+import { getPrimaryMariCalendarStampForIssue } from "@/lib/mari/calendar-stamp";
 import { getTicketDetail, patchTicketFields } from "@/lib/mari/tickets";
+import { zurichNowParts } from "@/lib/dashboard/day-briefing";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,7 +38,11 @@ export async function GET(_request: Request, context: Ctx) {
 
   try {
     const ticket = await getTicketDetail(id);
-    return NextResponse.json({ ticket });
+    const calendarStamp = getPrimaryMariCalendarStampForIssue(
+      id,
+      zurichNowParts().todayIso
+    );
+    return NextResponse.json({ ticket, calendarStamp });
   } catch (err) {
     const message =
       err instanceof MariApiError

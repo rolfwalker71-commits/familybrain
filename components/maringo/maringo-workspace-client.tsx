@@ -110,6 +110,7 @@ import { MaringoTimeBookDialog } from "@/components/maringo/maringo-time-book-di
 import { MaringoTicketKopfForm } from "@/components/maringo/maringo-ticket-kopf-form";
 import type { TimeBookFormDefaults } from "@/components/maringo/maringo-time-book-form";
 import { AdhocEventDialog } from "@/components/calendar/adhoc-event-dialog";
+import type { MariCalendarStamp } from "@/lib/mari/calendar-stamp";
 import {
   MaringoTimeSuggestionsPanel,
   suggestionToBookDefaults,
@@ -398,6 +399,27 @@ function formatDayMonth(iso: string | null | undefined): string | null {
   return swiss;
 }
 
+function formatStampWhen(stamp: {
+  eventDate: string;
+  startHm: string | null;
+}): string {
+  const day =
+    formatDayMonth(stamp.eventDate) ||
+    formatDateShort(stamp.eventDate) ||
+    stamp.eventDate;
+  const hm = stamp.startHm?.slice(0, 5) || null;
+  return hm ? `${day} ${hm}` : day;
+}
+
+function zurichTodayYmd(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Zurich",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
 function primaryContact(raw: string | null | undefined): string | null {
   if (!raw?.trim()) return null;
   return raw.split(";")[0]?.trim() || null;
@@ -668,6 +690,8 @@ export function MaringoWorkspaceClient() {
   const [editBookDefaults, setEditBookDefaults] =
     useState<TimeBookFormDefaults | null>(null);
   const [ticketCalendarOpen, setTicketCalendarOpen] = useState(false);
+  const [ticketCalendarStamp, setTicketCalendarStamp] =
+    useState<MariCalendarStamp | null>(null);
   const [pendingStampBook, setPendingStampBook] =
     useState<MariTimeSuggestion | null>(null);
   const [suggestionsRefresh, setSuggestionsRefresh] = useState(0);
@@ -871,14 +895,40 @@ export function MaringoWorkspaceClient() {
     setManualNoteDraft("");
     setManualNoteHint(null);
     setPostingManualNote(false);
+    setTicketCalendarStamp(null);
     setError(null);
     try {
       const res = await fetch(`/api/maringo/tickets/${id}`);
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Detail fehlgeschlagen");
-      setDetail(data.ticket as MariTicketDetail);
-      const due = (data.ticket as MariTicketDetail)?.dueDate;
-      setDueDraft(due ? due.slice(0, 10) : "");
+      const ticket = data.ticket as MariTicketDetail;
+      setDetail(ticket);
+      setTicketCalendarStamp(
+        data.calendarStamp && typeof data.calendarStamp === "object"
+          ? (data.calendarStamp as MariCalendarStamp)
+          : null
+      );
+      const due = ticket?.dueDate;
+      if (due) {
+        setDueDraft(due.slice(0, 10));
+      } else {
+        const today = zurichTodayYmd();
+        setDueDraft(today);
+        try {
+          const patchRes = await fetch(`/api/maringo/tickets/${id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ dueDate: today }),
+          });
+          const patchData = await patchRes.json().catch(() => ({}));
+          if (patchRes.ok && patchData.ticket) {
+            setDetail(patchData.ticket as MariTicketDetail);
+            void loadList();
+          }
+        } catch {
+          /* Stichtag-Vorbelegung optional */
+        }
+      }
 
       const storedRes = await fetch(`/api/maringo/tickets/${id}/analyze`);
       const storedData = await storedRes.json().catch(() => ({}));
@@ -910,10 +960,11 @@ export function MaringoWorkspaceClient() {
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setDetail(null);
+      setTicketCalendarStamp(null);
     } finally {
       setDetailLoading(false);
     }
-  }, []);
+  }, [loadList]);
 
   const loadTicketTimeLines = useCallback(async (id: number) => {
     setTicketTimeLoading(true);
@@ -2425,11 +2476,21 @@ export function MaringoWorkspaceClient() {
                             type="button"
                             size="sm"
                             variant="outline"
-                            title="Termin aus Ticket — Slot suchen und anlegen"
+                            title={
+                              ticketCalendarStamp
+                                ? `Termin eingeplant · ${formatStampWhen(ticketCalendarStamp)} — erneut öffnen für weiteren Termin`
+                                : "Termin aus Ticket — Slot suchen und anlegen"
+                            }
                             onClick={() => setTicketCalendarOpen(true)}
+                            className={cn(
+                              ticketCalendarStamp &&
+                                "border-emerald-300 bg-emerald-50 text-emerald-950 hover:bg-emerald-100 hover:text-emerald-950"
+                            )}
                           >
                             <CalendarPlus className="size-3.5" />
-                            Termin
+                            {ticketCalendarStamp
+                              ? `Termin eingeplant (${formatStampWhen(ticketCalendarStamp)})`
+                              : "Termin"}
                           </Button>
                           <Button
                             type="button"
@@ -3083,6 +3144,24 @@ export function MaringoWorkspaceClient() {
         open={ticketCalendarOpen}
         onOpenChange={setTicketCalendarOpen}
         mariIssueId={detail?.issueId ?? null}
+        onCreated={() => {
+          const id = detail?.issueId;
+          if (id == null) return;
+          void (async () => {
+            try {
+              const res = await fetch(`/api/maringo/tickets/${id}`);
+              const data = await res.json().catch(() => ({}));
+              if (!res.ok) return;
+              setTicketCalendarStamp(
+                data.calendarStamp && typeof data.calendarStamp === "object"
+                  ? (data.calendarStamp as MariCalendarStamp)
+                  : null
+              );
+            } catch {
+              /* optional */
+            }
+          })();
+        }}
         initialTitle={
           detail
             ? `#${detail.issueId} · ${detail.briefDescription}`.slice(0, 200)

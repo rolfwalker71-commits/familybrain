@@ -212,6 +212,41 @@ export function listPendingMariCalendarStamps(opts?: {
   return rows.map(mapStampRow);
 }
 
+/** Active (pending/booked) stamps for a ticket, newest event first. */
+export function listMariCalendarStampsForIssue(
+  issueId: number
+): MariCalendarStamp[] {
+  if (!Number.isInteger(issueId) || issueId <= 0) return [];
+  ensureMariCalendarStampsTable();
+  const rows = getDb()
+    .prepare(
+      `SELECT * FROM mari_calendar_stamps
+       WHERE issue_id = ? AND status IN ('pending', 'booked')
+       ORDER BY event_date DESC, start_hm DESC, created_at DESC`
+    )
+    .all(issueId) as Array<Record<string, unknown>>;
+  return rows.map(mapStampRow);
+}
+
+/**
+ * Prefer the next upcoming stamp for a ticket; otherwise the latest past one.
+ */
+export function getPrimaryMariCalendarStampForIssue(
+  issueId: number,
+  todayYmd: string
+): MariCalendarStamp | null {
+  const stamps = listMariCalendarStampsForIssue(issueId);
+  if (stamps.length === 0) return null;
+  const upcoming = stamps
+    .filter((s) => s.eventDate >= todayYmd)
+    .sort((a, b) => {
+      const d = a.eventDate.localeCompare(b.eventDate);
+      if (d !== 0) return d;
+      return (a.startHm || "").localeCompare(b.startHm || "");
+    });
+  return upcoming[0] || stamps[0] || null;
+}
+
 export function updateMariCalendarStampStatus(input: {
   eventProvider: "microsoft" | "google";
   eventId: string;
