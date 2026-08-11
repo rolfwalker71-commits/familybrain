@@ -8,6 +8,8 @@ export type CreateOutlookEventInput = {
   allDay?: boolean;
   location?: string | null;
   notes?: string | null;
+  /** Outlook categories (e.g. Buddy/Maringo). */
+  categories?: string[] | null;
 };
 
 export type CreatedOutlookEvent = {
@@ -21,6 +23,8 @@ export async function createOutlookCalendarEvent(
   input: CreateOutlookEventInput
 ): Promise<CreatedOutlookEvent> {
   const allDay = input.allDay || !input.startTime;
+  const categories =
+    input.categories?.map((c) => c.trim()).filter(Boolean) || undefined;
   let body: Record<string, unknown>;
   if (allDay) {
     const endDate = (() => {
@@ -37,6 +41,7 @@ export async function createOutlookCalendarEvent(
       body: input.notes
         ? { contentType: "Text", content: input.notes }
         : undefined,
+      categories,
     };
   } else {
     const startHm = input.startTime || "09:00";
@@ -62,6 +67,7 @@ export async function createOutlookCalendarEvent(
       body: input.notes
         ? { contentType: "Text", content: input.notes }
         : undefined,
+      categories,
     };
   }
 

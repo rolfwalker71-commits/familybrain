@@ -3,11 +3,18 @@ import { z } from "zod";
 import { isAuthError, requireAuth } from "@/lib/auth/current-user";
 import { ensureInitialized } from "@/lib/db/migrations";
 import { findRolfAppUserId } from "@/lib/calendar/ics-calendars";
+import { createGoogleCalendarEvent } from "@/lib/google/calendar-write";
 import { suggestGoogleFreeSlotsForDuration } from "@/lib/google/calendar-review";
 import {
   hasGoogleCalendarEventsWriteScope,
   hasGoogleCalendarScope,
 } from "@/lib/google/oauth";
+import {
+  appendMariBodyMarker,
+  mariGooglePrivateProps,
+  mariOutlookCategories,
+  upsertMariCalendarStamp,
+} from "@/lib/mari/calendar-stamp";
 import {
   hasMicrosoftCalendarScope,
   isMicrosoftConnected,
@@ -33,7 +40,10 @@ const BodySchema = z.discriminatedUnion("action", [
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     startHm: z.string().regex(/^\d{2}:\d{2}$/),
     endHm: z.string().regex(/^\d{2}:\d{2}$/),
-    notes: z.string().trim().max(2000).optional().nullable(),
+    notes: z.string().trim().max(4000).optional().nullable(),
+    /** Stamp event as originating from this Maringo ticket. */
+    mariIssueId: z.number().int().positive().optional().nullable(),
+    provider: z.enum(["microsoft", "google", "auto"]).optional(),
   }),
 ]);
 
@@ -51,6 +61,7 @@ export async function POST(request: Request) {
     isMicrosoftConnected(userId) && hasMicrosoftCalendarScope(userId);
   const googleOk =
     hasGoogleCalendarScope(userId) || hasGoogleCalendarEventsWriteScope(userId);
+  const googleWriteOk = hasGoogleCalendarEventsWriteScope(userId);
 
   let body: z.infer<typeof BodySchema>;
   try {
@@ -116,27 +127,105 @@ export async function POST(request: Request) {
       });
     }
 
-    if (!msOk) {
+    const prefer = body.provider || "auto";
+    const useMs =
+      prefer === "google"
+        ? false
+        : prefer === "microsoft"
+          ? true
+          : msOk
+            ? true
+            : googleWriteOk;
+    const mariIssueId =
+      body.mariIssueId != null && body.mariIssueId > 0
+        ? body.mariIssueId
+        : null;
+    const rawNotes = body.notes?.trim() || null;
+    const notes = mariIssueId
+      ? appendMariBodyMarker(rawNotes, mariIssueId)
+      : rawNotes;
+
+    if (useMs) {
+      if (!msOk) {
+        return NextResponse.json(
+          {
+            error:
+              "Outlook-Kalender nicht verbunden. Bitte Microsoft verbinden oder Google wählen.",
+          },
+          { status: 400 }
+        );
+      }
+      const created = await createOutlookCalendarEvent(userId, {
+        title: body.title,
+        date: body.date,
+        startTime: body.startHm,
+        endTime: body.endHm,
+        notes,
+        categories: mariIssueId ? mariOutlookCategories(mariIssueId) : null,
+      });
+      if (mariIssueId) {
+        upsertMariCalendarStamp({
+          eventProvider: "microsoft",
+          eventId: created.id,
+          issueId: mariIssueId,
+          eventDate: body.date,
+          startHm: body.startHm,
+          endHm: body.endHm,
+          title: body.title,
+          memo: rawNotes,
+        });
+      }
+      return NextResponse.json({
+        ok: true,
+        provider: "microsoft",
+        event: created,
+        mariIssueId,
+      });
+    }
+
+    if (!googleWriteOk) {
       return NextResponse.json(
         {
           error:
-            "Ad-hoc Anlegen läuft über Outlook. Bitte Microsoft-Kalender verbinden — oder Termin über Tagesanalyse übernehmen.",
+            "Kein Kalender zum Anlegen verfügbar. Microsoft oder Google (mit Schreibrecht) verbinden.",
         },
         { status: 400 }
       );
     }
 
-    const created = await createOutlookCalendarEvent(userId, {
-      title: body.title,
-      date: body.date,
-      startTime: body.startHm,
-      endTime: body.endHm,
-      notes: body.notes?.trim() || null,
-    });
+    const created = await createGoogleCalendarEvent(
+      userId,
+      {
+        calendarId: "primary",
+        title: body.title,
+        description: notes,
+        startDate: body.date,
+        startTime: body.startHm,
+        endTime: body.endHm,
+        privateProps: mariIssueId
+          ? mariGooglePrivateProps(mariIssueId)
+          : null,
+      },
+      request
+    );
+    if (mariIssueId) {
+      upsertMariCalendarStamp({
+        eventProvider: "google",
+        eventId: created.id,
+        calendarId: created.calendarId,
+        issueId: mariIssueId,
+        eventDate: body.date,
+        startHm: body.startHm,
+        endHm: body.endHm,
+        title: body.title,
+        memo: rawNotes,
+      });
+    }
     return NextResponse.json({
       ok: true,
-      provider: "microsoft",
+      provider: "google",
       event: created,
+      mariIssueId,
     });
   } catch (error) {
     return NextResponse.json(

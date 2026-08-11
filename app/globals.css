@@ -90,14 +90,14 @@
   --brand-settings-soft: #e2e8f0;
   --brand-sync: #3f6b52;
   --brand-sync-soft: #d9e4d1;
-  /* Lighter slate-teal — charcoal logo layers need clear separation from the rail */
-  --sidebar: #3f5568;
-  --sidebar-foreground: #eef3f6;
+  /* Light slate rail — dark brand marks (Buddy charcoal, Maringo navy) read without white chips */
+  --sidebar: #d6dbe3;
+  --sidebar-foreground: #1e293b;
   --sidebar-primary: #e86a2b;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #4d6578;
-  --sidebar-accent-foreground: #f8fafc;
-  --sidebar-border: #5a7386;
+  --sidebar-accent: #c2cad5;
+  --sidebar-accent-foreground: #0f172a;
+  --sidebar-border: #b0b9c6;
   --sidebar-ring: #e86a2b;
 }
 

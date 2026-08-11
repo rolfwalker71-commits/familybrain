@@ -16,6 +16,8 @@ export type CreateGoogleEventInput = {
   endDate?: string | null;
   endTime?: string | null;
   allDay?: boolean;
+  /** Private extended properties (Buddy stamps). */
+  privateProps?: Record<string, string> | null;
 };
 
 export type CreatedGoogleEvent = {
@@ -55,7 +57,15 @@ export async function createGoogleCalendarEvent(
   const auth = await getAuthedGoogleClient(userId, request);
   const calendar = google.calendar({ version: "v3", auth });
 
-  const requestBody = allDay
+  const privateProps = input.privateProps
+    ? Object.fromEntries(
+        Object.entries(input.privateProps).filter(
+          ([, v]) => typeof v === "string" && v.trim()
+        )
+      )
+    : null;
+
+  const requestBody: Record<string, unknown> = allDay
     ? {
         summary: title,
         description: input.description?.trim() || undefined,
@@ -76,6 +86,10 @@ export async function createGoogleCalendarEvent(
           timeZone: "Europe/Zurich",
         },
       };
+
+  if (privateProps && Object.keys(privateProps).length) {
+    requestBody.extendedProperties = { private: privateProps };
+  }
 
   // If timed and end <= start, bump end by 1 hour via dateTime on same day + 1h
   if (!allDay && input.startTime) {

@@ -30,7 +30,7 @@ export type DayCloseRitualStatus = {
 
 function ritualSubtitle(status?: DayCloseRitualStatus | null): string {
   const bits: string[] = [
-    "Termine prüfen · Tagesanalysen (Google / Microsoft)",
+    "Termine prüfen · Tagesanalysen · Ticket-Stunden",
   ];
   if (status) {
     if (status.calendarOpen > 0) {
@@ -70,7 +70,7 @@ export function buildDayCloseRitualItem(
     amount: null,
     currency: null,
     documentId: null,
-    href: "/google?tab=calendar",
+    href: "/maringo?tab=hours",
     badge: "Ritual",
     time: DAY_CLOSE_TIME,
     endTime: DAY_CLOSE_END_TIME,
@@ -82,7 +82,8 @@ export function buildDayCloseRitualItem(
     description:
       "Virtueller Buddy-Termin (nicht im Google-/Outlook-Kalender).\n" +
       "1) Offene Termine erledigen, verschieben oder bestätigen\n" +
-      "2) Gmail- und Outlook-Tagesanalyse laufen lassen",
+      "2) Gmail- und Outlook-Tagesanalyse laufen lassen\n" +
+      "3) Stunden aus Ticket-Terminen prüfen und buchen (Maringo → Stunden)",
   };
 }
 

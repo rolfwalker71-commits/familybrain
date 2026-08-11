@@ -321,8 +321,8 @@ function NavLinkRow({
           ? "justify-center px-2 py-2"
           : "gap-2.5 px-2.5 py-1.5",
         active
-          ? "bg-white/15 text-white"
-          : "text-sidebar-foreground/90 hover:bg-sidebar-accent hover:text-white"
+          ? "bg-black/10 text-sidebar-foreground"
+          : "text-sidebar-foreground/90 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
       )}
     >
       {item.logo ? (
@@ -358,7 +358,7 @@ function NavLinkRow({
                       ? "bg-red-500 text-white"
                       : item.pendingStyle && isRunning
                         ? "bg-amber-500 text-white"
-                        : "bg-white/15 text-white"
+                        : "bg-black/10 text-sidebar-foreground"
                 )
           )}
           title={
@@ -487,7 +487,7 @@ export function Sidebar({
             collapsed ? "Navigation ausklappen" : "Navigation einklappen"
           }
           className={cn(
-            "absolute z-10 flex size-8 items-center justify-center rounded-lg text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-white",
+            "absolute z-10 flex size-8 items-center justify-center rounded-lg text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
             collapsed ? "top-3 right-2.5" : "top-3.5 right-3.5"
           )}
         >
@@ -536,7 +536,7 @@ export function Sidebar({
             />
           </span>
           {!collapsed ? (
-            <span className="text-3xl font-extrabold leading-none tracking-tight text-white">
+            <span className="text-3xl font-extrabold leading-none tracking-tight text-sidebar-foreground">
               {brandTitle}
             </span>
           ) : null}
@@ -544,7 +544,7 @@ export function Sidebar({
         {me ? (
           <div
             className={cn(
-              "mt-4 flex items-center rounded-xl bg-white/10 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1)]",
+              "mt-4 flex items-center rounded-xl bg-black/5 shadow-[inset_0_0_0_1px_rgba(15,23,42,0.08)]",
               collapsed
                 ? "justify-center px-1.5 py-2"
                 : "gap-2.5 px-3 py-2.5"
@@ -555,7 +555,7 @@ export function Sidebar({
               name={me.displayName}
               src={me.avatarUrl}
               size={collapsed ? "sm" : "md"}
-              className="ring-white/30"
+              className="ring-slate-400/40"
             />
             {!collapsed ? (
               <div className="min-w-0 flex-1">
@@ -563,7 +563,7 @@ export function Sidebar({
                   Angemeldet als:
                 </p>
                 <p
-                  className="mt-1.5 truncate text-sm font-semibold tracking-tight text-white"
+                  className="mt-1.5 truncate text-sm font-semibold tracking-tight text-sidebar-foreground"
                   title={me.displayName}
                 >
                   {me.displayName}
@@ -583,7 +583,7 @@ export function Sidebar({
             onClick={handleGoHome}
             title={`Zurück zu ${BRAND.app}`}
             className={cn(
-              "flex w-full items-center rounded-lg text-xs font-semibold text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-white",
+              "flex w-full items-center rounded-lg text-xs font-semibold text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
               collapsed
                 ? "justify-center px-2 py-2"
                 : "gap-2 px-3 py-2"
@@ -594,7 +594,7 @@ export function Sidebar({
           </button>
           <div
             className={cn(
-              "rounded-xl bg-white/10 p-1",
+              "rounded-xl bg-black/5 p-1",
               collapsed ? "flex flex-col gap-1" : "grid grid-cols-3 gap-1"
             )}
           >
@@ -612,8 +612,8 @@ export function Sidebar({
                       ? "px-2 py-2"
                       : "flex-col gap-1 px-1 py-2 text-[10px] font-semibold leading-tight",
                     active
-                      ? "bg-white/20 text-white shadow-sm"
-                      : "text-sidebar-foreground/70 hover:bg-white/10 hover:text-white"
+                      ? "bg-black/10 text-sidebar-foreground shadow-sm"
+                      : "text-sidebar-foreground/70 hover:bg-black/5 hover:text-sidebar-accent-foreground"
                   )}
                 >
                   <entry.icon
@@ -652,7 +652,7 @@ export function Sidebar({
                 title={entry.label}
                 onClick={() => selectArea(entry)}
                 className={cn(
-                  "flex w-full rounded-xl bg-white/5 text-left transition-colors hover:bg-white/10",
+                  "flex w-full rounded-xl bg-black/[0.03] text-left transition-colors hover:bg-black/5",
                   collapsed
                     ? "items-center justify-center px-2 py-2.5"
                     : "items-start gap-3 px-3 py-3"
@@ -660,7 +660,7 @@ export function Sidebar({
               >
                 <entry.icon
                   className={cn(
-                    "shrink-0 text-white",
+                    "shrink-0 text-sidebar-foreground",
                     collapsed ? "size-5" : "mt-0.5 size-5"
                   )}
                   strokeWidth={APP_ICON_STROKE}
@@ -669,7 +669,7 @@ export function Sidebar({
                 />
                 {!collapsed ? (
                   <span className="min-w-0 flex-1">
-                    <span className="block text-[15px] font-semibold tracking-tight text-white">
+                    <span className="block text-[15px] font-semibold tracking-tight text-sidebar-foreground">
                       {entry.label}
                     </span>
                     <span className="mt-0.5 block text-xs text-sidebar-foreground/65">

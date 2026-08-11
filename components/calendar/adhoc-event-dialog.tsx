@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CalendarPlus, Loader2 } from "lucide-react";
 import {
   Dialog,
@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { APP_ICON_STROKE } from "@/lib/branding/app-icons";
 import {
   groupFreeSlotsByDate,
@@ -31,10 +32,23 @@ export function AdhocEventDialog({
   open,
   onOpenChange,
   onCreated,
+  initialTitle,
+  initialNotes,
+  mariIssueId,
+  dialogTitle,
+  dialogDescription,
+  defaultDurationMinutes = 60,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreated?: () => void;
+  /** Prefill when opening (e.g. from Maringo ticket). */
+  initialTitle?: string | null;
+  initialNotes?: string | null;
+  mariIssueId?: number | null;
+  dialogTitle?: string;
+  dialogDescription?: string;
+  defaultDurationMinutes?: number;
 }) {
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
@@ -43,16 +57,32 @@ export function AdhocEventDialog({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const [providerLabel, setProviderLabel] = useState<string | null>(null);
+
+  const isMari = mariIssueId != null && mariIssueId > 0;
 
   function reset() {
     setTitle("");
     setNotes("");
-    setDuration(60);
+    setDuration(defaultDurationMinutes);
     setSlots([]);
     setError(null);
     setMsg(null);
     setBusy(false);
+    setProviderLabel(null);
   }
+
+  useEffect(() => {
+    if (!open) return;
+    setTitle((initialTitle || "").trim());
+    setNotes((initialNotes || "").trim());
+    setDuration(defaultDurationMinutes);
+    setSlots([]);
+    setError(null);
+    setMsg(null);
+    setBusy(false);
+    setProviderLabel(null);
+  }, [open, initialTitle, initialNotes, defaultDurationMinutes, mariIssueId]);
 
   async function suggestSlots() {
     setBusy(true);
@@ -75,9 +105,16 @@ export function AdhocEventDialog({
       }
       const next = (data.slots || []) as FreeSlot[];
       setSlots(next);
+      const prov =
+        data.provider === "google"
+          ? "Google"
+          : data.provider === "microsoft"
+            ? "Outlook"
+            : null;
+      setProviderLabel(prov);
       setMsg(
         next.length
-          ? `${next.length} freie Slots (heute–+7 Tage, 08–18).`
+          ? `${next.length} freie Slots (heute–+7 Tage, 08–18)${prov ? ` · ${prov}` : ""}.`
           : "Keine freien Slots gefunden."
       );
     } catch (err) {
@@ -107,14 +144,21 @@ export function AdhocEventDialog({
           startHm: slot.startHm,
           endHm: slot.endHm,
           notes: notes.trim() || null,
+          mariIssueId: isMari ? mariIssueId : null,
         }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         throw new Error(data.error || "Termin anlegen fehlgeschlagen");
       }
+      const prov =
+        data.provider === "google"
+          ? "Google"
+          : data.provider === "microsoft"
+            ? "Outlook"
+            : "Kalender";
       setMsg(
-        `Eingetragen: ${trimmed} · ${slot.date} ${slot.startHm}–${slot.endHm}`
+        `Eingetragen (${prov}): ${trimmed} · ${slot.date} ${slot.startHm}–${slot.endHm}`
       );
       onCreated?.();
       onOpenChange(false);
@@ -143,10 +187,16 @@ export function AdhocEventDialog({
               absoluteStrokeWidth
               aria-hidden
             />
-            Ad-hoc einplanen
+            {dialogTitle ||
+              (isMari
+                ? `Termin · Ticket #${mariIssueId}`
+                : "Ad-hoc einplanen")}
           </DialogTitle>
           <DialogDescription>
-            Aufgabe als Outlook-Termin — Dauer wählen, freien Slot nehmen.
+            {dialogDescription ||
+              (isMari
+                ? "Freien Slot suchen und Termin anlegen — Stempel für Abend-Stundenbuchung."
+                : "Aufgabe als Kalender-Termin — Dauer wählen, freien Slot nehmen.")}
           </DialogDescription>
         </DialogHeader>
 
@@ -164,15 +214,30 @@ export function AdhocEventDialog({
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="adhoc-notes">Notiz (optional)</Label>
-            <Input
-              id="adhoc-notes"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Kurzbeschreibung"
-              maxLength={500}
-              disabled={busy}
-            />
+            <Label htmlFor="adhoc-notes">
+              {isMari ? "Beschreibung / Memo" : "Notiz (optional)"}
+            </Label>
+            {isMari ? (
+              <Textarea
+                id="adhoc-notes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Ticketzusammenfassung für den Termin"
+                maxLength={4000}
+                rows={5}
+                disabled={busy}
+                className="resize-y text-[13px]"
+              />
+            ) : (
+              <Input
+                id="adhoc-notes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Kurzbeschreibung"
+                maxLength={500}
+                disabled={busy}
+              />
+            )}
           </div>
 
           <div className="space-y-1.5">
@@ -213,7 +278,9 @@ export function AdhocEventDialog({
           {slots.length > 0 ? (
             <div className="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-2">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Slot wählen → Outlook ({duration} Min · 7 Tage)
+                Slot wählen
+                {providerLabel ? ` → ${providerLabel}` : ""} ({duration} Min · 7
+                Tage)
               </p>
               <div className="max-h-56 space-y-2.5 overflow-y-auto">
                 {groupFreeSlotsByDate(slots).map(({ date, slots: daySlots }) => (

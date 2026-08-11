@@ -9,11 +9,13 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   ArrowDownAZ,
   ArrowUpAZ,
   Check,
   Calendar,
+  CalendarPlus,
   ChevronDown,
   Clock3,
   Flag,
@@ -106,6 +108,12 @@ import { MaringoTimekeepingPanel } from "@/components/maringo/maringo-timekeepin
 import { MaringoTimeBookDialog } from "@/components/maringo/maringo-time-book-dialog";
 import { MaringoTicketKopfForm } from "@/components/maringo/maringo-ticket-kopf-form";
 import type { TimeBookFormDefaults } from "@/components/maringo/maringo-time-book-form";
+import { AdhocEventDialog } from "@/components/calendar/adhoc-event-dialog";
+import {
+  MaringoTimeSuggestionsPanel,
+  suggestionToBookDefaults,
+  type MariTimeSuggestion,
+} from "@/components/maringo/maringo-time-suggestions-panel";
 
 function ReplyLangToggle({
   lang,
@@ -589,6 +597,7 @@ function TimelineRow({
 }
 
 export function MaringoWorkspaceClient() {
+  const searchParams = useSearchParams();
   const [workspaceTab, setWorkspaceTab] = useState<"tickets" | "hours">(
     "tickets"
   );
@@ -656,6 +665,10 @@ export function MaringoWorkspaceClient() {
   const [editBookLineId, setEditBookLineId] = useState<number | null>(null);
   const [editBookDefaults, setEditBookDefaults] =
     useState<TimeBookFormDefaults | null>(null);
+  const [ticketCalendarOpen, setTicketCalendarOpen] = useState(false);
+  const [pendingStampBook, setPendingStampBook] =
+    useState<MariTimeSuggestion | null>(null);
+  const [suggestionsRefresh, setSuggestionsRefresh] = useState(0);
   const [busyTicketLineId, setBusyTicketLineId] = useState<number | null>(null);
   const [ticketTimeLines, setTicketTimeLines] = useState<MariTimeLine[]>([]);
   const [ticketTimeLoading, setTicketTimeLoading] = useState(false);
@@ -1096,6 +1109,20 @@ export function MaringoWorkspaceClient() {
   }, []);
 
   useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab === "hours") setWorkspaceTab("hours");
+    const openRaw = searchParams.get("open");
+    if (openRaw) {
+      const id = Number(openRaw);
+      if (Number.isFinite(id) && id > 0) {
+        setSelectedId(id);
+        setTicketFlyoutOpen(true);
+        setWorkspaceTab("tickets");
+      }
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
     setSecondaryFlyouts([]);
   }, [selectedId]);
 
@@ -1143,6 +1170,41 @@ export function MaringoWorkspaceClient() {
 
   function closeSecondary(id: MariSecondaryFlyoutId) {
     setSecondaryFlyouts((stack) => stack.filter((x) => x !== id));
+  }
+
+  async function bookFromSuggestion(s: MariTimeSuggestion) {
+    setError(null);
+    try {
+      const res = await fetch(`/api/maringo/tickets/${s.issueId}`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || "Ticket für Buchung laden fehlgeschlagen");
+      }
+      const ticket = data.ticket as MariTicketDetail | undefined;
+      setPendingStampBook(s);
+      setEditBookLineId(null);
+      setEditBookDefaults(
+        suggestionToBookDefaults(
+          s,
+          ticket
+            ? {
+                projectNumber: ticket.projectNumber,
+                projectLabel: formatMariProjectLabel(
+                  ticket.projectNumber,
+                  ticket.addressMatchcode || ticket.cardCode
+                ),
+                contractId: ticket.contractId,
+                contractPositionId: ticket.contractPositionId,
+                activity: ticket.briefDescription,
+              }
+            : null
+        )
+      );
+      setSelectedId(s.issueId);
+      setBookDialogOpen(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
   }
 
   function toggleStatus(id: number) {
@@ -1515,7 +1577,13 @@ export function MaringoWorkspaceClient() {
       ) : null}
 
       {workspaceTab === "hours" ? (
-        <MaringoTimekeepingPanel />
+        <div className="space-y-4">
+          <MaringoTimeSuggestionsPanel
+            refreshKey={suggestionsRefresh}
+            onBookSuggestion={(s) => void bookFromSuggestion(s)}
+          />
+          <MaringoTimekeepingPanel />
+        </div>
       ) : (
       <div className="min-h-[70vh] overflow-hidden rounded-2xl border border-border/60 bg-card shadow-[0_4px_18px_rgba(15,23,42,0.05)]">
         {/* List pane */}
@@ -2300,6 +2368,16 @@ export function MaringoWorkspaceClient() {
                             type="button"
                             size="sm"
                             variant="outline"
+                            title="Termin aus Ticket — Slot suchen und anlegen"
+                            onClick={() => setTicketCalendarOpen(true)}
+                          >
+                            <CalendarPlus className="size-3.5" />
+                            Termin
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
                             disabled={!detail.projectNumber}
                             title={
                               detail.projectNumber
@@ -2886,6 +2964,7 @@ export function MaringoWorkspaceClient() {
           if (!open) {
             setEditBookLineId(null);
             setEditBookDefaults(null);
+            setPendingStampBook(null);
           }
         }}
         defaults={
@@ -2909,20 +2988,59 @@ export function MaringoWorkspaceClient() {
         title={
           editBookLineId
             ? `Buchung ändern · #${editBookLineId}`
-            : detail
-              ? `Zeit buchen · Ticket #${detail.issueId}`
-              : "Zeit buchen"
+            : pendingStampBook
+              ? `Stunden aus Termin · Ticket #${pendingStampBook.issueId}`
+              : detail
+                ? `Zeit buchen · Ticket #${detail.issueId}`
+                : "Zeit buchen"
         }
         description={
           editBookLineId
             ? "Speichern ersetzt die Zeile in MARI. Ticket-Verknüpfung bleibt erhalten."
-            : "Buchung wird mit SourceReference auf dieses Ticket verknüpft."
+            : pendingStampBook
+              ? "Vorschlag aus gestempeltem Ticket-Termin — prüfen und buchen."
+              : "Buchung wird mit SourceReference auf dieses Ticket verknüpft."
         }
         submitLabel={editBookLineId ? "Speichern" : "Auf Ticket buchen"}
         editLineId={editBookLineId}
         onBooked={() => {
+          const stamp = pendingStampBook;
+          if (stamp) {
+            void fetch("/api/maringo/timekeeping/suggestions", {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                eventProvider: stamp.eventProvider,
+                eventId: stamp.eventId,
+                status: "booked",
+              }),
+            }).catch(() => undefined);
+          }
+          setPendingStampBook(null);
+          setSuggestionsRefresh((n) => n + 1);
           if (selectedId != null) void loadTicketTimeLines(selectedId);
         }}
+      />
+
+      <AdhocEventDialog
+        open={ticketCalendarOpen}
+        onOpenChange={setTicketCalendarOpen}
+        mariIssueId={detail?.issueId ?? null}
+        initialTitle={
+          detail
+            ? `#${detail.issueId} · ${detail.briefDescription}`.slice(0, 200)
+            : null
+        }
+        initialNotes={
+          analysis?.summary?.trim() ||
+          detail?.briefDescription ||
+          null
+        }
+        defaultDurationMinutes={60}
+        dialogTitle={
+          detail ? `Termin · Ticket #${detail.issueId}` : "Termin aus Ticket"
+        }
+        dialogDescription="Freien Slot suchen, Termin anlegen — wird für die Abend-Stundenbuchung gestempelt."
       />
     </div>
   );

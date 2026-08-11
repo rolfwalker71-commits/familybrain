@@ -145,6 +145,7 @@ export function bootstrapDatabase(db: Database.Database): void {
   ensureMailSenderPrefsTable(db);
   ensureMariTimeBookFavoritesTable(db);
   ensureMariTicketAnalysesTable(db);
+  ensureMariCalendarStampsTable(db);
   ensureMailAppliedLinksTable(db);
   ensureBuddySourceLinksTable(db);
   ensureReferenceNotesTable(db);
@@ -329,6 +330,32 @@ function ensureMariTicketAnalysesTable(db: Database.Database): void {
       `ALTER TABLE mari_ticket_analyses ADD COLUMN internal_note_posted_at TEXT`
     );
   }
+}
+
+function ensureMariCalendarStampsTable(db: Database.Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS mari_calendar_stamps (
+      event_provider TEXT NOT NULL,
+      event_id TEXT NOT NULL,
+      calendar_id TEXT,
+      issue_id INTEGER NOT NULL,
+      event_date TEXT NOT NULL,
+      start_hm TEXT,
+      end_hm TEXT,
+      title TEXT NOT NULL,
+      memo TEXT,
+      hours REAL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      booked_line_id INTEGER,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (event_provider, event_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_mari_calendar_stamps_pending
+      ON mari_calendar_stamps(status, event_date);
+    CREATE INDEX IF NOT EXISTS idx_mari_calendar_stamps_issue
+      ON mari_calendar_stamps(issue_id, event_date);
+  `);
 }
 
 function ensureMailAppliedLinksTable(db: Database.Database): void {
