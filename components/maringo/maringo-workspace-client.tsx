@@ -73,6 +73,7 @@ import type {
   MariTimelineSort,
 } from "@/lib/mari/ticket-filter-prefs";
 import {
+  MariMainFlyoutShell,
   MariSecondaryFlyoutShell,
   MariTicketFlyoutRail,
   toggleMariSecondaryFlyout,
@@ -1076,6 +1077,38 @@ export function MaringoWorkspaceClient() {
     void loadList();
   }, [loadList, filterReady]);
 
+  /** After idle / tab switch: auto-retry when MARI error is sticky. */
+  useEffect(() => {
+    if (!filterReady || workspaceTab !== "tickets") return;
+    const onVis = () => {
+      if (document.visibilityState !== "visible") return;
+      if (!error) return;
+      if (!/MARI HTTP|Login fehlgeschlagen|fehlgeschlagen/i.test(error)) {
+        return;
+      }
+      void loadList();
+      if (selectedId != null && ticketFlyoutOpen) {
+        void loadDetail(selectedId);
+        void loadTicketTimeLines(selectedId);
+      }
+    };
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("focus", onVis);
+    return () => {
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("focus", onVis);
+    };
+  }, [
+    error,
+    filterReady,
+    workspaceTab,
+    loadList,
+    loadDetail,
+    loadTicketTimeLines,
+    selectedId,
+    ticketFlyoutOpen,
+  ]);
+
   useEffect(() => {
     if (selectedId != null) {
       void loadDetail(selectedId);
@@ -1933,7 +1966,7 @@ export function MaringoWorkspaceClient() {
                 aria-label="Flyout schliessen"
                 onClick={closeTicketFlyout}
               />
-              <div className="absolute inset-y-0 right-0 z-[1001] flex h-full w-[min(100%,42rem)] max-w-full border-l border-border/70 bg-background shadow-[-12px_0_32px_rgba(15,23,42,0.12)]">
+              <MariMainFlyoutShell>
                 <MariTicketFlyoutRail
                   openIds={secondaryFlyouts}
                   onToggle={toggleSecondary}
@@ -2625,7 +2658,7 @@ export function MaringoWorkspaceClient() {
                     </>
                   )}
                 </div>
-              </div>
+              </MariMainFlyoutShell>
 
               {secondaryFlyouts.map((id, i) => {
                 const widthClass =

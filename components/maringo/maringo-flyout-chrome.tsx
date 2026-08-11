@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   CalendarClock,
   Clock3,
@@ -25,6 +25,9 @@ export const MARI_SECONDARY_FLYOUT_META: Record<
   arbeitszeit: { label: "Arbeitszeit", short: "Zeit" },
 };
 
+/** Slide-in duration for main + secondary flyouts (ms). */
+export const MARI_FLYOUT_ENTER_MS = 1500;
+
 /** Toggle / bring-to-front / close-if-top for the secondary stack. */
 export function toggleMariSecondaryFlyout(
   stack: MariSecondaryFlyoutId[],
@@ -34,6 +37,22 @@ export function toggleMariSecondaryFlyout(
   if (idx === -1) return [...stack, id];
   if (idx === stack.length - 1) return stack.slice(0, -1);
   return [...stack.filter((x) => x !== id), id];
+}
+
+function useFlyoutEnter(open = true) {
+  const [entered, setEntered] = useState(false);
+  useEffect(() => {
+    if (!open) {
+      setEntered(false);
+      return;
+    }
+    setEntered(false);
+    const id = window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => setEntered(true));
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [open]);
+  return entered;
 }
 
 export function MariTicketFlyoutRail({
@@ -87,6 +106,28 @@ export function MariTicketFlyoutRail({
   );
 }
 
+export function MariMainFlyoutShell({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  const entered = useFlyoutEnter(true);
+  return (
+    <div
+      className={cn(
+        "absolute inset-y-0 right-0 z-[1001] flex h-full w-[min(100%,42rem)] max-w-full overflow-hidden rounded-l-2xl border-l border-border/70 bg-background shadow-[-12px_0_32px_rgba(15,23,42,0.12)] transition-transform ease-out will-change-transform",
+        entered ? "translate-x-0" : "translate-x-full",
+        className
+      )}
+      style={{ transitionDuration: `${MARI_FLYOUT_ENTER_MS}ms` }}
+    >
+      {children}
+    </div>
+  );
+}
+
 export function MariSecondaryFlyoutShell({
   title,
   description,
@@ -104,13 +145,19 @@ export function MariSecondaryFlyoutShell({
   offsetPx: number;
   children: ReactNode;
 }) {
+  const entered = useFlyoutEnter(true);
   return (
     <aside
       className={cn(
-        "pointer-events-auto absolute inset-y-0 flex flex-col border-l border-border/70 bg-background shadow-[-8px_0_24px_rgba(15,23,42,0.08)]",
+        "pointer-events-auto absolute inset-y-0 flex flex-col overflow-hidden rounded-l-2xl border-l border-border/70 bg-background shadow-[-8px_0_24px_rgba(15,23,42,0.08)] transition-transform ease-out will-change-transform",
+        entered ? "translate-x-0" : "translate-x-full",
         widthClass
       )}
-      style={{ right: offsetPx, zIndex }}
+      style={{
+        right: offsetPx,
+        zIndex,
+        transitionDuration: `${MARI_FLYOUT_ENTER_MS}ms`,
+      }}
       role="dialog"
       aria-modal="false"
       aria-label={title}

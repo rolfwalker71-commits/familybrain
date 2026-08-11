@@ -7,6 +7,8 @@ type TokenCache = {
 
 /** Per MARI username — colleagues must not share the admin token. */
 const tokenCaches = new Map<string, TokenCache>();
+/** Single-flight logins per cache key (avoids stampede after expiry / 500). */
+const tokenInflight = new Map<string, Promise<TokenCache>>();
 
 export class MariApiError extends Error {
   status: number;
@@ -18,6 +20,20 @@ export class MariApiError extends Error {
     this.status = status;
     this.body = body;
   }
+}
+
+/**
+ * MARI often returns opaque HTTP 500 ("An error has occurred.") for dead
+ * sessions instead of 401. Treat those as refreshable once.
+ */
+export function mariStatusSuggestsStaleAuth(status: number): boolean {
+  return (
+    status === 401 ||
+    status === 403 ||
+    status === 500 ||
+    status === 502 ||
+    status === 503
+  );
 }
 
 async function fetchToken(cfg: MariConfig): Promise<TokenCache> {
@@ -46,9 +62,11 @@ async function fetchToken(cfg: MariConfig): Promise<TokenCache> {
     );
   }
   const expiresIn = Number(json.expires_in) || 3600;
+  // Refresh early — MARI sessions can die before advertised expiry.
+  const skewSec = Math.max(120, Math.floor(expiresIn * 0.15));
   return {
     accessToken: json.access_token,
-    expiresAt: Date.now() + Math.max(30, expiresIn - 60) * 1000,
+    expiresAt: Date.now() + Math.max(30, expiresIn - skewSec) * 1000,
   };
 }
 
@@ -56,14 +74,38 @@ function cacheKey(cfg: MariConfig): string {
   return `${cfg.baseUrl}::${cfg.username}`;
 }
 
-async function getAccessToken(cfg: MariConfig): Promise<string> {
+async function getAccessToken(
+  cfg: MariConfig,
+  opts?: { force?: boolean }
+): Promise<string> {
   const key = cacheKey(cfg);
-  const cached = tokenCaches.get(key);
-  if (cached && cached.expiresAt > Date.now()) {
-    return cached.accessToken;
+  if (!opts?.force) {
+    const cached = tokenCaches.get(key);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.accessToken;
+    }
+  } else {
+    tokenCaches.delete(key);
   }
-  const next = await fetchToken(cfg);
-  tokenCaches.set(key, next);
+
+  let inflight = tokenInflight.get(key);
+  if (!inflight || opts?.force) {
+    // Force: abandon joining a pre-existing login that may still write a stale token.
+    const login = fetchToken(cfg)
+      .then((next) => {
+        tokenCaches.set(key, next);
+        return next;
+      })
+      .finally(() => {
+        if (tokenInflight.get(key) === login) {
+          tokenInflight.delete(key);
+        }
+      });
+    tokenInflight.set(key, login);
+    inflight = login;
+  }
+
+  const next = await inflight;
   return next.accessToken;
 }
 
@@ -71,12 +113,18 @@ async function getAccessToken(cfg: MariConfig): Promise<string> {
 export function clearMariTokenCache(username?: string | null): void {
   if (!username?.trim()) {
     tokenCaches.clear();
+    tokenInflight.clear();
     return;
   }
   const needle = username.trim().toLowerCase();
-  for (const key of tokenCaches.keys()) {
+  for (const key of [...tokenCaches.keys()]) {
     if (key.toLowerCase().endsWith(`::${needle}`)) {
       tokenCaches.delete(key);
+    }
+  }
+  for (const key of [...tokenInflight.keys()]) {
+    if (key.toLowerCase().endsWith(`::${needle}`)) {
+      tokenInflight.delete(key);
     }
   }
 }
@@ -94,15 +142,35 @@ export function requireMariConfig(): MariConfig {
 
 export async function mariFetch(
   path: string,
-  init: RequestInit = {}
+  init: RequestInit = {},
+  retried = false
 ): Promise<Response> {
   const cfg = requireMariConfig();
-  const token = await getAccessToken(cfg);
+  const token = await getAccessToken(cfg, { force: retried });
   const url = path.startsWith("http") ? path : `${cfg.baseUrl}${path}`;
   const headers = new Headers(init.headers);
   headers.set("Authorization", `Bearer ${token}`);
   if (!headers.has("Accept")) headers.set("Accept", "application/json");
-  return fetch(url, { ...init, headers, cache: "no-store" });
+
+  let res: Response;
+  try {
+    res = await fetch(url, { ...init, headers, cache: "no-store" });
+  } catch (err) {
+    // Transient network blip after idle — one re-login + retry.
+    if (!retried) {
+      clearMariTokenCache(cfg.username);
+      return mariFetch(path, init, true);
+    }
+    throw err;
+  }
+
+  if (!retried && mariStatusSuggestsStaleAuth(res.status)) {
+    // Consume body so the socket can be reused; ignore content.
+    await res.text().catch(() => "");
+    clearMariTokenCache(cfg.username);
+    return mariFetch(path, init, true);
+  }
+  return res;
 }
 
 export async function mariJson<T>(
