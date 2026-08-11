@@ -31,6 +31,10 @@ type AnalysisStatus = {
   travelDocuments: number;
   knowledgeDocuments: number;
   triagePendingCount: number;
+  /** Offene Google-Mail-Triage-Vorschläge */
+  mailTriageGoogleCount: number;
+  /** Offene Microsoft-Mail-Triage-Vorschläge */
+  mailTriageMicrosoftCount: number;
   hasOpenAIKey: boolean;
   isRunning: boolean;
   mode: AnalysisMode | null;
@@ -74,6 +78,8 @@ const defaultStatus: AnalysisStatus = {
   travelDocuments: 0,
   knowledgeDocuments: 0,
   triagePendingCount: 0,
+  mailTriageGoogleCount: 0,
+  mailTriageMicrosoftCount: 0,
   hasOpenAIKey: false,
   isRunning: false,
   mode: null,
@@ -127,6 +133,12 @@ export function AnalysisProvider({ children }: { children: React.ReactNode }) {
         ),
         triagePendingCount: Number(
           dash.triagePending ?? prev.triagePendingCount
+        ),
+        mailTriageGoogleCount: Number(
+          dash.mailTriageGoogle ?? prev.mailTriageGoogleCount
+        ),
+        mailTriageMicrosoftCount: Number(
+          dash.mailTriageMicrosoft ?? prev.mailTriageMicrosoftCount
         ),
         hasOpenAIKey: Boolean(settings.hasOpenAIKey),
       }));

@@ -28,7 +28,9 @@ type NavItem = {
     | "urgentDeadlinesCount"
     | "warrantiesExpiringSoon"
     | "openDueFinanceCount"
-    | "triagePendingCount";
+    | "triagePendingCount"
+    | "mailTriageGoogleCount"
+    | "mailTriageMicrosoftCount";
   pendingStyle?: boolean;
 };
 
@@ -53,12 +55,16 @@ const myBrainNavItems: NavItem[] = [
     icon: pageVisuals.google.icon,
     tone: pageVisuals.google.tone,
     section: "Cloud",
+    countKey: "mailTriageGoogleCount",
+    pendingStyle: true,
   },
   {
     href: "/microsoft",
     label: "Microsoft 365",
     icon: pageVisuals.microsoft.icon,
     tone: pageVisuals.microsoft.tone,
+    countKey: "mailTriageMicrosoftCount",
+    pendingStyle: true,
   },
   {
     href: "/maringo",
@@ -232,19 +238,26 @@ function NavLinkRow({
   isRunning: boolean;
   onNavigate?: () => void;
 }) {
+  const itemPath = item.href.split("?")[0] || item.href;
   const active =
-    pathname === item.href || pathname.startsWith(`${item.href}/`);
+    pathname === itemPath || pathname.startsWith(`${itemPath}/`);
   const analysis = useAnalysis();
   const count =
     showBadges && item.countKey != null
       ? Number(analysis[item.countKey] || 0)
       : null;
   const showCount = count != null && count > 0;
+  const linkHref =
+    showCount &&
+    (item.countKey === "mailTriageGoogleCount" ||
+      item.countKey === "mailTriageMicrosoftCount")
+      ? `${itemPath}?tab=triage`
+      : item.href;
   const Icon = item.icon;
 
   return (
     <Link
-      href={item.href}
+      href={linkHref}
       onClick={onNavigate}
       className={cn(
         "flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm font-medium transition-colors",
@@ -268,7 +281,9 @@ function NavLinkRow({
             "min-w-[1.5rem] rounded-full px-1.5 py-0.5 text-center text-[10px] font-semibold tabular-nums",
             active
               ? "bg-red-500 text-white"
-              : item.countKey === "triagePendingCount"
+              : item.countKey === "triagePendingCount" ||
+                  item.countKey === "mailTriageGoogleCount" ||
+                  item.countKey === "mailTriageMicrosoftCount"
                 ? "bg-red-500 text-white"
                 : item.pendingStyle && isRunning
                   ? "bg-amber-500 text-white"
@@ -285,7 +300,11 @@ function NavLinkRow({
                     ? "Offene Rechnungen"
                     : item.countKey === "triagePendingCount"
                       ? "Inbox / Triage"
-                      : undefined
+                      : item.countKey === "mailTriageGoogleCount"
+                        ? "Google Mail-Triage"
+                        : item.countKey === "mailTriageMicrosoftCount"
+                          ? "Microsoft Mail-Triage"
+                          : undefined
           }
         >
           {formatCount(count)}

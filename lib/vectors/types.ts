@@ -36,6 +36,8 @@ export type GuideSource = {
   score: number;
   pageStart?: number | null;
   pageEnd?: number | null;
+  /** Chunk index within the guide; used to keep multiple excerpts per guide. */
+  chunkIndex?: number | null;
 };
 
 export type TriliumNoteSource = {

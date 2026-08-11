@@ -368,6 +368,17 @@ export function MicrosoftDayClient() {
     }
   }, []);
 
+  const loadTriagePending = useCallback(async () => {
+    try {
+      const res = await fetch("/api/microsoft/mail/triage");
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) return;
+      setInboxPending(Number(json.pendingCount) || 0);
+    } catch {
+      /* Badge optional */
+    }
+  }, []);
+
   const loadCalendar = useCallback(async () => {
     setCalLoading(true);
     setError(null);
@@ -420,6 +431,7 @@ export function MicrosoftDayClient() {
     if (connected) {
       void loadCalendar();
       void loadMail(mailFrom, mailTo);
+      void loadTriagePending();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- initial load when connected
   }, [connected]);

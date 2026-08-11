@@ -173,9 +173,10 @@ Regeln:
 - OCR-Auszüge und Abschnitte «Reiseverlauf» können Tabellen und Tageshalte enthalten – lies diese sorgfältig aus und zitiere sie.
 - Wenn die Frage ein konkretes Schiff, Produkt oder eine Buchungsnummer nennt, beantworte NUR mit Daten zu genau diesem Objekt.
 - Strukturelle Fakten können unvollständig sein. Bei Widerspruch: zuerst Korrekturen, danach Dokumentkontexte (OCR / Reiseverlauf) vor Kurzfassungen.
-- Beträge, Daten, Produktnamen und Fristen nur nennen, wenn sie in den Daten oder Korrekturen stehen.
-- Wenn etwas fehlt, sage ehrlich, dass es in der aktuellen Basis nicht gefunden wurde.
-- Erfinde nichts.
+- Beträge, Daten, Produktnamen, Versionsbezeichnungen, Patch-IDs, Befehle, Pfade und Fristen nur nennen, wenn sie in den bereitgestellten Auszügen oder Korrekturen stehen.
+- Wenn Guide-Auszüge zur Frage passen: antworte ausführlich und praxisnah daraus (Schritte, Voraussetzungen, relevante Abschnitte) – aber ausschließlich mit Inhalt aus diesen Auszügen.
+- Wenn etwas fehlt oder die Auszüge die Frage nicht beantworten: sage ehrlich, dass es in der aktuellen Basis nicht gefunden wurde. Keine Vermutungen, kein Allgemeinwissen, keine erfundenen Schritte.
+- Erfinde nichts. Ergänze keine fehlenden Verfahren, Parameter oder Versionsdetails aus dem Training.
 - Formatiere Antworten als Markdown.
 - Schreibe alle Datumsangaben im Schweizer Format **dd.mm.yyyy**.
 - Schreibe KEINEN sichtbaren Abschnitt «Quellen» in die Antwort.
@@ -281,19 +282,22 @@ export async function answerDocumentChat(
     ? await retrieveTriliumForChat(question, 5)
     : [];
   const guideSources = sourcesEnabled.guides
-    ? await retrieveGuidesForChat(question, 6)
+    ? await retrieveGuidesForChat(question, 10)
     : [];
   const corrections = retrieveCorrectionsForChat(question, 12);
   const triliumSynced = countSyncedTriliumNotes();
   const triliumEmbedded = countIndexedTriliumNotes();
   const guidesIndexed = countIndexedKnowledgeGuides();
 
+  const paperlessCorpusNote = sourcesEnabled.paperless
+    ? `- Paperless-Dokumente synchronisiert: ${retrieval.corpus.totalDocuments} (analysiert: ${retrieval.corpus.analyzedDocuments})`
+    : `- Paperless deaktiviert (Zähler «Dokumente» gilt nicht für Guides/Trilium)`;
+
   const corpusBlock = `Aktive Quellen: ${describeChatSources(sourcesEnabled)}
 Gesamte lokale Basis:
 - Heute: ${toSwissDate(todayIso)} · aktuelles Jahr: ${year}
 - Paperless aktiv: ${sourcesEnabled.paperless ? "ja" : "nein"}
-- Dokumente synchronisiert: ${retrieval.corpus.totalDocuments}
-- Davon analysiert: ${retrieval.corpus.analyzedDocuments}
+${paperlessCorpusNote}
 - Garantien/Geräte: ${retrieval.corpus.warranties}
 - Fristen: ${retrieval.corpus.deadlines}
 - Finanzpositionen: ${retrieval.corpus.financialItems}
@@ -304,8 +308,9 @@ Gesamte lokale Basis:
 - Trilium-Notizen (Treffer zur Frage): ${triliumNotes.length}
 - Guides aktiv: ${sourcesEnabled.guides ? "ja" : "nein"}
 - PDF-Guides indexiert: ${guidesIndexed}
-- Guide-Treffer (semantisch): ${guideSources.length}
-- Gespeicherte Nutzer-Korrekturen: ${corrections.length}`;
+- Guide-Auszüge (Treffer zur Frage, semantisch+Stichwort): ${guideSources.length}
+- Gespeicherte Nutzer-Korrekturen: ${corrections.length}
+Hinweis: «0 Paperless-Dokumente» bedeutet nicht, dass keine Guides oder Trilium-Notizen vorhanden sind.`;
 
   const correctionBlocks = formatCorrectionsForPrompt(corrections);
 
@@ -406,12 +411,17 @@ ${contextBlocks}
 RELEVANTE TRILIUM-NOTIZEN (Master → Privat / Geschäftlich ANG):
 ${triliumBlocks}
 
-RELEVANTE GUIDE-AUSZÜGE (importierte PDF-Handbücher, semantische Suche):
+RELEVANTE GUIDE-AUSZÜGE (importierte PDF-Handbücher, semantische + Stichwort-Suche):
 ${guideBlocks}
 
 Beantworte die Frage jetzt anhand der gesamten Wissensbasis.
 Beachte den Kalenderkontext: «dieses Jahr» = ${year}, «kommend/geplant» ab ${toSwissDate(todayIso)}.
 Wenn Korrekturen vorliegen und Dokumente widersprechen, folge den Korrekturen.
+
+WICHTIG – keine Halluzination:
+- Nutze nur Fakten, Schritte, Befehle, Pfade und Versionsangaben, die in den obigen Auszügen oder Korrekturen stehen.
+- Wenn Guide-Auszüge vorhanden und relevant sind: fasse sie detailliert zusammen (nummerierte Schritte, wo der Text sie hergibt).
+- Wenn die Auszüge die Frage nicht abdecken: sage klar «nicht in der Basis gefunden» – erfinde keine SAP-/Produktkenntnisse und keine fehlenden Handbuchpassagen.
 
 Wichtig für Quellen:
 - Gib keinen sichtbaren Quellenabschnitt aus.
@@ -457,9 +467,13 @@ Wichtig für Quellen:
     .map((id) => noteCandidates.get(id))
     .filter((note): note is TriliumNoteSource => Boolean(note));
 
-  const guideCandidates = new Map(
-    guideSources.map((guide) => [guide.id, guide])
-  );
+  const guideCandidates = new Map<number, GuideSource>();
+  for (const guide of guideSources) {
+    const existing = guideCandidates.get(guide.id);
+    if (!existing || existing.score < guide.score) {
+      guideCandidates.set(guide.id, guide);
+    }
+  }
   const citedGuideSources = parsed.guideIds
     .map((id) => guideCandidates.get(id))
     .filter((guide): guide is GuideSource => Boolean(guide));

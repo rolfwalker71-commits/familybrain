@@ -151,13 +151,27 @@ const STOPWORDS = new Set([
 ]);
 
 function tokenize(query: string): string[] {
-  return query
-    .toLowerCase()
-    .normalize("NFC")
-    .split(/[^a-z0-9äöüàéèêâôûïß]+/i)
-    .map((t) => t.trim())
-    .filter((t) => t.length >= 3 && !STOPWORDS.has(t))
-    .slice(0, 12);
+  const lower = query.toLowerCase().normalize("NFC");
+  const out: string[] = [];
+
+  // Keep short product/patch identifiers: «SP 2605», «FP2505», …
+  for (const m of lower.matchAll(/\b([a-z]{1,5})\s*[-_]?\s*(\d{3,6})\b/g)) {
+    out.push(m[1], m[2], `${m[1]}${m[2]}`);
+  }
+
+  for (const raw of lower.split(/[^a-z0-9äöüàéèêâôûïß]+/i)) {
+    const t = raw.trim();
+    if (!t || STOPWORDS.has(t)) continue;
+    if (t.length >= 3) {
+      out.push(t);
+      continue;
+    }
+    if (/^\d{2,}$/.test(t) || /^[a-z]{2}$/.test(t)) {
+      out.push(t);
+    }
+  }
+
+  return [...new Set(out)].slice(0, 16);
 }
 
 /** Resolve relative year phrases so retrieval prefers the calendar year users mean. */

@@ -538,9 +538,9 @@ export function ChatClient() {
                               </Badge>
                             </a>
                           ))}
-                          {message.guideSources?.map((guide) => (
+                          {message.guideSources?.map((guide, guideIdx) => (
                             <Link
-                              key={`guide-${guide.id}`}
+                              key={`guide-${guide.id}-${guide.pageStart ?? "x"}-${guideIdx}`}
                               href={`/guides#guide-${guide.id}`}
                               title="Guide öffnen"
                               className="max-w-full"

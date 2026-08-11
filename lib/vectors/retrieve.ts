@@ -1,6 +1,7 @@
 import { embedQuery } from "@/lib/vectors/embeddings";
 import { searchVectorPoints } from "@/lib/vectors/client";
 import { VECTOR_MIN_SCORE, VECTOR_SEARCH_LIMIT } from "@/lib/vectors/constants";
+import { retrieveGuidesByKeyword } from "@/lib/vectors/guide-keyword";
 import type {
   GuideSource,
   PaperlessVectorSource,
@@ -21,7 +22,68 @@ function toGuideSource(hit: VectorSearchHit): GuideSource | null {
     score: hit.score,
     pageStart: hit.payload.page_start ?? null,
     pageEnd: hit.payload.page_end ?? null,
+    chunkIndex: hit.payload.chunk_index ?? null,
   };
+}
+
+function guideChunkKey(source: GuideSource): string {
+  if (source.chunkIndex != null) {
+    return `${source.id}:${source.chunkIndex}`;
+  }
+  const page = source.pageStart ?? "x";
+  return `${source.id}:${page}:${source.excerpt.slice(0, 48)}`;
+}
+
+/**
+ * Merge semantic + keyword guide hits. Keep several chunks per guide so
+ * handbook answers can cite neighbouring passages, not just one embedding.
+ */
+function mergeGuideSources(
+  semantic: GuideSource[],
+  keyword: GuideSource[],
+  limit: number,
+  maxPerGuide = 3
+): GuideSource[] {
+  const byChunk = new Map<string, GuideSource>();
+
+  for (const source of semantic) {
+    // Cosine ~0–1 → keyword-ish range so both ranks are comparable.
+    const scaled: GuideSource = {
+      ...source,
+      score: source.score * 12 + 2,
+    };
+    byChunk.set(guideChunkKey(scaled), scaled);
+  }
+
+  for (const source of keyword) {
+    const key = guideChunkKey(source);
+    const existing = byChunk.get(key);
+    if (!existing) {
+      byChunk.set(key, source);
+      continue;
+    }
+    byChunk.set(key, {
+      ...existing,
+      score: existing.score + source.score * 0.85,
+      // Prefer longer keyword excerpt if same chunk collided oddly.
+      excerpt:
+        source.excerpt.length > existing.excerpt.length
+          ? source.excerpt
+          : existing.excerpt,
+    });
+  }
+
+  const ranked = [...byChunk.values()].sort((a, b) => b.score - a.score);
+  const perGuide = new Map<number, number>();
+  const selected: GuideSource[] = [];
+  for (const source of ranked) {
+    const used = perGuide.get(source.id) ?? 0;
+    if (used >= maxPerGuide) continue;
+    perGuide.set(source.id, used + 1);
+    selected.push(source);
+    if (selected.length >= limit) break;
+  }
+  return selected;
 }
 
 function toTriliumSource(hit: VectorSearchHit): TriliumNoteSource | null {
@@ -101,22 +163,18 @@ export async function retrieveVectorForChat(
 
 export async function retrieveGuidesForChat(
   question: string,
-  limit = 6
+  limit = 10
 ): Promise<GuideSource[]> {
-  const { guideSources } = await retrieveVectorForChat(question, {
-    limit,
-    sourceType: "guide",
-  });
-  const byId = new Map<number, GuideSource>();
-  for (const source of guideSources) {
-    const existing = byId.get(source.id);
-    if (!existing || existing.score < source.score) {
-      byId.set(source.id, source);
-    }
-  }
-  return [...byId.values()]
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit);
+  const fetchLimit = Math.max(limit * 3, 18);
+  const [{ guideSources: semantic }, keyword] = await Promise.all([
+    retrieveVectorForChat(question, {
+      limit: fetchLimit,
+      sourceType: "guide",
+      minScore: Math.min(VECTOR_MIN_SCORE, 0.32),
+    }),
+    Promise.resolve(retrieveGuidesByKeyword(question, fetchLimit)),
+  ]);
+  return mergeGuideSources(semantic, keyword, limit, 3);
 }
 
 export async function retrieveTriliumNotesForChat(

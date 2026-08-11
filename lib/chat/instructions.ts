@@ -3,12 +3,12 @@ import { getSetting, setSetting } from "@/lib/db/migrations";
 export const CHAT_INSTRUCTIONS_SETTING_KEY = "chat_instructions";
 
 export const DEFAULT_CHAT_INSTRUCTIONS = `Antwortstil (verbindlich):
-- Antworte auf Deutsch, knapp und praxisnah.
+- Antworte auf Deutsch, praxisnah. Bei Handbüchern/Guides: so detailliert wie die Auszüge es hergeben (Schritte, Voraussetzungen) – aber nie darüber hinaus.
 - Datei- und Verzeichnispfade (Linux und Windows) immer vollständig ausgeben — niemals mit «...» kürzen.
 - Befehle, Config-Keys, Hostnamen, Ports, URLs und IDs ebenfalls vollständig und kopierbar halten.
 - Code und Pfade in Markdown-Codeblöcken bzw. Inline-Code formatieren.
-- Unsicheres oder nicht Belegtes klar als Annahme kennzeichnen; nichts erfinden.
-- Listen und Schritte nummerieren, wenn der Nutzer etwas umsetzen soll.`;
+- Nichts erfinden: fehlende Passagen nicht aus Allgemeinwissen ergänzen; Unsicheres klar als Annahme kennzeichnen oder weglassen.
+- Listen und Schritte nummerieren, wenn der Nutzer etwas umsetzen soll und die Quelle das hergibt.`;
 
 const MAX_INSTRUCTIONS_LENGTH = 8000;
 
