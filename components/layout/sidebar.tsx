@@ -15,6 +15,7 @@ import { useAnalysis } from "@/components/analysis/analysis-provider";
 import { useAuth } from "@/components/auth/auth-provider";
 import {
   GoogleLogo,
+  MaringoLogo,
   MicrosoftLogo,
 } from "@/components/branding/provider-logos";
 import { useAdminNav } from "@/components/layout/admin-nav-provider";
@@ -86,6 +87,7 @@ const myBrainNavItems: NavItem[] = [
     href: "/maringo",
     label: "Maringo Support",
     icon: pageVisuals.maringo.icon,
+    logo: <MaringoLogo className="size-4" />,
     tone: pageVisuals.maringo.tone,
   },
   {
@@ -207,6 +209,7 @@ const maringoNavItem: NavItem = {
   href: "/maringo",
   label: "Maringo Support",
   icon: pageVisuals.maringo.icon,
+  logo: <MaringoLogo className="size-4" />,
   tone: pageVisuals.maringo.tone,
 };
 

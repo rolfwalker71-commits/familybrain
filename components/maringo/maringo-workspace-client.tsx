@@ -45,6 +45,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { PageHeader } from "@/components/layout/page-primitives";
+import { MaringoLogo } from "@/components/branding/provider-logos";
 import { pageVisuals } from "@/components/layout/icon-circle";
 import { APP_ICON_STROKE } from "@/lib/branding/app-icons";
 import {
@@ -1450,7 +1451,7 @@ export function MaringoWorkspaceClient() {
       <PageHeader
         title="Maringo Support"
         description="Support-Tickets, Verlauf, AI-Analyse und Stundenbuchung."
-        icon={pageVisuals.maringo.icon}
+        logo={<MaringoLogo className="size-8" />}
         tone={pageVisuals.maringo.tone}
       />
 

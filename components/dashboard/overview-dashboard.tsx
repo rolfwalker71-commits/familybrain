@@ -19,7 +19,6 @@ import {
   Car,
   CheckCircle2,
   Monitor,
-  Ticket,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,6 +28,7 @@ import {
   GmailLogo,
   GoogleDriveLogo,
   GoogleLogo,
+  MaringoLogo,
   MicrosoftLogo,
   MicrosoftPlannerLogo,
   MicrosoftTeamsLogo,
@@ -729,12 +729,7 @@ function MariTicketsAsideCard({
     <Card className={ASIDE_WIDGET_CLASS}>
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2 text-[16px] font-black">
-          <Ticket
-            className="size-4 text-orange-700"
-            strokeWidth={APP_ICON_STROKE}
-            absoluteStrokeWidth
-            aria-hidden
-          />
+          <MaringoLogo className="size-4" />
           Tickets von mir
         </CardTitle>
         {data.employeeNumber ? (

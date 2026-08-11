@@ -1,3 +1,6 @@
+"use client";
+
+import { useId } from "react";
 import { cn } from "@/lib/utils";
 
 type LogoProps = {
@@ -195,6 +198,49 @@ export function GmailLogo({ className, title = "Gmail" }: LogoProps) {
         fill="#C5221F"
         d="M52 51v8l20 15V48l-5.6-4.2c-5.94-4.45-14.4-.22-14.4 7.2"
       />
+    </svg>
+  );
+}
+
+/**
+ * Maringo Support-Markenzeichen: gestreiftes „M“ aus dem Maringo-Wortbild
+ * (Navy #003060) plus AI-Funke in MARIProject-Gold (#fab900).
+ */
+export function MaringoLogo({ className, title = "Maringo" }: LogoProps) {
+  const uid = useId().replace(/:/g, "");
+  const clipId = `maringo-m-${uid}`;
+
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={cn("size-4 shrink-0", className)}
+      aria-hidden={title ? undefined : true}
+      role={title ? "img" : undefined}
+    >
+      {title ? <title>{title}</title> : null}
+      <defs>
+        <clipPath id={clipId}>
+          <path d="M2.8 20.5V3.5h3.9l4.3 10.6L15.3 3.5h3.9v17h-3.35V9.6L13 19.6h-2L7.15 9.6v10.9H2.8z" />
+        </clipPath>
+      </defs>
+      <g clipPath={`url(#${clipId})`}>
+        {[3.4, 5.6, 7.8, 10, 12.2, 14.4, 16.6, 18.8].map((y) => (
+          <rect
+            key={y}
+            x="2"
+            y={y}
+            width="18"
+            height="1.55"
+            fill="#003060"
+          />
+        ))}
+      </g>
+      {/* AI-Akzent */}
+      <path
+        fill="#fab900"
+        d="M19.1 1.6 19.85 3.5l1.9.75-1.9.75-.75 1.9-.75-1.9-1.9-.75 1.9-.75z"
+      />
+      <circle cx="17.35" cy="8.15" r="1.05" fill="#fab900" />
     </svg>
   );
 }

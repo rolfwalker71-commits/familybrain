@@ -23,7 +23,7 @@ import {
   HandCoins,
   Luggage,
   Sparkles,
-  Ticket,
+  Headset,
 } from "lucide-react";
 
 /** Bold outline stroke (mockup style, maximum readable weight). */
@@ -69,7 +69,7 @@ export const appIcons = {
   summaries: { icon: Sparkles, tone: "teal" as const },
   buddyArea: { icon: Home, tone: "teal" as const },
   microsoft: { icon: Cloud, tone: "blue" as const },
-  maringo: { icon: Ticket, tone: "orange" as const },
+  maringo: { icon: Headset, tone: "orange" as const },
 } as const satisfies Record<string, AppIconSpec>;
 
 export type AppIconKey = keyof typeof appIcons;

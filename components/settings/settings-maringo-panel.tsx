@@ -1,14 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Ticket } from "lucide-react";
+import { MaringoLogo } from "@/components/branding/provider-logos";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { IconCircle } from "@/components/layout/icon-circle";
 
 export function SettingsMaringoPanel() {
   const [baseUrl, setBaseUrl] = useState("");
@@ -140,7 +139,9 @@ export function SettingsMaringoPanel() {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-3">
         <CardTitle className="flex items-center gap-3">
-          <IconCircle icon={Ticket} tone="orange" size="sm" />
+          <span className="flex size-8 items-center justify-center rounded-full bg-white shadow-[inset_0_0_0_1px_rgba(15,23,42,0.06)]">
+            <MaringoLogo className="size-4" />
+          </span>
           Maringo / MARI
         </CardTitle>
         {configured ? (
