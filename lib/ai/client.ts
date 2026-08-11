@@ -131,6 +131,61 @@ export function hasChatKey(): boolean {
 }
 
 /**
+ * DeepSeek client for mail compose AI — independent of global chat_provider.
+ * Prefers chat_api_key; falls back when chat_provider is already deepseek.
+ */
+export function getDeepSeekMailApiKey(): string | null {
+  const chatKey =
+    getSetting("chat_api_key") || process.env.CHAT_API_KEY || null;
+  if (chatKey?.trim()) return chatKey.trim();
+  if (getChatProvider() === "deepseek") return getChatApiKey();
+  if (legacyOpenAiBaseUrl()?.includes("deepseek.com")) {
+    return getOpenAIApiKey();
+  }
+  return null;
+}
+
+export function hasDeepSeekMailKey(): boolean {
+  return Boolean(getDeepSeekMailApiKey());
+}
+
+export function getDeepSeekMailModel(): string {
+  const explicit =
+    getSetting("mail_compose_ai_model") ||
+    process.env.MAIL_COMPOSE_AI_MODEL ||
+    null;
+  if (explicit?.trim()) return explicit.trim();
+  if (getChatProvider() === "deepseek") {
+    const m = getChatModel();
+    if (m.toLowerCase().includes("deepseek")) return m;
+  }
+  return "deepseek-v4-flash";
+}
+
+export function getDeepSeekMailClient(): OpenAI {
+  const apiKey = getDeepSeekMailApiKey();
+  if (!apiKey) {
+    throw new Error(
+      "DeepSeek-Key fehlt für Mail-AI. Unter Einstellungen → KI-API den Chat-Key (DeepSeek) hinterlegen."
+    );
+  }
+  const baseURL =
+    normalizeBaseUrl(getSetting("chat_base_url") || process.env.CHAT_BASE_URL) ||
+    DEEPSEEK_BASE_URL;
+  return new OpenAI({
+    apiKey,
+    baseURL,
+    timeout: 120_000,
+    maxRetries: 2,
+  });
+}
+
+/** DeepSeek V4: disable thinking for fast JSON mail drafts. */
+export function getDeepSeekMailJsonExtras(): Record<string, unknown> {
+  return { thinking: { type: "disabled" } };
+}
+
+/**
  * Extra request fields for JSON chat jobs on OpenAI-compatible providers.
  * DeepSeek V4 enables thinking by default — that burns max_tokens, slows
  * multi-batch jobs (Tagesanalyse) a lot, and can leave message.content empty.
