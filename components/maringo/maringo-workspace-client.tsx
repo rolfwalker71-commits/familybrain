@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -81,6 +82,10 @@ import type {
 import {
   DEFAULT_MARI_LIST_META_FIELDS,
   MARI_LIST_META_FIELD_OPTIONS,
+  parseMariTicketFilterPrefsPatch,
+  readMariTicketFilterPrefsLocal,
+  writeMariTicketFilterPrefsLocal,
+  type MariTicketFilterPrefsPatch,
 } from "@/lib/mari/ticket-filter-prefs-shared";
 import { buildMariTicketListMetaItems } from "@/lib/mari/ticket-list-meta";
 import { MariCustomerChip } from "@/components/maringo/mari-customer-chip";
@@ -628,6 +633,8 @@ export function MaringoWorkspaceClient() {
   const [statuses, setStatuses] = useState<number[]>([...WORK_STATUS_IDS]);
   const [overdueOnly, setOverdueOnly] = useState(false);
   const [filterReady, setFilterReady] = useState(false);
+  /** Skip auto-PUT right after hydrate so defaults never overwrite saved prefs. */
+  const skipFilterPrefsSaveRef = useRef(true);
   const [timelineSort, setTimelineSort] =
     useState<MariTimelineSort>("oldest");
   const [listSort, setListSort] = useState<MariListSort>("newest");
@@ -1018,61 +1025,63 @@ export function MaringoWorkspaceClient() {
 
   useEffect(() => {
     let cancelled = false;
+
+    const applyPrefsPatch = (patch: MariTicketFilterPrefsPatch) => {
+      if (patch.statuses && patch.statuses.length > 0) {
+        setStatuses([...patch.statuses].sort((a, b) => a - b));
+      }
+      if (typeof patch.overdueOnly === "boolean") {
+        setOverdueOnly(patch.overdueOnly);
+      }
+      if (patch.filterMode === "handler" || patch.filterMode === "customer") {
+        setFilterMode(patch.filterMode);
+      }
+      if (patch.timelineSort === "newest" || patch.timelineSort === "oldest") {
+        setTimelineSort(patch.timelineSort);
+      }
+      if (patch.listSort === "newest" || patch.listSort === "oldest") {
+        setListSort(patch.listSort);
+      }
+      if (patch.listMetaFields && patch.listMetaFields.length > 0) {
+        setListMetaFields(patch.listMetaFields);
+      } else if (patch.listMetaFields) {
+        setListMetaFields([...DEFAULT_MARI_LIST_META_FIELDS]);
+      }
+      if (patch.customers) {
+        const next = patch.customers.map((c) => ({
+          cardCode: c.cardCode,
+          name: c.name || c.cardCode,
+        }));
+        setSelectedCustomers(next);
+        setCustomerDraft(next);
+      }
+    };
+
+    // Restore immediately from browser so Docker/API lag doesn't flash defaults.
+    const local = readMariTicketFilterPrefsLocal();
+    if (local) applyPrefsPatch(local);
+
     void (async () => {
       try {
         const res = await fetch("/api/maringo/ticket-filter-prefs");
         const data = await res.json().catch(() => ({}));
-        if (cancelled || !res.ok) return;
-        if (Array.isArray(data.statuses) && data.statuses.length > 0) {
-          const next = data.statuses
-            .map((n: unknown) => Number(n))
-            .filter((n: number) => Number.isInteger(n) && n > 0);
-          if (next.length > 0) {
-            setStatuses([...new Set(next as number[])].sort((a, b) => a - b));
-          }
+        if (cancelled) return;
+        if (!res.ok) {
+          // Keep local/defaults — do not PUT defaults over a healthy DB.
+          return;
         }
-        if (typeof data.overdueOnly === "boolean") {
-          setOverdueOnly(data.overdueOnly);
-        }
-        if (data.filterMode === "handler" || data.filterMode === "customer") {
-          setFilterMode(data.filterMode);
-        }
-        if (data.timelineSort === "newest" || data.timelineSort === "oldest") {
-          setTimelineSort(data.timelineSort);
-        }
-        if (data.listSort === "newest" || data.listSort === "oldest") {
-          setListSort(data.listSort);
-        }
-        if (Array.isArray(data.listMetaFields)) {
-          const allowed = new Set(
-            MARI_LIST_META_FIELD_OPTIONS.map((o) => o.id)
-          );
-          const next = data.listMetaFields.filter(
-            (f: unknown): f is MariListMetaField =>
-              typeof f === "string" && allowed.has(f as MariListMetaField)
-          );
-          setListMetaFields(
-            next.length > 0 ? next : [...DEFAULT_MARI_LIST_META_FIELDS]
-          );
-        }
-        if (Array.isArray(data.customers)) {
-          const next = data.customers
-            .map((c: { cardCode?: unknown; name?: unknown }) => {
-              const cardCode = String(c?.cardCode || "").trim();
-              if (!cardCode) return null;
-              return {
-                cardCode,
-                name: String(c?.name || cardCode).trim() || cardCode,
-              };
-            })
-            .filter(Boolean) as MariCustomerOption[];
-          setSelectedCustomers(next);
-          setCustomerDraft(next);
+        const patch = parseMariTicketFilterPrefsPatch(data);
+        if (patch) {
+          applyPrefsPatch(patch);
+          writeMariTicketFilterPrefsLocal(patch);
         }
       } catch {
-        /* defaults bleiben */
+        /* local/defaults bleiben */
       } finally {
-        if (!cancelled) setFilterReady(true);
+        if (!cancelled) {
+          skipFilterPrefsSaveRef.current = true;
+          setFilterReady(true);
+        }
       }
     })();
     return () => {
@@ -1082,21 +1091,27 @@ export function MaringoWorkspaceClient() {
 
   useEffect(() => {
     if (!filterReady) return;
+    if (skipFilterPrefsSaveRef.current) {
+      skipFilterPrefsSaveRef.current = false;
+      return;
+    }
+    const payload = {
+      statuses,
+      overdueOnly,
+      filterMode,
+      customers: selectedCustomers,
+      timelineSort,
+      listSort,
+      listMetaFields,
+    };
+    writeMariTicketFilterPrefsLocal(payload);
     const t = window.setTimeout(() => {
       void fetch("/api/maringo/ticket-filter-prefs", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          statuses,
-          overdueOnly,
-          filterMode,
-          customers: selectedCustomers,
-          timelineSort,
-          listSort,
-          listMetaFields,
-        }),
+        body: JSON.stringify(payload),
       }).catch(() => {
-        /* optional */
+        /* local mirror already written */
       });
     }, 350);
     return () => window.clearTimeout(t);

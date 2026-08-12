@@ -6,6 +6,7 @@ import {
   normalizeMariCardCode,
   parseCardCodesParam,
 } from "@/lib/mari/customers";
+import { parseMariTicketFilterPrefsPatch } from "@/lib/mari/ticket-filter-prefs-shared";
 
 test("normalizeCustomerSearchQuery strips wildcards", () => {
   assert.equal(normalizeCustomerSearchQuery("*Bübchen*"), "Bübchen");
@@ -39,4 +40,22 @@ test("ticket filter prefs default to handler mode", () => {
     "aktivitaet",
   ]);
   assert.ok(d.statuses.length > 0);
+});
+
+test("parseMariTicketFilterPrefsPatch keeps custom status selection", () => {
+  const patch = parseMariTicketFilterPrefsPatch({
+    statuses: [7, 10, 4, 14, 16, 7],
+    overdueOnly: true,
+    filterMode: "handler",
+  });
+  assert.ok(patch);
+  assert.deepEqual(patch!.statuses, [4, 7, 10, 14, 16]);
+  assert.equal(patch!.overdueOnly, true);
+  assert.equal(patch!.filterMode, "handler");
+});
+
+test("parseMariTicketFilterPrefsPatch ignores empty garbage", () => {
+  assert.equal(parseMariTicketFilterPrefsPatch(null), null);
+  assert.equal(parseMariTicketFilterPrefsPatch({ statuses: [] }), null);
+  assert.equal(parseMariTicketFilterPrefsPatch({ filterMode: "nope" }), null);
 });
