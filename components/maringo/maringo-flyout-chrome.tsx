@@ -174,10 +174,10 @@ export function MariTicketFlyoutRail({
               onClick={() => onToggle(id)}
               className={cn(
                 "flex size-10 items-center justify-center rounded-xl transition-colors",
-                top
-                  ? "bg-orange-100 text-orange-950"
+                  top
+                  ? "bg-orange-100 text-orange-950 dark:bg-orange-500/25 dark:text-orange-100"
                   : active
-                    ? "bg-orange-50 text-orange-900"
+                    ? "bg-orange-50 text-orange-900 dark:bg-orange-500/15 dark:text-orange-100"
                     : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
               )}
             >

@@ -106,11 +106,11 @@ export function MaringoTimeSuggestionsPanel({
   }
 
   return (
-    <Card className={cn("border-orange-200/70 bg-orange-50/30", className)}>
+    <Card className={cn("border-orange-200/70 bg-orange-50/30 dark:border-orange-400/30 dark:bg-orange-500/10", className)}>
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2 text-[15px] font-black tracking-tight">
           <CalendarClock
-            className="size-4 text-orange-800"
+            className="size-4 text-orange-800 dark:text-orange-300"
             strokeWidth={APP_ICON_STROKE}
             absoluteStrokeWidth
             aria-hidden

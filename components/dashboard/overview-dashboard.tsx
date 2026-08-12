@@ -51,6 +51,7 @@ import type {
 } from "@/lib/dashboard/overview";
 import type { MailListItem } from "@/lib/mail/gmail";
 import { statusAsideKpiClass } from "@/lib/mari/status";
+import { softTint } from "@/lib/ui/soft-tint";
 import type { LucideIcon } from "lucide-react";
 
 /** Aside widgets: light + dim-dark compatible raised edge. */
@@ -364,7 +365,7 @@ function HomeWeatherWidget({ weather }: { weather: HomeWeatherCard }) {
               key={day.date}
               className={cn(
                 "flex min-w-0 flex-col items-center rounded-md px-0.5 py-1 text-center",
-                i === 0 && "bg-sky-50"
+                i === 0 && "bg-sky-50 dark:bg-sky-500/15"
               )}
               title={`${weekdayShortDe(day.date)}: ${day.weatherLabelDe}, ${day.temperatureMinC}–${day.temperatureMaxC}°`}
             >
@@ -513,7 +514,7 @@ function SystemStatusCard({ data }: { data: OverviewPayload }) {
                     aria-label="OK"
                   />
                 ) : (
-                  <span className="text-[11px] font-semibold text-amber-700">
+                  <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-300">
                     —
                   </span>
                 )}
@@ -523,7 +524,9 @@ function SystemStatusCard({ data }: { data: OverviewPayload }) {
           <li
             className={cn(
               "ml-auto inline-flex items-center gap-1.5 text-[12px] font-semibold",
-              allOk ? "text-emerald-700" : "text-amber-800"
+              allOk
+                ? "text-emerald-700 dark:text-emerald-300"
+                : "text-amber-800 dark:text-amber-300"
             )}
           >
             {allOk ? (
@@ -560,7 +563,7 @@ function NextHockeyCard({ game }: { game: HockeyGameCard }) {
     <Card className="border-border/60 shadow-[0_4px_18px_rgba(15,23,42,0.05)]">
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2 text-[16px] font-black">
-          <Trophy className="size-4 text-rose-700" />
+          <Trophy className="size-4 text-rose-700 dark:text-rose-300" />
           Nächstes Spiel
         </CardTitle>
       </CardHeader>
@@ -870,7 +873,9 @@ function DayTimeline({
               <span
                 className={cn(
                   "text-[12px] font-semibold tabular-nums leading-tight sm:text-[13px]",
-                  active ? "text-emerald-800" : "text-muted-foreground"
+                  active
+                    ? "text-emerald-800 dark:text-emerald-300"
+                    : "text-muted-foreground"
                 )}
               >
                 {hm}
@@ -908,13 +913,14 @@ function DayTimeline({
             <div
               className={cn(
                 "mb-5 min-w-0 overflow-hidden rounded-2xl border border-border/60 bg-card shadow-[0_4px_18px_rgba(15,23,42,0.05)] last:mb-1",
-                active && "border-emerald-200/90 shadow-[0_4px_18px_rgba(5,150,105,0.12)]",
+                active &&
+                  "border-emerald-200/90 shadow-[0_4px_18px_rgba(5,150,105,0.12)] dark:border-emerald-400/35 dark:shadow-[0_4px_18px_rgba(16,185,129,0.12)]",
                 !active &&
                   item.calendarId?.startsWith("google-cal:") &&
-                  "border-sky-200/80 bg-sky-50/35",
+                  "border-sky-200/80 bg-sky-50/35 dark:border-sky-400/25 dark:bg-sky-500/10",
                 !active &&
                   item.calendarId?.startsWith("ms-cal:") &&
-                  "border-violet-200/70 bg-violet-50/30"
+                  "border-violet-200/70 bg-violet-50/30 dark:border-violet-400/25 dark:bg-violet-500/10"
               )}
             >
               <div className="flex items-stretch">
@@ -922,7 +928,7 @@ function DayTimeline({
                 <div
                   className={cn(
                     "flex min-w-0 flex-1 items-stretch gap-2",
-                    active && "bg-emerald-50/40"
+                    active && "bg-emerald-50/40 dark:bg-emerald-500/10"
                   )}
                 >
                   <div className="min-w-0 flex-1 px-3 py-2.5">
@@ -1073,23 +1079,23 @@ function FocusTile({
   detail: string;
 }) {
   const cardCls = {
-    teal: "border-teal-200/70 bg-teal-50/60",
-    rose: "border-rose-200/70 bg-rose-50/60",
-    amber: "border-amber-200/70 bg-amber-50/60",
-    sky: "border-sky-200/70 bg-sky-50/60",
+    teal: softTint.teal.card,
+    rose: softTint.rose.card,
+    amber: softTint.amber.card,
+    sky: softTint.sky.card,
   }[tone];
   const iconWrap = {
-    teal: "bg-teal-100/80 text-teal-800",
-    rose: "bg-rose-100/80 text-rose-800",
-    amber: "bg-amber-100/80 text-amber-800",
-    sky: "bg-sky-100/80 text-sky-800",
+    teal: softTint.teal.well,
+    rose: softTint.rose.well,
+    amber: softTint.amber.well,
+    sky: softTint.sky.well,
   }[tone];
 
   return (
     <Link
       href={href}
       className={cn(
-        "flex min-w-0 items-center gap-3 rounded-2xl border px-3.5 py-3 shadow-[0_4px_18px_rgba(15,23,42,0.04)] transition-colors hover:brightness-[0.98]",
+        "flex min-w-0 items-center gap-3 rounded-2xl border px-3.5 py-3 shadow-[0_4px_18px_rgba(15,23,42,0.04)] transition-colors hover:brightness-[0.98] dark:shadow-[0_4px_18px_rgba(0,0,0,0.22)] dark:hover:brightness-110",
         cardCls
       )}
     >
@@ -1097,7 +1103,7 @@ function FocusTile({
         className={cn(
           "flex size-9 shrink-0 items-center justify-center rounded-full",
           logo
-            ? "bg-white shadow-[inset_0_0_0_1px_rgba(15,23,42,0.06)]"
+            ? "bg-white shadow-[inset_0_0_0_1px_rgba(15,23,42,0.06)] dark:bg-card dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]"
             : iconWrap
         )}
       >
@@ -1663,16 +1669,16 @@ export function OverviewDashboard({
               </div>
               {visibleConflicts.length > 0 ? (
                 <div
-                  className="flex items-start gap-2 rounded-xl border border-amber-200/80 bg-amber-50/70 px-3 py-2 text-[13px] text-amber-950"
+                  className="flex items-start gap-2 rounded-xl border border-amber-200/80 bg-amber-50/70 px-3 py-2 text-[13px] text-amber-950 dark:border-amber-400/30 dark:bg-amber-500/12 dark:text-amber-100"
                   role="status"
                 >
                   <AlertTriangle
-                    className="mt-0.5 size-4 shrink-0 text-amber-700"
+                    className="mt-0.5 size-4 shrink-0 text-amber-700 dark:text-amber-300"
                     aria-hidden
                   />
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold">Termin-Konflikt</p>
-                    <ul className="mt-0.5 space-y-0.5 text-amber-900/90">
+                    <ul className="mt-0.5 space-y-0.5 text-amber-900/90 dark:text-amber-100/90">
                       {visibleConflicts.slice(0, 2).map((c) => (
                         <li key={c.id} className="truncate">
                           {c.label}
@@ -1684,7 +1690,7 @@ export function OverviewDashboard({
                     type="button"
                     size="sm"
                     variant="ghost"
-                    className="h-7 shrink-0 px-2 text-[12px] text-amber-900/80 hover:bg-amber-100/80 hover:text-amber-950"
+                    className="h-7 shrink-0 px-2 text-[12px] text-amber-900/80 hover:bg-amber-100/80 hover:text-amber-950 dark:text-amber-200/90 dark:hover:bg-amber-500/20 dark:hover:text-amber-100"
                     onClick={muteConflictsForToday}
                     title="Für heute ausblenden"
                   >
@@ -1805,7 +1811,7 @@ export function OverviewDashboard({
                 href="/travel"
                 className="flex flex-1 items-center gap-3 px-4 py-3.5 transition-colors hover:bg-muted/30"
               >
-                <Plane className="size-4 shrink-0 text-sky-700" />
+                <Plane className="size-4 shrink-0 text-sky-700 dark:text-sky-300" />
                 <div className="min-w-0">
                   <p className="text-[14px] font-black">Reisen</p>
                   <p className="truncate text-[12px] text-muted-foreground">
@@ -1819,7 +1825,7 @@ export function OverviewDashboard({
                 href="/deadlines"
                 className="flex flex-1 items-center gap-3 border-t border-border/60 px-4 py-3.5 transition-colors hover:bg-muted/30 sm:border-t-0"
               >
-                <Clock3 className="size-4 shrink-0 text-teal-700" />
+                <Clock3 className="size-4 shrink-0 text-teal-700 dark:text-teal-300" />
                 <div className="min-w-0">
                   <p className="text-[14px] font-black">Fristen</p>
                   <p className="truncate text-[12px] text-muted-foreground">

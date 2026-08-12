@@ -201,7 +201,7 @@ export function MariHoursSplitSummary({
 
       <div className="min-w-0 flex-1 space-y-1">
         <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
-          <div className="rounded-md border border-emerald-200/70 bg-emerald-50/60 px-1.5 py-1">
+          <div className="rounded-md border border-emerald-200/70 bg-emerald-50/60 px-1.5 py-1 dark:border-emerald-400/30 dark:bg-emerald-500/12">
             <p className="flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wide text-emerald-900/80">
               <span
                 className="size-1.5 shrink-0 rounded-full"

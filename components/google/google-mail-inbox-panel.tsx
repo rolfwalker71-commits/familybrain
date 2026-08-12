@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { APP_ICON_STROKE } from "@/lib/branding/app-icons";
+import { mailAnalysisChipClass } from "@/lib/ui/soft-tint";
 import type { MailListFilter, MailListItem, MailMessageDetail } from "@/lib/mail/gmail";
 import type { MailAnalysis, MailSuggestion } from "@/lib/mail/mail-action-schema";
 import type { MailAnalysisChip } from "@/lib/mail/mail-heuristic";
@@ -68,28 +69,7 @@ function suggestionKey(s: MailSuggestion, index: number): string {
 }
 
 function chipClass(chip: MailAnalysisChip): string {
-  if (chip === "suggestion") {
-    return "bg-amber-100 text-amber-900 border-amber-200";
-  }
-  if (chip === "applied") {
-    return "bg-emerald-100 text-emerald-900 border-emerald-200";
-  }
-  if (chip === "dismissed") {
-    return "bg-muted text-muted-foreground";
-  }
-  if (chip === "skipped") {
-    return "bg-stone-100 text-stone-700 border-stone-200";
-  }
-  if (chip === "error") {
-    return "bg-rose-100 text-rose-900 border-rose-200";
-  }
-  if (chip === "pending") {
-    return "bg-muted/80 text-muted-foreground border-border/70";
-  }
-  if (chip === "none") {
-    return "bg-slate-100 text-slate-700 border-slate-200";
-  }
-  return "bg-sky-50 text-sky-900 border-sky-200";
+  return mailAnalysisChipClass(chip);
 }
 
 export function GoogleMailInboxPanel({
@@ -402,7 +382,7 @@ export function GoogleMailInboxPanel({
       ) : null}
 
       {!hasGmailModify ? (
-        <p className="rounded-lg border border-amber-200/80 bg-amber-50/80 px-3 py-2 text-xs text-amber-950">
+        <p className="rounded-lg border border-amber-200/80 bg-amber-50/80 px-3 py-2 text-xs text-amber-950 dark:border-amber-400/30 dark:bg-amber-500/12 dark:text-amber-100">
           Gmail-Labels brauchen die Berechtigung «ändern». Bitte{" "}
           <a
             href="/api/google/oauth/start"

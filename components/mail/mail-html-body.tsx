@@ -41,7 +41,7 @@ export function MailHtmlBody({
   return (
     <div className={cn("space-y-2", className)}>
       {showBanner ? (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200/80 bg-amber-50 px-3 py-2 text-[12px] text-amber-950">
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200/80 bg-amber-50 px-3 py-2 text-[12px] text-amber-950 dark:border-amber-400/30 dark:bg-amber-500/12 dark:text-amber-100">
           <p className="min-w-0 flex-1">
             {prepared.externalImageCount === 1
               ? "1 externes Bild blockiert (Datenschutz)."
@@ -51,7 +51,7 @@ export function MailHtmlBody({
             type="button"
             size="sm"
             variant="outline"
-            className="h-7 gap-1.5 border-amber-300 bg-white text-[11px]"
+            className="h-7 gap-1.5 border-amber-300 bg-white text-[11px] dark:border-amber-400/40 dark:bg-card dark:text-amber-100"
             onClick={() => setLoadImages(true)}
           >
             <ImageIcon className="size-3.5" strokeWidth={APP_ICON_STROKE} />

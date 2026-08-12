@@ -440,12 +440,12 @@ export function MaringoTimeBookForm({
       className={cn("space-y-3", className)}
     >
       {error ? (
-        <p className="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-2 text-[12px] whitespace-pre-wrap break-words text-rose-950">
+        <p className="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-2 text-[12px] whitespace-pre-wrap break-words text-rose-950 dark:border-rose-400/30 dark:bg-rose-500/12 dark:text-rose-100">
           {error}
         </p>
       ) : null}
       {hint ? (
-        <p className="rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-2 text-[12px] text-sky-950">
+        <p className="rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-2 text-[12px] text-sky-950 dark:border-sky-400/30 dark:bg-sky-500/12 dark:text-sky-100">
           {hint}
         </p>
       ) : null}

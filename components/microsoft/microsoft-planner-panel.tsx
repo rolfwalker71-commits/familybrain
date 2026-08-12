@@ -323,7 +323,7 @@ export function MicrosoftPlannerPanel() {
 
       {notice ? (
         <p
-          className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900"
+          className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900 dark:border-emerald-400/30 dark:bg-emerald-500/12 dark:text-emerald-100"
           role="status"
         >
           {notice}

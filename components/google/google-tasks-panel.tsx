@@ -155,7 +155,7 @@ export function GoogleTasksPanel() {
 
   if (!connected) {
     return (
-      <Card className="border-sky-200/70 bg-sky-50/40">
+      <Card className="border-sky-200/70 bg-sky-50/40 dark:border-sky-400/30 dark:bg-sky-500/10">
         <CardContent className="space-y-2 p-5 text-sm">
           <p className="font-medium text-sky-950">Google nicht verbunden</p>
           <p className="text-muted-foreground">
@@ -172,7 +172,7 @@ export function GoogleTasksPanel() {
 
   if (!hasTasksScope) {
     return (
-      <Card className="border-sky-200/70 bg-sky-50/40">
+      <Card className="border-sky-200/70 bg-sky-50/40 dark:border-sky-400/30 dark:bg-sky-500/10">
         <CardContent className="space-y-2 p-5 text-sm">
           <p className="font-medium text-sky-950">Tasks-Recht fehlt</p>
           <p className="text-muted-foreground">
@@ -198,7 +198,7 @@ export function GoogleTasksPanel() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <select
-            className="h-8 max-w-[12rem] rounded-md border border-sky-200/80 bg-sky-50/50 px-2 text-xs"
+            className="h-8 max-w-[12rem] rounded-md border border-sky-200/80 bg-sky-50/50 px-2 text-xs dark:border-sky-400/30 dark:bg-sky-500/10"
             value={listFilter}
             onChange={(e) => setListFilter(e.target.value)}
             aria-label="Liste filtern"
@@ -236,7 +236,7 @@ export function GoogleTasksPanel() {
 
       {notice ? (
         <p
-          className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900"
+          className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900 dark:border-emerald-400/30 dark:bg-emerald-500/12 dark:text-emerald-100"
           role="status"
         >
           {notice}
@@ -267,7 +267,7 @@ export function GoogleTasksPanel() {
           const done = isDone(task.status);
           return (
             <li key={key}>
-              <Card className="border-sky-200/70 bg-sky-50/30">
+              <Card className="border-sky-200/70 bg-sky-50/30 dark:border-sky-400/30 dark:bg-sky-500/10">
                 <CardContent className="space-y-2 p-3">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0">
@@ -291,7 +291,7 @@ export function GoogleTasksPanel() {
                       className={cn(
                         "text-[10px]",
                         !done &&
-                          "border-sky-300/80 bg-sky-100/80 text-sky-950"
+                          "border-sky-300/80 bg-sky-100/80 text-sky-950 dark:border-sky-400/40 dark:bg-sky-500/20 dark:text-sky-100"
                       )}
                     >
                       {done ? "Erledigt" : "Privat"}

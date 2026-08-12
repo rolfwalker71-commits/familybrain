@@ -1144,8 +1144,8 @@ export function GoogleWorkspaceClient() {
               className={cn(
                 "rounded-lg border px-3 py-2 text-sm",
                 analyzing
-                  ? "border-sky-200 bg-sky-50 text-sky-950"
-                  : "border-emerald-200 bg-emerald-50 text-emerald-900"
+                  ? "border-sky-200 bg-sky-50 text-sky-950 dark:border-sky-400/30 dark:bg-sky-500/15 dark:text-sky-100"
+                  : "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-400/30 dark:bg-emerald-500/15 dark:text-emerald-100"
               )}
               role="status"
             >

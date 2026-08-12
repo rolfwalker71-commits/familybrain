@@ -62,7 +62,7 @@ export function MailAnalysisThreadHint({
   return (
     <div
       className={cn(
-        "flex gap-2.5 rounded-xl border border-sky-200/80 bg-sky-50/60 px-3 py-2.5 text-[13px] leading-snug text-sky-950",
+        "flex gap-2.5 rounded-xl border border-sky-200/80 bg-sky-50/60 px-3 py-2.5 text-[13px] leading-snug text-sky-950 dark:border-sky-400/30 dark:bg-sky-500/12 dark:text-sky-100",
         className
       )}
       role="note"

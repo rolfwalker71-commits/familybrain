@@ -114,8 +114,8 @@ function MailChronikRow({
           : indented
             ? "hover:bg-muted/30"
             : isInbox
-              ? "bg-teal-50/70 hover:bg-teal-100/70"
-              : "bg-amber-50/70 hover:bg-amber-100/70"
+              ? "bg-teal-50/70 hover:bg-teal-100/70 dark:bg-teal-500/10 dark:hover:bg-teal-500/16"
+              : "bg-amber-50/70 hover:bg-amber-100/70 dark:bg-amber-500/10 dark:hover:bg-amber-500/16"
       )}
     >
       <div className="flex w-[4.25rem] shrink-0 flex-col items-start gap-1">
@@ -126,8 +126,8 @@ function MailChronikRow({
             isContext
               ? "border-border/70 bg-background/70 text-muted-foreground"
               : isInbox
-                ? "border-teal-200/80 bg-teal-50 text-teal-950"
-                : "border-amber-200/80 bg-amber-50 text-amber-950"
+                ? "border-teal-200/80 bg-teal-50 text-teal-950 dark:border-teal-400/30 dark:bg-teal-500/15 dark:text-teal-100"
+                : "border-amber-200/80 bg-amber-50 text-amber-950 dark:border-amber-400/30 dark:bg-amber-500/15 dark:text-amber-100"
           )}
         >
           {isInbox ? "Eingang" : "Gesendet"}

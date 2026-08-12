@@ -604,7 +604,7 @@ export function MailTriagePanel({
                   </ul>
                   {row.analysis?.replyDraft?.body ||
                   replyDrafts[row.messageId] ? (
-                    <div className="space-y-1.5 rounded-lg border border-sky-200/70 bg-sky-50/40 px-2.5 py-2">
+                    <div className="space-y-1.5 rounded-lg border border-sky-200/70 bg-sky-50/40 px-2.5 py-2 dark:border-sky-400/30 dark:bg-sky-500/10">
                       <p className="text-[10px] font-semibold uppercase tracking-wide text-sky-900/80">
                         Antwort-Entwurf
                       </p>
@@ -633,7 +633,7 @@ export function MailTriagePanel({
                   ) : null}
                   {pendingWarnings?.messageId === row.messageId ? (
                     <div
-                      className="space-y-2 rounded-lg border border-amber-300/80 bg-amber-50/80 px-2.5 py-2 text-xs text-amber-950"
+                      className="space-y-2 rounded-lg border border-amber-300/80 bg-amber-50/80 px-2.5 py-2 text-xs text-amber-950 dark:border-amber-400/35 dark:bg-amber-500/12 dark:text-amber-100"
                       role="alert"
                     >
                       <p className="font-semibold">Hinweise vor Übernehmen</p>

@@ -9,9 +9,9 @@ export type MailWorkspaceAccent = "google" | "microsoft";
 
 const ACCENT = {
   google: {
-    activeText: "text-teal-900",
-    underline: "border-teal-700",
-    softBg: "bg-teal-50/40",
+    activeText: "text-teal-900 dark:text-teal-200",
+    underline: "border-teal-700 dark:border-teal-400",
+    softBg: "bg-teal-50/40 dark:bg-teal-500/10",
   },
   microsoft: {
     activeText: "text-[var(--brand-docs)]",

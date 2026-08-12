@@ -305,3 +305,18 @@ input[type="time"]:not([data-empty="true"])::-webkit-datetime-edit-text {
   background: #0f766e;
   box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.15);
 }
+
+/* Dim dark: neutralize light email/ticket HTML so panes don't flash white */
+.dark .mail-html-body,
+.dark .mari-note-html {
+  color: var(--foreground);
+}
+.dark .mail-html-body :where(div, p, span, table, td, th, font, center, section, article, body),
+.dark .mari-note-html :where(div, p, span, table, td, th, font, center, section, article, body) {
+  background-color: transparent !important;
+  color: inherit !important;
+}
+.dark .mail-html-body :where(a),
+.dark .mari-note-html :where(a) {
+  color: color-mix(in oklab, var(--primary) 85%, white) !important;
+}

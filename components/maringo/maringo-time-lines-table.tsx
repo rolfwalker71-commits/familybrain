@@ -114,10 +114,14 @@ function ApprovalBadge({
     <span
       className={cn(
         "inline-flex whitespace-nowrap rounded px-1 py-px text-[9px] font-semibold",
-        s === "approved" && "bg-emerald-100 text-emerald-900",
-        s === "recorded" && "bg-amber-100 text-amber-950",
-        s === "draft" && "bg-sky-100 text-sky-950",
-        s === "rejected" && "bg-rose-100 text-rose-950",
+        s === "approved" &&
+          "bg-emerald-100 text-emerald-900 dark:bg-emerald-500/20 dark:text-emerald-100",
+        s === "recorded" &&
+          "bg-amber-100 text-amber-950 dark:bg-amber-500/20 dark:text-amber-100",
+        s === "draft" &&
+          "bg-sky-100 text-sky-950 dark:bg-sky-500/20 dark:text-sky-100",
+        s === "rejected" &&
+          "bg-rose-100 text-rose-950 dark:bg-rose-500/20 dark:text-rose-100",
         s === "unknown" && "bg-muted text-muted-foreground"
       )}
     >

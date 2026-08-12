@@ -1,3 +1,5 @@
+import { softTint } from "@/lib/ui/soft-tint";
+
 /** Arbeitsfilter — Status-IDs aus MPHOTLINESETTINGS SETTING=1 */
 export const WORK_STATUS_IDS = [1, 3, 4, 6, 7, 11, 13, 14] as const;
 
@@ -38,23 +40,23 @@ export function statusChipLabel(statusId: number, fallback?: string): string {
 export function statusChipClass(statusId: number): string {
   switch (statusId) {
     case 11: // NEU
-      return "border-rose-200/90 bg-rose-50 text-rose-900";
+      return softTint.rose.chip;
     case 1: // Offen
-      return "border-sky-200/90 bg-sky-50 text-sky-950";
+      return softTint.sky.chip;
     case 3: // In Arbeit
-      return "border-teal-200/90 bg-teal-50 text-teal-950";
+      return softTint.teal.chip;
     case 13: // Aktualisiert
-      return "border-cyan-200/90 bg-cyan-50 text-cyan-950";
+      return softTint.cyan.chip;
     case 6: // Warte auf Kunden
     case 9:
-      return "border-orange-200/90 bg-orange-50 text-orange-950";
+      return softTint.orange.chip;
     case 7: // Warte auf Hersteller
     case 10:
-      return "border-violet-200/90 bg-violet-50 text-violet-950";
+      return softTint.violet.chip;
     case 4: // Wieder geöffnet
-      return "border-amber-200/90 bg-amber-50 text-amber-950";
+      return softTint.amber.chip;
     case 14: // Eskalation
-      return "border-red-200/90 bg-red-50 text-red-950";
+      return softTint.red.chip;
     case 2: // Gelöst
     case 12:
       return "border-border bg-muted/60 text-muted-foreground";
@@ -63,7 +65,7 @@ export function statusChipClass(statusId: number): string {
       return "border-border bg-muted/40 text-muted-foreground";
     case 15: // On Hold
     case 16: // Abklärung Notwendig
-      return "border-slate-200/90 bg-slate-50 text-slate-900";
+      return softTint.slate.chip;
     default:
       return "border-border bg-muted/50 text-foreground";
   }
@@ -73,23 +75,23 @@ export function statusChipClass(statusId: number): string {
 export function statusDetailHeaderClass(statusId: number): string {
   switch (statusId) {
     case 11: // NEU
-      return "border-b border-rose-200/80 bg-rose-50 text-rose-950";
+      return "border-b border-rose-200/80 bg-rose-50 text-rose-950 dark:border-rose-400/25 dark:bg-rose-500/15 dark:text-rose-100";
     case 1: // Offen
-      return "border-b border-sky-200/80 bg-sky-50 text-sky-950";
+      return "border-b border-sky-200/80 bg-sky-50 text-sky-950 dark:border-sky-400/25 dark:bg-sky-500/15 dark:text-sky-100";
     case 3: // In Arbeit
-      return "border-b border-teal-200/80 bg-teal-50 text-teal-950";
+      return "border-b border-teal-200/80 bg-teal-50 text-teal-950 dark:border-teal-400/25 dark:bg-teal-500/15 dark:text-teal-100";
     case 13: // Aktualisiert
-      return "border-b border-cyan-200/80 bg-cyan-50 text-cyan-950";
+      return "border-b border-cyan-200/80 bg-cyan-50 text-cyan-950 dark:border-cyan-400/25 dark:bg-cyan-500/15 dark:text-cyan-100";
     case 6: // Warte auf Kunden
     case 9:
-      return "border-b border-orange-200/80 bg-orange-50 text-orange-950";
+      return "border-b border-orange-200/80 bg-orange-50 text-orange-950 dark:border-orange-400/25 dark:bg-orange-500/15 dark:text-orange-100";
     case 7: // Warte auf Hersteller
     case 10:
-      return "border-b border-violet-200/80 bg-violet-50 text-violet-950";
+      return "border-b border-violet-200/80 bg-violet-50 text-violet-950 dark:border-violet-400/25 dark:bg-violet-500/15 dark:text-violet-100";
     case 4: // Wieder geöffnet
-      return "border-b border-amber-200/80 bg-amber-50 text-amber-950";
+      return "border-b border-amber-200/80 bg-amber-50 text-amber-950 dark:border-amber-400/25 dark:bg-amber-500/15 dark:text-amber-100";
     case 14: // Eskalation
-      return "border-b border-red-200/80 bg-red-50 text-red-950";
+      return "border-b border-red-200/80 bg-red-50 text-red-950 dark:border-red-400/25 dark:bg-red-500/15 dark:text-red-100";
     case 2: // Gelöst
     case 12:
       return "border-b border-border/70 bg-muted/50 text-foreground";
@@ -98,7 +100,7 @@ export function statusDetailHeaderClass(statusId: number): string {
       return "border-b border-border/60 bg-muted/40 text-muted-foreground";
     case 15: // On Hold
     case 16: // Abklärung Notwendig
-      return "border-b border-slate-200/80 bg-slate-50 text-slate-900";
+      return "border-b border-slate-200/80 bg-slate-50 text-slate-900 dark:border-slate-400/25 dark:bg-slate-500/15 dark:text-slate-100";
     default:
       return "border-b border-border/70 bg-muted/40 text-foreground";
   }
@@ -108,34 +110,34 @@ export function statusDetailHeaderClass(statusId: number): string {
 export function statusAsideKpiClass(statusId: number): string {
   switch (statusId) {
     case 11:
-      return "border-rose-300 bg-rose-50 text-rose-950";
+      return softTint.rose.chip;
     case 1:
-      return "border-sky-300 bg-sky-50 text-sky-950";
+      return softTint.sky.chip;
     case 3:
-      return "border-teal-300 bg-teal-50 text-teal-950";
+      return softTint.teal.chip;
     case 13:
-      return "border-cyan-300 bg-cyan-50 text-cyan-950";
+      return softTint.cyan.chip;
     case 6:
     case 9:
-      return "border-orange-300 bg-orange-50 text-orange-950";
+      return softTint.orange.chip;
     case 7:
     case 10:
-      return "border-violet-300 bg-violet-50 text-violet-950";
+      return softTint.violet.chip;
     case 4:
-      return "border-amber-300 bg-amber-50 text-amber-950";
+      return softTint.amber.chip;
     case 14:
-      return "border-red-300 bg-red-50 text-red-950";
+      return softTint.red.chip;
     case 2:
     case 12:
-      return "border-slate-300 bg-muted/60 text-muted-foreground";
+      return "border-slate-300 bg-muted/60 text-muted-foreground dark:border-border";
     case 5:
     case 8:
-      return "border-slate-300 bg-muted/40 text-muted-foreground";
+      return "border-slate-300 bg-muted/40 text-muted-foreground dark:border-border";
     case 15:
     case 16:
-      return "border-slate-300 bg-slate-50 text-slate-900";
+      return softTint.slate.chip;
     default:
-      return "border-slate-300 bg-muted/50 text-foreground";
+      return "border-slate-300 bg-muted/50 text-foreground dark:border-border";
   }
 }
 

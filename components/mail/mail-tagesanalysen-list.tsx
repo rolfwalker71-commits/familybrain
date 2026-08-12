@@ -53,11 +53,11 @@ export function MailTagesanalysenList({
 
   const activeBorder =
     accent === "google"
-      ? "border-teal-700/70 bg-teal-50/30"
+      ? "border-teal-700/70 bg-teal-50/30 dark:border-teal-400/40 dark:bg-teal-500/10"
       : "border-[var(--brand-docs)]/50 bg-[var(--brand-docs-soft)]/40";
   const iconWrap =
     accent === "google"
-      ? "bg-teal-50 text-teal-800"
+      ? "bg-teal-50 text-teal-800 dark:bg-teal-500/15 dark:text-teal-100"
       : "bg-[var(--brand-docs-soft)] text-[var(--brand-docs)]";
 
   return (

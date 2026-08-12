@@ -186,7 +186,7 @@ export function AnalysisEventDraftCard({
                           className={cn(
                             "rounded-md border px-2 py-1 text-[12px] tabular-nums",
                             selected
-                              ? "border-emerald-700 bg-emerald-50 text-emerald-950"
+                              ? "border-emerald-700 bg-emerald-50 text-emerald-950 dark:border-emerald-400/50 dark:bg-emerald-500/15 dark:text-emerald-100"
                               : "border-border/60 hover:bg-muted"
                           )}
                           onClick={() => pickSlot(s)}
