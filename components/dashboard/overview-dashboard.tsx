@@ -1860,7 +1860,7 @@ export function OverviewDashboard({
                     : "Kalender öffnen"
                 }
               />
-{domain === "gesamt" ? (
+{domain === "gesamt" || domain === "privat" ? (
               <FocusTile
                 href="/finance"
                 tone="rose"
