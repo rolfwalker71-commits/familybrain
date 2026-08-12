@@ -23,6 +23,7 @@ import { UserAvatar } from "@/components/users/user-avatar";
 import { APP_VERSION } from "@/lib/app-version";
 import { BRAND } from "@/lib/branding";
 import { BuddyLogo } from "@/components/brand/buddy-logo";
+import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { pageVisuals, type IconTone } from "@/components/layout/icon-circle";
 import { APP_ICON_STROKE } from "@/lib/branding/app-icons";
 import type { AdminNavMode } from "@/lib/navigation/admin-nav";
@@ -477,6 +478,12 @@ export function Sidebar({
       )}
       data-collapsed={collapsed ? "true" : "false"}
     >
+      <ThemeToggle
+        className={cn(
+          "absolute z-10",
+          collapsed ? "top-3 left-2.5" : "top-3.5 left-3.5"
+        )}
+      />
       {!onNavigate ? (
         <button
           type="button"
@@ -501,7 +508,7 @@ export function Sidebar({
       <div
         className={cn(
           collapsed ? "px-2 py-4" : "px-5 py-6",
-          !onNavigate && (collapsed ? "pt-11" : "pr-12")
+          collapsed ? "pt-11" : "pr-12 pt-11"
         )}
       >
         <button
@@ -544,7 +551,7 @@ export function Sidebar({
         {me ? (
           <div
             className={cn(
-              "mt-4 flex items-center rounded-xl bg-black/5 shadow-[inset_0_0_0_1px_rgba(15,23,42,0.08)]",
+              "mt-4 flex items-center rounded-xl bg-black/5 shadow-[inset_0_0_0_1px_rgba(15,23,42,0.08)] dark:bg-white/5 dark:shadow-[inset_0_0_0_1px_rgba(232,234,237,0.08)]",
               collapsed
                 ? "justify-center px-1.5 py-2"
                 : "gap-2.5 px-3 py-2.5"

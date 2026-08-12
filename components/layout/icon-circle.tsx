@@ -22,17 +22,20 @@ import { cn } from "@/lib/utils";
 import { APP_ICON_STROKE, appIcons } from "@/lib/branding/app-icons";
 
 export const iconToneClasses = {
-  blue: "bg-blue-50 text-blue-600",
-  amber: "bg-amber-50 text-amber-600",
-  rose: "bg-rose-50 text-rose-500",
-  orange: "bg-orange-50 text-orange-600",
+  blue: "bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300",
+  amber: "bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300",
+  rose: "bg-rose-50 text-rose-500 dark:bg-rose-500/15 dark:text-rose-300",
+  orange:
+    "bg-orange-50 text-orange-600 dark:bg-orange-500/15 dark:text-orange-300",
   /** Sage / FinanzBuddy */
   green: "bg-[var(--brand-finance-soft)] text-[var(--brand-finance)]",
   /** Dokumente / TravelBuddy — same sage as FinanzBuddy */
   teal: "bg-[var(--brand-finance-soft)] text-[var(--brand-finance)]",
-  sky: "bg-sky-50 text-sky-600",
-  indigo: "bg-indigo-50 text-indigo-600",
-  violet: "bg-violet-50 text-violet-600",
+  sky: "bg-sky-50 text-sky-600 dark:bg-sky-500/15 dark:text-sky-300",
+  indigo:
+    "bg-indigo-50 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300",
+  violet:
+    "bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300",
   /** Settings navy-ish */
   slate: "bg-[var(--brand-settings-soft)] text-[var(--brand-settings)]",
 } as const;
@@ -57,56 +60,63 @@ export const iconToneSolidClasses = {
  */
 export const toneSurfaceClasses = {
   blue: {
-    title: "border-blue-300/70 bg-blue-200/90 text-blue-950",
-    body: "border-blue-200/80 bg-blue-50/90",
-    soft: "bg-blue-100/60",
+    title:
+      "border-blue-300/70 bg-blue-200/90 text-blue-950 dark:border-blue-500/30 dark:bg-blue-500/15 dark:text-blue-100",
+    body: "border-blue-200/80 bg-blue-50/90 dark:border-blue-500/20 dark:bg-blue-500/10",
+    soft: "bg-blue-100/60 dark:bg-blue-500/10",
   },
   amber: {
-    title: "border-amber-300/70 bg-amber-200/90 text-amber-950",
-    body: "border-amber-200/80 bg-amber-50/90",
-    soft: "bg-amber-100/60",
+    title:
+      "border-amber-300/70 bg-amber-200/90 text-amber-950 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-100",
+    body: "border-amber-200/80 bg-amber-50/90 dark:border-amber-500/20 dark:bg-amber-500/10",
+    soft: "bg-amber-100/60 dark:bg-amber-500/10",
   },
   rose: {
-    title: "border-rose-300/70 bg-rose-200/90 text-rose-950",
-    body: "border-rose-200/80 bg-rose-50/90",
-    soft: "bg-rose-100/60",
+    title:
+      "border-rose-300/70 bg-rose-200/90 text-rose-950 dark:border-rose-500/30 dark:bg-rose-500/15 dark:text-rose-100",
+    body: "border-rose-200/80 bg-rose-50/90 dark:border-rose-500/20 dark:bg-rose-500/10",
+    soft: "bg-rose-100/60 dark:bg-rose-500/10",
   },
   orange: {
-    title: "border-orange-300/70 bg-orange-200/90 text-orange-950",
-    body: "border-orange-200/80 bg-orange-50/90",
-    soft: "bg-orange-100/60",
+    title:
+      "border-orange-300/70 bg-orange-200/90 text-orange-950 dark:border-orange-500/30 dark:bg-orange-500/15 dark:text-orange-100",
+    body: "border-orange-200/80 bg-orange-50/90 dark:border-orange-500/20 dark:bg-orange-500/10",
+    soft: "bg-orange-100/60 dark:bg-orange-500/10",
   },
   green: {
     title:
       "border-[color-mix(in_oklab,var(--brand-finance),white_55%)] bg-[var(--brand-finance-soft)] text-[var(--brand-finance)]",
-    body: "border-[color-mix(in_oklab,var(--brand-finance),white_70%)] bg-white",
+    body: "border-[color-mix(in_oklab,var(--brand-finance),white_70%)] bg-card",
     soft: "bg-[var(--brand-finance-soft)]",
   },
   teal: {
     title:
       "border-[color-mix(in_oklab,var(--brand-docs),white_55%)] bg-[var(--brand-docs-soft)] text-[var(--brand-docs)]",
-    body: "border-[color-mix(in_oklab,var(--brand-docs),white_70%)] bg-white",
+    body: "border-[color-mix(in_oklab,var(--brand-docs),white_70%)] bg-card",
     soft: "bg-[var(--brand-docs-soft)]",
   },
   sky: {
-    title: "border-sky-300/70 bg-sky-200/90 text-sky-950",
-    body: "border-sky-200/80 bg-sky-50/90",
-    soft: "bg-sky-100/60",
+    title:
+      "border-sky-300/70 bg-sky-200/90 text-sky-950 dark:border-sky-500/30 dark:bg-sky-500/15 dark:text-sky-100",
+    body: "border-sky-200/80 bg-sky-50/90 dark:border-sky-500/20 dark:bg-sky-500/10",
+    soft: "bg-sky-100/60 dark:bg-sky-500/10",
   },
   indigo: {
-    title: "border-indigo-300/70 bg-indigo-200/90 text-indigo-950",
-    body: "border-indigo-200/80 bg-indigo-50/90",
-    soft: "bg-indigo-100/60",
+    title:
+      "border-indigo-300/70 bg-indigo-200/90 text-indigo-950 dark:border-indigo-500/30 dark:bg-indigo-500/15 dark:text-indigo-100",
+    body: "border-indigo-200/80 bg-indigo-50/90 dark:border-indigo-500/20 dark:bg-indigo-500/10",
+    soft: "bg-indigo-100/60 dark:bg-indigo-500/10",
   },
   violet: {
-    title: "border-violet-300/70 bg-violet-200/90 text-violet-950",
-    body: "border-violet-200/80 bg-violet-50/90",
-    soft: "bg-violet-100/60",
+    title:
+      "border-violet-300/70 bg-violet-200/90 text-violet-950 dark:border-violet-500/30 dark:bg-violet-500/15 dark:text-violet-100",
+    body: "border-violet-200/80 bg-violet-50/90 dark:border-violet-500/20 dark:bg-violet-500/10",
+    soft: "bg-violet-100/60 dark:bg-violet-500/10",
   },
   slate: {
     title:
       "border-[color-mix(in_oklab,var(--brand-settings),white_60%)] bg-[var(--brand-settings-soft)] text-[var(--brand-settings)]",
-    body: "border-[color-mix(in_oklab,var(--brand-settings),white_75%)] bg-white",
+    body: "border-[color-mix(in_oklab,var(--brand-settings),white_75%)] bg-card",
     soft: "bg-[var(--brand-settings-soft)]",
   },
 } as const;

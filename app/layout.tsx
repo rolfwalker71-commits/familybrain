@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { AppShell } from "@/components/layout/app-shell";
+import { THEME_FOUC_SCRIPT } from "@/lib/theme/fouc-script";
 import { BRAND, BRAND_TAGLINE } from "@/lib/branding";
 import "./globals.css";
 
@@ -50,8 +51,11 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 5,
   viewportFit: "cover",
-  themeColor: "#ffffff",
-  colorScheme: "light",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f5f7f6" },
+    { media: "(prefers-color-scheme: dark)", color: "#1c212b" },
+  ],
+  colorScheme: "light dark",
 };
 
 export default function RootLayout({
@@ -63,7 +67,13 @@ export default function RootLayout({
     <html
       lang="de"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
+      <head>
+        <script
+          dangerouslySetInnerHTML={{ __html: THEME_FOUC_SCRIPT }}
+        />
+      </head>
       <body className="min-h-full font-sans">
         <AppShell>{children}</AppShell>
       </body>

@@ -53,9 +53,9 @@ import type { MailListItem } from "@/lib/mail/gmail";
 import { statusAsideKpiClass } from "@/lib/mari/status";
 import type { LucideIcon } from "lucide-react";
 
-/** Aside widgets: light border + subtle raised edge. */
+/** Aside widgets: light + dim-dark compatible raised edge. */
 const ASIDE_WIDGET_CLASS =
-  "border border-slate-300/80 bg-card shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_0_0_rgb(203_213_225),0_3px_10px_rgba(15,23,42,0.06)]";
+  "border border-border/70 bg-card shadow-[inset_0_1px_0_rgba(255,255,255,0.55),0_1px_0_0_rgb(203_213_225),0_3px_10px_rgba(15,23,42,0.06)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_4px_14px_rgba(0,0,0,0.28)]";
 
 const ASIDE_KPI_3D =
   "border shadow-[inset_0_1px_0_rgba(255,255,255,0.75),0_1px_0_0_rgba(15,23,42,0.08),0_2px_4px_rgba(15,23,42,0.06)]";
@@ -1452,11 +1452,11 @@ export function OverviewDashboard({
           aria-hidden
         />
         <div
-          className="absolute inset-0 bg-gradient-to-r from-white/92 via-white/78 to-white/45"
+          className="absolute inset-0 bg-gradient-to-r from-white/92 via-white/78 to-white/45 dark:from-[#1c212b]/92 dark:via-[#1c212b]/72 dark:to-[#1c212b]/35"
           aria-hidden
         />
         <div
-          className="absolute inset-0 bg-gradient-to-t from-white/55 via-transparent to-sky-50/30"
+          className="absolute inset-0 bg-gradient-to-t from-white/55 via-transparent to-sky-50/30 dark:from-[#1c212b]/70 dark:via-transparent dark:to-black/20"
           aria-hidden
         />
         <div className="relative grid gap-4 px-4 py-6 sm:px-6 sm:py-7 lg:grid-cols-[minmax(0,1fr)_minmax(16rem,22rem)] lg:items-start lg:gap-6">

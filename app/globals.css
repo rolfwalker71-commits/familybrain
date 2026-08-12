@@ -90,6 +90,10 @@
   --brand-settings-soft: #e2e8f0;
   --brand-sync: #3f6b52;
   --brand-sync-soft: #d9e4d1;
+  /* Buddy mark (3-card stack) */
+  --brand-mark-front: #e86a2b;
+  --brand-mark: #252a34;
+  --brand-mark-gap: var(--sidebar);
   /* Light slate rail — dark brand marks (Buddy charcoal, Maringo navy) read without white chips */
   --sidebar: #d6dbe3;
   --sidebar-foreground: #1e293b;
@@ -99,6 +103,54 @@
   --sidebar-accent-foreground: #0f172a;
   --sidebar-border: #b0b9c6;
   --sidebar-ring: #e86a2b;
+  color-scheme: light;
+}
+
+.dark {
+  /* Dim dark — not OLED black; readable off-white type + orange accent */
+  --background: #1c212b;
+  --foreground: #e8eaed;
+  --card: #272d38;
+  --card-foreground: #e8eaed;
+  --popover: #2a303c;
+  --popover-foreground: #e8eaed;
+  --primary: #5f8f6e;
+  --primary-foreground: #ffffff;
+  --secondary: #323948;
+  --secondary-foreground: #e8eaed;
+  --muted: #323948;
+  --muted-foreground: #9aa3b2;
+  --accent: #343b49;
+  --accent-foreground: #e8eaed;
+  --destructive: #f87171;
+  --border: #3a4252;
+  --input: #3a4252;
+  --ring: #e86a2b;
+  --chart-1: #5f8f6e;
+  --chart-2: #e86a2b;
+  --chart-3: #fbbf24;
+  --chart-4: #7dd3fc;
+  --chart-5: #94a3b8;
+  --brand-docs: #9db8a6;
+  --brand-docs-soft: #2a3330;
+  --brand-finance: #9db8a6;
+  --brand-finance-soft: #2a3330;
+  --brand-settings: #93c5fd;
+  --brand-settings-soft: #2a3548;
+  --brand-sync: #9db8a6;
+  --brand-sync-soft: #2a3330;
+  --brand-mark-front: #e86a2b;
+  --brand-mark: #c8cdd6;
+  --brand-mark-gap: var(--sidebar);
+  --sidebar: #151922;
+  --sidebar-foreground: #e8eaed;
+  --sidebar-primary: #e86a2b;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #272d38;
+  --sidebar-accent-foreground: #e8eaed;
+  --sidebar-border: #2a303c;
+  --sidebar-ring: #e86a2b;
+  color-scheme: dark;
 }
 
 @layer base {
@@ -114,7 +166,7 @@
     @apply font-sans;
     min-height: 100%;
     overscroll-behavior-y: none;
-    background-color: #ffffff;
+    background-color: var(--background);
   }
 }
 

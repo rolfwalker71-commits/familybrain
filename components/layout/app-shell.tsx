@@ -7,6 +7,7 @@ import { AnalysisStatusBar } from "@/components/analysis/analysis-status-bar";
 import { TriageMassPauseBanner } from "@/components/analysis/triage-mass-pause-banner";
 import { AuthProvider, useAuth } from "@/components/auth/auth-provider";
 import { AdminNavProvider } from "@/components/layout/admin-nav-provider";
+import { ThemeProvider } from "@/components/theme/theme-provider";
 import { RealtimeToasts } from "@/components/realtime/realtime-toasts";
 import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register";
 import { CloseoutAssistant } from "@/components/closeout/closeout-assistant";
@@ -16,13 +17,15 @@ import { Sidebar } from "./sidebar";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
-    <AuthProvider>
-      <AnalysisProvider>
-        <AdminNavProvider>
-          <AppShellInner>{children}</AppShellInner>
-        </AdminNavProvider>
-      </AnalysisProvider>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <AnalysisProvider>
+          <AdminNavProvider>
+            <AppShellInner>{children}</AppShellInner>
+          </AdminNavProvider>
+        </AnalysisProvider>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 
