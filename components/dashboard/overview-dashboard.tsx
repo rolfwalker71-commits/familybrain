@@ -19,6 +19,10 @@ import {
   Car,
   CheckCircle2,
   Monitor,
+  ExternalLink,
+  Briefcase,
+  Home,
+  Layers,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -50,16 +54,12 @@ import type {
   OverviewPeriod,
 } from "@/lib/dashboard/overview";
 import type { MailListItem } from "@/lib/mail/gmail";
-import { statusAsideKpiClass } from "@/lib/mari/status";
 import { softTint } from "@/lib/ui/soft-tint";
 import type { LucideIcon } from "lucide-react";
 
 /** Aside widgets: light + dim-dark compatible raised edge. */
 const ASIDE_WIDGET_CLASS =
   "border border-border/70 bg-card shadow-[inset_0_1px_0_rgba(255,255,255,0.55),0_1px_0_0_rgb(203_213_225),0_3px_10px_rgba(15,23,42,0.06)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_4px_14px_rgba(0,0,0,0.28)]";
-
-const ASIDE_KPI_3D =
-  "border shadow-[inset_0_1px_0_rgba(255,255,255,0.75),0_1px_0_0_rgba(15,23,42,0.08),0_2px_4px_rgba(15,23,42,0.06)]";
 
 function zurichTodayIso(): string {
   return new Intl.DateTimeFormat("en-CA", {
@@ -125,6 +125,187 @@ function isBirthdayItem(item: AgendaItem): boolean {
     item.calendarType === "birthday" ||
     /^Geburtstag\b/i.test(item.title) ||
     /\bhat\s+Geburtstag\b/i.test(item.title)
+  );
+}
+
+export type OverviewDomain = "gesamt" | "privat" | "geschaeftlich";
+
+const OVERVIEW_DOMAIN_KEY = "buddy.overviewDomain";
+
+function parseOverviewDomain(raw: string | null | undefined): OverviewDomain {
+  if (raw === "privat" || raw === "geschaeftlich" || raw === "gesamt") return raw;
+  return "gesamt";
+}
+
+/** Privat = Google; Geschäftlich = M365; sonst nur auf Gesamt. */
+function agendaItemDomain(
+  item: AgendaItem
+): "privat" | "geschaeftlich" | "shared" {
+  const id = item.calendarId || "";
+  if (id.startsWith("google-cal:")) return "privat";
+  if (id.startsWith("ms-cal:")) return "geschaeftlich";
+  if (item.kind === "hockey" || item.calendarType === "hockey") return "privat";
+  return "shared";
+}
+
+function filterAgendaByDomain(
+  items: AgendaItem[],
+  domain: OverviewDomain
+): AgendaItem[] {
+  if (domain === "gesamt") return items;
+  if (domain === "privat") {
+    return items.filter((i) => agendaItemDomain(i) === "privat");
+  }
+  return items.filter((i) => agendaItemDomain(i) === "geschaeftlich");
+}
+
+function calendarSourceMeta(item: AgendaItem): {
+  provider: "google" | "microsoft" | "other";
+  providerLabel: string;
+  calendarLabel: string;
+} {
+  const id = item.calendarId || "";
+  const name = item.calendarName?.trim() || null;
+  if (id.startsWith("google-cal:") || id.startsWith("google:")) {
+    return {
+      provider: "google",
+      providerLabel: "Google",
+      calendarLabel: name || "Google Kalender",
+    };
+  }
+  if (id.startsWith("ms-cal:") || id.startsWith("ms:")) {
+    return {
+      provider: "microsoft",
+      providerLabel: "M365",
+      calendarLabel: name || "Outlook",
+    };
+  }
+  return {
+    provider: "other",
+    providerLabel: item.badge || "Buddy",
+    calendarLabel: name || item.badge || "Kalender",
+  };
+}
+
+const MARI_DONUT_COLORS: Record<number, string> = {
+  11: "#f43f5e", // NEU
+  1: "#e86a2b", // Offen
+  3: "#8b7cf6", // In Arbeit
+  13: "#22d3ee", // Aktualisiert
+  6: "#eab308", // Warte auf Kunden
+  9: "#f59e0b",
+  7: "#a78bfa",
+  10: "#c084fc",
+  4: "#fb923c",
+  14: "#ef4444",
+};
+
+function mariDonutColor(statusId: number, index: number): string {
+  return (
+    MARI_DONUT_COLORS[statusId] ||
+    ["#e86a2b", "#8b7cf6", "#eab308", "#38bdf8", "#34d399"][index % 5]!
+  );
+}
+
+function polarDeg(cx: number, cy: number, r: number, angleDeg: number) {
+  const rad = ((angleDeg - 90) * Math.PI) / 180;
+  return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+}
+
+function donutArcPath(
+  cx: number,
+  cy: number,
+  r: number,
+  startAngle: number,
+  endAngle: number
+): string {
+  const start = polarDeg(cx, cy, r, endAngle);
+  const end = polarDeg(cx, cy, r, startAngle);
+  const large = endAngle - startAngle > 180 ? 1 : 0;
+  return `M ${start.x} ${start.y} A ${r} ${r} 0 ${large} 0 ${end.x} ${end.y}`;
+}
+
+function MariStatusDonut({
+  segments,
+  size = 104,
+}: {
+  segments: Array<{ statusId: number; label: string; count: number }>;
+  size?: number;
+}) {
+  const total = segments.reduce((s, x) => s + x.count, 0);
+  const cx = size / 2;
+  const cy = size / 2;
+  const r = size / 2 - 10;
+  const stroke = Math.max(14, size * 0.18);
+
+  if (total <= 0) {
+    return (
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden>
+        <circle
+          cx={cx}
+          cy={cy}
+          r={r}
+          fill="none"
+          stroke="var(--border)"
+          strokeWidth={stroke}
+        />
+      </svg>
+    );
+  }
+
+  let angle = 0;
+  const slices = segments.map((seg, i) => {
+    const span = (seg.count / total) * 360;
+    const startAngle = angle;
+    const endAngle = i === segments.length - 1 ? 360 : angle + span;
+    angle = endAngle;
+    return {
+      ...seg,
+      color: mariDonutColor(seg.statusId, i),
+      startAngle,
+      endAngle,
+      mid: (startAngle + endAngle) / 2,
+      span: endAngle - startAngle,
+    };
+  });
+
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox={`0 0 ${size} ${size}`}
+      role="img"
+      aria-label="Ticket-Status"
+    >
+      {slices.map((s) => {
+        const labelPos = polarDeg(cx, cy, r, s.mid);
+        return (
+          <g key={s.statusId}>
+            <path
+              d={donutArcPath(cx, cy, r, s.startAngle, s.endAngle)}
+              fill="none"
+              stroke={s.color}
+              strokeWidth={stroke}
+              strokeLinecap="butt"
+            />
+            {s.span >= 24 ? (
+              <text
+                x={labelPos.x}
+                y={labelPos.y}
+                textAnchor="middle"
+                dominantBaseline="middle"
+                fill="#fff"
+                fontSize={11}
+                fontWeight={700}
+                className="tabular-nums"
+              >
+                {s.count}
+              </text>
+            ) : null}
+          </g>
+        );
+      })}
+    </svg>
   );
 }
 
@@ -722,19 +903,27 @@ function MariTicketsAsideCard({
 }) {
   if (!data.configured) return null;
   const pollLabel = formatPollAt(data.lastPollAt);
-  /** Selected statuses from prefs (backend always returns one row each). */
   const statusCounts = data.countsByStatus;
   const positiveCounts = statusCounts.filter((c) => c.count > 0);
-  const recentChanges = data.recentChanges.slice(0, 2);
-  const showKpis = Boolean(data.lastPollAt) || data.total > 0 || statusCounts.length > 0;
+  const showKpis =
+    Boolean(data.lastPollAt) || data.total > 0 || statusCounts.length > 0;
 
   return (
     <Card className={ASIDE_WIDGET_CLASS}>
       <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2 text-[16px] font-black">
-          <MaringoLogo className="size-4" />
-          Tickets von mir
-        </CardTitle>
+        <div className="flex items-start justify-between gap-2">
+          <CardTitle className="flex items-center gap-2 text-[16px] font-black">
+            <MaringoLogo className="size-5" />
+            Tickets von mir
+          </CardTitle>
+          <Link
+            href="/maringo"
+            className="inline-flex shrink-0 items-center gap-1 text-[12px] font-semibold text-orange-600 hover:underline dark:text-orange-400"
+          >
+            Zu Maringo
+            <ExternalLink className="size-3.5" aria-hidden />
+          </Link>
+        </div>
         {data.employeeNumber ? (
           <p className="text-[12px] text-muted-foreground">
             {data.employeeNumber}
@@ -743,43 +932,60 @@ function MariTicketsAsideCard({
       </CardHeader>
       <CardContent className="space-y-3">
         {showKpis ? (
-          <div className="flex items-start gap-2.5">
-            <div className="flex min-w-[3.25rem] shrink-0 flex-col items-start leading-none">
-              <span className="text-[2.25rem] font-black tabular-nums tracking-tight text-foreground">
+          <div className="flex items-center gap-3">
+            <div className="flex min-w-[3.5rem] shrink-0 flex-col items-start leading-none">
+              <span className="text-[2.5rem] font-black tabular-nums tracking-tight text-orange-600 dark:text-orange-400">
                 {data.total}
               </span>
               <span className="mt-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                gesamt
+                Gesamt
               </span>
             </div>
             {positiveCounts.length > 0 ? (
-              <ul className="grid min-w-0 flex-1 grid-cols-2 gap-1.5 pt-0.5">
-                {positiveCounts.map((c) => (
-                  <li
-                    key={c.statusId}
-                    className={cn(
-                      "flex min-w-0 items-center justify-between gap-1.5 rounded-md px-1.5 py-1",
-                      statusAsideKpiClass(c.statusId),
-                      ASIDE_KPI_3D
-                    )}
-                    title={`${c.label}: ${c.count}`}
-                  >
-                    <p className="min-w-0 truncate text-[10px] font-medium leading-tight opacity-90">
-                      {c.label}
-                    </p>
-                    <p className="shrink-0 text-[15px] font-bold tabular-nums leading-none">
-                      {c.count}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            ) : data.lastPollAt ? (
-              <p className="min-w-0 flex-1 pt-1 text-[12px] text-muted-foreground">
-                Keine Tickets in den gewählten Status.
-              </p>
+              <>
+                <div className="shrink-0">
+                  <MariStatusDonut segments={positiveCounts} size={100} />
+                </div>
+                <ul className="min-w-0 flex-1 space-y-1.5">
+                  {positiveCounts.map((c, i) => {
+                    const pct =
+                      data.total > 0
+                        ? ((c.count / data.total) * 100).toLocaleString(
+                            "de-CH",
+                            { maximumFractionDigits: 1 }
+                          )
+                        : "0";
+                    const color = mariDonutColor(c.statusId, i);
+                    return (
+                      <li
+                        key={c.statusId}
+                        className="flex min-w-0 items-center gap-2 border-b border-border/50 pb-1.5 last:border-b-0 last:pb-0"
+                        title={`${c.label}: ${c.count}`}
+                      >
+                        <span
+                          className="size-2.5 shrink-0 rounded-full"
+                          style={{ backgroundColor: color }}
+                          aria-hidden
+                        />
+                        <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-foreground">
+                          {c.label}
+                        </span>
+                        <span className="shrink-0 text-[13px] font-bold tabular-nums">
+                          {c.count}
+                        </span>
+                        <span className="w-10 shrink-0 text-right text-[11px] tabular-nums text-muted-foreground">
+                          {pct}%
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </>
             ) : (
-              <p className="min-w-0 flex-1 pt-1 text-[12px] text-muted-foreground">
-                Noch kein Poll — Scheduler lädt gleich.
+              <p className="min-w-0 flex-1 text-[12px] text-muted-foreground">
+                {data.lastPollAt
+                  ? "Keine Tickets in den gewählten Status."
+                  : "Noch kein Poll — Scheduler lädt gleich."}
               </p>
             )}
           </div>
@@ -789,38 +995,13 @@ function MariTicketsAsideCard({
           </p>
         )}
 
-        {recentChanges.length > 0 ? (
-          <div>
-            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Letzte Änderungen
-            </p>
-            <ul className="space-y-1.5">
-              {recentChanges.map((ch, i) => (
-                <li
-                  key={`${ch.issueId}-${ch.at}-${i}`}
-                  className="min-w-0 text-[12px] leading-snug"
-                >
-                  <span className="font-semibold tabular-nums">
-                    #{ch.issueId}
-                  </span>{" "}
-                  <span className="text-muted-foreground">{ch.detail}</span>
-                  {ch.title ? (
-                    <span className="mt-0.5 block truncate text-[11px] text-foreground/80">
-                      {ch.title}
-                    </span>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
-
         <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
           <Link
             href="/maringo"
-            className="text-[12px] font-medium text-muted-foreground underline-offset-2 hover:underline"
+            className="inline-flex items-center gap-1 text-[12px] font-semibold text-orange-600 hover:underline dark:text-orange-400"
           >
-            Maringo →
+            Meine offenen Tickets anzeigen
+            <ExternalLink className="size-3.5" aria-hidden />
           </Link>
           <p className="text-[10px] text-muted-foreground">
             {pollLabel
@@ -838,11 +1019,14 @@ function DayTimeline({
   activeId,
   today,
   onSelect,
+  showCalendarSource = false,
 }: {
   items: AgendaItem[];
   activeId: string | null;
   today: string;
   onSelect: (item: AgendaItem) => void;
+  /** Gesamt: Provider + Kalendername pro Zeile */
+  showCalendarSource?: boolean;
 }) {
   if (items.length === 0) {
     return (
@@ -859,8 +1043,8 @@ function DayTimeline({
         const isTomorrow = item.date > today;
         const hm = item.time || "—";
         const isLast = index === items.length - 1;
-        // Karte wenn geocodiert (virtuelle Orte werden serverseitig nicht angereichert)
         const showMap = Boolean(item.coords);
+        const source = showCalendarSource ? calendarSourceMeta(item) : null;
 
         return (
           <li key={item.id} className="contents">
@@ -937,6 +1121,31 @@ function DayTimeline({
                       className="w-full text-left hover:opacity-90"
                       onClick={() => onSelect(item)}
                     >
+                      {source ? (
+                        <p className="mb-1 flex min-w-0 flex-wrap items-center gap-1.5">
+                          <span
+                            className={cn(
+                              "inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide",
+                              source.provider === "google" &&
+                                "border-sky-300/80 bg-sky-50 text-sky-900 dark:border-sky-400/35 dark:bg-sky-500/15 dark:text-sky-100",
+                              source.provider === "microsoft" &&
+                                "border-violet-300/80 bg-violet-50 text-violet-950 dark:border-violet-400/35 dark:bg-violet-500/15 dark:text-violet-100",
+                              source.provider === "other" &&
+                                "border-border/70 bg-muted/50 text-muted-foreground"
+                            )}
+                          >
+                            {source.provider === "google" ? (
+                              <GoogleLogo className="size-3" />
+                            ) : source.provider === "microsoft" ? (
+                              <MicrosoftLogo className="size-3" />
+                            ) : null}
+                            {source.providerLabel}
+                          </span>
+                          <span className="min-w-0 truncate text-[11px] text-muted-foreground">
+                            {source.calendarLabel}
+                          </span>
+                        </p>
+                      ) : null}
                       <p className="truncate text-[14px] font-black tracking-tight">
                         {item.title}
                       </p>
@@ -1237,8 +1446,26 @@ export function OverviewDashboard({
   const [adhocOpen, setAdhocOpen] = useState(false);
   const [fromCache, setFromCache] = useState(false);
   const [nowTick, setNowTick] = useState(0);
+  const [domain, setDomain] = useState<OverviewDomain>("gesamt");
   const dataRef = useRef<OverviewPayload | null>(null);
   dataRef.current = data;
+
+  useEffect(() => {
+    try {
+      setDomain(parseOverviewDomain(localStorage.getItem(OVERVIEW_DOMAIN_KEY)));
+    } catch {
+      setDomain("gesamt");
+    }
+  }, []);
+
+  function selectDomain(next: OverviewDomain) {
+    setDomain(next);
+    try {
+      localStorage.setItem(OVERVIEW_DOMAIN_KEY, next);
+    } catch {
+      /* ignore */
+    }
+  }
 
   useEffect(() => {
     const id = window.setInterval(() => setNowTick((n) => n + 1), 30_000);
@@ -1363,20 +1590,25 @@ export function OverviewDashboard({
     return filterAblaufTimelineItems(merged, today, nowHm, 30);
   }, [data, today, nowHm]);
 
+  const domainTimelineItems = useMemo(
+    () => filterAgendaByDomain(timelineItems, domain),
+    [timelineItems, domain]
+  );
+
   const nextFocusEvents = useMemo(
-    () => pickNextUpcomingAgendaItems(timelineItems, today, nowHm, 2),
-    [timelineItems, today, nowHm]
+    () => pickNextUpcomingAgendaItems(domainTimelineItems, today, nowHm, 2),
+    [domainTimelineItems, today, nowHm]
   );
 
   const activeId =
     useMemo(
-      () => pickActiveTimelineItem(timelineItems, today, nowHm)?.id ?? null,
-      [timelineItems, today, nowHm]
+      () => pickActiveTimelineItem(domainTimelineItems, today, nowHm)?.id ?? null,
+      [domainTimelineItems, today, nowHm]
     );
 
   const conflicts = useMemo(
-    () => findConflicts(timelineItems, today, nowHm),
-    [timelineItems, today, nowHm]
+    () => findConflicts(domainTimelineItems, today, nowHm),
+    [domainTimelineItems, today, nowHm]
   );
 
   const CONFLICT_MUTE_KEY = "buddy-conflicts-muted-ymd";
@@ -1447,8 +1679,31 @@ export function OverviewDashboard({
   const msSample = mailInboxSample(mailFocusMicrosoft);
   const gSample = mailInboxSample(mailFocusGoogle);
 
+  const domainTasks = useMemo(() => {
+    const items = data?.tasks?.items || [];
+    if (domain === "gesamt") return items;
+    if (domain === "privat") {
+      return items.filter((t) => (t.source || "google") === "google");
+    }
+    return items.filter(
+      (t) => t.source === "planner" || t.source === "todo"
+    );
+  }, [data?.tasks?.items, domain]);
+
+  const domainTabs: {
+    id: OverviewDomain;
+    label: string;
+    icon: LucideIcon;
+  }[] = [
+    { id: "gesamt", label: "Gesamt", icon: Layers },
+    { id: "privat", label: "Privat", icon: Home },
+    { id: "geschaeftlich", label: "Geschäftlich", icon: Briefcase },
+  ];
+
+
   return (
     <div className="min-w-0 space-y-6 pb-10">
+      {domain === "gesamt" ? (
       <header className="relative overflow-hidden rounded-2xl border border-border/40 shadow-[0_8px_30px_rgba(15,23,42,0.06)]">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -1520,6 +1775,53 @@ export function OverviewDashboard({
           ) : null}
         </div>
       </header>
+      ) : (
+        <header className="flex flex-wrap items-end justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="text-[24px] font-black tracking-tight sm:text-[28px]">
+              {domain === "privat" ? "Privat" : "Geschäftlich"}
+              {greetingName ? ` · ${greetingName}` : ""}
+            </h1>
+            <p className="text-[14px] capitalize text-muted-foreground">
+              {formatLongDeDate()}
+              {domain === "privat"
+                ? " · Google Workspace"
+                : " · Microsoft 365 & Maringo"}
+            </p>
+          </div>
+          {refreshing || fromCache ? (
+            <p className="text-[12px] text-muted-foreground">
+              {refreshing ? "Aktualisiere…" : "Zwischengespeicherte Ansicht"}
+            </p>
+          ) : null}
+        </header>
+      )}
+
+      <nav
+        className="flex flex-wrap gap-1 rounded-xl border border-border/60 bg-muted/30 p-1"
+        aria-label="Übersicht Domäne"
+      >
+        {domainTabs.map((tab) => {
+          const Icon = tab.icon;
+          const active = domain === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => selectDomain(tab.id)}
+              className={cn(
+                "inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[13px] font-semibold transition-colors sm:flex-none",
+                active
+                  ? "bg-card text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <Icon className="size-3.5" strokeWidth={APP_ICON_STROKE} />
+              {tab.label}
+            </button>
+          );
+        })}
+      </nav>
 
       {error ? (
         <p className="text-[15px] text-destructive">{error}</p>
@@ -1531,7 +1833,11 @@ export function OverviewDashboard({
         <>
           <section className="space-y-3">
             <h2 className="text-[14px] font-black tracking-tight text-foreground">
-              Heute im Fokus
+              {domain === "privat"
+                ? "Privat · Fokus"
+                : domain === "geschaeftlich"
+                  ? "Geschäftlich · Fokus"
+                  : "Heute im Fokus"}
             </h2>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <FocusTile
@@ -1554,6 +1860,7 @@ export function OverviewDashboard({
                     : "Kalender öffnen"
                 }
               />
+{domain === "gesamt" ? (
               <FocusTile
                 href="/finance"
                 tone="rose"
@@ -1570,6 +1877,8 @@ export function OverviewDashboard({
                     : "Finanzen im Blick"
                 }
               />
+) : null}
+              {(domain === "gesamt" || domain === "geschaeftlich") && (
               <FocusTile
                 href={
                   (msMailStats?.pendingTriage || 0) > 0
@@ -1606,6 +1915,8 @@ export function OverviewDashboard({
                       : "Keine wichtigen"
                 }
               />
+              )}
+              {(domain === "gesamt" || domain === "privat") && (
               <FocusTile
                 href={
                   (gMailStats?.pendingTriage || 0) > 0
@@ -1640,6 +1951,7 @@ export function OverviewDashboard({
                       : "Keine wichtigen"
                 }
               />
+              )}
             </div>
           </section>
 
@@ -1647,7 +1959,11 @@ export function OverviewDashboard({
             <section className="min-w-0 space-y-3">
               <div className="flex items-baseline justify-between gap-2">
                 <h2 className="text-[14px] font-black tracking-tight">
-                  Heute · Ablauf
+                  {domain === "privat"
+                    ? "Heute · Privat"
+                    : domain === "geschaeftlich"
+                      ? "Heute · Geschäftlich"
+                      : "Heute · Ablauf"}
                 </h2>
                 <div className="flex shrink-0 items-center gap-2">
                   <Button
@@ -1704,10 +2020,11 @@ export function OverviewDashboard({
               <Card className="border-border/60 shadow-[0_4px_18px_rgba(15,23,42,0.05)]">
                 <CardContent className="px-3 py-3 sm:px-5 sm:py-4">
                   <DayTimeline
-                    items={timelineItems}
+                    items={domainTimelineItems}
                     activeId={activeId}
                     today={today}
                     onSelect={setEventDetail}
+                    showCalendarSource={domain === "gesamt"}
                   />
                 </CardContent>
               </Card>
@@ -1717,7 +2034,7 @@ export function OverviewDashboard({
                   Aufgaben
                 </h2>
                 <HomeTasksSection
-                  items={(data.tasks?.items || []).map((t) => ({
+                  items={domainTasks.map((t) => ({
                     key: t.key || `${t.source || "google"}:${t.id}`,
                     id: t.id,
                     source: t.source || "google",
@@ -1735,21 +2052,33 @@ export function OverviewDashboard({
                     bucketId: t.bucketId ?? null,
                   }))}
                   today={today}
-                  hasGoogleScope={Boolean(data.tasks?.hasGoogleScope)}
-                  hasMicrosoftScope={Boolean(data.tasks?.hasMicrosoftScope)}
+                  hasGoogleScope={
+                    domain !== "geschaeftlich" &&
+                    Boolean(data.tasks?.hasGoogleScope)
+                  }
+                  hasMicrosoftScope={
+                    domain !== "privat" &&
+                    Boolean(data.tasks?.hasMicrosoftScope)
+                  }
                   onChanged={() => void load()}
                 />
               </div>
             </section>
 
             <aside className="min-w-0 space-y-4">
-              <BirthdaysAsideCard items={upcomingBirthdays} today={today} />
-
-              {data.mariTickets?.configured ? (
-                <MariTicketsAsideCard data={data.mariTickets} />
+              {domain === "gesamt" || domain === "privat" ? (
+                <BirthdaysAsideCard items={upcomingBirthdays} today={today} />
               ) : null}
 
-              {data.referenceNotes && data.referenceNotes.length > 0 ? (
+              {domain === "gesamt" || domain === "geschaeftlich"
+                ? data.mariTickets?.configured
+                  ? <MariTicketsAsideCard data={data.mariTickets} />
+                  : null
+                : null}
+
+              {(domain === "gesamt" || domain === "privat") &&
+              data.referenceNotes &&
+              data.referenceNotes.length > 0 ? (
                 <Card className={ASIDE_WIDGET_CLASS}>
                   <CardHeader className="pb-2">
                     <CardTitle className="flex items-center gap-2 text-[16px] font-black">
@@ -1794,11 +2123,14 @@ export function OverviewDashboard({
                 </Card>
               ) : null}
 
-              {data.hockey.nextGame ? (
+              {(domain === "gesamt" || domain === "privat") &&
+              data.hockey.nextGame ? (
                 <NextHockeyCard game={data.hockey.nextGame} />
               ) : null}
 
-              <DriveAsideCard data={data} />
+              {domain === "gesamt" || domain === "privat" ? (
+                <DriveAsideCard data={data} />
+              ) : null}
             </aside>
           </div>
 
