@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   formatMariProjectLabel,
+  normalizeMariDueDate,
+  sanitizeMariProjectNumber,
   shiftTimePeriodAnchor,
 } from "@/lib/mari/timekeeping-shared";
 
@@ -16,6 +18,33 @@ test("formatMariProjectLabel builds Kunde (Projektnummer)", () => {
   assert.equal(
     formatMariProjectLabel("P200000", "Acme AG (P200000)"),
     "Acme AG (P200000)"
+  );
+});
+
+test("sanitizeMariProjectNumber rejects customer matchcodes", () => {
+  assert.equal(sanitizeMariProjectNumber("P600014"), "P600014");
+  assert.equal(
+    sanitizeMariProjectNumber("CT-X Holding AG", {
+      addressMatchcode: "CT-X Holding AG",
+    }),
+    null
+  );
+  assert.equal(
+    sanitizeMariProjectNumber("CT-X Holding AG (P600014)"),
+    null
+  );
+  assert.equal(sanitizeMariProjectNumber("C12345", { cardCode: "C12345" }), null);
+});
+
+test("normalizeMariDueDate treats MARI sentinel as empty", () => {
+  assert.equal(normalizeMariDueDate(null), null);
+  assert.equal(normalizeMariDueDate(""), null);
+  assert.equal(normalizeMariDueDate("0001-01-01"), null);
+  assert.equal(normalizeMariDueDate("0001-01-01T00:00:00"), null);
+  assert.equal(normalizeMariDueDate("2026-08-12"), "2026-08-12");
+  assert.equal(
+    normalizeMariDueDate("2026-08-12T00:00:00"),
+    "2026-08-12T00:00:00"
   );
 });
 

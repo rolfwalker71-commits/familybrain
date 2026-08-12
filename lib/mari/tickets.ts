@@ -23,6 +23,10 @@ import {
   WORK_STATUS_IDS,
   statusChipLabel,
 } from "@/lib/mari/status";
+import {
+  normalizeMariDueDate,
+  sanitizeMariProjectNumber,
+} from "@/lib/mari/timekeeping-shared";
 
 export type { MariTimelineKind, MariTimelineSide } from "@/lib/mari/timeline-side";
 export {
@@ -390,7 +394,7 @@ ORDER BY
         PRIORITY_LABELS[Number(r.Priority)] ||
         `Prio ${r.Priority}`,
       cardCode: r.CardCode || null,
-      dueDate: r.DueDate || null,
+      dueDate: normalizeMariDueDate(r.DueDate),
       handledBy: r.HandledBy || null,
       changeAtDate: r.ChangeAtDate || null,
       issueType: r.IssueType == null ? null : Number(r.IssueType),
@@ -412,7 +416,10 @@ ORDER BY
           ? null
           : String(r.StdFreigabe).trim(),
       aiLabel: ai,
-      projectNumber: (r.ProjectNumber || "").trim() || null,
+      projectNumber: sanitizeMariProjectNumber(r.ProjectNumber, {
+        addressMatchcode: r.AddressMatchcode || null,
+        cardCode: r.CardCode || null,
+      }),
       phaseId: r.PhaseID == null || Number(r.PhaseID) === 0 ? null : Number(r.PhaseID),
       phaseName: null,
       contractId:
@@ -928,6 +935,15 @@ WHERE i."IssueID"=${issueId}`
   if (!projectNumber && typeof issue.Project === "string") {
     projectNumber = issue.Project.trim() || null;
   }
+  const cardCodeResolved =
+    cardCodeFromView ||
+    (typeof issue.BusinessPartnerCode === "string"
+      ? issue.BusinessPartnerCode
+      : null);
+  projectNumber = sanitizeMariProjectNumber(projectNumber, {
+    addressMatchcode,
+    cardCode: cardCodeResolved,
+  });
   if (
     phaseId == null &&
     issue.PhaseID != null &&
@@ -992,14 +1008,11 @@ WHERE i."IssueID"=${issueId}`
     statusName,
     priority,
     priorityName,
-    cardCode:
-      cardCodeFromView ||
-      (typeof issue.BusinessPartnerCode === "string"
-        ? issue.BusinessPartnerCode
-        : null),
-    dueDate:
+    cardCode: cardCodeResolved,
+    dueDate: normalizeMariDueDate(
       dueDateFromView ||
-      (typeof issue.DueDate === "string" ? issue.DueDate : null),
+        (typeof issue.DueDate === "string" ? issue.DueDate : null)
+    ),
     handledBy:
       handledByFromView ||
       (typeof issue.Responsible === "string" ? issue.Responsible : null),

@@ -73,6 +73,48 @@ export function formatMariProjectLabel(
   return `${name} (${pn})`;
 }
 
+/**
+ * True for MARI project numbers (e.g. P600014). Rejects customer names / CardCodes
+ * so Kopf-Formulare nicht mit Matchcode vorbelegt werden.
+ */
+export function looksLikeMariProjectNumber(
+  raw: string | null | undefined
+): boolean {
+  const t = (raw || "").trim();
+  if (!t || /\s/.test(t)) return false;
+  if (/^P\d{3,}$/i.test(t)) return true;
+  // manche Mandanten nutzen rein numerische Projektkeys
+  if (/^\d{4,}$/.test(t)) return true;
+  return false;
+}
+
+export function sanitizeMariProjectNumber(
+  projectNumber: string | null | undefined,
+  opts?: { addressMatchcode?: string | null; cardCode?: string | null }
+): string | null {
+  const pn = (projectNumber || "").trim();
+  if (!pn) return null;
+  const am = (opts?.addressMatchcode || "").trim();
+  const cc = (opts?.cardCode || "").trim();
+  if (am && pn === am) return null;
+  if (cc && pn === cc) return null;
+  if (!looksLikeMariProjectNumber(pn)) return null;
+  return pn;
+}
+
+/** MARI-Sentinel «01.01.0001» / leere DueDate → null. */
+export function normalizeMariDueDate(
+  raw: string | null | undefined
+): string | null {
+  if (!raw?.trim()) return null;
+  const d = raw.trim();
+  const ymd = d.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return null;
+  const y = Number(ymd.slice(0, 4));
+  if (!Number.isFinite(y) || y < 1900) return null;
+  return d;
+}
+
 export type MariDayTimeSummary = {
   date: string;
   period: MariTimePeriod;

@@ -1,12 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import type { MariKeyPair } from "@/lib/mari/timekeeping-shared";
-import { formatMariProjectLabel } from "@/lib/mari/timekeeping-shared";
+import {
+  formatMariProjectLabel,
+  looksLikeMariProjectNumber,
+  sanitizeMariProjectNumber,
+} from "@/lib/mari/timekeeping-shared";
 import { MariKeyPairPicker } from "@/components/maringo/mari-key-pair-picker";
 import type { MariEmployeeOption } from "@/lib/mari/tickets";
 import type {
@@ -87,14 +91,18 @@ export function MaringoTicketKopfForm({
   className?: string;
 }) {
   const initialContact = splitContactPerson(defaults.contactPerson);
+  const initialProjectNumber =
+    sanitizeMariProjectNumber(defaults.projectNumber) || "";
   const [projectQuery, setProjectQuery] = useState("");
   const [projects, setProjects] = useState<MariKeyPair[]>([]);
-  const [projectNumber, setProjectNumber] = useState(
-    defaults.projectNumber || ""
-  );
-  const [projectLabel, setProjectLabel] = useState(
-    defaults.projectLabel || defaults.projectNumber || ""
-  );
+  const [projectNumber, setProjectNumber] = useState(initialProjectNumber);
+  const [projectLabel, setProjectLabel] = useState(() => {
+    if (!initialProjectNumber) return "";
+    return (
+      defaults.projectLabel?.trim() ||
+      formatMariProjectLabel(initialProjectNumber, null)
+    );
+  });
   const [contracts, setContracts] = useState<MariKeyPair[]>([]);
   const [contractId, setContractId] = useState(
     defaults.contractId != null && defaults.contractId > 0
@@ -280,21 +288,29 @@ export function MaringoTicketKopfForm({
   }, [contractId]);
 
   function selectProject(p: MariKeyPair) {
-    const pn = p.keyVisible || p.keyInternal;
-    setProjectNumber(p.keyInternal || p.keyVisible);
+    const visible = (p.keyVisible || "").trim();
+    const internal = (p.keyInternal || "").trim();
+    const pn = looksLikeMariProjectNumber(visible)
+      ? visible
+      : looksLikeMariProjectNumber(internal)
+        ? internal
+        : visible || internal;
+    setProjectNumber(pn);
     setProjectLabel(formatMariProjectLabel(pn, p.matchcode));
     setProjectOpen(false);
     setContractId("");
     setContractPositionId("");
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     setHint(null);
-    const pn = projectNumber.trim();
+    const pn = sanitizeMariProjectNumber(projectNumber);
     if (!pn) {
-      setError("Projektnummer fehlt.");
+      setError(
+        "Projektnummer fehlt — bitte ein Projekt aus der Liste wählen (nicht den Kundennamen)."
+      );
       return;
     }
     const act = activity.trim();

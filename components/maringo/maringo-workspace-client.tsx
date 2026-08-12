@@ -1316,10 +1316,12 @@ export function MaringoWorkspaceClient() {
           ticket
             ? {
                 projectNumber: ticket.projectNumber,
-                projectLabel: formatMariProjectLabel(
-                  ticket.projectNumber,
-                  ticket.addressMatchcode || ticket.cardCode
-                ),
+                projectLabel: ticket.projectNumber
+                              ? formatMariProjectLabel(
+                                  ticket.projectNumber,
+                                  ticket.addressMatchcode || ticket.cardCode
+                                )
+                              : "",
                 contractId: ticket.contractId,
                 contractPositionId: ticket.contractPositionId,
                 activity: ticket.briefDescription,
@@ -3199,10 +3201,12 @@ export function MaringoWorkspaceClient() {
                         key={`kopf-${detail.issueId}-${detail.changeAtDate || ""}`}
                         defaults={{
                           projectNumber: detail.projectNumber,
-                          projectLabel: formatMariProjectLabel(
-                            detail.projectNumber,
-                            detail.addressMatchcode || detail.cardCode
-                          ),
+                          projectLabel: detail.projectNumber
+                              ? formatMariProjectLabel(
+                                  detail.projectNumber,
+                                  detail.addressMatchcode || detail.cardCode
+                                )
+                              : "",
                           contractId: detail.contractId,
                           contractPositionId: detail.contractPositionId,
                           activity: detail.briefDescription,
@@ -3225,10 +3229,12 @@ export function MaringoWorkspaceClient() {
                             ? {
                                 issueId: detail.issueId,
                                 projectNumber: detail.projectNumber,
-                                projectLabel: formatMariProjectLabel(
+                                projectLabel: detail.projectNumber
+                              ? formatMariProjectLabel(
                                   detail.projectNumber,
                                   detail.addressMatchcode || detail.cardCode
-                                ),
+                                )
+                              : "",
                                 contractId: detail.contractId,
                                 contractPositionId: detail.contractPositionId,
                                 activity: detail.briefDescription.slice(0, 100),
@@ -3319,10 +3325,12 @@ export function MaringoWorkspaceClient() {
             ? {
                 issueId: detail.issueId,
                 projectNumber: detail.projectNumber,
-                projectLabel: formatMariProjectLabel(
-                  detail.projectNumber,
-                  detail.addressMatchcode || detail.cardCode
-                ),
+                projectLabel: detail.projectNumber
+                              ? formatMariProjectLabel(
+                                  detail.projectNumber,
+                                  detail.addressMatchcode || detail.cardCode
+                                )
+                              : "",
                 contractId: detail.contractId,
                 contractPositionId: detail.contractPositionId,
                 activity: detail.briefDescription.slice(0, 100),

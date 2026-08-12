@@ -2123,8 +2123,7 @@ export function OverviewDashboard({
                 </Card>
               ) : null}
 
-              {(domain === "gesamt" || domain === "privat") &&
-              data.hockey.nextGame ? (
+              {domain === "privat" && data.hockey.nextGame ? (
                 <NextHockeyCard game={data.hockey.nextGame} />
               ) : null}
 
