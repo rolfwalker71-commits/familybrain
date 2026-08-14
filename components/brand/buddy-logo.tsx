@@ -1,46 +1,47 @@
-import { BRAND } from "@/lib/branding";
+import { BRAND, BRAND_LOGO_SRC } from "@/lib/branding";
 import { cn } from "@/lib/utils";
 
 /**
- * Dual-mode Buddy mark: 3 staggered rounded cards.
- * Front = --brand-mark-front (orange); rear = --brand-mark;
- * gaps punch through via --brand-mark-gap (defaults to --sidebar).
+ * Buddy mark 2026 F · Capsules (freigestellt).
+ * Light + dark raster assets so rear pebbles stay readable on both sidebars.
  */
 export function BuddyLogo({
   size = 48,
   className,
-  priority: _priority = false,
+  priority = false,
 }: {
   size?: number;
   className?: string;
-  /** Kept for call-site compatibility (SVG has no load priority). */
   priority?: boolean;
 }) {
-  void _priority;
-  const gap = "var(--brand-mark-gap, var(--sidebar))";
-  const mark = "var(--brand-mark)";
-  const front = "var(--brand-mark-front, #e86a2b)";
-
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 64 64"
-      role="img"
-      aria-label={BRAND.app}
-      className={cn("select-none", className)}
+    <span
+      className={cn("relative inline-flex shrink-0", className)}
+      style={{ width: size, height: size }}
     >
-      <title>{BRAND.app}</title>
-      {/* Back slab */}
-      <rect x="24" y="4" width="30" height="46" rx="6.5" fill={mark} />
-      {/* Knockout behind middle */}
-      <rect x="14" y="11" width="30" height="46" rx="6.5" fill={gap} />
-      {/* Middle slab */}
-      <rect x="16" y="13" width="30" height="46" rx="6.5" fill={mark} />
-      {/* Knockout behind front */}
-      <rect x="4" y="20" width="30" height="40" rx="6.5" fill={gap} />
-      {/* Front slab (brand orange) */}
-      <rect x="6" y="22" width="30" height="38" rx="6.5" fill={front} />
-    </svg>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={BRAND_LOGO_SRC}
+        width={size}
+        height={size}
+        alt={BRAND.app}
+        decoding="async"
+        loading={priority ? "eager" : "lazy"}
+        className="size-full object-contain dark:hidden"
+        draggable={false}
+      />
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/buddy-logo-dark.png"
+        width={size}
+        height={size}
+        alt=""
+        aria-hidden
+        decoding="async"
+        loading={priority ? "eager" : "lazy"}
+        className="hidden size-full object-contain dark:block"
+        draggable={false}
+      />
+    </span>
   );
 }
