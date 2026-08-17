@@ -5,7 +5,8 @@ Activity details: {{details}}.
 Traveler notes: {{notes}}.
 Receipt context: {{beleg}}.
 Scene idea: {{scene}}.
-Style: clean modern editorial illustration, soft flat colors with gentle shading, friendly travel poster vibe. Any text in the image must be spelled correctly and clearly readable. No logos, watermarks, prices, or UI chrome. Suitable as a small card thumbnail.`;
+Style: clean modern editorial illustration, soft flat colors with gentle shading, friendly travel poster vibe. Any text in the image must be spelled correctly and clearly readable. No logos, watermarks, prices, or UI chrome. Suitable as a small card thumbnail.
+Timing rule: Only depict clock times, schedules, Abfahrt, Ankunft, departure or arrival times if Activity details explicitly list them. If details say Tagesausflug / all-day / no clock times, show NO times at all on the image.`;
 
 /** Public placeholders for the settings UI / custom templates. */
 export const EVENT_AI_IMAGE_PROMPT_PLACEHOLDERS = [
@@ -27,9 +28,29 @@ function trimOrEmpty(raw: string | null | undefined): string {
   return (raw || "").trim();
 }
 
+/** Treat blank / placeholder clock strings as "no time". */
+export function hasExplicitClockTime(
+  startTime?: string | null,
+  endTime?: string | null
+): boolean {
+  const start = trimOrEmpty(startTime);
+  const end = trimOrEmpty(endTime);
+  return Boolean(start || end);
+}
+
+function isDayTripType(eventType: string): boolean {
+  return (
+    eventType === "Ausflug" ||
+    eventType === "Aktivität" ||
+    eventType === "Sonstiges" ||
+    eventType === "Notiz"
+  );
+}
+
 function sceneForType(
   eventType: string,
-  cabinClass?: string | null
+  cabinClass?: string | null,
+  allDay?: boolean
 ): string {
   switch (eventType) {
     case "Flug": {
@@ -53,9 +74,13 @@ function sceneForType(
       return "train journey atmosphere at a railway station or scenic rail travel";
     case "Ausflug":
     case "Aktivität":
-      return "memorable sightseeing or outdoor activity atmosphere";
+      return allDay
+        ? "memorable all-day sightseeing outing atmosphere, no clocks or timetable boards"
+        : "memorable sightseeing or outdoor activity atmosphere";
     default:
-      return "authentic travel moment atmosphere";
+      return allDay
+        ? "authentic travel day atmosphere without clocks or departure boards"
+        : "authentic travel moment atmosphere";
   }
 }
 
@@ -101,17 +126,28 @@ function buildActivityDetails(event: EventImagePromptInput): string {
     if (v) parts.push(`${label}: ${v}`);
   };
 
+  const type = trimOrEmpty(event.event_type) || "Sonstiges";
   const startDate = trimOrEmpty(event.start_date);
   const endDate = trimOrEmpty(event.end_date);
   const startT = trimOrEmpty(event.start_time);
   const endT = trimOrEmpty(event.end_time);
+  const hasClock = hasExplicitClockTime(startT, endT);
   const datePart =
     startDate && endDate && endDate !== startDate
       ? `${startDate} – ${endDate}`
       : startDate || endDate || "";
-  const timePart =
-    startT || endT ? [startT, endT].filter(Boolean).join("–") : "";
-  push("when", [datePart, timePart].filter(Boolean).join(" "));
+
+  if (datePart) push("when", datePart);
+
+  if (hasClock) {
+    push("times", [startT, endT].filter(Boolean).join("–"));
+  } else if (isDayTripType(type) || Boolean(datePart)) {
+    // Explicit so the image model does not invent Abfahrt/Ankunft clocks.
+    push(
+      "schedule",
+      "Tagesausflug ohne Uhrzeit — no clock times, no Abfahrt, no Ankunft, no departure/arrival times on the image"
+    );
+  }
 
   push("place", trimOrEmpty(event.place_name));
   push("location", trimOrEmpty(event.location));
@@ -208,6 +244,7 @@ export function buildEventImagePrompt(
   template: string = DEFAULT_EVENT_AI_IMAGE_PROMPT
 ): string {
   const type = event.event_type || "Sonstiges";
+  const allDay = !hasExplicitClockTime(event.start_time, event.end_time);
   const notes = clip(event.notes, 180);
   const beleg = clip(
     (event.document_notes_md || "")
@@ -222,6 +259,6 @@ export function buildEventImagePrompt(
     details: buildActivityDetails(event),
     notes: notes || "",
     beleg: beleg || "",
-    scene: sceneForType(type, event.cabin_class),
+    scene: sceneForType(type, event.cabin_class, allDay),
   });
 }

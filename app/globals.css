@@ -188,16 +188,18 @@
   }
 }
 
-/* Safari paints "today" into empty date/time fields — hide that fake text so
-   empty fields look empty; real values stay bold foreground. */
-input[type="date"][data-empty="true"]::-webkit-datetime-edit-year-field,
-input[type="date"][data-empty="true"]::-webkit-datetime-edit-month-field,
-input[type="date"][data-empty="true"]::-webkit-datetime-edit-day-field,
-input[type="date"][data-empty="true"]::-webkit-datetime-edit-text,
-input[type="time"][data-empty="true"]::-webkit-datetime-edit-hour-field,
-input[type="time"][data-empty="true"]::-webkit-datetime-edit-minute-field,
-input[type="time"][data-empty="true"]::-webkit-datetime-edit-ampm-field,
-input[type="time"][data-empty="true"]::-webkit-datetime-edit-text {
+/* Safari paints "today"/placeholder chrome into empty date/time fields — hide
+   that fake text when empty AND not focused. While typing/focusing, keep
+   foreground color so manually entered values stay readable (picker-only
+   visibility was a common bug). */
+input[type="date"][data-empty="true"]:not(:focus)::-webkit-datetime-edit-year-field,
+input[type="date"][data-empty="true"]:not(:focus)::-webkit-datetime-edit-month-field,
+input[type="date"][data-empty="true"]:not(:focus)::-webkit-datetime-edit-day-field,
+input[type="date"][data-empty="true"]:not(:focus)::-webkit-datetime-edit-text,
+input[type="time"][data-empty="true"]:not(:focus)::-webkit-datetime-edit-hour-field,
+input[type="time"][data-empty="true"]:not(:focus)::-webkit-datetime-edit-minute-field,
+input[type="time"][data-empty="true"]:not(:focus)::-webkit-datetime-edit-ampm-field,
+input[type="time"][data-empty="true"]:not(:focus)::-webkit-datetime-edit-text {
   color: transparent;
 }
 
@@ -208,7 +210,15 @@ input[type="date"]:not([data-empty="true"])::-webkit-datetime-edit-text,
 input[type="time"]:not([data-empty="true"])::-webkit-datetime-edit-hour-field,
 input[type="time"]:not([data-empty="true"])::-webkit-datetime-edit-minute-field,
 input[type="time"]:not([data-empty="true"])::-webkit-datetime-edit-ampm-field,
-input[type="time"]:not([data-empty="true"])::-webkit-datetime-edit-text {
+input[type="time"]:not([data-empty="true"])::-webkit-datetime-edit-text,
+input[type="date"]:focus::-webkit-datetime-edit-year-field,
+input[type="date"]:focus::-webkit-datetime-edit-month-field,
+input[type="date"]:focus::-webkit-datetime-edit-day-field,
+input[type="date"]:focus::-webkit-datetime-edit-text,
+input[type="time"]:focus::-webkit-datetime-edit-hour-field,
+input[type="time"]:focus::-webkit-datetime-edit-minute-field,
+input[type="time"]:focus::-webkit-datetime-edit-ampm-field,
+input[type="time"]:focus::-webkit-datetime-edit-text {
   color: var(--foreground);
   font-weight: 600;
 }
