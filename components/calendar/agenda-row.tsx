@@ -195,7 +195,7 @@ export function weekdayLabel(iso: string): string {
 
 function AgendaWeatherLine({ weather }: { weather: AgendaWeatherChip }) {
   return (
-    <p className="mt-1 truncate text-[12px] text-muted-foreground">
+    <p className="mt-1 text-xs leading-snug text-muted-foreground">
       <span aria-hidden>{weather.icon}</span>{" "}
       <span className="tabular-nums">{weather.temperatureC}°</span>
       {weather.labelDe?.trim() ? ` · ${weather.labelDe.trim()}` : ""}
@@ -244,8 +244,8 @@ export function AgendaRow({
   const inner = (
     <div
       className={cn(
-        "overflow-hidden rounded-xl border border-border/60 bg-card shadow-[0_2px_10px_rgba(20,32,28,0.04)]",
-        isPaymentPipeline && "border-sky-300/80"
+        "overflow-hidden rounded-xl bg-card shadow-[0_2px_10px_rgba(20,32,28,0.04)] ring-1 ring-border/50",
+        isPaymentPipeline && "ring-sky-300/80"
       )}
     >
       <div className="flex items-stretch">
@@ -280,39 +280,39 @@ export function AgendaRow({
           <div className="min-w-0 flex-1">
             {upcomingHockey ? (
               <>
-                <p className="truncate text-[14px] font-black text-foreground">
+                <p className="text-sm font-black leading-snug text-foreground break-words">
                   {upcomingLine1}
                 </p>
                 {upcomingLine2 ? (
-                  <p className="truncate text-[13px] text-muted-foreground">
+                  <p className="text-[13px] leading-snug text-muted-foreground break-words">
                     {upcomingLine2}
                   </p>
                 ) : null}
-                <p className="truncate text-[13px] text-muted-foreground">
+                <p className="text-[13px] leading-snug text-muted-foreground break-words">
                   {upcomingLine3}
                 </p>
               </>
             ) : isHockey && hasLogos ? (
               <>
                 {item.subtitle ? (
-                  <p className="truncate text-[14px] font-black text-foreground">
+                  <p className="text-sm font-black leading-snug text-foreground break-words">
                     {item.subtitle}
                   </p>
                 ) : null}
-                <p className="truncate text-[13px] text-muted-foreground">
+                <p className="text-[13px] leading-snug text-muted-foreground break-words">
                   {item.title}
                 </p>
               </>
             ) : (
               <>
-                <p className="truncate text-[14px] font-black">{item.title}</p>
+                <p className="text-sm font-black leading-snug break-words">{item.title}</p>
                 {item.subtitle ? (
-                  <p className="truncate text-[13px] text-muted-foreground">
+                  <p className="text-[13px] leading-snug text-muted-foreground break-words">
                     {item.subtitle}
                   </p>
                 ) : null}
                 {item.kind === "calendar" && item.time ? (
-                  <p className="truncate text-[13px] text-muted-foreground tabular-nums">
+                  <p className="text-[13px] tabular-nums text-muted-foreground">
                     {item.time}
                   </p>
                 ) : null}
@@ -320,13 +320,13 @@ export function AgendaRow({
             )}
             {weather ? <AgendaWeatherLine weather={weather} /> : null}
             {item.driveLabel ? (
-              <p className="mt-1 flex items-center gap-1 text-[12px] text-muted-foreground">
+              <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
                 <Car className="size-3 shrink-0" aria-hidden />
                 {item.driveLabel}
               </p>
             ) : null}
             {isPaymentPipeline ? (
-              <p className="mt-1 text-[12px] font-medium text-sky-800">
+              <p className="mt-1 text-xs font-medium text-sky-800">
                 Zahlung geplant — noch in der Pipeline
               </p>
             ) : null}

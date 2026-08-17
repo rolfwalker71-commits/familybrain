@@ -1096,15 +1096,15 @@ function DayTimeline({
             </div>
             <div
               className={cn(
-                "mb-5 min-w-0 overflow-hidden rounded-2xl border border-border/60 bg-card shadow-[0_4px_18px_rgba(15,23,42,0.05)] last:mb-1",
+                "mb-5 min-w-0 rounded-2xl bg-card shadow-[0_4px_18px_rgba(15,23,42,0.05)] ring-1 ring-border/50 last:mb-1",
                 active &&
-                  "border-emerald-200/90 shadow-[0_4px_18px_rgba(5,150,105,0.12)] dark:border-emerald-400/35 dark:shadow-[0_4px_18px_rgba(16,185,129,0.12)]",
+                  "ring-emerald-300/80 shadow-[0_4px_18px_rgba(5,150,105,0.12)] dark:ring-emerald-400/35 dark:shadow-[0_4px_18px_rgba(16,185,129,0.12)]",
                 !active &&
                   item.calendarId?.startsWith("google-cal:") &&
-                  "border-sky-200/80 bg-sky-50/35 dark:border-sky-400/25 dark:bg-sky-500/10",
+                  "bg-sky-50/35 ring-sky-200/70 dark:bg-sky-500/10 dark:ring-sky-400/25",
                 !active &&
                   item.calendarId?.startsWith("ms-cal:") &&
-                  "border-violet-200/70 bg-violet-50/30 dark:border-violet-400/25 dark:bg-violet-500/10"
+                  "bg-violet-50/30 ring-violet-200/60 dark:bg-violet-500/10 dark:ring-violet-400/25"
               )}
             >
               <div className="flex items-stretch">
@@ -1119,44 +1119,44 @@ function DayTimeline({
                     <Button
                       type="button"
                       variant="ghost"
-                      className="h-auto w-full justify-start text-left hover:opacity-90"
+                      className="h-auto min-h-0 w-full flex-col items-stretch justify-start gap-0 whitespace-normal rounded-lg px-0 py-0 text-left hover:bg-transparent"
                       onClick={() => onSelect(item)}
                     >
                       {source ? (
-                        <p className="mb-1 flex min-w-0 flex-wrap items-center gap-1.5">
+                        <p className="mb-1.5 flex min-w-0 flex-wrap items-center gap-1.5">
                           <span
                             className={cn(
-                              "inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide",
+                              "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide",
                               source.provider === "google" &&
-                                "border-sky-300/80 bg-sky-50 text-sky-900 dark:border-sky-400/35 dark:bg-sky-500/15 dark:text-sky-100",
+                                "bg-sky-100/90 text-sky-900 dark:bg-sky-500/20 dark:text-sky-100",
                               source.provider === "microsoft" &&
-                                "border-violet-300/80 bg-violet-50 text-violet-950 dark:border-violet-400/35 dark:bg-violet-500/15 dark:text-violet-100",
+                                "bg-violet-100/90 text-violet-950 dark:bg-violet-500/20 dark:text-violet-100",
                               source.provider === "other" &&
-                                "border-border/70 bg-muted/50 text-muted-foreground"
+                                "bg-muted text-muted-foreground"
                             )}
                           >
                             {source.provider === "google" ? (
-                              <GoogleLogo className="size-3" />
+                              <GoogleLogo className="size-3 shrink-0" />
                             ) : source.provider === "microsoft" ? (
-                              <MicrosoftLogo className="size-3" />
+                              <MicrosoftLogo className="size-3 shrink-0" />
                             ) : null}
                             {source.providerLabel}
                           </span>
-                          <span className="min-w-0 truncate text-[11px] text-muted-foreground">
+                          <span className="min-w-0 text-[11px] leading-snug text-muted-foreground">
                             {source.calendarLabel}
                           </span>
                         </p>
                       ) : null}
-                      <p className="truncate text-[14px] font-black tracking-tight">
+                      <p className="text-sm font-black leading-snug tracking-tight break-words">
                         {item.title}
                       </p>
                       {item.subtitle ? (
-                        <p className="mt-0.5 truncate text-[13px] text-muted-foreground">
+                        <p className="mt-0.5 text-[13px] leading-snug text-muted-foreground break-words">
                           {item.subtitle}
                         </p>
                       ) : null}
                       {item.weather ? (
-                        <p className="mt-1 text-[12px] text-muted-foreground">
+                        <p className="mt-1 text-xs text-muted-foreground">
                           {item.weather.icon} {item.weather.temperatureC}°
                           {item.weather.labelDe
                             ? ` · ${item.weather.labelDe}`
@@ -1164,7 +1164,7 @@ function DayTimeline({
                         </p>
                       ) : null}
                       {item.driveLabel ? (
-                        <p className="mt-1 flex items-center gap-1 text-[12px] text-muted-foreground">
+                        <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
                           <Car className="size-3 shrink-0" aria-hidden />
                           {item.driveLabel}
                         </p>
@@ -1185,7 +1185,7 @@ function DayTimeline({
                                   href={item.meetUrl}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border/70 bg-background px-2.5 text-[12px] font-medium text-foreground shadow-sm hover:bg-muted/50"
+                                  className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-muted/70 px-2.5 text-xs font-medium text-foreground hover:bg-muted"
                                 >
                                   {isTeams ? (
                                     <MicrosoftTeamsLogo className="size-3.5" />
@@ -1202,7 +1202,7 @@ function DayTimeline({
                               href={item.mapsUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border/70 bg-background px-2.5 text-[12px] font-medium text-foreground shadow-sm hover:bg-muted/50"
+                              className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-muted/70 px-2.5 text-xs font-medium text-foreground hover:bg-muted"
                             >
                               <MapPin className="size-3.5" aria-hidden />
                               Route

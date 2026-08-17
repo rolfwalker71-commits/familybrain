@@ -1088,14 +1088,17 @@ export function MicrosoftDayClient() {
                 {connectedEmail || "Microsoft 365"}
               </span>
             </p>
-            <nav className="flex flex-wrap gap-0.5 border-b border-border/50">
+            <nav
+              className="flex flex-wrap gap-1 rounded-xl bg-muted/50 p-1"
+              aria-label="Microsoft 365 Bereiche"
+            >
               <Button
                 type="button"
                 variant="ghost"
                 className={mailWorkspaceTabClass(tab === "mail", "microsoft")}
                 onClick={() => setTab("mail")}
               >
-                <OutlookLogo className="size-3.5" />
+                <OutlookLogo className="size-3.5 shrink-0" />
                 Mails
               </Button>
               <Button
@@ -1104,7 +1107,7 @@ export function MicrosoftDayClient() {
                 className={mailWorkspaceTabClass(tab === "triage", "microsoft")}
                 onClick={() => setTab("triage")}
               >
-                <ListChecks className="size-3.5" strokeWidth={APP_ICON_STROKE} />
+                <ListChecks className="size-3.5 shrink-0" strokeWidth={APP_ICON_STROKE} />
                 Triage
                 {inboxPending > 0 ? (
                   <Badge variant="secondary" className="text-[10px]">
@@ -1118,7 +1121,7 @@ export function MicrosoftDayClient() {
                 className={mailWorkspaceTabClass(tab === "calendar", "microsoft")}
                 onClick={() => setTab("calendar")}
               >
-                <CalendarClock className="size-3.5" strokeWidth={APP_ICON_STROKE} />
+                <CalendarClock className="size-3.5 shrink-0" strokeWidth={APP_ICON_STROKE} />
                 Kalender
               </Button>
               <Button

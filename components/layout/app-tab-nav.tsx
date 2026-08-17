@@ -155,7 +155,7 @@ export function AppTabNav<T extends string>({
         className={cn(
           alwaysBottom
             ? "hidden"
-            : "hidden flex-wrap gap-1 rounded-xl border border-border/60 bg-muted/50 p-1 md:flex",
+            : "hidden flex-wrap gap-1 rounded-xl bg-muted/50 p-1 md:flex",
           className
         )}
       >
@@ -169,10 +169,10 @@ export function AppTabNav<T extends string>({
               variant="ghost"
               onClick={() => onChange(item.id)}
               className={cn(
-                "inline-flex h-auto flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium transition-colors",
+                "inline-flex h-auto flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium leading-snug whitespace-normal transition-colors",
                 isActive
                   ? cn("bg-card shadow-sm", activeText)
-                  : "text-muted-foreground hover:text-foreground"
+                  : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
               )}
             >
               <Icon className="size-4 shrink-0" />

@@ -11,15 +11,27 @@ export type MailWorkspaceAccent = "google" | "microsoft";
 const ACCENT = {
   google: {
     activeText: "text-teal-900 dark:text-teal-200",
-    underline: "border-teal-700 dark:border-teal-400",
-    softBg: "bg-teal-50/40 dark:bg-teal-500/10",
+    softBg: "bg-teal-50/50 dark:bg-teal-500/15",
   },
   microsoft: {
     activeText: "text-[var(--brand-docs)]",
-    underline: "border-[var(--brand-docs)]",
-    softBg: "bg-[var(--brand-docs-soft)]/40",
+    softBg: "bg-[var(--brand-docs-soft)]/50",
   },
 } as const;
+
+/** Soft pill tabs — no outline / underline borders (avoids clipped text). */
+export function mailWorkspaceTabClass(
+  active: boolean,
+  accent: MailWorkspaceAccent = "google"
+) {
+  const a = ACCENT[accent];
+  return cn(
+    "h-auto gap-1.5 rounded-lg px-3 py-2 text-sm font-medium leading-snug whitespace-normal",
+    active
+      ? cn("bg-card text-foreground shadow-sm", a.activeText)
+      : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+  );
+}
 
 export function MailWorkspaceSubnav({
   view,
@@ -32,67 +44,51 @@ export function MailWorkspaceSubnav({
   accent?: MailWorkspaceAccent;
   className?: string;
 }) {
-  const a = ACCENT[accent];
   return (
     <div
       className={cn(
-        "space-y-2 rounded-2xl border border-border/60 bg-muted/30 px-3 py-2.5 shadow-sm",
+        "space-y-2 rounded-2xl bg-muted/40 px-3 py-3",
         className
       )}
     >
-      <div className="flex flex-wrap gap-1">
+      <div
+        className="flex flex-wrap gap-1 rounded-xl bg-muted/50 p-1"
+        role="tablist"
+        aria-label="Mail-Ansicht"
+      >
         <Button
           type="button"
           variant="ghost"
-          className={cn(
-            "h-auto rounded-none border-b-2 px-3 py-1.5 text-sm font-medium",
-            view === "chronik"
-              ? cn(a.activeText, a.underline)
-              : "border-transparent text-muted-foreground hover:text-foreground"
-          )}
+          role="tab"
+          aria-selected={view === "chronik"}
+          className={mailWorkspaceTabClass(view === "chronik", accent)}
           onClick={() => onChange("chronik")}
         >
-          <History className="size-3.5" strokeWidth={APP_ICON_STROKE} aria-hidden />
+          <History className="size-3.5 shrink-0" strokeWidth={APP_ICON_STROKE} aria-hidden />
           Mails · Chronik
         </Button>
         <Button
           type="button"
           variant="ghost"
-          className={cn(
-            "h-auto rounded-none border-b-2 px-3 py-1.5 text-sm font-medium",
-            view === "tagesanalysen"
-              ? cn(a.activeText, a.underline)
-              : "border-transparent text-muted-foreground hover:text-foreground"
-          )}
+          role="tab"
+          aria-selected={view === "tagesanalysen"}
+          className={mailWorkspaceTabClass(view === "tagesanalysen", accent)}
           onClick={() => onChange("tagesanalysen")}
         >
-          <Sparkles className="size-3.5" strokeWidth={APP_ICON_STROKE} aria-hidden />
+          <Sparkles className="size-3.5 shrink-0" strokeWidth={APP_ICON_STROKE} aria-hidden />
           Tagesanalysen
         </Button>
       </div>
       {view === "chronik" ? (
-        <p className="text-[12px] text-muted-foreground">
+        <p className="px-1 text-xs leading-relaxed text-muted-foreground">
           Eingang und Gesendet gemischt, chronologisch
         </p>
       ) : (
-        <p className="text-[12px] text-muted-foreground">
+        <p className="px-1 text-xs leading-relaxed text-muted-foreground">
           Gespeicherte AI-Tagesbilder und neue Analyse
         </p>
       )}
     </div>
-  );
-}
-
-export function mailWorkspaceTabClass(
-  active: boolean,
-  accent: MailWorkspaceAccent = "google"
-) {
-  const a = ACCENT[accent];
-  return cn(
-    "inline-flex items-center gap-1.5 border-b-2 px-3 py-1.5 text-sm font-medium transition-colors",
-    active
-      ? cn(a.activeText, a.underline)
-      : "border-transparent text-muted-foreground hover:text-foreground"
   );
 }
 

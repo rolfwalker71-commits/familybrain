@@ -1087,14 +1087,17 @@ export function GoogleWorkspaceClient() {
                 {connectedEmail || "Google"}
               </span>
             </p>
-            <nav className="flex flex-wrap gap-0.5 border-b border-border/50">
+            <nav
+              className="flex flex-wrap gap-1 rounded-xl bg-muted/50 p-1"
+              aria-label="Google Workspace Bereiche"
+            >
               <Button
                 type="button"
                 variant="ghost"
                 className={mailWorkspaceTabClass(tab === "mail", "google")}
                 onClick={() => setTab("mail")}
               >
-                <GmailLogo className="size-3.5" />
+                <GmailLogo className="size-3.5 shrink-0" />
                 Mails
               </Button>
               <Button
@@ -1103,7 +1106,7 @@ export function GoogleWorkspaceClient() {
                 className={mailWorkspaceTabClass(tab === "triage", "google")}
                 onClick={() => setTab("triage")}
               >
-                <ListChecks className="size-3.5" strokeWidth={APP_ICON_STROKE} />
+                <ListChecks className="size-3.5 shrink-0" strokeWidth={APP_ICON_STROKE} />
                 Triage
                 {inboxPending > 0 ? (
                   <Badge variant="secondary" className="text-[10px]">
@@ -1117,7 +1120,7 @@ export function GoogleWorkspaceClient() {
                 className={mailWorkspaceTabClass(tab === "calendar", "google")}
                 onClick={() => setTab("calendar")}
               >
-                <CalendarClock className="size-3.5" strokeWidth={APP_ICON_STROKE} />
+                <CalendarClock className="size-3.5 shrink-0" strokeWidth={APP_ICON_STROKE} />
                 Kalender
               </Button>
               <Button
@@ -1126,7 +1129,7 @@ export function GoogleWorkspaceClient() {
                 className={mailWorkspaceTabClass(tab === "tasks", "google")}
                 onClick={() => setTab("tasks")}
               >
-                <GoogleTasksLogo className="size-3.5" />
+                <GoogleTasksLogo className="size-3.5 shrink-0" />
                 Tasks
               </Button>
             </nav>
