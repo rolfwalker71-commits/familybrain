@@ -1801,7 +1801,7 @@ export function OverviewDashboard({
       )}
 
       <nav
-        className="flex flex-wrap gap-1 rounded-xl border border-border/60 bg-muted/30 p-1"
+        className="flex flex-wrap gap-1 rounded-xl bg-muted/50 p-1"
         aria-label="Übersicht Domäne"
       >
         {domainTabs.map((tab) => {
@@ -1814,10 +1814,10 @@ export function OverviewDashboard({
               variant="ghost"
               onClick={() => selectDomain(tab.id)}
               className={cn(
-                "inline-flex h-auto flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[13px] font-semibold transition-colors sm:flex-none",
+                "inline-flex h-auto flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold leading-snug whitespace-normal sm:flex-none",
                 active
                   ? "bg-card text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
+                  : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
               )}
             >
               <Icon className="size-3.5" strokeWidth={APP_ICON_STROKE} />
