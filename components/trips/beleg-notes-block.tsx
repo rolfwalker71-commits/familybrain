@@ -57,9 +57,10 @@ export function BelegNotesBlock({
   return (
     <div className="space-y-2 rounded-md border border-border/60 bg-background/50 px-3 py-2">
       <div className="flex items-center gap-2">
-        <button
+        <Button
           type="button"
-          className="flex min-w-0 flex-1 items-center gap-2 text-left"
+          variant="ghost"
+          className="h-auto min-w-0 flex-1 items-center justify-start gap-2 px-0 text-left font-normal"
           onClick={toggleExpanded}
           aria-expanded={expanded}
         >
@@ -76,7 +77,7 @@ export function BelegNotesBlock({
           <span className="text-[10px] font-medium text-muted-foreground">
             {expanded ? "Einklappen" : "Vorschau"}
           </span>
-        </button>
+        </Button>
         <Button
           type="button"
           size="xs"
@@ -97,13 +98,14 @@ export function BelegNotesBlock({
         <ChatMarkdown content={markdown} className="text-xs" />
       </div>
       {!expanded ? (
-        <button
+        <Button
           type="button"
-          className="text-xs font-medium text-primary hover:underline"
+          variant="link"
+          className="h-auto p-0 text-xs font-medium"
           onClick={toggleExpanded}
         >
           Alles anzeigen
-        </button>
+        </Button>
       ) : null}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-h-[85dvh] w-[min(96vw,48rem)] overflow-y-auto sm:max-w-3xl">

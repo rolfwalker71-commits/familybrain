@@ -324,11 +324,12 @@ export function CloseoutAssistant() {
   // Launcher pill when closed
   if (!stored.open) {
     return (
-      <button
+      <Button
         type="button"
+        variant="outline"
         onClick={() => persist({ open: true, minimized: false })}
         className={cn(
-          "fixed z-40 flex items-center gap-2 rounded-full border border-border/70 bg-card px-3 py-2 text-[12px] font-semibold shadow-[0_8px_28px_rgba(15,23,42,0.14)] transition-colors hover:bg-muted/40",
+          "fixed z-40 h-auto gap-2 rounded-full border-border/70 bg-card px-3 py-2 text-[12px] font-semibold shadow-[0_8px_28px_rgba(15,23,42,0.14)] hover:bg-muted/40",
           "right-3 bottom-[calc(5.25rem+env(safe-area-inset-bottom,0px))] md:right-6 md:bottom-6"
         )}
         title="Tagesabschluss-Assistent"
@@ -345,17 +346,18 @@ export function CloseoutAssistant() {
             {remaining}
           </span>
         ) : null}
-      </button>
+      </Button>
     );
   }
 
   if (stored.minimized) {
     return (
-      <button
+      <Button
         type="button"
+        variant="default"
         onClick={() => persist({ minimized: false })}
         className={cn(
-          "fixed z-40 flex items-center gap-2 rounded-full border border-slate-700 bg-slate-800 px-3.5 py-2.5 text-[12px] font-semibold text-white shadow-[0_8px_28px_rgba(15,23,42,0.22)]",
+          "fixed z-40 h-auto gap-2 rounded-full border-slate-700 bg-slate-800 px-3.5 py-2.5 text-[12px] font-semibold text-white shadow-[0_8px_28px_rgba(15,23,42,0.22)] hover:bg-slate-800/90",
           "right-3 bottom-[calc(5.25rem+env(safe-area-inset-bottom,0px))] md:right-6 md:bottom-6"
         )}
       >
@@ -374,7 +376,7 @@ export function CloseoutAssistant() {
           <Check className="size-3.5 text-emerald-300" aria-hidden />
         )}
         <ChevronUp className="size-3.5 opacity-80" aria-hidden />
-      </button>
+      </Button>
     );
   }
 
@@ -399,17 +401,21 @@ export function CloseoutAssistant() {
             {busy ? " · aktualisiert…" : ""}
           </p>
         </div>
-        <button
+        <Button
           type="button"
-          className="rounded-md p-1 hover:bg-white/10"
+          variant="ghost"
+          size="icon-sm"
+          className="rounded-md text-white hover:bg-white/10"
           title="Minimieren"
           onClick={() => persist({ minimized: true })}
         >
           <Minimize2 className="size-3.5" aria-hidden />
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
-          className="rounded-md p-1 hover:bg-white/10"
+          variant="ghost"
+          size="icon-sm"
+          className="rounded-md text-white hover:bg-white/10"
           title="Schliessen"
           onClick={() =>
             persist({
@@ -419,7 +425,7 @@ export function CloseoutAssistant() {
           }
         >
           <X className="size-3.5" aria-hidden />
-        </button>
+        </Button>
       </div>
 
       <div className="h-1.5 bg-muted">
@@ -448,9 +454,11 @@ export function CloseoutAssistant() {
             },
           ] as const
         ).map((p) => (
-          <button
+          <Button
             key={p.id}
             type="button"
+            variant="ghost"
+            size="sm"
             disabled={status != null && !p.enabled && p.id !== provider}
             onClick={() =>
               persist({
@@ -461,7 +469,7 @@ export function CloseoutAssistant() {
               })
             }
             className={cn(
-              "flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] font-semibold transition-colors",
+              "h-auto flex-1 rounded-lg px-2 py-1.5 text-[11px] font-semibold",
               provider === p.id
                 ? "bg-white text-foreground shadow-sm"
                 : "text-muted-foreground hover:bg-white/60"
@@ -469,7 +477,7 @@ export function CloseoutAssistant() {
           >
             {p.logo}
             {p.label}
-          </button>
+          </Button>
         ))}
       </div>
 
@@ -500,17 +508,18 @@ export function CloseoutAssistant() {
             const current = idx === activeIndex;
             return (
               <li key={step.id}>
-                <button
+                <Button
                   type="button"
-                  onClick={() => persist({ stepIndex: idx })}
+                  variant="ghost"
                   className={cn(
-                    "flex w-full items-start gap-2.5 rounded-xl border px-2.5 py-2 text-left transition-colors",
+                    "h-auto w-full items-start justify-start gap-2.5 rounded-xl border px-2.5 py-2 text-left",
                     current
-                      ? "border-orange-300 bg-orange-50/80"
+                      ? "border-orange-300 bg-orange-50/80 hover:bg-orange-50/80"
                       : done
-                        ? "border-emerald-200/70 bg-emerald-50/40"
+                        ? "border-emerald-200/70 bg-emerald-50/40 hover:bg-emerald-50/40"
                         : "border-border/50 bg-background hover:bg-muted/30"
                   )}
+                  onClick={() => persist({ stepIndex: idx })}
                 >
                   <span
                     className={cn(
@@ -550,7 +559,7 @@ export function CloseoutAssistant() {
                       </span>
                     ) : null}
                   </span>
-                </button>
+                </Button>
               </li>
             );
           })}
@@ -647,13 +656,15 @@ export function CloseoutAssistant() {
 
       <p className="bg-muted/30 px-3 pb-2 text-center text-[10px] text-muted-foreground">
         Läuft mit während du arbeitest ·{" "}
-        <button
+        <Button
           type="button"
-          className="underline underline-offset-2"
+          variant="link"
+          size="sm"
+          className="h-auto p-0 text-[10px] underline underline-offset-2"
           onClick={() => void load()}
         >
           Refresh
-        </button>
+        </Button>
         {" · "}
         <Link href="/dashboard" className="underline underline-offset-2">
           Übersicht

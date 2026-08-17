@@ -9,7 +9,7 @@ import {
   Luggage,
   ArrowRight,
 } from "lucide-react";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   TodayAgendaWidget,
@@ -118,13 +118,14 @@ export function TodayHub() {
             Heute-Übersicht konnte nicht geladen werden.
           </p>
           <p className="text-muted-foreground">{error}</p>
-          <button
+          <Button
             type="button"
-            className="text-xs font-medium text-[var(--brand-finance)] underline-offset-2 hover:underline"
+            variant="link"
+            className="h-auto p-0 text-xs font-medium text-[var(--brand-finance)]"
             onClick={() => void load()}
           >
             Erneut versuchen
-          </button>
+          </Button>
         </CardContent>
       </Card>
     );

@@ -293,10 +293,11 @@ export function TripExportMenu({
               <Download className="size-4" />
               PDF herunterladen
             </a>
-            <button
+            <Button
               type="button"
               role="menuitem"
-              className={itemClass}
+              variant="ghost"
+              className={cn("h-auto w-full justify-start font-normal", itemClass)}
               onClick={() => {
                 setOpen(false);
                 window.open(`/trips/${tripId}/print?autoprint=1`, "_blank");
@@ -304,7 +305,7 @@ export function TripExportMenu({
             >
               <Printer className="size-4" />
               Drucken
-            </button>
+            </Button>
             <a
               role="menuitem"
               href={`/api/trips/${tripId}/export.html`}
@@ -314,44 +315,48 @@ export function TripExportMenu({
               <FileText className="size-4" />
               HTML herunterladen
             </a>
-            <button
+            <Button
               type="button"
               role="menuitem"
-              className={itemClass}
+              variant="ghost"
+              className={cn("h-auto w-full justify-start font-normal", itemClass)}
               disabled={exportableEvents.length === 0}
               onClick={() => openIcsPicker()}
             >
               <CalendarPlus className="size-4" />
               Termine in Kalender…
-            </button>
+            </Button>
             <div className="my-1 h-px bg-border" />
             <p className="px-2.5 py-1 text-xs font-medium text-muted-foreground">
               Teilen
             </p>
-            <button
+            <Button
               type="button"
               role="menuitem"
-              className={itemClass}
+              variant="ghost"
+              className={cn("h-auto w-full justify-start font-normal", itemClass)}
               onClick={() => void copyShareLink()}
             >
               <Link2 className="size-4" />
               {activeLink ? "Share-Link kopieren" : "Share-Link erzeugen"}
-            </button>
+            </Button>
             {activeLink ? (
-              <button
+              <Button
                 type="button"
                 role="menuitem"
-                className={itemClass}
+                variant="ghost"
+                className={cn("h-auto w-full justify-start font-normal", itemClass)}
                 onClick={() => void revokeShareLink()}
               >
                 <Trash2 className="size-4" />
                 Share-Link widerrufen
-              </button>
+              </Button>
             ) : null}
-            <button
+            <Button
               type="button"
               role="menuitem"
-              className={itemClass}
+              variant="ghost"
+              className={cn("h-auto w-full justify-start font-normal", itemClass)}
               onClick={() => {
                 setOpen(false);
                 mailPrepare();
@@ -359,16 +364,17 @@ export function TripExportMenu({
             >
               <Mail className="size-4" />
               Per Mail vorbereiten
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               role="menuitem"
-              className={itemClass}
+              variant="ghost"
+              className={cn("h-auto w-full justify-start font-normal", itemClass)}
               onClick={() => void webShare()}
             >
               <Copy className="size-4" />
               Teilen…
-            </button>
+            </Button>
           </div>
         ) : null}
       </div>

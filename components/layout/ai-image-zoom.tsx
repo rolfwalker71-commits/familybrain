@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
 
 /**
  * Fullscreen AI/image zoom via portal to document.body.
  * Closes on backdrop click, image click, or Escape.
+ * Uses shadcn Button for the dismiss layer (focus/touch consistency).
  */
 export function AiImageZoom({
   src,
@@ -38,9 +40,10 @@ export function AiImageZoom({
   if (!mounted) return null;
 
   return createPortal(
-    <button
+    <Button
       type="button"
-      className="fixed inset-0 z-[2000] flex cursor-zoom-out items-center justify-center bg-black/80 p-4"
+      variant="ghost"
+      className="fixed inset-0 z-[2000] flex h-dvh w-screen max-w-none cursor-zoom-out items-center justify-center rounded-none border-0 bg-black/80 p-4 hover:bg-black/80"
       onClick={onClose}
       aria-label="Schliessen"
       title="Klicken zum Schliessen"
@@ -51,7 +54,7 @@ export function AiImageZoom({
         alt={alt}
         className="h-[min(49dvh,49vw)] w-[min(49dvh,49vw)] max-h-[49dvh] max-w-[49vw] rounded-lg object-contain shadow-2xl"
       />
-    </button>,
+    </Button>,
     document.body
   );
 }

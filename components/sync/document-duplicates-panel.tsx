@@ -197,9 +197,10 @@ export function DocumentDuplicatesPanel() {
                 className="overflow-hidden rounded-xl border border-border/70 bg-muted/10"
               >
                 <div className="flex flex-wrap items-start gap-2 px-3 py-2.5">
-                  <button
+                  <Button
                     type="button"
-                    className="flex min-w-0 flex-1 items-start gap-2 text-left"
+                    variant="ghost"
+                    className="h-auto min-w-0 flex-1 items-start justify-start gap-2 rounded-none px-0 py-0 text-left font-normal"
                     onClick={() => toggleCluster(cluster.key)}
                     aria-expanded={open}
                   >
@@ -229,7 +230,7 @@ export function DocumentDuplicatesPanel() {
                         ) : null}
                       </span>
                     </span>
-                  </button>
+                  </Button>
                   <Button
                     size="sm"
                     variant="outline"

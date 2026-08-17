@@ -2,6 +2,7 @@
 
 import { CalendarDays, Check, ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { APP_ICON_STROKE } from "@/lib/branding/app-icons";
 import { toSwissDate } from "@/lib/utils/dates";
@@ -66,11 +67,12 @@ export function MailTagesanalysenList({
         const active = e.rangeKey === selectedKey;
         return (
           <li key={e.rangeKey}>
-            <button
+            <Button
               type="button"
+              variant="ghost"
               onClick={() => onSelect(e)}
               className={cn(
-                "flex w-full items-start gap-3 rounded-2xl border px-3.5 py-3.5 text-left shadow-[0_4px_18px_rgba(15,23,42,0.05)] transition-colors",
+                "h-auto w-full items-start justify-start gap-3 rounded-2xl border px-3.5 py-3.5 text-left shadow-[0_4px_18px_rgba(15,23,42,0.05)]",
                 active
                   ? activeBorder
                   : "border-border/60 bg-card hover:bg-muted/20"
@@ -138,7 +140,7 @@ export function MailTagesanalysenList({
                   aria-hidden
                 />
               </div>
-            </button>
+            </Button>
           </li>
         );
       })}

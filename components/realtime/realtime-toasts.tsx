@@ -17,6 +17,7 @@ import {
   type ActionFeedbackDetail,
 } from "@/lib/ui/action-feedback";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 type ToastItem = {
   id: string;
@@ -270,10 +271,11 @@ export function RealtimeToasts() {
 
   return (
     <>
-      <button
+      <Button
         type="button"
+        variant="ghost"
         aria-label="Benachrichtigungen schliessen"
-        className="fixed inset-0 z-[79] cursor-default bg-transparent"
+        className="fixed inset-0 z-[79] h-auto w-auto cursor-default rounded-none border-0 bg-transparent p-0 hover:bg-transparent"
         onClick={() => dismissAll()}
       />
       <div
@@ -348,35 +350,41 @@ export function RealtimeToasts() {
                   ) : null}
                 </div>
               </div>
-              <button
+              <Button
                 type="button"
-                className="absolute right-1.5 top-1.5 z-10 flex size-8 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+                variant="ghost"
+                size="icon-sm"
+                className="absolute right-1.5 top-1.5 z-10 rounded-full text-muted-foreground"
                 aria-label="Schliessen"
                 onClick={() => dismiss(toast.id)}
               >
                 <X className="size-4" />
-              </button>
+              </Button>
             </div>
           );
         })}
         <div className="pointer-events-auto flex flex-wrap justify-end gap-2">
-          <button
+          <Button
             type="button"
-            className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-background/90 px-3 py-1.5 text-[11px] text-muted-foreground shadow-sm backdrop-blur hover:bg-muted hover:text-foreground"
+            variant="outline"
+            size="sm"
+            className="h-auto rounded-full border-border/60 bg-background/90 px-3 py-1.5 text-[11px] text-muted-foreground shadow-sm backdrop-blur"
             onClick={() => dismissAll()}
           >
             Alle schliessen
-          </button>
+          </Button>
           {prefs.enabled ? (
-            <button
+            <Button
               type="button"
-              className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-background/90 px-3 py-1.5 text-[11px] text-muted-foreground shadow-sm backdrop-blur hover:bg-muted hover:text-foreground"
+              variant="outline"
+              size="sm"
+              className="h-auto rounded-full border-border/60 bg-background/90 px-3 py-1.5 text-[11px] text-muted-foreground shadow-sm backdrop-blur"
               onClick={() => void disableNotifications()}
               title="Live-Benachrichtigungen ausschalten"
             >
               <BellOff className="size-3" />
               Benachrichtigungen aus
-            </button>
+            </Button>
           ) : null}
         </div>
       </div>

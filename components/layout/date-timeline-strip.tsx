@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef } from "react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 const MONTH_SHORT_DE = [
   "JAN",
@@ -106,15 +107,16 @@ export function DateTimelineStrip({
       {items.map((item) => {
         const active = activeDate === item.iso;
         return (
-          <button
+          <Button
             key={item.iso}
             type="button"
+            variant="outline"
             data-date={item.iso}
             aria-current={active ? "date" : undefined}
             title={`${item.weekday} ${item.day}. ${item.month}`}
             onClick={() => scrollToDateAnchor(anchorIdForDate(item.iso))}
             className={cn(
-              "flex shrink-0 flex-col items-center rounded-md border px-2 py-1 text-center transition-colors",
+              "flex h-auto w-auto shrink-0 flex-col items-center rounded-md px-2 py-1 text-center transition-colors",
               active
                 ? accentActive[accent]
                 : "border-border/70 bg-background text-foreground hover:bg-muted/60"
@@ -139,7 +141,7 @@ export function DateTimelineStrip({
             >
               {item.weekday}
             </span>
-          </button>
+          </Button>
         );
       })}
     </div>

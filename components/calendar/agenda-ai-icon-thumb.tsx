@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AiImageZoom } from "@/components/layout/ai-image-zoom";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 /**
@@ -201,11 +202,12 @@ export function AgendaAiIconThumb({
 
   return (
     <>
-      <button
+      <Button
         type="button"
+        variant="ghost"
         title="Vergrössern"
         className={cn(
-          "relative shrink-0 cursor-zoom-in overflow-hidden rounded-lg border border-border/50 shadow-sm",
+          "relative h-auto w-auto shrink-0 cursor-zoom-in overflow-hidden rounded-lg border border-border/50 p-0 shadow-sm hover:bg-transparent",
           className
         )}
         onClick={(e) => {
@@ -228,7 +230,7 @@ export function AgendaAiIconThumb({
             AI
           </span>
         ) : null}
-      </button>
+      </Button>
       {zoomOpen ? (
         <AiImageZoom src={url} onClose={() => setZoomOpen(false)} />
       ) : null}

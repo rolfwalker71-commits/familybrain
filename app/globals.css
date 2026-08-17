@@ -171,6 +171,7 @@
 }
 
 @media (pointer: coarse) {
+  /* shadcn Button / Input / Select */
   [data-slot="button"] {
     min-height: 2.75rem;
     min-width: 2.75rem;
@@ -178,6 +179,12 @@
   [data-slot="select-trigger"],
   [data-slot="input"] {
     min-height: 2.75rem;
+  }
+  /* Native controls that still use raw <button> (until fully migrated) */
+  button:not([data-slot]):not(:disabled),
+  [role="button"]:not([data-slot]):not([aria-disabled="true"]) {
+    min-height: 2.75rem;
+    min-width: 2.75rem;
   }
 }
 

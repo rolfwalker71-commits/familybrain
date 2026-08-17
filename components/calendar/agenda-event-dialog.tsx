@@ -457,12 +457,10 @@ export function AgendaEventDialog({
               {item.id.startsWith("buddy-day-close") ? (
                 <DetailRow label="Tagesabschluss">
                   <div className="flex flex-wrap gap-2">
-                    <button
+                    <Button
                       type="button"
-                      className={cn(
-                        buttonVariants({ size: "sm" }),
-                        "gap-1.5"
-                      )}
+                      size="sm"
+                      className="gap-1.5"
                       onClick={() => {
                         try {
                           const raw =
@@ -491,7 +489,7 @@ export function AgendaEventDialog({
                       }}
                     >
                       Assistent starten
-                    </button>
+                    </Button>
                     <Link
                       href="/google?tab=calendar"
                       className={cn(

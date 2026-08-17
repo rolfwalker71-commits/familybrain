@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
@@ -120,35 +121,40 @@ export function ExpenseSplitParticipants({
         <div className="flex flex-wrap items-center gap-2">
           {hasCouples ? (
             <div className="flex rounded-md border border-border/60 p-0.5 text-[11px]">
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="xs"
                 className={cn(
                   "rounded px-2 py-0.5 font-medium",
                   mode === "equal"
-                    ? "bg-[var(--brand-finance-soft)] text-[var(--brand-finance)]"
+                    ? "bg-[var(--brand-finance-soft)] text-[var(--brand-finance)] hover:bg-[var(--brand-finance-soft)]"
                     : "text-muted-foreground"
                 )}
                 onClick={() => setMode("equal")}
               >
                 Personen
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="ghost"
+                size="xs"
                 className={cn(
                   "rounded px-2 py-0.5 font-medium",
                   mode === "coupleEqual"
-                    ? "bg-[var(--brand-finance-soft)] text-[var(--brand-finance)]"
+                    ? "bg-[var(--brand-finance-soft)] text-[var(--brand-finance)] hover:bg-[var(--brand-finance-soft)]"
                     : "text-muted-foreground"
                 )}
                 onClick={() => setMode("coupleEqual")}
               >
                 Paare
-              </button>
+              </Button>
             </div>
           ) : null}
-          <button
+          <Button
             type="button"
-            className="text-[11px] font-medium text-[var(--brand-finance)] underline-offset-2 hover:underline"
+            variant="link"
+            className="h-auto p-0 text-[11px] font-medium text-[var(--brand-finance)]"
             onClick={() => {
               if (mode === "coupleEqual") {
                 onChange({
@@ -172,7 +178,7 @@ export function ExpenseSplitParticipants({
               : allMembersSelected
                 ? "Keine"
                 : "Alle"}
-          </button>
+          </Button>
         </div>
       </div>
 

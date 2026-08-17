@@ -695,10 +695,11 @@ function FinanceOverviewClientInner({
               toneSurface("amber").title
             )}
           >
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              className="h-auto min-w-0 flex-1 justify-start gap-2 text-left"
               onClick={() => setDueOpen((v) => !v)}
-              className="flex min-w-0 flex-1 items-start gap-2 text-left"
               aria-expanded={dueOpen}
             >
               <ChevronDown
@@ -723,7 +724,7 @@ function FinanceOverviewClientInner({
                     : ""}
                 </p>
               </div>
-            </button>
+            </Button>
             <div className="flex flex-wrap items-center gap-2">
               {selectableDueIds.length > 0 ? (
                 <Button
@@ -805,10 +806,11 @@ function FinanceOverviewClientInner({
               {olderDueInvoices.length > 0 ? (
                 <div className="border-t border-border">
                   <div className="flex flex-wrap items-center justify-between gap-2 bg-muted/70 px-4 py-3">
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
+                      className="h-auto min-w-0 justify-start gap-2 text-left text-sm"
                       onClick={() => setOlderDueOpen((v) => !v)}
-                      className="flex min-w-0 items-center gap-2 text-left text-sm"
                       aria-expanded={olderDueOpen}
                     >
                       <ChevronDown
@@ -824,7 +826,7 @@ function FinanceOverviewClientInner({
                         {olderDueInvoices.length} Positionen ·{" "}
                         {formatCHF(olderDueTotal)}
                       </span>
-                    </button>
+                    </Button>
                     {olderDueOpen && olderDueEvents.length > 0 ? (
                       <AddToCalendarButton
                         events={olderDueEvents}
@@ -854,10 +856,11 @@ function FinanceOverviewClientInner({
               toneSurface("sky").title
             )}
           >
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              className="h-auto min-w-0 flex-1 justify-start gap-2 text-left"
               onClick={() => setPlannedOpen((v) => !v)}
-              className="flex min-w-0 flex-1 items-start gap-2 text-left"
               aria-expanded={plannedOpen}
             >
               <ChevronDown
@@ -880,7 +883,7 @@ function FinanceOverviewClientInner({
                   · {formatCHF(plannedPaymentTotal)}
                 </p>
               </div>
-            </button>
+            </Button>
           </div>
           {plannedOpen ? (
             <CardContent className="space-y-0 p-0">
@@ -965,12 +968,13 @@ function FinanceOverviewClientInner({
           const surface = toneSurface(meta.tone);
 
           return (
-            <button
+            <Button
               key={key}
               type="button"
+              variant="ghost"
               onClick={() => openDimension(key, "current")}
               className={cn(
-                "min-w-0 overflow-hidden rounded-xl border text-left shadow-[0_4px_16px_rgba(20,32,28,0.05)] transition-all",
+                "h-auto min-w-0 overflow-hidden rounded-xl border text-left shadow-[0_4px_16px_rgba(20,32,28,0.05)] transition-all",
                 surface.body,
                 active
                   ? "border-[var(--brand-finance)] ring-2 ring-[var(--brand-finance)]/20"
@@ -1016,7 +1020,7 @@ function FinanceOverviewClientInner({
                   <p className="mt-4 text-sm text-muted-foreground">{meta.empty}</p>
                 )}
               </div>
-            </button>
+            </Button>
           );
         })}
       </div>
@@ -1047,12 +1051,13 @@ function FinanceOverviewClientInner({
                 historyByYear.map((row) => {
                   const isCurrent = row.label === String(statsYear);
                   return (
-                    <button
+                    <Button
                       key={row.label}
                       type="button"
+                      variant="ghost"
                       onClick={() => openHistoryYear(row.label)}
                       className={cn(
-                        "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors hover:bg-muted/60",
+                        "h-auto w-full justify-between gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors hover:bg-muted/60",
                         isCurrent && "bg-[var(--brand-finance-soft)]/50"
                       )}
                     >
@@ -1067,7 +1072,7 @@ function FinanceOverviewClientInner({
                       <span className="shrink-0 tabular-nums text-muted-foreground">
                         {row.count} · {formatCHF(row.total)}
                       </span>
-                    </button>
+                    </Button>
                   );
                 })
               )}
@@ -1088,11 +1093,12 @@ function FinanceOverviewClientInner({
                 </p>
               ) : (
                 historyByCategory.slice(0, 12).map((row) => (
-                  <button
+                  <Button
                     key={row.label}
                     type="button"
+                    variant="ghost"
                     onClick={() => openHistoryCategory(row.label)}
-                    className="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors hover:bg-muted/60"
+                    className="h-auto w-full justify-between gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors hover:bg-muted/60"
                   >
                     <span className="min-w-0 truncate font-medium">
                       {row.label}
@@ -1100,17 +1106,18 @@ function FinanceOverviewClientInner({
                     <span className="shrink-0 tabular-nums text-muted-foreground">
                       {row.count} · {formatCHF(row.total)}
                     </span>
-                  </button>
+                  </Button>
                 ))
               )}
               {historyByCategory.length > 12 ? (
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
                   onClick={() => openDimension("category", "history")}
-                  className="w-full rounded-lg px-3 py-2 text-left text-xs font-medium text-[var(--brand-finance)] hover:bg-muted/60"
+                  className="h-auto w-full justify-start rounded-lg px-3 py-2 text-left text-xs font-medium text-[var(--brand-finance)] hover:bg-muted/60"
                 >
                   Alle {historyByCategory.length} Rubriken anzeigen…
-                </button>
+                </Button>
               ) : null}
             </CardContent>
           </Card>
@@ -1229,11 +1236,12 @@ function FinanceOverviewClientInner({
                       const isSelected = selected === item.label;
                       return (
                         <li key={item.label}>
-                          <button
+                          <Button
                             type="button"
+                            variant="ghost"
                             onClick={() => setSelected(item.label)}
                             className={cn(
-                              "flex w-full min-w-0 items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-[var(--brand-finance-soft)]/50",
+                              "h-auto w-full min-w-0 justify-start gap-3 px-3 py-2.5 text-left transition-colors hover:bg-[var(--brand-finance-soft)]/50",
                               isSelected && "bg-[var(--brand-finance-soft)]/70"
                             )}
                           >
@@ -1249,7 +1257,7 @@ function FinanceOverviewClientInner({
                               {formatCHF(item.total)}
                             </span>
                             <ChevronRight className="size-4 shrink-0 text-[var(--brand-finance)]" />
-                          </button>
+                          </Button>
                         </li>
                       );
                     })}
@@ -1552,10 +1560,11 @@ function DueBucketSection({
 
   return (
     <section className="min-w-0 rounded-xl border border-border/60 bg-background/60">
-      <button
+      <Button
         type="button"
+        variant="ghost"
+        className="h-auto w-full justify-start gap-2 px-3 py-2.5 text-left"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-2 px-3 py-2.5 text-left"
         aria-expanded={open}
       >
         <ChevronDown
@@ -1571,7 +1580,7 @@ function DueBucketSection({
             {rows.length === 1 ? "Rechnung" : "Rechnungen"} · {formatCHF(total)}
           </p>
         </div>
-      </button>
+      </Button>
       {open ? (
         <div className="grid grid-cols-1 gap-2.5 border-t border-border/50 p-3 sm:grid-cols-2 xl:grid-cols-3">
           {rows.map((row) => (

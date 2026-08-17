@@ -469,23 +469,27 @@ export function MaringoTimeBookForm({
                   key={fav.id}
                   className="inline-flex max-w-full items-center gap-0.5 rounded-lg border border-border/70 bg-muted/40 pl-1"
                 >
-                  <button
+                  <Button
                     type="button"
-                    className="max-w-[14rem] truncate px-2 py-1 text-left text-[12px] font-medium hover:underline"
+                    variant="ghost"
+                    size="sm"
+                    className="h-auto max-w-[14rem] truncate px-2 py-1 text-left text-[12px] font-medium"
                     title={`${formatMariProjectLabel(fav.projectNumber, fav.projectLabel)} · ${fav.activity}`}
                     onClick={() => applyFavorite(fav)}
                   >
                     {fav.name}
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
-                    className="mr-0.5 rounded p-1 text-muted-foreground hover:bg-background hover:text-rose-700"
+                    variant="ghost"
+                    size="icon-sm"
+                    className="mr-0.5 text-muted-foreground hover:text-rose-700"
                     aria-label={`Favorit «${fav.name}» löschen`}
                     title="Löschen"
                     onClick={() => void deleteFavorite(fav.id)}
                   >
                     <X className="size-3.5" strokeWidth={APP_ICON_STROKE} />
-                  </button>
+                  </Button>
                 </div>
               ))}
             </div>
@@ -586,16 +590,17 @@ export function MaringoTimeBookForm({
                 <ul>
                   {projects.slice(0, 80).map((p) => (
                     <li key={`${p.keyInternal}-${p.matchcode}`}>
-                      <button
+                      <Button
                         type="button"
-                        className="flex w-full flex-col px-2.5 py-1.5 text-left text-[12px] hover:bg-muted"
+                        variant="ghost"
+                        className="h-auto w-full flex-col items-start justify-start px-2.5 py-1.5 text-left text-[12px] font-normal hover:bg-muted"
                         onClick={() => selectProject(p)}
                       >
                         <span className="font-medium">{p.matchcode}</span>
                         <span className="text-muted-foreground">
                           {p.keyVisible || p.keyInternal}
                         </span>
-                      </button>
+                      </Button>
                     </li>
                   ))}
                 </ul>

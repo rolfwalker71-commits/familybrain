@@ -233,9 +233,11 @@ function ReplyLangToggle({
       onKeyDown={(e) => e.stopPropagation()}
     >
       {(["de", "en"] as const).map((code) => (
-        <button
+        <Button
           key={code}
           type="button"
+          variant="ghost"
+          size="xs"
           disabled={busy}
           className={cn(
             "rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase",
@@ -250,7 +252,7 @@ function ReplyLangToggle({
           }}
         >
           {code}
-        </button>
+        </Button>
       ))}
     </div>
   );
@@ -1087,16 +1089,18 @@ export function MicrosoftDayClient() {
               </span>
             </p>
             <nav className="flex flex-wrap gap-0.5 border-b border-border/50">
-              <button
+              <Button
                 type="button"
+                variant="ghost"
                 className={mailWorkspaceTabClass(tab === "mail", "microsoft")}
                 onClick={() => setTab("mail")}
               >
                 <OutlookLogo className="size-3.5" />
                 Mails
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="ghost"
                 className={mailWorkspaceTabClass(tab === "triage", "microsoft")}
                 onClick={() => setTab("triage")}
               >
@@ -1107,17 +1111,19 @@ export function MicrosoftDayClient() {
                     {inboxPending}
                   </Badge>
                 ) : null}
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="ghost"
                 className={mailWorkspaceTabClass(tab === "calendar", "microsoft")}
                 onClick={() => setTab("calendar")}
               >
                 <CalendarClock className="size-3.5" strokeWidth={APP_ICON_STROKE} />
                 Kalender
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="ghost"
                 className={mailWorkspaceTabClass(tab === "planner", "microsoft")}
                 onClick={() => setTab("planner")}
               >
@@ -1126,7 +1132,7 @@ export function MicrosoftDayClient() {
                   <MicrosoftToDoLogo className="size-3.5" />
                 </span>
                 Aufgaben
-              </button>
+              </Button>
             </nav>
           </div>
 

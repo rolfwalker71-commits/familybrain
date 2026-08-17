@@ -144,8 +144,10 @@ export function DocumentPdfThumb({
       onMouseLeave={canZoomHover ? clearHoverTimer : undefined}
     >
       {onRemove ? (
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="icon-xs"
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -153,14 +155,15 @@ export function DocumentPdfThumb({
           }}
           disabled={removing}
           title="Entfernen"
-          className="absolute -right-1.5 -top-1.5 z-10 flex size-5 items-center justify-center rounded-full border border-border bg-background text-muted-foreground shadow-sm hover:bg-destructive hover:text-destructive-foreground disabled:opacity-50"
+          className="absolute -right-1.5 -top-1.5 z-10 size-5 rounded-full border border-border bg-background text-muted-foreground shadow-sm hover:bg-destructive hover:text-destructive-foreground disabled:opacity-50"
         >
           <XIcon className="size-3" />
           <span className="sr-only">Entfernen</span>
-        </button>
+        </Button>
       ) : null}
-      <button
+      <Button
         type="button"
+        variant="ghost"
         onClick={(e) => {
           e.stopPropagation();
           clearHoverTimer();
@@ -176,7 +179,7 @@ export function DocumentPdfThumb({
             : title || "PDF öffnen"
         }
         className={cn(
-          "group relative block h-full w-full overflow-hidden rounded-md border border-border/70 bg-muted/40 text-left transition-colors hover:bg-muted",
+          "group relative block h-full w-full overflow-hidden rounded-md border border-border/70 bg-muted/40 p-0 text-left transition-colors hover:bg-muted",
           canZoomHover && "cursor-zoom-in"
         )}
       >
@@ -208,7 +211,7 @@ export function DocumentPdfThumb({
           <Maximize2 className="size-2.5" />
           {canZoomHover ? "Zoom" : "Öffnen"}
         </div>
-      </button>
+      </Button>
       {!square && (title || href) ? (
         <div className="mt-0.5 truncate text-[9px] leading-tight text-muted-foreground">
           {href ? (
@@ -296,11 +299,12 @@ export function DocumentPdfPreview({
         <CardContent
           className={cn(fillHeight && "flex min-h-0 flex-1 flex-col")}
         >
-          <button
+          <Button
             type="button"
+            variant="ghost"
             onClick={() => setOpen(true)}
             className={cn(
-              "group relative w-full overflow-hidden rounded-lg border border-border bg-muted/40 text-left transition-colors hover:bg-muted",
+              "group relative h-auto w-full overflow-hidden rounded-lg border border-border bg-muted/40 p-0 text-left transition-colors hover:bg-muted",
               fillHeight &&
                 "flex min-h-[12rem] flex-1 items-center justify-center"
             )}
@@ -330,7 +334,7 @@ export function DocumentPdfPreview({
             <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/50 to-transparent px-3 py-2 text-xs text-white opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
               Klicken für Vollansicht
             </div>
-          </button>
+          </Button>
         </CardContent>
       </Card>
 

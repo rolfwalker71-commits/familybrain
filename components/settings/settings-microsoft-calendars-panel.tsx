@@ -225,9 +225,10 @@ export function SettingsMicrosoftCalendarsPanel() {
   return (
     <Card>
       <CardHeader className="pb-4">
-        <button
+        <Button
           type="button"
-          className="flex w-full items-center gap-3 rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          variant="ghost"
+          className="flex h-auto w-full items-center gap-3 rounded-md p-0 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
           aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
         >
@@ -249,7 +250,7 @@ export function SettingsMicrosoftCalendarsPanel() {
             )}
             aria-hidden
           />
-        </button>
+        </Button>
       </CardHeader>
       {open ? (
       <CardContent className="space-y-4 pt-0">
@@ -381,10 +382,11 @@ export function SettingsMicrosoftCalendarsPanel() {
                                 <Label className="text-xs">Farbe</Label>
                                 <div className="flex flex-wrap items-center gap-1.5">
                                   {PRESET_COLORS.map((hex) => (
-                                    <button
+                                    <Button
                                       key={hex}
                                       type="button"
-                                      className="size-6 rounded-full border border-black/10"
+                                      variant="ghost"
+                                      className="size-6 rounded-full border border-black/10 p-0 hover:bg-transparent"
                                       style={{
                                         backgroundColor: hex,
                                         boxShadow:

@@ -257,9 +257,10 @@ export function EventDiaryPanel({
   return (
     <div className={cn("space-y-3", className)}>
       {collapsible ? (
-        <button
+        <Button
           type="button"
-          className="flex w-full items-center gap-2 text-left text-sm font-medium text-foreground"
+          variant="ghost"
+          className="h-auto w-full items-center justify-start gap-2 px-0 text-left text-sm font-medium text-foreground"
           aria-expanded={open}
           onClick={() => setCollapsed((v) => !v)}
         >
@@ -276,7 +277,7 @@ export function EventDiaryPanel({
               open && "rotate-180"
             )}
           />
-        </button>
+        </Button>
       ) : (
         <div className="flex items-center gap-2 text-sm font-medium text-foreground">
           <MessageCircle className="size-4 text-muted-foreground" />
@@ -385,9 +386,10 @@ export function EventDiaryPanel({
                   <p className="min-w-0 flex-1 whitespace-pre-wrap text-sm leading-relaxed text-foreground">
                     {c.body}
                   </p>
-                  <button
+                  <Button
                     type="button"
-                    className="shrink-0 overflow-hidden rounded-lg border border-border/50 self-start"
+                    variant="ghost"
+                    className="h-auto shrink-0 self-start overflow-hidden rounded-lg border border-border/50 p-0"
                     onClick={() => setZoomUrl(c.image_url)}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -396,7 +398,7 @@ export function EventDiaryPanel({
                       alt="Standortkarte"
                       className="size-36 object-cover sm:size-40"
                     />
-                  </button>
+                  </Button>
                 </div>
               ) : (
                 <>
@@ -404,9 +406,10 @@ export function EventDiaryPanel({
                     {c.body}
                   </p>
                   {c.image_url ? (
-                    <button
+                    <Button
                       type="button"
-                      className="mt-2 block overflow-hidden rounded-lg border border-border/50"
+                      variant="ghost"
+                      className="mt-2 block h-auto overflow-hidden rounded-lg border border-border/50 p-0"
                       onClick={() => setZoomUrl(c.image_url)}
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -415,7 +418,7 @@ export function EventDiaryPanel({
                         alt=""
                         className="max-h-40 w-auto max-w-full object-cover"
                       />
-                    </button>
+                    </Button>
                   ) : null}
                 </>
               )}
@@ -453,16 +456,18 @@ export function EventDiaryPanel({
                 alt=""
                 className="h-20 w-20 rounded-lg border border-border object-cover"
               />
-              <button
+              <Button
                 type="button"
-                className="absolute -right-1.5 -top-1.5 flex size-5 items-center justify-center rounded-full border border-border bg-background shadow-sm"
+                variant="outline"
+                size="icon-xs"
+                className="absolute -right-1.5 -top-1.5 size-5 rounded-full bg-background shadow-sm"
                 onClick={() => {
                   setImageFile(null);
                   if (fileRef.current) fileRef.current.value = "";
                 }}
               >
                 <XIcon className="size-3" />
-              </button>
+              </Button>
             </div>
           ) : null}
           <div className="flex flex-wrap gap-2">
@@ -538,8 +543,10 @@ export function CommentCountChip({
   );
   if (onClick) {
     return (
-      <button
+      <Button
         type="button"
+        variant="ghost"
+        size="xs"
         className={sharedClass}
         title={
           count > 0
@@ -553,7 +560,7 @@ export function CommentCountChip({
       >
         <MessageCircle className="size-3" />
         {count > 0 ? count : "Kommentar"}
-      </button>
+      </Button>
     );
   }
   return (

@@ -2463,17 +2463,17 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
                       .map((m) => {
                         const checked = couplePick.includes(m.id);
                         return (
-                          <button
+                          <Button
                             key={m.id}
                             type="button"
+                            variant="outline"
+                            size="xs"
                             disabled={
                               !checked && couplePick.length >= 2
                             }
                             className={cn(
-                              "rounded-md border px-2 py-1 text-xs",
-                              checked
-                                ? "border-[var(--brand-finance)] bg-[var(--brand-finance-soft)]"
-                                : "border-border/60"
+                              checked &&
+                                "border-[var(--brand-finance)] bg-[var(--brand-finance-soft)]"
                             )}
                             onClick={() =>
                               setCouplePick((prev) =>
@@ -2486,7 +2486,7 @@ function FinanceLedgerDetailInner({ ledgerId }: { ledgerId: number }) {
                             }
                           >
                             {m.display_name}
-                          </button>
+                          </Button>
                         );
                       })}
                   </div>

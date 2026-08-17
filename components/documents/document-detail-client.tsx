@@ -622,14 +622,16 @@ function DocumentDetailInner({ detail }: DetailProps) {
     <div className="space-y-4 pb-28 md:space-y-6 md:pb-0">
       {/* Mobile soft header */}
       <div className="flex items-center gap-2 md:hidden">
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="icon"
           onClick={() => router.back()}
-          className="flex size-10 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted"
+          className="size-10 shrink-0 rounded-full text-muted-foreground"
           aria-label="Zurück"
         >
           <ChevronLeft className="size-5" />
-        </button>
+        </Button>
         <div className="flex min-w-0 flex-1 items-center gap-2.5">
           {editingTitle ? (
             <input
@@ -707,13 +709,14 @@ function DocumentDetailInner({ detail }: DetailProps) {
       {/* Desktop header */}
       <div className="hidden flex-wrap items-start justify-between gap-4 md:flex">
         <div className="min-w-0">
-          <button
+          <Button
             type="button"
+            variant="link"
             onClick={() => router.back()}
-            className="mb-2 text-sm text-muted-foreground hover:text-foreground hover:underline"
+            className="mb-2 h-auto p-0 text-sm text-muted-foreground"
           >
             ← Zurück
-          </button>
+          </Button>
           <div className="min-w-0">
             {editingTitle ? (
               <div className="flex flex-wrap items-center gap-2">
@@ -939,10 +942,11 @@ function DocumentDetailInner({ detail }: DetailProps) {
           <div className="grid grid-cols-[minmax(7.5rem,10rem)_1fr] items-stretch gap-3 sm:grid-cols-[minmax(9rem,12rem)_1fr] sm:gap-4">
             <div className="relative h-full min-h-[7.5rem] overflow-hidden rounded-xl border border-border/50 bg-muted/30 shadow-sm">
               {aiIconUrl ? (
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
                   title="Tippen zum Vergrössern"
-                  className="absolute inset-0 block h-full w-full cursor-zoom-in"
+                  className="absolute inset-0 block h-full w-full cursor-zoom-in rounded-none p-0 hover:bg-transparent"
                   onClick={() => {
                     if (!iconBusy) setZoomUrl(aiIconUrl);
                   }}
@@ -953,7 +957,7 @@ function DocumentDetailInner({ detail }: DetailProps) {
                     alt=""
                     className="h-full w-full object-cover"
                   />
-                </button>
+                </Button>
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center">
                   <IconCircle

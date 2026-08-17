@@ -18,6 +18,7 @@ import {
 } from "@/lib/finance-brain/settlement-audit";
 import { expenseSettledBadge } from "@/lib/finance-brain/constants";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 type Debt = {
   fromMemberId: number;
@@ -114,9 +115,10 @@ export function SettlementAuditPanel({
       className="overflow-hidden border-border/60 shadow-[0_4px_16px_rgba(20,32,28,0.05)]"
     >
       <CardHeader tone="green" className="py-1.5">
-        <button
+        <Button
           type="button"
-          className="flex w-full items-center justify-between gap-2 text-left"
+          variant="ghost"
+          className="h-auto w-full items-center justify-between gap-2 px-0 text-left"
           aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
         >
@@ -130,7 +132,7 @@ export function SettlementAuditPanel({
               open && "rotate-180"
             )}
           />
-        </button>
+        </Button>
       </CardHeader>
       {open ? (
         <CardContent className="space-y-4">
@@ -365,19 +367,20 @@ export function SettlementAuditPanel({
                         }
                         return (
                           <td key={to.id} className="px-1 py-0.5 text-right">
-                            <button
+                            <Button
                               type="button"
-                              onClick={() => togglePair(from.id, to.id)}
-                              aria-pressed={isSelected}
+                              variant="ghost"
                               className={cn(
-                                "w-full rounded px-1 py-1 text-right tabular-nums font-medium transition-colors",
+                                "h-auto w-full rounded px-1 py-1 text-right tabular-nums font-medium",
                                 isSelected
-                                  ? "bg-amber-100 text-amber-950 ring-1 ring-amber-300"
+                                  ? "bg-amber-100 text-amber-950 ring-1 ring-amber-300 hover:bg-amber-100"
                                   : "text-amber-900 hover:bg-amber-50"
                               )}
+                              onClick={() => togglePair(from.id, to.id)}
+                              aria-pressed={isSelected}
                             >
                               {formatMoney(amt, baseCurrency)}
-                            </button>
+                            </Button>
                           </td>
                         );
                       })}
@@ -458,13 +461,14 @@ function PairDebtBreakdown({
             </span>
           </p>
         </div>
-        <button
+        <Button
           type="button"
+          variant="link"
+          className="h-auto p-0 text-[11px] text-muted-foreground"
           onClick={onClose}
-          className="text-[11px] text-muted-foreground underline-offset-2 hover:underline"
         >
           Schliessen
-        </button>
+        </Button>
       </div>
 
       <div className="space-y-3">

@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { APP_ICON_STROKE } from "@/lib/branding/app-icons";
 import { cn } from "@/lib/utils";
@@ -64,14 +65,15 @@ export function MariKeyPairPicker({
   return (
     <div ref={rootRef} className="relative space-y-1">
       <Label htmlFor={fieldId}>{label}</Label>
-      <button
+      <Button
         id={fieldId}
         type="button"
+        variant="outline"
         disabled={disabled}
         aria-haspopup="listbox"
         aria-expanded={open}
         className={cn(
-          "flex h-9 w-full items-center justify-between gap-2 rounded-md border border-input bg-transparent px-3 text-left text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
+          "h-9 w-full justify-between gap-2 px-3 text-left text-sm font-normal",
           disabled && "cursor-not-allowed opacity-50"
         )}
         onClick={() => {
@@ -86,17 +88,18 @@ export function MariKeyPairPicker({
           strokeWidth={APP_ICON_STROKE}
           aria-hidden
         />
-      </button>
+      </Button>
       {open ? (
         <ul
           role="listbox"
           className="absolute left-0 z-40 mt-1 max-h-64 w-max min-w-full max-w-[min(42rem,calc(100vw-1.5rem))] overflow-auto rounded-lg border border-border bg-background py-1 shadow-lg"
         >
           <li role="option" aria-selected={!value}>
-            <button
+            <Button
               type="button"
+              variant="ghost"
               className={cn(
-                "w-full px-2.5 py-1.5 text-left text-[12px] hover:bg-muted",
+                "h-auto w-full justify-start px-2.5 py-1.5 text-left text-[12px] font-normal hover:bg-muted",
                 !value && "bg-muted/60 font-medium"
               )}
               onClick={() => {
@@ -105,17 +108,18 @@ export function MariKeyPairPicker({
               }}
             >
               {options.length === 0 ? emptyLabel || placeholder : placeholder}
-            </button>
+            </Button>
           </li>
           {options.map((o) => {
             const text = formatKeyPair(o);
             const active = o.keyInternal === value;
             return (
               <li key={o.keyInternal} role="option" aria-selected={active}>
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
                   className={cn(
-                    "w-full whitespace-nowrap px-2.5 py-1.5 text-left text-[12px] hover:bg-muted",
+                    "h-auto w-full justify-start whitespace-nowrap px-2.5 py-1.5 text-left text-[12px] font-normal hover:bg-muted",
                     active && "bg-muted font-medium"
                   )}
                   title={text}
@@ -125,7 +129,7 @@ export function MariKeyPairPicker({
                   }}
                 >
                   {text}
-                </button>
+                </Button>
               </li>
             );
           })}

@@ -326,14 +326,16 @@ export function ActionInbox() {
                 ["completed", "Erledigt", board.counts.completed],
               ] as const
             ).map(([key, label, count]) => (
-              <button
+              <Button
                 key={key}
                 type="button"
+                variant="outline"
+                size="sm"
                 onClick={() => setTab(key)}
                 className={cn(
-                  "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                  "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors",
                   tab === key
-                    ? "border-transparent bg-[var(--brand-docs)] text-white"
+                    ? "border-transparent bg-[var(--brand-docs)] text-white hover:bg-[var(--brand-docs)]/90"
                     : "border-border/70 bg-background text-muted-foreground hover:bg-muted/50"
                 )}
               >
@@ -347,7 +349,7 @@ export function ActionInbox() {
                 >
                   {count}
                 </Badge>
-              </button>
+              </Button>
             ))}
           </div>
         </div>

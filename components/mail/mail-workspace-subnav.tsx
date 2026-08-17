@@ -1,6 +1,7 @@
 "use client";
 
 import { History, Sparkles } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { APP_ICON_STROKE } from "@/lib/branding/app-icons";
 
@@ -40,10 +41,11 @@ export function MailWorkspaceSubnav({
       )}
     >
       <div className="flex flex-wrap gap-1">
-        <button
+        <Button
           type="button"
+          variant="ghost"
           className={cn(
-            "inline-flex items-center gap-1.5 border-b-2 px-3 py-1.5 text-sm font-medium transition-colors",
+            "h-auto rounded-none border-b-2 px-3 py-1.5 text-sm font-medium",
             view === "chronik"
               ? cn(a.activeText, a.underline)
               : "border-transparent text-muted-foreground hover:text-foreground"
@@ -52,11 +54,12 @@ export function MailWorkspaceSubnav({
         >
           <History className="size-3.5" strokeWidth={APP_ICON_STROKE} aria-hidden />
           Mails · Chronik
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
+          variant="ghost"
           className={cn(
-            "inline-flex items-center gap-1.5 border-b-2 px-3 py-1.5 text-sm font-medium transition-colors",
+            "h-auto rounded-none border-b-2 px-3 py-1.5 text-sm font-medium",
             view === "tagesanalysen"
               ? cn(a.activeText, a.underline)
               : "border-transparent text-muted-foreground hover:text-foreground"
@@ -65,7 +68,7 @@ export function MailWorkspaceSubnav({
         >
           <Sparkles className="size-3.5" strokeWidth={APP_ICON_STROKE} aria-hidden />
           Tagesanalysen
-        </button>
+        </Button>
       </div>
       {view === "chronik" ? (
         <p className="text-[12px] text-muted-foreground">

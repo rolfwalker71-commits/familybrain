@@ -25,6 +25,7 @@ import {
   User,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { formatCHF } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
 import { APP_ICON_STROKE } from "@/lib/branding/app-icons";
@@ -387,13 +388,14 @@ export function AgendaRow({
     (item.documentId != null ? `/documents/${item.documentId}` : null);
   if (onOpen) {
     return (
-      <button
+      <Button
         type="button"
-        className="block w-full cursor-pointer text-left"
+        variant="ghost"
+        className="h-auto w-full cursor-pointer justify-start text-left"
         onClick={() => onOpen(item)}
       >
         {inner}
-      </button>
+      </Button>
     );
   }
   if (linkHref) {

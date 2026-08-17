@@ -11,6 +11,7 @@ import {
   UserRound,
   Users,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { IconCircle } from "@/components/layout/icon-circle";
 import { FinancePieCard } from "@/components/finance-brain/finance-pie-card";
@@ -215,10 +216,11 @@ export function LedgerOverviewDashboards({
             <ul className="space-y-1.5">
               {top.map((e, i) => (
                 <li key={e.id}>
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
                     className={cn(
-                      "flex w-full items-baseline justify-between gap-2 rounded-lg px-1 py-0.5 text-left text-sm leading-snug",
+                      "h-auto w-full items-baseline justify-between gap-2 rounded-lg px-1 py-0.5 text-left text-sm font-normal leading-snug",
                       onOpenExpense && "hover:bg-muted/50"
                     )}
                     onClick={() => onOpenExpense?.(e.id)}
@@ -239,7 +241,7 @@ export function LedgerOverviewDashboards({
                     <span className="shrink-0 font-semibold tabular-nums">
                       {formatMoney(e.amountBase, baseCurrency)}
                     </span>
-                  </button>
+                  </Button>
                 </li>
               ))}
             </ul>
@@ -303,10 +305,11 @@ export function LedgerOverviewDashboards({
             <ul className="space-y-1.5">
               {recent.map((item) => (
                 <li key={`${item.kind}-${item.id}`}>
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
                     className={cn(
-                      "flex w-full items-baseline justify-between gap-2 rounded-lg px-1 py-0.5 text-left text-sm leading-snug",
+                      "h-auto w-full items-baseline justify-between gap-2 rounded-lg px-1 py-0.5 text-left text-sm font-normal leading-snug",
                       item.kind === "expense" &&
                         onOpenExpense &&
                         "hover:bg-muted/50"
@@ -332,7 +335,7 @@ export function LedgerOverviewDashboards({
                         ? formatSignedMoney(item.amountBase, baseCurrency)
                         : formatMoney(item.amountBase, baseCurrency)}
                     </span>
-                  </button>
+                  </Button>
                 </li>
               ))}
             </ul>

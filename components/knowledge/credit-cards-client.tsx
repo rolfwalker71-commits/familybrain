@@ -18,6 +18,7 @@ import type {
 } from "@/lib/knowledge/credit-cards";
 import { formatMoney } from "@/lib/finance-brain/format";
 import { toSwissDate } from "@/lib/utils/dates";
+import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/layout/page-primitives";
 import { IconCircle, pageVisuals } from "@/components/layout/icon-circle";
 import { cn } from "@/lib/utils";
@@ -120,9 +121,11 @@ function StatementRow({
         <span className="shrink-0 text-sm tabular-nums">
           {chf(charge.amount, charge.currency)}
         </span>
-        <button
+        <Button
           type="button"
-          className="flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
+          variant="ghost"
+          size="icon-sm"
+          className="size-7 shrink-0"
           disabled={
             busyKey === `charge:${charge.key}` || charge.excludedByMerchant
           }
@@ -137,16 +140,17 @@ function StatementRow({
           onClick={() => void onDecision("charge", charge.key, !excluded)}
         >
           {excluded ? <Eye className="size-3.5" /> : <EyeOff className="size-3.5" />}
-        </button>
+        </Button>
       </li>
     );
   }
 
   return (
     <li className="border-b border-border/50 last:border-0">
-      <button
+      <Button
         type="button"
-        className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-muted/30"
+        variant="ghost"
+        className="h-auto w-full items-center justify-start gap-3 rounded-none px-3 py-2.5 text-left font-normal hover:bg-muted/30"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
       >
@@ -182,7 +186,7 @@ function StatementRow({
           )}
           aria-hidden
         />
-      </button>
+      </Button>
 
       {open ? (
         <div className="border-t border-border/40 bg-muted/10 px-3 py-2">
@@ -199,9 +203,10 @@ function StatementRow({
               </ul>
               {hiddenCharges.length > 0 ? (
                 <div className="mt-2 overflow-hidden rounded-lg border border-border/50 bg-muted/20">
-                  <button
+                  <Button
                     type="button"
-                    className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs font-medium text-muted-foreground"
+                    variant="ghost"
+                    className="h-auto w-full items-center justify-between gap-3 rounded-none px-3 py-2 text-left text-xs font-medium text-muted-foreground"
                     aria-expanded={hiddenOpen}
                     onClick={() => setHiddenOpen((value) => !value)}
                   >
@@ -215,7 +220,7 @@ function StatementRow({
                         hiddenOpen && "rotate-180"
                       )}
                     />
-                  </button>
+                  </Button>
                   {hiddenOpen ? (
                     <ul className="divide-y divide-border/40 border-t border-border/40 px-2">
                       {hiddenCharges.map((charge) => renderCharge(charge, true))}
@@ -288,16 +293,18 @@ function MerchantList({
           <span className="shrink-0 text-sm font-semibold tabular-nums">
             {chf(amount)}
           </span>
-          <button
+          <Button
             type="button"
-            className="flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
+            variant="ghost"
+            size="icon-sm"
+            className="size-7 shrink-0"
             disabled={busyKey === `merchant:${m.key}`}
             title={excluded ? "Händler wieder einbeziehen" : "Händler aus Auswertung ausblenden"}
             aria-label={excluded ? "Händler wieder einblenden" : "Händler ausblenden"}
             onClick={() => void onDecision("merchant", m.key, !excluded)}
           >
             {excluded ? <Eye className="size-3.5" /> : <EyeOff className="size-3.5" />}
-          </button>
+          </Button>
         </div>
         <div className="flex items-center gap-2 pr-7">
           <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
@@ -322,9 +329,10 @@ function MerchantList({
       <ul className="space-y-2.5">{visible.map((m) => renderMerchant(m, false))}</ul>
       {hidden.length > 0 ? (
         <div className="overflow-hidden rounded-lg border border-border/50 bg-muted/20">
-          <button
+          <Button
             type="button"
-            className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs font-medium text-muted-foreground"
+            variant="ghost"
+            className="h-auto w-full items-center justify-between gap-3 rounded-none px-3 py-2 text-left text-xs font-medium text-muted-foreground"
             aria-expanded={hiddenOpen}
             onClick={() => setHiddenOpen((value) => !value)}
           >
@@ -338,7 +346,7 @@ function MerchantList({
                 hiddenOpen && "rotate-180"
               )}
             />
-          </button>
+          </Button>
           {hiddenOpen ? (
             <ul className="space-y-2.5 border-t border-border/40 p-2">
               {hidden.map((m) => renderMerchant(m, true))}
@@ -527,32 +535,32 @@ export function CreditCardsClient({
       {model.years.length > 0 ? (
         <div className="flex flex-wrap gap-2">
           {model.years.map((y) => (
-            <button
+            <Button
               key={y}
               type="button"
-              onClick={() => setYear(y)}
+              variant="outline"
               className={cn(
-                "rounded-full border px-3 py-1.5 text-sm tabular-nums transition-colors",
-                year === y
-                  ? "border-[var(--brand-finance)] bg-[var(--brand-finance-soft)] text-[var(--brand-finance)]"
-                  : "border-border/70 text-muted-foreground hover:bg-muted/40"
+                "h-auto rounded-full px-3 py-1.5 text-sm tabular-nums",
+                year === y &&
+                  "border-[var(--brand-finance)] bg-[var(--brand-finance-soft)] text-[var(--brand-finance)] hover:bg-[var(--brand-finance-soft)]"
               )}
+              onClick={() => setYear(y)}
             >
               {y}
-            </button>
+            </Button>
           ))}
-          <button
+          <Button
             type="button"
-            onClick={() => setYear(null)}
+            variant="outline"
             className={cn(
-              "rounded-full border px-3 py-1.5 text-sm transition-colors",
-              year == null
-                ? "border-[var(--brand-finance)] bg-[var(--brand-finance-soft)] text-[var(--brand-finance)]"
-                : "border-border/70 text-muted-foreground hover:bg-muted/40"
+              "h-auto rounded-full px-3 py-1.5 text-sm",
+              year == null &&
+                "border-[var(--brand-finance)] bg-[var(--brand-finance-soft)] text-[var(--brand-finance)] hover:bg-[var(--brand-finance-soft)]"
             )}
+            onClick={() => setYear(null)}
           >
             Alle Jahre
-          </button>
+          </Button>
         </div>
       ) : null}
 
@@ -574,9 +582,10 @@ export function CreditCardsClient({
                   key={group.cardKey}
                   className="overflow-hidden rounded-2xl border border-border/70 bg-card"
                 >
-                  <button
+                  <Button
                     type="button"
-                    className="flex w-full items-center gap-3 px-3 py-2.5 text-left sm:px-4"
+                    variant="ghost"
+                    className="h-auto w-full items-center justify-start gap-3 rounded-none px-3 py-2.5 text-left font-normal sm:px-4"
                     aria-expanded={open}
                     onClick={() =>
                       setOpenCards((prev) => {
@@ -622,7 +631,7 @@ export function CreditCardsClient({
                       )}
                       aria-hidden
                     />
-                  </button>
+                  </Button>
                   {open ? (
                     <ul className="border-t border-border/60">
                       {group.statements.map((statement) => (
@@ -682,9 +691,11 @@ export function CreditCardsClient({
                   Summiert über alle Karten
                 </p>
               </div>
-              <button
+              <Button
                 type="button"
-                className="flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-md px-2 text-xs font-medium text-[var(--brand-finance)] hover:bg-[var(--brand-finance-soft)] disabled:opacity-50"
+                variant="ghost"
+                size="sm"
+                className="h-8 shrink-0 gap-1.5 px-2 text-xs font-medium text-[var(--brand-finance)] hover:bg-[var(--brand-finance-soft)]"
                 disabled={logoBusy || merchants.length === 0}
                 title="Alle Händlerlogos konsistent mit AI erzeugen"
                 aria-label="AI-Logos erzeugen"
@@ -692,7 +703,7 @@ export function CreditCardsClient({
               >
                 <Sparkles className={cn("size-4", logoBusy && "animate-pulse")} />
                 <span>{logoBusy ? "Erzeuge…" : "AI-Logos"}</span>
-              </button>
+              </Button>
             </div>
             {logoProgress ? (
               <p className="mb-3 text-xs text-muted-foreground">
@@ -716,16 +727,17 @@ export function CreditCardsClient({
                     key={yt.year}
                     className="flex items-center justify-between gap-3 text-sm"
                   >
-                    <button
+                    <Button
                       type="button"
+                      variant="link"
                       className={cn(
-                        "tabular-nums underline-offset-2 hover:underline",
+                        "h-auto p-0 tabular-nums",
                         yt.year === year && "font-semibold"
                       )}
                       onClick={() => setYear(yt.year)}
                     >
                       {yt.year}
-                    </button>
+                    </Button>
                     <span className="tabular-nums text-muted-foreground">
                       {chf(yt.total)}
                     </span>

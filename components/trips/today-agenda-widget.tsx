@@ -11,6 +11,7 @@ import {
   Ticket,
   TrainFront,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { coerceTripEventType } from "@/lib/trips/constants";
 import { toTimeInputValue } from "@/lib/utils/dates";
@@ -142,9 +143,10 @@ export function TodayAgendaWidget({
                 {time || "—"}
               </span>
 
-              <button
+              <Button
                 type="button"
-                className="flex min-w-0 flex-1 items-center gap-2.5 rounded-2xl border border-border bg-card px-2.5 py-2 text-left shadow-none transition-colors hover:bg-muted/40 sm:gap-3 sm:px-3 sm:py-2.5"
+                variant="outline"
+                className="h-auto min-w-0 flex-1 items-center justify-start gap-2.5 rounded-2xl border-border bg-card px-2.5 py-2 text-left font-normal shadow-none hover:bg-muted/40 sm:gap-3 sm:px-3 sm:py-2.5"
                 onClick={() => onSelectEvent?.(event.id, iso)}
               >
                 <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-foreground sm:size-10">
@@ -170,7 +172,7 @@ export function TodayAgendaWidget({
                 >
                   {booked ? "Gebucht" : "Geplant"}
                 </span>
-              </button>
+              </Button>
             </li>
           );
         })}

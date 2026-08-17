@@ -110,14 +110,16 @@ export function DetailCarousel({
           </Button>
           <div className="flex items-center gap-1.5" role="tablist" aria-label="Seiten">
             {slides.map((_, i) => (
-              <button
+              <Button
                 key={i}
                 type="button"
+                variant="ghost"
+                size="icon-xs"
                 role="tab"
                 aria-selected={i === index}
                 aria-label={`Seite ${i + 1}`}
                 className={cn(
-                  "size-1.5 rounded-full transition-colors",
+                  "size-1.5 min-h-0 min-w-0 shrink-0 rounded-full p-0 transition-colors hover:bg-transparent",
                   i === index
                     ? "bg-[var(--brand-finance)]"
                     : "bg-muted-foreground/30"

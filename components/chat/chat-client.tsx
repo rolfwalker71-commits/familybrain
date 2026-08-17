@@ -323,19 +323,21 @@ export function ChatClient() {
               {SOURCE_OPTIONS.map((option) => {
                 const active = chatSources[option.key];
                 return (
-                  <button
+                  <Button
                     key={option.key}
                     type="button"
+                    variant="outline"
+                    size="sm"
                     onClick={() => toggleSource(option.key)}
                     aria-pressed={active}
                     className={
                       active
-                        ? "rounded-full border border-primary/40 bg-primary/10 px-2.5 py-1 text-xs font-medium text-foreground"
+                        ? "rounded-full border border-primary/40 bg-primary/10 px-2.5 py-1 text-xs font-medium text-foreground hover:bg-primary/10"
                         : "rounded-full border border-border/60 bg-background px-2.5 py-1 text-xs text-muted-foreground hover:bg-muted"
                     }
                   >
                     {option.label}
-                  </button>
+                  </Button>
                 );
               })}
             </div>
@@ -450,14 +452,16 @@ export function ChatClient() {
                 </div>
                 <div className="flex max-w-2xl flex-wrap justify-center gap-2">
                   {SUGGESTIONS.map((s) => (
-                    <button
+                    <Button
                       key={s}
                       type="button"
+                      variant="outline"
+                      size="sm"
                       onClick={() => void send(s)}
-                      className="min-h-11 rounded-full border border-border/60 bg-background px-3 py-2 text-left text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                      className="min-h-11 h-auto rounded-full border border-border/60 bg-background px-3 py-2 text-left text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                     >
                       {s}
-                    </button>
+                    </Button>
                   ))}
                 </div>
               </div>

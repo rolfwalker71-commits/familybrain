@@ -537,17 +537,18 @@ function TravelOverviewClientInner({ items, documentTripLinks = {} }: Props) {
           const surface = toneSurface(meta.tone);
 
           return (
-            <button
+            <Button
               key={key}
               type="button"
-              onClick={() => openDimension(key)}
+              variant="ghost"
               className={cn(
-                "min-w-0 overflow-hidden rounded-xl border text-left shadow-[0_4px_16px_rgba(20,32,28,0.05)] transition-all",
+                "h-auto min-w-0 overflow-hidden rounded-xl border text-left font-normal shadow-[0_4px_16px_rgba(20,32,28,0.05)]",
                 surface.body,
                 active
                   ? "border-[var(--brand-docs)] ring-2 ring-[var(--brand-docs)]/20"
                   : "border-border/60 hover:border-[var(--brand-docs)]/40"
               )}
+              onClick={() => openDimension(key)}
             >
               <TileTitleBar
                 tone={meta.tone}
@@ -586,7 +587,7 @@ function TravelOverviewClientInner({ items, documentTripLinks = {} }: Props) {
                   <p className="mt-4 text-sm text-muted-foreground">{meta.empty}</p>
                 )}
               </div>
-            </button>
+            </Button>
           );
         })}
       </div>
@@ -636,20 +637,21 @@ function TravelOverviewClientInner({ items, documentTripLinks = {} }: Props) {
                   const dimTone = dimensionMeta[dimension].tone;
                   const itemSurface = toneSurface(dimTone);
                   return (
-                    <button
+                    <Button
                       key={item.label}
                       type="button"
-                      onClick={() => {
-                        setSelected(isSelected ? null : item.label);
-                        setDetailId(null);
-                      }}
+                      variant="ghost"
                       className={cn(
-                        "min-w-0 overflow-hidden rounded-xl border text-left shadow-[0_4px_16px_rgba(20,32,28,0.05)] transition-colors",
+                        "h-auto min-w-0 overflow-hidden rounded-xl border text-left font-normal shadow-[0_4px_16px_rgba(20,32,28,0.05)]",
                         itemSurface.body,
                         isSelected
                           ? "border-[var(--brand-docs)] ring-2 ring-[var(--brand-docs)]/20"
                           : "border-border/60 hover:border-[var(--brand-docs)]/40"
                       )}
+                      onClick={() => {
+                        setSelected(isSelected ? null : item.label);
+                        setDetailId(null);
+                      }}
                     >
                       <TileTitleBar
                         tone={dimTone}
@@ -670,7 +672,7 @@ function TravelOverviewClientInner({ items, documentTripLinks = {} }: Props) {
                         </div>
                         <ShareBar value={share} />
                       </div>
-                    </button>
+                    </Button>
                   );
                 })}
               </div>

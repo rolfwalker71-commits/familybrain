@@ -451,9 +451,10 @@ export function GoogleMailInboxPanel({
           <ul className="space-y-2">
             {items.map((item) => (
               <li key={item.id}>
-                <button
+                <Button
                   type="button"
-                  className="flex w-full items-start gap-3 rounded-xl border border-border/60 bg-card px-3 py-2.5 text-left shadow-[0_2px_10px_rgba(20,32,28,0.04)] hover:bg-muted/30"
+                  variant="ghost"
+                  className="h-auto w-full justify-start items-start gap-3 rounded-xl border border-border/60 bg-card px-3 py-2.5 text-left shadow-[0_2px_10px_rgba(20,32,28,0.04)] hover:bg-muted/30"
                   onClick={() => void openMail(item.id)}
                 >
                   <Mail
@@ -501,7 +502,7 @@ export function GoogleMailInboxPanel({
                       Neu
                     </Badge>
                   ) : null}
-                </button>
+                </Button>
               </li>
             ))}
           </ul>

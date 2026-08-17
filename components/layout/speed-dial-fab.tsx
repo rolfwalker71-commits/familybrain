@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { Plus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 export type SpeedDialAction = {
   id: string;
@@ -59,10 +60,11 @@ export function SpeedDialFab({
           {actions.map((action) => {
             const Icon = action.icon;
             return (
-              <button
+              <Button
                 key={action.id}
                 type="button"
-                className="flex items-center gap-2 rounded-full border border-border/70 bg-card py-1.5 pl-3 pr-2 text-sm font-medium shadow-md"
+                variant="outline"
+                className="flex h-auto w-auto items-center gap-2 rounded-full border-border/70 bg-card py-1.5 pl-3 pr-2 text-sm font-medium shadow-md"
                 onClick={() => {
                   setOpen(false);
                   action.onSelect();
@@ -77,25 +79,27 @@ export function SpeedDialFab({
                 >
                   <Icon className="size-4" />
                 </span>
-              </button>
+              </Button>
             );
           })}
         </div>
       ) : null}
 
-      <button
+      <Button
         type="button"
+        variant="default"
+        size="icon-lg"
         aria-label={label}
         aria-expanded={open}
         className={cn(
-          "pointer-events-auto flex size-14 items-center justify-center rounded-full shadow-lg transition-transform",
+          "pointer-events-auto size-14 rounded-full shadow-lg transition-transform",
           solid,
           open && "rotate-45"
         )}
         onClick={() => setOpen((o) => !o)}
       >
         {open ? <X className="size-6" /> : <Plus className="size-6" />}
-      </button>
+      </Button>
     </div>
   );
 }

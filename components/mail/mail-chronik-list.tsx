@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { ExternalLink } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -103,11 +103,12 @@ function MailChronikRow({
       : `An ${partyName}`;
 
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
       onClick={() => onOpen(mail)}
       className={cn(
-        "flex w-full min-w-0 items-start gap-3 px-3.5 py-3 text-left transition-colors",
+        "h-auto w-full min-w-0 justify-start items-start gap-3 px-3.5 py-3 text-left transition-colors",
         indented && "border-l-2 border-border/60 bg-muted/15 pl-5 sm:pl-6",
         isContext
           ? "text-muted-foreground hover:bg-muted/35"
@@ -170,7 +171,7 @@ function MailChronikRow({
           {sub}
         </p>
       </div>
-    </button>
+    </Button>
   );
 }
 

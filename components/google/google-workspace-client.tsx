@@ -231,9 +231,11 @@ function ReplyLangToggle({
       onKeyDown={(e) => e.stopPropagation()}
     >
       {(["de", "en"] as const).map((code) => (
-        <button
+        <Button
           key={code}
           type="button"
+          variant="ghost"
+          size="xs"
           disabled={busy}
           className={cn(
             "rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase",
@@ -248,7 +250,7 @@ function ReplyLangToggle({
           }}
         >
           {code}
-        </button>
+        </Button>
       ))}
     </div>
   );
@@ -1086,16 +1088,18 @@ export function GoogleWorkspaceClient() {
               </span>
             </p>
             <nav className="flex flex-wrap gap-0.5 border-b border-border/50">
-              <button
+              <Button
                 type="button"
+                variant="ghost"
                 className={mailWorkspaceTabClass(tab === "mail", "google")}
                 onClick={() => setTab("mail")}
               >
                 <GmailLogo className="size-3.5" />
                 Mails
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="ghost"
                 className={mailWorkspaceTabClass(tab === "triage", "google")}
                 onClick={() => setTab("triage")}
               >
@@ -1106,23 +1110,25 @@ export function GoogleWorkspaceClient() {
                     {inboxPending}
                   </Badge>
                 ) : null}
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="ghost"
                 className={mailWorkspaceTabClass(tab === "calendar", "google")}
                 onClick={() => setTab("calendar")}
               >
                 <CalendarClock className="size-3.5" strokeWidth={APP_ICON_STROKE} />
                 Kalender
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="ghost"
                 className={mailWorkspaceTabClass(tab === "tasks", "google")}
                 onClick={() => setTab("tasks")}
               >
                 <GoogleTasksLogo className="size-3.5" />
                 Tasks
-              </button>
+              </Button>
             </nav>
           </div>
 

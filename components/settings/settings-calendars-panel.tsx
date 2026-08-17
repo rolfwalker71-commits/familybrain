@@ -269,9 +269,10 @@ export function SettingsCalendarsPanel() {
   return (
     <Card>
       <CardHeader className="pb-4">
-        <button
+        <Button
           type="button"
-          className="flex w-full items-center gap-3 rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          variant="ghost"
+          className="flex h-auto w-full items-center gap-3 rounded-md p-0 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
           aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
         >
@@ -291,7 +292,7 @@ export function SettingsCalendarsPanel() {
             )}
             aria-hidden
           />
-        </button>
+        </Button>
       </CardHeader>
       {open ? (
       <CardContent className="space-y-6 pt-0">
@@ -368,10 +369,11 @@ export function SettingsCalendarsPanel() {
                       <Label>Farbe</Label>
                       <div className="flex flex-wrap items-center gap-2">
                         {PRESET_COLORS.map((hex) => (
-                          <button
+                          <Button
                             key={hex}
                             type="button"
-                            className="size-7 rounded-full border border-black/10 ring-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            variant="ghost"
+                            className="size-7 rounded-full border border-black/10 p-0 ring-offset-2 hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                             style={{
                               backgroundColor: hex,
                               boxShadow:
@@ -572,10 +574,11 @@ export function SettingsCalendarsPanel() {
             <Label>Farbe</Label>
             <div className="flex flex-wrap items-center gap-2">
               {PRESET_COLORS.map((hex) => (
-                <button
+                <Button
                   key={hex}
                   type="button"
-                  className="size-7 rounded-full border border-black/10"
+                  variant="ghost"
+                  className="size-7 rounded-full border border-black/10 p-0 hover:bg-transparent"
                   style={{
                     backgroundColor: hex,
                     boxShadow:

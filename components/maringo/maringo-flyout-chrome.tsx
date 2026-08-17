@@ -6,6 +6,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { Button } from "@/components/ui/button";
 import {
   ClipboardList,
   Clock3,
@@ -14,7 +15,6 @@ import {
   SquarePen,
   X,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { APP_ICON_STROKE } from "@/lib/branding/app-icons";
 import { cn } from "@/lib/utils";
 
@@ -167,22 +167,24 @@ export function MariTicketFlyoutRail({
               index === items.length - 1 && "mt-auto"
             )}
           >
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon"
               aria-label={label}
               aria-pressed={active}
               onClick={() => onToggle(id)}
               className={cn(
-                "flex size-10 items-center justify-center rounded-xl transition-colors",
+                "size-10 rounded-xl",
                   top
-                  ? "bg-orange-100 text-orange-950 dark:bg-orange-500/25 dark:text-orange-100"
+                  ? "bg-orange-100 text-orange-950 hover:bg-orange-100 dark:bg-orange-500/25 dark:text-orange-100 dark:hover:bg-orange-500/25"
                   : active
-                    ? "bg-orange-50 text-orange-900 dark:bg-orange-500/15 dark:text-orange-100"
+                    ? "bg-orange-50 text-orange-900 hover:bg-orange-50 dark:bg-orange-500/15 dark:text-orange-100 dark:hover:bg-orange-500/15"
                     : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
               )}
             >
               <Icon className="size-5" strokeWidth={APP_ICON_STROKE} />
-            </button>
+            </Button>
             <span
               role="tooltip"
               className="pointer-events-none absolute top-1/2 left-full z-20 ml-2 -translate-y-1/2 whitespace-nowrap rounded-md bg-foreground px-2 py-1 text-[11px] font-medium text-background opacity-0 shadow-md transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"

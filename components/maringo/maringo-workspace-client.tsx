@@ -139,9 +139,11 @@ function ReplyLangToggle({
       onKeyDown={(e) => e.stopPropagation()}
     >
       {(["de", "en"] as const).map((code) => (
-        <button
+        <Button
           key={code}
           type="button"
+          variant="ghost"
+          size="xs"
           disabled={busy}
           className={cn(
             "rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase",
@@ -156,7 +158,7 @@ function ReplyLangToggle({
           }}
         >
           {code}
-        </button>
+        </Button>
       ))}
     </div>
   );
@@ -232,9 +234,10 @@ function TimelineImageThumb({
   }
 
   return (
-    <button
+    <Button
       type="button"
-      className="group relative overflow-hidden rounded-lg border border-border/60 bg-background shadow-sm transition hover:border-orange-300"
+      variant="ghost"
+      className="group relative h-auto overflow-hidden rounded-lg border border-border/60 bg-background p-0 shadow-sm transition hover:border-orange-300"
       onClick={onOpen}
       title={attachment.orgFilename}
       disabled={!src}
@@ -254,7 +257,7 @@ function TimelineImageThumb({
       <span className="absolute inset-x-0 bottom-0 truncate bg-black/55 px-1.5 py-0.5 text-[10px] text-white opacity-0 transition group-hover:opacity-100">
         {attachment.orgFilename}
       </span>
-    </button>
+    </Button>
   );
 }
 
@@ -331,14 +334,16 @@ function TimelineAttachments({
           aria-label={lightbox.orgFilename}
           onClick={() => setLightbox(null)}
         >
-          <button
+          <Button
             type="button"
-            className="absolute right-4 top-4 rounded-full bg-black/50 p-2 text-white hover:bg-black/70"
+            variant="ghost"
+            size="icon"
+            className="absolute right-4 top-4 size-9 rounded-full bg-black/50 text-white hover:bg-black/70"
             onClick={() => setLightbox(null)}
             aria-label="Schliessen"
           >
             <X className="size-5" />
-          </button>
+          </Button>
           <div
             className="flex max-h-full max-w-full flex-col items-center gap-2"
             onClick={(e) => e.stopPropagation()}
@@ -1738,31 +1743,35 @@ export function MaringoWorkspaceClient() {
       />
 
       <div className="flex flex-wrap gap-1.5">
-        <button
+        <Button
           type="button"
+          variant="outline"
+          size="sm"
           onClick={() => {
             setTicketFlyoutOpen(false);
             setSecondaryFlyouts([]);
             setWorkspaceTab("tickets");
           }}
           className={cn(
-            "rounded-full border px-3 py-1.5 text-[12px] font-semibold transition-colors",
+            "h-auto rounded-full px-3 py-1.5 text-[12px] font-semibold",
             workspaceTab === "tickets"
               ? "border-orange-300 bg-orange-50 text-orange-950 dark:border-orange-400/40 dark:bg-orange-500/15 dark:text-orange-100"
               : "border-border/70 bg-background text-muted-foreground hover:bg-muted/40"
           )}
         >
           Tickets
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
+          variant="outline"
+          size="sm"
           onClick={() => {
             setTicketFlyoutOpen(false);
             setSecondaryFlyouts([]);
             setWorkspaceTab("hours");
           }}
           className={cn(
-            "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-semibold transition-colors",
+            "h-auto rounded-full px-3 py-1.5 text-[12px] font-semibold",
             workspaceTab === "hours"
               ? "border-orange-300 bg-orange-50 text-orange-950 dark:border-orange-400/40 dark:bg-orange-500/15 dark:text-orange-100"
               : "border-border/70 bg-background text-muted-foreground hover:bg-muted/40"
@@ -1770,7 +1779,7 @@ export function MaringoWorkspaceClient() {
         >
           <Clock3 className="size-3.5" strokeWidth={APP_ICON_STROKE} />
           Stunden
-        </button>
+        </Button>
       </div>
 
       {!configured ? (
@@ -1833,30 +1842,34 @@ export function MaringoWorkspaceClient() {
 
           <div className="space-y-1.5 border-b border-border/50 px-3 py-2">
             <div className="flex flex-wrap items-center gap-1.5">
-              <button
+              <Button
                 type="button"
+                variant="outline"
+                size="sm"
                 onClick={selectAllWorkStatuses}
                 className={cn(
-                  "rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors",
+                  "h-auto rounded-full px-2.5 py-1 text-[11px] font-semibold",
                   statuses.length === WORK_STATUS_IDS.length && !overdueOnly
                     ? "border-orange-200/90 bg-orange-50/80 text-orange-900 dark:border-orange-400/35 dark:bg-orange-500/15 dark:text-orange-100"
                     : "border-border/70 bg-background text-muted-foreground hover:bg-muted/40"
                 )}
               >
                 Meine
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="outline"
+                size="sm"
                 onClick={() => setOverdueOnly((v) => !v)}
                 className={cn(
-                  "rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors",
+                  "h-auto rounded-full px-2.5 py-1 text-[11px] font-semibold",
                   overdueOnly
                     ? "border-rose-300 bg-rose-50 text-rose-950 dark:border-rose-400/40 dark:bg-rose-500/15 dark:text-rose-100"
                     : "border-border/70 bg-background text-muted-foreground hover:bg-muted/40"
                 )}
               >
                 Überfällig
-              </button>
+              </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger
                   render={
@@ -1893,12 +1906,14 @@ export function MaringoWorkspaceClient() {
                 </DropdownMenuContent>
               </DropdownMenu>
               <div className="ml-auto inline-flex items-center gap-0.5 rounded-full border border-border/70 p-0.5">
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="sm"
                   onClick={() => setListSort("newest")}
                   title="Neueste zuerst"
                   className={cn(
-                    "inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-semibold transition-colors",
+                    "h-auto rounded-full px-2 py-1 text-[11px] font-semibold",
                     listSort === "newest"
                       ? "bg-muted text-foreground"
                       : "text-muted-foreground hover:text-foreground"
@@ -1906,13 +1921,15 @@ export function MaringoWorkspaceClient() {
                 >
                   <ArrowDownAZ className="size-3.5" strokeWidth={APP_ICON_STROKE} />
                   Neu→Alt
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="sm"
                   onClick={() => setListSort("oldest")}
                   title="Älteste zuerst"
                   className={cn(
-                    "inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-semibold transition-colors",
+                    "h-auto rounded-full px-2 py-1 text-[11px] font-semibold",
                     listSort === "oldest"
                       ? "bg-muted text-foreground"
                       : "text-muted-foreground hover:text-foreground"
@@ -1920,7 +1937,7 @@ export function MaringoWorkspaceClient() {
                 >
                   <ArrowUpAZ className="size-3.5" strokeWidth={APP_ICON_STROKE} />
                   Alt→Neu
-                </button>
+                </Button>
               </div>
             </div>
             {statuses.length > 0 ? (
@@ -1937,30 +1954,34 @@ export function MaringoWorkspaceClient() {
             ) : null}
             <div className="space-y-1.5 pt-0.5">
               <div className="flex gap-1 rounded-lg border border-border/60 bg-muted/20 p-0.5">
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="sm"
                   onClick={() => setFilterMode("handler")}
                   className={cn(
-                    "flex-1 rounded-md px-2 py-1 text-[11px] font-semibold transition-colors",
+                    "h-auto flex-1 rounded-md px-2 py-1 text-[11px] font-semibold",
                     filterMode === "handler"
                       ? "bg-background text-foreground shadow-sm"
                       : "text-muted-foreground hover:text-foreground"
                   )}
                 >
                   Bearbeiter
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="sm"
                   onClick={() => setFilterMode("customer")}
                   className={cn(
-                    "flex-1 rounded-md px-2 py-1 text-[11px] font-semibold transition-colors",
+                    "h-auto flex-1 rounded-md px-2 py-1 text-[11px] font-semibold",
                     filterMode === "customer"
                       ? "bg-background text-foreground shadow-sm"
                       : "text-muted-foreground hover:text-foreground"
                   )}
                 >
                   Kunde
-                </button>
+                </Button>
               </div>
 
               {filterMode === "handler" ? (
@@ -2023,9 +2044,11 @@ export function MaringoWorkspaceClient() {
                   {selectedCustomers.length > 0 ? (
                     <div className="flex flex-wrap gap-1">
                       {selectedCustomers.map((c) => (
-                        <button
+                        <Button
                           key={c.cardCode}
                           type="button"
+                          variant="outline"
+                          size="sm"
                           title="Abwählen"
                           onClick={() => {
                             setSelectedCustomers((prev) =>
@@ -2035,7 +2058,7 @@ export function MaringoWorkspaceClient() {
                               prev.filter((x) => x.cardCode !== c.cardCode)
                             );
                           }}
-                          className="inline-flex max-w-full items-center gap-1 rounded-full border border-sky-200/80 bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-sky-950 dark:border-sky-400/30 dark:bg-sky-500/15 dark:text-sky-100"
+                          className="inline-flex h-auto max-w-full items-center gap-1 rounded-full border-sky-200/80 bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-sky-950 dark:border-sky-400/30 dark:bg-sky-500/15 dark:text-sky-100"
                         >
                           <span className="truncate">
                             {c.name}
@@ -2044,7 +2067,7 @@ export function MaringoWorkspaceClient() {
                             </span>
                           </span>
                           <X className="size-3 shrink-0 opacity-60" aria-hidden />
-                        </button>
+                        </Button>
                       ))}
                     </div>
                   ) : null}
@@ -2076,10 +2099,11 @@ export function MaringoWorkspaceClient() {
                             );
                             return (
                               <li key={hit.cardCode}>
-                                <button
+                                <Button
                                   type="button"
+                                  variant="ghost"
                                   className={cn(
-                                    "flex w-full items-start gap-2 px-2.5 py-1.5 text-left text-[12px] hover:bg-muted/50",
+                                    "h-auto w-full items-start justify-start gap-2 px-2.5 py-1.5 text-left text-[12px] font-normal",
                                     checked && "bg-sky-50/80 dark:bg-sky-500/15"
                                   )}
                                   onClick={() => {
@@ -2113,7 +2137,7 @@ export function MaringoWorkspaceClient() {
                                       {hit.cardCode}
                                     </span>
                                   </span>
-                                </button>
+                                </Button>
                               </li>
                             );
                           })}
@@ -2203,13 +2227,14 @@ export function MaringoWorkspaceClient() {
               const stamp = listCalendarStamps[t.issueId] || null;
               return (
                 <li key={t.issueId} className="border-b border-border/40 last:border-b-0">
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
                     onClick={() => openTicket(t.issueId)}
                     className={cn(
-                      "relative flex w-full items-start gap-2 border-l-2 px-2.5 py-2 text-left transition-colors",
+                      "relative h-auto w-full items-start justify-start gap-2 rounded-none border-l-2 px-2.5 py-2 text-left",
                       active
-                        ? "border-l-orange-400 bg-orange-50/70 dark:bg-orange-500/15"
+                        ? "border-l-orange-400 bg-orange-50/70 hover:bg-orange-50/70 dark:bg-orange-500/15 dark:hover:bg-orange-500/15"
                         : "border-l-transparent hover:bg-muted/40"
                     )}
                   >
@@ -2276,7 +2301,7 @@ export function MaringoWorkspaceClient() {
                         </span>
                       ) : null}
                     </div>
-                  </button>
+                  </Button>
                 </li>
               );
             })}
@@ -2289,10 +2314,11 @@ export function MaringoWorkspaceClient() {
       {flyoutPortalReady && ticketFlyoutPresence.mounted
         ? createPortal(
             <div className="fixed inset-0 z-[1000]">
-              <button
+              <Button
                 type="button"
+                variant="ghost"
                 className={cn(
-                  "absolute inset-0 bg-black/20 transition-opacity ease-in-out",
+                  "absolute inset-0 h-auto w-full rounded-none border-0 bg-black/20 p-0 transition-opacity ease-in-out hover:bg-black/20",
                   ticketFlyoutPresence.entered ? "opacity-100" : "opacity-0"
                 )}
                 style={{ transitionDuration: `${MARI_FLYOUT_MS}ms` }}
@@ -2469,16 +2495,18 @@ export function MaringoWorkspaceClient() {
                               {detail.referenceText || "–"}
                             </DetailField>
                             <DetailField label="Std. Freigabe">
-                              <button
+                              <Button
                                 type="button"
-                                className="text-left font-medium text-orange-900 underline-offset-2 hover:underline dark:text-orange-200"
+                                variant="link"
+                                size="sm"
+                                className="h-auto p-0 text-left font-medium text-orange-900 dark:text-orange-200"
                                 onClick={() => toggleSecondary("kopf")}
                                 title="Ticket-Kopf bearbeiten"
                               >
                                 {detail.stdFreigabe
                                   ? `${detail.stdFreigabe} h`
                                   : "–"}
-                              </button>
+                              </Button>
                             </DetailField>
                             {detail.aiLabel ? (
                               <DetailField label="AI">{detail.aiLabel}</DetailField>
@@ -2916,10 +2944,11 @@ export function MaringoWorkspaceClient() {
                           </Card>
                         ) : null}
 
-                        <button
+                        <Button
                           type="button"
+                          variant="outline"
                           onClick={() => toggleSecondary("buchungen")}
-                          className="w-full rounded-2xl border border-border/60 bg-muted/20 px-3.5 py-3 text-left transition-colors hover:bg-muted/40"
+                          className="h-auto w-full flex-col items-start justify-start rounded-2xl border-border/60 bg-muted/20 px-3.5 py-3 text-left hover:bg-muted/40"
                         >
                           <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0">
@@ -2939,7 +2968,7 @@ export function MaringoWorkspaceClient() {
                               Öffnen
                             </span>
                           </div>
-                        </button>
+                        </Button>
 
                         <div>
                           <h3 className="mb-3 flex items-center gap-2 text-[13px] font-black tracking-tight">
@@ -3081,10 +3110,11 @@ export function MaringoWorkspaceClient() {
                           </div>
                         ) : null}
 
-                        <button
+                        <Button
                           type="button"
+                          variant="outline"
                           onClick={() => toggleSecondary("verlauf")}
-                          className="w-full rounded-2xl border border-border/60 bg-muted/20 px-3.5 py-3 text-left transition-colors hover:bg-muted/40"
+                          className="h-auto w-full items-center justify-between rounded-2xl border-border/60 bg-muted/20 px-3.5 py-3 text-left hover:bg-muted/40"
                         >
                           <div className="flex items-center justify-between gap-2">
                             <p className="flex items-center gap-2 text-[13px] font-black tracking-tight">
@@ -3095,7 +3125,7 @@ export function MaringoWorkspaceClient() {
                               Öffnen
                             </span>
                           </div>
-                        </button>
+                        </Button>
                       </div>
                     </>
                   ) : (
@@ -3146,11 +3176,13 @@ export function MaringoWorkspaceClient() {
                     {id === "verlauf" ? (
                       <div className="space-y-3">
                         <div className="inline-flex items-center gap-0.5 rounded-lg border border-border/60 p-0.5">
-                          <button
+                          <Button
                             type="button"
+                            variant="ghost"
+                            size="sm"
                             onClick={() => setTimelineSort("newest")}
                             className={cn(
-                              "inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold transition-colors",
+                              "h-auto rounded-md px-2 py-1 text-[11px] font-semibold",
                               timelineSort === "newest"
                                 ? "bg-muted text-foreground"
                                 : "text-muted-foreground hover:text-foreground"
@@ -3158,12 +3190,14 @@ export function MaringoWorkspaceClient() {
                           >
                             <ArrowDownAZ className="size-3.5" />
                             Aktuellste oben
-                          </button>
-                          <button
+                          </Button>
+                          <Button
                             type="button"
+                            variant="ghost"
+                            size="sm"
                             onClick={() => setTimelineSort("oldest")}
                             className={cn(
-                              "inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold transition-colors",
+                              "h-auto rounded-md px-2 py-1 text-[11px] font-semibold",
                               timelineSort === "oldest"
                                 ? "bg-muted text-foreground"
                                 : "text-muted-foreground hover:text-foreground"
@@ -3171,7 +3205,7 @@ export function MaringoWorkspaceClient() {
                           >
                             <ArrowUpAZ className="size-3.5" />
                             Älteste oben
-                          </button>
+                          </Button>
                         </div>
                         {sortedTimeline.length === 0 ? (
                           <div className="rounded-xl border border-dashed border-border/60 px-3 py-6 text-center text-sm text-muted-foreground">

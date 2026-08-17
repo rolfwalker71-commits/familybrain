@@ -3220,10 +3220,11 @@ function TripDetailInner({
                     </div>
                     <div className="max-h-56 space-y-0.5 overflow-y-auto overscroll-contain pr-1">
                       {trainConnectionOptions[editingEventId].map((option) => (
-                        <button
+                        <Button
                           key={option.id}
                           type="button"
-                          className="block w-full rounded-md px-2 py-1.5 text-left text-xs hover:bg-muted"
+                          variant="ghost"
+                          className="block h-auto w-full flex-col items-start justify-start rounded-md px-2 py-1.5 text-left text-xs font-normal hover:bg-muted"
                           onClick={() =>
                             void applyTrainConnection(editingEventId, option)
                           }
@@ -3232,7 +3233,7 @@ function TripDetailInner({
                           <div className="text-muted-foreground">
                             {option.summary}
                           </div>
-                        </button>
+                        </Button>
                       ))}
                     </div>
                   </div>
@@ -3343,17 +3344,18 @@ function TripDetailInner({
                         : "OSM-Treffer wählen"}
                     </div>
                     {placeCandidates[editingEventId].map((c) => (
-                      <button
+                      <Button
                         key={c.osmId}
                         type="button"
-                        className="block w-full rounded-md px-2 py-1.5 text-left text-xs hover:bg-muted"
+                        variant="ghost"
+                        className="block h-auto w-full flex-col items-start justify-start rounded-md px-2 py-1.5 text-left text-xs font-normal hover:bg-muted"
                         onClick={() => void applyPlace(editingEventId, c)}
                       >
                         <div className="font-medium">{c.name}</div>
                         <div className="text-muted-foreground">
                           {c.displayName}
                         </div>
-                      </button>
+                      </Button>
                     ))}
                   </div>
                 ) : null}
@@ -3626,11 +3628,13 @@ function TripDetailInner({
                             {event.title}
                           </div>
                           {editMode ? (
-                            <button
+                            <Button
                               type="button"
+                              variant="ghost"
+                              size="icon-sm"
                               draggable
                               title="Ziehen zum Sortieren"
-                              className="hidden cursor-grab touch-none rounded p-0.5 text-muted-foreground hover:bg-muted active:cursor-grabbing sm:inline-flex"
+                              className="hidden cursor-grab touch-none p-0.5 text-muted-foreground active:cursor-grabbing sm:inline-flex"
                               onClick={(e) => e.stopPropagation()}
                               onDragStart={(e) => {
                                 setDragEventId(event.id);
@@ -3646,7 +3650,7 @@ function TripDetailInner({
                               }}
                             >
                               <GripVertical className="size-4" />
-                            </button>
+                            </Button>
                           ) : null}
                         </div>
                         {dateLine ? (

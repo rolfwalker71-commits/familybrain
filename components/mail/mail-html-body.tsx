@@ -62,13 +62,14 @@ export function MailHtmlBody({
       {loadImages && prepared.externalImageCount > 0 ? (
         <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-muted-foreground">
           <span>Externe Bilder geladen.</span>
-          <button
+          <Button
             type="button"
-            className="underline underline-offset-2 hover:text-foreground"
+            variant="link"
+            className="h-auto p-0 text-[11px] underline underline-offset-2"
             onClick={() => setLoadImages(false)}
           >
             Wieder blockieren
-          </button>
+          </Button>
         </div>
       ) : null}
       <div

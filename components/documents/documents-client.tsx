@@ -1371,13 +1371,14 @@ export function DocumentsClient() {
           {analyzeBusy && analyzeProgress
             ? analyzeProgress
             : "Analyse läuft — «Analysieren» pro Zeile ist gesperrt."}{" "}
-          <button
+          <Button
             type="button"
-            className="font-semibold underline underline-offset-2"
+            variant="link"
+            className="h-auto p-0 font-semibold underline underline-offset-2"
             onClick={() => void stopRunningWork()}
           >
             Analyse stoppen
-          </button>
+          </Button>
           {analyzeBusy ? null : ", dann erneut tippen. KI-Icons sind davon unabhängig."}
         </div>
       ) : null}

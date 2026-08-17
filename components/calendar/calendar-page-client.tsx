@@ -218,12 +218,13 @@ export function CalendarPageClient() {
           {sources.map((s) => {
             const on = activeSelected?.has(s.id) ?? s.enabled;
             return (
-              <button
+              <Button
                 key={s.id}
                 type="button"
+                variant="outline"
                 onClick={() => toggleSource(s.id)}
                 className={cn(
-                  "inline-flex max-w-full items-center gap-1 rounded-full border px-1.5 py-0.5 text-[11px] leading-tight transition-colors",
+                  "h-auto max-w-full gap-1 rounded-full border px-1.5 py-0.5 text-[11px] leading-tight",
                   on
                     ? "border-border/70 bg-card"
                     : "border-transparent bg-muted/50 text-muted-foreground line-through opacity-70"
@@ -240,7 +241,7 @@ export function CalendarPageClient() {
                     aus
                   </span>
                 ) : null}
-              </button>
+              </Button>
             );
           })}
         </div>

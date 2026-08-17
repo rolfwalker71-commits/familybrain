@@ -5,6 +5,7 @@ import { THEME_FOUC_SCRIPT } from "@/lib/theme/fouc-script";
 import { BRAND, BRAND_TAGLINE } from "@/lib/branding";
 import "./globals.css";
 
+/** Brand typography: Geist (intentional; not Inter). */
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],

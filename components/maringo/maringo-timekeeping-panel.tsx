@@ -574,11 +574,13 @@ export function MaringoTimekeepingPanel({
                   aria-label="Zeitraum"
                 >
                   {PERIOD_OPTIONS.map((opt) => (
-                    <button
+                    <Button
                       key={opt.id}
                       type="button"
+                      variant="ghost"
+                      size="sm"
                       className={cn(
-                        "rounded-md px-2.5 py-1 text-[12px] font-medium transition-colors",
+                        "h-auto rounded-md px-2.5 py-1 text-[12px] font-medium",
                         period === opt.id
                           ? "bg-background text-foreground shadow-sm"
                           : "text-muted-foreground hover:text-foreground"
@@ -587,7 +589,7 @@ export function MaringoTimekeepingPanel({
                       onClick={() => setPeriod(opt.id)}
                     >
                       {opt.label}
-                    </button>
+                    </Button>
                   ))}
                 </div>
 
@@ -684,10 +686,11 @@ export function MaringoTimekeepingPanel({
       {flyoutPortalReady && bookFlyoutPresence.mounted
         ? createPortal(
             <div className="fixed inset-0 z-[1000]">
-              <button
+              <Button
                 type="button"
+                variant="ghost"
                 className={cn(
-                  "absolute inset-0 bg-black/20 transition-opacity ease-in-out",
+                  "absolute inset-0 h-auto w-full rounded-none border-0 bg-black/20 p-0 transition-opacity ease-in-out hover:bg-black/20",
                   bookFlyoutPresence.entered ? "opacity-100" : "opacity-0"
                 )}
                 style={{ transitionDuration: `${MARI_FLYOUT_MS}ms` }}

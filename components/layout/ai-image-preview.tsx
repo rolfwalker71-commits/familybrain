@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 type BrandTone = "finance" | "travel" | "docs";
 
@@ -22,11 +23,12 @@ export function AiImagePreview({
   className?: string;
 }) {
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
       title="Tippen zum Vergrössern"
       className={cn(
-        "relative shrink-0 overflow-hidden rounded-lg border border-border/50 shadow-sm",
+        "relative h-auto w-auto shrink-0 overflow-hidden rounded-lg border border-border/50 p-0 shadow-sm",
         className
       )}
       onClick={(e) => {
@@ -36,6 +38,6 @@ export function AiImagePreview({
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={src} alt={alt} className={imageClassName} />
-    </button>
+    </Button>
   );
 }

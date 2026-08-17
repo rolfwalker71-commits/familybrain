@@ -15,9 +15,16 @@ export default async function LoginPage({
 }) {
   const params = await searchParams;
   return (
-    <main className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-slate-950 px-4 py-[max(2rem,env(safe-area-inset-top))]">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(37,99,235,0.45),transparent_42%),radial-gradient(circle_at_bottom_right,rgba(20,184,166,0.28),transparent_38%)]" />
-      <div className="absolute left-1/2 top-1/2 size-[32rem] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/10" />
+    <main className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-foreground px-4 py-[max(2rem,env(safe-area-inset-top))]">
+      <div
+        className="absolute inset-0 opacity-90"
+        style={{
+          background:
+            "radial-gradient(circle at top left, color-mix(in oklab, var(--chart-4) 45%, transparent), transparent 42%), radial-gradient(circle at bottom right, color-mix(in oklab, var(--chart-5) 28%, transparent), transparent 38%)",
+        }}
+        aria-hidden
+      />
+      <div className="absolute left-1/2 top-1/2 size-[32rem] -translate-x-1/2 -translate-y-1/2 rounded-full border border-background/10" aria-hidden />
       <div className="relative z-10 w-full">
         <LoginForm nextPath={safeNextPath(params.next)} />
       </div>

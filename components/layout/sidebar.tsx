@@ -24,6 +24,7 @@ import { APP_VERSION } from "@/lib/app-version";
 import { BRAND } from "@/lib/branding";
 import { BuddyLogo } from "@/components/brand/buddy-logo";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
+import { Button } from "@/components/ui/button";
 import { pageVisuals, type IconTone } from "@/components/layout/icon-circle";
 import { APP_ICON_STROKE } from "@/lib/branding/app-icons";
 import type { AdminNavMode } from "@/lib/navigation/admin-nav";
@@ -485,8 +486,10 @@ export function Sidebar({
         )}
       />
       {!onNavigate ? (
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="icon"
           onClick={toggleCollapsed}
           title={collapsed ? "Navigation ausklappen" : "Navigation einklappen"}
           aria-expanded={!collapsed}
@@ -494,7 +497,7 @@ export function Sidebar({
             collapsed ? "Navigation ausklappen" : "Navigation einklappen"
           }
           className={cn(
-            "absolute z-10 flex size-8 items-center justify-center rounded-lg text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+            "absolute z-10 size-8 text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
             collapsed ? "top-3 right-2.5" : "top-3.5 right-3.5"
           )}
         >
@@ -503,7 +506,7 @@ export function Sidebar({
           ) : (
             <ChevronsLeft className="size-4" strokeWidth={2} aria-hidden />
           )}
-        </button>
+        </Button>
       ) : null}
       <div
         className={cn(
@@ -511,11 +514,12 @@ export function Sidebar({
           collapsed ? "pt-11" : "pr-12 pt-11"
         )}
       >
-        <button
+        <Button
           type="button"
+          variant="ghost"
           className={cn(
-            "flex w-full items-center text-left",
-            collapsed ? "justify-center" : "gap-3"
+            "h-auto w-full px-0 py-0 text-left hover:bg-transparent",
+            collapsed ? "justify-center" : "justify-start gap-3"
           )}
           title={brandTitle}
           onClick={() => {
@@ -547,7 +551,7 @@ export function Sidebar({
               {brandTitle}
             </span>
           ) : null}
-        </button>
+        </Button>
         {me ? (
           <div
             className={cn(
@@ -585,20 +589,21 @@ export function Sidebar({
         <div
           className={cn("space-y-2 pb-3", collapsed ? "px-1.5" : "px-3")}
         >
-          <button
+          <Button
             type="button"
+            variant="ghost"
             onClick={handleGoHome}
             title={`Zurück zu ${BRAND.app}`}
             className={cn(
-              "flex w-full items-center rounded-lg text-xs font-semibold text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+              "h-auto w-full text-xs font-semibold text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
               collapsed
                 ? "justify-center px-2 py-2"
-                : "gap-2 px-3 py-2"
+                : "justify-start gap-2 px-3 py-2"
             )}
           >
             <ArrowLeft className="size-3.5 shrink-0" />
             {!collapsed ? <>Zurück zu {BRAND.app}</> : null}
-          </button>
+          </Button>
           <div
             className={cn(
               "rounded-xl bg-black/5 p-1",
@@ -608,18 +613,19 @@ export function Sidebar({
             {areaEntries.map((entry) => {
               const active = mode === entry.mode;
               return (
-                <button
+                <Button
                   key={entry.mode}
                   type="button"
+                  variant="ghost"
                   title={entry.label}
                   onClick={() => selectArea(entry)}
                   className={cn(
-                    "flex items-center justify-center rounded-lg transition-colors",
+                    "h-auto rounded-lg",
                     collapsed
-                      ? "px-2 py-2"
+                      ? "justify-center px-2 py-2"
                       : "flex-col gap-1 px-1 py-2 text-[10px] font-semibold leading-tight",
                     active
-                      ? "bg-black/10 text-sidebar-foreground shadow-sm"
+                      ? "bg-black/10 text-sidebar-foreground shadow-sm hover:bg-black/10"
                       : "text-sidebar-foreground/70 hover:bg-black/5 hover:text-sidebar-accent-foreground"
                   )}
                 >
@@ -632,7 +638,7 @@ export function Sidebar({
                   {!collapsed ? (
                     <span className="truncate">{entry.shortLabel}</span>
                   ) : null}
-                </button>
+                </Button>
               );
             })}
           </div>
@@ -653,16 +659,17 @@ export function Sidebar({
               </p>
             ) : null}
             {areaEntries.map((entry) => (
-              <button
+              <Button
                 key={entry.mode}
                 type="button"
+                variant="ghost"
                 title={entry.label}
                 onClick={() => selectArea(entry)}
                 className={cn(
-                  "flex w-full rounded-xl bg-black/[0.03] text-left transition-colors hover:bg-black/5",
+                  "h-auto w-full rounded-xl bg-black/[0.03] text-left hover:bg-black/5",
                   collapsed
-                    ? "items-center justify-center px-2 py-2.5"
-                    : "items-start gap-3 px-3 py-3"
+                    ? "justify-center px-2 py-2.5"
+                    : "items-start justify-start gap-3 px-3 py-3"
                 )}
               >
                 <entry.icon
@@ -684,7 +691,7 @@ export function Sidebar({
                     </span>
                   </span>
                 ) : null}
-              </button>
+              </Button>
             ))}
           </div>
         ) : (
@@ -726,12 +733,13 @@ export function Sidebar({
           collapsed ? "px-1.5" : "px-4"
         )}
       >
-        <button
+        <Button
           type="button"
+          variant="ghost"
           title="Abmelden"
           className={cn(
-            "flex min-h-11 w-full items-center rounded-xl text-sm font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-            collapsed ? "justify-center px-2 py-2" : "gap-3 px-3 py-2"
+            "min-h-11 w-full text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+            collapsed ? "justify-center px-2 py-2" : "justify-start gap-3 px-3 py-2"
           )}
           onClick={async () => {
             await fetch("/api/auth/logout", { method: "POST" }).catch(
@@ -742,7 +750,7 @@ export function Sidebar({
         >
           <LogOut className="size-4" />
           {!collapsed ? "Abmelden" : null}
-        </button>
+        </Button>
         {!collapsed ? (
           <p
             className="font-mono text-[10px] tabular-nums tracking-wide text-sidebar-foreground/50"

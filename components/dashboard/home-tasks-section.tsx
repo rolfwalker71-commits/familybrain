@@ -686,9 +686,10 @@ export function HomeTasksSection({
 
         {connected && laterRows.length > 0 ? (
           <div className="border-t border-border/60 pt-3">
-            <button
+            <Button
               type="button"
-              className="flex w-full items-center justify-between gap-2 rounded-lg px-1 py-1.5 text-left hover:bg-muted/40"
+              variant="ghost"
+              className="h-auto w-full justify-between gap-2 rounded-lg px-1 py-1.5 text-left hover:bg-muted/40"
               onClick={() => setLaterOpen((v) => !v)}
               aria-expanded={laterOpen}
             >
@@ -705,7 +706,7 @@ export function HomeTasksSection({
                 )}
                 aria-hidden
               />
-            </button>
+            </Button>
             {laterOpen ? (
               <div className="mt-3 space-y-4">
                 {bySource(laterRows).map(({ source, tasks }) => (

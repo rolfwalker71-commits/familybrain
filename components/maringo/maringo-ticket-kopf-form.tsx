@@ -499,16 +499,17 @@ export function MaringoTicketKopfForm({
                 <ul>
                   {projects.slice(0, 80).map((p) => (
                     <li key={`${p.keyInternal}-${p.matchcode}`}>
-                      <button
+                      <Button
                         type="button"
-                        className="flex w-full flex-col px-2.5 py-1.5 text-left text-[12px] hover:bg-muted"
+                        variant="ghost"
+                        className="h-auto w-full flex-col items-start justify-start px-2.5 py-1.5 text-left text-[12px] font-normal hover:bg-muted"
                         onClick={() => selectProject(p)}
                       >
                         <span className="font-medium">{p.matchcode}</span>
                         <span className="text-muted-foreground">
                           {p.keyVisible || p.keyInternal}
                         </span>
-                      </button>
+                      </Button>
                     </li>
                   ))}
                 </ul>

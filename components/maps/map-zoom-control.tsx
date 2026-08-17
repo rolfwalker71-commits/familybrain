@@ -1,6 +1,7 @@
 "use client";
 
 import { Minus, Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -33,15 +34,17 @@ export function MapZoomControl({
       onClick={(e) => e.preventDefault()}
       onPointerDown={(e) => e.stopPropagation()}
     >
-      <button
+      <Button
         type="button"
-        className="inline-flex size-5 shrink-0 items-center justify-center rounded text-foreground hover:bg-black/5 disabled:opacity-40"
+        variant="ghost"
+        size="icon-xs"
+        className="size-5 shrink-0 rounded text-foreground hover:bg-black/5 disabled:opacity-40"
         aria-label="Hereinzoomen"
         onClick={() => onZoomChange(zoom + 1)}
         disabled={zoom >= maxZoom}
       >
         <Plus className="size-3" aria-hidden />
-      </button>
+      </Button>
       <label htmlFor={id} className="sr-only">
         Kartenzoom
       </label>
@@ -57,15 +60,17 @@ export function MapZoomControl({
           className="map-zoom-range absolute h-5 w-14 origin-center -rotate-90 cursor-pointer sm:w-16"
         />
       </div>
-      <button
+      <Button
         type="button"
-        className="inline-flex size-5 shrink-0 items-center justify-center rounded text-foreground hover:bg-black/5 disabled:opacity-40"
+        variant="ghost"
+        size="icon-xs"
+        className="size-5 shrink-0 rounded text-foreground hover:bg-black/5 disabled:opacity-40"
         aria-label="Herauszoomen"
         onClick={() => onZoomChange(zoom - 1)}
         disabled={zoom <= minZoom}
       >
         <Minus className="size-3" aria-hidden />
-      </button>
+      </Button>
     </div>
   );
 }

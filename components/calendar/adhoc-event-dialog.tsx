@@ -318,12 +318,13 @@ export function AdhocEventDialog({
                     <ul className="flex flex-col gap-1">
                       {daySlots.map((s) => (
                         <li key={`${s.date}-${s.startHm}`}>
-                          <button
+                          <Button
                             type="button"
+                            variant="ghost"
                             disabled={busy}
                             onClick={() => void createInSlot(s)}
                             className={cn(
-                              "flex w-full items-center justify-between gap-2 rounded-md border border-border/50 bg-card px-2.5 py-2 text-left text-[13px] transition-colors hover:bg-muted/40 disabled:opacity-60"
+                              "h-auto w-full items-center justify-between gap-2 rounded-md border border-border/50 bg-card px-2.5 py-2 text-left text-[13px] hover:bg-muted/40 disabled:opacity-60"
                             )}
                           >
                             <span className="tabular-nums text-muted-foreground">
@@ -332,7 +333,7 @@ export function AdhocEventDialog({
                             <span className="text-[11px] font-medium text-foreground">
                               Eintragen
                             </span>
-                          </button>
+                          </Button>
                         </li>
                       ))}
                     </ul>

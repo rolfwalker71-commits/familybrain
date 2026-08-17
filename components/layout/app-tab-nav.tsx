@@ -4,6 +4,7 @@ import type { LucideIcon } from "lucide-react";
 import { MoreHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { IconTone } from "@/components/layout/icon-circle";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -88,18 +89,19 @@ export function AppTabNav<T extends string>({
       <DropdownMenu>
         <DropdownMenuTrigger
           render={
-            <button
+            <Button
               type="button"
+              variant="ghost"
               className={
                 variant === "desktop"
                   ? cn(
-                      "inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium transition-colors",
+                      "inline-flex h-auto flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium transition-colors",
                       overflowActive
                         ? cn("bg-card shadow-sm", activeText)
                         : "text-muted-foreground hover:text-foreground"
                     )
                   : cn(
-                      "flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-xl px-1 py-1 text-[10px] font-bold tracking-tight transition-colors",
+                      "flex h-auto min-w-0 flex-1 flex-col items-center gap-0.5 rounded-xl px-1 py-1 text-[10px] font-bold tracking-tight transition-colors",
                       overflowActive ? "text-foreground" : "text-foreground/55"
                     )
               }
@@ -161,12 +163,13 @@ export function AppTabNav<T extends string>({
           const Icon = item.icon;
           const isActive = item.id === active;
           return (
-            <button
+            <Button
               key={item.id}
               type="button"
+              variant="ghost"
               onClick={() => onChange(item.id)}
               className={cn(
-                "inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium transition-colors",
+                "inline-flex h-auto flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium transition-colors",
                 isActive
                   ? cn("bg-card shadow-sm", activeText)
                   : "text-muted-foreground hover:text-foreground"
@@ -174,7 +177,7 @@ export function AppTabNav<T extends string>({
             >
               <Icon className="size-4 shrink-0" />
               {item.label}
-            </button>
+            </Button>
           );
         })}
         {renderOverflowTrigger("desktop")}
@@ -196,12 +199,13 @@ export function AppTabNav<T extends string>({
               const isEmphasize = Boolean(item.emphasize);
 
               return (
-                <button
+                <Button
                   key={item.id}
                   type="button"
+                  variant="ghost"
                   onClick={() => onChange(item.id)}
                   className={cn(
-                    "flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-xl px-1 py-1 text-[10px] font-bold tracking-tight transition-colors",
+                    "flex h-auto min-w-0 flex-1 flex-col items-center gap-0.5 rounded-xl px-1 py-1 text-[10px] font-bold tracking-tight transition-colors",
                     isEmphasize
                       ? "text-foreground"
                       : isActive
@@ -226,7 +230,7 @@ export function AppTabNav<T extends string>({
                     />
                   </span>
                   <span className="truncate">{item.label}</span>
-                </button>
+                </Button>
               );
             })}
             {renderOverflowTrigger("mobile")}

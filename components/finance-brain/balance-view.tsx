@@ -491,9 +491,10 @@ export function BalanceView({
               </p>
               {minimalDebts.map((d, i) => renderDebtRow("min", d, i))}
               <div className="border-t border-border/40 pt-1.5">
-                <button
+                <Button
                   type="button"
-                  className="flex w-full items-center justify-between gap-2 rounded-md px-1 py-1 text-left text-[11px] font-medium text-[var(--brand-finance)] hover:bg-muted/40"
+                  variant="ghost"
+                  className="h-auto w-full items-center justify-between gap-2 rounded-md px-1 py-1 text-left text-[11px] font-medium text-[var(--brand-finance)] hover:bg-muted/40"
                   aria-expanded={minExplainOpen}
                   onClick={() => setMinExplainOpen((o) => !o)}
                 >
@@ -504,7 +505,7 @@ export function BalanceView({
                       minExplainOpen && "rotate-180"
                     )}
                   />
-                </button>
+                </Button>
                 {minExplainOpen ? (
                   <div className="mt-1.5 space-y-2.5 rounded-lg border border-border/50 bg-muted/15 px-2.5 py-2">
                     <p className="text-[11px] leading-snug text-muted-foreground">
@@ -2138,14 +2139,16 @@ export function ExpenseList({
               aria-label="Ausgaben durchsuchen"
             />
             {query ? (
-              <button
+              <Button
                 type="button"
-                className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                variant="ghost"
+                size="icon-xs"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
                 title="Suche leeren"
                 onClick={() => setQuery("")}
               >
                 <XIcon className="size-3.5" />
-              </button>
+              </Button>
             ) : null}
           </div>
           <Button
@@ -2283,9 +2286,10 @@ export function ExpenseList({
             <span>
               {filteredExpenses.length} von {expenses.length} angezeigt
             </span>
-            <button
+            <Button
               type="button"
-              className="font-medium text-[var(--brand-finance)] hover:underline"
+              variant="link"
+              className="h-auto p-0 text-[11px] font-medium text-[var(--brand-finance)]"
               onClick={() => {
                 setQuery("");
                 setPayerFilter("__all__");
@@ -2295,7 +2299,7 @@ export function ExpenseList({
               }}
             >
               Filter zurücksetzen
-            </button>
+            </Button>
           </div>
         ) : null}
       </div>
@@ -2334,13 +2338,14 @@ export function ExpenseList({
       ) : null}
       {!isPwa || toolsOpen ? toolsPanel : null}
       {isPwa && !toolsOpen && filtersActive ? (
-        <button
+        <Button
           type="button"
-          className="text-left text-[11px] font-medium text-[var(--brand-finance)] hover:underline"
+          variant="link"
+          className="h-auto p-0 text-left text-[11px] font-medium text-[var(--brand-finance)]"
           onClick={() => setToolsOpen(true)}
         >
           {filteredExpenses.length} von {expenses.length} · Filter anpassen
-        </button>
+        </Button>
       ) : null}
     </div>
   );

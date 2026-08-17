@@ -108,9 +108,10 @@ export const ExpenseReceiptControls = forwardRef<
 
       {triggerOnly ? (
         receiptUrl ? (
-          <button
+          <Button
             type="button"
-            className="overflow-hidden rounded border border-border"
+            variant="ghost"
+            className="h-auto overflow-hidden rounded border border-border p-0"
             onClick={() => setPreviewOpen(true)}
             title="Foto anzeigen"
           >
@@ -120,15 +121,16 @@ export const ExpenseReceiptControls = forwardRef<
               alt={`Beleg ${expenseId}`}
               className="h-8 w-8 object-cover"
             />
-          </button>
+          </Button>
         ) : null
       ) : (
         <div className="flex flex-wrap items-center gap-1">
           {receiptUrl ? (
             <>
-              <button
+              <Button
                 type="button"
-                className="overflow-hidden rounded border border-border/60"
+                variant="ghost"
+                className="h-auto overflow-hidden rounded border border-border/60 p-0"
                 onClick={() => setPreviewOpen(true)}
                 title="Foto anzeigen"
               >
@@ -138,7 +140,7 @@ export const ExpenseReceiptControls = forwardRef<
                   alt={`Beleg ${expenseId}`}
                   className="h-10 w-10 object-cover"
                 />
-              </button>
+              </Button>
               <Button
                 type="button"
                 variant="ghost"
@@ -220,16 +222,17 @@ export function PendingReceiptPicker({
           <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
             <ImageIcon className="size-3.5" />
             {file.name}
-            <button
+            <Button
               type="button"
-              className="text-destructive hover:underline"
+              variant="link"
+              className="h-auto p-0 text-destructive"
               onClick={() => {
                 onChange(null);
                 if (fileRef.current) fileRef.current.value = "";
               }}
             >
               Entfernen
-            </button>
+            </Button>
           </span>
         ) : (
           <span className="text-xs text-muted-foreground">

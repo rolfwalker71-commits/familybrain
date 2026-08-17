@@ -391,35 +391,35 @@ export function KnowledgeBrowseClient({
 
       {filterMembers.length > 0 ? (
         <div className="flex flex-wrap gap-2">
-          <button
+          <Button
             type="button"
-            onClick={() => setMemberFilter(null)}
+            variant="outline"
             className={cn(
-              "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition-colors",
-              memberFilter == null
-                ? "border-[var(--brand-docs)] bg-[var(--brand-docs-soft)] text-[var(--brand-docs)]"
-                : "border-border/70 text-muted-foreground hover:bg-muted/40"
+              "h-auto rounded-full px-3 py-1.5 text-sm",
+              memberFilter == null &&
+                "border-[var(--brand-docs)] bg-[var(--brand-docs-soft)] text-[var(--brand-docs)] hover:bg-[var(--brand-docs-soft)]"
             )}
+            onClick={() => setMemberFilter(null)}
           >
             Alle
-          </button>
+          </Button>
           {filterMembers.map((m) => (
-            <button
+            <Button
               key={m.id}
               type="button"
+              variant="outline"
+              className={cn(
+                "h-auto rounded-full px-3 py-1.5 text-sm",
+                memberFilter === m.id &&
+                  "border-[var(--brand-docs)] bg-[var(--brand-docs-soft)] text-[var(--brand-docs)] hover:bg-[var(--brand-docs-soft)]"
+              )}
               onClick={() =>
                 setMemberFilter((prev) => (prev === m.id ? null : m.id))
               }
-              className={cn(
-                "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition-colors",
-                memberFilter === m.id
-                  ? "border-[var(--brand-docs)] bg-[var(--brand-docs-soft)] text-[var(--brand-docs)]"
-                  : "border-border/70 text-muted-foreground hover:bg-muted/40"
-              )}
             >
               <UserAvatar name={m.display_name} src={m.avatar_url} size="xs" />
               {m.display_name}
-            </button>
+            </Button>
           ))}
         </div>
       ) : null}
@@ -494,9 +494,10 @@ export function KnowledgeBrowseClient({
                       aria-label={`${group.label} auswählen`}
                     />
                   ) : null}
-                  <button
+                  <Button
                     type="button"
-                    className="flex min-w-0 flex-1 items-center justify-between gap-3 py-1 text-left"
+                    variant="ghost"
+                    className="h-auto min-w-0 flex-1 items-center justify-between gap-3 px-0 py-1 text-left font-normal"
                     onClick={() => toggleYear(yKey)}
                     aria-expanded={yearOpen}
                   >
@@ -527,7 +528,7 @@ export function KnowledgeBrowseClient({
                         yearOpen && "rotate-180"
                       )}
                     />
-                  </button>
+                  </Button>
                 </div>
 
                 {yearOpen ? (
@@ -542,9 +543,10 @@ export function KnowledgeBrowseClient({
                           key={mg.memberKey}
                           className="overflow-hidden rounded-xl border border-border/50 bg-muted/10"
                         >
-                          <button
+                          <Button
                             type="button"
-                            className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left"
+                            variant="ghost"
+                            className="h-auto w-full items-center justify-between gap-3 rounded-none px-3 py-2 text-left font-normal"
                             onClick={() => toggleMember(mKey)}
                             aria-expanded={memberOpen}
                           >
@@ -574,7 +576,7 @@ export function KnowledgeBrowseClient({
                                 memberOpen && "rotate-180"
                               )}
                             />
-                          </button>
+                          </Button>
                           {memberOpen ? (
                             <div className="space-y-2 border-t border-border/50 bg-card/60 p-2">
                               {isSteuern && mg.bankAccountGroups.length > 0 ? (

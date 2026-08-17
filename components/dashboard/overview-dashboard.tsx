@@ -1116,9 +1116,10 @@ function DayTimeline({
                   )}
                 >
                   <div className="min-w-0 flex-1 px-3 py-2.5">
-                    <button
+                    <Button
                       type="button"
-                      className="w-full text-left hover:opacity-90"
+                      variant="ghost"
+                      className="h-auto w-full justify-start text-left hover:opacity-90"
                       onClick={() => onSelect(item)}
                     >
                       {source ? (
@@ -1168,7 +1169,7 @@ function DayTimeline({
                           {item.driveLabel}
                         </p>
                       ) : null}
-                    </button>
+                    </Button>
 
                     {item.meetUrl || item.mapsUrl || showMap ? (
                       <div className="mt-2.5 space-y-2">
@@ -1251,14 +1252,16 @@ function DayTimeline({
                       className="shadow-md"
                       imgClassName="h-[4.5rem] w-[5.25rem] sm:h-[5rem] sm:w-[6rem]"
                     />
-                    <button
+                    <Button
                       type="button"
-                      className="rounded-md p-1 text-muted-foreground/70 hover:bg-muted/50 hover:text-foreground"
+                      variant="ghost"
+                      size="icon-sm"
+                      className="rounded-md text-muted-foreground/70"
                       aria-label="Details"
                       onClick={() => onSelect(item)}
                     >
                       <ChevronRight className="size-4" aria-hidden />
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -1713,11 +1716,11 @@ export function OverviewDashboard({
           aria-hidden
         />
         <div
-          className="absolute inset-0 bg-gradient-to-r from-white/92 via-white/78 to-white/45 dark:from-[#1c212b]/92 dark:via-[#1c212b]/72 dark:to-[#1c212b]/35"
+          className="absolute inset-0 bg-gradient-to-r from-white/92 via-white/78 to-white/45 dark:from-background/92 dark:via-background/72 dark:to-background/35"
           aria-hidden
         />
         <div
-          className="absolute inset-0 bg-gradient-to-t from-white/55 via-transparent to-sky-50/30 dark:from-[#1c212b]/70 dark:via-transparent dark:to-black/20"
+          className="absolute inset-0 bg-gradient-to-t from-white/55 via-transparent to-sky-50/30 dark:from-background/70 dark:via-transparent dark:to-black/20"
           aria-hidden
         />
         <div className="relative grid gap-4 px-4 py-6 sm:px-6 sm:py-7 lg:grid-cols-[minmax(0,1fr)_minmax(16rem,22rem)] lg:items-start lg:gap-6">
@@ -1805,12 +1808,13 @@ export function OverviewDashboard({
           const Icon = tab.icon;
           const active = domain === tab.id;
           return (
-            <button
+            <Button
               key={tab.id}
               type="button"
+              variant="ghost"
               onClick={() => selectDomain(tab.id)}
               className={cn(
-                "inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[13px] font-semibold transition-colors sm:flex-none",
+                "inline-flex h-auto flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[13px] font-semibold transition-colors sm:flex-none",
                 active
                   ? "bg-card text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
@@ -1818,7 +1822,7 @@ export function OverviewDashboard({
             >
               <Icon className="size-3.5" strokeWidth={APP_ICON_STROKE} />
               {tab.label}
-            </button>
+            </Button>
           );
         })}
       </nav>

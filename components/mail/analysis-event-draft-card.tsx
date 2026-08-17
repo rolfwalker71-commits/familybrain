@@ -125,12 +125,14 @@ export function AnalysisEventDraftCard({
             <Label>Dauer</Label>
             <div className="flex flex-wrap gap-1.5">
               {SLOT_DURATION_PRESETS.map((m) => (
-                <button
+                <Button
                   key={m}
                   type="button"
+                  variant="outline"
+                  size="sm"
                   disabled={disabled || slotBusy}
                   className={cn(
-                    "rounded-md border px-2 py-1 text-[12px] font-medium",
+                    "h-auto rounded-md px-2 py-1 text-[12px] font-medium",
                     duration === m
                       ? "border-foreground bg-background"
                       : "border-border/60 text-muted-foreground hover:text-foreground"
@@ -141,7 +143,7 @@ export function AnalysisEventDraftCard({
                   }}
                 >
                   {m} Min
-                </button>
+                </Button>
               ))}
             </div>
           </div>
@@ -179,12 +181,14 @@ export function AnalysisEventDraftCard({
                         event.startTime === s.startHm &&
                         event.endTime === s.endHm;
                       return (
-                        <button
+                        <Button
                           key={`${s.date}-${s.startHm}`}
                           type="button"
+                          variant="outline"
+                          size="sm"
                           disabled={disabled || slotBusy}
                           className={cn(
-                            "rounded-md border px-2 py-1 text-[12px] tabular-nums",
+                            "h-auto rounded-md px-2 py-1 text-[12px] tabular-nums",
                             selected
                               ? "border-emerald-700 bg-emerald-50 text-emerald-950 dark:border-emerald-400/50 dark:bg-emerald-500/15 dark:text-emerald-100"
                               : "border-border/60 hover:bg-muted"
@@ -192,7 +196,7 @@ export function AnalysisEventDraftCard({
                           onClick={() => pickSlot(s)}
                         >
                           {s.startHm}–{s.endHm}
-                        </button>
+                        </Button>
                       );
                     })}
                   </div>

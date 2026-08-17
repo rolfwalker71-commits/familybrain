@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import type { TimeBucketDef } from "@/lib/utils/time-buckets";
 
 const ACCENT: Record<TimeBucketDef["accent"], string> = {
@@ -30,10 +31,11 @@ export function TimeBucketSection({
 
   return (
     <section className="min-w-0 overflow-hidden border-b border-border/60 last:border-b-0 md:border-border/70">
-      <button
+      <Button
         type="button"
+        variant="ghost"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-2 bg-muted/40 px-3 py-2.5 text-left md:px-4"
+        className="flex h-auto w-full items-center gap-2 bg-muted/40 px-3 py-2.5 text-left md:px-4"
         aria-expanded={open}
       >
         <ChevronDown
@@ -48,7 +50,7 @@ export function TimeBucketSection({
             <p className="text-xs text-muted-foreground">{countLabel}</p>
           ) : null}
         </div>
-      </button>
+      </Button>
       {open ? <div>{children}</div> : null}
     </section>
   );

@@ -422,10 +422,11 @@ export function AutomationPanel() {
               {runs.slice(0, 3).map((run) => {
                 const summary = parseSummary(run.summary_json);
                 return (
-                  <button
+                  <Button
                     key={run.id}
                     type="button"
-                    className="w-full rounded-xl border border-border/60 p-3 text-left text-sm hover:bg-[var(--brand-docs-soft)]/40"
+                    variant="outline"
+                    className="h-auto w-full justify-start rounded-xl p-3 text-left text-sm font-normal hover:bg-[var(--brand-docs-soft)]/40"
                     onClick={() => {
                       if (selectedRun === run.id) {
                         setSelectedRun(null);
@@ -455,7 +456,7 @@ export function AutomationPanel() {
                         {run.error_message}
                       </div>
                     ) : null}
-                  </button>
+                  </Button>
                 );
               })}
             </div>

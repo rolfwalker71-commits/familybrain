@@ -1525,13 +1525,14 @@ function SettingsPageInner() {
           <div className="rounded-xl border border-border/60 bg-muted/30 px-3 py-3 text-xs text-muted-foreground">
             Live-Toasts (Dokumente, Reisen, Finanzen), Ton und Anzeigedauer
             stellst du unter{" "}
-            <button
+            <Button
               type="button"
-              className="font-medium text-foreground underline-offset-2 hover:underline"
+              variant="link"
+              className="h-auto p-0 font-medium text-foreground"
               onClick={() => setTab("notify")}
             >
               Hinweise & Backup
-            </button>{" "}
+            </Button>{" "}
             ein.
           </div>
 

@@ -136,9 +136,10 @@ export function BackupStatusPanel() {
     <Card className="border-border/70">
       <CardContent className="p-4">
         <div className="flex items-start gap-2">
-          <button
+          <Button
             type="button"
-            className="flex min-w-0 flex-1 items-start gap-2 rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            variant="ghost"
+            className="flex h-auto min-w-0 flex-1 items-start gap-2 rounded-md p-0 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
             aria-expanded={open}
             onClick={() => setOpen((v) => !v)}
           >
@@ -174,7 +175,7 @@ export function BackupStatusPanel() {
               )}
               aria-hidden
             />
-          </button>
+          </Button>
           <Button
             type="button"
             size="sm"

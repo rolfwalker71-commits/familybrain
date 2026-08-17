@@ -401,9 +401,10 @@ export function MicrosoftMailInboxPanel({
             <ul className="space-y-2">
               {items.map((item) => (
                 <li key={item.id}>
-                  <button
+                  <Button
                     type="button"
-                    className="flex w-full items-start gap-3 rounded-xl border border-border/70 bg-card p-3 text-left hover:bg-muted/40"
+                    variant="ghost"
+                    className="h-auto w-full justify-start items-start gap-3 rounded-xl border border-border/70 bg-card p-3 text-left hover:bg-muted/40"
                     onClick={() => void openMail(item.id)}
                   >
                     <Mail
@@ -441,7 +442,7 @@ export function MicrosoftMailInboxPanel({
                         </p>
                       ) : null}
                     </div>
-                  </button>
+                  </Button>
                 </li>
               ))}
             </ul>

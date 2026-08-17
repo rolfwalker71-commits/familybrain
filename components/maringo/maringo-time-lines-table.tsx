@@ -77,9 +77,11 @@ function MemoBlock({ memo }: { memo: string }) {
 
   return (
     <div className="mt-0.5">
-      <button
+      <Button
         type="button"
-        className="inline-flex items-center gap-0.5 text-[10px] font-medium text-orange-800 underline-offset-2 hover:underline"
+        variant="link"
+        size="sm"
+        className="inline-flex h-auto items-center gap-0.5 p-0 text-[10px] font-medium text-orange-800 underline-offset-2"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
       >
@@ -91,7 +93,7 @@ function MemoBlock({ memo }: { memo: string }) {
           aria-hidden
         />
         {open ? "Memo zuklappen" : "Memo aufklappen"}
-      </button>
+      </Button>
       {open ? (
         <p className="mt-0.5 whitespace-pre-wrap text-[10px] text-muted-foreground">
           {memo}
