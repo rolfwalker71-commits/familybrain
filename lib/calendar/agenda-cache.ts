@@ -1,6 +1,8 @@
 import { getSetting, setSetting } from "@/lib/db/migrations";
 import type { AgendaItem } from "@/lib/dashboard/overview";
 
+export { filterAgendaItemsBySources } from "@/lib/calendar/agenda-filter";
+
 type CachedAgendaRange = "today" | "week" | "14d";
 
 export type CalendarAgendaCacheRecord = {
@@ -45,15 +47,5 @@ export function writeCalendarAgendaCache(
   setSetting(
     cacheKey(userId, record.rangeStart, record.rangeEnd),
     JSON.stringify(record)
-  );
-}
-
-export function filterAgendaItemsBySources(
-  items: AgendaItem[],
-  selected: Set<string> | null
-): AgendaItem[] {
-  if (selected == null) return items;
-  return items.filter(
-    (item) => !item.calendarId || selected.has(item.calendarId)
   );
 }

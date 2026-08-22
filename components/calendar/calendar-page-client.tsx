@@ -15,7 +15,7 @@ import type {
   CalendarAgendaRange,
   CalendarSource,
 } from "@/lib/calendar/agenda-feed";
-import { filterAgendaItemsBySources } from "@/lib/calendar/agenda-cache";
+import { filterAgendaItemsBySources } from "@/lib/calendar/agenda-filter";
 import type { AgendaPlaceEnrichment } from "@/lib/dashboard/agenda-weather";
 
 const RANGES: { id: CalendarAgendaRange; label: string }[] = [
