@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <defs>
+    <mask id="buddy-b">
+      <rect width="256" height="256" fill="#000"/>
+      <!-- stem -->
+      <rect x="60" y="34" width="56" height="188" rx="28" fill="#fff"/>
+      <!-- top bowl -->
+      <ellipse cx="138" cy="80" rx="58" ry="50" fill="#fff"/>
+      <!-- bottom bowl -->
+      <ellipse cx="146" cy="176" rx="70" ry="58" fill="#fff"/>
+      <!-- right waist notch so it reads as B, not 8 -->
+      <circle cx="236" cy="128" r="32" fill="#000"/>
+      <!-- nucleus hole -->
+      <circle cx="112" cy="128" r="22" fill="#000"/>
+    </mask>
+  </defs>
+  <rect width="256" height="256" fill="#3D4A5C" mask="url(#buddy-b)"/>
+  <circle cx="112" cy="128" r="15.5" fill="#F26A21"/>
+</svg>

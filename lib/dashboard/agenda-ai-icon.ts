@@ -227,6 +227,35 @@ export function lookupAgendaAiIconUrl(
   return { key, url: agendaAiIconPublicUrl(key) };
 }
 
+export type AgendaAiVisualFields = {
+  aiIconKey?: string | null;
+  aiIconUrl?: string | null;
+};
+
+/**
+ * Attach calendar-cache key/url when this row generates agenda icons.
+ * Preserve already-set URLs from other sources (document / trip / expense).
+ */
+export function attachAgendaAiVisual<T extends AgendaIconSubject & AgendaAiVisualFields>(
+  item: T
+): T {
+  const existingUrl = item.aiIconUrl ?? null;
+  if (!shouldHaveAgendaAiIcon(item)) {
+    return {
+      ...item,
+      aiIconKey: item.aiIconKey ?? null,
+      aiIconUrl: existingUrl,
+    };
+  }
+  const key = buildAgendaAiIconKey(item);
+  const hit = lookupAgendaAiIconUrl(item);
+  return {
+    ...item,
+    aiIconKey: key || null,
+    aiIconUrl: existingUrl || hit?.url || null,
+  };
+}
+
 function clip(raw: string | null | undefined, max: number): string {
   const t = (raw || "").replace(/\s+/g, " ").trim();
   if (!t) return "";

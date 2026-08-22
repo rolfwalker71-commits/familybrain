@@ -2,8 +2,8 @@ import { BRAND, BRAND_LOGO_SRC } from "@/lib/branding";
 import { cn } from "@/lib/utils";
 
 /**
- * Buddy mark 2026 F · Capsules (freigestellt).
- * Light + dark raster assets so rear pebbles stay readable on both sidebars.
+ * Buddy B-Monogramm (freigestellt).
+ * Light: navy + orange. Dark: helles Grau + orange — lesbar auf der dunklen Sidebar.
  */
 export function BuddyLogo({
   size = 48,

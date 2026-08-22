@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { NextResponse } from "next/server";
-import { isAuthError, requireAdmin } from "@/lib/auth/current-user";
+import { isAuthError, requireAuth } from "@/lib/auth/current-user";
 import { resolveDocumentAiIconPath } from "@/lib/paperless/document-icon";
 
 export const runtime = "nodejs";
@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 type Ctx = { params: Promise<{ filename: string }> };
 
 export async function GET(_request: Request, context: Ctx) {
-  const auth = await requireAdmin();
+  const auth = await requireAuth();
   if (isAuthError(auth)) return auth;
   const { filename } = await context.params;
   const full = resolveDocumentAiIconPath(decodeURIComponent(filename));

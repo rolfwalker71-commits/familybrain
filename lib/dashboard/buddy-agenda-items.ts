@@ -2,7 +2,9 @@
  * Buddy-domain agenda rows (Travel / Finanzen) for Kalender + Übersicht.
  */
 import { getDb } from "@/lib/db/client";
+import { publicAiIconUrl } from "@/lib/db/queries";
 import { paymentMethodLabel } from "@/lib/finance/payment-methods";
+import { eventAiImagePublicUrl } from "@/lib/trips/cover";
 import { toSwissDate } from "@/lib/utils/dates";
 import type { AgendaItem } from "@/lib/dashboard/overview";
 import { SQL_DOC_NOT_BUSINESS } from "@/lib/documents/business";
@@ -28,7 +30,7 @@ export function listInvoiceAgendaItems(
   const invoices = db
     .prepare(
       `SELECT d.id as document_id, d.title, d.correspondent_name,
-              d.payment_planned_date, d.payment_method,
+              d.payment_planned_date, d.payment_method, d.ai_icon_path,
               f.id as finance_id, f.amount, f.currency, f.vendor,
               f.invoice_date, f.due_date, f.category
        FROM paperless_documents d
@@ -48,6 +50,7 @@ export function listInvoiceAgendaItems(
     correspondent_name: string | null;
     payment_planned_date: string | null;
     payment_method: string | null;
+    ai_icon_path: string | null;
     finance_id: number | null;
     amount: number | null;
     currency: string | null;
@@ -104,6 +107,7 @@ export function listInvoiceAgendaItems(
       accentColor: "#0f766e",
       calendarId: CALENDAR_SOURCE_INVOICES,
       planningRelevant: true,
+      aiIconUrl: publicAiIconUrl(row.ai_icon_path),
     });
   }
   return out;
@@ -120,7 +124,7 @@ export function listTravelAgendaItems(
       `SELECT e.id, e.trip_id, e.event_type, e.title, e.start_date, e.start_time,
               e.provider, e.origin_place, e.destination_place,
               e.departure_airport, e.arrival_airport, e.place_name, e.location,
-              e.flight_number, e.airline, e.document_id,
+              e.flight_number, e.airline, e.document_id, e.ai_image_path,
               t.title as trip_title
        FROM trip_events e
        JOIN trips t ON t.id = e.trip_id
@@ -147,6 +151,7 @@ export function listTravelAgendaItems(
     flight_number: string | null;
     airline: string | null;
     document_id: number | null;
+    ai_image_path: string | null;
     trip_title: string;
   }>;
 
@@ -188,6 +193,7 @@ export function listTravelAgendaItems(
       accentColor: "#0284c7",
       calendarId: CALENDAR_SOURCE_TRAVEL,
       planningRelevant: true,
+      aiIconUrl: eventAiImagePublicUrl(row.ai_image_path),
     };
   });
 }

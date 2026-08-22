@@ -15,19 +15,19 @@ export default function manifest(): MetadataRoute.Manifest {
     categories: ["productivity", "utilities"],
     icons: [
       {
-        src: "/icon-192.png",
+        src: "/icon-192.png?v=bmono",
         sizes: "192x192",
         type: "image/png",
         purpose: "any",
       },
       {
-        src: "/icon-512.png",
+        src: "/icon-512.png?v=bmono",
         sizes: "512x512",
         type: "image/png",
         purpose: "any",
       },
       {
-        src: "/icon-maskable-512.png",
+        src: "/icon-maskable-512.png?v=bmono",
         sizes: "512x512",
         type: "image/png",
         purpose: "maskable",
@@ -38,19 +38,19 @@ export default function manifest(): MetadataRoute.Manifest {
         name: "Dashboard",
         short_name: "Home",
         url: "/dashboard",
-        icons: [{ src: "/icon-192.png", sizes: "192x192" }],
+        icons: [{ src: "/icon-192.png?v=bmono", sizes: "192x192" }],
       },
       {
         name: BRAND.travel,
         short_name: "Reisen",
         url: "/trips",
-        icons: [{ src: "/icon-192.png", sizes: "192x192" }],
+        icons: [{ src: "/icon-192.png?v=bmono", sizes: "192x192" }],
       },
       {
         name: BRAND.finance,
         short_name: "Finanzen",
         url: "/finance-brain",
-        icons: [{ src: "/icon-192.png", sizes: "192x192" }],
+        icons: [{ src: "/icon-192.png?v=bmono", sizes: "192x192" }],
       },
     ],
   };

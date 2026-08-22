@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  attachAgendaAiVisual,
   buildAgendaAiIconKey,
   buildAgendaAiIconPrompt,
   hasDriveAgendaContext,
@@ -185,4 +186,38 @@ test("Tagesabschluss ritual reuses one cache key and evening prompt", () => {
   assert.match(prompt, /end-of-day wrap-up/i);
   assert.doesNotMatch(prompt, /Tiguan/i);
   assert.match(prompt, /not a video call/i);
+});
+
+test("document-like agenda kinds do not use calendar icon cache", () => {
+  for (const kind of ["invoice", "travel", "triage", "ledger", "warranty"]) {
+    assert.equal(
+      shouldHaveAgendaAiIcon({ title: "energieUri AG", kind }),
+      false,
+      kind
+    );
+  }
+});
+
+test("attachAgendaAiVisual keeps document/trip/expense image URLs", () => {
+  const invoice = attachAgendaAiVisual({
+    title: "energieUri AG",
+    kind: "invoice",
+    aiIconUrl: "/api/documents/media/ai-icon/doc-1.jpg",
+  });
+  assert.equal(invoice.aiIconUrl, "/api/documents/media/ai-icon/doc-1.jpg");
+  assert.equal(invoice.aiIconKey, null);
+
+  const trip = attachAgendaAiVisual({
+    title: "Zug nach Bellinzona",
+    kind: "travel",
+    aiIconUrl: "/api/trips/media/ai/event-1.jpg",
+  });
+  assert.equal(trip.aiIconUrl, "/api/trips/media/ai/event-1.jpg");
+
+  const empty = attachAgendaAiVisual({
+    title: "Quittung H&M",
+    kind: "triage",
+  });
+  assert.equal(empty.aiIconUrl, null);
+  assert.equal(empty.aiIconKey, null);
 });

@@ -13,11 +13,10 @@ import {
   enrichAgendaWithWeather,
   fetchHomeWeather,
 } from "@/lib/dashboard/agenda-weather";
-import {
-  buildAgendaAiIconKey,
-  lookupAgendaAiIconUrl,
-  shouldHaveAgendaAiIcon,
-} from "@/lib/dashboard/agenda-ai-icon";
+import { attachAgendaAiVisual } from "@/lib/dashboard/agenda-ai-icon";
+import { publicAiIconUrl } from "@/lib/db/queries";
+import { expenseAiImagePublicUrl } from "@/lib/finance-brain/expense-image";
+import { eventAiImagePublicUrl } from "@/lib/trips/cover";
 import { weatherConditionIcon } from "@/lib/trips/weather";
 import { daysFromNow, toSwissDate } from "@/lib/utils/dates";
 import type { IcsCalendarType } from "@/lib/calendar/ics-types";
@@ -28,18 +27,7 @@ import { getSchedulerRuntimeStatus } from "@/lib/jobs/scheduler";
 import { getMariTicketsWatchStateLive } from "@/lib/mari/sync-tickets-if-due";
 
 function attachAgendaAiIconMeta<T extends AgendaItem>(items: T[]): T[] {
-  return items.map((item) => {
-    if (!shouldHaveAgendaAiIcon(item)) {
-      return { ...item, aiIconKey: null, aiIconUrl: null };
-    }
-    const key = buildAgendaAiIconKey(item);
-    const hit = lookupAgendaAiIconUrl(item);
-    return {
-      ...item,
-      aiIconKey: key || null,
-      aiIconUrl: hit?.url ?? null,
-    };
-  });
+  return items.map((item) => attachAgendaAiVisual(item));
 }
 
 export type OverviewPeriod = "week" | "month" | "quarter" | "half" | "year";
@@ -411,7 +399,7 @@ export async function getDashboardOverview(
   const invoices = db
     .prepare(
       `SELECT d.id as document_id, d.title, d.correspondent_name,
-              d.payment_planned_date, d.payment_method,
+              d.payment_planned_date, d.payment_method, d.ai_icon_path,
               f.id as finance_id, f.amount, f.currency, f.vendor,
               f.invoice_date, f.due_date, f.category
        FROM paperless_documents d
@@ -431,6 +419,7 @@ export async function getDashboardOverview(
     correspondent_name: string | null;
     payment_planned_date: string | null;
     payment_method: string | null;
+    ai_icon_path: string | null;
     finance_id: number | null;
     amount: number | null;
     currency: string | null;
@@ -485,13 +474,14 @@ export async function getDashboardOverview(
       documentId: row.document_id,
       href: null,
       badge: inPipeline ? "Zahlung" : "Rechnung",
+      aiIconUrl: publicAiIconUrl(row.ai_icon_path),
     });
   }
 
   const deadlines = db
     .prepare(
       `SELECT dl.id, dl.title, dl.deadline_date, dl.deadline_type,
-              d.id as document_id, d.correspondent_name
+              d.id as document_id, d.correspondent_name, d.ai_icon_path
        FROM deadlines dl
        JOIN paperless_documents d ON d.id = dl.document_id
        WHERE dl.status = 'open'
@@ -507,6 +497,7 @@ export async function getDashboardOverview(
     deadline_type: string | null;
     document_id: number;
     correspondent_name: string | null;
+    ai_icon_path: string | null;
   }>;
 
   for (const row of deadlines) {
@@ -521,13 +512,14 @@ export async function getDashboardOverview(
       documentId: row.document_id,
       href: null,
       badge: "Frist",
+      aiIconUrl: publicAiIconUrl(row.ai_icon_path),
     });
   }
 
   const warranties = db
     .prepare(
       `SELECT w.id, w.product_name, w.vendor, w.warranty_until, w.document_id,
-              d.title as document_title
+              d.title as document_title, d.ai_icon_path
        FROM devices_and_warranties w
        LEFT JOIN paperless_documents d ON d.id = w.document_id
        WHERE w.warranty_until IS NOT NULL
@@ -541,6 +533,7 @@ export async function getDashboardOverview(
     warranty_until: string;
     document_id: number | null;
     document_title: string | null;
+    ai_icon_path: string | null;
   }>;
 
   for (const row of warranties) {
@@ -555,6 +548,7 @@ export async function getDashboardOverview(
       documentId: row.document_id,
       href: null,
       badge: "Garantie",
+      aiIconUrl: publicAiIconUrl(row.ai_icon_path),
     });
   }
 
@@ -563,7 +557,7 @@ export async function getDashboardOverview(
       `SELECT e.id, e.trip_id, e.event_type, e.title, e.start_date, e.start_time,
               e.provider, e.origin_place, e.destination_place,
               e.departure_airport, e.arrival_airport, e.place_name, e.location,
-              e.flight_number, e.airline, e.document_id,
+              e.flight_number, e.airline, e.document_id, e.ai_image_path,
               t.title as trip_title
        FROM trip_events e
        JOIN trips t ON t.id = e.trip_id
@@ -590,6 +584,7 @@ export async function getDashboardOverview(
     flight_number: string | null;
     airline: string | null;
     document_id: number | null;
+    ai_image_path: string | null;
     trip_title: string;
   }>;
 
@@ -627,13 +622,14 @@ export async function getDashboardOverview(
         row.destination_place ||
         row.arrival_airport ||
         null,
+      aiIconUrl: eventAiImagePublicUrl(row.ai_image_path),
     });
   }
 
   const ledgerExpenses = db
     .prepare(
       `SELECT e.id, e.ledger_id, e.amount, e.currency, e.description,
-              e.category_label, e.expense_date, e.amount_base,
+              e.category_label, e.expense_date, e.amount_base, e.ai_image_path,
               l.title as ledger_title, l.base_currency,
               m.display_name as payer_name
        FROM finance_expenses e
@@ -657,6 +653,7 @@ export async function getDashboardOverview(
     ledger_title: string;
     base_currency: string;
     payer_name: string | null;
+    ai_image_path: string | null;
   }>;
 
   for (const row of ledgerExpenses) {
@@ -674,13 +671,14 @@ export async function getDashboardOverview(
       documentId: null,
       href: `/finance-brain/${row.ledger_id}`,
       badge: "FinanzBuddy",
+      aiIconUrl: expenseAiImagePublicUrl(row.ai_image_path),
     });
   }
 
   // Triage pending → "offen" bucket at today
   const triageRows = db
     .prepare(
-      `SELECT d.id, d.title, d.correspondent_name, d.triage_reasons
+      `SELECT d.id, d.title, d.correspondent_name, d.triage_reasons, d.ai_icon_path
        FROM paperless_documents d
        WHERE d.triage_status = 'pending'
          AND COALESCE(d.sync_status, 'synced') != 'missing'
@@ -693,6 +691,7 @@ export async function getDashboardOverview(
     title: string | null;
     correspondent_name: string | null;
     triage_reasons: string | null;
+    ai_icon_path: string | null;
   }>;
 
   for (const row of triageRows) {
@@ -707,6 +706,7 @@ export async function getDashboardOverview(
       documentId: row.id,
       href: null,
       badge: "Triage",
+      aiIconUrl: publicAiIconUrl(row.ai_icon_path),
     });
   }
 

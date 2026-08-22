@@ -52,7 +52,7 @@ export function AgendaAiIconThumb({
 }) {
   const [url, setUrl] = useState<string | null>(aiIconUrl ?? null);
   const [loading, setLoading] = useState(
-    () => !aiIconUrl && Boolean(aiIconKey || title?.trim())
+    () => !aiIconUrl && Boolean(aiIconKey)
   );
   const [failed, setFailed] = useState(false);
   const [zoomOpen, setZoomOpen] = useState(false);
@@ -67,7 +67,9 @@ export function AgendaAiIconThumb({
 
   useEffect(() => {
     if (url) return;
-    if (!aiIconKey && !title?.trim()) {
+    // Only generate calendar-cache icons when a key is known.
+    // Document / trip / expense thumbs come from a different origin URL.
+    if (!aiIconKey) {
       setLoading(false);
       return;
     }

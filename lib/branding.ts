@@ -20,7 +20,7 @@ export const BRAND = {
 export const BRAND_TAGLINE =
   "Haushalt, Reisen und gemeinsame Abrechnung — klar getrennt.";
 
-/** Freestanding Buddy stack/hub mark (transparent) — also used as PWA icon. */
+/** Freigestelltes B-Monogramm (transparent) — Sidebar, Login, Mail. */
 export const BRAND_LOGO_SRC = "/buddy-logo.png";
 
 export function brandTitle(section?: keyof typeof BRAND): string {
