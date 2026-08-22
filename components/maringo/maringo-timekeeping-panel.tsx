@@ -464,11 +464,11 @@ export function MaringoTimekeepingPanel({
               <div className="space-y-2.5 border-b border-border/50 px-3 py-2.5">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <h2 className="text-[14px] font-black tracking-tight">
+                    <h2 className="text-sm font-black tracking-tight">
                       {overviewTitle}
                     </h2>
                     {periodHint ? (
-                      <p className="mt-0.5 text-[11px] text-muted-foreground">
+                      <p className="mt-0.5 text-[0.6875rem] text-muted-foreground">
                         {periodHint}
                         {fromDate !== toDate
                           ? ` · ${lines.length} Buchungen`
@@ -580,7 +580,7 @@ export function MaringoTimekeepingPanel({
                       variant="ghost"
                       size="sm"
                       className={cn(
-                        "h-auto rounded-md px-2.5 py-1 text-[12px] font-medium",
+                        "h-auto rounded-md px-2.5 py-1 text-xs font-medium",
                         period === opt.id
                           ? "bg-background text-foreground shadow-sm"
                           : "text-muted-foreground hover:text-foreground"
@@ -637,7 +637,7 @@ export function MaringoTimekeepingPanel({
                   <div className="flex flex-wrap items-end justify-between gap-2">
                     <div>
                       <CardTitle className="text-sm">{overviewTitle}</CardTitle>
-                      <p className="mt-0.5 text-[11px] text-muted-foreground">
+                      <p className="mt-0.5 text-[0.6875rem] text-muted-foreground">
                         {loading
                           ? "Lade…"
                           : `${lines.length} Buchung${lines.length === 1 ? "" : "en"}`}

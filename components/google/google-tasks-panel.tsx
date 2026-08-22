@@ -274,7 +274,7 @@ export function GoogleTasksPanel() {
                       <p className="text-sm font-medium leading-snug">
                         {task.title}
                       </p>
-                      <p className="mt-0.5 text-[11px] text-muted-foreground">
+                      <p className="mt-0.5 text-[0.6875rem] text-muted-foreground">
                         {[
                           task.listTitle || "Liste",
                           task.dueDate
@@ -289,7 +289,7 @@ export function GoogleTasksPanel() {
                     <Badge
                       variant={done ? "secondary" : "outline"}
                       className={cn(
-                        "text-[10px]",
+                        "text-[0.625rem]",
                         !done &&
                           "border-sky-300/80 bg-sky-100/80 text-sky-950 dark:border-sky-400/40 dark:bg-sky-500/20 dark:text-sky-100"
                       )}

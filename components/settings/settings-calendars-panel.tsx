@@ -405,7 +405,7 @@ export function SettingsCalendarsPanel() {
                       />
                       <span>
                         Relevant für Terminplanung
-                        <span className="mt-0.5 block text-[11px] text-muted-foreground/90">
+                        <span className="mt-0.5 block text-[0.6875rem] text-muted-foreground/90">
                           Aus = nur Referenz (z.&nbsp;B. Partner-Dienstplan):
                           anzeigen, aber nicht als nächster Termin / Konflikt
                         </span>
@@ -434,26 +434,26 @@ export function SettingsCalendarsPanel() {
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="truncate font-medium">{c.name}</p>
-                        <Badge variant="secondary" className="text-[10px]">
+                        <Badge variant="secondary" className="text-[0.625rem]">
                           {typeLabel(c.type)}
                         </Badge>
                         {c.builtin ? (
-                          <Badge className="bg-rose-50 text-rose-800 hover:bg-rose-50 text-[10px]">
+                          <Badge className="bg-rose-50 text-rose-800 hover:bg-rose-50 text-[0.625rem]">
                             Built-in
                           </Badge>
                         ) : null}
                         {!c.enabled ? (
-                          <Badge variant="outline" className="text-[10px]">
+                          <Badge variant="outline" className="text-[0.625rem]">
                             Ausgeblendet
                           </Badge>
                         ) : null}
                         {c.planningRelevant === false ? (
-                          <Badge variant="outline" className="text-[10px]">
+                          <Badge variant="outline" className="text-[0.625rem]">
                             Nur Referenz
                           </Badge>
                         ) : null}
                       </div>
-                      <p className="mt-1 truncate font-mono text-[11px] text-muted-foreground">
+                      <p className="mt-1 truncate font-mono text-[0.6875rem] text-muted-foreground">
                         {c.url}
                       </p>
                     </div>
@@ -606,7 +606,7 @@ export function SettingsCalendarsPanel() {
             />
             <span>
               Relevant für Terminplanung
-              <span className="mt-0.5 block text-[11px] text-muted-foreground/90">
+              <span className="mt-0.5 block text-[0.6875rem] text-muted-foreground/90">
                 Aus = nur Referenz (anzeigen, ohne Fokus/Konflikte)
               </span>
             </span>

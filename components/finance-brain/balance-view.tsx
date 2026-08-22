@@ -357,7 +357,7 @@ export function BalanceView({
             type="button"
             size="sm"
             variant="outline"
-            className="h-6 shrink-0 px-2 text-[11px]"
+            className="h-6 shrink-0 px-2 text-[0.6875rem]"
             disabled={busy || Boolean(recordBusyKey)}
             onClick={() => void onRecordDebt?.(d)}
           >
@@ -407,7 +407,7 @@ export function BalanceView({
         className="overflow-hidden border-border/60 shadow-[0_4px_16px_rgba(20,32,28,0.05)]"
       >
         <CardHeader tone="green" className="py-1.5">
-          <CardTitle className="flex items-center gap-2 text-[15px]! text-[var(--brand-finance)]">
+          <CardTitle className="flex items-center gap-2 text-[0.9375rem]! text-[var(--brand-finance)]">
             <IconCircle icon={Scale} tone="green" size="sm" />
             Saldo pro Person
           </CardTitle>
@@ -417,7 +417,7 @@ export function BalanceView({
             <p className="text-sm text-muted-foreground">Noch keine Teilnehmer.</p>
           ) : (
             <>
-              <p className="text-[11px] leading-snug text-muted-foreground">
+              <p className="text-[0.6875rem] leading-snug text-muted-foreground">
                 Netto = bezahlt − Anteil (+ Rückzahlungen). Plus = Guthaben,
                 Minus = Schuld.
               </p>
@@ -438,7 +438,7 @@ export function BalanceView({
                       size="sm"
                       nameClassName="font-medium"
                     />
-                    <div className="mt-0.5 truncate text-[10px] leading-tight text-muted-foreground">
+                    <div className="mt-0.5 truncate text-[0.625rem] leading-tight text-muted-foreground">
                       bezahlt {formatMoney(b.paidBase, baseCurrency)}
                       {" · "}
                       Anteil {formatMoney(b.owedBase, baseCurrency)}
@@ -475,7 +475,7 @@ export function BalanceView({
         className="overflow-hidden border-border/60 shadow-[0_4px_16px_rgba(20,32,28,0.05)]"
       >
         <CardHeader tone="green" className="py-1.5">
-          <CardTitle className="flex items-center gap-2 text-[15px]! text-amber-900">
+          <CardTitle className="flex items-center gap-2 text-[0.9375rem]! text-amber-900">
             <IconCircle icon={ArrowLeftRight} tone="green" size="sm" />
             Wenigste Überweisungen
           </CardTitle>
@@ -485,7 +485,7 @@ export function BalanceView({
             <p className="text-sm text-muted-foreground">Alles ausgeglichen.</p>
           ) : (
             <>
-              <p className="text-[11px] leading-snug text-muted-foreground">
+              <p className="text-[0.6875rem] leading-snug text-muted-foreground">
                 Minimale Transfers aus dem Netto-Saldo bis alle ausgeglichen
                 sind.
               </p>
@@ -494,7 +494,7 @@ export function BalanceView({
                 <Button
                   type="button"
                   variant="ghost"
-                  className="h-auto w-full items-center justify-between gap-2 rounded-md px-1 py-1 text-left text-[11px] font-medium text-[var(--brand-finance)] hover:bg-muted/40"
+                  className="h-auto w-full items-center justify-between gap-2 rounded-md px-1 py-1 text-left text-[0.6875rem] font-medium text-[var(--brand-finance)] hover:bg-muted/40"
                   aria-expanded={minExplainOpen}
                   onClick={() => setMinExplainOpen((o) => !o)}
                 >
@@ -508,7 +508,7 @@ export function BalanceView({
                 </Button>
                 {minExplainOpen ? (
                   <div className="mt-1.5 space-y-2.5 rounded-lg border border-border/50 bg-muted/15 px-2.5 py-2">
-                    <p className="text-[11px] leading-snug text-muted-foreground">
+                    <p className="text-[0.6875rem] leading-snug text-muted-foreground">
                       Nicht aus einzelnen Buchungen, sondern aus dem
                       Netto-Saldo (siehe «Saldo pro Person»). Schuldner und
                       Gläubiger werden nacheinander mit{" "}
@@ -518,7 +518,7 @@ export function BalanceView({
                       verrechnet.
                     </p>
                     <div>
-                      <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      <p className="mb-1 text-[0.625rem] font-semibold uppercase tracking-wide text-muted-foreground">
                         1. Ausgangslage
                       </p>
                       <ul className="space-y-1">
@@ -557,7 +557,7 @@ export function BalanceView({
                       </ul>
                     </div>
                     <div>
-                      <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      <p className="mb-1 text-[0.625rem] font-semibold uppercase tracking-wide text-muted-foreground">
                         2. Matching-Schritte
                       </p>
                       {minTransfersExplain.steps.length === 0 ? (
@@ -594,7 +594,7 @@ export function BalanceView({
                                   {formatMoney(s.amount, baseCurrency)}
                                 </span>
                               </div>
-                              <p className="mt-0.5 text-[10px] text-muted-foreground">
+                              <p className="mt-0.5 text-[0.625rem] text-muted-foreground">
                                 Rest Schuld {s.fromName}:{" "}
                                 {formatMoney(s.debtorRemaining, baseCurrency)}
                                 {" · "}
@@ -648,7 +648,7 @@ export function BalanceView({
                 className="overflow-hidden border-border/60 shadow-[0_4px_16px_rgba(20,32,28,0.05)]"
               >
                 <CardHeader tone="green" className="py-1.5">
-                  <CardTitle className="flex items-center gap-2 text-[15px]! text-amber-900">
+                  <CardTitle className="flex items-center gap-2 text-[0.9375rem]! text-amber-900">
                     <IconCircle icon={ArrowLeftRight} tone="green" size="sm" />
                     Nach Zahler
                   </CardTitle>
@@ -660,7 +660,7 @@ export function BalanceView({
                     </p>
                   ) : (
                     <>
-                      <p className="text-[11px] leading-snug text-muted-foreground">
+                      <p className="text-[0.6875rem] leading-snug text-muted-foreground">
                         Anteil an Ausgaben des Zahlers (Rückzahlungen /
                         Gegenforderungen verrechnet).
                       </p>
@@ -680,13 +680,13 @@ export function BalanceView({
                 className="overflow-hidden border-border/60 shadow-[0_4px_16px_rgba(20,32,28,0.05)]"
               >
                 <CardHeader tone="green" className="py-1.5">
-                  <CardTitle className="flex items-center gap-2 text-[15px]! text-[var(--brand-finance)]">
+                  <CardTitle className="flex items-center gap-2 text-[0.9375rem]! text-[var(--brand-finance)]">
                     <IconCircle icon={Users} tone="green" size="sm" />
                     Saldo je Paar
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-1.5">
-                  <p className="text-[11px] leading-snug text-muted-foreground">
+                  <p className="text-[0.6875rem] leading-snug text-muted-foreground">
                     Summe der Personen-Salden im Paar.
                   </p>
                   {coupleBalances.map((b) => (
@@ -696,7 +696,7 @@ export function BalanceView({
                     >
                       <div className="min-w-0">
                         <div className="font-medium">{b.name}</div>
-                        <div className="mt-0.5 truncate text-[10px] leading-tight text-muted-foreground">
+                        <div className="mt-0.5 truncate text-[0.625rem] leading-tight text-muted-foreground">
                           bezahlt {formatMoney(b.paidBase, baseCurrency)}
                           {" · "}
                           Anteil {formatMoney(b.owedBase, baseCurrency)}
@@ -727,7 +727,7 @@ export function BalanceView({
                 className="overflow-hidden border-border/60 shadow-[0_4px_16px_rgba(20,32,28,0.05)]"
               >
                 <CardHeader tone="green" className="py-1.5">
-                  <CardTitle className="flex items-center gap-2 text-[15px]! text-amber-900">
+                  <CardTitle className="flex items-center gap-2 text-[0.9375rem]! text-amber-900">
                     <IconCircle icon={ArrowLeftRight} tone="green" size="sm" />
                     Ausgleich zwischen Paaren
                   </CardTitle>
@@ -739,7 +739,7 @@ export function BalanceView({
                     </p>
                   ) : (
                     <>
-                      <p className="text-[11px] leading-snug text-muted-foreground">
+                      <p className="text-[0.6875rem] leading-snug text-muted-foreground">
                         Vorschlag zwischen Paaren (Erfassen = Rückzahlung der
                         Vertreter).
                       </p>
@@ -1031,7 +1031,7 @@ function ExpenseCard({
 
           <div className="flex min-w-0 flex-1 items-start gap-2 overflow-hidden sm:gap-3">
             <div className="min-w-0 flex-1 overflow-hidden">
-              <p className="min-w-0 text-base font-black leading-snug tracking-tight text-foreground line-clamp-2 sm:text-xl md:truncate">
+              <p className="min-w-0 break-words text-base font-black leading-snug tracking-tight text-foreground line-clamp-2 sm:text-xl">
                 {exp.description || (isIncome ? "Einnahme" : "Ausgabe")}
               </p>
               <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
@@ -1067,7 +1067,7 @@ function ExpenseCard({
                     <Badge
                       variant="secondary"
                       title={badge.title}
-                      className="mt-1.5 h-5 w-fit gap-0.5 border border-[var(--brand-finance)]/25 bg-[var(--brand-finance-soft)] px-1.5 text-[10px] font-semibold text-[var(--brand-finance)]"
+                      className="mt-1.5 h-5 w-fit gap-0.5 border border-[var(--brand-finance)]/25 bg-[var(--brand-finance-soft)] px-1.5 text-[0.625rem] font-semibold text-[var(--brand-finance)]"
                     >
                       <Check
                         className="size-3"
@@ -1083,7 +1083,7 @@ function ExpenseCard({
                 <Link
                   href={`/trips/${exp.trip_event.trip_id}`}
                   onClick={(e) => e.stopPropagation()}
-                  className="mt-1.5 inline-flex w-fit max-w-full items-center gap-1 rounded-full bg-[var(--brand-docs-soft)] px-2 py-0.5 text-[10px] font-semibold text-[var(--brand-docs)] hover:opacity-90"
+                  className="mt-1.5 inline-flex w-fit max-w-full items-center gap-1 rounded-full bg-[var(--brand-docs-soft)] px-2 py-0.5 text-[0.625rem] font-semibold text-[var(--brand-docs)] hover:opacity-90"
                   title={
                     [
                       formatDateDe(exp.trip_event.start_date) || null,
@@ -1113,7 +1113,7 @@ function ExpenseCard({
                   onOpen={() => setZoomOpen(true)}
                 />
               ) : aiImageBusy ? (
-                <div className="flex h-[4.5rem] w-[4.5rem] shrink-0 items-center justify-center rounded-lg border border-dashed border-[var(--brand-finance)]/35 bg-[var(--brand-finance-soft)] text-[10px] font-medium text-[var(--brand-finance)]">
+                <div className="flex h-[4.5rem] w-[4.5rem] shrink-0 items-center justify-center rounded-lg border border-dashed border-[var(--brand-finance)]/35 bg-[var(--brand-finance-soft)] text-[0.625rem] font-medium text-[var(--brand-finance)]">
                   KI…
                 </div>
               ) : null}
@@ -1130,7 +1130,7 @@ function ExpenseCard({
                 {formatMoney(exp.amount_base, baseCurrency)}
               </p>
               {fx.hasFx ? (
-                <div className="max-w-[9.5rem] text-right text-[10px] leading-snug text-muted-foreground sm:max-w-[11rem] sm:text-xs">
+                <div className="max-w-[9.5rem] text-right text-[0.625rem] leading-snug text-muted-foreground sm:max-w-[11rem] sm:text-xs">
                   <p className="tabular-nums">{fx.primary}</p>
                   <p className="tabular-nums">
                     {formatExchangeRateLine({
@@ -1144,7 +1144,7 @@ function ExpenseCard({
                 </div>
               ) : null}
               {exp.document || exp.document_id ? (
-                <span className="inline-flex items-center gap-1 rounded-full bg-[var(--brand-finance-soft)] px-2 py-0.5 text-[10px] font-semibold text-[var(--brand-finance)]">
+                <span className="inline-flex items-center gap-1 rounded-full bg-[var(--brand-finance-soft)] px-2 py-0.5 text-[0.625rem] font-semibold text-[var(--brand-finance)]">
                   <FileText className="size-3" />
                   1 Beleg
                 </span>
@@ -1378,7 +1378,7 @@ function ExpenseCard({
                   </div>
                 ) : null}
                 {editCurrency !== baseCurrency && Number(editAmount) > 0 ? (
-                  <p className="text-[11px] text-muted-foreground sm:col-span-2">
+                  <p className="text-[0.6875rem] text-muted-foreground sm:col-span-2">
                     ≈{" "}
                     {formatMoney(
                       Number(editAmount) * (Number(editRate) || 1),
@@ -1473,7 +1473,7 @@ function ExpenseCard({
                             <Badge
                               variant="secondary"
                               title={badge.title}
-                              className="h-6 gap-0.5 border border-[var(--brand-finance)]/25 bg-[var(--brand-finance-soft)] px-2 text-[11px] font-semibold text-[var(--brand-finance)]"
+                              className="h-6 gap-0.5 border border-[var(--brand-finance)]/25 bg-[var(--brand-finance-soft)] px-2 text-[0.6875rem] font-semibold text-[var(--brand-finance)]"
                             >
                               <Check
                                 className="size-3"
@@ -1486,7 +1486,7 @@ function ExpenseCard({
                         })()
                       : null}
                     {exp.document || exp.document_id ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-[var(--brand-finance-soft)] px-2.5 py-1 text-[11px] font-semibold text-[var(--brand-finance)]">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-[var(--brand-finance-soft)] px-2.5 py-1 text-[0.6875rem] font-semibold text-[var(--brand-finance)]">
                         <FileText className="size-3.5" />
                         1 Beleg
                       </span>
@@ -1494,7 +1494,7 @@ function ExpenseCard({
                   </div>
                   {!cashbookMode && participantIds.length > 0 ? (
                     <div className="flex flex-col items-center gap-1.5">
-                      <p className="text-[11px] font-medium text-muted-foreground">
+                      <p className="text-[0.6875rem] font-medium text-muted-foreground">
                         {memberName(exp.paid_by_member_id)} → Teilnehmer
                       </p>
                       <div className="flex -space-x-2">
@@ -1515,7 +1515,7 @@ function ExpenseCard({
                       </div>
                     </div>
                   ) : null}
-                  <p className="text-[11px] text-muted-foreground">
+                  <p className="text-[0.6875rem] text-muted-foreground">
                     Wischen für weitere Infos
                   </p>
                 </div>
@@ -2165,7 +2165,7 @@ export function ExpenseList({
             {activeFilterCount > 0 ? (
               <Badge
                 variant="secondary"
-                className="h-5 min-w-5 justify-center px-1 text-[10px] font-semibold"
+                className="h-5 min-w-5 justify-center px-1 text-[0.625rem] font-semibold"
               >
                 {activeFilterCount}
               </Badge>
@@ -2282,14 +2282,14 @@ export function ExpenseList({
           </div>
         ) : null}
         {filtersActive ? (
-          <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+          <div className="flex items-center justify-between gap-2 text-[0.6875rem] text-muted-foreground">
             <span>
               {filteredExpenses.length} von {expenses.length} angezeigt
             </span>
             <Button
               type="button"
               variant="link"
-              className="h-auto p-0 text-[11px] font-medium text-[var(--brand-finance)]"
+              className="h-auto p-0 text-[0.6875rem] font-medium text-[var(--brand-finance)]"
               onClick={() => {
                 setQuery("");
                 setPayerFilter("__all__");
@@ -2322,7 +2322,7 @@ export function ExpenseList({
             {activeFilterCount > 0 || query.trim() ? (
               <Badge
                 variant="secondary"
-                className="h-5 min-w-5 justify-center px-1 text-[10px] font-semibold"
+                className="h-5 min-w-5 justify-center px-1 text-[0.625rem] font-semibold"
               >
                 {activeFilterCount + (query.trim() ? 1 : 0)}
               </Badge>
@@ -2341,7 +2341,7 @@ export function ExpenseList({
         <Button
           type="button"
           variant="link"
-          className="h-auto p-0 text-left text-[11px] font-medium text-[var(--brand-finance)]"
+          className="h-auto p-0 text-left text-[0.6875rem] font-medium text-[var(--brand-finance)]"
           onClick={() => setToolsOpen(true)}
         >
           {filteredExpenses.length} von {expenses.length} · Filter anpassen
@@ -2602,10 +2602,10 @@ function SettlementCard({
               {settledLabel ? ` · ${settledLabel}` : ""}
             </p>
             {fx.detail ? (
-              <div className="mt-0.5 space-y-0.5 text-[11px] leading-snug text-muted-foreground">
+              <div className="mt-0.5 space-y-0.5 text-[0.6875rem] leading-snug text-muted-foreground">
                 <p>Währung: {s.currency.toUpperCase()}</p>
                 <p>FW Betrag: {fx.primary}</p>
-                <p className="text-[12px] font-bold text-foreground">
+                <p className="text-xs font-bold text-foreground">
                   Betrag {baseCurrency}:{" "}
                   {formatMoney(s.amount_base, baseCurrency)}
                 </p>

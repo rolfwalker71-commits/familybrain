@@ -119,25 +119,25 @@ function StepVisual({
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <p className="text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground">
               Wegleitung
             </p>
             {here ? (
-              <span className="rounded-full bg-teal-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-teal-800">
+              <span className="rounded-full bg-teal-100 px-1.5 py-0.5 text-[0.5625rem] font-bold uppercase tracking-wide text-teal-800">
                 Du bist hier
               </span>
             ) : null}
             {done ? (
-              <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-emerald-800">
+              <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[0.5625rem] font-bold uppercase tracking-wide text-emerald-800">
                 Erledigt
               </span>
             ) : (
-              <span className="rounded-full bg-orange-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-orange-800">
+              <span className="rounded-full bg-orange-100 px-1.5 py-0.5 text-[0.5625rem] font-bold uppercase tracking-wide text-orange-800">
                 Noch offen
               </span>
             )}
           </div>
-          <p className="text-[13px] font-semibold leading-snug text-foreground">
+          <p className="text-[0.8125rem] font-semibold leading-snug text-foreground">
             {stepId === "calendar"
               ? "Kalender öffnen und offene Termine abarbeiten"
               : stepId === "triage"
@@ -155,7 +155,7 @@ function StepVisual({
           {micros.map((label, i) => (
             <li
               key={label}
-              className="flex items-center gap-2 text-[11px] text-muted-foreground"
+              className="flex items-center gap-2 text-[0.6875rem] text-muted-foreground"
             >
               <span
                 className={cn(
@@ -329,7 +329,7 @@ export function CloseoutAssistant() {
         variant="outline"
         onClick={() => persist({ open: true, minimized: false })}
         className={cn(
-          "fixed z-40 h-auto gap-2 rounded-full border-border/70 bg-card px-3 py-2 text-[12px] font-semibold shadow-[0_8px_28px_rgba(15,23,42,0.14)] hover:bg-muted/40",
+          "fixed z-40 h-auto gap-2 rounded-full border-border/70 bg-card px-3 py-2 text-xs font-semibold shadow-[0_8px_28px_rgba(15,23,42,0.14)] hover:bg-muted/40",
           "right-3 bottom-[calc(5.25rem+env(safe-area-inset-bottom,0px))] md:right-6 md:bottom-6"
         )}
         title="Tagesabschluss-Assistent"
@@ -342,7 +342,7 @@ export function CloseoutAssistant() {
         />
         Abschluss
         {remaining > 0 ? (
-          <span className="rounded-full bg-orange-500 px-1.5 py-0.5 text-[10px] text-white">
+          <span className="rounded-full bg-orange-500 px-1.5 py-0.5 text-[0.625rem] text-white">
             {remaining}
           </span>
         ) : null}
@@ -357,7 +357,7 @@ export function CloseoutAssistant() {
         variant="default"
         onClick={() => persist({ minimized: false })}
         className={cn(
-          "fixed z-40 h-auto gap-2 rounded-full border-slate-700 bg-slate-800 px-3.5 py-2.5 text-[12px] font-semibold text-white shadow-[0_8px_28px_rgba(15,23,42,0.22)] hover:bg-slate-800/90",
+          "fixed z-40 h-auto gap-2 rounded-full border-slate-700 bg-slate-800 px-3.5 py-2.5 text-xs font-semibold text-white shadow-[0_8px_28px_rgba(15,23,42,0.22)] hover:bg-slate-800/90",
           "right-3 bottom-[calc(5.25rem+env(safe-area-inset-bottom,0px))] md:right-6 md:bottom-6"
         )}
       >
@@ -369,7 +369,7 @@ export function CloseoutAssistant() {
         {provider === "google" ? "Google" : "Outlook"} · {activeIndex + 1}/
         {steps.length}
         {remaining > 0 ? (
-          <span className="rounded-full bg-orange-500 px-1.5 py-0.5 text-[10px]">
+          <span className="rounded-full bg-orange-500 px-1.5 py-0.5 text-[0.625rem]">
             {remaining}
           </span>
         ) : (
@@ -392,11 +392,11 @@ export function CloseoutAssistant() {
       <div className="flex items-center gap-2 bg-slate-800 px-3 py-2.5 text-white">
         <Sparkles className="size-4 text-orange-400" aria-hidden />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[13px] font-bold tracking-tight">
+          <p className="break-words text-[0.8125rem] font-bold leading-snug tracking-tight">
             Tagesabschluss ·{" "}
             {provider === "google" ? "Google" : "Outlook"}
           </p>
-          <p className="text-[10px] text-white/70">
+          <p className="text-[0.625rem] text-white/70">
             Schritt {activeIndex + 1} von {steps.length}
             {busy ? " · aktualisiert…" : ""}
           </p>
@@ -437,7 +437,10 @@ export function CloseoutAssistant() {
         />
       </div>
 
-      <div className="flex gap-1 border-b border-border/50 bg-muted/20 p-1.5">
+      <div
+        data-segmented=""
+        className="flex h-10 min-h-10 items-stretch gap-0.5 border-b border-border/50 bg-muted p-0.5"
+      >
         {(
           [
             {
@@ -469,10 +472,10 @@ export function CloseoutAssistant() {
               })
             }
             className={cn(
-              "h-auto flex-1 rounded-lg px-2 py-1.5 text-[11px] font-semibold",
+              "h-full min-h-0 flex-1 rounded-full px-2 py-0 text-[0.6875rem] font-semibold leading-none",
               provider === p.id
-                ? "bg-white text-foreground shadow-sm"
-                : "text-muted-foreground hover:bg-white/60"
+                ? "bg-card text-foreground shadow-sm"
+                : "text-muted-foreground hover:bg-card/80"
             )}
           >
             {p.logo}
@@ -487,7 +490,7 @@ export function CloseoutAssistant() {
         ) : null}
 
         {allClear ? (
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 px-3 py-2.5 text-[13px] font-semibold text-emerald-900">
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 px-3 py-2.5 text-[0.8125rem] font-semibold text-emerald-900">
             Alles erledigt für heute — guter Feierabend.
           </div>
         ) : null}
@@ -523,7 +526,7 @@ export function CloseoutAssistant() {
                 >
                   <span
                     className={cn(
-                      "mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold",
+                      "mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full text-[0.6875rem] font-bold",
                       done
                         ? "bg-emerald-500 text-white"
                         : current
@@ -535,13 +538,13 @@ export function CloseoutAssistant() {
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center justify-between gap-2">
-                      <span className="text-[13px] font-semibold tracking-tight">
+                      <span className="text-[0.8125rem] font-semibold tracking-tight">
                         {step.title}
                       </span>
                       {status ? (
                         <span
                           className={cn(
-                            "shrink-0 text-[10px] font-semibold",
+                            "shrink-0 text-[0.625rem] font-semibold",
                             done
                               ? "text-emerald-700"
                               : "text-orange-700"
@@ -554,7 +557,7 @@ export function CloseoutAssistant() {
                       ) : null}
                     </span>
                     {current ? (
-                      <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                      <span className="mt-0.5 block text-[0.6875rem] text-muted-foreground">
                         {step.hint}
                       </span>
                     ) : null}
@@ -607,7 +610,7 @@ export function CloseoutAssistant() {
         >
           Zurück
         </Button>
-        <label className="flex cursor-pointer items-center gap-1 text-[10px] text-muted-foreground">
+        <label className="flex cursor-pointer items-center gap-1 text-[0.625rem] text-muted-foreground">
           <input
             type="checkbox"
             className="size-3 rounded border-border"
@@ -621,7 +624,7 @@ export function CloseoutAssistant() {
           type="button"
           size="sm"
           variant="ghost"
-          className="h-8 text-[11px]"
+          className="h-8 text-[0.6875rem]"
           onClick={() =>
             persist({
               open: false,
@@ -654,13 +657,13 @@ export function CloseoutAssistant() {
         </Button>
       </div>
 
-      <p className="bg-muted/30 px-3 pb-2 text-center text-[10px] text-muted-foreground">
+      <p className="bg-muted/30 px-3 pb-2 text-center text-[0.625rem] text-muted-foreground">
         Läuft mit während du arbeitest ·{" "}
         <Button
           type="button"
           variant="link"
           size="sm"
-          className="h-auto p-0 text-[10px] underline underline-offset-2"
+          className="h-auto p-0 text-[0.625rem] underline underline-offset-2"
           onClick={() => void load()}
         >
           Refresh

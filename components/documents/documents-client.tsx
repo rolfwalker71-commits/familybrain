@@ -103,14 +103,14 @@ type DocRow = {
 function GuideBadges({ doc }: { doc: DocRow }) {
   if (doc.has_guide) {
     return (
-      <span className="inline-flex rounded-full bg-emerald-700 px-2 py-0.5 text-[11px] font-medium text-white">
+      <span className="inline-flex rounded-full bg-emerald-700 px-2 py-0.5 text-[0.6875rem] font-medium text-white">
         In Guide
       </span>
     );
   }
   if (doc.for_guide) {
     return (
-      <span className="inline-flex rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-900">
+      <span className="inline-flex rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[0.6875rem] font-medium text-emerald-900">
         Für Guide
       </span>
     );
@@ -1002,7 +1002,7 @@ export function DocumentsClient() {
           })()
         )}
         {generating ? (
-          <span className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-black/70 px-1 text-center text-[9px] font-semibold leading-tight text-white">
+          <span className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-black/70 px-1 text-center text-[0.5625rem] font-semibold leading-tight text-white">
             Generierung…
           </span>
         ) : null}
@@ -1853,8 +1853,8 @@ export function DocumentsClient() {
                   key={doc.id}
                   className={
                     doc.has_guide
-                      ? "flex items-center gap-2.5 rounded-xl border border-emerald-200/80 bg-emerald-50/60 p-3.5 shadow-[0_4px_16px_rgba(20,32,28,0.05)]"
-                      : "flex items-center gap-2.5 rounded-xl border border-border/60 bg-card p-3.5 shadow-[0_4px_16px_rgba(20,32,28,0.05)]"
+                      ? "flex items-center gap-2.5 rounded-2xl bg-emerald-50 p-3.5 shadow-[0_2px_10px_rgba(20,32,28,0.04)] ring-1 ring-emerald-200/80"
+                      : "flex items-center gap-2.5 rounded-2xl bg-card p-3.5 shadow-[0_2px_10px_rgba(20,32,28,0.04)] ring-1 ring-border/50"
                   }
                 >
                   <input
@@ -1892,17 +1892,17 @@ export function DocumentsClient() {
                   >
                     <DocListIcon doc={doc} />
                     <div className="min-w-0 flex-1">
-                      <div className="truncate font-semibold text-foreground">
+                      <div className="break-words font-semibold leading-snug text-foreground">
                         {doc.title || `Dokument #${doc.id}`}
                       </div>
                       <div className="mt-1 flex flex-wrap gap-1">
                         {doc.is_business || doc.category === "Geschäftlich" ? (
-                          <span className="inline-flex rounded-full bg-slate-800 px-2 py-0.5 text-[11px] font-medium text-white">
+                          <span className="inline-flex rounded-full bg-slate-800 px-2 py-0.5 text-[0.6875rem] font-medium text-white">
                             Geschäftlich · O365
                           </span>
                         ) : null}
                         {doc.category && doc.category !== "Geschäftlich" ? (
-                          <span className="inline-flex rounded-full bg-[var(--brand-docs-soft)] px-2 py-0.5 text-[11px] font-medium text-[var(--brand-docs)]">
+                          <span className="inline-flex rounded-full bg-[var(--brand-docs-soft)] px-2 py-0.5 text-[0.6875rem] font-medium text-[var(--brand-docs)]">
                             {doc.category}
                           </span>
                         ) : null}
@@ -1936,15 +1936,14 @@ export function DocumentsClient() {
           </div>
 
           {/* Desktop list */}
-          <Card className="hidden min-w-0 overflow-hidden md:block">
-            <CardContent className="p-0">
+          <div className="hidden min-w-0 md:block">
               <DataList>
                 {docs.map((doc) => (
                   <DataListRow
                     key={doc.id}
                     className={
                       doc.has_guide
-                        ? "bg-emerald-50/50 dark:bg-emerald-950/20"
+                        ? "bg-emerald-50 dark:bg-emerald-950"
                         : undefined
                     }
                   >
@@ -1990,7 +1989,7 @@ export function DocumentsClient() {
                             <span>{doc.document_type_name}</span>
                           ) : null}
                           {doc.is_business || doc.category === "Geschäftlich" ? (
-                            <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[11px] font-medium text-white">
+                            <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[0.6875rem] font-medium text-white">
                               Geschäftlich · O365
                             </span>
                           ) : doc.category ? (
@@ -2053,8 +2052,7 @@ export function DocumentsClient() {
                   </DataListRow>
                 ))}
               </DataList>
-            </CardContent>
-          </Card>
+          </div>
         </>
       )}
 

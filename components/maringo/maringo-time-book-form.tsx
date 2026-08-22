@@ -440,26 +440,26 @@ export function MaringoTimeBookForm({
       className={cn("space-y-3", className)}
     >
       {error ? (
-        <p className="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-2 text-[12px] whitespace-pre-wrap break-words text-rose-950 dark:border-rose-400/30 dark:bg-rose-500/12 dark:text-rose-100">
+        <p className="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-2 text-xs whitespace-pre-wrap break-words text-rose-950 dark:border-rose-400/30 dark:bg-rose-500/12 dark:text-rose-100">
           {error}
         </p>
       ) : null}
       {hint ? (
-        <p className="rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-2 text-[12px] text-sky-950 dark:border-sky-400/30 dark:bg-sky-500/12 dark:text-sky-100">
+        <p className="rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-2 text-xs text-sky-950 dark:border-sky-400/30 dark:bg-sky-500/12 dark:text-sky-100">
           {hint}
         </p>
       ) : null}
 
       {enableFavorites ? (
         <div className="space-y-1.5">
-          <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <div className="flex items-center gap-1.5 text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground">
             <Star className="size-3.5" strokeWidth={APP_ICON_STROKE} />
             Favoriten
           </div>
           {favoritesLoading && favorites.length === 0 ? (
-            <p className="text-[12px] text-muted-foreground">Lade Favoriten…</p>
+            <p className="text-xs text-muted-foreground">Lade Favoriten…</p>
           ) : favorites.length === 0 ? (
-            <p className="text-[12px] text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               Noch keine Favoriten — unten «Als Favorit speichern» wählen.
             </p>
           ) : (
@@ -473,7 +473,7 @@ export function MaringoTimeBookForm({
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="h-auto max-w-[14rem] truncate px-2 py-1 text-left text-[12px] font-medium"
+                    className="h-auto max-w-[14rem] truncate px-2 py-1 text-left text-xs font-medium"
                     title={`${formatMariProjectLabel(fav.projectNumber, fav.projectLabel)} · ${fav.activity}`}
                     onClick={() => applyFavorite(fav)}
                   >
@@ -547,7 +547,7 @@ export function MaringoTimeBookForm({
               disabled={!billable}
               placeholder="0.25"
             />
-            <label className="flex h-9 shrink-0 items-center gap-2 whitespace-nowrap text-[13px]">
+            <label className="flex h-9 shrink-0 items-center gap-2 whitespace-nowrap text-[0.8125rem]">
               <input
                 type="checkbox"
                 checked={billable}
@@ -579,11 +579,11 @@ export function MaringoTimeBookForm({
           {projectOpen ? (
             <div className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-border bg-background shadow-lg">
               {loadingProjects ? (
-                <p className="px-2.5 py-2 text-[12px] text-muted-foreground">
+                <p className="px-2.5 py-2 text-xs text-muted-foreground">
                   Lade…
                 </p>
               ) : projects.length === 0 ? (
-                <p className="px-2.5 py-2 text-[12px] text-muted-foreground">
+                <p className="px-2.5 py-2 text-xs text-muted-foreground">
                   Keine Treffer
                 </p>
               ) : (
@@ -593,7 +593,7 @@ export function MaringoTimeBookForm({
                       <Button
                         type="button"
                         variant="ghost"
-                        className="h-auto w-full flex-col items-start justify-start px-2.5 py-1.5 text-left text-[12px] font-normal hover:bg-muted"
+                        className="h-auto w-full flex-col items-start justify-start px-2.5 py-1.5 text-left text-xs font-normal hover:bg-muted"
                         onClick={() => selectProject(p)}
                       >
                         <span className="font-medium">{p.matchcode}</span>
@@ -693,7 +693,7 @@ export function MaringoTimeBookForm({
 
       {enableFavorites ? (
         <div className="space-y-2 rounded-lg border border-border/60 bg-muted/20 px-3 py-2.5">
-          <label className="flex items-center gap-2 text-[13px]">
+          <label className="flex items-center gap-2 text-[0.8125rem]">
             <input
               type="checkbox"
               checked={saveAsFavorite}
@@ -716,7 +716,7 @@ export function MaringoTimeBookForm({
                 maxLength={80}
                 placeholder="z.B. Daily ANG"
               />
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-[0.6875rem] text-muted-foreground">
                 Speichert Projekt, Vertrag, Aktivität, Memo und Verrechenbarkeit
                 (ohne Datum). Beim Buchen mit — oder nur Favorit speichern.
               </p>

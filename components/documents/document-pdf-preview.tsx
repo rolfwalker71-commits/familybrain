@@ -202,18 +202,18 @@ export function DocumentPdfThumb({
             )}
           >
             <FileText className="size-4" />
-            <span className="px-0.5 text-center text-[9px] leading-tight">
+            <span className="px-0.5 text-center text-[0.5625rem] leading-tight">
               PDF
             </span>
           </div>
         )}
-        <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-0.5 bg-gradient-to-t from-black/55 to-transparent px-0.5 py-1 text-[9px] text-white opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
+        <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-0.5 bg-gradient-to-t from-black/55 to-transparent px-0.5 py-1 text-[0.5625rem] text-white opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
           <Maximize2 className="size-2.5" />
           {canZoomHover ? "Zoom" : "Öffnen"}
         </div>
       </Button>
       {!square && (title || href) ? (
-        <div className="mt-0.5 truncate text-[9px] leading-tight text-muted-foreground">
+        <div className="mt-0.5 truncate text-[0.5625rem] leading-tight text-muted-foreground">
           {href ? (
             <a
               href={href}

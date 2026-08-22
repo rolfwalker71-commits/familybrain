@@ -372,7 +372,7 @@ export function TripMap({
         />
       </div>
       {!compact ? (
-        <div className="flex items-center justify-between gap-2 px-2 py-1 text-[10px] text-muted-foreground">
+        <div className="flex items-center justify-between gap-2 px-2 py-1 text-[0.625rem] text-muted-foreground">
           <span>{attribution}</span>
           {valid.length === 1 ? (
             <a

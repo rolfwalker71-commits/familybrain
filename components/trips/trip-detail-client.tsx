@@ -395,7 +395,7 @@ function EventTimelineRail({
   const time = toTimeInputValue(event.start_time);
   return (
     <div className="flex w-8 shrink-0 flex-col items-center sm:w-9">
-      <span className="h-3.5 text-[10px] font-semibold tabular-nums text-muted-foreground sm:text-[11px]">
+      <span className="h-3.5 text-[0.625rem] font-semibold tabular-nums text-muted-foreground sm:text-[0.6875rem]">
         {time || ""}
       </span>
       <span
@@ -432,7 +432,7 @@ function EventStatusPill({
     <Badge
       variant={booked ? "secondary" : "outline"}
       className={cn(
-        "h-5 shrink-0 px-1.5 text-[10px] font-semibold",
+        "h-5 shrink-0 px-1.5 text-[0.625rem] font-semibold",
         booked
           ? "border-[var(--brand-finance)]/25 bg-[var(--brand-finance-soft)] text-[var(--brand-finance)]"
           : "text-muted-foreground",
@@ -542,7 +542,7 @@ function EventDenseFactsColumn({
           key={f.key}
           className={cn(
             "inline-flex items-center gap-1.5 font-semibold tabular-nums text-foreground/90",
-            size === "sm" ? "text-[11px] leading-snug" : "text-xs sm:text-sm"
+            size === "sm" ? "text-[0.6875rem] leading-snug" : "text-xs sm:text-sm"
           )}
         >
           <f.icon
@@ -553,13 +553,13 @@ function EventDenseFactsColumn({
         </span>
       ))}
       {docCount > 0 ? (
-        <span className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-[var(--brand-finance-soft)] px-2 py-0.5 text-[10px] font-semibold text-[var(--brand-finance)]">
+        <span className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-[var(--brand-finance-soft)] px-2 py-0.5 text-[0.625rem] font-semibold text-[var(--brand-finance)]">
           <FileText className="size-3" />
           {docCount} {docCount === 1 ? "Beleg" : "Belege"}
         </span>
       ) : null}
       {financeCount > 0 ? (
-        <span className="inline-flex items-center gap-1 rounded-full bg-[var(--brand-finance-soft)] px-2 py-0.5 text-[10px] font-semibold text-[var(--brand-finance)]">
+        <span className="inline-flex items-center gap-1 rounded-full bg-[var(--brand-finance-soft)] px-2 py-0.5 text-[0.625rem] font-semibold text-[var(--brand-finance)]">
           <Wallet className="size-3" />
           {financeCount === 1 ? "1 FinanzBuddy" : `${financeCount} FinanzBuddy`}
         </span>
@@ -3175,7 +3175,7 @@ function TripDetailInner({
                         {busy ? "Sucht…" : "Verbindungen suchen"}
                       </Button>
                     </div>
-                    <p className="text-[10px] text-muted-foreground">
+                    <p className="text-[0.625rem] text-muted-foreground">
                       Sucht Abfahrten ab dieser Zeit am gewählten Datum
                       (Europe/Zurich).
                     </p>
@@ -3204,7 +3204,7 @@ function TripDetailInner({
                         type="button"
                         size="sm"
                         variant="ghost"
-                        className="h-7 px-2 text-[11px]"
+                        className="h-7 px-2 text-[0.6875rem]"
                         disabled={busy}
                         onClick={() => {
                           const next = nextDepartAfterFromOptions(editingEventId);
@@ -3624,7 +3624,7 @@ function TripDetailInner({
                         />
                         <div className="min-w-0 flex-1 overflow-hidden">
                         <div className="flex min-w-0 items-center gap-1.5">
-                          <div className="min-w-0 flex-1 text-sm font-black leading-snug tracking-tight line-clamp-2 md:truncate sm:text-base">
+                          <div className="min-w-0 flex-1 break-words text-sm font-black leading-snug tracking-tight line-clamp-2 sm:text-base">
                             {event.title}
                           </div>
                           {editMode ? (
@@ -3654,7 +3654,7 @@ function TripDetailInner({
                           ) : null}
                         </div>
                         {dateLine ? (
-                          <div className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
+                          <div className="mt-0.5 flex items-center gap-1 text-[0.6875rem] text-muted-foreground">
                             <Calendar className="size-3 shrink-0" />
                             <span className="truncate">{dateLine}</span>
                           </div>
@@ -4104,7 +4104,7 @@ function TripDetailInner({
               const focusIdx = events.findIndex((e) => e.id === focus.id);
               return (
                 <div className="space-y-1.5">
-                  <p className="truncate px-1 text-[11px] text-muted-foreground">
+                  <p className="truncate px-1 text-[0.6875rem] text-muted-foreground">
                     {focus.title}
                   </p>
                   <div className="flex items-center gap-1 overflow-x-auto pb-0.5">

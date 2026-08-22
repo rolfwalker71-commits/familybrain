@@ -26,7 +26,7 @@ function ServiceDateLabel({
     <span className={cn("inline-flex flex-col leading-tight", className)}>
       <span className="tabular-nums">{toSwissDate(serviceDate)}</span>
       {weekday ? (
-        <span className="text-[10px] font-normal text-muted-foreground">
+        <span className="text-[0.625rem] font-normal text-muted-foreground">
           {weekday}
         </span>
       ) : null}
@@ -81,7 +81,7 @@ function MemoBlock({ memo }: { memo: string }) {
         type="button"
         variant="link"
         size="sm"
-        className="inline-flex h-auto items-center gap-0.5 p-0 text-[10px] font-medium text-orange-800 underline-offset-2"
+        className="inline-flex h-auto items-center gap-0.5 p-0 text-[0.625rem] font-medium text-orange-800 underline-offset-2"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
       >
@@ -95,7 +95,7 @@ function MemoBlock({ memo }: { memo: string }) {
         {open ? "Memo zuklappen" : "Memo aufklappen"}
       </Button>
       {open ? (
-        <p className="mt-0.5 whitespace-pre-wrap text-[10px] text-muted-foreground">
+        <p className="mt-0.5 whitespace-pre-wrap text-[0.625rem] text-muted-foreground">
           {memo}
         </p>
       ) : null}
@@ -115,7 +115,7 @@ function ApprovalBadge({
   return (
     <span
       className={cn(
-        "inline-flex whitespace-nowrap rounded px-1 py-px text-[9px] font-semibold",
+        "inline-flex whitespace-nowrap rounded px-1 py-px text-[0.5625rem] font-semibold",
         s === "approved" &&
           "bg-emerald-100 text-emerald-900 dark:bg-emerald-500/20 dark:text-emerald-100",
         s === "recorded" &&
@@ -242,7 +242,7 @@ export function MaringoTimeLinesTable({
 
   if (lines.length === 0) {
     return (
-      <p className="rounded-lg border border-dashed border-border/60 px-2.5 py-4 text-center text-[12px] text-muted-foreground">
+      <p className="rounded-lg border border-dashed border-border/60 px-2.5 py-4 text-center text-xs text-muted-foreground">
         {emptyText}
       </p>
     );
@@ -258,7 +258,7 @@ export function MaringoTimeLinesTable({
         totalHint="Ticket"
       />
     ) : summaryVariant === "text" ? (
-      <p className="text-[11px] text-muted-foreground">
+      <p className="text-[0.6875rem] text-muted-foreground">
         Summe{" "}
         <span className="font-semibold tabular-nums text-foreground">
           {formatHours(total)} h
@@ -287,7 +287,7 @@ export function MaringoTimeLinesTable({
             return (
               <li
                 key={l.lineId}
-                className="rounded-lg border border-border/60 bg-background px-2.5 py-1.5 text-[11px]"
+                className="rounded-lg border border-border/60 bg-background px-2.5 py-1.5 text-[0.6875rem]"
               >
                 <div className="flex items-start justify-between gap-1.5">
                   <div className="min-w-0 flex-1 space-y-0.5">
@@ -308,7 +308,7 @@ export function MaringoTimeLinesTable({
                     </p>
                     {l.memo ? <MemoBlock memo={l.memo} /> : null}
                     {l.internalRemarkVerr || l.zeroHoursReason ? (
-                      <div className="space-y-0.5 text-[10px] text-muted-foreground">
+                      <div className="space-y-0.5 text-[0.625rem] text-muted-foreground">
                         {l.internalRemarkVerr ? (
                           <p>
                             Verr.:{" "}
@@ -327,7 +327,7 @@ export function MaringoTimeLinesTable({
                         ) : null}
                       </div>
                     ) : null}
-                    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[10px] text-muted-foreground">
+                    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[0.625rem] text-muted-foreground">
                       <span>
                         {l.employeeName || l.employeeNumber || "–"}
                       </span>
@@ -364,8 +364,8 @@ export function MaringoTimeLinesTable({
   return (
     <div className={cn("space-y-1.5", className)}>
       <div className="overflow-x-auto rounded-lg border border-border/60">
-        <table className="w-full min-w-[44rem] text-left text-[11px]">
-          <thead className="bg-muted/40 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
+        <table className="w-full min-w-[44rem] text-left text-[0.6875rem]">
+          <thead className="bg-muted/40 text-[0.5625rem] font-semibold uppercase tracking-wide text-muted-foreground">
             <tr>
               <th className="px-2 py-1.5">Datum</th>
               <th className="px-2 py-1.5">Projekt</th>
@@ -419,11 +419,11 @@ export function MaringoTimeLinesTable({
                   <td className="px-2 py-1.5 text-right tabular-nums">
                     {formatHours(l.hoursBillable)}
                     {l.billable ? (
-                      <span className="ml-1 text-[9px] text-emerald-700">
+                      <span className="ml-1 text-[0.5625rem] text-emerald-700">
                         ja
                       </span>
                     ) : (
-                      <span className="ml-1 text-[9px] text-muted-foreground">
+                      <span className="ml-1 text-[0.5625rem] text-muted-foreground">
                         nein
                       </span>
                     )}

@@ -146,7 +146,7 @@ function ReplyLangToggle({
           size="xs"
           disabled={busy}
           className={cn(
-            "rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase",
+            "rounded px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase",
             lang === code
               ? "bg-muted text-foreground"
               : "text-muted-foreground hover:text-foreground"
@@ -222,7 +222,7 @@ function TimelineImageThumb({
     return (
       <a
         href={attachmentUrl(attachment.attachmentId, true)}
-        className="inline-flex h-24 w-28 flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border/70 bg-muted/30 px-2 text-center text-[10px] text-muted-foreground hover:border-orange-300 hover:text-foreground"
+        className="inline-flex h-24 w-28 flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border/70 bg-muted/30 px-2 text-center text-[0.625rem] text-muted-foreground hover:border-orange-300 hover:text-foreground"
         title={`${attachment.orgFilename} herunterladen`}
       >
         <Paperclip className="size-3.5" />
@@ -250,11 +250,11 @@ function TimelineImageThumb({
           className="h-24 w-auto max-w-[11rem] object-cover"
         />
       ) : (
-        <span className="flex h-24 w-28 items-center justify-center text-[10px] text-muted-foreground">
+        <span className="flex h-24 w-28 items-center justify-center text-[0.625rem] text-muted-foreground">
           Lädt…
         </span>
       )}
-      <span className="absolute inset-x-0 bottom-0 truncate bg-black/55 px-1.5 py-0.5 text-[10px] text-white opacity-0 transition group-hover:opacity-100">
+      <span className="absolute inset-x-0 bottom-0 truncate bg-black/55 px-1.5 py-0.5 text-[0.625rem] text-white opacity-0 transition group-hover:opacity-100">
         {attachment.orgFilename}
       </span>
     </Button>
@@ -316,7 +316,7 @@ function TimelineAttachments({
             <li key={a.attachmentId}>
               <a
                 href={attachmentUrl(a.attachmentId, true)}
-                className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-border/60 bg-background px-2 py-1 text-[11px] font-medium text-foreground hover:border-orange-300 hover:bg-orange-50/50 dark:hover:border-orange-400/40 dark:hover:bg-orange-500/10"
+                className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-border/60 bg-background px-2 py-1 text-[0.6875rem] font-medium text-foreground hover:border-orange-300 hover:bg-orange-50/50 dark:hover:border-orange-400/40 dark:hover:bg-orange-500/10"
                 title={a.orgFilename}
               >
                 <Paperclip className="size-3 shrink-0 text-muted-foreground" />
@@ -362,7 +362,7 @@ function TimelineAttachments({
             )}
             <a
               href={attachmentUrl(lightbox.attachmentId, true)}
-              className="rounded-full bg-white/90 px-3 py-1 text-[12px] font-medium text-foreground hover:bg-white"
+              className="rounded-full bg-white/90 px-3 py-1 text-xs font-medium text-foreground hover:bg-white"
             >
               {lightbox.orgFilename} herunterladen
             </a>
@@ -463,7 +463,7 @@ function StatusChip({
     <Badge
       variant="outline"
       className={cn(
-        "h-5 shrink-0 rounded-full px-2 text-[10px] font-semibold",
+        "h-5 shrink-0 rounded-full px-2 text-[0.625rem] font-semibold",
         statusChipClass(status),
         className
       )}
@@ -484,10 +484,10 @@ function DetailField({
 }) {
   return (
     <div className={cn("min-w-0", className)}>
-      <p className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
+      <p className="text-[0.5625rem] font-semibold uppercase tracking-wide text-muted-foreground">
         {label}
       </p>
-      <div className="truncate text-[12px] font-semibold leading-snug">
+      <div className="truncate text-xs font-semibold leading-snug">
         {children}
       </div>
     </div>
@@ -510,10 +510,10 @@ function TimelineRow({
       <li className="relative pl-8">
         <span className="absolute left-[0.55rem] top-2 size-2.5 rounded-full bg-slate-600 ring-4 ring-background" />
         <div className="inline-flex max-w-full flex-col rounded-md border border-slate-300 bg-slate-100 px-2.5 py-1.5 text-slate-900 dark:border-slate-400/30 dark:bg-slate-500/15 dark:text-slate-100">
-          <span className="text-[11px] font-medium leading-tight text-slate-600 dark:text-slate-300">
+          <span className="text-[0.6875rem] font-medium leading-tight text-slate-600 dark:text-slate-300">
             {formatTimelineAt(item.at)}
           </span>
-          <span className="text-[12px] font-medium leading-snug">
+          <span className="text-xs font-medium leading-snug">
             {item.text}
           </span>
         </div>
@@ -561,10 +561,10 @@ function TimelineRow({
       <div
         className={cn("max-w-[92%] space-y-1", fromSupport && "ml-auto")}
       >
-        <p className="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        <p className="flex flex-wrap items-center gap-1.5 text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground">
           <span
             className={cn(
-              "rounded-md border px-1.5 py-0.5 text-[10px] font-bold normal-case tracking-normal",
+              "rounded-md border px-1.5 py-0.5 text-[0.625rem] font-bold normal-case tracking-normal",
               sideChipClass(side)
             )}
           >
@@ -580,7 +580,7 @@ function TimelineRow({
               type="button"
               size="sm"
               variant="ghost"
-              className="h-6 gap-1 px-1.5 text-[10px] text-muted-foreground hover:text-destructive"
+              className="h-6 gap-1 px-1.5 text-[0.625rem] text-muted-foreground hover:text-destructive"
               disabled={deleting}
               title="Internen Kommentar löschen"
               onClick={() => onDeleteInternalNote(deletableId)}
@@ -591,20 +591,20 @@ function TimelineRow({
           ) : null}
         </p>
         {item.subject ? (
-          <p className="text-[12px] font-medium text-foreground/80">
+          <p className="text-xs font-medium text-foreground/80">
             {item.subject}
           </p>
         ) : null}
         <div
           className={cn(
-            "space-y-2 rounded-md border px-3.5 py-2.5 text-[13px] leading-relaxed",
+            "space-y-2 rounded-md border px-3.5 py-2.5 text-[0.8125rem] leading-relaxed",
             bubble
           )}
         >
           {showBody ? (
             item.html ? (
               <div
-                className="mari-note-html max-w-none overflow-x-auto text-[13px] leading-relaxed [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_pre]:whitespace-pre-wrap [&_pre]:font-mono [&_pre]:text-[11px]"
+                className="mari-note-html max-w-none overflow-x-auto text-[0.8125rem] leading-relaxed [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_pre]:whitespace-pre-wrap [&_pre]:font-mono [&_pre]:text-[0.6875rem]"
                 dangerouslySetInnerHTML={{ __html: item.html }}
               />
             ) : (
@@ -612,7 +612,7 @@ function TimelineRow({
             )
           ) : null}
           {isAttachmentOnly && hasAttachments ? (
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-[0.6875rem] text-muted-foreground">
               {attachments.length === 1
                 ? "Anhang aus E-Mail / Ticket"
                 : `${attachments.length} Anhänge aus E-Mail / Ticket`}
@@ -1753,7 +1753,7 @@ export function MaringoWorkspaceClient() {
             setWorkspaceTab("tickets");
           }}
           className={cn(
-            "h-auto rounded-full px-3 py-1.5 text-[12px] font-semibold",
+            "h-auto rounded-full px-3 py-1.5 text-xs font-semibold",
             workspaceTab === "tickets"
               ? "border-orange-300 bg-orange-50 text-orange-950 dark:border-orange-400/40 dark:bg-orange-500/15 dark:text-orange-100"
               : "border-border/70 bg-background text-muted-foreground hover:bg-muted/40"
@@ -1771,7 +1771,7 @@ export function MaringoWorkspaceClient() {
             setWorkspaceTab("hours");
           }}
           className={cn(
-            "h-auto rounded-full px-3 py-1.5 text-[12px] font-semibold",
+            "h-auto rounded-full px-3 py-1.5 text-xs font-semibold",
             workspaceTab === "hours"
               ? "border-orange-300 bg-orange-50 text-orange-950 dark:border-orange-400/40 dark:bg-orange-500/15 dark:text-orange-100"
               : "border-border/70 bg-background text-muted-foreground hover:bg-muted/40"
@@ -1819,8 +1819,8 @@ export function MaringoWorkspaceClient() {
         <section className="flex min-h-0 flex-col">
           <div className="flex items-center justify-between gap-2 border-b border-border/50 px-3 py-2">
             <div className="min-w-0">
-              <p className="text-[13px] font-black tracking-tight">Tickets</p>
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-[0.8125rem] font-black tracking-tight">Tickets</p>
+              <p className="text-[0.6875rem] text-muted-foreground">
                 {tickets.length} Ticket{tickets.length === 1 ? "" : "s"}
               </p>
             </div>
@@ -1848,7 +1848,7 @@ export function MaringoWorkspaceClient() {
                 size="sm"
                 onClick={selectAllWorkStatuses}
                 className={cn(
-                  "h-auto rounded-full px-2.5 py-1 text-[11px] font-semibold",
+                  "h-auto rounded-full px-2.5 py-1 text-[0.6875rem] font-semibold",
                   statuses.length === WORK_STATUS_IDS.length && !overdueOnly
                     ? "border-orange-200/90 bg-orange-50/80 text-orange-900 dark:border-orange-400/35 dark:bg-orange-500/15 dark:text-orange-100"
                     : "border-border/70 bg-background text-muted-foreground hover:bg-muted/40"
@@ -1862,7 +1862,7 @@ export function MaringoWorkspaceClient() {
                 size="sm"
                 onClick={() => setOverdueOnly((v) => !v)}
                 className={cn(
-                  "h-auto rounded-full px-2.5 py-1 text-[11px] font-semibold",
+                  "h-auto rounded-full px-2.5 py-1 text-[0.6875rem] font-semibold",
                   overdueOnly
                     ? "border-rose-300 bg-rose-50 text-rose-950 dark:border-rose-400/40 dark:bg-rose-500/15 dark:text-rose-100"
                     : "border-border/70 bg-background text-muted-foreground hover:bg-muted/40"
@@ -1877,7 +1877,7 @@ export function MaringoWorkspaceClient() {
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="h-7 rounded-full px-2.5 text-[11px] font-semibold"
+                      className="h-7 rounded-full px-2.5 text-[0.6875rem] font-semibold"
                     />
                   }
                 >
@@ -1913,7 +1913,7 @@ export function MaringoWorkspaceClient() {
                   onClick={() => setListSort("newest")}
                   title="Neueste zuerst"
                   className={cn(
-                    "h-auto rounded-full px-2 py-1 text-[11px] font-semibold",
+                    "h-auto rounded-full px-2 py-1 text-[0.6875rem] font-semibold",
                     listSort === "newest"
                       ? "bg-muted text-foreground"
                       : "text-muted-foreground hover:text-foreground"
@@ -1929,7 +1929,7 @@ export function MaringoWorkspaceClient() {
                   onClick={() => setListSort("oldest")}
                   title="Älteste zuerst"
                   className={cn(
-                    "h-auto rounded-full px-2 py-1 text-[11px] font-semibold",
+                    "h-auto rounded-full px-2 py-1 text-[0.6875rem] font-semibold",
                     listSort === "oldest"
                       ? "bg-muted text-foreground"
                       : "text-muted-foreground hover:text-foreground"
@@ -1942,7 +1942,7 @@ export function MaringoWorkspaceClient() {
             </div>
             {statuses.length > 0 ? (
               <p
-                className="truncate text-[11px] leading-snug text-muted-foreground"
+                className="truncate text-[0.6875rem] leading-snug text-muted-foreground"
                 title={statuses
                   .map((id) => STATUS_LABELS[id] || `Status ${id}`)
                   .join(", ")}
@@ -1960,7 +1960,7 @@ export function MaringoWorkspaceClient() {
                   size="sm"
                   onClick={() => setFilterMode("handler")}
                   className={cn(
-                    "h-auto flex-1 rounded-md px-2 py-1 text-[11px] font-semibold",
+                    "h-auto flex-1 rounded-md px-2 py-1 text-[0.6875rem] font-semibold",
                     filterMode === "handler"
                       ? "bg-background text-foreground shadow-sm"
                       : "text-muted-foreground hover:text-foreground"
@@ -1974,7 +1974,7 @@ export function MaringoWorkspaceClient() {
                   size="sm"
                   onClick={() => setFilterMode("customer")}
                   className={cn(
-                    "h-auto flex-1 rounded-md px-2 py-1 text-[11px] font-semibold",
+                    "h-auto flex-1 rounded-md px-2 py-1 text-[0.6875rem] font-semibold",
                     filterMode === "customer"
                       ? "bg-background text-foreground shadow-sm"
                       : "text-muted-foreground hover:text-foreground"
@@ -1991,7 +1991,7 @@ export function MaringoWorkspaceClient() {
                   </Label>
                   <select
                     id="mari-handler"
-                    className="h-8 w-full rounded-lg border border-border/70 bg-background px-2 text-[12px] outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
+                    className="h-8 w-full rounded-lg border border-border/70 bg-background px-2 text-xs outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
                     value={
                       handlerMode === "manual"
                         ? "__manual__"
@@ -2025,7 +2025,7 @@ export function MaringoWorkspaceClient() {
                         setManualHandledBy(e.target.value.toUpperCase())
                       }
                       placeholder="z.B. M2055"
-                      className="mt-1.5 h-8 text-[12px]"
+                      className="mt-1.5 h-8 text-xs"
                       spellCheck={false}
                       autoComplete="off"
                     />
@@ -2033,7 +2033,7 @@ export function MaringoWorkspaceClient() {
                   {effectiveHandledBy &&
                   defaultHandledBy &&
                   effectiveHandledBy !== defaultHandledBy ? (
-                    <p className="mt-1 text-[10px] text-muted-foreground">
+                    <p className="mt-1 text-[0.625rem] text-muted-foreground">
                       Ansicht: {effectiveHandledBy} (nicht deine Nummer{" "}
                       {defaultHandledBy})
                     </p>
@@ -2058,7 +2058,7 @@ export function MaringoWorkspaceClient() {
                               prev.filter((x) => x.cardCode !== c.cardCode)
                             );
                           }}
-                          className="inline-flex h-auto max-w-full items-center gap-1 rounded-full border-sky-200/80 bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-sky-950 dark:border-sky-400/30 dark:bg-sky-500/15 dark:text-sky-100"
+                          className="inline-flex h-auto max-w-full items-center gap-1 rounded-full border-sky-200/80 bg-sky-50 px-2 py-0.5 text-[0.625rem] font-semibold text-sky-950 dark:border-sky-400/30 dark:bg-sky-500/15 dark:text-sky-100"
                         >
                           <span className="truncate">
                             {c.name}
@@ -2080,13 +2080,13 @@ export function MaringoWorkspaceClient() {
                       value={customerQuery}
                       onChange={(e) => setCustomerQuery(e.target.value)}
                       placeholder="z.B. Bübchen oder CardCode…"
-                      className="h-8 text-[12px]"
+                      className="h-8 text-xs"
                       spellCheck={false}
                       autoComplete="off"
                       disabled={!configured}
                     />
                     {customerSearchBusy ? (
-                      <p className="mt-1 text-[10px] text-muted-foreground">
+                      <p className="mt-1 text-[0.625rem] text-muted-foreground">
                         Suche…
                       </p>
                     ) : null}
@@ -2103,7 +2103,7 @@ export function MaringoWorkspaceClient() {
                                   type="button"
                                   variant="ghost"
                                   className={cn(
-                                    "h-auto w-full items-start justify-start gap-2 px-2.5 py-1.5 text-left text-[12px] font-normal",
+                                    "h-auto w-full items-start justify-start gap-2 px-2.5 py-1.5 text-left text-xs font-normal",
                                     checked && "bg-sky-50/80 dark:bg-sky-500/15"
                                   )}
                                   onClick={() => {
@@ -2133,7 +2133,7 @@ export function MaringoWorkspaceClient() {
                                     <span className="block truncate font-semibold">
                                       {hit.name}
                                     </span>
-                                    <span className="block truncate text-[10px] text-muted-foreground">
+                                    <span className="block truncate text-[0.625rem] text-muted-foreground">
                                       {hit.cardCode}
                                     </span>
                                   </span>
@@ -2143,7 +2143,7 @@ export function MaringoWorkspaceClient() {
                           })}
                         </ul>
                         <div className="flex items-center justify-between gap-2 border-t border-border/50 bg-muted/20 px-2 py-1.5">
-                          <p className="text-[10px] text-muted-foreground">
+                          <p className="text-[0.625rem] text-muted-foreground">
                             {customerDraft.length} gewählt
                           </p>
                           <div className="flex gap-1.5">
@@ -2151,7 +2151,7 @@ export function MaringoWorkspaceClient() {
                               type="button"
                               size="sm"
                               variant="ghost"
-                              className="h-7 px-2 text-[11px]"
+                              className="h-7 px-2 text-[0.6875rem]"
                               onClick={() => {
                                 setCustomerDraft(selectedCustomers);
                                 setCustomerQuery("");
@@ -2164,7 +2164,7 @@ export function MaringoWorkspaceClient() {
                             <Button
                               type="button"
                               size="sm"
-                              className="h-7 bg-sky-600 px-2.5 text-[11px] text-white hover:bg-sky-700"
+                              className="h-7 bg-sky-600 px-2.5 text-[0.6875rem] text-white hover:bg-sky-700"
                               onClick={() => {
                                 setSelectedCustomers(customerDraft);
                                 setCustomerQuery("");
@@ -2181,18 +2181,18 @@ export function MaringoWorkspaceClient() {
                     {customerQuery.trim().length >= 2 &&
                     !customerSearchBusy &&
                     customerHits.length === 0 ? (
-                      <p className="mt-1 text-[10px] text-muted-foreground">
+                      <p className="mt-1 text-[0.625rem] text-muted-foreground">
                         Keine Treffer
                       </p>
                     ) : null}
                   </div>
                   {selectedCustomers.length === 0 ? (
-                    <p className="text-[10px] text-muted-foreground">
+                    <p className="text-[0.625rem] text-muted-foreground">
                       Mehrere Kunden anhaken, dann «Übernehmen» — Tickets aller
                       Bearbeiter.
                     </p>
                   ) : (
-                    <p className="text-[10px] text-muted-foreground">
+                    <p className="text-[0.625rem] text-muted-foreground">
                       {selectedCustomers.length} Kunde
                       {selectedCustomers.length === 1 ? "" : "n"} aktiv · Tickets
                       aller Kollegen
@@ -2203,7 +2203,7 @@ export function MaringoWorkspaceClient() {
             </div>
           </div>
 
-          <ul className="min-h-0 flex-1 overflow-y-auto">
+          <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto p-2">
             {listLoading && tickets.length === 0 ? (
               <li className="px-3 py-8 text-sm text-muted-foreground">
                 Lade Tickets…
@@ -2226,29 +2226,29 @@ export function MaringoWorkspaceClient() {
               );
               const stamp = listCalendarStamps[t.issueId] || null;
               return (
-                <li key={t.issueId} className="border-b border-border/40 last:border-b-0">
+                <li key={t.issueId}>
                   <Button
                     type="button"
                     variant="ghost"
                     onClick={() => openTicket(t.issueId)}
                     className={cn(
-                      "relative h-auto w-full items-start justify-start gap-2 rounded-none border-l-2 px-2.5 py-2 text-left",
+                      "relative h-auto w-full items-start justify-start gap-2 rounded-2xl px-2.5 py-2 text-left ring-1",
                       active
-                        ? "border-l-orange-400 bg-orange-50/70 hover:bg-orange-50/70 dark:bg-orange-500/15 dark:hover:bg-orange-500/15"
-                        : "border-l-transparent hover:bg-muted/40"
+                        ? "bg-orange-50 ring-orange-200 hover:bg-orange-50 dark:bg-orange-950 dark:ring-orange-800 dark:hover:bg-orange-950"
+                        : "bg-card ring-border/50 hover:bg-muted"
                     )}
                   >
                     <div className="min-w-0 flex-1 pr-2">
                       <div className="flex min-w-0 items-baseline gap-1.5">
-                        <span className="shrink-0 text-[12px] font-bold tabular-nums text-foreground">
+                        <span className="shrink-0 text-xs font-bold tabular-nums text-foreground">
                           #{t.issueId}
                         </span>
-                        <p className="min-w-0 truncate text-[13px] font-semibold leading-snug tracking-tight">
+                        <p className="min-w-0 break-words text-[0.8125rem] font-semibold leading-snug tracking-tight">
                           {t.briefDescription}
                         </p>
                       </div>
                       {metaItems.length > 0 ? (
-                        <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] text-muted-foreground">
+                        <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-[0.6875rem] text-muted-foreground">
                           {metaItems.map((item, idx) => (
                             <span
                               key={`${item.id}-${idx}`}
@@ -2273,7 +2273,7 @@ export function MaringoWorkspaceClient() {
                     </div>
                     {stamp ? (
                       <span
-                        className="pointer-events-none absolute left-1/2 top-1/2 z-[1] -translate-x-1/2 -translate-y-1/2 rounded-full border border-emerald-300/90 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold tabular-nums text-emerald-950 shadow-sm dark:border-emerald-400/40 dark:bg-emerald-500/20 dark:text-emerald-100"
+                        className="pointer-events-none absolute left-1/2 top-1/2 z-[1] -translate-x-1/2 -translate-y-1/2 rounded-full border border-emerald-300/90 bg-emerald-50 px-2 py-0.5 text-[0.625rem] font-semibold tabular-nums text-emerald-950 shadow-sm dark:border-emerald-400/40 dark:bg-emerald-500/20 dark:text-emerald-100"
                         title={`Termin eingeplant · ${formatStampWhen(stamp)}`}
                       >
                         Termin ({formatStampWhen(stamp)})
@@ -2283,12 +2283,12 @@ export function MaringoWorkspaceClient() {
                       <StatusChip
                         status={t.status}
                         statusName={t.statusName}
-                        className="h-4 px-1.5 text-[9px]"
+                        className="h-4 px-1.5 text-[0.5625rem]"
                       />
                       {due ? (
                         <span
                           className={cn(
-                            "text-[11px] font-semibold tabular-nums",
+                            "text-[0.6875rem] font-semibold tabular-nums",
                             overdue ? "text-rose-700 dark:text-rose-300" : "text-muted-foreground"
                           )}
                           title={
@@ -2358,10 +2358,10 @@ export function MaringoWorkspaceClient() {
                         )}
                       >
                         <div className="min-w-0 flex-1">
-                          <p className="text-[11px] font-semibold tabular-nums text-current/70">
+                          <p className="text-[0.6875rem] font-semibold tabular-nums text-current/70">
                             #{detail.issueId}
                           </p>
-                          <h2 className="text-[15px] font-bold leading-snug tracking-tight">
+                          <h2 className="text-[0.9375rem] font-bold leading-snug tracking-tight">
                             {detail.briefDescription}
                           </h2>
                         </div>
@@ -2425,7 +2425,7 @@ export function MaringoWorkspaceClient() {
                             </DetailField>
                             <DetailField label="Projekt">
                               {detail.projectNumber ? (
-                                <span className="inline-flex flex-wrap items-center gap-1.5 text-[12px]">
+                                <span className="inline-flex flex-wrap items-center gap-1.5 text-xs">
                                   {(
                                     detail.addressMatchcode || detail.cardCode
                                   )?.trim() ? (
@@ -2517,7 +2517,7 @@ export function MaringoWorkspaceClient() {
                             <Label htmlFor="dueDate" className="sr-only">
                               Stichtag
                             </Label>
-                            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                            <p className="text-[0.625rem] font-semibold uppercase tracking-wide text-muted-foreground">
                               Stichtag
                             </p>
                             <Input
@@ -2532,7 +2532,7 @@ export function MaringoWorkspaceClient() {
                               type="button"
                               size="sm"
                               variant="outline"
-                              className="h-7 text-[11px]"
+                              className="h-7 text-[0.6875rem]"
                               disabled={patching || !dueDraft}
                               onClick={() =>
                                 void patchTicket({ dueDate: dueDraft || null })
@@ -2609,7 +2609,7 @@ export function MaringoWorkspaceClient() {
                                 >
                                   <span className="flex flex-col gap-0.5">
                                     <span className="font-medium">Nur Text</span>
-                                    <span className="text-[11px] text-muted-foreground">
+                                    <span className="text-[0.6875rem] text-muted-foreground">
                                       Chat-Provider (z. B. DeepSeek) — empfohlen
                                     </span>
                                   </span>
@@ -2625,7 +2625,7 @@ export function MaringoWorkspaceClient() {
                                       Mit Screenshots (
                                       {detailImageAttachmentCount})
                                     </span>
-                                    <span className="text-[11px] text-muted-foreground">
+                                    <span className="text-[0.6875rem] text-muted-foreground">
                                       OpenAI Vision — wenn Bildinhalt wichtig
                                       ist
                                     </span>
@@ -2692,18 +2692,18 @@ export function MaringoWorkspaceClient() {
                       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
                         {analysis && analysisOpen ? (
                           <Card className="border-orange-200/70 bg-orange-50/40 dark:border-orange-400/30 dark:bg-orange-500/10">
-                            <CardContent className="space-y-3 p-4 text-[13px]">
-                              <p className="flex items-center gap-2 text-[12px] font-black uppercase tracking-wide text-orange-900 dark:text-orange-100">
+                            <CardContent className="space-y-3 p-4 text-[0.8125rem]">
+                              <p className="flex items-center gap-2 text-xs font-black uppercase tracking-wide text-orange-900 dark:text-orange-100">
                                 <Sparkles className="size-3.5" />
                                 AI-Zusammenfassung
                               </p>
                               {savedAnalyzedAt ? (
-                                <p className="text-[11px] text-orange-900/70 dark:text-orange-200/80">
+                                <p className="text-[0.6875rem] text-orange-900/70 dark:text-orange-200/80">
                                   Gespeichert {formatAnalyzedAt(savedAnalyzedAt)}
                                 </p>
                               ) : null}
                               {imagesAnalyzed > 0 ? (
-                                <p className="text-[11px] text-orange-900/80 dark:text-orange-200/85">
+                                <p className="text-[0.6875rem] text-orange-900/80 dark:text-orange-200/85">
                                   Inkl. {imagesAnalyzed} Screenshot
                                   {imagesAnalyzed === 1 ? "" : "s"} (OpenAI
                                   Vision)
@@ -2712,13 +2712,13 @@ export function MaringoWorkspaceClient() {
                                     : ""}
                                 </p>
                               ) : (
-                                <p className="text-[11px] text-muted-foreground">
+                                <p className="text-[0.6875rem] text-muted-foreground">
                                   Textanalyse ohne Screenshot-Vision
                                   (Chat-Provider).
                                 </p>
                               )}
                               {analysisUsageLines.length > 0 ? (
-                                <div className="rounded-lg border border-orange-200/50 bg-white/50 px-2.5 py-2 text-[11px] leading-relaxed text-orange-950/80 dark:border-orange-400/25 dark:bg-black/20 dark:text-orange-100/85">
+                                <div className="rounded-lg border border-orange-200/50 bg-white/50 px-2.5 py-2 text-[0.6875rem] leading-relaxed text-orange-950/80 dark:border-orange-400/25 dark:bg-black/20 dark:text-orange-100/85">
                                   <p className="font-semibold text-orange-900/90 dark:text-orange-100">
                                     Token / Kosten (nur in Buddy)
                                   </p>
@@ -2790,18 +2790,18 @@ export function MaringoWorkspaceClient() {
                                   </p>
                                   {analysis.solutionSketch.vendors.length >
                                   0 ? (
-                                    <p className="mt-1 text-[11px] text-sky-900/80 dark:text-sky-200/85">
+                                    <p className="mt-1 text-[0.6875rem] text-sky-900/80 dark:text-sky-200/85">
                                       Hersteller:{" "}
                                       {analysis.solutionSketch.vendors.join(
                                         " · "
                                       )}
                                     </p>
                                   ) : null}
-                                  <pre className="mt-2 whitespace-pre-wrap font-sans text-[12px] leading-relaxed text-sky-950/95">
+                                  <pre className="mt-2 whitespace-pre-wrap font-sans text-xs leading-relaxed text-sky-950/95">
                                     {analysis.solutionSketch.outline}
                                   </pre>
                                   {analysis.solutionSketch.steps.length > 0 ? (
-                                    <ol className="mt-3 list-decimal space-y-2 pl-4 text-[12px] text-sky-950/95">
+                                    <ol className="mt-3 list-decimal space-y-2 pl-4 text-xs text-sky-950/95">
                                       {analysis.solutionSketch.steps.map(
                                         (s, i) => (
                                           <li
@@ -2816,7 +2816,7 @@ export function MaringoWorkspaceClient() {
                                             </span>
                                             {s.action}
                                             {s.detail ? (
-                                              <p className="mt-0.5 text-[11px] text-sky-900/75">
+                                              <p className="mt-0.5 text-[0.6875rem] text-sky-900/75">
                                                 {s.detail}
                                               </p>
                                             ) : null}
@@ -2828,7 +2828,7 @@ export function MaringoWorkspaceClient() {
                                   {analysis.solutionSketch.artifacts.length >
                                   0 ? (
                                     <div className="mt-3 space-y-2.5">
-                                      <p className="text-[11px] font-semibold uppercase tracking-wide text-sky-900/80">
+                                      <p className="text-[0.6875rem] font-semibold uppercase tracking-wide text-sky-900/80">
                                         Queries / Skripte / Code
                                       </p>
                                       {analysis.solutionSketch.artifacts.map(
@@ -2837,11 +2837,11 @@ export function MaringoWorkspaceClient() {
                                             key={`${a.kind}-${a.title}-${i}`}
                                             className="overflow-hidden rounded-lg border border-sky-200/70 bg-white/80 dark:border-sky-400/25 dark:bg-black/20"
                                           >
-                                            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 border-b border-sky-100 px-2.5 py-1.5 text-[11px]">
+                                            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 border-b border-sky-100 px-2.5 py-1.5 text-[0.6875rem]">
                                               <span className="font-semibold text-sky-950 dark:text-sky-100">
                                                 {a.title}
                                               </span>
-                                              <span className="rounded bg-sky-100/80 px-1.5 py-0.5 font-mono text-[10px] text-sky-900 dark:bg-sky-500/20 dark:text-sky-100">
+                                              <span className="rounded bg-sky-100/80 px-1.5 py-0.5 font-mono text-[0.625rem] text-sky-900 dark:bg-sky-500/20 dark:text-sky-100">
                                                 {a.kind}
                                               </span>
                                               {a.language ? (
@@ -2851,11 +2851,11 @@ export function MaringoWorkspaceClient() {
                                               ) : null}
                                             </div>
                                             {a.note ? (
-                                              <p className="border-b border-sky-100 px-2.5 py-1 text-[11px] text-sky-900/70">
+                                              <p className="border-b border-sky-100 px-2.5 py-1 text-[0.6875rem] text-sky-900/70">
                                                 {a.note}
                                               </p>
                                             ) : null}
-                                            <pre className="max-h-[28rem] overflow-auto whitespace-pre-wrap p-2.5 font-mono text-[11px] leading-snug text-sky-950">
+                                            <pre className="max-h-[28rem] overflow-auto whitespace-pre-wrap p-2.5 font-mono text-[0.6875rem] leading-snug text-sky-950">
                                               {a.code}
                                             </pre>
                                           </div>
@@ -2864,11 +2864,11 @@ export function MaringoWorkspaceClient() {
                                     </div>
                                   ) : null}
                                   {analysis.solutionSketch.caveats ? (
-                                    <p className="mt-2 text-[11px] text-sky-900/70">
+                                    <p className="mt-2 text-[0.6875rem] text-sky-900/70">
                                       {analysis.solutionSketch.caveats}
                                     </p>
                                   ) : (
-                                    <p className="mt-2 text-[11px] text-sky-900/70">
+                                    <p className="mt-2 text-[0.6875rem] text-sky-900/70">
                                       Vorschlag aus allgemein verfügbarem
                                       Herstellerwissen (u.a. SAP Business One,
                                       nicht S/4) — bitte mit offizieller Doku
@@ -2896,7 +2896,7 @@ export function MaringoWorkspaceClient() {
                                       }
                                     />
                                   </div>
-                                  <pre className="mt-1 whitespace-pre-wrap rounded-xl border border-border/50 bg-white/70 p-2.5 font-sans text-[12px] dark:bg-black/20">
+                                  <pre className="mt-1 whitespace-pre-wrap rounded-xl border border-border/50 bg-white/70 p-2.5 font-sans text-xs dark:bg-black/20">
                                     {analysis.nextReplyDraft}
                                   </pre>
                                 </div>
@@ -2904,10 +2904,10 @@ export function MaringoWorkspaceClient() {
                               <div className="flex flex-col gap-2 border-t border-orange-200/50 pt-3">
                                 {analysisInternalNotePostedAt ? (
                                   <div className="rounded-lg border border-emerald-200/80 bg-emerald-50/70 px-3 py-2 dark:border-emerald-400/30 dark:bg-emerald-500/12">
-                                    <p className="text-[12px] font-semibold text-emerald-950">
+                                    <p className="text-xs font-semibold text-emerald-950">
                                       Bereits als intern gespeichert
                                     </p>
-                                    <p className="mt-0.5 text-[11px] text-emerald-900/75">
+                                    <p className="mt-0.5 text-[0.6875rem] text-emerald-900/75">
                                       {formatAnalyzedAt(
                                         analysisInternalNotePostedAt
                                       )}{" "}
@@ -2933,7 +2933,7 @@ export function MaringoWorkspaceClient() {
                                       : "Als internen Kommentar schreiben"}
                                 </Button>
                                 {!analysisInternalNotePostedAt ? (
-                                  <p className="text-[11px] text-orange-900/75 dark:text-orange-200/80">
+                                  <p className="text-[0.6875rem] text-orange-900/75 dark:text-orange-200/80">
                                     Wird mit Flag «Internal» nach Maringo
                                     geschrieben — nur für Support sichtbar,
                                     nicht für den Kunden.
@@ -2952,11 +2952,11 @@ export function MaringoWorkspaceClient() {
                         >
                           <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0">
-                              <p className="flex items-center gap-2 text-[13px] font-black tracking-tight">
+                              <p className="flex items-center gap-2 text-[0.8125rem] font-black tracking-tight">
                                 <Clock3 className="size-3.5 text-muted-foreground" />
                                 Buchungen
                               </p>
-                              <p className="mt-1 text-[12px] text-muted-foreground">
+                              <p className="mt-1 text-xs text-muted-foreground">
                                 {ticketTimeLoading
                                   ? "Lade Buchungen…"
                                   : ticketTimeLines.length === 0
@@ -2964,14 +2964,14 @@ export function MaringoWorkspaceClient() {
                                     : `${ticketTimeHoursTotal} Std · ${ticketTimeLines.length} Buchung${ticketTimeLines.length === 1 ? "" : "en"}`}
                               </p>
                             </div>
-                            <span className="shrink-0 text-[11px] font-semibold text-orange-800 dark:text-orange-300">
+                            <span className="shrink-0 text-[0.6875rem] font-semibold text-orange-800 dark:text-orange-300">
                               Öffnen
                             </span>
                           </div>
                         </Button>
 
                         <div>
-                          <h3 className="mb-3 flex items-center gap-2 text-[13px] font-black tracking-tight">
+                          <h3 className="mb-3 flex items-center gap-2 text-[0.8125rem] font-black tracking-tight">
                             <Lock className="size-3.5 text-muted-foreground" />
                             Interner Kommentar
                           </h3>
@@ -2991,10 +2991,10 @@ export function MaringoWorkspaceClient() {
                               }
                               placeholder="Eigene Notiz fürs Support-Team (nicht für den Kunden)…"
                               disabled={postingManualNote}
-                              className="resize-y border-amber-200/80 bg-white/80 text-[13px] dark:border-amber-400/30 dark:bg-card"
+                              className="resize-y border-amber-200/80 bg-white/80 text-[0.8125rem] dark:border-amber-400/30 dark:bg-card"
                             />
                             <div className="mt-2.5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                              <p className="text-[11px] text-amber-950/70 dark:text-amber-200/75">
+                              <p className="text-[0.6875rem] text-amber-950/70 dark:text-amber-200/75">
                                 Wird mit Flag «Internal» nach Maringo
                                 geschrieben — nur intern sichtbar.
                               </p>
@@ -3015,7 +3015,7 @@ export function MaringoWorkspaceClient() {
                               </Button>
                             </div>
                             {manualNoteHint ? (
-                              <p className="mt-2 text-[11px] font-medium text-emerald-800">
+                              <p className="mt-2 text-[0.6875rem] font-medium text-emerald-800">
                                 {manualNoteHint}
                               </p>
                             ) : null}
@@ -3023,7 +3023,7 @@ export function MaringoWorkspaceClient() {
                         </div>
 
                         <div>
-                          <h3 className="mb-3 flex items-center gap-2 text-[13px] font-black tracking-tight">
+                          <h3 className="mb-3 flex items-center gap-2 text-[0.8125rem] font-black tracking-tight">
                             <Mail className="size-3.5 text-muted-foreground" />
                             Externer Kommentar
                           </h3>
@@ -3045,10 +3045,10 @@ export function MaringoWorkspaceClient() {
                               disabled={
                                 postingExternalNote || draftingExternalNote
                               }
-                              className="resize-y border-sky-200/80 bg-white/80 text-[13px] dark:border-sky-400/30 dark:bg-card"
+                              className="resize-y border-sky-200/80 bg-white/80 text-[0.8125rem] dark:border-sky-400/30 dark:bg-card"
                             />
                             <div className="mt-2.5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                              <p className="text-[11px] text-sky-950/70">
+                              <p className="text-[0.6875rem] text-sky-950/70">
                                 Wird ohne «Internal» nach Maringo geschrieben —
                                 Mailversand übernimmt Maringo.
                               </p>
@@ -3089,7 +3089,7 @@ export function MaringoWorkspaceClient() {
                               </div>
                             </div>
                             {externalNoteHint ? (
-                              <p className="mt-2 text-[11px] font-medium text-emerald-800">
+                              <p className="mt-2 text-[0.6875rem] font-medium text-emerald-800">
                                 {externalNoteHint}
                               </p>
                             ) : null}
@@ -3098,11 +3098,11 @@ export function MaringoWorkspaceClient() {
 
                         {detail.requestTextPlain ? (
                           <div>
-                            <h3 className="mb-2 flex items-center gap-2 text-[13px] font-black tracking-tight">
+                            <h3 className="mb-2 flex items-center gap-2 text-[0.8125rem] font-black tracking-tight">
                               <Inbox className="size-3.5 text-muted-foreground" />
                               Anfragetext
                             </h3>
-                            <div className="rounded-2xl border border-teal-200/70 bg-teal-50/40 px-3.5 py-2.5 text-[13px] leading-relaxed text-teal-950 dark:border-teal-400/30 dark:bg-teal-500/10 dark:text-teal-50">
+                            <div className="rounded-2xl border border-teal-200/70 bg-teal-50/40 px-3.5 py-2.5 text-[0.8125rem] leading-relaxed text-teal-950 dark:border-teal-400/30 dark:bg-teal-500/10 dark:text-teal-50">
                               <div className="whitespace-pre-wrap">
                                 {detail.requestTextPlain}
                               </div>
@@ -3117,11 +3117,11 @@ export function MaringoWorkspaceClient() {
                           className="h-auto w-full items-center justify-between rounded-2xl border-border/60 bg-muted/20 px-3.5 py-3 text-left hover:bg-muted/40"
                         >
                           <div className="flex items-center justify-between gap-2">
-                            <p className="flex items-center gap-2 text-[13px] font-black tracking-tight">
+                            <p className="flex items-center gap-2 text-[0.8125rem] font-black tracking-tight">
                               <MessageSquare className="size-3.5 text-muted-foreground" />
                               Verlauf öffnen ({detail.timeline.length})
                             </p>
-                            <span className="shrink-0 text-[11px] font-semibold text-orange-800 dark:text-orange-300">
+                            <span className="shrink-0 text-[0.6875rem] font-semibold text-orange-800 dark:text-orange-300">
                               Öffnen
                             </span>
                           </div>
@@ -3182,7 +3182,7 @@ export function MaringoWorkspaceClient() {
                             size="sm"
                             onClick={() => setTimelineSort("newest")}
                             className={cn(
-                              "h-auto rounded-md px-2 py-1 text-[11px] font-semibold",
+                              "h-auto rounded-md px-2 py-1 text-[0.6875rem] font-semibold",
                               timelineSort === "newest"
                                 ? "bg-muted text-foreground"
                                 : "text-muted-foreground hover:text-foreground"
@@ -3197,7 +3197,7 @@ export function MaringoWorkspaceClient() {
                             size="sm"
                             onClick={() => setTimelineSort("oldest")}
                             className={cn(
-                              "h-auto rounded-md px-2 py-1 text-[11px] font-semibold",
+                              "h-auto rounded-md px-2 py-1 text-[0.6875rem] font-semibold",
                               timelineSort === "oldest"
                                 ? "bg-muted text-foreground"
                                 : "text-muted-foreground hover:text-foreground"
@@ -3284,7 +3284,7 @@ export function MaringoWorkspaceClient() {
                     ) : null}
                     {id === "anzeige" ? (
                       <div className="space-y-3">
-                        <p className="text-[12px] leading-relaxed text-muted-foreground">
+                        <p className="text-xs leading-relaxed text-muted-foreground">
                           Felder in der Ticketliste (Meta-Zeile). Vorhandene
                           Werte werden bei «Zeit buchen» vorbelegt und können
                           dort überschrieben werden.
@@ -3321,10 +3321,10 @@ export function MaringoWorkspaceClient() {
                                     }}
                                   />
                                   <span className="min-w-0">
-                                    <span className="block text-[13px] font-semibold">
+                                    <span className="block text-[0.8125rem] font-semibold">
                                       {opt.label}
                                     </span>
-                                    <span className="block text-[11px] text-muted-foreground">
+                                    <span className="block text-[0.6875rem] text-muted-foreground">
                                       {opt.hint}
                                     </span>
                                   </span>

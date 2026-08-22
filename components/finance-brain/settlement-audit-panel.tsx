@@ -122,7 +122,7 @@ export function SettlementAuditPanel({
           aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
         >
-          <CardTitle className="flex items-center gap-2 text-[15px]! text-[var(--brand-finance)]">
+          <CardTitle className="flex items-center gap-2 text-[0.9375rem]! text-[var(--brand-finance)]">
             <IconCircle icon={Table2} tone="green" size="sm" />
             Prüfen: Anteile
           </CardTitle>
@@ -136,14 +136,14 @@ export function SettlementAuditPanel({
       </CardHeader>
       {open ? (
         <CardContent className="space-y-4">
-          <p className="text-[11px] leading-snug text-muted-foreground">
+          <p className="text-[0.6875rem] leading-snug text-muted-foreground">
             Jede Zeile ist eine Buchung, jede Spalte ein Teilnehmer. Zellen =
             Anteil. Summe bezahlt / Anteil / Netto unten sollten zu «Saldo pro
             Person» passen (Netto hier ohne Rückzahlungen).
           </p>
 
           <div className="overflow-x-auto rounded-lg border border-border/50">
-            <table className="w-full min-w-[36rem] border-collapse text-left text-[11px] leading-snug">
+            <table className="w-full min-w-[36rem] border-collapse text-left text-[0.6875rem] leading-snug">
               <thead>
                 <tr className="border-b border-border/60 bg-muted/40">
                   <th className="sticky left-0 z-10 bg-muted/95 px-2 py-1.5 font-semibold">
@@ -172,7 +172,7 @@ export function SettlementAuditPanel({
                     <td className="sticky left-0 z-10 max-w-[10rem] truncate bg-inherit px-2 py-1 font-medium">
                       {row.description}
                       {row.settledStatus !== 0 ? (
-                        <span className="ml-1 text-[9px] font-normal text-muted-foreground">
+                        <span className="ml-1 text-[0.5625rem] font-normal text-muted-foreground">
                           ·{" "}
                           {expenseSettledBadge(row.settledStatus)?.label ??
                             "ausgeglichen"}
@@ -254,7 +254,7 @@ export function SettlementAuditPanel({
                   >
                     Netto (bezahlt − Anteil)
                   </td>
-                  <td className="px-2 py-1.5 text-right text-[10px] text-muted-foreground">
+                  <td className="px-2 py-1.5 text-right text-[0.625rem] text-muted-foreground">
                     Σ {formatSignedMoney(matrix.netSum, baseCurrency)}
                   </td>
                   {matrix.members.map((m) => {
@@ -310,15 +310,15 @@ export function SettlementAuditPanel({
           </div>
 
           <div>
-            <p className="mb-1.5 text-[11px] font-semibold text-foreground">
+            <p className="mb-1.5 text-[0.6875rem] font-semibold text-foreground">
               Wer → wem (Nach Zahler)
             </p>
-            <p className="mb-2 text-[11px] leading-snug text-muted-foreground">
+            <p className="mb-2 text-[0.6875rem] leading-snug text-muted-foreground">
               Zeile schuldet Spalte. Betrag antippen für die Aufschlüsselung
               (Buchungen + Rückzahlungen).
             </p>
             <div className="overflow-x-auto rounded-lg border border-border/50">
-              <table className="w-full min-w-[20rem] border-collapse text-left text-[11px]">
+              <table className="w-full min-w-[20rem] border-collapse text-left text-[0.6875rem]">
                 <thead>
                   <tr className="border-b border-border/60 bg-muted/40">
                     <th className="px-2 py-1.5 font-semibold">Von \ An</th>
@@ -451,10 +451,10 @@ function PairDebtBreakdown({
     <div className="mt-3 rounded-lg border border-amber-200/80 bg-amber-50/40 p-3">
       <div className="mb-2 flex items-start justify-between gap-2">
         <div>
-          <p className="text-[12px] font-semibold text-foreground">
+          <p className="text-xs font-semibold text-foreground">
             {explain.fromName} → {explain.toName}
           </p>
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-[0.6875rem] text-muted-foreground">
             Netto{" "}
             <span className="font-semibold tabular-nums text-amber-950">
               {formatMoney(Math.max(0, explain.netAmount), baseCurrency)}
@@ -464,7 +464,7 @@ function PairDebtBreakdown({
         <Button
           type="button"
           variant="link"
-          className="h-auto p-0 text-[11px] text-muted-foreground"
+          className="h-auto p-0 text-[0.6875rem] text-muted-foreground"
           onClick={onClose}
         >
           Schliessen
@@ -482,14 +482,14 @@ function PairDebtBreakdown({
           );
           return (
             <div key={kind}>
-              <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <p className="mb-1 text-[0.625rem] font-semibold uppercase tracking-wide text-muted-foreground">
                 {meta.title(explain.fromName, explain.toName)}
               </p>
               <ul className="space-y-0.5">
                 {sectionLines.map((line, i) => (
                   <li
                     key={`${kind}-${line.expenseId ?? line.settlementId ?? i}`}
-                    className="flex items-baseline justify-between gap-3 text-[11px]"
+                    className="flex items-baseline justify-between gap-3 text-[0.6875rem]"
                   >
                     <span className="min-w-0 truncate text-foreground">
                       {line.label}
@@ -512,7 +512,7 @@ function PairDebtBreakdown({
               </ul>
               <p
                 className={cn(
-                  "mt-0.5 text-right text-[11px] font-semibold tabular-nums",
+                  "mt-0.5 text-right text-[0.6875rem] font-semibold tabular-nums",
                   meta.tone
                 )}
               >
@@ -523,7 +523,7 @@ function PairDebtBreakdown({
         })}
       </div>
 
-      <p className="mt-3 border-t border-amber-200/70 pt-2 text-[11px] leading-snug text-muted-foreground">
+      <p className="mt-3 border-t border-amber-200/70 pt-2 text-[0.6875rem] leading-snug text-muted-foreground">
         Rechnung: Anteile an {explain.toName}s Ausgaben (
         {formatMoney(explain.oweTotal, baseCurrency)}) − Anteile von{" "}
         {explain.toName} an {explain.fromName}s Ausgaben (

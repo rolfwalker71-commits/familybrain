@@ -332,8 +332,8 @@ export function ChatClient() {
                     aria-pressed={active}
                     className={
                       active
-                        ? "rounded-full border border-primary/40 bg-primary/10 px-2.5 py-1 text-xs font-medium text-foreground hover:bg-primary/10"
-                        : "rounded-full border border-border/60 bg-background px-2.5 py-1 text-xs text-muted-foreground hover:bg-muted"
+                        ? "rounded-full border-transparent bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground shadow-sm hover:bg-primary"
+                        : "rounded-full border-transparent bg-muted px-2.5 py-1 text-xs text-muted-foreground hover:bg-muted"
                     }
                   >
                     {option.label}

@@ -187,7 +187,7 @@ export function MariTicketFlyoutRail({
             </Button>
             <span
               role="tooltip"
-              className="pointer-events-none absolute top-1/2 left-full z-20 ml-2 -translate-y-1/2 whitespace-nowrap rounded-md bg-foreground px-2 py-1 text-[11px] font-medium text-background opacity-0 shadow-md transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
+              className="pointer-events-none absolute top-1/2 left-full z-20 ml-2 -translate-y-1/2 whitespace-nowrap rounded-md bg-foreground px-2 py-1 text-[0.6875rem] font-medium text-background opacity-0 shadow-md transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
             >
               {label}
             </span>
@@ -260,9 +260,9 @@ export function MariSecondaryFlyoutShell({
     >
       <div className="flex shrink-0 items-start gap-2 border-b border-border/60 px-3 py-2.5 pr-2">
         <div className="min-w-0 flex-1">
-          <p className="text-[13px] font-black tracking-tight">{title}</p>
+          <p className="text-[0.8125rem] font-black tracking-tight">{title}</p>
           {description ? (
-            <p className="text-[11px] text-muted-foreground">{description}</p>
+            <p className="text-[0.6875rem] text-muted-foreground">{description}</p>
           ) : null}
         </div>
         <Button

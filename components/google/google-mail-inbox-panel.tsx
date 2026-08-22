@@ -396,7 +396,7 @@ export function GoogleMailInboxPanel({
 
       {mode === "inbox" ? (
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="self-center text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <span className="self-center text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground">
             Filter
           </span>
           {FILTERS.map((f) => (
@@ -454,7 +454,7 @@ export function GoogleMailInboxPanel({
                 <Button
                   type="button"
                   variant="ghost"
-                  className="h-auto w-full justify-start items-start gap-3 rounded-xl border border-border/60 bg-card px-3 py-2.5 text-left shadow-[0_2px_10px_rgba(20,32,28,0.04)] hover:bg-muted/30"
+                  className="h-auto w-full items-start justify-start gap-3 rounded-2xl bg-card px-3 py-2.5 text-left shadow-[0_2px_10px_rgba(20,32,28,0.04)] ring-1 ring-border/50 hover:bg-muted"
                   onClick={() => void openMail(item.id)}
                 >
                   <Mail
@@ -471,17 +471,17 @@ export function GoogleMailInboxPanel({
                           aria-label="Ungelesen"
                         />
                       ) : null}
-                      <p className="truncate text-sm font-medium">
+                      <p className="break-words text-sm font-medium leading-snug">
                         {item.fromName}
                       </p>
-                      <span className="text-[11px] tabular-nums text-muted-foreground">
+                      <span className="text-[0.6875rem] tabular-nums text-muted-foreground">
                         {formatMailWhen(item)}
                       </span>
                       {item.analysisChipLabel ? (
                         <Badge
                           variant="outline"
                           className={cn(
-                            "text-[10px]",
+                            "text-[0.625rem]",
                             chipClass(item.analysisChip || "pending")
                           )}
                           title={item.analysisSummary || undefined}
@@ -490,7 +490,7 @@ export function GoogleMailInboxPanel({
                         </Badge>
                       ) : null}
                     </div>
-                    <p className="truncate text-sm text-foreground">
+                    <p className="break-words text-sm leading-snug text-foreground">
                       {item.subject}
                     </p>
                     <p className="truncate text-xs text-muted-foreground">
@@ -498,7 +498,7 @@ export function GoogleMailInboxPanel({
                     </p>
                   </div>
                   {item.unread ? (
-                    <Badge variant="secondary" className="text-[10px]">
+                    <Badge variant="secondary" className="text-[0.625rem]">
                       Neu
                     </Badge>
                   ) : null}
@@ -568,7 +568,7 @@ export function GoogleMailInboxPanel({
                 {analysis ? (
                   <div className="space-y-3 rounded-xl border border-border/70 bg-muted/20 p-3">
                     <div>
-                      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      <p className="text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground">
                         Buddy · {analysis.relevance}
                       </p>
                       <p className="text-sm">{analysis.summary}</p>
@@ -648,12 +648,12 @@ export function GoogleMailInboxPanel({
                                       />
                                     </label>
                                   </div>
-                                  <p className="text-[11px] text-muted-foreground">
+                                  <p className="text-[0.6875rem] text-muted-foreground">
                                     {formatMailSuggestionDetail(s)}
                                     {s.reason ? ` · ${s.reason}` : ""}
                                   </p>
                                   <label className="block space-y-0.5">
-                                    <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                                    <span className="text-[0.625rem] font-medium uppercase tracking-wide text-muted-foreground">
                                       Beschreibung
                                     </span>
                                     <textarea
@@ -672,7 +672,7 @@ export function GoogleMailInboxPanel({
                                   </label>
                                   {s.kind === "trip" ? (
                                     <label className="block space-y-0.5">
-                                      <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                                      <span className="text-[0.625rem] font-medium uppercase tracking-wide text-muted-foreground">
                                         Reise zuordnen
                                       </span>
                                       <select
@@ -701,7 +701,7 @@ export function GoogleMailInboxPanel({
                                     </label>
                                   ) : null}
                                   {s.kind === "finance" && s.documentId ? (
-                                    <p className="text-[11px] text-rose-800/90">
+                                    <p className="text-[0.6875rem] text-rose-800/90">
                                       Verknüpft mit offener Rechnung · Doc #
                                       {s.documentId}
                                     </p>

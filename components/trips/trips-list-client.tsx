@@ -265,7 +265,7 @@ export function TripsListClient() {
               >
                 Einstellungen → Backup & Hinweise
               </Link>{" "}
-              · <code className="text-[10px]">docs/backup-restic.md</code>
+              · <code className="text-[0.625rem]">docs/backup-restic.md</code>
             </>
           }
         />

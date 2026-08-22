@@ -47,7 +47,7 @@ function MerchantLogo({
       <span
         className={cn(
           box,
-          "flex shrink-0 items-center justify-center rounded-md bg-[var(--brand-finance-soft)] text-[10px] font-bold uppercase text-[var(--brand-finance)]"
+          "flex shrink-0 items-center justify-center rounded-md bg-[var(--brand-finance-soft)] text-[0.625rem] font-bold uppercase text-[var(--brand-finance)]"
         )}
         aria-hidden
       >
@@ -109,7 +109,7 @@ function StatementRow({
           refresh={logoRefresh}
         />
         <span className="min-w-0 flex-1">
-          <span className={cn("block truncate text-sm", excluded && "line-through")}>
+          <span className={cn("block break-words text-sm leading-snug", excluded && "line-through")}>
             {charge.description}
           </span>
           {charge.foreignAmount != null && charge.foreignCurrency ? (
@@ -158,7 +158,7 @@ function StatementRow({
         <span className="min-w-0 flex-1">
           <Link
             href={`/documents/${statement.documentId}`}
-            className="block truncate text-sm font-semibold text-foreground underline-offset-2 hover:underline"
+            className="block break-words text-sm font-semibold leading-snug text-foreground underline-offset-2 hover:underline"
             title="Beleg öffnen"
             onClick={(event) => event.stopPropagation()}
           >
@@ -287,7 +287,7 @@ function MerchantList({
             size="lg"
             refresh={logoRefresh}
           />
-          <span className={cn("min-w-0 flex-1 truncate text-sm", excluded && "line-through")}>
+          <span className={cn("min-w-0 flex-1 break-words text-sm leading-snug", excluded && "line-through")}>
             {m.label}
           </span>
           <span className="shrink-0 text-sm font-semibold tabular-nums">
@@ -317,7 +317,7 @@ function MerchantList({
               />
             ) : null}
           </div>
-          <span className="w-8 shrink-0 text-right text-[11px] tabular-nums text-muted-foreground">
+          <span className="w-8 shrink-0 text-right text-[0.6875rem] tabular-nums text-muted-foreground">
             {count}×
           </span>
         </div>
@@ -603,7 +603,7 @@ export function CreditCardsClient({
                       shape="rounded"
                     />
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate font-semibold">
+                      <span className="block break-words font-semibold leading-snug">
                         {group.label}
                       </span>
                       <span className="text-xs text-muted-foreground">
@@ -662,7 +662,7 @@ export function CreditCardsClient({
 
         <aside className="min-w-0 space-y-4">
           <div className="rounded-2xl border border-border/70 bg-card p-4">
-            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+            <p className="text-[0.6875rem] uppercase tracking-wide text-muted-foreground">
               {year != null ? `Total ${year}` : "Total alle Jahre"}
             </p>
             <p className="mt-1 text-2xl font-semibold tabular-nums">

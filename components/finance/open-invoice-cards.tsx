@@ -48,7 +48,7 @@ function CardThumb({
     return (
       <div className="flex h-full w-full flex-col items-center justify-center gap-1 bg-muted/50 text-muted-foreground">
         <FileText className="size-6 opacity-60" />
-        <span className="text-[10px]">PDF</span>
+        <span className="text-[0.625rem]">PDF</span>
       </div>
     );
   }
@@ -90,7 +90,7 @@ export function OpenInvoiceCard({ invoice }: { invoice: OpenInvoiceCardModel }) 
       <div className="flex min-h-0 flex-1 flex-col border-b border-border/70 px-2.5 py-1.5">
         <Link
           href={`/documents/${invoice.id}`}
-          className="block min-w-0 text-[10px] font-semibold leading-snug text-[var(--brand-docs)] hover:underline sm:text-[11px]"
+          className="block min-w-0 text-[0.625rem] font-semibold leading-snug text-[var(--brand-docs)] hover:underline sm:text-[0.6875rem]"
         >
           {correspondent ? (
             <>
@@ -102,7 +102,7 @@ export function OpenInvoiceCard({ invoice }: { invoice: OpenInvoiceCardModel }) 
           )}
         </Link>
         {invoice.amount != null ? (
-          <p className="mt-0.5 text-[10px] font-semibold tabular-nums text-foreground">
+          <p className="mt-0.5 text-[0.625rem] font-semibold tabular-nums text-foreground">
             {formatCHF(invoice.amount, invoice.currency || "CHF")}
           </p>
         ) : null}
@@ -111,7 +111,7 @@ export function OpenInvoiceCard({ invoice }: { invoice: OpenInvoiceCardModel }) 
             <RecipientAvatars
               recipients={invoice.recipients}
               size="xs"
-              className="text-[10px]"
+              className="text-[0.625rem]"
             />
           </div>
         ) : null}
@@ -122,7 +122,7 @@ export function OpenInvoiceCard({ invoice }: { invoice: OpenInvoiceCardModel }) 
           <Badge
             variant="secondary"
             className={cn(
-              "max-w-[65%] truncate text-[10px] font-semibold",
+              "max-w-[65%] truncate text-[0.625rem] font-semibold",
               dueUrgencyBadgeClass(urgency)
             )}
           >
@@ -133,7 +133,7 @@ export function OpenInvoiceCard({ invoice }: { invoice: OpenInvoiceCardModel }) 
         )}
         <Link
           href={`/documents/${invoice.id}`}
-          className="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium text-[var(--brand-finance)] hover:bg-muted"
+          className="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-0.5 text-[0.6875rem] font-medium text-[var(--brand-finance)] hover:bg-muted"
         >
           Öffnen
           <ExternalLink className="size-3" />

@@ -370,7 +370,7 @@ export function FinanceLedgersListClient() {
               >
                 Einstellungen → Backup & Hinweise
               </Link>{" "}
-              · <code className="text-[10px]">docs/backup-restic.md</code>
+              · <code className="text-[0.625rem]">docs/backup-restic.md</code>
             </>
           }
         />
@@ -469,10 +469,10 @@ export function FinanceLedgersListClient() {
                           </p>
                         ) : null}
                         <div className="mt-2 flex flex-wrap gap-1.5">
-                          <span className="inline-flex rounded-full bg-muted px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+                          <span className="inline-flex rounded-full bg-muted px-2.5 py-0.5 text-[0.6875rem] font-medium text-muted-foreground">
                             {LEDGER_KIND_LABELS[kind]}
                           </span>
-                          <span className="inline-flex rounded-full bg-muted px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+                          <span className="inline-flex rounded-full bg-muted px-2.5 py-0.5 text-[0.6875rem] font-medium text-muted-foreground">
                             {ledger.base_currency}
                           </span>
                         </div>

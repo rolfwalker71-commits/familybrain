@@ -160,11 +160,11 @@ export function TodayHub() {
         <Card className="border-[var(--brand-finance)]/35 bg-[var(--brand-finance-soft)]/40">
           <CardContent className="flex flex-wrap items-center gap-3 p-4">
             <div className="min-w-0 flex-1">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--brand-finance)]">
+              <p className="text-[0.6875rem] font-semibold uppercase tracking-wide text-[var(--brand-finance)]">
                 Nächster Termin
                 {nextEvent.day.isToday ? " · heute" : ""}
               </p>
-              <p className="truncate text-base font-bold tracking-tight">
+              <p className="break-words text-base font-bold leading-snug tracking-tight">
                 {nextEvent.event.title}
               </p>
               <p className="mt-0.5 text-xs text-muted-foreground">
@@ -199,12 +199,12 @@ export function TodayHub() {
                 <Luggage className="size-5" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <p className="text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground">
                   Aktuelle Reise
                 </p>
                 <Link
                   href={`/trips/${data.activeTrip.id}`}
-                  className="block truncate text-base font-bold tracking-tight text-foreground underline-offset-2 hover:underline"
+                  className="block break-words text-base font-bold leading-snug tracking-tight text-foreground underline-offset-2 hover:underline"
                 >
                   {data.activeTrip.title}
                 </Link>
@@ -231,7 +231,7 @@ export function TodayHub() {
               </Link>
             </div>
             <div className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2">
-              <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <p className="mb-1.5 flex items-center gap-1.5 text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground">
                 <CheckSquare className="size-3.5" />
                 Reise-Check
               </p>

@@ -92,46 +92,46 @@ export function MailTagesanalysenList({
                 />
               </span>
               <div className="min-w-0 flex-1 space-y-1.5">
-                <p className="text-[12px] text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                   {finishedLabel(e.finishedAt)}
                   <span className="text-muted-foreground/70">
                     {" "}
                     · {rangeLabel(e.fromYmd, e.toYmd)}
                   </span>
                 </p>
-                <p className="text-[15px] font-black tracking-tight">
+                <p className="text-[0.9375rem] font-black tracking-tight">
                   AI · Tagesbild
                 </p>
-                <p className="line-clamp-2 text-[13px] leading-snug text-muted-foreground">
+                <p className="line-clamp-2 text-[0.8125rem] leading-snug text-muted-foreground">
                   {e.daySummary ||
                     `Analyse von Posteingang und Gesendet. ${e.clusterCount} Cluster, ${e.taskCount} Aufgabe(n).`}
                 </p>
                 <div className="flex flex-wrap gap-1.5 pt-0.5">
-                  <Badge variant="outline" className="h-5 text-[10px]">
+                  <Badge variant="outline" className="h-5 text-[0.625rem]">
                     {e.clusterCount} Cluster
                   </Badge>
-                  <Badge variant="outline" className="h-5 text-[10px]">
+                  <Badge variant="outline" className="h-5 text-[0.625rem]">
                     {e.taskCount} Aufgabe{e.taskCount === 1 ? "" : "n"}
                   </Badge>
                   {e.replyCount > 0 ? (
-                    <Badge variant="outline" className="h-5 text-[10px]">
+                    <Badge variant="outline" className="h-5 text-[0.625rem]">
                       {e.replyCount} Antwort{e.replyCount === 1 ? "" : "en"}
                     </Badge>
                   ) : null}
                   {e.model ? (
-                    <Badge variant="outline" className="h-5 text-[10px]">
+                    <Badge variant="outline" className="h-5 text-[0.625rem]">
                       {e.model}
                     </Badge>
                   ) : null}
                   {e.usageLine ? (
-                    <Badge variant="outline" className="h-5 text-[10px]">
+                    <Badge variant="outline" className="h-5 text-[0.625rem]">
                       {e.usageLine}
                     </Badge>
                   ) : null}
                 </div>
               </div>
               <div className="flex shrink-0 flex-col items-end gap-2 self-stretch pt-0.5">
-                <Badge className="h-6 gap-1 rounded-full border-transparent bg-emerald-100 px-2 text-[11px] font-semibold text-emerald-900 hover:bg-emerald-100">
+                <Badge className="h-6 gap-1 rounded-full border-transparent bg-emerald-100 px-2 text-[0.6875rem] font-semibold text-emerald-900 hover:bg-emerald-100">
                   <Check className="size-3" aria-hidden />
                   Fertig
                 </Badge>

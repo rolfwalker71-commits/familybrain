@@ -440,7 +440,7 @@ export function MailTriagePanel({
                 <CardContent className="space-y-3 p-4">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold">
+                      <p className="break-words text-sm font-semibold leading-snug">
                         {row.subject || "(kein Betreff)"}
                       </p>
                       <p className="text-xs text-muted-foreground">
@@ -448,7 +448,7 @@ export function MailTriagePanel({
                         {row.summary ? ` · ${row.summary}` : ""}
                       </p>
                       {row.analysis?.suggestedMember ? (
-                        <p className="mt-0.5 text-[11px] font-medium text-violet-800/90">
+                        <p className="mt-0.5 text-[0.6875rem] font-medium text-violet-800/90">
                           Person: {row.analysis.suggestedMember.displayName}
                         </p>
                       ) : null}
@@ -534,12 +534,12 @@ export function MailTriagePanel({
                               />
                             </label>
                           </div>
-                          <p className="text-[11px] text-muted-foreground">
+                          <p className="text-[0.6875rem] text-muted-foreground">
                             {formatMailSuggestionDetail(s)}
                             {s.patchEventId ? " · aktualisiert bestehenden Termin" : ""}
                           </p>
                           <label className="block space-y-0.5">
-                            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                            <span className="text-[0.625rem] font-medium uppercase tracking-wide text-muted-foreground">
                               Beschreibung
                             </span>
                             <textarea
@@ -565,7 +565,7 @@ export function MailTriagePanel({
                           </label>
                           {s.kind === "trip" ? (
                             <label className="block space-y-0.5">
-                              <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                              <span className="text-[0.625rem] font-medium uppercase tracking-wide text-muted-foreground">
                                 Reise zuordnen
                               </span>
                               <select
@@ -593,7 +593,7 @@ export function MailTriagePanel({
                             </label>
                           ) : null}
                           {s.kind === "finance" && s.documentId ? (
-                            <p className="text-[11px] text-rose-800/90">
+                            <p className="text-[0.6875rem] text-rose-800/90">
                               Verknüpft mit offener Rechnung · Doc #
                               {s.documentId}
                             </p>
@@ -605,7 +605,7 @@ export function MailTriagePanel({
                   {row.analysis?.replyDraft?.body ||
                   replyDrafts[row.messageId] ? (
                     <div className="space-y-1.5 rounded-lg border border-sky-200/70 bg-sky-50/40 px-2.5 py-2 dark:border-sky-400/30 dark:bg-sky-500/10">
-                      <p className="text-[10px] font-semibold uppercase tracking-wide text-sky-900/80">
+                      <p className="text-[0.625rem] font-semibold uppercase tracking-wide text-sky-900/80">
                         Antwort-Entwurf
                       </p>
                       <textarea

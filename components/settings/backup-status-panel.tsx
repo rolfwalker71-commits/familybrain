@@ -76,7 +76,7 @@ function ActionRow({ action }: { action: BackupRunAction }) {
         {action.snapshotId ? (
           <>
             {" "}
-            · <code className="text-[10px]">{action.snapshotId.slice(0, 12)}</code>
+            · <code className="text-[0.625rem]">{action.snapshotId.slice(0, 12)}</code>
           </>
         ) : null}
       </p>
@@ -204,13 +204,13 @@ export function BackupStatusPanel() {
 
                 <dl className="grid gap-1.5 sm:grid-cols-2">
                   <div>
-                    <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                    <dt className="text-[0.6875rem] uppercase tracking-wide text-muted-foreground">
                       Start
                     </dt>
                     <dd className="tabular-nums">{fmtWhen(data.startedAt)}</dd>
                   </div>
                   <div>
-                    <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                    <dt className="text-[0.6875rem] uppercase tracking-wide text-muted-foreground">
                       Ende
                     </dt>
                     <dd className="tabular-nums">
@@ -221,7 +221,7 @@ export function BackupStatusPanel() {
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                    <dt className="text-[0.6875rem] uppercase tracking-wide text-muted-foreground">
                       Letzter Snapshot
                     </dt>
                     <dd className="tabular-nums">
@@ -230,7 +230,7 @@ export function BackupStatusPanel() {
                         <>
                           {" "}
                           ·{" "}
-                          <code className="text-[10px]">
+                          <code className="text-[0.625rem]">
                             {data.snapshotId.slice(0, 12)}
                           </code>
                         </>
@@ -238,7 +238,7 @@ export function BackupStatusPanel() {
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                    <dt className="text-[0.6875rem] uppercase tracking-wide text-muted-foreground">
                       Letzter Check
                     </dt>
                     <dd className="tabular-nums">
@@ -251,7 +251,7 @@ export function BackupStatusPanel() {
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                    <dt className="text-[0.6875rem] uppercase tracking-wide text-muted-foreground">
                       Neu im Repo
                     </dt>
                     <dd className="tabular-nums">
@@ -262,7 +262,7 @@ export function BackupStatusPanel() {
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                    <dt className="text-[0.6875rem] uppercase tracking-wide text-muted-foreground">
                       Gelesen / Dateien
                     </dt>
                     <dd className="tabular-nums">
@@ -273,7 +273,7 @@ export function BackupStatusPanel() {
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                    <dt className="text-[0.6875rem] uppercase tracking-wide text-muted-foreground">
                       Restore-Nachweis
                     </dt>
                     <dd className="tabular-nums">
@@ -281,7 +281,7 @@ export function BackupStatusPanel() {
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                    <dt className="text-[0.6875rem] uppercase tracking-wide text-muted-foreground">
                       Repository
                     </dt>
                     <dd className="truncate">{data.repository || "—"}</dd>
@@ -300,7 +300,7 @@ export function BackupStatusPanel() {
                       {showLog ? "Log ausblenden" : "Letztes Log anzeigen"}
                     </Button>
                     {showLog ? (
-                      <pre className="max-h-48 overflow-auto rounded-md bg-muted/50 p-2 text-[11px] leading-relaxed whitespace-pre-wrap">
+                      <pre className="max-h-48 overflow-auto rounded-md bg-muted/50 p-2 text-[0.6875rem] leading-relaxed whitespace-pre-wrap">
                         {data.logTail}
                       </pre>
                     ) : null}
@@ -308,7 +308,7 @@ export function BackupStatusPanel() {
                 ) : null}
 
                 <div>
-                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                  <p className="text-[0.6875rem] uppercase tracking-wide text-muted-foreground">
                     Letzte restic-Aktionen
                     {data.recentActions.length > 0
                       ? ` (${Math.min(20, data.recentActions.length)})`
@@ -336,7 +336,7 @@ export function BackupStatusPanel() {
                 </p>
                 <p className="text-xs text-muted-foreground">
                   Runbook:{" "}
-                  <code className="text-[11px]">{data.runbookPath}</code>
+                  <code className="text-[0.6875rem]">{data.runbookPath}</code>
                   {data.notes.length > 0 ? ` · ${data.notes.join(" · ")}` : ""}
                 </p>
               </div>

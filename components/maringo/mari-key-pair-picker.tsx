@@ -99,7 +99,7 @@ export function MariKeyPairPicker({
               type="button"
               variant="ghost"
               className={cn(
-                "h-auto w-full justify-start px-2.5 py-1.5 text-left text-[12px] font-normal hover:bg-muted",
+                "h-auto w-full justify-start px-2.5 py-1.5 text-left text-xs font-normal hover:bg-muted",
                 !value && "bg-muted/60 font-medium"
               )}
               onClick={() => {
@@ -119,7 +119,7 @@ export function MariKeyPairPicker({
                   type="button"
                   variant="ghost"
                   className={cn(
-                    "h-auto w-full justify-start whitespace-nowrap px-2.5 py-1.5 text-left text-[12px] font-normal hover:bg-muted",
+                    "h-auto w-full justify-start whitespace-nowrap px-2.5 py-1.5 text-left text-xs font-normal hover:bg-muted",
                     active && "bg-muted font-medium"
                   )}
                   title={text}

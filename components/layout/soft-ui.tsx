@@ -3,19 +3,17 @@ import { cn } from "@/lib/utils";
 import type { IconTone } from "@/components/layout/icon-circle";
 
 const chipActive: Record<string, string> = {
-  primary: "border-transparent bg-primary text-primary-foreground",
-  teal: "border-transparent bg-[var(--brand-docs)] text-white",
-  green: "border-transparent bg-[var(--brand-finance)] text-white",
-  slate: "border-transparent bg-[var(--brand-settings)] text-white",
+  primary: "border-transparent bg-primary text-primary-foreground shadow-sm",
+  teal: "border-transparent bg-[var(--brand-docs)] text-white shadow-sm",
+  green: "border-transparent bg-[var(--brand-finance)] text-white shadow-sm",
+  slate: "border-transparent bg-[var(--brand-settings)] text-white shadow-sm",
 };
 
 const chipIdle: Record<string, string> = {
-  primary: "border-primary/40 bg-transparent text-primary",
-  teal: "border-[var(--brand-docs)]/45 bg-transparent text-[var(--brand-docs)]",
-  green:
-    "border-[var(--brand-finance)]/45 bg-transparent text-[var(--brand-finance)]",
-  slate:
-    "border-[var(--brand-settings)]/45 bg-transparent text-[var(--brand-settings)]",
+  primary: "border-transparent bg-muted text-muted-foreground",
+  teal: "border-transparent bg-muted text-muted-foreground",
+  green: "border-transparent bg-muted text-muted-foreground",
+  slate: "border-transparent bg-muted text-muted-foreground",
 };
 
 const fabTone: Record<string, string> = {
@@ -50,7 +48,7 @@ export function FilterChip({
       type="button"
       variant="outline"
       className={cn(
-        "h-auto shrink-0 gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-medium",
+        "h-auto shrink-0 gap-1.5 rounded-full border-transparent px-3.5 py-1.5 text-sm font-medium leading-snug whitespace-normal shadow-none",
         active ? chipActive[key] : chipIdle[key],
         className
       )}

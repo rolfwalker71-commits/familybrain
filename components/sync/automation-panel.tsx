@@ -369,7 +369,7 @@ export function AutomationPanel() {
                     <Badge
                       variant="secondary"
                       className={cn(
-                        "shrink-0 text-[10px] font-medium",
+                        "shrink-0 text-[0.625rem] font-medium",
                         internalStateClass(job.state)
                       )}
                     >

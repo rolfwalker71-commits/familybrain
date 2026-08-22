@@ -47,7 +47,7 @@ export function MailAnalysisThreadHint({
     return (
       <p
         className={cn(
-          "text-[12px] leading-snug text-muted-foreground",
+          "text-xs leading-snug text-muted-foreground",
           className
         )}
       >
@@ -62,7 +62,7 @@ export function MailAnalysisThreadHint({
   return (
     <div
       className={cn(
-        "flex gap-2.5 rounded-xl border border-sky-200/80 bg-sky-50/60 px-3 py-2.5 text-[13px] leading-snug text-sky-950 dark:border-sky-400/30 dark:bg-sky-500/12 dark:text-sky-100",
+        "flex gap-2.5 rounded-xl border border-sky-200/80 bg-sky-50/60 px-3 py-2.5 text-[0.8125rem] leading-snug text-sky-950 dark:border-sky-400/30 dark:bg-sky-500/12 dark:text-sky-100",
         className
       )}
       role="note"
@@ -76,7 +76,7 @@ export function MailAnalysisThreadHint({
         <p className="font-semibold tracking-tight">
           Vollständige Threads · ein Cluster pro Gespräch
         </p>
-        <p className="text-[12px] text-sky-950/85">
+        <p className="text-xs text-sky-950/85">
           Zu jeder Mail im Von–Bis-Zeitraum wird der{" "}
           <strong className="font-semibold">gesamte Gesprächsverlauf</strong>{" "}
           nachgeladen. Die AI legt{" "}
@@ -90,12 +90,12 @@ export function MailAnalysisThreadHint({
           Frühere Analysen blenden nichts aus.
         </p>
         {stats ? (
-          <p className="text-[12px] font-medium tabular-nums text-sky-900">
+          <p className="text-xs font-medium tabular-nums text-sky-900">
             Geladen: {stats}
             {clusterLine ? ` · Analyse: ${clusterLine}` : ""}
           </p>
         ) : (
-          <p className="text-[12px] text-sky-900/70">
+          <p className="text-xs text-sky-900/70">
             Nach «Aktualisieren» oder Analyse start erscheinen hier die
             Thread-Zahlen.
           </p>

@@ -315,7 +315,7 @@ export function RealtimeToasts() {
                 <div className="min-w-0 flex-1">
                   <p
                     className={cn(
-                      "text-[11px] font-semibold uppercase tracking-wide",
+                      "text-[0.6875rem] font-semibold uppercase tracking-wide",
                       toast.tone === "error"
                         ? "text-rose-700"
                         : "text-[var(--brand-docs)]"
@@ -335,7 +335,7 @@ export function RealtimeToasts() {
                     </p>
                   ) : null}
                   {n.detail ? (
-                    <p className="mt-1 line-clamp-2 text-[11px] leading-snug text-muted-foreground">
+                    <p className="mt-1 line-clamp-2 text-[0.6875rem] leading-snug text-muted-foreground">
                       {n.detail}
                     </p>
                   ) : null}
@@ -368,7 +368,7 @@ export function RealtimeToasts() {
             type="button"
             variant="outline"
             size="sm"
-            className="h-auto rounded-full border-border/60 bg-background/90 px-3 py-1.5 text-[11px] text-muted-foreground shadow-sm backdrop-blur"
+            className="h-auto rounded-full border-border/60 bg-background/90 px-3 py-1.5 text-[0.6875rem] text-muted-foreground shadow-sm backdrop-blur"
             onClick={() => dismissAll()}
           >
             Alle schliessen
@@ -378,7 +378,7 @@ export function RealtimeToasts() {
               type="button"
               variant="outline"
               size="sm"
-              className="h-auto rounded-full border-border/60 bg-background/90 px-3 py-1.5 text-[11px] text-muted-foreground shadow-sm backdrop-blur"
+              className="h-auto rounded-full border-border/60 bg-background/90 px-3 py-1.5 text-[0.6875rem] text-muted-foreground shadow-sm backdrop-blur"
               onClick={() => void disableNotifications()}
               title="Live-Benachrichtigungen ausschalten"
             >

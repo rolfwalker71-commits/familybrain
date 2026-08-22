@@ -324,7 +324,7 @@ function EventStatusPill({ event }: { event: EventDetailEvent }) {
     <Badge
       variant={booked ? "secondary" : "outline"}
       className={cn(
-        "h-5 shrink-0 px-1.5 text-[10px] font-semibold",
+        "h-5 shrink-0 px-1.5 text-[0.625rem] font-semibold",
         booked
           ? "border-[var(--brand-finance)]/25 bg-[var(--brand-finance-soft)] text-[var(--brand-finance)]"
           : "text-muted-foreground"
@@ -570,7 +570,7 @@ export function EventDetailOverlay({
                   ))}
                 </div>
               ) : null}
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-[0.6875rem] text-muted-foreground">
                 Wischen für weitere Infos
               </p>
             </div>
@@ -770,7 +770,7 @@ export function EventDetailOverlay({
                                 isTransfer && "bg-amber-500/10"
                               )}
                             >
-                              <div className="tabular-nums text-[11px] leading-snug text-foreground/80">
+                              <div className="tabular-nums text-[0.6875rem] leading-snug text-foreground/80">
                                 {an ? (
                                   <div>
                                     An {an}
@@ -805,7 +805,7 @@ export function EventDetailOverlay({
                                   ) : null}
                                 </div>
                                 {meta.length > 0 ? (
-                                  <div className="text-[10px] text-muted-foreground">
+                                  <div className="text-[0.625rem] text-muted-foreground">
                                     {meta.join(" · ")}
                                   </div>
                                 ) : null}

@@ -319,7 +319,7 @@ export function EventDiaryPanel({
                     <p className="text-sm font-semibold text-foreground">
                       {c.author_name}
                     </p>
-                    <p className="text-[11px] text-muted-foreground">
+                    <p className="text-[0.6875rem] text-muted-foreground">
                       {formatCommentWhen(c.created_at)}
                       {c.updated_at !== c.created_at ? " · bearbeitet" : ""}
                     </p>
@@ -536,7 +536,7 @@ export function CommentCountChip({
       ? `${count} Kommentar${count === 1 ? "" : "e"}`
       : "Kommentar";
   const sharedClass = cn(
-    "inline-flex items-center gap-1 rounded-full border border-border/60 bg-muted/50 px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground",
+    "inline-flex items-center gap-1 rounded-full border border-border/60 bg-muted/50 px-1.5 py-0.5 text-[0.625rem] font-semibold text-muted-foreground",
     onClick &&
       "cursor-pointer transition-colors hover:border-[var(--brand-docs)]/40 hover:bg-[var(--brand-docs-soft)] hover:text-[var(--brand-docs)]",
     className

@@ -4,6 +4,7 @@ import type { LucideIcon } from "lucide-react";
 import { MoreHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { IconTone } from "@/components/layout/icon-circle";
+import { SEGMENTED_TRACK, SEGMENTED_TRIGGER } from "@/components/layout/segmented";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -95,13 +96,14 @@ export function AppTabNav<T extends string>({
               className={
                 variant === "desktop"
                   ? cn(
-                      "inline-flex h-auto flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium transition-colors",
+                      SEGMENTED_TRIGGER,
+                      "inline-flex text-sm font-medium",
                       overflowActive
                         ? cn("bg-card shadow-sm", activeText)
                         : "text-muted-foreground hover:text-foreground"
                     )
                   : cn(
-                      "flex h-auto min-w-0 flex-1 flex-col items-center gap-0.5 rounded-xl px-1 py-1 text-[10px] font-bold tracking-tight transition-colors",
+                      "flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1 text-xs font-bold leading-snug tracking-tight",
                       overflowActive ? "text-foreground" : "text-foreground/55"
                     )
               }
@@ -152,10 +154,11 @@ export function AppTabNav<T extends string>({
   return (
     <>
       <div
+        data-app-tab-nav=""
+        data-segmented=""
         className={cn(
-          alwaysBottom
-            ? "hidden"
-            : "hidden flex-wrap gap-1 rounded-xl bg-muted/50 p-1 md:flex",
+          alwaysBottom ? "hidden" : "hidden md:flex",
+          SEGMENTED_TRACK,
           className
         )}
       >
@@ -169,7 +172,8 @@ export function AppTabNav<T extends string>({
               variant="ghost"
               onClick={() => onChange(item.id)}
               className={cn(
-                "inline-flex h-auto flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium leading-snug whitespace-normal transition-colors",
+                SEGMENTED_TRIGGER,
+                "inline-flex text-sm font-medium",
                 isActive
                   ? cn("bg-card shadow-sm", activeText)
                   : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
@@ -191,8 +195,11 @@ export function AppTabNav<T extends string>({
         )}
         aria-label="Bereiche"
       >
-        <div className="pointer-events-auto mx-3 mb-[max(0.5rem,env(safe-area-inset-bottom))] rounded-xl border border-border/60 bg-card px-1.5 pt-1.5 pb-1.5 shadow-[0_8px_32px_rgba(20,32,28,0.14)]">
-          <div className="mx-auto flex max-w-lg items-stretch justify-between gap-0.5">
+        <div className="pointer-events-auto mx-3 mb-[max(0.75rem,env(safe-area-inset-bottom))] rounded-2xl border border-border/60 bg-card px-1.5 pt-1.5 pb-1.5 shadow-[0_8px_32px_rgba(20,32,28,0.14)]">
+          <div
+            data-app-tab-nav=""
+            className="mx-auto flex max-w-lg items-stretch justify-between gap-0.5"
+          >
             {items.map((item) => {
               const Icon = item.icon;
               const isActive = item.id === active;
@@ -205,7 +212,7 @@ export function AppTabNav<T extends string>({
                   variant="ghost"
                   onClick={() => onChange(item.id)}
                   className={cn(
-                    "flex h-auto min-w-0 flex-1 flex-col items-center gap-0.5 rounded-xl px-1 py-1 text-[10px] font-bold tracking-tight transition-colors",
+                    "flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1 text-xs font-bold leading-snug tracking-tight",
                     isEmphasize
                       ? "text-foreground"
                       : isActive
@@ -215,9 +222,9 @@ export function AppTabNav<T extends string>({
                 >
                   <span
                     className={cn(
-                      "flex size-9 items-center justify-center rounded-lg transition-colors",
+                      "flex size-9 items-center justify-center rounded-xl transition-colors",
                       isEmphasize && solid,
-                      !isEmphasize && isActive && "bg-foreground/8",
+                      !isEmphasize && isActive && "bg-muted",
                       !isEmphasize && !isActive && "bg-transparent"
                     )}
                   >
@@ -229,7 +236,9 @@ export function AppTabNav<T extends string>({
                       absoluteStrokeWidth
                     />
                   </span>
-                  <span className="truncate">{item.label}</span>
+                  <span className="max-w-full text-center leading-snug break-words [overflow-wrap:anywhere] line-clamp-2">
+                    {item.label}
+                  </span>
                 </Button>
               );
             })}

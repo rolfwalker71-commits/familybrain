@@ -363,7 +363,7 @@ export function SettingsTelegramPanel() {
             ) : null}
 
             {probeResult ? (
-              <pre className="max-h-48 overflow-auto rounded-md border border-border/70 bg-background p-3 text-[11px] leading-relaxed whitespace-pre-wrap break-all">
+              <pre className="max-h-48 overflow-auto rounded-md border border-border/70 bg-background p-3 text-[0.6875rem] leading-relaxed whitespace-pre-wrap break-all">
                 {probeResult}
               </pre>
             ) : null}

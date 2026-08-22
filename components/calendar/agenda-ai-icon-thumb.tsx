@@ -189,7 +189,7 @@ export function AgendaAiIconThumb({
     return (
       <span
         className={cn(
-          "inline-flex shrink-0 items-center justify-center rounded-lg border border-border/40 bg-muted/50 text-[13px] font-bold text-muted-foreground",
+          "inline-flex shrink-0 items-center justify-center rounded-lg border border-border/40 bg-muted/50 text-[0.8125rem] font-bold text-muted-foreground",
           sizeClass,
           className,
           failed && "opacity-80"
@@ -228,7 +228,7 @@ export function AgendaAiIconThumb({
           }}
         />
         {showAiBadge ? (
-          <span className="absolute bottom-1 right-1 rounded bg-emerald-600 px-1 py-px text-[8px] font-bold uppercase leading-none tracking-wide text-white shadow-sm">
+          <span className="absolute bottom-1 right-1 rounded bg-emerald-600 px-1 py-px text-[0.5rem] font-bold uppercase leading-none tracking-wide text-white shadow-sm">
             AI
           </span>
         ) : null}

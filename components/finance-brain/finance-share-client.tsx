@@ -986,7 +986,7 @@ function FinanceShareInner({ token }: { token: string }) {
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-[0.6875rem] text-muted-foreground">
                 Nur Personen aus der gewählten Beteiligung.
               </p>
             </div>
@@ -1001,7 +1001,7 @@ function FinanceShareInner({ token }: { token: string }) {
                 <span className="font-medium">
                   Bereits ausgeglichen (nacherfasst)
                 </span>
-                <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                <span className="mt-0.5 block text-[0.6875rem] text-muted-foreground">
                   Zählt zu den Reise-Gesamtkosten. Anteile der anderen werden
                   automatisch als Rückzahlung an den Zahler gebucht — Saldo
                   bleibt neutral.

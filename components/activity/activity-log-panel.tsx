@@ -81,7 +81,7 @@ export function ActivityLogPanel({
           <History className="size-4 text-muted-foreground" />
           <p className="text-sm font-semibold text-foreground">Aktivität</p>
           {total > 0 ? (
-            <Badge variant="secondary" className="text-[10px]">
+            <Badge variant="secondary" className="text-[0.625rem]">
               {total}
             </Badge>
           ) : null}
@@ -115,15 +115,15 @@ export function ActivityLogPanel({
               className="rounded-lg border border-border/60 bg-muted/15 px-3 py-2"
             >
               <div className="flex flex-wrap items-center gap-1.5">
-                <Badge variant="outline" className="text-[10px]">
+                <Badge variant="outline" className="text-[0.625rem]">
                   {ACTIVITY_ACTION_LABELS[row.action as ActivityAction] ||
                     row.action}
                 </Badge>
-                <span className="text-[11px] tabular-nums text-muted-foreground">
+                <span className="text-[0.6875rem] tabular-nums text-muted-foreground">
                   {formatWhen(row.created_at)}
                 </span>
                 {row.actor ? (
-                  <span className="text-[11px] text-muted-foreground">
+                  <span className="text-[0.6875rem] text-muted-foreground">
                     · {row.actor}
                   </span>
                 ) : null}

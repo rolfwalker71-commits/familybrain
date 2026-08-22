@@ -215,16 +215,16 @@ export function DocumentDuplicatesPanel() {
                         {cluster.description}
                       </span>
                       <span className="mt-1 flex flex-wrap gap-1">
-                        <Badge variant="secondary" className="text-[10px]">
+                        <Badge variant="secondary" className="text-[0.625rem]">
                           {cluster.count}× gleich
                         </Badge>
                         {cluster.refNumber ? (
-                          <Badge variant="outline" className="text-[10px]">
+                          <Badge variant="outline" className="text-[0.625rem]">
                             Nr. {cluster.refNumber}
                           </Badge>
                         ) : null}
                         {cluster.matchedByDate ? (
-                          <Badge variant="secondary" className="text-[10px]">
+                          <Badge variant="secondary" className="text-[0.625rem]">
                             Titel + Datum
                           </Badge>
                         ) : null}
@@ -331,16 +331,16 @@ function DuplicateRow({
             href={doc.paperless_url}
             target="_blank"
             rel="noreferrer"
-            className="text-[11px] text-[var(--brand-docs)] underline-offset-2 hover:underline"
+            className="text-[0.6875rem] text-[var(--brand-docs)] underline-offset-2 hover:underline"
           >
             In Paperless öffnen
           </a>
         ) : null}
       </div>
       {selected ? (
-        <Badge className="shrink-0 text-[10px]">Behalten</Badge>
+        <Badge className="shrink-0 text-[0.625rem]">Behalten</Badge>
       ) : (
-        <Badge variant="secondary" className="shrink-0 text-[10px]">
+        <Badge variant="secondary" className="shrink-0 text-[0.625rem]">
           Duplikat
         </Badge>
       )}

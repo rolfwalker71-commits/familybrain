@@ -108,7 +108,7 @@ export function MaringoTimeSuggestionsPanel({
   return (
     <Card className={cn("border-orange-200/70 bg-orange-50/30 dark:border-orange-400/30 dark:bg-orange-500/10", className)}>
       <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2 text-[15px] font-black tracking-tight">
+        <CardTitle className="flex items-center gap-2 text-[0.9375rem] font-black tracking-tight">
           <CalendarClock
             className="size-4 text-orange-800 dark:text-orange-300"
             strokeWidth={APP_ICON_STROKE}
@@ -117,12 +117,12 @@ export function MaringoTimeSuggestionsPanel({
           />
           Stunden aus Ticket-Terminen
           {items.length ? (
-            <span className="rounded-full bg-orange-500 px-2 py-0.5 text-[10px] font-semibold text-white">
+            <span className="rounded-full bg-orange-500 px-2 py-0.5 text-[0.625rem] font-semibold text-white">
               {items.length}
             </span>
           ) : null}
         </CardTitle>
-        <p className="text-[12px] text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           Gestempelte Kalendertermine aus Maringo — prüfen und buchen.
         </p>
       </CardHeader>
@@ -141,10 +141,10 @@ export function MaringoTimeSuggestionsPanel({
               >
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-[13px] font-semibold tracking-tight">
+                    <p className="truncate text-[0.8125rem] font-semibold tracking-tight">
                       {s.title}
                     </p>
-                    <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    <p className="mt-0.5 text-[0.6875rem] text-muted-foreground">
                       #{s.issueId} · {s.eventDate}
                       {s.startHm && s.endHm
                         ? ` · ${s.startHm}–${s.endHm}`
@@ -153,7 +153,7 @@ export function MaringoTimeSuggestionsPanel({
                       {` · ${s.eventProvider === "google" ? "Google" : "Outlook"}`}
                     </p>
                     {s.memo ? (
-                      <p className="mt-1 line-clamp-2 text-[12px] text-foreground/80">
+                      <p className="mt-1 line-clamp-2 text-xs text-foreground/80">
                         {s.memo}
                       </p>
                     ) : null}
@@ -182,7 +182,7 @@ export function MaringoTimeSuggestionsPanel({
                     </Button>
                     <Link
                       href={s.href}
-                      className="inline-flex h-8 items-center rounded-lg px-2.5 text-[12px] font-medium text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                      className="inline-flex h-8 items-center rounded-lg px-2.5 text-xs font-medium text-muted-foreground hover:bg-muted/50 hover:text-foreground"
                     >
                       Ticket
                     </Link>
@@ -197,7 +197,7 @@ export function MaringoTimeSuggestionsPanel({
             type="button"
             size="sm"
             variant="ghost"
-            className="h-7 text-[11px]"
+            className="h-7 text-[0.6875rem]"
             onClick={() => void load()}
             disabled={loading}
           >

@@ -247,7 +247,7 @@ export function FinancePieCard({
         tone="green"
         className="flex flex-row items-center justify-between gap-2 py-1.5"
       >
-        <CardTitle className="flex min-w-0 items-center gap-2 text-[15px]! text-[var(--brand-finance)]">
+        <CardTitle className="flex min-w-0 items-center gap-2 text-[0.9375rem]! text-[var(--brand-finance)]">
           <IconCircle icon={Icon} tone="green" size="sm" />
           <span className="truncate">{title}</span>
         </CardTitle>

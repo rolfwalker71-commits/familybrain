@@ -102,7 +102,7 @@ export function AnalysisEventDraftCard({
 
   return (
     <div className="space-y-2 rounded-lg border border-border/60 p-3">
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+      <p className="text-[0.625rem] font-semibold uppercase tracking-wide text-muted-foreground">
         Termin · {calendarLabel}
         {needsSlot ? " · aus Aufgabe" : ""}
       </p>
@@ -117,7 +117,7 @@ export function AnalysisEventDraftCard({
 
       {needsSlot ? (
         <div className="space-y-2 rounded-md border border-dashed border-border/70 bg-muted/20 p-2.5">
-          <p className="text-[12px] text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             Dauer wählen und freien Slot suchen — erst dann wird der Termin
             angelegt.
           </p>
@@ -132,7 +132,7 @@ export function AnalysisEventDraftCard({
                   size="sm"
                   disabled={disabled || slotBusy}
                   className={cn(
-                    "h-auto rounded-md px-2 py-1 text-[12px] font-medium",
+                    "h-auto rounded-md px-2 py-1 text-xs font-medium",
                     duration === m
                       ? "border-foreground bg-background"
                       : "border-border/60 text-muted-foreground hover:text-foreground"
@@ -157,13 +157,13 @@ export function AnalysisEventDraftCard({
             {slotBusy ? "Suche…" : "Freie Slots suchen"}
           </Button>
           {slotError ? (
-            <p className="text-[12px] text-rose-700">{slotError}</p>
+            <p className="text-xs text-rose-700">{slotError}</p>
           ) : null}
           {slotMsg ? (
-            <p className="text-[12px] text-muted-foreground">{slotMsg}</p>
+            <p className="text-xs text-muted-foreground">{slotMsg}</p>
           ) : null}
           {event.startTime && event.endTime ? (
-            <p className="text-[12px] font-medium text-emerald-800">
+            <p className="text-xs font-medium text-emerald-800">
               Slot: {toSwissDate(event.date)} {event.startTime}–{event.endTime}
             </p>
           ) : null}
@@ -171,7 +171,7 @@ export function AnalysisEventDraftCard({
             <div className="space-y-2">
               {groupFreeSlotsByDate(slots).map((day) => (
                 <div key={day.date} className="space-y-1">
-                  <p className="text-[11px] font-semibold text-muted-foreground">
+                  <p className="text-[0.6875rem] font-semibold text-muted-foreground">
                     {weekdayLabel(day.date)} · {toSwissDate(day.date)}
                   </p>
                   <div className="flex flex-wrap gap-1.5">
@@ -188,7 +188,7 @@ export function AnalysisEventDraftCard({
                           size="sm"
                           disabled={disabled || slotBusy}
                           className={cn(
-                            "h-auto rounded-md px-2 py-1 text-[12px] tabular-nums",
+                            "h-auto rounded-md px-2 py-1 text-xs tabular-nums",
                             selected
                               ? "border-emerald-700 bg-emerald-50 text-emerald-950 dark:border-emerald-400/50 dark:bg-emerald-500/15 dark:text-emerald-100"
                               : "border-border/60 hover:bg-muted"

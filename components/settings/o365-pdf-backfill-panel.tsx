@@ -175,7 +175,7 @@ function ProgressBar(props: {
   const pct = Math.min(100, Math.round((props.value / max) * 100));
   return (
     <div className="space-y-1">
-      <div className="flex justify-between gap-2 text-[11px] text-muted-foreground">
+      <div className="flex justify-between gap-2 text-[0.6875rem] text-muted-foreground">
         <span>{props.label}</span>
         <span>
           {props.value}/{props.max} ({pct}%)
@@ -561,7 +561,7 @@ export function O365PdfBackfillPanel() {
                 </Button>
               ) : null}
             </div>
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-[0.6875rem] text-muted-foreground">
               «Zeitraum setzen» stoppt einen laufenden Batch und löscht Cursor,
               Zähler und Log — nur für einen bewussten Neustart. Für Fortsetzen
               nach Pause: «Weiter».
@@ -669,7 +669,7 @@ export function O365PdfBackfillPanel() {
                 <p className="text-xs font-medium text-foreground">
                   Crawl-Log (neueste zuerst)
                 </p>
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-[0.6875rem] text-muted-foreground">
                   Nur Uploads/Fehler/bereits — Mails ohne PDF werden still
                   übersprungen
                 </p>
@@ -693,7 +693,7 @@ export function O365PdfBackfillPanel() {
                       <Badge
                         variant="secondary"
                         className={cn(
-                          "shrink-0 text-[10px] font-medium",
+                          "shrink-0 text-[0.625rem] font-medium",
                           outcomeClass(e.outcome)
                         )}
                       >
@@ -705,7 +705,7 @@ export function O365PdfBackfillPanel() {
                         {e.subject}
                       </span>
                       {e.detail ? (
-                        <span className="basis-full truncate text-[11px] text-muted-foreground">
+                        <span className="basis-full truncate text-[0.6875rem] text-muted-foreground">
                           {e.detail}
                         </span>
                       ) : null}

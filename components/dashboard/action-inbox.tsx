@@ -343,7 +343,7 @@ export function ActionInbox() {
                 <Badge
                   variant="secondary"
                   className={cn(
-                    "h-5 min-w-5 justify-center px-1 text-[10px]",
+                    "h-5 min-w-5 justify-center px-1 text-[0.625rem]",
                     tab === key && "bg-white/20 text-white"
                   )}
                 >
@@ -583,21 +583,21 @@ function TaskRow({
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
-            <Badge variant="secondary" className="text-[10px]">
+            <Badge variant="secondary" className="text-[0.625rem]">
               {INBOX_SOURCE_LABELS[task.sourceKind]}
             </Badge>
             {task.status === "snoozed" && task.snoozedUntil ? (
-              <Badge variant="outline" className="text-[10px]">
+              <Badge variant="outline" className="text-[0.625rem]">
                 bis {toSwissDate(task.snoozedUntil)}
               </Badge>
             ) : null}
             {task.paymentPipeline ? (
-              <Badge className="bg-sky-100 text-[10px] text-sky-900 hover:bg-sky-100">
+              <Badge className="bg-sky-100 text-[0.625rem] text-sky-900 hover:bg-sky-100">
                 Zahlungspipeline
               </Badge>
             ) : null}
             {task.status === "done" || task.status === "dismissed" ? (
-              <Badge variant="outline" className="text-[10px]">
+              <Badge variant="outline" className="text-[0.625rem]">
                 {task.status === "dismissed" ? "Ausgeblendet" : "Erledigt"}
               </Badge>
             ) : null}
@@ -823,7 +823,7 @@ function TriagePendingCard({
           />
           <span className="min-w-0 flex-1">
             <span className="flex flex-wrap items-center gap-1.5">
-              <Badge variant="secondary" className="text-[10px]">
+              <Badge variant="secondary" className="text-[0.625rem]">
                 Prüfung
               </Badge>
             </span>
@@ -835,12 +835,12 @@ function TriagePendingCard({
             </span>
             <span className="mt-1 flex flex-wrap gap-1">
               {row.reasons.map((reason) => (
-                <Badge key={reason} variant="secondary" className="text-[10px]">
+                <Badge key={reason} variant="secondary" className="text-[0.625rem]">
                   {TRIAGE_LABELS[reason] || reason}
                 </Badge>
               ))}
               {row.tax_suggested ? (
-                <Badge variant="secondary" className="text-[10px]">
+                <Badge variant="secondary" className="text-[0.625rem]">
                   Steuern
                   {row.tax_year != null ? ` ${row.tax_year}` : ""}
                 </Badge>
@@ -863,7 +863,7 @@ function TriagePendingCard({
 
       <div className="mt-3 space-y-3">
         <div className="space-y-1.5">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <p className="text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground">
             Status
           </p>
           <div className="flex flex-wrap gap-2">
@@ -946,7 +946,7 @@ function TriagePendingCard({
         ) : (
           <>
             <div className="space-y-1.5">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <p className="text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground">
                 Steuerrelevant
               </p>
               <div className="flex flex-wrap items-center gap-2">

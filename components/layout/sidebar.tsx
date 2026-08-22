@@ -340,7 +340,7 @@ function NavLinkRow({
         />
       )}
       {!collapsed ? (
-        <span className="flex-1 text-[14px] font-semibold tracking-tight">
+        <span className="flex-1 text-sm font-semibold tracking-tight">
           {item.label}
         </span>
       ) : null}
@@ -349,9 +349,9 @@ function NavLinkRow({
           className={cn(
             "font-semibold tabular-nums",
             collapsed
-              ? "absolute -top-0.5 -right-0.5 flex size-4 items-center justify-center rounded-full bg-red-500 text-[9px] text-white"
+              ? "absolute -top-0.5 -right-0.5 flex size-4 items-center justify-center rounded-full bg-red-500 text-[0.5625rem] text-white"
               : cn(
-                  "min-w-[1.5rem] rounded-full px-1.5 py-0.5 text-center text-[10px]",
+                  "min-w-[1.5rem] rounded-full px-1.5 py-0.5 text-center text-[0.625rem]",
                   active
                     ? "bg-red-500 text-white"
                     : item.countKey === "triagePendingCount" ||
@@ -570,7 +570,7 @@ export function Sidebar({
             />
             {!collapsed ? (
               <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-medium leading-none text-sidebar-foreground/65">
+                <p className="text-[0.6875rem] font-medium leading-none text-sidebar-foreground/65">
                   Angemeldet als:
                 </p>
                 <p
@@ -623,7 +623,7 @@ export function Sidebar({
                     "h-auto rounded-lg",
                     collapsed
                       ? "justify-center px-2 py-2"
-                      : "flex-col gap-1 px-1 py-2 text-[10px] font-semibold leading-tight",
+                      : "flex-col gap-1 px-1 py-2 text-[0.625rem] font-semibold leading-tight",
                     active
                       ? "bg-black/10 text-sidebar-foreground shadow-sm hover:bg-black/10"
                       : "text-sidebar-foreground/70 hover:bg-black/5 hover:text-sidebar-accent-foreground"
@@ -654,7 +654,7 @@ export function Sidebar({
         {isAdminNav && mode === "home" ? (
           <div className="space-y-1.5 pt-0.5">
             {!collapsed ? (
-              <p className="px-2 pb-0.5 text-[10px] font-semibold uppercase tracking-wide text-sidebar-foreground/55">
+              <p className="px-2 pb-0.5 text-[0.625rem] font-semibold uppercase tracking-wide text-sidebar-foreground/55">
                 Bereiche
               </p>
             ) : null}
@@ -683,7 +683,7 @@ export function Sidebar({
                 />
                 {!collapsed ? (
                   <span className="min-w-0 flex-1">
-                    <span className="block text-[15px] font-semibold tracking-tight text-sidebar-foreground">
+                    <span className="block text-[0.9375rem] font-semibold tracking-tight text-sidebar-foreground">
                       {entry.label}
                     </span>
                     <span className="mt-0.5 block text-xs text-sidebar-foreground/65">
@@ -706,7 +706,7 @@ export function Sidebar({
                 {showSection ? (
                   <p
                     className={cn(
-                      "px-2.5 pb-0 text-[10px] font-semibold uppercase tracking-wide text-sidebar-foreground/55",
+                      "px-2.5 pb-0 text-[0.625rem] font-semibold uppercase tracking-wide text-sidebar-foreground/55",
                       index === 0 ? "pt-0.5" : "pt-1.5"
                     )}
                   >
@@ -753,14 +753,14 @@ export function Sidebar({
         </Button>
         {!collapsed ? (
           <p
-            className="font-mono text-[10px] tabular-nums tracking-wide text-sidebar-foreground/50"
+            className="font-mono text-[0.625rem] tabular-nums tracking-wide text-sidebar-foreground/50"
             title="App-Version (Datum-Uhrzeit des letzten Commits)"
           >
             {APP_VERSION}
           </p>
         ) : (
           <p
-            className="truncate px-0.5 text-center font-mono text-[8px] tabular-nums text-sidebar-foreground/40"
+            className="truncate px-0.5 text-center font-mono text-[0.5rem] tabular-nums text-sidebar-foreground/40"
             title={APP_VERSION}
           >
             {APP_VERSION.slice(-4)}

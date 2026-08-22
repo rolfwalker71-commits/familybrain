@@ -52,7 +52,7 @@ function Panel({
         tone="green"
         className="flex flex-row items-center justify-between gap-2 py-1.5"
       >
-        <CardTitle className="flex items-center gap-2 text-[15px]! text-[var(--brand-finance)]">
+        <CardTitle className="flex items-center gap-2 text-[0.9375rem]! text-[var(--brand-finance)]">
           <IconCircle icon={Icon} tone="green" size="sm" />
           {title}
         </CardTitle>
@@ -174,7 +174,7 @@ export function LedgerOverviewDashboards({
                     <span className="min-w-0 truncate font-medium">{p.label}</span>
                     <span className="shrink-0 tabular-nums text-muted-foreground">
                       {formatMoney(p.totalBase, baseCurrency)}
-                      <span className="ml-1.5 text-[10px]">
+                      <span className="ml-1.5 text-[0.625rem]">
                         Σ {formatMoney(p.cumulativeBase, baseCurrency)}
                       </span>
                     </span>
@@ -204,7 +204,7 @@ export function LedgerOverviewDashboards({
               ))}
             </ul>
           )}
-          <p className="text-[10px] leading-tight text-muted-foreground">
+          <p className="text-[0.625rem] leading-tight text-muted-foreground">
             Dunkel = Periode, hell = kumuliert.
           </p>
         </Panel>
@@ -231,7 +231,7 @@ export function LedgerOverviewDashboards({
                         {i + 1}.
                       </span>
                       <span className="font-medium">{e.description}</span>
-                      <span className="mt-0.5 block truncate text-[10px] text-muted-foreground">
+                      <span className="mt-0.5 block truncate text-[0.625rem] text-muted-foreground">
                         {e.categoryLabel} · {e.payerName}
                         {e.expenseDate
                           ? ` · ${formatDateDe(e.expenseDate) || e.expenseDate}`
@@ -252,26 +252,26 @@ export function LedgerOverviewDashboards({
           <Panel title="Offen vs. erledigt" icon={ArrowLeftRight}>
             <div className="grid gap-2 sm:grid-cols-3">
               <div className="rounded-lg border border-border/50 bg-white px-2.5 py-2">
-                <p className="text-[11px] text-muted-foreground">Noch offen</p>
+                <p className="text-[0.6875rem] text-muted-foreground">Noch offen</p>
                 <p className="text-base font-semibold tabular-nums text-rose-600">
                   {formatMoney(openSettled.openDebtBase, baseCurrency)}
                 </p>
               </div>
               <div className="rounded-lg border border-border/50 bg-white px-2.5 py-2">
-                <p className="text-[11px] text-muted-foreground">Rückzahlungen</p>
+                <p className="text-[0.6875rem] text-muted-foreground">Rückzahlungen</p>
                 <p className="text-base font-semibold tabular-nums text-[var(--brand-finance)]">
                   {formatMoney(openSettled.settlementsBase, baseCurrency)}
                 </p>
               </div>
               <div className="rounded-lg border border-border/50 bg-white px-2.5 py-2">
-                <p className="text-[11px] text-muted-foreground">Pre-settled</p>
+                <p className="text-[0.6875rem] text-muted-foreground">Pre-settled</p>
                 <p className="text-base font-semibold tabular-nums">
                   {formatMoney(openSettled.preSettledBase, baseCurrency)}
                 </p>
               </div>
             </div>
             <div className="space-y-1">
-              <div className="flex justify-between text-[10px] text-muted-foreground">
+              <div className="flex justify-between text-[0.625rem] text-muted-foreground">
                 <span>Offen {openSettled.openDebtSharePct}%</span>
                 <span>Rückz. {openSettled.settlementsSharePct}%</span>
                 <span>Pre {openSettled.preSettledSharePct}%</span>
@@ -291,7 +291,7 @@ export function LedgerOverviewDashboards({
                 />
               </div>
             </div>
-            <p className="text-[10px] leading-tight text-muted-foreground">
+            <p className="text-[0.625rem] leading-tight text-muted-foreground">
               Anteile relativ zur Ausgabensumme{" "}
               {formatMoney(openSettled.totalSpentBase, baseCurrency)}.
             </p>
@@ -321,7 +321,7 @@ export function LedgerOverviewDashboards({
                   >
                     <span className="min-w-0">
                       <span className="font-medium">{item.title}</span>
-                      <span className="mt-0.5 block truncate text-[10px] text-muted-foreground">
+                      <span className="mt-0.5 block truncate text-[0.625rem] text-muted-foreground">
                         {item.subtitle}
                       </span>
                     </span>

@@ -68,22 +68,22 @@ function StatusRow({
         <div className="flex flex-wrap gap-1.5">
           <Badge
             variant={buckets.indexed > 0 ? "default" : "secondary"}
-            className="text-[11px]"
+            className="text-[0.6875rem]"
           >
             {buckets.indexed}/{buckets.eligible} indexiert
           </Badge>
           {(buckets.skipped ?? 0) > 0 ? (
-            <Badge variant="secondary" className="text-[11px]">
+            <Badge variant="secondary" className="text-[0.6875rem]">
               {buckets.skipped} übersprungen
             </Badge>
           ) : null}
           {backlog > 0 ? (
-            <Badge variant="outline" className="text-[11px]">
+            <Badge variant="outline" className="text-[0.6875rem]">
               {backlog} in Warteschlange
             </Badge>
           ) : null}
           {buckets.error > 0 ? (
-            <Badge variant="destructive" className="text-[11px]">
+            <Badge variant="destructive" className="text-[0.6875rem]">
               {buckets.error} Fehler
             </Badge>
           ) : null}
@@ -94,7 +94,7 @@ function StatusRow({
         label={`${percent}% erledigt (indexiert oder übersprungen)`}
         detail={`Qdrant-Chunks: ${qdrantChunks}`}
       />
-      <div className="grid grid-cols-2 gap-1 text-[11px] text-muted-foreground sm:grid-cols-5">
+      <div className="grid grid-cols-2 gap-1 text-[0.6875rem] text-muted-foreground sm:grid-cols-5">
         <span>Indexiert: {buckets.indexed}</span>
         <span>Wartend: {buckets.pending}</span>
         <span>Übersprungen: {buckets.skipped ?? 0}</span>
@@ -177,12 +177,12 @@ export function VectorIndexStatusPanel() {
                   </strong>
                 </span>
                 {data.qdrant.ok ? (
-                  <Badge variant="secondary" className="text-[11px]">
+                  <Badge variant="secondary" className="text-[0.6875rem]">
                     {data.qdrant.points} Chunks gesamt
                   </Badge>
                 ) : null}
                 {!data.hasOpenAIKey ? (
-                  <Badge variant="destructive" className="text-[11px]">
+                  <Badge variant="destructive" className="text-[0.6875rem]">
                     OpenAI-Key fehlt
                   </Badge>
                 ) : null}

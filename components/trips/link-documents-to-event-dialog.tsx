@@ -195,7 +195,7 @@ export function LinkDocumentsToEventDialog({
               <Upload className="size-4" />
               {uploading ? "Wird hochgeladen…" : "Eigenes PDF hochladen"}
             </Button>
-            <p className="mt-1.5 text-[11px] text-muted-foreground">
+            <p className="mt-1.5 text-[0.6875rem] text-muted-foreground">
               Wird lokal bei der Aktivität gespeichert (max. 40 MB) — kein
               Paperless nötig.
             </p>

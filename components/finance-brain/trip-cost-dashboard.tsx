@@ -106,7 +106,7 @@ function BucketList({
     return (
       <div className="rounded-lg border border-border/50 bg-white px-2.5 py-2">
         <p className="text-sm font-medium">{title}</p>
-        <p className="mt-0.5 text-[11px] text-muted-foreground">Noch keine Daten.</p>
+        <p className="mt-0.5 text-[0.6875rem] text-muted-foreground">Noch keine Daten.</p>
       </div>
     );
   }
@@ -130,7 +130,7 @@ function BucketList({
                 </span>
                 <span className="shrink-0 tabular-nums text-muted-foreground">
                   {formatMoney(b.totalBase, currency)}
-                  <span className="ml-1.5 text-[11px]">{b.sharePct}%</span>
+                  <span className="ml-1.5 text-[0.6875rem]">{b.sharePct}%</span>
                 </span>
               </div>
               <ShareBar value={b.sharePct} />
@@ -156,7 +156,7 @@ export function TripCostDashboard({ data }: { data: TripCostDashboardData }) {
       className="overflow-hidden border-border/60 shadow-[0_4px_16px_rgba(20,32,28,0.05)]"
     >
       <CardHeader tone="green" className="py-1.5">
-        <CardTitle className="flex items-center gap-2 text-[15px]! text-[var(--brand-finance)]">
+        <CardTitle className="flex items-center gap-2 text-[0.9375rem]! text-[var(--brand-finance)]">
           <IconCircle icon={PieChart} tone="green" size="sm" />
           Reise-Kosten
         </CardTitle>
@@ -164,11 +164,11 @@ export function TripCostDashboard({ data }: { data: TripCostDashboardData }) {
       <CardContent className="space-y-3">
         <div className="grid gap-2 sm:grid-cols-3">
           <div className="rounded-lg border border-border/50 bg-white px-2.5 py-2">
-            <p className="text-[11px] text-muted-foreground">Gesamtausgaben</p>
+            <p className="text-[0.6875rem] text-muted-foreground">Gesamtausgaben</p>
             <p className="text-base font-semibold tabular-nums leading-tight">
               {formatMoney(data.totalSpentBase, currency)}
             </p>
-            <p className="mt-0.5 text-[10px] leading-tight text-muted-foreground">
+            <p className="mt-0.5 text-[0.625rem] leading-tight text-muted-foreground">
               {data.expenseCount} Ausgabe
               {data.expenseCount === 1 ? "" : "n"}
               {data.unlinkedCount > 0
@@ -177,16 +177,16 @@ export function TripCostDashboard({ data }: { data: TripCostDashboardData }) {
             </p>
           </div>
           <div className="rounded-lg border border-border/50 bg-white px-2.5 py-2">
-            <p className="text-[11px] text-muted-foreground">Pro Person (fair)</p>
+            <p className="text-[0.6875rem] text-muted-foreground">Pro Person (fair)</p>
             <p className="text-base font-semibold tabular-nums leading-tight">
               {formatMoney(perHead, currency)}
             </p>
-            <p className="mt-0.5 text-[10px] leading-tight text-muted-foreground">
+            <p className="mt-0.5 text-[0.625rem] leading-tight text-muted-foreground">
               Total ÷ {data.byPerson.length || "–"} Teilnehmer
             </p>
           </div>
           <div className="rounded-lg border border-border/50 bg-white px-2.5 py-2">
-            <p className="text-[11px] text-muted-foreground">Teilnehmer</p>
+            <p className="text-[0.6875rem] text-muted-foreground">Teilnehmer</p>
             <p className="flex items-center gap-1.5 text-base font-semibold leading-tight">
               <Users className="size-3.5 text-muted-foreground" />
               {data.byPerson.length}
@@ -204,7 +204,7 @@ export function TripCostDashboard({ data }: { data: TripCostDashboardData }) {
                   className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0 text-sm leading-snug"
                 >
                   <span className="font-medium">{p.displayName}</span>
-                  <span className="text-[10px] leading-tight text-muted-foreground sm:order-last sm:w-full">
+                  <span className="text-[0.625rem] leading-tight text-muted-foreground sm:order-last sm:w-full">
                     bezahlt {formatMoney(p.paidBase, currency)}
                     {" · "}
                     Anteil {formatMoney(p.fairShareBase, currency)}
@@ -238,7 +238,7 @@ export function TripCostDashboard({ data }: { data: TripCostDashboardData }) {
                 </li>
               ))}
             </ul>
-            <p className="mt-1.5 text-[10px] leading-tight text-muted-foreground">
+            <p className="mt-1.5 text-[0.625rem] leading-tight text-muted-foreground">
               Delta = bezahlt − Anteil (vor Rückzahlungen). Netto inkl.
               Rückzahlungen.
             </p>
@@ -255,7 +255,7 @@ export function TripCostDashboard({ data }: { data: TripCostDashboardData }) {
                   className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0 text-sm leading-snug"
                 >
                   <span className="font-medium">{c.name}</span>
-                  <span className="text-[10px] leading-tight text-muted-foreground sm:order-last sm:w-full">
+                  <span className="text-[0.625rem] leading-tight text-muted-foreground sm:order-last sm:w-full">
                     bezahlt {formatMoney(c.paidBase, currency)}
                     {" · "}
                     Anteil {formatMoney(c.fairShareBase, currency)}

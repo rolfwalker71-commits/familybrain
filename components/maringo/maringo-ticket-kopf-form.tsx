@@ -355,23 +355,23 @@ export function MaringoTicketKopfForm({
       className={cn("space-y-3", className)}
     >
       {error ? (
-        <p className="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-2 text-[12px] whitespace-pre-wrap break-words text-rose-950 dark:border-rose-400/30 dark:bg-rose-500/12 dark:text-rose-100">
+        <p className="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-2 text-xs whitespace-pre-wrap break-words text-rose-950 dark:border-rose-400/30 dark:bg-rose-500/12 dark:text-rose-100">
           {error}
         </p>
       ) : null}
       {hint ? (
-        <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-2 text-[12px] text-emerald-950 dark:border-emerald-400/30 dark:bg-emerald-500/12 dark:text-emerald-100">
+        <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-2 text-xs text-emerald-950 dark:border-emerald-400/30 dark:bg-emerald-500/12 dark:text-emerald-100">
           {hint}
         </p>
       ) : null}
 
-      <p className="text-[11px] leading-relaxed text-muted-foreground">
+      <p className="text-[0.6875rem] leading-relaxed text-muted-foreground">
         Ansprechpartner, Supportgruppe, Zuständig, Priorität und Kanal sowie
         Projekt / Vertrag / Betreff in MARI.
       </p>
 
       <div className="space-y-2 rounded-xl border border-border/60 bg-muted/15 p-3">
-        <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+        <p className="text-[0.625rem] font-semibold uppercase tracking-wide text-muted-foreground">
           Organisation
         </p>
         <div className="space-y-1">
@@ -396,7 +396,7 @@ export function MaringoTicketKopfForm({
             maxLength={120}
             autoComplete="off"
           />
-          <p className="text-[10px] text-muted-foreground">
+          <p className="text-[0.625rem] text-muted-foreground">
             Wird mit dem Namen als «Name; E-Mail» in ContactPerson gespeichert.
           </p>
         </div>
@@ -404,7 +404,7 @@ export function MaringoTicketKopfForm({
           <Label htmlFor="tk-kopf-group">Supportgruppe</Label>
           <select
             id="tk-kopf-group"
-            className="flex h-9 w-full rounded-md border border-input bg-background px-2.5 text-[13px]"
+            className="flex h-9 w-full rounded-md border border-input bg-background px-2.5 text-[0.8125rem]"
             value={supportGroupId}
             onChange={(e) => setSupportGroupId(e.target.value)}
           >
@@ -420,7 +420,7 @@ export function MaringoTicketKopfForm({
           <Label htmlFor="tk-kopf-handled">Zuständig</Label>
           <select
             id="tk-kopf-handled"
-            className="flex h-9 w-full rounded-md border border-input bg-background px-2.5 text-[13px]"
+            className="flex h-9 w-full rounded-md border border-input bg-background px-2.5 text-[0.8125rem]"
             value={handledBy}
             onChange={(e) => setHandledBy(e.target.value)}
           >
@@ -437,7 +437,7 @@ export function MaringoTicketKopfForm({
             <Label htmlFor="tk-kopf-prio">Priorität</Label>
             <select
               id="tk-kopf-prio"
-              className="flex h-9 w-full rounded-md border border-input bg-background px-2.5 text-[13px]"
+              className="flex h-9 w-full rounded-md border border-input bg-background px-2.5 text-[0.8125rem]"
               value={priority}
               onChange={(e) => setPriority(e.target.value)}
             >
@@ -453,7 +453,7 @@ export function MaringoTicketKopfForm({
             <Label htmlFor="tk-kopf-medium">Kommunikationskanal</Label>
             <select
               id="tk-kopf-medium"
-              className="flex h-9 w-full rounded-md border border-input bg-background px-2.5 text-[13px]"
+              className="flex h-9 w-full rounded-md border border-input bg-background px-2.5 text-[0.8125rem]"
               value={medium}
               onChange={(e) => setMedium(e.target.value)}
             >
@@ -488,11 +488,11 @@ export function MaringoTicketKopfForm({
           {projectOpen ? (
             <div className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-border bg-background shadow-lg">
               {loadingProjects ? (
-                <p className="px-2.5 py-2 text-[12px] text-muted-foreground">
+                <p className="px-2.5 py-2 text-xs text-muted-foreground">
                   Lade…
                 </p>
               ) : projects.length === 0 ? (
-                <p className="px-2.5 py-2 text-[12px] text-muted-foreground">
+                <p className="px-2.5 py-2 text-xs text-muted-foreground">
                   Keine Treffer
                 </p>
               ) : (
@@ -502,7 +502,7 @@ export function MaringoTicketKopfForm({
                       <Button
                         type="button"
                         variant="ghost"
-                        className="h-auto w-full flex-col items-start justify-start px-2.5 py-1.5 text-left text-[12px] font-normal hover:bg-muted"
+                        className="h-auto w-full flex-col items-start justify-start px-2.5 py-1.5 text-left text-xs font-normal hover:bg-muted"
                         onClick={() => selectProject(p)}
                       >
                         <span className="font-medium">{p.matchcode}</span>
@@ -567,7 +567,7 @@ export function MaringoTicketKopfForm({
           onChange={(e) => setStdFreigabeRaw(e.target.value)}
           placeholder="z.B. 8"
         />
-        <p className="text-[10px] text-muted-foreground">
+        <p className="text-[0.625rem] text-muted-foreground">
           USER_U_Std_Freigegeben_Kunde — ganze Stunden (leer = löschen)
         </p>
       </div>

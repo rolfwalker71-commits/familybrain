@@ -158,9 +158,9 @@ export function SettingsMicrosoftPanel() {
                 placeholder="organizations"
                 autoComplete="off"
               />
-              <p className="text-[12px] text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 Für ANG GmbH: Tenant-ID aus Entra eintragen, oder{" "}
-                <code className="text-[11px]">organizations</code> lassen.
+                <code className="text-[0.6875rem]">organizations</code> lassen.
               </p>
             </div>
 
@@ -192,24 +192,24 @@ export function SettingsMicrosoftPanel() {
             </div>
 
             <div className="rounded-lg border border-border/70 bg-muted/30 px-3 py-2">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <p className="text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground">
                 Redirect-URI (in Entra eintragen)
               </p>
-              <p className="mt-1 break-all font-mono text-[13px]">
+              <p className="mt-1 break-all font-mono text-[0.8125rem]">
                 {data?.microsoftOauthRedirectUri || "—"}
               </p>
-              <p className="mt-2 text-[12px] text-muted-foreground">
+              <p className="mt-2 text-xs text-muted-foreground">
                 Soll{" "}
-                <code className="text-[11px]">
+                <code className="text-[0.6875rem]">
                   https://buddyapp.rolfwalker.ch/api/microsoft/oauth/callback
                 </code>{" "}
                 sein. Wenn hier eine andere Domain steht: unter Einstellungen →
                 Mail/SMTP die «Öffentliche App-URL» auf{" "}
-                <code className="text-[11px]">
+                <code className="text-[0.6875rem]">
                   https://buddyapp.rolfwalker.ch
                 </code>{" "}
                 setzen (oder Env{" "}
-                <code className="text-[11px]">APP_PUBLIC_URL</code>).
+                <code className="text-[0.6875rem]">APP_PUBLIC_URL</code>).
               </p>
             </div>
 

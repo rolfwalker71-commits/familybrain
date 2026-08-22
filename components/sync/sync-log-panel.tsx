@@ -259,7 +259,7 @@ export function SyncLogPanel() {
                   <div className="min-w-0 flex-1 space-y-1">
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                       <span
-                        className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${
+                        className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[0.6875rem] font-medium ${
                           isPush
                             ? "border-amber-200 bg-amber-50 text-amber-900"
                             : "border-sky-200 bg-sky-50 text-sky-900"

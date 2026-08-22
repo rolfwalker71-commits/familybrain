@@ -172,17 +172,17 @@ export function SettingsGooglePanel() {
                 <p className="font-medium text-foreground">
                   Redirect-URI (in Google Cloud eintragen)
                 </p>
-                <code className="mt-1 block break-all font-mono text-[11px] text-muted-foreground">
+                <code className="mt-1 block break-all font-mono text-[0.6875rem] text-muted-foreground">
                   {data.googleOauthRedirectUri}
                 </code>
                 <p className="mt-2 text-muted-foreground">
                   Sollte{" "}
-                  <code className="text-[11px]">
+                  <code className="text-[0.6875rem]">
                     https://buddyapp.rolfwalker.ch/api/google/oauth/callback
                   </code>{" "}
                   sein. Wenn hier eine andere Domain steht: Einstellungen → Mail
                   «Öffentliche App-URL» bzw. Env{" "}
-                  <code className="text-[11px]">APP_PUBLIC_URL</code> setzen.
+                  <code className="text-[0.6875rem]">APP_PUBLIC_URL</code> setzen.
                 </p>
               </div>
             ) : null}

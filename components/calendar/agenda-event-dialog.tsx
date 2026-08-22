@@ -117,10 +117,10 @@ function DetailRow({
 }) {
   return (
     <div className="space-y-0.5">
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+      <p className="text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground">
         {label}
       </p>
-      <div className="text-[15px] text-foreground">{children}</div>
+      <div className="text-[0.9375rem] text-foreground">{children}</div>
     </div>
   );
 }
@@ -293,23 +293,23 @@ export function AgendaEventDialog({
             <div className="flex items-stretch border-b border-border/60">
               <AgendaTypeRail item={item} className="w-14" />
               <DialogHeader className="min-w-0 flex-1 space-y-1 px-4 py-3 text-left">
-                <DialogTitle className="pr-8 text-[16px] font-black leading-snug">
+                <DialogTitle className="pr-8 text-base font-black leading-snug">
                   {item.title}
                 </DialogTitle>
-                <DialogDescription className="text-[13px]">
+                <DialogDescription className="text-[0.8125rem]">
                   {when}
                 </DialogDescription>
                 <div className="flex flex-wrap gap-1.5 pt-1">
-                  <Badge variant="secondary" className="text-[11px]">
+                  <Badge variant="secondary" className="text-[0.6875rem]">
                     {typeLabel(item)}
                   </Badge>
                   {item.calendarType && item.badge !== typeLabel(item) ? (
-                    <Badge variant="outline" className="text-[11px]">
+                    <Badge variant="outline" className="text-[0.6875rem]">
                       {item.badge}
                     </Badge>
                   ) : null}
                   {done ? (
-                    <Badge variant="secondary" className="text-[11px]">
+                    <Badge variant="secondary" className="text-[0.6875rem]">
                       Erledigt
                     </Badge>
                   ) : null}
@@ -440,7 +440,7 @@ export function AgendaEventDialog({
 
               {description ? (
                 <DetailRow label="Notizen">
-                  <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-foreground/90">
+                  <p className="whitespace-pre-wrap text-[0.9375rem] leading-relaxed text-foreground/90">
                     {description}
                   </p>
                 </DetailRow>
@@ -544,7 +544,7 @@ export function AgendaEventDialog({
                   <div className="space-y-2">
                     {!done && item?.time ? (
                       <div className="space-y-1.5">
-                        <p className="text-[11px] text-muted-foreground">
+                        <p className="text-[0.6875rem] text-muted-foreground">
                           Dauer für Slot-Suche (kürzer = engere Lücken, Termin
                           wird angepasst)
                         </p>
@@ -620,14 +620,14 @@ export function AgendaEventDialog({
                     </div>
                     {slots.length > 0 ? (
                       <div className="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-2">
-                        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        <p className="text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground">
                           Verschieben nach ({slotDuration} Min · 7 Tage)
                         </p>
                         <div className="max-h-56 space-y-2.5 overflow-y-auto">
                           {groupFreeSlotsByDate(slots).map(
                             ({ date, slots: daySlots }) => (
                               <div key={date} className="space-y-1">
-                                <p className="text-[12px] font-semibold text-foreground">
+                                <p className="text-xs font-semibold text-foreground">
                                   {weekdayLabel(date)} · {date.slice(8)}.
                                   {date.slice(5, 7)}.
                                 </p>
@@ -670,7 +670,7 @@ export function AgendaEventDialog({
               !item.aiIconKey &&
               !item.aiIconUrl &&
               !cloud ? (
-                <p className="text-[13px] text-muted-foreground">
+                <p className="text-[0.8125rem] text-muted-foreground">
                   Keine weiteren Details in der Quelle.
                 </p>
               ) : null}

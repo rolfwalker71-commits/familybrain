@@ -3,8 +3,8 @@
 import { cn } from "@/lib/utils";
 
 const SIZE = {
-  xs: "size-5 text-[9px]",
-  sm: "size-6 text-[10px]",
+  xs: "size-5 text-[0.5625rem]",
+  sm: "size-6 text-[0.625rem]",
   md: "size-8 text-xs",
   lg: "size-12 text-sm",
 } as const;

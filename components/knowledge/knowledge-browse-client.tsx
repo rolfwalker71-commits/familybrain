@@ -581,7 +581,7 @@ export function KnowledgeBrowseClient({
                             <div className="space-y-2 border-t border-border/50 bg-card/60 p-2">
                               {isSteuern && mg.bankAccountGroups.length > 0 ? (
                                 <div className="space-y-2">
-                                  <p className="px-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                  <p className="px-1 text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground">
                                     Bankbelege
                                   </p>
                                   {mg.bankAccountGroups.map((ag) => (
@@ -605,7 +605,7 @@ export function KnowledgeBrowseClient({
                               {isSteuern && mg.otherDocuments.length > 0 ? (
                                 <div className="space-y-1">
                                   {mg.bankAccountGroups.length > 0 ? (
-                                    <p className="px-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                    <p className="px-1 text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground">
                                       Weitere Steuerbelege
                                     </p>
                                   ) : null}

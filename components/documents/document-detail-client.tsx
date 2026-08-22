@@ -650,7 +650,7 @@ function DocumentDetailInner({ detail }: DetailProps) {
               }}
             />
           ) : (
-            <h1 className="truncate text-base font-semibold tracking-tight">
+            <h1 className="break-words text-base font-semibold leading-snug tracking-tight">
               {displayTitle || `Dokument #${document.id}`}
             </h1>
           )}
@@ -855,7 +855,7 @@ function DocumentDetailInner({ detail }: DetailProps) {
           <Badge
             key={`${link.sourceKind}-${link.role}`}
             variant="outline"
-            className="text-[11px]"
+            className="text-[0.6875rem]"
           >
             {link.label || link.sourceKind}
             {link.role === "mirror" ? " · Spiegel" : ""}
@@ -1038,7 +1038,7 @@ function DocumentDetailInner({ detail }: DetailProps) {
                             );
                           })
                         )}
-                        <p className="text-[11px] text-muted-foreground">
+                        <p className="text-[0.6875rem] text-muted-foreground">
                           Keine Auswahl = Empfänger unbekannt.
                         </p>
                         <div className="flex flex-wrap gap-2 pt-1">

@@ -159,7 +159,7 @@ export function TeamLogo({
       <span
         className={cn(
           box,
-          "flex shrink-0 items-center justify-center rounded-full bg-rose-50 text-[11px] font-bold uppercase text-rose-700"
+          "flex shrink-0 items-center justify-center rounded-full bg-rose-50 text-[0.6875rem] font-bold uppercase text-rose-700"
         )}
         aria-hidden
         title={label}
@@ -244,7 +244,7 @@ export function AgendaRow({
   const inner = (
     <div
       className={cn(
-        "overflow-hidden rounded-xl bg-card shadow-[0_2px_10px_rgba(20,32,28,0.04)] ring-1 ring-border/50",
+        "overflow-hidden rounded-2xl bg-card shadow-[0_2px_10px_rgba(20,32,28,0.04)] ring-1 ring-border/50",
         isPaymentPipeline && "ring-sky-300/80"
       )}
     >
@@ -267,7 +267,7 @@ export function AgendaRow({
                 src={item.logos?.left}
                 size="md"
               />
-              <span className="px-0.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <span className="px-0.5 text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground">
                 vs.
               </span>
               <TeamLogo
@@ -284,11 +284,11 @@ export function AgendaRow({
                   {upcomingLine1}
                 </p>
                 {upcomingLine2 ? (
-                  <p className="text-[13px] leading-snug text-muted-foreground break-words">
+                  <p className="text-[0.8125rem] leading-snug text-muted-foreground break-words">
                     {upcomingLine2}
                   </p>
                 ) : null}
-                <p className="text-[13px] leading-snug text-muted-foreground break-words">
+                <p className="text-[0.8125rem] leading-snug text-muted-foreground break-words">
                   {upcomingLine3}
                 </p>
               </>
@@ -299,7 +299,7 @@ export function AgendaRow({
                     {item.subtitle}
                   </p>
                 ) : null}
-                <p className="text-[13px] leading-snug text-muted-foreground break-words">
+                <p className="text-[0.8125rem] leading-snug text-muted-foreground break-words">
                   {item.title}
                 </p>
               </>
@@ -307,12 +307,12 @@ export function AgendaRow({
               <>
                 <p className="text-sm font-black leading-snug break-words">{item.title}</p>
                 {item.subtitle ? (
-                  <p className="text-[13px] leading-snug text-muted-foreground break-words">
+                  <p className="text-[0.8125rem] leading-snug text-muted-foreground break-words">
                     {item.subtitle}
                   </p>
                 ) : null}
                 {item.kind === "calendar" && item.time ? (
-                  <p className="text-[13px] tabular-nums text-muted-foreground">
+                  <p className="text-[0.8125rem] tabular-nums text-muted-foreground">
                     {item.time}
                   </p>
                 ) : null}
@@ -354,14 +354,14 @@ export function AgendaRow({
               aiIconUrl={item.aiIconUrl}
             />
             {item.amount != null ? (
-              <span className="text-[15px] font-semibold tabular-nums">
+              <span className="text-[0.9375rem] font-semibold tabular-nums">
                 {formatCHF(item.amount, item.currency || "CHF")}
               </span>
             ) : null}
             <Badge
               variant="secondary"
               className={cn(
-                "text-[11px]",
+                "text-[0.6875rem]",
                 isPaymentPipeline && "bg-sky-100 text-sky-900",
                 isHockey && "bg-rose-50 text-rose-800",
                 item.kind === "holiday" && "bg-violet-50 text-violet-900"

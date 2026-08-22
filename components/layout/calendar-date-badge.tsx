@@ -47,22 +47,22 @@ const SIZE_STYLES = {
   /** Narrow but fits «Donnerstag» without clipping */
   sm: {
     root: "w-[4.55rem] rounded-md",
-    month: "px-0.5 py-px text-[11px] font-black leading-none",
+    month: "px-0.5 py-px text-[0.6875rem] font-black leading-none",
     body: "gap-px px-0.5 py-0.5",
     weekday: "text-[8.5px] font-semibold leading-none tracking-tight",
-    day: "text-[19px] font-black leading-none",
-    year: "text-[9px] font-bold leading-none",
-    time: "mt-0.5 text-[9px] font-semibold leading-tight",
+    day: "text-[1.1875rem] font-black leading-none",
+    year: "text-[0.5625rem] font-bold leading-none",
+    time: "mt-0.5 text-[0.5625rem] font-semibold leading-tight",
   },
   /** Desktop — still compact */
   md: {
     root: "w-[5rem] rounded-lg sm:w-[5.25rem]",
-    month: "px-0.5 py-0.5 text-[12px] font-black leading-none sm:text-[13px]",
+    month: "px-0.5 py-0.5 text-xs font-black leading-none sm:text-[0.8125rem]",
     body: "gap-0.5 px-0.5 py-1",
-    weekday: "text-[9px] font-semibold leading-none tracking-tight sm:text-[10px]",
-    day: "text-[24px] font-black leading-none sm:text-[26px]",
-    year: "text-[10px] font-bold leading-none sm:text-[11px]",
-    time: "mt-1 text-[10px] font-semibold leading-tight sm:text-[11px]",
+    weekday: "text-[0.5625rem] font-semibold leading-none tracking-tight sm:text-[0.625rem]",
+    day: "text-2xl font-black leading-none sm:text-[1.625rem]",
+    year: "text-[0.625rem] font-bold leading-none sm:text-[0.6875rem]",
+    time: "mt-1 text-[0.625rem] font-semibold leading-tight sm:text-[0.6875rem]",
   },
 } as const;
 

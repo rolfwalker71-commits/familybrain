@@ -287,7 +287,7 @@ export function SettingsMicrosoftConnectPanel() {
               <div className="space-y-3 rounded-xl border border-border/60 bg-muted/15 p-3">
                 <div className="space-y-1">
                   <Label htmlFor="ms-sig">Mail-Signatur für Buddy-Versand</Label>
-                  <p className="text-[12px] text-muted-foreground">
+                  <p className="text-xs text-muted-foreground">
                     Outlook-Client-Signaturen sind über die Microsoft-API{" "}
                     <span className="font-medium text-foreground">nicht lesbar</span>
                     . Einmal aus Outlook kopieren und hier einfügen — Buddy hängt

@@ -44,6 +44,7 @@ import { AdhocEventDialog } from "@/components/calendar/adhoc-event-dialog";
 import { formatCHF } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
 import { APP_ICON_STROKE } from "@/lib/branding/app-icons";
+import { SEGMENTED_TRACK, SEGMENTED_TRIGGER } from "@/components/layout/segmented";
 import { windDirectionDe } from "@/lib/trips/weather";
 import { filterAblaufTimelineItems } from "@/lib/dashboard/ablauf-timeline";
 import type {
@@ -503,20 +504,20 @@ function HomeWeatherWidget({ weather }: { weather: HomeWeatherCard }) {
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
-              <p className="truncate text-[14px] font-semibold tracking-tight text-foreground">
+              <p className="break-words text-sm font-semibold leading-snug tracking-tight text-foreground">
                 {weather.placeLabel}
               </p>
-              <p className="truncate text-[12px] capitalize text-muted-foreground">
+              <p className="break-words text-xs capitalize leading-snug text-muted-foreground">
                 {weather.weatherLabelDe}
               </p>
             </div>
-            <p className="shrink-0 text-[28px] font-bold tabular-nums leading-none tracking-tight text-foreground">
+            <p className="shrink-0 text-[1.75rem] font-bold tabular-nums leading-none tracking-tight text-foreground">
               {weather.temperatureC}°
             </p>
           </div>
           {(weather.temperatureMinC != null ||
             weather.temperatureMaxC != null) && (
-            <p className="mt-1 text-[12px] tabular-nums text-muted-foreground">
+            <p className="mt-1 text-xs tabular-nums text-muted-foreground">
               Heute{" "}
               <span className="font-medium text-foreground">
                 {weather.temperatureMinC ?? "—"}°
@@ -550,16 +551,16 @@ function HomeWeatherWidget({ weather }: { weather: HomeWeatherCard }) {
               )}
               title={`${weekdayShortDe(day.date)}: ${day.weatherLabelDe}, ${day.temperatureMinC}–${day.temperatureMaxC}°`}
             >
-              <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <span className="text-[0.625rem] font-semibold uppercase tracking-wide text-muted-foreground">
                 {i === 0 ? "Heute" : weekdayShortDe(day.date)}
               </span>
               <span className="mt-0.5 text-[1.05rem] leading-none" aria-hidden>
                 {day.icon}
               </span>
-              <span className="mt-1 text-[10px] font-semibold tabular-nums leading-tight text-foreground">
+              <span className="mt-1 text-[0.625rem] font-semibold tabular-nums leading-tight text-foreground">
                 {day.temperatureMaxC}°
               </span>
-              <span className="text-[10px] tabular-nums leading-tight text-muted-foreground">
+              <span className="text-[0.625rem] tabular-nums leading-tight text-muted-foreground">
                 {day.temperatureMinC}°
               </span>
             </li>
@@ -601,8 +602,8 @@ function DriveAsideCard({ data }: { data: OverviewPayload }) {
     >
       <GoogleDriveLogo className="size-5" />
       <div className="min-w-0 flex-1">
-        <p className="text-[14px] font-black tracking-tight">Drive</p>
-        <p className="truncate text-[12px] text-muted-foreground">{meta.label}</p>
+        <p className="text-sm font-black tracking-tight">Drive</p>
+        <p className="truncate text-xs text-muted-foreground">{meta.label}</p>
       </div>
       {meta.ok ? (
         <CheckCircle2
@@ -669,7 +670,7 @@ function SystemStatusCard({ data }: { data: OverviewPayload }) {
   return (
     <Card className="border-border/60 shadow-[0_4px_18px_rgba(15,23,42,0.05)]">
       <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2 text-[16px] font-black">
+        <CardTitle className="flex items-center gap-2 text-base font-black">
           <Monitor
             className="size-4 text-muted-foreground"
             strokeWidth={APP_ICON_STROKE}
@@ -685,7 +686,7 @@ function SystemStatusCard({ data }: { data: OverviewPayload }) {
             <li key={row.key}>
               <Link
                 href={row.href}
-                className="inline-flex items-center gap-1.5 text-[12px] font-medium text-foreground/90 hover:underline"
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-foreground/90 hover:underline"
               >
                 {row.logo}
                 <span>{row.label}</span>
@@ -695,7 +696,7 @@ function SystemStatusCard({ data }: { data: OverviewPayload }) {
                     aria-label="OK"
                   />
                 ) : (
-                  <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-300">
+                  <span className="text-[0.6875rem] font-semibold text-amber-700 dark:text-amber-300">
                     —
                   </span>
                 )}
@@ -704,7 +705,7 @@ function SystemStatusCard({ data }: { data: OverviewPayload }) {
           ))}
           <li
             className={cn(
-              "ml-auto inline-flex items-center gap-1.5 text-[12px] font-semibold",
+              "ml-auto inline-flex items-center gap-1.5 text-xs font-semibold",
               allOk
                 ? "text-emerald-700 dark:text-emerald-300"
                 : "text-amber-800 dark:text-amber-300"
@@ -720,7 +721,7 @@ function SystemStatusCard({ data }: { data: OverviewPayload }) {
             )}
           </li>
         </ul>
-        <div className="flex flex-wrap gap-x-3 gap-y-1 border-t border-border/50 pt-2 text-[12px]">
+        <div className="flex flex-wrap gap-x-3 gap-y-1 border-t border-border/50 pt-2 text-xs">
           <Link
             href="/sync?tab=automation"
             className="font-medium text-foreground underline-offset-2 hover:underline"
@@ -743,7 +744,7 @@ function NextHockeyCard({ game }: { game: HockeyGameCard }) {
   return (
     <Card className="border-border/60 shadow-[0_4px_18px_rgba(15,23,42,0.05)]">
       <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2 text-[16px] font-black">
+        <CardTitle className="flex items-center gap-2 text-base font-black">
           <Trophy className="size-4 text-rose-700 dark:text-rose-300" />
           Nächstes Spiel
         </CardTitle>
@@ -756,25 +757,25 @@ function NextHockeyCard({ game }: { game: HockeyGameCard }) {
               src={game.homeTeam.logoUrl}
               size="lg"
             />
-            <p className="line-clamp-2 text-[13px] font-medium leading-snug">
+            <p className="line-clamp-2 text-[0.8125rem] font-medium leading-snug">
               {game.homeTeam.label}
             </p>
           </div>
           <div className="shrink-0 text-center">
-            <p className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <p className="text-[0.8125rem] font-semibold uppercase tracking-wide text-muted-foreground">
               {game.isHome ? "Heim" : "Auswärts"}
             </p>
             {game.score ? (
-              <p className="text-[19px] font-bold tabular-nums tracking-tight">
+              <p className="text-[1.1875rem] font-bold tabular-nums tracking-tight">
                 {game.score}
               </p>
             ) : (
-              <p className="text-[15px] font-bold tabular-nums">
+              <p className="text-[0.9375rem] font-bold tabular-nums">
                 {game.time || "—"}
               </p>
             )}
             {game.score && game.time ? (
-              <p className="text-[12px] tabular-nums text-muted-foreground">
+              <p className="text-xs tabular-nums text-muted-foreground">
                 {game.time}
               </p>
             ) : null}
@@ -785,12 +786,12 @@ function NextHockeyCard({ game }: { game: HockeyGameCard }) {
               src={game.awayTeam.logoUrl}
               size="lg"
             />
-            <p className="line-clamp-2 text-[13px] font-medium leading-snug">
+            <p className="line-clamp-2 text-[0.8125rem] font-medium leading-snug">
               {game.awayTeam.label}
             </p>
           </div>
         </div>
-        <p className="text-center text-[13px] text-muted-foreground">
+        <p className="text-center text-[0.8125rem] text-muted-foreground">
           {weekdayLabel(game.date)}
           {game.location ? ` · ${game.location}` : ""}
         </p>
@@ -811,7 +812,7 @@ function BirthdaysAsideCard({
   return (
     <Card className={ASIDE_WIDGET_CLASS}>
       <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2 text-[16px] font-black">
+        <CardTitle className="flex items-center gap-2 text-base font-black">
           <Cake
             className="size-4 text-pink-700"
             strokeWidth={APP_ICON_STROKE}
@@ -820,7 +821,7 @@ function BirthdaysAsideCard({
           />
           Geburtstage
         </CardTitle>
-        <p className="text-[12px] text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           Heute bis in 7 Tagen
         </p>
       </CardHeader>
@@ -828,15 +829,15 @@ function BirthdaysAsideCard({
         <ul className="space-y-2">
           {items.map((item) => (
             <li key={item.id} className="flex items-start gap-2">
-              <span className="w-14 shrink-0 text-[12px] font-medium text-muted-foreground">
+              <span className="w-14 shrink-0 text-xs font-medium text-muted-foreground">
                 {birthdayDayLabel(item.date, today)}
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-[13px] font-semibold">
+                <span className="block break-words text-[0.8125rem] font-semibold leading-snug">
                   {item.title.replace(/^Geburtstag\s+/i, "")}
                 </span>
                 {item.subtitle ? (
-                  <span className="text-[11px] text-muted-foreground">
+                  <span className="text-[0.6875rem] text-muted-foreground">
                     {item.subtitle}
                   </span>
                 ) : null}
@@ -846,7 +847,7 @@ function BirthdaysAsideCard({
         </ul>
         <Link
           href="/calendar"
-          className="mt-3 inline-block text-[12px] font-medium text-muted-foreground underline-offset-2 hover:underline"
+          className="mt-3 inline-block text-xs font-medium text-muted-foreground underline-offset-2 hover:underline"
         >
           Kalender →
         </Link>
@@ -912,20 +913,20 @@ function MariTicketsAsideCard({
     <Card className={ASIDE_WIDGET_CLASS}>
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between gap-2">
-          <CardTitle className="flex items-center gap-2 text-[16px] font-black">
+          <CardTitle className="flex items-center gap-2 text-base font-black">
             <MaringoLogo className="size-5" />
             Tickets von mir
           </CardTitle>
           <Link
             href="/maringo"
-            className="inline-flex shrink-0 items-center gap-1 text-[12px] font-semibold text-orange-600 hover:underline dark:text-orange-400"
+            className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-orange-600 hover:underline dark:text-orange-400"
           >
             Zu Maringo
             <ExternalLink className="size-3.5" aria-hidden />
           </Link>
         </div>
         {data.employeeNumber ? (
-          <p className="text-[12px] text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             {data.employeeNumber}
           </p>
         ) : null}
@@ -937,7 +938,7 @@ function MariTicketsAsideCard({
               <span className="text-[2.5rem] font-black tabular-nums tracking-tight text-orange-600 dark:text-orange-400">
                 {data.total}
               </span>
-              <span className="mt-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              <span className="mt-1 text-[0.625rem] font-medium uppercase tracking-wide text-muted-foreground">
                 Gesamt
               </span>
             </div>
@@ -967,13 +968,13 @@ function MariTicketsAsideCard({
                           style={{ backgroundColor: color }}
                           aria-hidden
                         />
-                        <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-foreground">
+                        <span className="min-w-0 flex-1 truncate text-xs font-medium text-foreground">
                           {c.label}
                         </span>
-                        <span className="shrink-0 text-[13px] font-bold tabular-nums">
+                        <span className="shrink-0 text-[0.8125rem] font-bold tabular-nums">
                           {c.count}
                         </span>
-                        <span className="w-10 shrink-0 text-right text-[11px] tabular-nums text-muted-foreground">
+                        <span className="w-10 shrink-0 text-right text-[0.6875rem] tabular-nums text-muted-foreground">
                           {pct}%
                         </span>
                       </li>
@@ -982,7 +983,7 @@ function MariTicketsAsideCard({
                 </ul>
               </>
             ) : (
-              <p className="min-w-0 flex-1 text-[12px] text-muted-foreground">
+              <p className="min-w-0 flex-1 text-xs text-muted-foreground">
                 {data.lastPollAt
                   ? "Keine Tickets in den gewählten Status."
                   : "Noch kein Poll — Scheduler lädt gleich."}
@@ -990,7 +991,7 @@ function MariTicketsAsideCard({
             )}
           </div>
         ) : (
-          <p className="text-[12px] text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             Noch kein Poll — Scheduler lädt gleich.
           </p>
         )}
@@ -998,12 +999,12 @@ function MariTicketsAsideCard({
         <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
           <Link
             href="/maringo"
-            className="inline-flex items-center gap-1 text-[12px] font-semibold text-orange-600 hover:underline dark:text-orange-400"
+            className="inline-flex items-center gap-1 text-xs font-semibold text-orange-600 hover:underline dark:text-orange-400"
           >
             Meine offenen Tickets anzeigen
             <ExternalLink className="size-3.5" aria-hidden />
           </Link>
-          <p className="text-[10px] text-muted-foreground">
+          <p className="text-[0.625rem] text-muted-foreground">
             {pollLabel
               ? `Zuletzt geprüft: ${pollLabel}`
               : "Noch nicht geprüft"}
@@ -1030,7 +1031,7 @@ function DayTimeline({
 }) {
   if (items.length === 0) {
     return (
-      <p className="px-1 py-6 text-[15px] text-muted-foreground">
+      <p className="px-1 py-6 text-[0.9375rem] text-muted-foreground">
         Keine Termine für heute — der Tag ist frei.
       </p>
     );
@@ -1050,13 +1051,13 @@ function DayTimeline({
           <li key={item.id} className="contents">
             <div className="flex flex-col items-end justify-start pt-2 text-right">
               {isTomorrow ? (
-                <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:text-[11px]">
+                <span className="text-[0.625rem] font-semibold uppercase tracking-wide text-muted-foreground sm:text-[0.6875rem]">
                   Morgen
                 </span>
               ) : null}
               <span
                 className={cn(
-                  "text-[12px] font-semibold tabular-nums leading-tight sm:text-[13px]",
+                  "text-xs font-semibold tabular-nums leading-tight sm:text-[0.8125rem]",
                   active
                     ? "text-emerald-800 dark:text-emerald-300"
                     : "text-muted-foreground"
@@ -1065,7 +1066,7 @@ function DayTimeline({
                 {hm}
               </span>
               {item.endTime && item.time ? (
-                <span className="text-[10px] tabular-nums text-muted-foreground/80 sm:text-[11px]">
+                <span className="text-[0.625rem] tabular-nums text-muted-foreground/80 sm:text-[0.6875rem]">
                   –{item.endTime}
                 </span>
               ) : null}
@@ -1126,7 +1127,7 @@ function DayTimeline({
                         <p className="mb-1.5 flex min-w-0 flex-wrap items-center gap-1.5">
                           <span
                             className={cn(
-                              "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide",
+                              "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[0.625rem] font-bold uppercase tracking-wide",
                               source.provider === "google" &&
                                 "bg-sky-100/90 text-sky-900 dark:bg-sky-500/20 dark:text-sky-100",
                               source.provider === "microsoft" &&
@@ -1142,7 +1143,7 @@ function DayTimeline({
                             ) : null}
                             {source.providerLabel}
                           </span>
-                          <span className="min-w-0 text-[11px] leading-snug text-muted-foreground">
+                          <span className="min-w-0 text-[0.6875rem] leading-snug text-muted-foreground">
                             {source.calendarLabel}
                           </span>
                         </p>
@@ -1151,7 +1152,7 @@ function DayTimeline({
                         {item.title}
                       </p>
                       {item.subtitle ? (
-                        <p className="mt-0.5 text-[13px] leading-snug text-muted-foreground break-words">
+                        <p className="mt-0.5 text-[0.8125rem] leading-snug text-muted-foreground break-words">
                           {item.subtitle}
                         </p>
                       ) : null}
@@ -1331,11 +1332,11 @@ function FocusTile({
         ) : null}
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        <p className="text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground">
           {eyebrow}
         </p>
-        <p className="truncate text-[15px] font-black tracking-tight">{title}</p>
-        <p className="truncate text-[13px] text-muted-foreground">{detail}</p>
+        <p className="break-words text-[0.9375rem] font-black leading-snug tracking-tight">{title}</p>
+        <p className="break-words text-[0.8125rem] leading-snug text-muted-foreground">{detail}</p>
       </div>
       <ChevronRight
         className="size-4 shrink-0 text-muted-foreground/70"
@@ -1726,21 +1727,21 @@ export function OverviewDashboard({
         <div className="relative grid gap-4 px-4 py-6 sm:px-6 sm:py-7 lg:grid-cols-[minmax(0,1fr)_minmax(16rem,22rem)] lg:items-start lg:gap-6">
           <div className="min-w-0 space-y-1">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h1 className="text-[30px] font-black tracking-tight text-foreground drop-shadow-sm sm:text-[32px]">
+              <h1 className="text-3xl font-black tracking-tight text-foreground drop-shadow-sm sm:text-3xl">
                 {greeting}
                 {greetingName ? `, ${greetingName}` : ""}
               </h1>
               {refreshing || fromCache ? (
-                <p className="text-[12px] text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                   {refreshing ? "Aktualisiere…" : "Zwischengespeicherte Ansicht"}
                 </p>
               ) : null}
             </div>
-            <p className="text-[15px] capitalize text-muted-foreground">
+            <p className="text-[0.9375rem] capitalize text-muted-foreground">
               {formatLongDeDate()}
             </p>
             {data ? (
-              <p className="pt-1 text-[13px] text-muted-foreground">
+              <p className="pt-1 text-[0.8125rem] text-muted-foreground">
                 {overviewStatusLine(data, todayEventCount)}
               </p>
             ) : null}
@@ -1749,20 +1750,20 @@ export function OverviewDashboard({
               data.briefing.open.length > 0) ? (
               <div className="grid max-w-2xl gap-3 pt-2 sm:grid-cols-2">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  <p className="text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground">
                     Erledigt
                   </p>
-                  <ul className="mt-1 space-y-0.5 text-[13px] text-foreground/85">
+                  <ul className="mt-1 space-y-0.5 text-[0.8125rem] text-foreground/85">
                     {data.briefing.done.map((line) => (
                       <li key={`done-${line}`}>{line}</li>
                     ))}
                   </ul>
                 </div>
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  <p className="text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground">
                     Offen
                   </p>
-                  <ul className="mt-1 space-y-0.5 text-[13px] text-foreground/85">
+                  <ul className="mt-1 space-y-0.5 text-[0.8125rem] text-foreground/85">
                     {data.briefing.open.map((line) => (
                       <li key={`open-${line}`}>{line}</li>
                     ))}
@@ -1781,11 +1782,11 @@ export function OverviewDashboard({
       ) : (
         <header className="flex flex-wrap items-end justify-between gap-3">
           <div className="min-w-0">
-            <h1 className="text-[24px] font-black tracking-tight sm:text-[28px]">
+            <h1 className="text-2xl font-black tracking-tight sm:text-[1.75rem]">
               {domain === "privat" ? "Privat" : "Geschäftlich"}
               {greetingName ? ` · ${greetingName}` : ""}
             </h1>
-            <p className="text-[14px] capitalize text-muted-foreground">
+            <p className="text-sm capitalize text-muted-foreground">
               {formatLongDeDate()}
               {domain === "privat"
                 ? " · Google Workspace"
@@ -1793,7 +1794,7 @@ export function OverviewDashboard({
             </p>
           </div>
           {refreshing || fromCache ? (
-            <p className="text-[12px] text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               {refreshing ? "Aktualisiere…" : "Zwischengespeicherte Ansicht"}
             </p>
           ) : null}
@@ -1801,7 +1802,8 @@ export function OverviewDashboard({
       )}
 
       <nav
-        className="flex flex-wrap gap-1 rounded-xl bg-muted/50 p-1"
+        data-segmented=""
+        className={SEGMENTED_TRACK}
         aria-label="Übersicht Domäne"
       >
         {domainTabs.map((tab) => {
@@ -1814,7 +1816,8 @@ export function OverviewDashboard({
               variant="ghost"
               onClick={() => selectDomain(tab.id)}
               className={cn(
-                "inline-flex h-auto flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold leading-snug whitespace-normal sm:flex-none",
+                SEGMENTED_TRIGGER,
+                "inline-flex text-sm font-semibold sm:flex-none",
                 active
                   ? "bg-card text-foreground shadow-sm"
                   : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
@@ -1828,7 +1831,7 @@ export function OverviewDashboard({
       </nav>
 
       {error ? (
-        <p className="text-[15px] text-destructive">{error}</p>
+        <p className="text-[0.9375rem] text-destructive">{error}</p>
       ) : null}
 
       {loading && !data ? <OverviewSkeleton /> : null}
@@ -1836,7 +1839,7 @@ export function OverviewDashboard({
       {data ? (
         <>
           <section className="space-y-3">
-            <h2 className="text-[14px] font-black tracking-tight text-foreground">
+            <h2 className="text-sm font-black tracking-tight text-foreground">
               {domain === "privat"
                 ? "Privat · Fokus"
                 : domain === "geschaeftlich"
@@ -1962,7 +1965,7 @@ export function OverviewDashboard({
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(17rem,0.85fr)]">
             <section className="min-w-0 space-y-3">
               <div className="flex items-baseline justify-between gap-2">
-                <h2 className="text-[14px] font-black tracking-tight">
+                <h2 className="text-sm font-black tracking-tight">
                   {domain === "privat"
                     ? "Heute · Privat"
                     : domain === "geschaeftlich"
@@ -1974,14 +1977,14 @@ export function OverviewDashboard({
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="h-7 rounded-full px-2.5 text-[12px] font-semibold"
+                    className="h-7 rounded-full px-2.5 text-xs font-semibold"
                     onClick={() => setAdhocOpen(true)}
                   >
                     Ad-hoc einplanen
                   </Button>
                   <Link
                     href="/calendar"
-                    className="text-[13px] font-medium text-muted-foreground underline-offset-2 hover:underline"
+                    className="text-[0.8125rem] font-medium text-muted-foreground underline-offset-2 hover:underline"
                   >
                     Alle Termine →
                   </Link>
@@ -1989,7 +1992,7 @@ export function OverviewDashboard({
               </div>
               {visibleConflicts.length > 0 ? (
                 <div
-                  className="flex items-start gap-2 rounded-xl border border-amber-200/80 bg-amber-50/70 px-3 py-2 text-[13px] text-amber-950 dark:border-amber-400/30 dark:bg-amber-500/12 dark:text-amber-100"
+                  className="flex items-start gap-2 rounded-xl border border-amber-200/80 bg-amber-50/70 px-3 py-2 text-[0.8125rem] text-amber-950 dark:border-amber-400/30 dark:bg-amber-500/12 dark:text-amber-100"
                   role="status"
                 >
                   <AlertTriangle
@@ -2010,7 +2013,7 @@ export function OverviewDashboard({
                     type="button"
                     size="sm"
                     variant="ghost"
-                    className="h-7 shrink-0 px-2 text-[12px] text-amber-900/80 hover:bg-amber-100/80 hover:text-amber-950 dark:text-amber-200/90 dark:hover:bg-amber-500/20 dark:hover:text-amber-100"
+                    className="h-7 shrink-0 px-2 text-xs text-amber-900/80 hover:bg-amber-100/80 hover:text-amber-950 dark:text-amber-200/90 dark:hover:bg-amber-500/20 dark:hover:text-amber-100"
                     onClick={muteConflictsForToday}
                     title="Für heute ausblenden"
                   >
@@ -2034,7 +2037,7 @@ export function OverviewDashboard({
               </Card>
 
               <div className="space-y-3 pt-2">
-                <h2 className="text-[14px] font-black tracking-tight text-foreground">
+                <h2 className="text-sm font-black tracking-tight text-foreground">
                   Aufgaben
                 </h2>
                 <HomeTasksSection
@@ -2085,7 +2088,7 @@ export function OverviewDashboard({
               data.referenceNotes.length > 0 ? (
                 <Card className={ASIDE_WIDGET_CLASS}>
                   <CardHeader className="pb-2">
-                    <CardTitle className="flex items-center gap-2 text-[16px] font-black">
+                    <CardTitle className="flex items-center gap-2 text-base font-black">
                       <StickyNote
                         className="size-4 text-muted-foreground"
                         strokeWidth={APP_ICON_STROKE}
@@ -2103,10 +2106,10 @@ export function OverviewDashboard({
                           className="flex min-w-0 items-start gap-2 px-1"
                         >
                           <div className="min-w-0 flex-1">
-                            <p className="truncate text-[14px] font-black">
+                            <p className="break-words text-sm font-black leading-snug">
                               {n.title}
                             </p>
-                            <p className="truncate font-mono text-[12px] text-muted-foreground">
+                            <p className="truncate font-mono text-xs text-muted-foreground">
                               {n.reference || "—"}
                             </p>
                           </div>
@@ -2138,7 +2141,7 @@ export function OverviewDashboard({
           </div>
 
           <section className="space-y-3">
-            <h2 className="text-[14px] font-black tracking-tight">
+            <h2 className="text-sm font-black tracking-tight">
               Später im Monat
             </h2>
             <div className="flex flex-col overflow-hidden rounded-2xl border border-border/60 bg-card shadow-[0_4px_18px_rgba(15,23,42,0.05)] sm:flex-row sm:divide-x sm:divide-border/60">
@@ -2148,8 +2151,8 @@ export function OverviewDashboard({
               >
                 <Plane className="size-4 shrink-0 text-sky-700 dark:text-sky-300" />
                 <div className="min-w-0">
-                  <p className="text-[14px] font-black">Reisen</p>
-                  <p className="truncate text-[12px] text-muted-foreground">
+                  <p className="text-sm font-black">Reisen</p>
+                  <p className="truncate text-xs text-muted-foreground">
                     {laterCounts.travel > 0
                       ? `${laterCounts.travel} · ${laterCounts.travelSample || "geplant"}`
                       : "Keine Reisen geplant"}
@@ -2162,8 +2165,8 @@ export function OverviewDashboard({
               >
                 <Clock3 className="size-4 shrink-0 text-teal-700 dark:text-teal-300" />
                 <div className="min-w-0">
-                  <p className="text-[14px] font-black">Fristen</p>
-                  <p className="truncate text-[12px] text-muted-foreground">
+                  <p className="text-sm font-black">Fristen</p>
+                  <p className="truncate text-xs text-muted-foreground">
                     {laterCounts.deadlines || data.chips.urgentDeadlines
                       ? `${laterCounts.deadlines || data.chips.urgentDeadlines} · ${laterCounts.deadlineSample || "offen"}`
                       : "Keine offenen Fristen"}
@@ -2176,8 +2179,8 @@ export function OverviewDashboard({
               >
                 <ListChecks className="size-4 shrink-0 text-[var(--brand-finance)]" />
                 <div className="min-w-0">
-                  <p className="text-[14px] font-black">Pipeline</p>
-                  <p className="truncate text-[12px] text-muted-foreground">
+                  <p className="text-sm font-black">Pipeline</p>
+                  <p className="truncate text-xs text-muted-foreground">
                     {laterCounts.pipeline > 0
                       ? `${laterCounts.pipeline} · ${laterCounts.pipelineSample || "Zahlungen"}`
                       : "Keine geplanten Zahlungen"}

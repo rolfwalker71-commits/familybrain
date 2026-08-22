@@ -145,7 +145,7 @@ export function TripTravelersCard({
                 <div className="min-w-0">
                   <p className="truncate font-medium">{t.display_name}</p>
                   {t.email ? (
-                    <p className="truncate text-[11px] text-muted-foreground">
+                    <p className="truncate text-[0.6875rem] text-muted-foreground">
                       {t.email}
                     </p>
                   ) : null}
@@ -205,7 +205,7 @@ export function TripTravelersCard({
             </Button>
             {users.length > 0 ? (
               <div className="space-y-1 border-t border-border/40 pt-2">
-                <p className="text-[11px] font-medium text-muted-foreground">
+                <p className="text-[0.6875rem] font-medium text-muted-foreground">
                   App-Benutzer übernehmen
                 </p>
                 <div className="flex flex-wrap gap-1.5">

@@ -164,6 +164,7 @@
   }
   html {
     @apply font-sans;
+    font-size: 112.5%;
     min-height: 100%;
     overscroll-behavior-y: none;
     background-color: var(--background);
@@ -185,6 +186,14 @@
   [role="button"]:not([data-slot]):not([aria-disabled="true"]) {
     min-height: 2.75rem;
     min-width: 2.75rem;
+  }
+  /* Segmented pills: the track is the hit area — do not inflate triggers. */
+  [data-slot="tabs-trigger"],
+  [data-slot="tabs-list"] [data-slot="button"],
+  [data-segmented] [data-slot="button"],
+  [data-app-tab-nav] [data-slot="button"] {
+    min-height: 0;
+    min-width: 0;
   }
 }
 

@@ -404,7 +404,7 @@ export function MicrosoftMailInboxPanel({
                   <Button
                     type="button"
                     variant="ghost"
-                    className="h-auto w-full justify-start items-start gap-3 rounded-xl border border-border/70 bg-card p-3 text-left hover:bg-muted/40"
+                    className="h-auto w-full items-start justify-start gap-3 rounded-2xl bg-card p-3 text-left shadow-[0_2px_10px_rgba(20,32,28,0.04)] ring-1 ring-border/50 hover:bg-muted"
                     onClick={() => void openMail(item.id)}
                   >
                     <Mail
@@ -415,7 +415,7 @@ export function MicrosoftMailInboxPanel({
                       <div className="flex flex-wrap items-center gap-2">
                         <p
                           className={cn(
-                            "truncate text-sm",
+                            "break-words text-sm leading-snug",
                             item.unread ? "font-semibold" : "font-medium"
                           )}
                         >
@@ -425,7 +425,7 @@ export function MicrosoftMailInboxPanel({
                           <Badge
                             variant="outline"
                             className={cn(
-                              "text-[10px]",
+                              "text-[0.625rem]",
                               chipClass(item.analysisChip)
                             )}
                           >
@@ -626,7 +626,7 @@ export function MicrosoftMailInboxPanel({
                         </span>
                       </li>
                     ))}
-                    <li className="pt-0.5 text-[11px] text-muted-foreground">
+                    <li className="pt-0.5 text-[0.6875rem] text-muted-foreground">
                       Tags: O365 · ANG · geschäftlich
                     </li>
                   </ul>
@@ -695,7 +695,7 @@ export function MicrosoftMailInboxPanel({
                 ) : null}
                 {analysis?.replyDraft?.body ? (
                   <div className="space-y-2 rounded-xl border border-border/70 bg-muted/20 p-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    <p className="text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground">
                       Antwortvorschlag
                     </p>
                     <pre className="whitespace-pre-wrap break-words text-sm">

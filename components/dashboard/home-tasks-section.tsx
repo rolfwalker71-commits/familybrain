@@ -116,7 +116,7 @@ function TaskChips({ task }: { task: HomeTaskRow }) {
       <Badge
         variant="outline"
         className={cn(
-          "h-5 rounded-md border px-1.5 text-[10px] font-semibold",
+          "h-5 rounded-md border px-1.5 text-[0.625rem] font-semibold",
           ACCOUNT_CHIP[task.source]
         )}
       >
@@ -126,7 +126,7 @@ function TaskChips({ task }: { task: HomeTaskRow }) {
         <Badge
           variant="outline"
           className={cn(
-            "h-5 max-w-[14rem] truncate rounded-md border px-1.5 text-[10px] font-medium",
+            "h-5 max-w-[14rem] truncate rounded-md border px-1.5 text-[0.625rem] font-medium",
             BUCKET_CHIP[task.source]
           )}
           title={bucket}
@@ -177,14 +177,14 @@ function TaskRow({
       <div className="min-w-0 flex-1 space-y-1.5">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0 space-y-1">
-            <p className="text-[14px] font-black leading-snug">{task.title}</p>
+            <p className="text-sm font-black leading-snug">{task.title}</p>
             {justDone ? (
-              <p className="text-[12px] font-medium text-emerald-800">
+              <p className="text-xs font-medium text-emerald-800">
                 Als erledigt markiert
               </p>
             ) : (
               <>
-                <p className="text-[12px] text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                   <span
                     className={cn(task.overdue && "font-medium text-rose-700")}
                   >
@@ -201,7 +201,7 @@ function TaskRow({
               href={task.href}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-1 text-[11px] text-primary underline-offset-2 hover:underline"
+              className="inline-flex items-center gap-1 text-[0.6875rem] text-primary underline-offset-2 hover:underline"
             >
               <ExternalLink className="size-3" aria-hidden />
               öffnen
@@ -244,7 +244,7 @@ function TaskRow({
                   aria-hidden
                 />
                 <select
-                  className="h-8 max-w-[12rem] rounded-md border border-border bg-background px-2 text-[12px]"
+                  className="h-8 max-w-[12rem] rounded-md border border-border bg-background px-2 text-xs"
                   disabled={busy}
                   value={task.bucketId || ""}
                   title="Planner-Bucket"
@@ -327,7 +327,7 @@ function SourceBlock({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="flex items-center gap-1.5 text-[13px] font-bold tracking-tight">
+        <h3 className="flex items-center gap-1.5 text-[0.8125rem] font-bold tracking-tight">
           {source === "planner" ? (
             <MicrosoftPlannerLogo className="size-3.5" />
           ) : source === "todo" ? (
@@ -337,16 +337,16 @@ function SourceBlock({
           )}
           {SOURCE_LABEL[source]}
           {source === "google" ? (
-            <span className="ml-1.5 text-[11px] font-medium text-sky-800">
+            <span className="ml-1.5 text-[0.6875rem] font-medium text-sky-800">
               privat
             </span>
           ) : source === "todo" || source === "planner" ? (
-            <span className="ml-1.5 text-[11px] font-medium text-violet-800">
+            <span className="ml-1.5 text-[0.6875rem] font-medium text-violet-800">
               Arbeit
             </span>
           ) : null}
         </h3>
-        <span className="text-[11px] text-muted-foreground">
+        <span className="text-[0.6875rem] text-muted-foreground">
           {tasks.length}
         </span>
       </div>
@@ -593,7 +593,7 @@ export function HomeTasksSection({
     <Card className="border-border/60 shadow-[0_4px_18px_rgba(15,23,42,0.05)]">
       <CardHeader className="pb-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <CardTitle className="flex items-center gap-2 text-[16px] font-black">
+          <CardTitle className="flex items-center gap-2 text-base font-black">
             <CheckSquare
               className="size-4 text-muted-foreground"
               strokeWidth={APP_ICON_STROKE}
@@ -602,7 +602,7 @@ export function HomeTasksSection({
             />
             Heute &amp; Morgen
           </CardTitle>
-          <div className="flex flex-wrap gap-2 text-[12px] text-muted-foreground">
+          <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
             {hasMicrosoftScope ? (
               <>
                 <Link
@@ -636,7 +636,7 @@ export function HomeTasksSection({
       <CardContent className="space-y-4">
         {notice ? (
           <p
-            className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[13px] text-emerald-900"
+            className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[0.8125rem] text-emerald-900"
             role="status"
           >
             {notice}
@@ -644,7 +644,7 @@ export function HomeTasksSection({
         ) : null}
         {error ? (
           <p
-            className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-[13px] text-rose-900"
+            className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-[0.8125rem] text-rose-900"
             role="alert"
           >
             {error}
@@ -652,7 +652,7 @@ export function HomeTasksSection({
         ) : null}
 
         {!connected ? (
-          <p className="text-[13px] text-muted-foreground">
+          <p className="text-[0.8125rem] text-muted-foreground">
             Noch keine Aufgaben-Quellen verbunden — unter{" "}
             <Link
               href="/account"
@@ -663,7 +663,7 @@ export function HomeTasksSection({
             Google Tasks und/oder Microsoft 365 verbinden.
           </p>
         ) : focusRows.length === 0 ? (
-          <p className="text-[13px] text-muted-foreground">
+          <p className="text-[0.8125rem] text-muted-foreground">
             Keine Aufgaben mit Fälligkeit heute oder morgen.
           </p>
         ) : (
@@ -693,7 +693,7 @@ export function HomeTasksSection({
               onClick={() => setLaterOpen((v) => !v)}
               aria-expanded={laterOpen}
             >
-              <span className="text-[13px] font-bold tracking-tight">
+              <span className="text-[0.8125rem] font-bold tracking-tight">
                 Später fällig
                 <span className="ml-2 font-medium text-muted-foreground">
                   {laterRows.length}

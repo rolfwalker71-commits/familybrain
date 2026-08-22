@@ -151,7 +151,7 @@ export function TripFinanceLedgerCard({
                 </span>
               </div>
               {costSummary.topCategories.length > 0 ? (
-                <p className="mt-1 truncate text-[11px] text-muted-foreground">
+                <p className="mt-1 truncate text-[0.6875rem] text-muted-foreground">
                   {costSummary.topCategories
                     .map((c) => `${c.label} ${c.sharePct}%`)
                     .join(" · ")}
@@ -159,7 +159,7 @@ export function TripFinanceLedgerCard({
               ) : null}
               <Link
                 href={`/finance-brain/${ledger.id}`}
-                className="mt-1 inline-block text-[11px] font-medium text-[var(--brand-finance)] underline-offset-2 hover:underline"
+                className="mt-1 inline-block text-[0.6875rem] font-medium text-[var(--brand-finance)] underline-offset-2 hover:underline"
               >
                 Kosten-Übersicht öffnen
               </Link>

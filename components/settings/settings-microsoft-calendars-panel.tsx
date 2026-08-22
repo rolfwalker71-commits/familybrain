@@ -342,13 +342,13 @@ export function SettingsMicrosoftCalendarsPanel() {
                             {c.primary ? (
                               <Badge
                                 variant="secondary"
-                                className="text-[10px]"
+                                className="text-[0.625rem]"
                               >
                                 Primär
                               </Badge>
                             ) : null}
                             {d.on && !d.planningRelevant ? (
-                              <Badge variant="outline" className="text-[10px]">
+                              <Badge variant="outline" className="text-[0.625rem]">
                                 Nur Referenz
                               </Badge>
                             ) : null}
@@ -427,7 +427,7 @@ export function SettingsMicrosoftCalendarsPanel() {
                                 />
                                 <span>
                                   Relevant für Terminplanung
-                                  <span className="mt-0.5 block text-[11px] text-muted-foreground/90">
+                                  <span className="mt-0.5 block text-[0.6875rem] text-muted-foreground/90">
                                     Aus = nur Referenz: sichtbar, ohne Fokus /
                                     Konflikte
                                   </span>
@@ -436,7 +436,7 @@ export function SettingsMicrosoftCalendarsPanel() {
                             </div>
                           ) : null}
                           {d.on && isWorkCalendarType(d.type) ? (
-                            <p className="text-[11px] text-muted-foreground">
+                            <p className="text-[0.6875rem] text-muted-foreground">
                               {d.type === "work_rolf"
                                 ? "Arbeit Rolf: AI-Bilder mit Mann."
                                 : d.type === "work_valentyna"

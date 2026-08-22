@@ -1819,7 +1819,7 @@ function SettingsPageInner() {
                 {sofascoreTestBusy ? "Fragt API…" : "Sofascore-Key testen"}
               </Button>
               {sofascoreTestResult ? (
-                <pre className="max-h-48 overflow-auto rounded-md border border-border/70 bg-background p-2 text-[11px] leading-relaxed whitespace-pre-wrap break-all">
+                <pre className="max-h-48 overflow-auto rounded-md border border-border/70 bg-background p-2 text-[0.6875rem] leading-relaxed whitespace-pre-wrap break-all">
                   {sofascoreTestResult}
                 </pre>
               ) : null}
@@ -1961,7 +1961,7 @@ function SettingsPageInner() {
               ) : null}
             </div>
             {googleMapsTestResult ? (
-              <pre className="max-h-60 overflow-auto rounded-md border border-border/70 bg-background p-3 text-[11px] leading-relaxed whitespace-pre-wrap break-all">
+              <pre className="max-h-60 overflow-auto rounded-md border border-border/70 bg-background p-3 text-[0.6875rem] leading-relaxed whitespace-pre-wrap break-all">
                 {googleMapsTestResult}
               </pre>
             ) : null}
@@ -2030,14 +2030,14 @@ function SettingsPageInner() {
             />
             <p className="text-xs text-muted-foreground">
               Platzhalter:{" "}
-              <code className="text-[11px]">
+              <code className="text-[0.6875rem]">
                 {eventAiImagePromptPlaceholders.join(" ")}
               </code>
               . In {"{{details}}"} landen automatisch alle ausgefüllten Felder
               der Aktivität (Datum, Ort, Buchung, Flugdaten, Adresse usw.). Beim
               Erzeugen kannst du den Prompt pro Aktivität noch anpassen. Stil
               steckt im Prompt; Modell:{" "}
-              <code className="text-[11px]">gpt-image-2</code> (besser lesbarer
+              <code className="text-[0.6875rem]">gpt-image-2</code> (besser lesbarer
               Text).
             </p>
             <Button
@@ -2123,7 +2123,7 @@ function SettingsPageInner() {
               {flightTestBusy ? "Fragt API…" : "API-Anfrage starten"}
             </Button>
             {flightTestResult ? (
-              <pre className="max-h-80 overflow-auto rounded-md border border-border/70 bg-background p-3 text-[11px] leading-relaxed whitespace-pre-wrap break-all">
+              <pre className="max-h-80 overflow-auto rounded-md border border-border/70 bg-background p-3 text-[0.6875rem] leading-relaxed whitespace-pre-wrap break-all">
                 {flightTestResult}
               </pre>
             ) : null}
@@ -2212,7 +2212,7 @@ function SettingsPageInner() {
               </div>
             </div>
             {ojpTestResult ? (
-              <pre className="max-h-80 overflow-auto rounded-md border border-border/70 bg-background p-3 text-[11px] leading-relaxed whitespace-pre-wrap break-all">
+              <pre className="max-h-80 overflow-auto rounded-md border border-border/70 bg-background p-3 text-[0.6875rem] leading-relaxed whitespace-pre-wrap break-all">
                 {ojpTestResult}
               </pre>
             ) : null}
@@ -2253,7 +2253,7 @@ function SettingsPageInner() {
             />
             <p className="text-xs text-muted-foreground">
               Basis für OAuth-Redirect, Push- und Mail-Links — nicht localhost.
-              Alternativ Env <code className="text-[11px]">APP_PUBLIC_URL</code>.
+              Alternativ Env <code className="text-[0.6875rem]">APP_PUBLIC_URL</code>.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -2649,7 +2649,7 @@ function SettingsPageInner() {
               <p className="text-xs text-muted-foreground">
                 Anzeigename in der Mail (z.B. «Buddy»). Leer = Buddy mit der
                 SMTP-Adresse. Optional vollständig:{" "}
-                <span className="font-mono text-[11px]">
+                <span className="font-mono text-[0.6875rem]">
                   Buddy &lt;name@icloud.com&gt;
                 </span>
                 .
@@ -2878,12 +2878,12 @@ function SettingsPageInner() {
             />
             <p className="text-xs text-muted-foreground">
               Platzhalter:{" "}
-              <code className="text-[11px]">
+              <code className="text-[0.6875rem]">
                 {financeExpenseAiImagePromptPlaceholders.join(" ")}
               </code>
               . In {"{{details}}"} landen Betrag, Datum, Ort und Zahler.
               Kategorie-Icons setzt die KI beim Speichern; Modell für Bilder:{" "}
-              <code className="text-[11px]">gpt-image-2</code>.
+              <code className="text-[0.6875rem]">gpt-image-2</code>.
             </p>
             <Button
               type="button"
@@ -3087,7 +3087,7 @@ function SettingsPageInner() {
           ) : null}
           {chatProvider === "deepseek" ? (
             <p className="text-xs text-muted-foreground">
-              Endpoint: <code className="text-[11px]">{DEEPSEEK_BASE_URL}</code>
+              Endpoint: <code className="text-[0.6875rem]">{DEEPSEEK_BASE_URL}</code>
             </p>
           ) : null}
           <div className="space-y-2">

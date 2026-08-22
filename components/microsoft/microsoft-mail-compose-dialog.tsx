@@ -229,7 +229,7 @@ export function MicrosoftMailComposeDialog({
                   variant="secondary"
                   disabled={blocked}
                   onClick={() => void runAi("suggest")}
-                  className="h-7 gap-1 px-2 text-[11px]"
+                  className="h-7 gap-1 px-2 text-[0.6875rem]"
                 >
                   <Sparkles
                     className="size-3"
@@ -243,7 +243,7 @@ export function MicrosoftMailComposeDialog({
                   variant="outline"
                   disabled={blocked || !body.trim()}
                   onClick={() => void runAi("shorter")}
-                  className="h-7 px-2 text-[11px]"
+                  className="h-7 px-2 text-[0.6875rem]"
                 >
                   {aiBusy === "shorter" ? "…" : "Kürzer"}
                 </Button>
@@ -253,7 +253,7 @@ export function MicrosoftMailComposeDialog({
                   variant="outline"
                   disabled={blocked || !body.trim()}
                   onClick={() => void runAi("formal")}
-                  className="h-7 px-2 text-[11px]"
+                  className="h-7 px-2 text-[0.6875rem]"
                 >
                   {aiBusy === "formal" ? "…" : "Formeller"}
                 </Button>
@@ -263,7 +263,7 @@ export function MicrosoftMailComposeDialog({
                   variant="outline"
                   disabled={blocked || !body.trim()}
                   onClick={() => void runAi("toDe")}
-                  className="h-7 px-2 text-[11px]"
+                  className="h-7 px-2 text-[0.6875rem]"
                 >
                   {aiBusy === "toDe" ? "…" : "DE"}
                 </Button>
@@ -273,7 +273,7 @@ export function MicrosoftMailComposeDialog({
                   variant="outline"
                   disabled={blocked || !body.trim()}
                   onClick={() => void runAi("toEn")}
-                  className="h-7 px-2 text-[11px]"
+                  className="h-7 px-2 text-[0.6875rem]"
                 >
                   {aiBusy === "toEn" ? "…" : "EN"}
                 </Button>
@@ -287,11 +287,11 @@ export function MicrosoftMailComposeDialog({
               disabled={blocked}
             />
             {usageLine ? (
-              <p className="text-[11px] text-muted-foreground" title="Listenpreis, ungefähr">
+              <p className="text-[0.6875rem] text-muted-foreground" title="Listenpreis, ungefähr">
                 Tokens · {usageLine}
               </p>
             ) : (
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-[0.6875rem] text-muted-foreground">
                 AI-Aktionen zeigen danach geschätzte Token-Kosten.
               </p>
             )}

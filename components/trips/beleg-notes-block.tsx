@@ -74,7 +74,7 @@ export function BelegNotesBlock({
               expanded && "rotate-180"
             )}
           />
-          <span className="text-[10px] font-medium text-muted-foreground">
+          <span className="text-[0.625rem] font-medium text-muted-foreground">
             {expanded ? "Einklappen" : "Vorschau"}
           </span>
         </Button>

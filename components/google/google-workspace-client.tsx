@@ -45,6 +45,7 @@ import { weekdayLabel } from "@/components/calendar/agenda-row";
 import { GoogleMailInboxPanel } from "@/components/google/google-mail-inbox-panel";
 import { GoogleTasksPanel } from "@/components/google/google-tasks-panel";
 import { MailWorkspaceSubnav, type MailWorkspaceView, mailWorkspacePrimaryBtnClass, mailWorkspaceTabClass } from "@/components/mail/mail-workspace-subnav";
+import { SEGMENTED_TRACK } from "@/components/layout/segmented";
 import {
   MailChronikList,
   MailChronikSummary,
@@ -238,7 +239,7 @@ function ReplyLangToggle({
           size="xs"
           disabled={busy}
           className={cn(
-            "rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase",
+            "rounded px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase",
             lang === code
               ? "bg-muted text-foreground"
               : "text-muted-foreground hover:text-foreground"
@@ -1088,7 +1089,8 @@ export function GoogleWorkspaceClient() {
               </span>
             </p>
             <nav
-              className="flex flex-wrap gap-1 rounded-xl bg-muted/50 p-1"
+              data-segmented=""
+              className={SEGMENTED_TRACK}
               aria-label="Google Workspace Bereiche"
             >
               <Button
@@ -1109,7 +1111,7 @@ export function GoogleWorkspaceClient() {
                 <ListChecks className="size-3.5 shrink-0" strokeWidth={APP_ICON_STROKE} />
                 Triage
                 {inboxPending > 0 ? (
-                  <Badge variant="secondary" className="text-[10px]">
+                  <Badge variant="secondary" className="text-[0.625rem]">
                     {inboxPending}
                   </Badge>
                 ) : null}
@@ -1162,7 +1164,7 @@ export function GoogleWorkspaceClient() {
                 <div>
                   <p>{analyzeNotice}</p>
                   {analyzing ? (
-                    <p className="mt-0.5 text-[11px] opacity-80">
+                    <p className="mt-0.5 text-[0.6875rem] opacity-80">
                       Läuft serverseitig inkl. vollständiger Mail-Threads — du
                       kannst die Seite verlassen. Bei Rückkehr erscheinen die
                       Resultate automatisch; zusätzlich Toast und
@@ -1197,7 +1199,7 @@ export function GoogleWorkspaceClient() {
           {tab === "calendar" ? (
             <section className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <h2 className="text-[15px] font-semibold">
+                <h2 className="text-[0.9375rem] font-semibold">
                   Heute · {openEvents.length} offen /{" "}
                   {events.filter((e) => e.done).length} erledigt
                 </h2>
@@ -1255,7 +1257,7 @@ export function GoogleWorkspaceClient() {
                           {!e.done ? (
                             <div className="space-y-2">
                               <div className="space-y-1">
-                                <p className="text-[11px] text-muted-foreground">
+                                <p className="text-[0.6875rem] text-muted-foreground">
                                   Dauer für Slot-Suche (kürzer = engere Lücken)
                                 </p>
                                 <div className="flex flex-wrap gap-1.5">
@@ -1338,7 +1340,7 @@ export function GoogleWorkspaceClient() {
                           ) : null}
                           {slotsByEvent[e.id]?.length ? (
                             <div className="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-2">
-                              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                              <p className="text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground">
                                 Vorschläge à {slotDurationFor(e)} Min (7 Tage,
                                 08–18)
                               </p>
@@ -1346,7 +1348,7 @@ export function GoogleWorkspaceClient() {
                                 {groupFreeSlotsByDate(slotsByEvent[e.id]!).map(
                                   ({ date, slots: daySlots }) => (
                                     <div key={date} className="space-y-1">
-                                      <p className="text-[12px] font-semibold text-foreground">
+                                      <p className="text-xs font-semibold text-foreground">
                                         {weekdayLabel(date)} ·{" "}
                                         {toSwissDate(date)}
                                       </p>
@@ -1471,7 +1473,7 @@ export function GoogleWorkspaceClient() {
                 loading={mailLoading}
                 provider="google"
               />
-              <p className="text-[12px] text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 Gleiche Struktur auch unter Microsoft 365
               </p>
             </section>
@@ -1479,7 +1481,7 @@ export function GoogleWorkspaceClient() {
             <section className="space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
                 <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
-                  <h2 className="text-[22px] font-semibold tracking-tight text-foreground">
+                  <h2 className="text-[1.375rem] font-semibold tracking-tight text-foreground">
                     Tagesanalysen
                   </h2>
                   <div className="flex flex-wrap items-center gap-2">
@@ -1537,7 +1539,7 @@ export function GoogleWorkspaceClient() {
                       }}
                     />
                     {cachedDays.includes(mailRangeKey(mailFrom, mailTo)) ? (
-                      <span className="text-[11px] text-muted-foreground">
+                      <span className="text-[0.6875rem] text-muted-foreground">
                         Analyse gespeichert
                       </span>
                     ) : null}
@@ -1599,7 +1601,7 @@ export function GoogleWorkspaceClient() {
                     <CardTitle className="flex flex-wrap items-center gap-2 text-sm">
                       AI · Tagesbild
                       {analysisFromCache ? (
-                        <Badge variant="secondary" className="text-[10px] font-normal">
+                        <Badge variant="secondary" className="text-[0.625rem] font-normal">
                           gespeichert
                         </Badge>
                       ) : null}
@@ -1614,7 +1616,7 @@ export function GoogleWorkspaceClient() {
                   <CardContent className="space-y-4">
                     <p className="text-sm leading-relaxed">{analysis.daySummary}</p>
                     {formatTokenUsageLine(analysis.usage) ? (
-                      <p className="text-[11px] text-muted-foreground">
+                      <p className="text-[0.6875rem] text-muted-foreground">
                         Tokens · {formatTokenUsageLine(analysis.usage)}
                       </p>
                     ) : null}
@@ -1648,7 +1650,7 @@ export function GoogleWorkspaceClient() {
                                   </span>
                                 </p>
                                 {cluster.counterpartEmail ? (
-                                  <p className="text-[11px] text-muted-foreground">
+                                  <p className="text-[0.6875rem] text-muted-foreground">
                                     {cluster.counterpartEmail}
                                   </p>
                                 ) : null}
@@ -1657,7 +1659,7 @@ export function GoogleWorkspaceClient() {
                                 {!clusterNeedsAction(cluster) ? (
                                   <Badge
                                     variant="outline"
-                                    className="text-[10px] font-normal"
+                                    className="text-[0.625rem] font-normal"
                                   >
                                     Thread erfordert keine Aktion
                                   </Badge>
@@ -1665,7 +1667,7 @@ export function GoogleWorkspaceClient() {
                                 {cluster.status ? (
                                   <Badge
                                     variant="secondary"
-                                    className="text-[10px]"
+                                    className="text-[0.625rem]"
                                   >
                                     {STATUS_LABEL[cluster.status] ||
                                       cluster.status}
@@ -1679,7 +1681,7 @@ export function GoogleWorkspaceClient() {
 
                             {cluster.tasks.length > 0 ? (
                               <div className="mt-3 space-y-1.5">
-                                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                <p className="text-[0.625rem] font-semibold uppercase tracking-wide text-muted-foreground">
                                   Aufgaben
                                 </p>
                                 {cluster.tasks.map((t, li) => {
@@ -1715,14 +1717,14 @@ export function GoogleWorkspaceClient() {
                                           {t.title}
                                         </span>
                                         {existing ? (
-                                          <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px]">
+                                          <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[0.6875rem]">
                                             <Badge
                                               variant={
                                                 existing.status === "done"
                                                   ? "secondary"
                                                   : "outline"
                                               }
-                                              className="text-[10px]"
+                                              className="text-[0.625rem]"
                                             >
                                               {existing.status === "done"
                                                 ? "Erledigt in Tasks"
@@ -1746,7 +1748,7 @@ export function GoogleWorkspaceClient() {
                                             ) : null}
                                           </span>
                                         ) : (
-                                          <span className="block text-[11px] text-muted-foreground">
+                                          <span className="block text-[0.6875rem] text-muted-foreground">
                                             {[
                                               t.dueDate
                                                 ? `fällig ${toSwissDate(t.dueDate)}`
@@ -1766,7 +1768,7 @@ export function GoogleWorkspaceClient() {
 
                             {cluster.events.length > 0 ? (
                               <div className="mt-3 space-y-1.5">
-                                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                <p className="text-[0.625rem] font-semibold uppercase tracking-wide text-muted-foreground">
                                   Termine
                                 </p>
                                 {cluster.events.map((ev, li) => {
@@ -1794,7 +1796,7 @@ export function GoogleWorkspaceClient() {
                                         <span className="block text-sm font-medium">
                                           {ev.title}
                                         </span>
-                                        <span className="block text-[11px] text-muted-foreground">
+                                        <span className="block text-[0.6875rem] text-muted-foreground">
                                           {[
                                             ev.fromTaskTwin
                                               ? "aus Aufgabe"
@@ -1820,7 +1822,7 @@ export function GoogleWorkspaceClient() {
 
                             {cluster.replies.length > 0 ? (
                               <div className="mt-3 space-y-1.5">
-                                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                <p className="text-[0.625rem] font-semibold uppercase tracking-wide text-muted-foreground">
                                   Antwort-Entwürfe
                                 </p>
                                 {cluster.replies.map((r, li) => {
@@ -1862,7 +1864,7 @@ export function GoogleWorkspaceClient() {
                                             }
                                           />
                                         </span>
-                                        <span className="block text-[11px] text-muted-foreground">
+                                        <span className="block text-[0.6875rem] text-muted-foreground">
                                           An {r.to}
                                           {r.reason ? ` · ${r.reason}` : ""}
                                           {busy ? " · übersetzt…" : ""}
@@ -1908,7 +1910,7 @@ export function GoogleWorkspaceClient() {
                         >
                           {`Ausgewählte prüfen (${selectedCount})`}
                         </Button>
-                        <p className="text-[11px] text-muted-foreground">
+                        <p className="text-[0.6875rem] text-muted-foreground">
                           Alles über Google: Aufgaben → Tasks, Termine →
                           Kalender, Antworten → Entwürfe. Vor dem Anlegen kannst
                           du Texte noch anpassen.
@@ -1919,7 +1921,7 @@ export function GoogleWorkspaceClient() {
                 </Card>
               ) : null}
 
-              <p className="text-[12px] text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 Spiegelbild unter Microsoft 365 · Outlook
               </p>
             </section>
@@ -1940,7 +1942,7 @@ export function GoogleWorkspaceClient() {
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-3">
             {draftTasks.map((t, i) => (
               <div key={`dt-${i}`} className="space-y-2 rounded-lg border border-border/60 p-3">
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <p className="text-[0.625rem] font-semibold uppercase tracking-wide text-muted-foreground">
                   Aufgabe · Google Tasks
                 </p>
                 <div className="space-y-1">
@@ -2008,7 +2010,7 @@ export function GoogleWorkspaceClient() {
               return (
               <div key={`dr-${i}`} className="space-y-2 rounded-lg border border-border/60 p-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  <p className="text-[0.625rem] font-semibold uppercase tracking-wide text-muted-foreground">
                     Antwort · Gmail Entwurf
                     {busy ? " · übersetzt…" : ""}
                   </p>
@@ -2087,7 +2089,7 @@ export function GoogleWorkspaceClient() {
         </DialogContent>
       </Dialog>
 
-      <p className="text-[12px] text-muted-foreground">
+      <p className="text-xs text-muted-foreground">
         OAuth und Status unter{" "}
         <Link href="/account" className="underline underline-offset-2">
           Konto

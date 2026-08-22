@@ -68,7 +68,7 @@ export function MailChronikSummary({
   sentCount: number;
 }) {
   return (
-    <p className="px-1 text-[14px] font-semibold tracking-tight">
+    <p className="px-1 text-sm font-semibold tracking-tight">
       {rangeLabel}
       <span className="font-normal text-muted-foreground"> · </span>
       <span className="font-semibold text-teal-800">{inboxCount} Eingang</span>
@@ -108,22 +108,22 @@ function MailChronikRow({
       variant="ghost"
       onClick={() => onOpen(mail)}
       className={cn(
-        "h-auto w-full min-w-0 justify-start items-start gap-3 px-3.5 py-3 text-left transition-colors",
-        indented && "border-l-2 border-border/60 bg-muted/15 pl-5 sm:pl-6",
+        "h-auto w-full min-w-0 items-start justify-start gap-3 px-3.5 py-3 text-left transition-colors",
+        indented && "border-l-2 border-border/60 bg-muted pl-5 sm:pl-6",
         isContext
-          ? "text-muted-foreground hover:bg-muted/35"
+          ? "text-muted-foreground hover:bg-muted"
           : indented
-            ? "hover:bg-muted/30"
+            ? "hover:bg-muted"
             : isInbox
-              ? "bg-teal-50/70 hover:bg-teal-100/70 dark:bg-teal-500/10 dark:hover:bg-teal-500/16"
-              : "bg-amber-50/70 hover:bg-amber-100/70 dark:bg-amber-500/10 dark:hover:bg-amber-500/16"
+              ? "bg-teal-50 hover:bg-teal-100 dark:bg-teal-950 dark:hover:bg-teal-900"
+              : "bg-amber-50 hover:bg-amber-100 dark:bg-amber-950 dark:hover:bg-amber-900"
       )}
     >
       <div className="flex w-[4.25rem] shrink-0 flex-col items-start gap-1">
         <Badge
           variant="outline"
           className={cn(
-            "mt-0.5 h-5 rounded-md px-1.5 text-[10px] font-semibold",
+            "mt-0.5 h-5 rounded-md px-1.5 text-[0.625rem] font-semibold",
             isContext
               ? "border-border/70 bg-background/70 text-muted-foreground"
               : isInbox
@@ -134,7 +134,7 @@ function MailChronikRow({
           {isInbox ? "Eingang" : "Gesendet"}
         </Badge>
         {isContext ? (
-          <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/90">
+          <span className="text-[0.625rem] font-medium uppercase tracking-wide text-muted-foreground/90">
             Kontext
           </span>
         ) : null}
@@ -143,7 +143,7 @@ function MailChronikRow({
         <div className="flex items-start justify-between gap-3">
           <p
             className={cn(
-              "min-w-0 flex-1 truncate text-[14px] leading-snug",
+              "min-w-0 flex-1 break-words text-sm leading-snug",
               isContext
                 ? "font-normal"
                 : isInbox && !mail.isRead
@@ -155,7 +155,7 @@ function MailChronikRow({
           </p>
           <span
             className={cn(
-              "shrink-0 whitespace-nowrap pt-0.5 text-[12px] tabular-nums",
+              "shrink-0 whitespace-nowrap pt-0.5 text-xs tabular-nums",
               isContext ? "text-muted-foreground/80" : "text-muted-foreground"
             )}
           >
@@ -164,7 +164,7 @@ function MailChronikRow({
         </div>
         <p
           className={cn(
-            "mt-0.5 truncate text-[12px]",
+            "mt-0.5 truncate text-xs",
             isContext ? "text-muted-foreground/80" : "text-muted-foreground"
           )}
         >
@@ -267,7 +267,7 @@ export function MailChronikList({
               >
                 {isThread ? (
                   <div className="flex items-center justify-between gap-2 border-b border-border/50 bg-muted/30 px-3.5 py-2">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    <p className="text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground">
                       Thread · {thread.mails.length} Mails
                       {contextCount > 0
                         ? ` · ${contextCount} Kontext`
@@ -371,7 +371,7 @@ export function MailChronikList({
             ) : detail ? (
               <div className="space-y-3">
                 {detail.to ? (
-                  <p className="text-[12px] text-muted-foreground">
+                  <p className="text-xs text-muted-foreground">
                     An: {detail.to}
                   </p>
                 ) : null}

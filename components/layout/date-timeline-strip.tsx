@@ -124,7 +124,7 @@ export function DateTimelineStrip({
           >
             <span
               className={cn(
-                "text-[9px] font-bold uppercase leading-none tracking-wide",
+                "text-[0.5625rem] font-bold uppercase leading-none tracking-wide",
                 active ? "opacity-80" : "text-muted-foreground"
               )}
             >
@@ -135,7 +135,7 @@ export function DateTimelineStrip({
             </span>
             <span
               className={cn(
-                "mt-0.5 text-[9px] font-medium leading-none",
+                "mt-0.5 text-[0.5625rem] font-medium leading-none",
                 active ? "opacity-80" : "text-muted-foreground"
               )}
             >

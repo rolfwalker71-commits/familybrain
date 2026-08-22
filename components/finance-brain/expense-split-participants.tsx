@@ -120,7 +120,7 @@ export function ExpenseSplitParticipants({
         </Label>
         <div className="flex flex-wrap items-center gap-2">
           {hasCouples ? (
-            <div className="flex rounded-md border border-border/60 p-0.5 text-[11px]">
+            <div className="flex rounded-md border border-border/60 p-0.5 text-[0.6875rem]">
               <Button
                 type="button"
                 variant="ghost"
@@ -154,7 +154,7 @@ export function ExpenseSplitParticipants({
           <Button
             type="button"
             variant="link"
-            className="h-auto p-0 text-[11px] font-medium text-[var(--brand-finance)]"
+            className="h-auto p-0 text-[0.6875rem] font-medium text-[var(--brand-finance)]"
             onClick={() => {
               if (mode === "coupleEqual") {
                 onChange({
@@ -215,7 +215,7 @@ export function ExpenseSplitParticipants({
                   <span className="min-w-0 truncate">
                     <span className="font-medium">{c.name}</span>
                     {names ? (
-                      <span className="ml-1 text-[11px] text-muted-foreground">
+                      <span className="ml-1 text-[0.6875rem] text-muted-foreground">
                         ({names})
                       </span>
                     ) : null}
@@ -225,11 +225,11 @@ export function ExpenseSplitParticipants({
             })}
           </div>
           {value.mode === "coupleEqual" && value.coupleIds.length === 0 ? (
-            <p className="text-[11px] text-rose-600">
+            <p className="text-[0.6875rem] text-rose-600">
               Mindestens ein Paar wählen.
             </p>
           ) : (
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-[0.6875rem] text-muted-foreground">
               Betrag zuerst gleich auf Paare, dann innerhalb jedes Paars.
             </p>
           )}
@@ -266,11 +266,11 @@ export function ExpenseSplitParticipants({
             })}
           </div>
           {value.mode === "equal" && value.memberIds.length === 0 ? (
-            <p className="text-[11px] text-rose-600">
+            <p className="text-[0.6875rem] text-rose-600">
               Mindestens eine Person wählen.
             </p>
           ) : value.mode === "equal" ? (
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-[0.6875rem] text-muted-foreground">
               Betrag wird durch {value.memberIds.length} geteilt
               {value.memberIds.length === members.length
                 ? " (ganze Gruppe)"

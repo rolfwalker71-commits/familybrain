@@ -235,7 +235,7 @@ export function AdhocEventDialog({
                 maxLength={4000}
                 rows={5}
                 disabled={busy}
-                className="resize-y text-[13px]"
+                className="resize-y text-[0.8125rem]"
               />
             ) : (
               <Input
@@ -281,10 +281,10 @@ export function AdhocEventDialog({
               onChange={(e) => setTeamsMeeting(e.target.checked)}
             />
             <span className="min-w-0">
-              <span className="block text-[13px] font-semibold">
+              <span className="block text-[0.8125rem] font-semibold">
                 Teams-Meeting
               </span>
-              <span className="block text-[11px] text-muted-foreground">
+              <span className="block text-[0.6875rem] text-muted-foreground">
                 Bei Outlook: Online-Meeting anlegen. Bei Google ohne Wirkung.
               </span>
             </span>
@@ -304,7 +304,7 @@ export function AdhocEventDialog({
 
           {slots.length > 0 ? (
             <div className="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-2">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <p className="text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground">
                 Slot wählen
                 {providerLabel ? ` → ${providerLabel}` : ""} ({duration} Min · 7
                 Tage)
@@ -312,7 +312,7 @@ export function AdhocEventDialog({
               <div className="max-h-56 space-y-2.5 overflow-y-auto">
                 {groupFreeSlotsByDate(slots).map(({ date, slots: daySlots }) => (
                   <div key={date} className="space-y-1">
-                    <p className="text-[12px] font-semibold text-foreground">
+                    <p className="text-xs font-semibold text-foreground">
                       {weekdayLabel(date)} · {date.slice(8)}.{date.slice(5, 7)}.
                     </p>
                     <ul className="flex flex-col gap-1">
@@ -324,13 +324,13 @@ export function AdhocEventDialog({
                             disabled={busy}
                             onClick={() => void createInSlot(s)}
                             className={cn(
-                              "h-auto w-full items-center justify-between gap-2 rounded-md border border-border/50 bg-card px-2.5 py-2 text-left text-[13px] hover:bg-muted/40 disabled:opacity-60"
+                              "h-auto w-full items-center justify-between gap-2 rounded-md border border-border/50 bg-card px-2.5 py-2 text-left text-[0.8125rem] hover:bg-muted/40 disabled:opacity-60"
                             )}
                           >
                             <span className="tabular-nums text-muted-foreground">
                               {s.startHm}–{s.endHm}
                             </span>
-                            <span className="text-[11px] font-medium text-foreground">
+                            <span className="text-[0.6875rem] font-medium text-foreground">
                               Eintragen
                             </span>
                           </Button>

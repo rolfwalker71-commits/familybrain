@@ -162,7 +162,7 @@ export function TileTitleBar({
         className
       )}
     >
-      <div className="flex min-h-8 min-w-0 flex-1 items-center text-[16px] font-bold leading-none">
+      <div className="flex min-h-8 min-w-0 flex-1 items-center text-base font-bold leading-none">
         {children}
       </div>
       {trailing ? (

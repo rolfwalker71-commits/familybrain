@@ -65,7 +65,7 @@ export function FinanceStatsToggle({
         {value ? "In Statistik" : "Ohne Statistik"}
       </Button>
       {error ? (
-        <span className="max-w-[10rem] truncate text-[10px] text-destructive">
+        <span className="max-w-[10rem] truncate text-[0.625rem] text-destructive">
           {error}
         </span>
       ) : null}

@@ -107,7 +107,7 @@ export function TodayAgendaWidget({
       aria-label={isToday ? "Was steht heute an" : "Nächster Reisetag"}
     >
       <div className="mb-3">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        <p className="text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground">
           {isToday ? "Was steht heute an" : "Was steht als Nächstes an"}
         </p>
         <h2 className="mt-0.5 text-base font-bold tracking-tight text-foreground sm:text-lg">
@@ -139,7 +139,7 @@ export function TodayAgendaWidget({
                 ) : null}
               </div>
 
-              <span className="w-10 shrink-0 pt-3 text-[11px] font-semibold tabular-nums text-foreground/80 sm:w-11 sm:text-xs">
+              <span className="w-10 shrink-0 pt-3 text-[0.6875rem] font-semibold tabular-nums text-foreground/80 sm:w-11 sm:text-xs">
                 {time || "—"}
               </span>
 
@@ -153,18 +153,18 @@ export function TodayAgendaWidget({
                   <Icon className="size-4 sm:size-[1.15rem]" strokeWidth={2} />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-bold leading-snug tracking-tight text-foreground sm:text-[15px]">
+                  <span className="block break-words text-sm font-bold leading-snug tracking-tight text-foreground sm:text-[0.9375rem]">
                     {event.title}
                   </span>
                   {subtitle ? (
-                    <span className="mt-0.5 block truncate text-[11px] text-muted-foreground sm:text-xs">
+                    <span className="mt-0.5 block truncate text-[0.6875rem] text-muted-foreground sm:text-xs">
                       {subtitle}
                     </span>
                   ) : null}
                 </span>
                 <span
                   className={cn(
-                    "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                    "shrink-0 rounded-full px-2 py-0.5 text-[0.625rem] font-semibold",
                     booked
                       ? "bg-[var(--brand-finance-soft)] text-[var(--brand-finance)]"
                       : "bg-muted text-muted-foreground"

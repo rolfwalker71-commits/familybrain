@@ -136,7 +136,7 @@ export function SoftChip({
     <span
       title={title}
       className={cn(
-        "inline-flex items-center gap-1 rounded-full border border-border/60 bg-muted/40 px-2.5 py-1 text-[11px] font-medium text-muted-foreground",
+        "inline-flex items-center gap-1 rounded-full border border-border/60 bg-muted/40 px-2.5 py-1 text-[0.6875rem] font-medium text-muted-foreground",
         className
       )}
     >

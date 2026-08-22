@@ -118,13 +118,13 @@ export function TravelTypeReclassify({
         </Button>
       </div>
       {learn && learnHint ? (
-        <p className="text-[11px] text-muted-foreground">{learnHint}</p>
+        <p className="text-[0.6875rem] text-muted-foreground">{learnHint}</p>
       ) : null}
       {info ? (
-        <p className="text-[11px] text-muted-foreground">{info}</p>
+        <p className="text-[0.6875rem] text-muted-foreground">{info}</p>
       ) : null}
       {error ? (
-        <p className="text-[11px] text-destructive">{error}</p>
+        <p className="text-[0.6875rem] text-destructive">{error}</p>
       ) : null}
     </div>
   );

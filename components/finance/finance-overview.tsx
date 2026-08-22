@@ -709,7 +709,7 @@ function FinanceOverviewClientInner({
                 )}
               />
               <div className="min-w-0">
-                <div className="flex items-center gap-2 text-[16px] font-bold">
+                <div className="flex items-center gap-2 text-base font-bold">
                   <IconCircle icon={CircleAlert} tone="amber" size="sm" />
                   Offene Rechnungen (Zu bezahlen)
                 </div>
@@ -870,7 +870,7 @@ function FinanceOverviewClientInner({
                 )}
               />
               <div className="min-w-0">
-                <div className="flex items-center gap-2 text-[16px] font-bold">
+                <div className="flex items-center gap-2 text-base font-bold">
                   <IconCircle icon={HandCoins} tone="sky" size="sm" />
                   Geplante Zahlungen
                 </div>
@@ -1246,10 +1246,10 @@ function FinanceOverviewClientInner({
                             )}
                           >
                             <span className="min-w-0 flex-1">
-                              <span className="block truncate text-sm font-medium text-foreground">
+                              <span className="block break-words text-sm font-medium leading-snug text-foreground">
                                 {item.label}
                               </span>
-                              <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                              <span className="mt-0.5 block text-[0.6875rem] text-muted-foreground">
                                 {item.count} Positionen · {share}%
                               </span>
                             </span>
@@ -1477,7 +1477,7 @@ function DueInvoiceCard({
             className="min-w-0 flex-1"
             onClick={(e) => e.stopPropagation()}
           >
-            <p className="truncate text-sm font-semibold hover:underline">
+            <p className="break-words text-sm font-semibold leading-snug hover:underline">
               {vendor}
             </p>
             <p className="mt-0.5 text-base font-bold tabular-nums tracking-tight">
@@ -1518,7 +1518,7 @@ function DueInvoiceCard({
             countsInStats={isCountedInStats(row)}
           />
         ) : (
-          <span className="text-[10px] text-muted-foreground">
+          <span className="text-[0.625rem] text-muted-foreground">
             Kein Extrakt
           </span>
         )}

@@ -31,9 +31,9 @@ export function ModuleBackupCard({
         <div className="mr-auto min-w-0">
           <p className="text-sm text-muted-foreground">{title}</p>
           {hint ? (
-            <p className="mt-0.5 text-[11px] text-muted-foreground/90">{hint}</p>
+            <p className="mt-0.5 text-[0.6875rem] text-muted-foreground/90">{hint}</p>
           ) : (
-            <p className="mt-0.5 text-[11px] text-muted-foreground/90">
+            <p className="mt-0.5 text-[0.6875rem] text-muted-foreground/90">
               Modul-JSON — kein vollständiges Server-Backup (restic).
             </p>
           )}

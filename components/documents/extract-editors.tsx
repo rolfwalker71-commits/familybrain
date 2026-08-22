@@ -105,7 +105,7 @@ export function ExtractDeadlinesEditor({
                 {toSwissDate(String(d.deadline_date || ""))} – {String(d.title || "")}
               </span>
               {d.manual_override ? (
-                <Badge variant="outline" className="text-[10px]">
+                <Badge variant="outline" className="text-[0.625rem]">
                   Manuell
                 </Badge>
               ) : null}
@@ -217,7 +217,7 @@ export function ExtractFinanceEditor({
                 {f.due_date ? ` · fällig ${toSwissDate(f.due_date)}` : ""}
               </span>
               {f.manual_override ? (
-                <Badge variant="outline" className="text-[10px]">
+                <Badge variant="outline" className="text-[0.625rem]">
                   Manuell
                 </Badge>
               ) : null}
@@ -322,7 +322,7 @@ export function ExtractWarrantyEditor({
                   : ""}
               </span>
               {w.manual_override ? (
-                <Badge variant="outline" className="text-[10px]">
+                <Badge variant="outline" className="text-[0.625rem]">
                   Manuell
                 </Badge>
               ) : null}

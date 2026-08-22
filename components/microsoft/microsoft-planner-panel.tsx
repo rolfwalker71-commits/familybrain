@@ -362,14 +362,14 @@ export function MicrosoftPlannerPanel() {
                       <div className="min-w-0 flex-1">
                         <div className="mb-1 flex items-center gap-1.5">
                           <MicrosoftPlannerLogo className="size-3.5" />
-                          <span className="text-[10px] font-semibold uppercase tracking-wide text-teal-800">
+                          <span className="text-[0.625rem] font-semibold uppercase tracking-wide text-teal-800">
                             Planner
                           </span>
                         </div>
                         <p className="text-sm font-medium leading-snug">
                           {task.title}
                         </p>
-                        <p className="mt-0.5 text-[11px] text-muted-foreground">
+                        <p className="mt-0.5 text-[0.6875rem] text-muted-foreground">
                           {[
                             task.planTitle || "Plan",
                             task.bucketName,
@@ -385,7 +385,7 @@ export function MicrosoftPlannerPanel() {
                         variant={
                           task.status === "done" ? "secondary" : "outline"
                         }
-                        className="text-[10px]"
+                        className="text-[0.625rem]"
                       >
                         {task.status === "done"
                           ? "Erledigt"
@@ -503,7 +503,7 @@ export function MicrosoftPlannerPanel() {
                     <div className="min-w-0 flex-1 space-y-1">
                       <div className="flex items-center gap-1.5">
                         <MicrosoftToDoLogo className="size-3.5" />
-                        <span className="text-[10px] font-semibold uppercase tracking-wide text-violet-800">
+                        <span className="text-[0.625rem] font-semibold uppercase tracking-wide text-violet-800">
                           To Do
                         </span>
                       </div>
@@ -537,7 +537,7 @@ export function MicrosoftPlannerPanel() {
                         }}
                         title="Titel bearbeiten"
                       />
-                      <p className="text-[11px] text-muted-foreground">
+                      <p className="text-[0.6875rem] text-muted-foreground">
                         {[
                           task.listTitle || "Liste",
                           task.dueDate
@@ -551,7 +551,7 @@ export function MicrosoftPlannerPanel() {
                     </div>
                     <Badge
                       variant={task.status === "done" ? "secondary" : "outline"}
-                      className="text-[10px]"
+                      className="text-[0.625rem]"
                     >
                       {task.status === "done" ? "Erledigt" : "Offen"}
                     </Badge>
