@@ -272,6 +272,7 @@ function readCache(cacheKey: string): CachePayload | null {
 
 export async function getHockeyGames(options?: {
   forceRefresh?: boolean;
+  allowStale?: boolean;
   icsUrl?: string;
   cacheKey?: string;
   calendarName?: string;
@@ -288,6 +289,18 @@ export async function getHockeyGames(options?: {
     : Number.POSITIVE_INFINITY;
   let ics = cached?.ics || "";
   let fetchedAt = cached?.fetchedAt || new Date().toISOString();
+
+  if (options?.allowStale) {
+    const nameMatch = ics ? /X-WR-CALNAME:(.*)/.exec(ics) : null;
+    return {
+      games: ics ? parseHockeyGamesFromIcs(ics) : [],
+      fetchedAt,
+      calendarName:
+        options?.calendarName?.trim() ||
+        nameMatch?.[1]?.trim() ||
+        "HC Ambri-Piotta",
+    };
+  }
 
   if (options?.forceRefresh || !cached || age > CACHE_TTL_MS) {
     try {

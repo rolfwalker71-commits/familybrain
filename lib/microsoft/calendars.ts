@@ -401,20 +401,89 @@ export async function listMicrosoftCalendarEventsInRange(
   });
 }
 
-export async function listMicrosoftAgendaInRange(
+function microsoftAgendaCacheKey(userId: number): string {
+  return `ms_agenda_cache_u${userId}`;
+}
+
+type MicrosoftAgendaCache = {
+  fetchedAt: string;
+  start: string;
+  end: string;
+  events: MicrosoftCalendarEvent[];
+};
+
+function readMicrosoftAgendaCache(
   userId: number,
   startYmd: string,
   endYmd: string
+): MicrosoftAgendaCache | null {
+  const raw = getSetting(microsoftAgendaCacheKey(userId));
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as MicrosoftAgendaCache;
+    if (!parsed || !Array.isArray(parsed.events)) return null;
+    const start = startYmd.slice(0, 10);
+    const end = endYmd.slice(0, 10);
+    return {
+      ...parsed,
+      events: parsed.events.filter((e) => {
+        const d = (e.date || "").slice(0, 10);
+        return d >= start && d <= end;
+      }),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function listedFromMicrosoftSelections(
+  userId: number
+): MicrosoftCalendarListItem[] {
+  return getEnabledMicrosoftCalendarSelections(userId).map((s) => {
+    const type = s.type || "other";
+    return {
+      id: s.id,
+      name: s.name || s.id.slice(0, 24),
+      color: s.color || ICS_TYPE_META[type].defaultColor,
+      primary: false,
+      canEdit: false,
+      suggestedType: type,
+      selected: true,
+      enabled: true,
+      type,
+      planningRelevant: s.planningRelevant !== false,
+    };
+  });
+}
+
+export async function listMicrosoftAgendaInRange(
+  userId: number,
+  startYmd: string,
+  endYmd: string,
+  options?: { allowStale?: boolean }
 ): Promise<{ events: MicrosoftCalendarEvent[] }> {
   if (!isMicrosoftConnected(userId) || !hasMicrosoftCalendarScope(userId)) {
     return { events: [] };
   }
-  const listed = (await listMicrosoftCalendarsForUser(userId)).calendars;
+  if (options?.allowStale) {
+    const cached = readMicrosoftAgendaCache(userId, startYmd, endYmd);
+    return { events: cached?.events || [] };
+  }
+  const listed = listedFromMicrosoftSelections(userId);
   const events = await listMicrosoftCalendarEventsInRange(
     userId,
     startYmd,
     endYmd,
     listed
+  );
+  setSetting(
+    microsoftAgendaCacheKey(userId),
+    JSON.stringify({
+      fetchedAt: new Date().toISOString(),
+      start: startYmd.slice(0, 10),
+      end: endYmd.slice(0, 10),
+      events,
+    } satisfies MicrosoftAgendaCache)
   );
   return { events };
 }

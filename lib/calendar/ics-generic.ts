@@ -312,7 +312,7 @@ async function fetchIcs(url: string): Promise<string> {
 
 export async function getGenericCalendarEvents(
   calendar: IcsCalendar,
-  options?: { forceRefresh?: boolean }
+  options?: { forceRefresh?: boolean; allowStale?: boolean }
 ): Promise<GenericIcsEvent[]> {
   const key = cacheKey(calendar.id);
   const raw = getSetting(key);
@@ -329,6 +329,9 @@ export async function getGenericCalendarEvents(
     : Number.POSITIVE_INFINITY;
 
   let ics = cached?.ics || "";
+  if (options?.allowStale) {
+    return ics ? parseGenericIcsEvents(ics, calendar) : [];
+  }
   if (options?.forceRefresh || !cached?.ics || age > CACHE_TTL_MS) {
     try {
       ics = await fetchIcs(calendar.url);

@@ -15,6 +15,7 @@ import type {
   CalendarAgendaRange,
   CalendarSource,
 } from "@/lib/calendar/agenda-feed";
+import { filterAgendaItemsBySources } from "@/lib/calendar/agenda-cache";
 import type { AgendaPlaceEnrichment } from "@/lib/dashboard/agenda-weather";
 
 const RANGES: { id: CalendarAgendaRange; label: string }[] = [
@@ -50,10 +51,13 @@ export function CalendarPageClient() {
   const [rangeStart, setRangeStart] = useState("");
   const [rangeEnd, setRangeEnd] = useState("");
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [enriching, setEnriching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [eventDetail, setEventDetail] = useState<AgendaItem | null>(null);
   const enrichGen = useRef(0);
+  const loadGen = useRef(0);
+  const paintedRef = useRef(false);
 
   const enrichItems = useCallback(async (agendaItems: AgendaItem[]) => {
     const payload = agendaItems
@@ -98,60 +102,109 @@ export function CalendarPageClient() {
     }
   }, []);
 
+  const applyPayload = useCallback(
+    (data: {
+      items?: AgendaItem[];
+      sources?: CalendarSource[];
+      rangeStart?: string;
+      rangeEnd?: string;
+    }) => {
+      const nextItems = (data.items || []) as AgendaItem[];
+      setItems((prev) => {
+        if (prev.length === 0) return nextItems;
+        const byId = new Map(prev.map((item) => [item.id, item]));
+        return nextItems.map((item) => {
+          const old = byId.get(item.id);
+          if (!old?.weather && !old?.driveLabel) return item;
+          return {
+            ...item,
+            weather: item.weather ?? old.weather,
+            coords: item.coords ?? old.coords,
+            driveMinutes: item.driveMinutes ?? old.driveMinutes,
+            driveLabel: item.driveLabel ?? old.driveLabel,
+            mapsUrl: item.mapsUrl ?? old.mapsUrl,
+          };
+        });
+      });
+      setSources(data.sources || []);
+      setRangeStart(data.rangeStart || "");
+      setRangeEnd(data.rangeEnd || "");
+      setSelected((prev) => {
+        if (prev) return prev;
+        if (!Array.isArray(data.sources)) return prev;
+        return new Set(
+          data.sources.filter((s) => s.enabled).map((s) => s.id)
+        );
+      });
+      return nextItems;
+    },
+    []
+  );
+
   const loadAgenda = useCallback(
-    async (sourceFilter: Set<string> | null) => {
-      setLoading(true);
+    async (opts?: { skipCache?: boolean }) => {
+      const gen = ++loadGen.current;
       setError(null);
       enrichGen.current += 1;
+      const params = new URLSearchParams({ range });
+
+      if (!opts?.skipCache) {
+        try {
+          const res = await fetch(`/api/calendar/agenda?${params.toString()}`);
+          const data = await res.json();
+          if (gen !== loadGen.current) return;
+          if (res.ok) {
+            const nextItems = applyPayload(data);
+            if (nextItems.length > 0) {
+              paintedRef.current = true;
+              setLoading(false);
+            }
+          }
+        } catch {
+          /* keep skeleton; live refresh follows */
+        }
+      }
+
+      if (gen !== loadGen.current) return;
+      setRefreshing(true);
       try {
-        const params = new URLSearchParams({ range });
-        if (sourceFilter !== null) {
-          params.set("sources", [...sourceFilter].join(","));
-        }
-        const res = await fetch(`/api/calendar/agenda?${params.toString()}`);
+        const res = await fetch(
+          `/api/calendar/agenda?${params.toString()}&fresh=1`
+        );
         const data = await res.json();
+        if (gen !== loadGen.current) return;
         if (!res.ok) throw new Error(data.error || "Laden fehlgeschlagen");
-        const nextItems = (data.items || []) as AgendaItem[];
-        setItems(nextItems);
-        setSources(data.sources || []);
-        setRangeStart(data.rangeStart || "");
-        setRangeEnd(data.rangeEnd || "");
-        if (sourceFilter === null && Array.isArray(data.sources)) {
-          // Default selection — do not re-fetch (avoids double pipeline)
-          setSelected(
-            new Set(
-              (data.sources as CalendarSource[])
-                .filter((s) => s.enabled)
-                .map((s) => s.id)
-            )
-          );
-        }
+        const nextItems = applyPayload(data);
+        paintedRef.current = true;
         void enrichItems(nextItems);
       } catch (err) {
-        setItems([]);
-        setError(err instanceof Error ? err.message : String(err));
+        if (gen !== loadGen.current) return;
+        if (!paintedRef.current) {
+          setError(err instanceof Error ? err.message : String(err));
+        }
       } finally {
-        setLoading(false);
+        if (gen === loadGen.current) {
+          setLoading(false);
+          setRefreshing(false);
+        }
       }
     },
-    [range, enrichItems]
+    [range, applyPayload, enrichItems]
   );
 
   useEffect(() => {
-    // Range change: reload all enabled sources (or keep filter if already set)
-    void loadAgenda(selected);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only when range changes; selected toggles call loadAgenda explicitly
-  }, [range]);
+    void loadAgenda();
+  }, [range, loadAgenda]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, AgendaItem[]>();
-    for (const item of items) {
+    for (const item of filterAgendaItemsBySources(items, selected)) {
       const list = map.get(item.date) || [];
       list.push(item);
       map.set(item.date, list);
     }
     return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
-  }, [items]);
+  }, [items, selected]);
 
   function toggleSource(id: string) {
     setSelected((prev) => {
@@ -161,7 +214,6 @@ export function CalendarPageClient() {
       const next = new Set(base);
       if (next.has(id)) next.delete(id);
       else next.add(id);
-      void loadAgenda(next);
       return next;
     });
   }
@@ -208,6 +260,9 @@ export function CalendarPageClient() {
         >
           Kalender verwalten →
         </Link>
+        {refreshing && !enriching ? (
+          <span className="ml-3 text-muted-foreground">Aktualisieren…</span>
+        ) : null}
         {enriching ? (
           <span className="ml-3 text-muted-foreground">Wetter/Fahrzeit…</span>
         ) : null}
@@ -273,7 +328,7 @@ export function CalendarPageClient() {
               <p className="text-xs font-black uppercase tracking-wide text-muted-foreground">
                 {weekdayLabel(date)}
               </p>
-              <div className="space-y-3">
+              <div className="flex w-full flex-col gap-3">
                 {dayItems.map((item) => (
                   <AgendaRow
                     key={item.id}
@@ -294,7 +349,7 @@ export function CalendarPageClient() {
         onOpenChange={(open) => {
           if (!open) setEventDetail(null);
         }}
-        onChanged={() => void loadAgenda(selected)}
+        onChanged={() => void loadAgenda({ skipCache: true })}
       />
     </div>
   );

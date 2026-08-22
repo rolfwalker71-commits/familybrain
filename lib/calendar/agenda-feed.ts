@@ -52,6 +52,10 @@ import {
   getUpcomingHockeyGames,
   type HockeyGame,
 } from "@/lib/hockey/games";
+import {
+  readCalendarAgendaCache,
+  writeCalendarAgendaCache,
+} from "@/lib/calendar/agenda-cache";
 
 export const CALENDAR_SOURCE_HOLIDAYS = "swiss-holidays";
 export const CALENDAR_SOURCE_DEADLINES = "deadlines";
@@ -255,7 +259,8 @@ type TaggedHockey = HockeyGame & {
 };
 
 async function loadHockeyGames(
-  calendars: IcsCalendar[]
+  calendars: IcsCalendar[],
+  options?: { allowStale?: boolean }
 ): Promise<TaggedHockey[]> {
   const hockeyCalendars = calendars.filter((c) => c.type === "hockey");
   const batches = await Promise.all(
@@ -263,6 +268,7 @@ async function loadHockeyGames(
       try {
         const hockey = await getHockeyGames({
           icsUrl: cal.url,
+          allowStale: options?.allowStale,
           cacheKey:
             cal.id === AMBRI_CALENDAR_ID
               ? "hockey_ambri_ics_cache"
@@ -308,10 +314,32 @@ export async function getCalendarAgenda(options: {
   /** If set, only these source ids. Empty/omit = all enabled ICS + holidays + deadlines. */
   sourceIds?: string[] | null;
   includeWeather?: boolean;
+  /**
+   * First paint: SQLite / stale source caches only. No live ICS, Google,
+   * Microsoft, People, or holiday HTTP. Caller should follow up without this.
+   */
+  allowStale?: boolean;
 }): Promise<CalendarAgendaPayload> {
   const { start, end } = resolveCalendarRange(options.range);
   const filterIds =
     options.sourceIds == null ? null : new Set(options.sourceIds);
+  const allowStale = Boolean(options.allowStale);
+
+  if (allowStale && options.sourceIds == null) {
+    const cached = readCalendarAgendaCache(options.userId, start, end);
+    if (cached) {
+      const { attachAgendaAiVisual } = await import(
+        "@/lib/dashboard/agenda-ai-icon"
+      );
+      return {
+        range: options.range,
+        rangeStart: start,
+        rangeEnd: end,
+        items: cached.items.map((item) => attachAgendaAiVisual(item)),
+        sources: listCalendarSources(options.userId),
+      };
+    }
+  }
 
   const sources = listCalendarSources(options.userId);
   const enabledIcs = getEnabledIcsCalendars(options.userId).filter((c) =>
@@ -359,21 +387,25 @@ export async function getCalendarAgenda(options: {
     peopleBirthdays,
   ] = await Promise.all([
       googleReady
-        ? listGoogleAgendaInRange(options.userId!, start, end).catch(() => ({
+        ? listGoogleAgendaInRange(options.userId!, start, end, null, {
+            allowStale,
+          }).catch(() => ({
             events: [],
             hockey: [],
           }))
         : Promise.resolve({ events: [], hockey: [] }),
       microsoftReady
-        ? listMicrosoftAgendaInRange(options.userId!, start, end).catch(
+        ? listMicrosoftAgendaInRange(options.userId!, start, end, {
+            allowStale,
+          }).catch(
             () => ({ events: [] })
           )
         : Promise.resolve({ events: [] }),
-      loadHockeyGames(hockeyIcs),
+      loadHockeyGames(hockeyIcs, { allowStale }),
       Promise.all(
         genericIcs.map(async (cal) => {
           try {
-            const events = await getGenericCalendarEvents(cal);
+            const events = await getGenericCalendarEvents(cal, { allowStale });
             return { cal, events };
           } catch {
             return { cal, events: [] as Awaited<
@@ -383,7 +415,7 @@ export async function getCalendarAgenda(options: {
         })
       ),
       wantHolidays
-        ? getSwissHolidays({ years: holidayYears }).catch(() => [])
+        ? getSwissHolidays({ years: holidayYears, allowStale }).catch(() => [])
         : Promise.resolve([] as Awaited<ReturnType<typeof getSwissHolidays>>),
       (async () => {
         if (!wantPeopleBirthdays || options.userId == null) return null;
@@ -398,9 +430,11 @@ export async function getCalendarAgenda(options: {
           const events = await listPeopleBirthdaysInRange(
             options.userId,
             start,
-            end
+            end,
+            undefined,
+            { allowStale }
           );
-          if (!getCachedPeopleHomeAddress()) {
+          if (!allowStale && !getCachedPeopleHomeAddress()) {
             void listPeopleHomeAddresses(options.userId).catch(() => undefined);
           }
           // Scope + successful call → Kontakte sind Quelle der Wahrheit für Geburtstage
@@ -709,6 +743,16 @@ export async function getCalendarAgenda(options: {
     "@/lib/dashboard/agenda-ai-icon"
   );
   const withIcons = withWeather.map((item) => attachAgendaAiVisual(item));
+
+  if (options.sourceIds == null && !options.includeWeather) {
+    writeCalendarAgendaCache(options.userId, {
+      fetchedAt: new Date().toISOString(),
+      range: options.range,
+      rangeStart: start,
+      rangeEnd: end,
+      items: withIcons,
+    });
+  }
 
   return {
     range: options.range,

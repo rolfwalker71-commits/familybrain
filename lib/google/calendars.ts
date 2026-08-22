@@ -556,14 +556,99 @@ export async function listGoogleHockeyGamesInRange(
   return bundles.filter((b): b is GoogleHockeyBundle => b != null);
 }
 
+function googleAgendaCacheKey(userId: number): string {
+  return `google_agenda_cache_u${userId}`;
+}
+
+type GoogleAgendaCache = {
+  fetchedAt: string;
+  start: string;
+  end: string;
+  events: GoogleCalendarEvent[];
+  hockey: GoogleHockeyBundle[];
+};
+
+function inYmdRange(date: string | null | undefined, start: string, end: string) {
+  const d = (date || "").slice(0, 10);
+  return d >= start && d <= end;
+}
+
+function readGoogleAgendaCache(
+  userId: number,
+  startIso: string,
+  endIso: string
+): { events: GoogleCalendarEvent[]; hockey: GoogleHockeyBundle[] } | null {
+  const raw = getSetting(googleAgendaCacheKey(userId));
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as GoogleAgendaCache;
+    if (!parsed || !Array.isArray(parsed.events) || !Array.isArray(parsed.hockey)) {
+      return null;
+    }
+    const start = startIso.slice(0, 10);
+    const end = endIso.slice(0, 10);
+    return {
+      events: parsed.events.filter((e) => inYmdRange(e.date, start, end)),
+      hockey: parsed.hockey
+        .map((bundle) => ({
+          ...bundle,
+          games: bundle.games.filter((g) => inYmdRange(g.date, start, end)),
+        }))
+        .filter((bundle) => bundle.games.length > 0),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeGoogleAgendaCache(
+  userId: number,
+  startIso: string,
+  endIso: string,
+  payload: { events: GoogleCalendarEvent[]; hockey: GoogleHockeyBundle[] }
+): void {
+  setSetting(
+    googleAgendaCacheKey(userId),
+    JSON.stringify({
+      fetchedAt: new Date().toISOString(),
+      start: startIso.slice(0, 10),
+      end: endIso.slice(0, 10),
+      events: payload.events,
+      hockey: payload.hockey,
+    } satisfies GoogleAgendaCache)
+  );
+}
+
+function listedFromGoogleSelections(userId: number): GoogleCalendarListItem[] {
+  return getEnabledGoogleCalendarSelections(userId).map((s) => {
+    const type = s.type || "other";
+    const shortId = s.id.includes("@") ? s.id.split("@")[0]! : s.id;
+    return {
+      id: s.id,
+      name: s.name || shortId,
+      description: null,
+      color: s.color || ICS_TYPE_META[type].defaultColor,
+      primary: false,
+      accessRole: null,
+      suggestedType: type,
+      selected: true,
+      enabled: true,
+      type,
+      planningRelevant: s.planningRelevant !== false,
+    };
+  });
+}
+
 /**
- * One calendarList.list + parallel events + hockey fetches for agenda.
+ * Parallel events + hockey fetches for agenda.
+ * Uses saved selections (no calendarList.list). Optional SQLite cache.
  */
 export async function listGoogleAgendaInRange(
   userId: number,
   startIso: string,
   endIso: string,
-  request?: Request | null
+  request?: Request | null,
+  options?: { allowStale?: boolean }
 ): Promise<{
   events: GoogleCalendarEvent[];
   hockey: GoogleHockeyBundle[];
@@ -571,7 +656,13 @@ export async function listGoogleAgendaInRange(
   if (!isGoogleMailConnected(userId) || !hasGoogleCalendarScope(userId)) {
     return { events: [], hockey: [] };
   }
-  const listed = (await listGoogleCalendarsForUser(userId, request)).calendars;
+  if (options?.allowStale) {
+    const cached = readGoogleAgendaCache(userId, startIso, endIso);
+    return cached
+      ? { events: cached.events, hockey: cached.hockey }
+      : { events: [], hockey: [] };
+  }
+  const listed = listedFromGoogleSelections(userId);
   const [events, hockey] = await Promise.all([
     listGoogleCalendarEventsInRange(
       userId,
@@ -582,5 +673,6 @@ export async function listGoogleAgendaInRange(
     ),
     listGoogleHockeyGamesInRange(userId, startIso, endIso, request, listed),
   ]);
+  writeGoogleAgendaCache(userId, startIso, endIso, { events, hockey });
   return { events, hockey };
 }

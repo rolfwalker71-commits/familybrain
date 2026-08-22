@@ -244,7 +244,7 @@ export function AgendaRow({
   const inner = (
     <div
       className={cn(
-        "overflow-hidden rounded-2xl bg-card shadow-[0_2px_10px_rgba(20,32,28,0.04)] ring-1 ring-border/50",
+        "w-full min-w-0 overflow-hidden rounded-2xl bg-card shadow-[0_2px_10px_rgba(20,32,28,0.04)] ring-1 ring-border/50",
         isPaymentPipeline && "ring-sky-300/80"
       )}
     >
@@ -391,7 +391,7 @@ export function AgendaRow({
       <Button
         type="button"
         variant="ghost"
-        className="h-auto w-full cursor-pointer justify-start text-left"
+        className="h-auto w-full min-w-0 cursor-pointer items-stretch justify-start whitespace-normal p-0 text-left"
         onClick={() => onOpen(item)}
       >
         {inner}
@@ -400,7 +400,7 @@ export function AgendaRow({
   }
   if (linkHref) {
     return (
-      <Link href={linkHref} className="block">
+      <Link href={linkHref} className="block w-full min-w-0">
         {inner}
       </Link>
     );

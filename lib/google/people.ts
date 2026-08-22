@@ -31,6 +31,41 @@ export type PeopleAddressHint = {
 };
 
 const HOME_ADDRESS_CACHE_KEY = "buddy_people_home_address_json";
+const PEOPLE_BDAY_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+
+function peopleBirthdayCacheKey(userId: number): string {
+  return `people_birthdays_cache_u${userId}`;
+}
+
+type PeopleBirthdayCache = {
+  fetchedAt: string;
+  people: PeopleBirthdayHint[];
+};
+
+function readPeopleBirthdayCache(userId: number): PeopleBirthdayCache | null {
+  const raw = getSetting(peopleBirthdayCacheKey(userId));
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as PeopleBirthdayCache;
+    if (!parsed?.fetchedAt || !Array.isArray(parsed.people)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writePeopleBirthdayCache(
+  userId: number,
+  people: PeopleBirthdayHint[]
+): void {
+  setSetting(
+    peopleBirthdayCacheKey(userId),
+    JSON.stringify({
+      fetchedAt: new Date().toISOString(),
+      people,
+    } satisfies PeopleBirthdayCache)
+  );
+}
 
 /** Lightweight probe that contacts scope works (empty list is ok). */
 export async function probeGoogleContacts(
@@ -97,60 +132,101 @@ function formatPeopleBirthdayTitle(
   return age != null ? `${base} (${age})` : base;
 }
 
+function expandPeopleBirthdays(
+  hints: PeopleBirthdayHint[],
+  startIso: string,
+  endIso: string
+): GoogleBirthdayEvent[] {
+  const start = startIso.slice(0, 10);
+  const end = endIso.slice(0, 10);
+  const years = [
+    ...new Set([Number(start.slice(0, 4)), Number(end.slice(0, 4))]),
+  ].filter((y) => Number.isFinite(y));
+  const out: GoogleBirthdayEvent[] = [];
+  for (const hint of hints) {
+    if (!hint.month || !hint.day) continue;
+    const birthYear =
+      typeof hint.year === "number" && hint.year > 0 ? hint.year : null;
+    for (const year of years) {
+      const iso = `${year}-${String(hint.month).padStart(2, "0")}-${String(hint.day).padStart(2, "0")}`;
+      if (iso < start || iso > end) continue;
+      out.push({
+        id: `people-bday-${hint.name}-${iso}`,
+        date: iso,
+        summary: formatPeopleBirthdayTitle(hint.name, iso, birthYear),
+        birthYear,
+      });
+    }
+  }
+  return out.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+async function fetchPeopleBirthdayHints(
+  userId: number,
+  request?: Request | null
+): Promise<PeopleBirthdayHint[]> {
+  const auth = await getAuthedGoogleClient(userId, request);
+  const people = google.people({ version: "v1", auth });
+  const hints: PeopleBirthdayHint[] = [];
+  let pageToken: string | undefined;
+  do {
+    const res = await people.people.connections.list({
+      resourceName: "people/me",
+      personFields: "names,birthdays",
+      pageSize: 100,
+      pageToken,
+    });
+    for (const person of res.data.connections || []) {
+      const name = displayName(person.names);
+      for (const b of person.birthdays || []) {
+        const d = b.date;
+        if (!d?.month || !d?.day) continue;
+        hints.push({
+          name,
+          month: d.month,
+          day: d.day,
+          year: typeof d.year === "number" && d.year > 0 ? d.year : null,
+        });
+      }
+    }
+    pageToken = res.data.nextPageToken || undefined;
+  } while (pageToken);
+  return hints;
+}
+
 /** Birthdays from Google Contacts (People API), mapped into a calendar year range. */
 export async function listPeopleBirthdaysInRange(
   userId: number,
   startIso: string,
   endIso: string,
-  request?: Request | null
-): Promise<GoogleBirthdayEvent[]> {
+  request?: Request | null,
+  options?: { allowStale?: boolean; forceRefresh?: boolean }
+): Promise<GoogleBirthdayEvent[] | null> {
   if (!hasGoogleContactsScope(userId)) return [];
+  const cached = readPeopleBirthdayCache(userId);
+  const age = cached
+    ? Date.now() - new Date(cached.fetchedAt).getTime()
+    : Number.POSITIVE_INFINITY;
+
+  if (options?.allowStale) {
+    return cached
+      ? expandPeopleBirthdays(cached.people, startIso, endIso)
+      : null;
+  }
+  if (cached && !options?.forceRefresh && age <= PEOPLE_BDAY_CACHE_TTL_MS) {
+    return expandPeopleBirthdays(cached.people, startIso, endIso);
+  }
+
   try {
-    const auth = await getAuthedGoogleClient(userId, request);
-    const people = google.people({ version: "v1", auth });
-    const out: GoogleBirthdayEvent[] = [];
-    let pageToken: string | undefined;
-    const start = startIso.slice(0, 10);
-    const end = endIso.slice(0, 10);
-    const years = [
-      ...new Set([Number(start.slice(0, 4)), Number(end.slice(0, 4))]),
-    ].filter((y) => Number.isFinite(y));
-
-    do {
-      const res = await people.people.connections.list({
-        resourceName: "people/me",
-        personFields: "names,birthdays",
-        pageSize: 100,
-        pageToken,
-      });
-      for (const person of res.data.connections || []) {
-        const name = displayName(person.names);
-        for (const b of person.birthdays || []) {
-          const d = b.date;
-          if (!d?.month || !d?.day) continue;
-          const birthYear =
-            typeof d.year === "number" && d.year > 0 ? d.year : null;
-          for (const year of years) {
-            const iso = `${year}-${String(d.month).padStart(2, "0")}-${String(d.day).padStart(2, "0")}`;
-            if (iso < start || iso > end) continue;
-            out.push({
-              id: `people-bday-${name}-${iso}`,
-              date: iso,
-              summary: formatPeopleBirthdayTitle(name, iso, birthYear),
-              birthYear,
-            });
-          }
-        }
-      }
-      pageToken = res.data.nextPageToken || undefined;
-    } while (pageToken);
-
-    return out.sort((a, b) => a.date.localeCompare(b.date));
+    const hints = await fetchPeopleBirthdayHints(userId, request);
+    writePeopleBirthdayCache(userId, hints);
+    return expandPeopleBirthdays(hints, startIso, endIso);
   } catch (error) {
     console.warn(
       "[people] birthdays:",
       error instanceof Error ? error.message : error
     );
+    if (cached) return expandPeopleBirthdays(cached.people, startIso, endIso);
     throw error;
   }
 }

@@ -123,6 +123,8 @@ export async function getSwissHolidays(input?: {
   years?: number[];
   cantons?: string[];
   forceRefresh?: boolean;
+  /** Use SQLite cache only — never call Nager.Date. */
+  allowStale?: boolean;
 }): Promise<SwissHoliday[]> {
   const cantons = (input?.cantons || [...DEFAULT_HOLIDAY_CANTONS]).map((c) =>
     c.toUpperCase()
@@ -138,13 +140,15 @@ export async function getSwissHolidays(input?: {
     : Number.POSITIVE_INFINITY;
   let byYearRaw = { ...(cache?.byYearRaw || {}) };
 
-  const needFetch = years.filter(
-    (y) =>
-      input?.forceRefresh ||
-      age > CACHE_TTL_MS ||
-      !byYearRaw[String(y)] ||
-      byYearRaw[String(y)]!.length === 0
-  );
+  const needFetch = input?.allowStale
+    ? []
+    : years.filter(
+        (y) =>
+          input?.forceRefresh ||
+          age > CACHE_TTL_MS ||
+          !byYearRaw[String(y)] ||
+          byYearRaw[String(y)]!.length === 0
+      );
 
   if (needFetch.length > 0) {
     try {
