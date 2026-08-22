@@ -1,4 +1,4 @@
-import { BRAND, BRAND_LOGO_SRC } from "@/lib/branding";
+import { BRAND, BRAND_LOGO_DARK_SRC, BRAND_LOGO_SRC } from "@/lib/branding";
 import { cn } from "@/lib/utils";
 
 /**
@@ -32,7 +32,7 @@ export function BuddyLogo({
       />
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="/buddy-logo-dark.png"
+        src={BRAND_LOGO_DARK_SRC}
         width={size}
         height={size}
         alt=""
